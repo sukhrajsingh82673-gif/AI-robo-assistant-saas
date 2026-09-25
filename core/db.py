@@ -497,6 +497,197 @@ CREATE TABLE IF NOT EXISTS employee_performance_records (
     FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
+
+-- 29. Zonata Discovery Sessions
+CREATE TABLE IF NOT EXISTS zonata_discovery_sessions (
+    session_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    completeness_score REAL NOT NULL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'IN_PROGRESS', -- IN_PROGRESS, READY_FOR_ORG, COMPLETED
+    missing_info JSON,
+    deferred_topics JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_discovery_company ON zonata_discovery_sessions(company_id);
+
+-- 30. Zonata Epistemic Facts & Findings
+CREATE TABLE IF NOT EXISTS zonata_facts (
+    fact_id TEXT PRIMARY KEY,
+    session_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    attribute TEXT NOT NULL,
+    value JSON NOT NULL,
+    epistemic_state TEXT NOT NULL DEFAULT 'FACT', -- FACT, OBSERVATION, CALCULATION, ESTIMATE, PREDICTION, SIMULATION, UNVERIFIED, VERIFIED
+    source TEXT NOT NULL,
+    source_type TEXT NOT NULL, -- OWNER_INPUT, DOCUMENT, PMS, ERP, CRM, POS, PUBLIC_WEB, API, INFERRED
+    confidence REAL NOT NULL DEFAULT 1.0,
+    evidence TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_facts_company ON zonata_facts(company_id);
+CREATE INDEX IF NOT EXISTS idx_zonata_facts_entity ON zonata_facts(entity_type, entity_id);
+
+-- 31. Zonata Interview History
+CREATE TABLE IF NOT EXISTS zonata_interviews (
+    exchange_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    question_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    question_text TEXT NOT NULL,
+    context_reason TEXT,
+    answer_text TEXT,
+    answer_type TEXT NOT NULL DEFAULT 'ANSWERED', -- ANSWERED, SKIPPED, NOT_AVAILABLE, ASK_LATER, BEST_EVIDENCE
+    extracted_facts JSON,
+    asked_at REAL NOT NULL,
+    answered_at REAL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_interview_session ON zonata_interviews(session_id);
+
+-- 32. Zonata Knowledge Graph Nodes
+CREATE TABLE IF NOT EXISTS zonata_kg_nodes (
+    node_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    properties JSON,
+    epistemic_state TEXT NOT NULL DEFAULT 'FACT',
+    confidence REAL NOT NULL DEFAULT 1.0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_kg_nodes ON zonata_kg_nodes(company_id, entity_type);
+
+-- 33. Zonata Knowledge Graph Edges
+CREATE TABLE IF NOT EXISTS zonata_kg_edges (
+    edge_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    source_node_id TEXT NOT NULL,
+    target_node_id TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    properties JSON,
+    epistemic_state TEXT NOT NULL DEFAULT 'FACT',
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(source_node_id) REFERENCES zonata_kg_nodes(node_id) ON DELETE CASCADE,
+    FOREIGN KEY(target_node_id) REFERENCES zonata_kg_nodes(node_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_kg_edges ON zonata_kg_edges(company_id, source_node_id, target_node_id);
+
+-- 34. Zonata Company Health Indicators
+CREATE TABLE IF NOT EXISTS zonata_health_indicators (
+    indicator_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    dimension TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    metric_value JSON NOT NULL,
+    source TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'VERIFIED',
+    trend TEXT NOT NULL DEFAULT 'STABLE',
+    period TEXT,
+    status TEXT NOT NULL DEFAULT 'HEALTHY',
+    evaluated_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_health_company ON zonata_health_indicators(company_id);
+
+-- 35. Zonata Dynamic Organization Blueprints
+CREATE TABLE IF NOT EXISTS zonata_org_blueprints (
+    blueprint_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    industry TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    executives JSON NOT NULL,
+    departments JSON NOT NULL,
+    workforce JSON NOT NULL,
+    reporting_hierarchy JSON NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PROPOSED', -- PROPOSED, APPROVED, ACTIVE
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_org_company ON zonata_org_blueprints(company_id);
+
+-- 36. Zonata Dynamic Workforce Registry
+CREATE TABLE IF NOT EXISTS zonata_workforce_members (
+    agent_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    blueprint_id TEXT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    executive_role TEXT,
+    mission_focus TEXT,
+    responsibilities JSON,
+    capabilities JSON,
+    tools JSON,
+    knowledge_sources JSON,
+    model_policy JSON,
+    budget_limit REAL NOT NULL DEFAULT 0.0,
+    risk_class TEXT NOT NULL DEFAULT 'LOW',
+    approval_policy JSON,
+    kpis JSON,
+    verification_policy JSON,
+    working_hours TEXT,
+    communication_channels JSON,
+    lifecycle_state TEXT NOT NULL DEFAULT 'NEED_IDENTIFIED',
+    certification JSON,
+    authority_scope JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_wf_company ON zonata_workforce_members(company_id);
+
+-- 37. Zonata Competitor Intelligence Profiles
+CREATE TABLE IF NOT EXISTS zonata_competitor_profiles (
+    competitor_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    website TEXT,
+    products JSON,
+    services JSON,
+    public_pricing JSON,
+    positioning TEXT,
+    customer_sentiment TEXT,
+    source TEXT NOT NULL DEFAULT 'PUBLIC_WEB',
+    confidence REAL NOT NULL DEFAULT 0.9,
+    discovered_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zonata_comp_company ON zonata_competitor_profiles(company_id);
 """
 
 class Database:

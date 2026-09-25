@@ -209,8 +209,158 @@ def cmd_causality():
     print(f" Net Contribution     : ₹{summary['net_verified_contribution']:,.2f}")
     print("="*65 + "\n")
 
+# --- ZONATA CLI COMMANDS ---
+def cmd_zonata_discover(statement: str):
+    from zonata.discovery import CompanyDiscoveryEngine
+    from zonata.interview import CEODiscoveryInterview
+    _, _, _, portfolio, _, _ = init_environment()
+    companies = portfolio.list_companies()
+    cid = companies[0].company_id if companies else "comp_primary"
+    engine = CompanyDiscoveryEngine()
+    findings = engine.ingest_owner_statement(tenant_id="tnt_primary", company_id=cid, statement=statement)
+    interview = CEODiscoveryInterview()
+    score, missing = interview.calculate_completeness("tnt_primary", cid)
+
+    print("\n" + "="*65)
+    print(" ZONATA UNIVERSAL AI CEO — COMPANY DISCOVERY")
+    print("="*65)
+    print(f" Input Statement: \"{statement}\"")
+    print(f" Discovered Facts: {len(findings)}")
+    print("-" * 65)
+    for f in findings:
+        print(f" • [{f.provenance.epistemic_state.value}] {f.entity_type.value}:{f.attribute} -> {f.value}")
+        print(f"   Evidence: {f.provenance.evidence} (Conf: {f.provenance.confidence})")
+    print("-" * 65)
+    print(f" DISCOVERY COMPLETENESS: {int(score * 100)}% ({score:.2f})")
+    print(f" Missing Knowledge Areas: {len(missing)}")
+    for m in missing[:3]:
+        print(f"   - {m['category']}: {m['label']}")
+    print("="*65 + "\n")
+
+def cmd_zonata_interview(answer: str = ""):
+    from zonata.interview import CEODiscoveryInterview
+    _, _, _, portfolio, _, _ = init_environment()
+    companies = portfolio.list_companies()
+    cid = companies[0].company_id if companies else "comp_primary"
+    interview = CEODiscoveryInterview()
+
+    print("\n" + "="*65)
+    print(" ZONATA UNIVERSAL AI CEO — DISCOVERY INTERVIEW")
+    print("="*65)
+
+    if answer:
+        q = interview.get_next_question("tnt_primary", cid)
+        qid = q.question_id if q else "q_general"
+        res = interview.submit_answer("tnt_primary", cid, qid, answer)
+        print(f" Owner Response Type: {res['answer_type']}")
+        print(f" Facts Extracted    : {res['facts_extracted']}")
+        print(f" Completeness Score : {res['completeness_pct']}")
+        print("-" * 65)
+
+    next_q = interview.get_next_question("tnt_primary", cid)
+    if next_q:
+        print(f" CEO Question [{next_q.category}]:")
+        print(f" \"{next_q.text}\"")
+        print(f" Context: {next_q.context_reason}")
+        if next_q.suggested_answers:
+            print(" Suggested Answers:")
+            for a in next_q.suggested_answers:
+                print(f"   • {a}")
+    else:
+        print(" Discovery phase complete! The CEO has sufficient operational clarity.")
+        print(" Ready to generate dynamic organization hierarchy with 'zonata-design'.")
+    print("="*65 + "\n")
+
+def cmd_zonata_health():
+    from zonata.health import CompanyHealthEngine
+    _, _, _, portfolio, _, _ = init_environment()
+    companies = portfolio.list_companies()
+    cid = companies[0].company_id if companies else "comp_primary"
+    engine = CompanyHealthEngine()
+    health = engine.evaluate_company_health("tnt_primary", cid)
+
+    print("\n" + "="*65)
+    print(f" ZONATA EVIDENCE-BACKED COMPANY HEALTH SCORECARD ({cid})")
+    print("="*65)
+    print(f" OVERALL HEALTH SCORE : {health.overall_score:.1f} / 100")
+    print("-" * 65)
+    print(" HEALTH INDICATORS (Constitutional: Value, Source, Time, Confidence, Trend):")
+    for ind in health.indicators:
+        val_str = str(ind.value)
+        conf_str = ind.confidence.value if hasattr(ind.confidence, "value") else str(ind.confidence)
+        print(f" • [{ind.status.value}] {ind.dimension.value}: {ind.metric_name}")
+        print(f"   VALUE: {val_str} | SOURCE: {ind.source}")
+        print(f"   CONFIDENCE: {conf_str} | TREND: {ind.trend} | PERIOD: {ind.period}")
+    print("-" * 65)
+    if health.strengths:
+        print(" VERIFIED STRENGTHS:")
+        for s in health.strengths:
+            print(f"  + {s}")
+    if health.vulnerabilities:
+        print(" OPERATIONAL VULNERABILITIES:")
+        for v in health.vulnerabilities:
+            print(f"  ! {v}")
+    if health.unverified_areas:
+        print(" UNVERIFIED / TELEMETRY GAPS:")
+        for u in health.unverified_areas:
+            print(f"  ? {u}")
+    print("="*65 + "\n")
+
+def cmd_zonata_design(industry: str = ""):
+    from zonata.org_designer import OrganizationDesignEngine
+    _, _, _, portfolio, _, _ = init_environment()
+    companies = portfolio.list_companies()
+    cid = companies[0].company_id if companies else "comp_primary"
+    engine = OrganizationDesignEngine()
+    org = engine.design_organization("tnt_primary", cid, industry_override=industry or None)
+
+    print("\n" + "="*65)
+    print(" ZONATA GENERATIVE ORGANIZATION BLUEPRINT")
+    print("="*65)
+    print(f" Company ID : {org.company_id} | Industry: {org.industry}")
+    print(f" Rationale  : {org.rationale}")
+    print("-" * 65)
+    print(f" EXECUTIVES ({len(org.executives)}):")
+    for ex in org.executives:
+        print(f" • {ex['role']} — {ex['title']} ({ex['focus']})")
+    print("-" * 65)
+    print(f" DYNAMIC DEPARTMENTS ({len(org.departments)}):")
+    for d in org.departments:
+        print(f" • [{d.code}] {d.name}")
+        print(f"   Justification: {d.justification}")
+        print(f"   Responsibilities: {', '.join(d.responsibilities)}")
+    print("-" * 65)
+    print(f" GOVERNED WORKFORCE ROLES ({len(org.workforce)}):")
+    for w in org.workforce:
+        print(f" • {w.name} ({w.role}) -> Reports to {w.executive}")
+        print(f"   Mission: {w.mission_focus}")
+        print(f"   Model: {w.model_policy.get('preferred_model')} | Budget: ${w.budget:.2f} | Risk: {w.risk_class}")
+        print(f"   Allowed Tools: {', '.join(w.tools)}")
+    print("="*65 + "\n")
+
+def cmd_zonata_mission(objective: str):
+    from zonata.org_designer import OrganizationDesignEngine
+    _, _, _, portfolio, _, _ = init_environment()
+    companies = portfolio.list_companies()
+    cid = companies[0].company_id if companies else "comp_primary"
+    engine = OrganizationDesignEngine()
+    wf = engine.generate_mission_workforce("tnt_primary", cid, objective)
+
+    print("\n" + "="*65)
+    print(f" ZONATA MISSION-FIRST WORKFORCE GENERATION")
+    print("="*65)
+    print(f" Objective: \"{objective}\"")
+    print(f" Generated Specialized Agents: {len(wf)}")
+    print("-" * 65)
+    for a in wf:
+        print(f" • {a.name} ({a.role})")
+        print(f"   Department: {a.department_id} | Executive: {a.executive}")
+        print(f"   Specialized Tools: {', '.join(a.tools)}")
+        print(f"   Governance Status: {a.certification.get('governance_status', 'ACTIVE')}")
+    print("="*65 + "\n")
+
 def main():
-    parser = argparse.ArgumentParser(description="RoboAssistant 2.0 Unified CLI Cockpit")
+    parser = argparse.ArgumentParser(description="RoboAssistant 2.0 / ZONATA Unified CLI Cockpit")
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("portfolio", help="View corporate portfolio status")
@@ -225,6 +375,21 @@ def main():
 
     chat_parser = subparsers.add_parser("chat", help="Strategic command chat with AI CEO")
     chat_parser.add_argument("instruction", type=str, help="Strategic instruction for AI CEO")
+
+    # Zonata Subcommands
+    disc_parser = subparsers.add_parser("zonata-discover", help="Ingest owner statement for company discovery")
+    disc_parser.add_argument("statement", type=str, help="Owner statement or business context")
+
+    int_parser = subparsers.add_parser("zonata-interview", help="Conduct adaptive CEO discovery interview")
+    int_parser.add_argument("--answer", type=str, default="", help="Answer to CEO's previous discovery question")
+
+    subparsers.add_parser("zonata-health", help="Evaluate evidence-based company health model")
+
+    des_parser = subparsers.add_parser("zonata-design", help="Synthesize dynamic organization hierarchy")
+    des_parser.add_argument("--industry", type=str, default="", help="Optional industry override (e.g. HOTEL, SAAS, MANUFACTURING)")
+
+    mis_parser = subparsers.add_parser("zonata-mission", help="Generate mission-first specialized autonomous workforce")
+    mis_parser.add_argument("objective", type=str, help="Specific mission objective to generate workforce for")
 
     args = parser.parse_args()
 
@@ -244,8 +409,19 @@ def main():
         cmd_causality()
     elif args.command == "chat":
         cmd_chat(args.instruction)
+    elif args.command == "zonata-discover":
+        cmd_zonata_discover(args.statement)
+    elif args.command == "zonata-interview":
+        cmd_zonata_interview(args.answer)
+    elif args.command == "zonata-health":
+        cmd_zonata_health()
+    elif args.command == "zonata-design":
+        cmd_zonata_design(args.industry)
+    elif args.command == "zonata-mission":
+        cmd_zonata_mission(args.objective)
     else:
         cmd_portfolio()
 
 if __name__ == "__main__":
     main()
+

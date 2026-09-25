@@ -85,6 +85,22 @@ voice_agent = GovernedVoiceAgent(tenant_id="tnt_primary")
 business_causality = BusinessCausalityEngine(tenant_id="tnt_primary")
 workforce_intel = WorkforceIntelligenceEngine(tenant_id="tnt_primary")
 
+# Zonata Universal AI CEO Subsystems
+from zonata.discovery import CompanyDiscoveryEngine
+from zonata.interview import CEODiscoveryInterview
+from zonata.knowledge_graph import CompanyKnowledgeGraph
+from zonata.health import CompanyHealthEngine
+from zonata.competitive import CompetitiveIntelligenceEngine
+from zonata.org_designer import OrganizationDesignEngine
+from zonata.agent_factory import GovernedAgentFactory
+
+zonata_discovery = CompanyDiscoveryEngine()
+zonata_interview = CEODiscoveryInterview()
+zonata_health = CompanyHealthEngine()
+zonata_competitive = CompetitiveIntelligenceEngine()
+zonata_org_designer = OrganizationDesignEngine()
+zonata_agent_factory = GovernedAgentFactory()
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -390,6 +406,93 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/causality/summary":
             summary = business_causality.get_causality_summary()
             self._send_json(summary)
+            return
+
+        # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (GET) ---
+        elif path == "/api/v1/zonata/discovery/session":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            session = zonata_discovery.get_or_create_session(tenant_id, cid)
+            self._send_json(session.to_dict())
+            return
+
+        elif path == "/api/v1/zonata/discovery/facts":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            facts = zonata_discovery.list_findings(tenant_id, cid)
+            self._send_json({"facts": facts, "count": len(facts)})
+            return
+
+        elif path == "/api/v1/zonata/interview/next":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            q = zonata_interview.get_next_question(tenant_id, cid)
+            score, missing = zonata_interview.calculate_completeness(tenant_id, cid)
+            self._send_json({
+                "next_question": q.to_dict() if q else None,
+                "completeness_score": round(score, 4),
+                "completeness_pct": f"{int(score * 100)}%",
+                "missing_information": missing,
+                "is_ready_for_org": score >= 0.70 or len(missing) == 0
+            })
+            return
+
+        elif path == "/api/v1/zonata/interview/history":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            history = zonata_interview.get_interview_history(tenant_id, cid)
+            self._send_json({"history": history, "count": len(history)})
+            return
+
+        elif path == "/api/v1/zonata/knowledge-graph":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            kg = CompanyKnowledgeGraph(tenant_id, cid)
+            self._send_json({
+                "summary": kg.export_summary(),
+                "graph": kg.to_dict()
+            })
+            return
+
+        elif path == "/api/v1/zonata/health":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            model = zonata_health.evaluate_company_health(tenant_id, cid)
+            self._send_json(model.to_dict())
+            return
+
+        elif path == "/api/v1/zonata/org-design":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT * FROM zonata_org_blueprints WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
+                    (tenant_id, cid)
+                ).fetchone()
+                if row:
+                    self._send_json({
+                        "blueprint_id": row["blueprint_id"],
+                        "industry": row["industry"],
+                        "rationale": row["rationale"],
+                        "executives": json.loads(row["executives"]),
+                        "departments": json.loads(row["departments"]),
+                        "workforce": json.loads(row["workforce"]),
+                        "reporting_hierarchy": json.loads(row["reporting_hierarchy"]),
+                        "status": row["status"]
+                    })
+                else:
+                    self._send_json({"status": "NOT_GENERATED", "message": "Run org-design/generate to synthesize organization."})
+            return
+
+        elif path == "/api/v1/zonata/competitors":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            comps = zonata_competitive.list_competitors(tenant_id, cid)
+            opps = zonata_competitive.analyze_competitive_opportunities(tenant_id, cid)
+            self._send_json({
+                "competitors": [c.to_dict() for c in comps],
+                "analysis": opps
+            })
             return
 
         # Fallback to static files in WEB_DIR
@@ -795,6 +898,77 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             rev = float(req_data.get("revenue", 0.0))
             res = business_causality.verify_outcome_with_transaction(chain_id, tx_id, rev)
             self._send_json(res)
+            return
+
+        # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (POST) ---
+        elif path == "/api/v1/zonata/discovery/ingest":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            stmt = req_data.get("statement")
+            findings = []
+            if stmt:
+                findings = zonata_discovery.ingest_owner_statement(tenant_id, cid, stmt)
+            elif req_data.get("doc_title") and req_data.get("doc_content"):
+                findings = zonata_discovery.ingest_document(
+                    tenant_id, cid, req_data["doc_title"], req_data["doc_content"], req_data.get("doc_type", "SOP")
+                )
+            elif req_data.get("system_name") and req_data.get("payload"):
+                findings = zonata_discovery.ingest_system_feed(
+                    tenant_id, cid, req_data["system_name"], req_data.get("system_type", "API"), req_data["payload"]
+                )
+            self._send_json({"success": True, "findings": [f.to_dict() for f in findings], "count": len(findings)})
+            return
+
+        elif path == "/api/v1/zonata/interview/answer":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            qid = req_data.get("question_id", "q_general")
+            ans = req_data.get("answer", "")
+            res = zonata_interview.submit_answer(tenant_id, cid, qid, ans)
+            self._send_json(res)
+            return
+
+        elif path == "/api/v1/zonata/org-design/generate":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            ind_override = req_data.get("industry")
+            org = zonata_org_designer.design_organization(tenant_id, cid, ind_override)
+            self._send_json(org.to_dict())
+            return
+
+        elif path == "/api/v1/zonata/org-design/mission-workforce":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            mis = req_data.get("mission_objective", "Increase company profitability")
+            dept = req_data.get("target_department")
+            wf = zonata_org_designer.generate_mission_workforce(tenant_id, cid, mis, dept)
+            self._send_json({"mission": mis, "workforce": [w.to_dict() for w in wf], "count": len(wf)})
+            return
+
+        elif path == "/api/v1/zonata/workforce/certify":
+            agent_id = req_data.get("agent_id")
+            if not agent_id:
+                self._send_json({"error": "agent_id is required"}, status=400)
+                return
+            t_res = zonata_agent_factory.run_sandbox_tests(agent_id)
+            cert_agent = zonata_agent_factory.certify_and_activate(agent_id)
+            self._send_json({"success": True, "test_results": t_res, "agent": cert_agent.to_dict()})
+            return
+
+        elif path == "/api/v1/zonata/competitors/add":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            c = zonata_competitive.register_competitor(
+                tenant_id=tenant_id,
+                company_id=cid,
+                name=req_data.get("name", "Competitor"),
+                website=req_data.get("website"),
+                products=req_data.get("products", []),
+                services=req_data.get("services", []),
+                public_pricing=req_data.get("public_pricing", {}),
+                positioning=req_data.get("positioning")
+            )
+            self._send_json({"success": True, "competitor": c.to_dict()})
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

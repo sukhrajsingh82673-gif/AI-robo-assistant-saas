@@ -157,13 +157,30 @@ python3 cli.py causality
 
 # Strategic natural language command with AI CEO
 python3 cli.py chat "Audit operational risks and prioritize revenue opportunities"
+
+# --- ZONATA UNIVERSAL AI CEO COMMANDS ---
+# Ingest owner statement for company discovery
+python3 cli.py zonata-discover "We operate a 50-room boutique hotel and resort called The Royal Palms using Cloudbeds PMS with roughly ₹45 lakh monthly revenue."
+
+# Conduct adaptive discovery interview with AI CEO
+python3 cli.py zonata-interview
+python3 cli.py zonata-interview --answer "Our General Manager handles room rates manually through Cloudbeds PMS."
+
+# View evidence-backed multidimensional company health scorecard
+python3 cli.py zonata-health
+
+# Synthesize dynamically generated organization blueprint (No fixed templates!)
+python3 cli.py zonata-design --industry HOTEL
+
+# Generate mission-first autonomous workforce fleet on demand
+python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA commission leakage"
 ```
 
 ### 3. Run Automated Validation Matrix
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 58/58 tests passing.*
+*Current test suite: 66/66 tests passing (100% pass rate).*
 
 ---
 
