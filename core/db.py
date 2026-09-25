@@ -246,6 +246,257 @@ CREATE TABLE IF NOT EXISTS usage_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id);
+
+-- 13. Executive Council & Dynamic Roles
+CREATE TABLE IF NOT EXISTS executive_council_roles (
+    role_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    role_type TEXT NOT NULL, -- CFO, COO, CTO, CMO, CRO, CHRO, CIO_DATA, RISK_OFFICER, CHIEF_OF_STAFF
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    current_stance TEXT,
+    last_consulted_at REAL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_council_company ON executive_council_roles(company_id);
+
+-- 14. Executive Council Debates & Challenge Loops
+CREATE TABLE IF NOT EXISTS executive_council_debates (
+    debate_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    proposal TEXT NOT NULL,
+    challenger_role TEXT NOT NULL,
+    counterargument TEXT NOT NULL,
+    risk_analysis TEXT NOT NULL,
+    consensus_outcome TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 15. Chief of Staff Decision & Coordination Queue
+CREATE TABLE IF NOT EXISTS chief_of_staff_items (
+    item_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    item_type TEXT NOT NULL, -- INBOX, DECISION_QUEUE, CROSS_DEPT_CONFLICT, DEADLINE, BRIEFING
+    title TEXT NOT NULL,
+    details TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, URGENT
+    status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN, IN_REVIEW, RESOLVED, ESCALATED
+    created_at REAL NOT NULL,
+    resolved_at REAL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 16. Host Infrastructure & Registry
+CREATE TABLE IF NOT EXISTS hosts (
+    host_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    host_type TEXT NOT NULL, -- LINUX_CLOUD, WINDOWS_WORKSTATION, MACOS_STUDIO, ANDROID_HOST, IOS_REMOTE
+    os_family TEXT NOT NULL,
+    os_version TEXT NOT NULL,
+    cpu_cores INTEGER NOT NULL DEFAULT 1,
+    ram_mb INTEGER NOT NULL DEFAULT 1024,
+    status TEXT NOT NULL DEFAULT 'ONLINE', -- ONLINE, BUSY, OFFLINE, QUARANTINED
+    last_heartbeat REAL NOT NULL,
+    security_posture TEXT NOT NULL DEFAULT 'SECURE',
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 17. Host Capabilities
+CREATE TABLE IF NOT EXISTS host_capabilities (
+    cap_id TEXT PRIMARY KEY,
+    host_id TEXT NOT NULL,
+    capability_name TEXT NOT NULL,
+    category TEXT NOT NULL, -- SCREEN, MOUSE, KEYBOARD, WINDOWS, FILES, PROCESS, BROWSER, INSTALLER
+    authority_required TEXT NOT NULL DEFAULT 'AUTOMATIC_IDEMPOTENT',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    verified_at REAL NOT NULL,
+    FOREIGN KEY(host_id) REFERENCES hosts(host_id) ON DELETE CASCADE
+);
+
+-- 18. Host Execution Receipts
+CREATE TABLE IF NOT EXISTS host_execution_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    host_id TEXT NOT NULL,
+    action_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    status TEXT NOT NULL, -- SUCCESS, FAILED, BLOCKED
+    exit_code INTEGER,
+    stdout_sample TEXT,
+    stderr_sample TEXT,
+    execution_time_ms INTEGER NOT NULL DEFAULT 0,
+    sha256_hash TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(host_id) REFERENCES hosts(host_id) ON DELETE CASCADE
+);
+
+-- 19. Installed Applications & Software Profiles
+CREATE TABLE IF NOT EXISTS installed_applications (
+    app_id TEXT PRIMARY KEY,
+    host_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    version TEXT,
+    publisher TEXT,
+    exec_path TEXT NOT NULL,
+    automation_interfaces JSON, -- ["API", "CLI", "GUI", "BROWSER"]
+    security_status TEXT NOT NULL DEFAULT 'VERIFIED_SAFE',
+    discovered_at REAL NOT NULL,
+    FOREIGN KEY(host_id) REFERENCES hosts(host_id) ON DELETE CASCADE
+);
+
+-- 20. Credential Handles (Secret-isolated)
+CREATE TABLE IF NOT EXISTS credential_handles (
+    handle_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    service_name TEXT NOT NULL,
+    account_label TEXT NOT NULL,
+    auth_type TEXT NOT NULL DEFAULT 'PASSWORD', -- PASSWORD, TOKEN, OAUTH, API_KEY
+    mfa_required INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, REVOKED, EXPIRED, WAITING_FOR_OWNER
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 21. Active Application / Browser Sessions
+CREATE TABLE IF NOT EXISTS active_sessions (
+    session_id TEXT PRIMARY KEY,
+    handle_id TEXT NOT NULL,
+    host_id TEXT NOT NULL,
+    session_type TEXT NOT NULL DEFAULT 'BROWSER', -- BROWSER, CLI, DESKTOP
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, EXPIRED, TERMINATED
+    expires_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(handle_id) REFERENCES credential_handles(handle_id) ON DELETE CASCADE,
+    FOREIGN KEY(host_id) REFERENCES hosts(host_id) ON DELETE CASCADE
+);
+
+-- 22. Enterprise Continuous Events
+CREATE TABLE IF NOT EXISTS enterprise_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, -- REVENUE_ANOMALY, COST_SPIKE, PAYMENT_FAILURE, LEAD_RECEIVED, CUSTOMER_COMPLAINT, SYSTEM_OUTAGE, INVENTORY_SHORTAGE, KPI_DEVIATION
+    category TEXT NOT NULL, -- FINANCIAL, OPERATIONAL, CUSTOMER, TECHNICAL, SECURITY
+    severity TEXT NOT NULL DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON NOT NULL,
+    handled INTEGER NOT NULL DEFAULT 0,
+    resulting_mission_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_company ON enterprise_events(company_id);
+
+-- 23. Sales Leads & Opportunities
+CREATE TABLE IF NOT EXISTS sales_leads (
+    lead_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    contact_name TEXT NOT NULL,
+    channel TEXT NOT NULL DEFAULT 'WEB_CHAT', -- WHATSAPP, EMAIL, WEB_CHAT, CRM, PHONE
+    intent TEXT NOT NULL,
+    qualification_score REAL NOT NULL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'NEW', -- NEW, QUALIFIED, NEGOTIATING, CONVERTED, LOST
+    assigned_agent_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 24. Sales Interactions & Customer Dialogue
+CREATE TABLE IF NOT EXISTS sales_interactions (
+    interaction_id TEXT PRIMARY KEY,
+    lead_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    customer_message TEXT NOT NULL,
+    agent_response TEXT NOT NULL,
+    discount_offered REAL NOT NULL DEFAULT 0.0,
+    policy_checked INTEGER NOT NULL DEFAULT 1,
+    converted INTEGER NOT NULL DEFAULT 0,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(lead_id) REFERENCES sales_leads(lead_id) ON DELETE CASCADE
+);
+
+-- 25. Voice AI Call Sessions
+CREATE TABLE IF NOT EXISTS voice_sessions (
+    session_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    caller_id TEXT NOT NULL,
+    direction TEXT NOT NULL DEFAULT 'INBOUND', -- INBOUND, OUTBOUND
+    call_state TEXT NOT NULL DEFAULT 'COMPLETED', -- INITIATED, ACTIVE, COMPLETED, DROPPED
+    consent_given INTEGER NOT NULL DEFAULT 1,
+    recording_authorized INTEGER NOT NULL DEFAULT 1,
+    outcome TEXT NOT NULL DEFAULT 'PROCESSED',
+    transcript JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 26. Interactive Executive Meetings
+CREATE TABLE IF NOT EXISTS executive_meetings (
+    meeting_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    meeting_type TEXT NOT NULL DEFAULT 'MORNING_OPERATING', -- MORNING_OPERATING, STRATEGIC_COUNCIL, EMERGENCY_REVIEW
+    agenda JSON NOT NULL,
+    discussion JSON NOT NULL,
+    agreed_missions JSON NOT NULL,
+    held_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 27. Business Causality Chains
+CREATE TABLE IF NOT EXISTS business_causality_chains (
+    chain_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    strategy_goal TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
+    task_id TEXT,
+    action_id TEXT,
+    transaction_id TEXT,
+    revenue_attributed REAL NOT NULL DEFAULT 0.0,
+    cost_attributed REAL NOT NULL DEFAULT 0.0,
+    verified_outcome TEXT NOT NULL DEFAULT 'PENDING_EVIDENCE', -- PENDING_EVIDENCE, VERIFIED_SUCCESS, FAILED_HYPOTHESIS
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+-- 28. Employee Performance & Governance Tracking
+CREATE TABLE IF NOT EXISTS employee_performance_records (
+    record_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    missions_completed INTEGER NOT NULL DEFAULT 0,
+    verification_rate REAL NOT NULL DEFAULT 1.0,
+    failures INTEGER NOT NULL DEFAULT 0,
+    avg_cost REAL NOT NULL DEFAULT 0.0,
+    business_contribution REAL NOT NULL DEFAULT 0.0,
+    recommendation TEXT NOT NULL DEFAULT 'CONTINUE_DEPLOYMENT',
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
 """
 
 class Database:

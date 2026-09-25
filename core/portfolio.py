@@ -193,6 +193,24 @@ class CompanyPortfolioManager:
     def list_companies(self) -> List[OperatingContext]:
         return list(self.companies.values())
 
+    def onboard_company(
+        self,
+        name: str,
+        country: str = "IN",
+        industry: str = "General",
+        company_type: str = "NEW",
+        operating_rules: Optional[List[str]] = None
+    ) -> OperatingContext:
+        ctx = CompanyOnboardingEngine.onboard_new_company(
+            name=name,
+            industry=industry,
+            business_model="Enterprise",
+            initial_operating_rules=operating_rules
+        )
+        ctx.company_type = company_type
+        self.register_company(ctx)
+        return ctx
+
     def get_portfolio_summary(self) -> Dict[str, Any]:
         """Group-level portfolio performance aggregation computed from real state."""
         total_rev = sum(c.revenue for c in self.companies.values())

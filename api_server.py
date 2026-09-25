@@ -62,6 +62,29 @@ portfolio = CompanyPortfolioManager(tenant_id="tnt_primary", load_from_db=True)
 ceo_command = CeoCommandEngine(portfolio)
 ceo_reports = ExecutiveReportEngine(portfolio)
 
+# Company OS 2.0 Subsystems
+from core.ceo_engine import CEOExecutiveEngine
+from core.executive_council import ExecutiveCouncil
+from core.ceo_chief_of_staff import ChiefOfStaff
+from core.host_fabric import UniversalHostAgent
+from core.desktop_robot import UniversalDesktopRobot
+from core.sales_workforce import AISalesWorkforce
+from core.voice_agent import GovernedVoiceAgent
+from core.event_engine import EnterpriseEventEngine
+from core.interactive_meeting import InteractiveMeetingSystem
+from core.business_causality import BusinessCausalityEngine
+from core.workforce_intelligence import WorkforceIntelligenceEngine
+
+ceo_engine = CEOExecutiveEngine(portfolio, tenant_id="tnt_primary")
+host_agent = UniversalHostAgent(tenant_id="tnt_primary")
+desktop_robot = UniversalDesktopRobot(host_agent, ledger=ledger)
+event_engine = EnterpriseEventEngine(portfolio, tenant_id="tnt_primary")
+interactive_meetings = InteractiveMeetingSystem(portfolio, tenant_id="tnt_primary")
+sales_workforce = AISalesWorkforce(tenant_id="tnt_primary")
+voice_agent = GovernedVoiceAgent(tenant_id="tnt_primary")
+business_causality = BusinessCausalityEngine(tenant_id="tnt_primary")
+workforce_intel = WorkforceIntelligenceEngine(tenant_id="tnt_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -304,6 +327,69 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/tenants":
             tenants = TenantManager.list_tenants()
             self._send_json({"tenants": tenants})
+            return
+
+        # Company OS 2.0 Endpoints
+        elif path == "/api/ceo/cycle":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            cycle_res = ceo_engine.execute_executive_cycle(cid)
+            self._send_json(cycle_res)
+            return
+
+        elif path == "/api/council/members":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            members = ExecutiveCouncil(tenant_id, cid).list_members()
+            self._send_json({"members": members})
+            return
+
+        elif path == "/api/council/debates":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            debates = ExecutiveCouncil(tenant_id, cid).list_debates()
+            self._send_json({"debates": debates})
+            return
+
+        elif path == "/api/chief-of-staff/dossier":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            dossier = ChiefOfStaff(tenant_id, cid).compile_executive_dossier()
+            self._send_json(dossier)
+            return
+
+        elif path == "/api/chief-of-staff/items":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            items = ChiefOfStaff(tenant_id, cid).list_items()
+            self._send_json({"items": items})
+            return
+
+        elif path == "/api/host/telemetry":
+            telemetry = host_agent.get_telemetry()
+            self._send_json(telemetry)
+            return
+
+        elif path == "/api/sales/leads":
+            leads = sales_workforce.list_leads()
+            self._send_json({"leads": leads})
+            return
+
+        elif path == "/api/events":
+            companies = portfolio.list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            events = event_engine.list_unhandled_events(cid)
+            self._send_json({"events": events})
+            return
+
+        elif path == "/api/meetings":
+            meetings = interactive_meetings.list_recent_meetings()
+            self._send_json({"meetings": meetings})
+            return
+
+        elif path == "/api/causality/summary":
+            summary = business_causality.get_causality_summary()
+            self._send_json(summary)
             return
 
         # Fallback to static files in WEB_DIR
@@ -617,6 +703,97 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 approver_user=user,
                 approved=approved
             )
+            self._send_json(res)
+            return
+
+        # Company OS 2.0 POST Endpoints
+        elif path == "/api/ceo/chat":
+            instruction = req_data.get("message", "")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            chat_res = ceo_engine.chat_directive(cid, instruction)
+            self._send_json(chat_res)
+            return
+
+        elif path == "/api/council/review":
+            topic = req_data.get("topic", "Executive Proposal")
+            proposal = req_data.get("proposal", "")
+            data = req_data.get("data", {})
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            review = ExecutiveCouncil(tenant_id, cid).review_proposal(topic, proposal, data)
+            self._send_json(review)
+            return
+
+        elif path == "/api/chief-of-staff/items":
+            itype = req_data.get("item_type", "INBOX")
+            title = req_data.get("title", "New Item")
+            details = req_data.get("details", "")
+            priority = req_data.get("priority", "MEDIUM")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            item_id = ChiefOfStaff(tenant_id, cid).add_inbox_item(itype, title, details, priority)
+            self._send_json({"success": True, "item_id": item_id})
+            return
+
+        elif path == "/api/host/quarantine":
+            reason = req_data.get("reason", "Manual security quarantine")
+            host_agent.quarantine(reason)
+            self._send_json({"success": True, "quarantined": True, "status": "QUARANTINED"})
+            return
+
+        elif path == "/api/sales/leads":
+            name = req_data.get("contact_name", "Lead Contact")
+            channel = req_data.get("channel", "WEB_CHAT")
+            inquiry = req_data.get("inquiry", "Product inquiry")
+            lead = sales_workforce.ingest_lead(name, channel, inquiry)
+            self._send_json(lead)
+            return
+
+        elif path == "/api/sales/message":
+            lead_id = req_data.get("lead_id", "")
+            message = req_data.get("message", "")
+            res = sales_workforce.process_customer_message(lead_id, message)
+            self._send_json(res)
+            return
+
+        elif path == "/api/voice/call":
+            caller_id = req_data.get("caller_id", "+91-0000000000")
+            direction = req_data.get("direction", "INBOUND")
+            consent = req_data.get("consent_given", True)
+            call = voice_agent.initiate_call_session(caller_id, direction, consent)
+            self._send_json(call)
+            return
+
+        elif path == "/api/voice/utterance":
+            session_id = req_data.get("session_id", "")
+            text = req_data.get("text", "")
+            turn = voice_agent.process_utterance(session_id, text)
+            self._send_json(turn)
+            return
+
+        elif path == "/api/events":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            etype = req_data.get("event_type", "REVENUE_ANOMALY")
+            category = req_data.get("category", "OPERATIONAL")
+            severity = req_data.get("severity", "MEDIUM")
+            details = req_data.get("details", {})
+            evt = event_engine.emit_event(cid, etype, category, severity, details)
+            self._send_json(evt)
+            return
+
+        elif path == "/api/meetings/conduct":
+            mtype = req_data.get("meeting_type", "MORNING_OPERATING")
+            rec = interactive_meetings.conduct_executive_operating_meeting(mtype)
+            self._send_json(rec)
+            return
+
+        elif path == "/api/causality/verify":
+            chain_id = req_data.get("chain_id", "")
+            tx_id = req_data.get("transaction_id", "tx_verified")
+            rev = float(req_data.get("revenue", 0.0))
+            res = business_causality.verify_outcome_with_transaction(chain_id, tx_id, rev)
             self._send_json(res)
             return
 
