@@ -1,0 +1,18 @@
+{
+  "facility": "Apex Precision Plant #2",
+  "workcell": "Cell-3 5-Axis CNC Milling",
+  "current_metrics": {
+    "availability": 0.88,
+    "performance": 0.74,
+    "quality_yield": 0.96,
+    "oee": 0.625
+  },
+  "root_cause": "Tool spindle thermal throttling during roughing passes on titanium aerospace brackets",
+  "corrective_actions": [
+    "Shift roughing cycle feed rate by -8% to eliminate thermal alarm trips",
+    "Reschedule high-torque roughing passes to night shift with active chilling loop",
+    "Projected new OEE: 86.4%"
+  ],
+  "projected_cost_savings_monthly": 185000.0,
+  "actionable_by_operator": true
+}

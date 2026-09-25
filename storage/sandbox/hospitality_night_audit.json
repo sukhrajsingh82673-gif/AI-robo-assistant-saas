@@ -1,0 +1,15 @@
+{
+  "property": "Royal Haveli Resort & Spa",
+  "audit_date": "2026-09-14",
+  "total_rooms": 120,
+  "occupied_rooms": 94,
+  "occupancy_rate": "78.33%",
+  "room_revenue": 791480.0,
+  "f_and_b_revenue": 214500.0,
+  "taxes_collected": 181076.0,
+  "gross_billings": 1187056.0,
+  "gateway_settlements_received": 1187056.0,
+  "variance": 0.0,
+  "reconciliation_status": "MATCHED_EXACT",
+  "auditor_agent": "night_audit_specialist_4a7ad3"
+}

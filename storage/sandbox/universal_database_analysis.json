@@ -1,0 +1,15 @@
+{
+  "workload": "Autonomous Capability Discovery & Execution",
+  "tool_discovered": "sqlite3",
+  "tool_license": "Public Domain",
+  "authority_invariant_tested": "Capability != Authority confirmed respected",
+  "database_file": "/roboassistant/storage/sandbox/universal_analytics.db",
+  "records_aggregated": 4,
+  "fleet_latencies": {
+    "Android-Host-Companion": 45.2,
+    "Linux-Cloud-Node-1": 12.4,
+    "Windows-Workstation": 18.9,
+    "macOS-Studio-Worker": 24.1
+  },
+  "verification_result": "ALL_CONSTRAINTS_MET"
+}

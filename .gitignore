@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Unit test / coverage
+.cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases & run logs
+*.log
+storage/*.db-journal
+storage/*.db-wal
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+
+# OS and IDE files
+.DS_Store
+.idea/
+.vscode/
