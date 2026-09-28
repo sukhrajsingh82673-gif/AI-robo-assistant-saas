@@ -29,7 +29,7 @@ from core.db import db
 from core.auth import TenantManager, UserManager, AuthorizationEnforcer, UserRole
 from core.departments import DepartmentControlUnit
 from core.approvals import ApprovalPipeline
-from core.knowledge_graph import CompanyKnowledgeGraph, TruthState
+from core.knowledge_graph import CompanyKnowledgeGraph as CoreKnowledgeGraph, TruthState
 from core.intelligence import OpportunityEngine, RiskEngine
 from core.memory import OrganizationalMemory, MemoryTier, MemoryType
 from core.financials import BudgetHierarchyEngine
@@ -291,8 +291,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/knowledge":
             companies = portfolio.list_companies()
             cid = companies[0].company_id if companies else "comp_none"
-            facts = CompanyKnowledgeGraph.query_facts(tenant_id, cid)
-            baseline = CompanyKnowledgeGraph.get_company_baseline(tenant_id, cid)
+            facts = CoreKnowledgeGraph.query_facts(tenant_id, cid)
+            baseline = CoreKnowledgeGraph.get_company_baseline(tenant_id, cid)
             self._send_json({"baseline": baseline, "facts": facts})
             return
 
