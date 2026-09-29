@@ -1115,6 +1115,33 @@ canvas {
   color: var(--accent-blue);
 }
 
+.tab-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: #a78bfa;
+  border-bottom: 2px solid var(--accent-purple);
+}
+
 /* CEO Directive / Command Bar */
 .ceo-command-bar {
   background: var(--bg-card);

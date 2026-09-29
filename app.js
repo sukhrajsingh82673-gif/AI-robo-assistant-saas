@@ -398,6 +398,7 @@ function switchNav(navKey) {
   else if (navKey === 'company') renderCompanySection();
   else if (navKey === 'ceo') renderCeoSection();
   else if (navKey === 'tools') renderToolsSection();
+  else if (navKey === 'agent-engine') renderAgentEngine();
   else if (navKey === 'settings') renderSettingsSection();
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3412,3 +3413,687 @@ window.submitAgentAssignment = function(e, agentId) {
   state.ceoTab = 'missions';
   renderCeoSection();
 };
+
+// ==========================================================================
+// 6. PAPERCLIP AGENT ENGINE & AUTONOMOUS TEAMS MODULE
+// ==========================================================================
+state.agentEngineTab = 'teams';
+state.agentEnginePlans = [];
+state.agentEngineTeams = [];
+state.agentEngineSkills = [];
+state.agentEngineRuns = [];
+
+async function renderAgentEngine() {
+  const container = document.getElementById('view-agent-engine');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; padding:60px;">
+      <div style="text-align:center;">
+        <div style="font-size:32px; margin-bottom:12px;">⚡</div>
+        <div style="color:var(--text-secondary); font-size:14px;">Synchronizing Paperclip Agent Engine...</div>
+      </div>
+    </div>
+  `;
+
+  // Fetch live state from API server
+  let statusData = { status: 'OPERATIONAL', default_adapter: 'gemini_local', heartbeat_interval_seconds: 30, active_runs_count: 0, active_plans_count: 0, total_bundled_teams: 4, total_skills: 5 };
+  try {
+    const [stRes, tmRes, skRes, plRes, hbRes] = await Promise.all([
+      fetch('/api/agent-engine/status').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/teams').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/skills').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/plans').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/heartbeats').then(r => r.json()).catch(() => null),
+    ]);
+    if (stRes) statusData = stRes;
+    if (tmRes && tmRes.teams) state.agentEngineTeams = tmRes.teams;
+    if (skRes && skRes.skills) state.agentEngineSkills = skRes.skills;
+    if (plRes && plRes.plans) state.agentEnginePlans = plRes.plans;
+    if (hbRes && hbRes.runs) state.agentEngineRuns = hbRes.runs;
+  } catch (err) {
+    console.warn("Could not sync agent-engine live API:", err);
+  }
+
+  const activeTab = state.agentEngineTab || 'teams';
+
+  container.innerHTML = `
+    <!-- Top Header Banner -->
+    <div class="view-header" style="margin-bottom:24px;">
+      <div class="view-header-title">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <h2 style="font-size:24px; font-weight:700;">Paperclip Autonomous Agent Engine</h2>
+          <span style="font-size:11px; font-weight:700; background:rgba(139,92,246,0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.4); padding:3px 10px; border-radius:12px;">
+            CORE v2.4
+          </span>
+        </div>
+        <p style="color:var(--text-secondary); font-size:13.5px; margin-top:4px;">
+          Autonomous multi-agent execution loop with PRP deterministic state machines, DAG task delegation, and pre-bundled specialized squads.
+        </p>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn-secondary" onclick="triggerAutonomousHeartbeat()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Trigger Heartbeat
+        </button>
+        <button class="btn-primary" onclick="openNewDelegationPlanModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M12 5v14M5 12h14"/></svg>
+          Delegate Company Goal
+        </button>
+      </div>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+      <div class="kpi-card">
+        <div class="kpi-label">Engine State</div>
+        <div class="kpi-value" style="color:var(--accent-emerald); font-size:20px;">
+          <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--accent-emerald); margin-right:6px;"></span>
+          ${statusData.status}
+        </div>
+        <div class="kpi-subtext">PRP State Machine Active</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Model Adapter</div>
+        <div class="kpi-value" style="font-size:18px;">${statusData.default_adapter}</div>
+        <div class="kpi-subtext">Central Config Managed</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Heartbeat Cadence</div>
+        <div class="kpi-value" style="font-size:18px;">${statusData.heartbeat_interval_seconds}s <span style="font-size:12px; color:var(--text-secondary);">±2.5s</span></div>
+        <div class="kpi-subtext">Exponential Backoff Enabled</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Bundled Squads</div>
+        <div class="kpi-value" style="font-size:18px;">${state.agentEngineTeams.length || 4} Squads</div>
+        <div class="kpi-subtext">1-Click Deployment Ready</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Active Delegations</div>
+        <div class="kpi-value" style="font-size:18px;">${state.agentEnginePlans.length} Plans</div>
+        <div class="kpi-subtext">Topological DAG Monitored</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div style="display:flex; gap:8px; border-bottom:1px solid var(--border-color); margin-bottom:24px;">
+      <button class="tab-btn ${activeTab === 'teams' ? 'active' : ''}" onclick="switchAgentEngineTab('teams')">
+        🏢 Autonomous Squads Catalog
+      </button>
+      <button class="tab-btn ${activeTab === 'delegation' ? 'active' : ''}" onclick="switchAgentEngineTab('delegation')">
+        🗺️ Goal Delegation & DAG Tracker (${state.agentEnginePlans.length})
+      </button>
+      <button class="tab-btn ${activeTab === 'heartbeats' ? 'active' : ''}" onclick="switchAgentEngineTab('heartbeats')">
+        💓 Heartbeat & PRP State Logs (${state.agentEngineRuns.length})
+      </button>
+      <button class="tab-btn ${activeTab === 'skills' ? 'active' : ''}" onclick="switchAgentEngineTab('skills')">
+        📖 Operational Skills SOPs (${state.agentEngineSkills.length || 5})
+      </button>
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="agentEngineTabContent">
+      ${renderAgentEngineTabContent(activeTab)}
+    </div>
+  `;
+}
+
+function switchAgentEngineTab(tabKey) {
+  state.agentEngineTab = tabKey;
+  renderAgentEngine();
+}
+
+function renderAgentEngineTabContent(tab) {
+  if (tab === 'teams') return renderTeamsCatalogTab();
+  if (tab === 'delegation') return renderDelegationTab();
+  if (tab === 'heartbeats') return renderHeartbeatsTab();
+  if (tab === 'skills') return renderSkillsTab();
+  return '';
+}
+
+function renderTeamsCatalogTab() {
+  const teams = state.agentEngineTeams.length ? state.agentEngineTeams : [
+    {
+      id: "core_executive_suite",
+      name: "Core Executive Suite",
+      category: "Leadership & Governance",
+      description: "Autonomous C-Suite governance team modeled after Paperclip's core executive structure. Coordinates cross-departmental execution, board reporting, and capital allocation.",
+      icon: "👑",
+      agents: [
+        { role: "Chief Executive Officer (CEO)", department: "Executive", budget_limit: 10000, allowed_tools: ["task_planning", "board_reporting", "ceo_engine"] },
+        { role: "Chief Technology Officer (CTO)", department: "Engineering", budget_limit: 5000, allowed_tools: ["git", "code_review_gate", "python3", "host_fabric"] },
+        { role: "Chief Operating Officer (COO)", department: "Operations", budget_limit: 3000, allowed_tools: ["issue_triage", "evidence_ledger", "agent_bus"] },
+        { role: "Chief Marketing Officer (CMO)", department: "Growth", budget_limit: 4000, allowed_tools: ["analytics", "browser_robot", "content_generator"] }
+      ]
+    },
+    {
+      id: "product_engineering_squad",
+      name: "Product & Engineering Squad",
+      category: "Product Delivery",
+      description: "Full lifecycle autonomous software delivery unit. Rapidly translates requirements into verified code, automated tests, and deployed services.",
+      icon: "⚡",
+      agents: [
+        { role: "Lead Product Manager", department: "Product", budget_limit: 2500, allowed_tools: ["task_planning", "issue_triage"] },
+        { role: "Senior Fullstack Engineer", department: "Engineering", budget_limit: 3500, allowed_tools: ["python3", "javascript", "sqlite3", "git"] },
+        { role: "QA & Reliability Engineer", department: "Engineering", budget_limit: 2000, allowed_tools: ["curl", "browser_robot", "evidence_ledger"] },
+        { role: "DevOps & Platform Engineer", department: "Engineering", budget_limit: 2500, allowed_tools: ["host_fabric", "secrets_manager", "bash"] }
+      ]
+    },
+    {
+      id: "growth_revenue_team",
+      name: "Growth & Customer Operations Team",
+      category: "Revenue & Scaling",
+      description: "Customer acquisition, sales automation, and client satisfaction workforce. Drives pipeline expansion and customer retention.",
+      icon: "🚀",
+      agents: [
+        { role: "AI Sales Development Rep (SDR)", department: "Sales", budget_limit: 2000, allowed_tools: ["search_engine", "browser_robot", "crm"] },
+        { role: "Customer Success Lead", department: "Customer Support", budget_limit: 2000, allowed_tools: ["issue_triage", "knowledge_base", "analytics"] }
+      ]
+    },
+    {
+      id: "security_compliance_squad",
+      name: "Security & Audit Governance Squad",
+      category: "Risk & Compliance",
+      description: "Continuous zero-trust auditing, credential protection, and regulatory verification team.",
+      icon: "🛡️",
+      agents: [
+        { role: "Security Compliance Auditor", department: "Governance", budget_limit: 2000, allowed_tools: ["secrets_manager", "evidence_ledger", "code_review_gate"] }
+      ]
+    }
+  ];
+
+  return `
+    <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="font-size:16px; font-weight:600;">Paperclip Pre-Configured Autonomous Squads</h3>
+        <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
+          Deploy full-fidelity specialist teams with pre-configured Digital Employment Contracts, tools, and reporting hierarchy in 1 click.
+        </p>
+      </div>
+      <div>
+        <select id="deployTargetCompanySelect" class="form-select" style="font-size:12px; padding:6px 12px; background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); border-radius:var(--radius-md);">
+          ${state.companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:20px;">
+      ${teams.map(team => `
+        <div class="card" style="display:flex; flex-direction:column; justify-content:space-between; padding:20px; border:1px solid var(--border-color); background:var(--bg-card); border-radius:var(--radius-lg);">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:40px; height:40px; border-radius:10px; background:rgba(139,92,246,0.15); display:flex; align-items:center; justify-content:center; font-size:22px;">
+                  ${team.icon || '🤖'}
+                </div>
+                <div>
+                  <h4 style="font-size:16px; font-weight:700;">${team.name}</h4>
+                  <span style="font-size:11px; color:var(--accent-blue); font-weight:600;">${team.category}</span>
+                </div>
+              </div>
+              <span style="font-size:11px; background:var(--bg-surface); padding:4px 8px; border-radius:6px; border:1px solid var(--border-color);">
+                ${team.agents.length} Autonomous Agents
+              </span>
+            </div>
+
+            <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5; margin-bottom:16px;">
+              ${team.description}
+            </p>
+
+            <!-- Agent List Preview -->
+            <div style="margin-bottom:16px; background:var(--bg-surface); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+              <div style="font-size:11.5px; font-weight:600; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">
+                Squad Members & Scoped Contracts:
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                ${team.agents.map(a => `
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="width:6px; height:6px; border-radius:50%; background:var(--accent-purple);"></span>
+                      <span style="font-weight:600; color:var(--text-primary);">${a.role}</span>
+                      <span style="font-size:10.5px; color:var(--text-secondary);">(${a.department})</span>
+                    </div>
+                    <span style="font-size:11px; color:var(--accent-emerald);">₹${(a.budget_limit || 2000).toLocaleString()}/mo</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+            <button class="btn-primary" style="width:100%; font-size:13px; padding:10px;" onclick="deploySquadToCompany('${team.id}')">
+              Deploy ${team.name}
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderDelegationTab() {
+  const plans = state.agentEnginePlans;
+
+  return `
+    <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="font-size:16px; font-weight:600;">Autonomous Goal Decomposition & Dependency DAGs</h3>
+        <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
+          Track high-level board goals decomposed into multi-specialist child tasks with strict topological ordering.
+        </p>
+      </div>
+      <button class="btn-primary" onclick="openNewDelegationPlanModal()" style="font-size:12px; padding:6px 14px;">
+        + Create New Delegation
+      </button>
+    </div>
+
+    ${plans.length === 0 ? `
+      <div class="card" style="text-align:center; padding:48px 24px; border:1px dashed var(--border-color);">
+        <div style="font-size:36px; margin-bottom:12px;">🗺️</div>
+        <h4 style="font-size:16px; font-weight:600; margin-bottom:6px;">No Active Delegation Plans</h4>
+        <p style="font-size:13px; color:var(--text-secondary); max-width:440px; margin:0 auto 16px auto;">
+          High-level goals are decomposed into structured subtasks with dependencies and assigned automatically to the best specialist agent.
+        </p>
+        <button class="btn-primary" onclick="openNewDelegationPlanModal()">Decompose Sample Strategic Goal</button>
+      </div>
+    ` : `
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        ${plans.map(plan => `
+          <div class="card" style="border:1px solid var(--border-color); padding:20px; border-radius:var(--radius-lg); background:var(--bg-card);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <h4 style="font-size:17px; font-weight:700;">${plan.goal_title}</h4>
+                  <span style="font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600; ${plan.approval_status === 'approved' ? 'background:rgba(16,185,129,0.15); color:var(--accent-emerald);' : 'background:rgba(245,158,11,0.15); color:var(--accent-amber);'}">
+                    ${plan.approval_status.toUpperCase()}
+                  </span>
+                </div>
+                <div style="font-size:11.5px; color:var(--text-secondary); margin-top:4px;">
+                  Lead Agent: <strong>${plan.lead_agent_id}</strong> • Created: ${plan.created_at || 'Recently'}
+                </div>
+              </div>
+
+              ${plan.approval_status === 'pending' ? `
+                <button class="btn-primary" style="font-size:12px; padding:6px 14px; background:var(--accent-emerald);" onclick="approveDelegationPlan('${plan.goal_id}')">
+                  ✓ Approve Plan & Unlock Execution
+                </button>
+              ` : `
+                <span style="font-size:12px; color:var(--accent-emerald); font-weight:600;">Execution In Progress</span>
+              `}
+            </div>
+
+            <!-- Subtask DAG Flow -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px;">
+              ${plan.subtasks.map((st, idx) => `
+                <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; position:relative;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:10.5px; font-weight:700; color:var(--text-secondary);">TASK ${idx + 1}</span>
+                    <span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; ${
+                      st.status === 'completed' ? 'background:rgba(16,185,129,0.2); color:var(--accent-emerald);' :
+                      st.status === 'blocked' ? 'background:rgba(239,68,68,0.2); color:var(--accent-rose);' :
+                      st.status === 'in_progress' ? 'background:rgba(59,130,246,0.2); color:var(--accent-blue);' :
+                      'background:rgba(139,92,246,0.2); color:var(--accent-purple);'
+                    }">
+                      ${st.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">
+                    ${st.title}
+                  </div>
+
+                  <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+                    Assigned: <strong>${st.target_role}</strong>
+                  </div>
+
+                  ${st.dependencies && st.dependencies.length > 0 ? `
+                    <div style="font-size:10px; color:var(--text-secondary); margin-bottom:8px;">
+                      Depends on: ${st.dependencies.map(d => `<span style="background:rgba(255,255,255,0.05); padding:1px 4px; border-radius:3px;">${d}</span>`).join(', ')}
+                    </div>
+                  ` : ''}
+
+                  ${st.status !== 'completed' && plan.approval_status === 'approved' ? `
+                    <button class="btn-secondary" style="width:100%; font-size:11px; padding:4px 8px; margin-top:6px;" onclick="simulateCompleteSubtask('${plan.goal_id}', '${st.id}')">
+                      Simulate Step Completion →
+                    </button>
+                  ` : st.status === 'completed' ? `
+                    <div style="font-size:11px; color:var(--accent-emerald); margin-top:4px;">
+                      ✓ ${st.result || 'Completed'}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+function renderHeartbeatsTab() {
+  const runs = state.agentEngineRuns;
+
+  return `
+    <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="font-size:16px; font-weight:600;">Autonomous Agent Heartbeat & PRP State Logs</h3>
+        <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
+          Deterministic execution history tracked by the Paperclip Runner Protocol (PRP) state machine reducer.
+        </p>
+      </div>
+      <button class="btn-primary" onclick="triggerAutonomousHeartbeat()" style="font-size:12px; padding:6px 14px;">
+        Trigger New Heartbeat
+      </button>
+    </div>
+
+    ${runs.length === 0 ? `
+      <div class="card" style="text-align:center; padding:48px 24px; border:1px dashed var(--border-color);">
+        <div style="font-size:36px; margin-bottom:12px;">💓</div>
+        <h4 style="font-size:16px; font-weight:600; margin-bottom:6px;">No Heartbeat Runs Logged</h4>
+        <p style="font-size:13px; color:var(--text-secondary); max-width:440px; margin:0 auto 16px auto;">
+          Trigger an on-demand heartbeat cycle to observe the 8-step lifecycle and state machine projection.
+        </p>
+        <button class="btn-primary" onclick="triggerAutonomousHeartbeat()">Trigger Sample Heartbeat</button>
+      </div>
+    ` : `
+      <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); overflow:hidden;">
+        <table class="data-table" style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.02); border-bottom:1px solid var(--border-color); text-align:left;">
+              <th style="padding:12px 16px;">RUN ID</th>
+              <th style="padding:12px 16px;">AGENT</th>
+              <th style="padding:12px 16px;">STATUS</th>
+              <th style="padding:12px 16px;">ACTIVE TASK</th>
+              <th style="padding:12px 16px;">TIMELINE STEPS</th>
+              <th style="padding:12px 16px;">NEXT CADENCE</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${runs.map(r => `
+              <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:12px 16px; font-family:monospace; color:var(--accent-purple);">${r.run_id}</td>
+                <td style="padding:12px 16px; font-weight:600;">${r.agent_id}</td>
+                <td style="padding:12px 16px;">
+                  <span style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(16,185,129,0.15); color:var(--accent-emerald);">
+                    ${r.status.toUpperCase()}
+                  </span>
+                </td>
+                <td style="padding:12px 16px; color:var(--text-secondary);">
+                  ${r.active_task ? r.active_task.title : 'Inbox empty (scheduled wake)'}
+                </td>
+                <td style="padding:12px 16px;">
+                  <span style="background:var(--bg-card); padding:2px 8px; border-radius:4px; border:1px solid var(--border-color);">
+                    ${r.timeline_count || 4} events recorded
+                  </span>
+                </td>
+                <td style="padding:12px 16px; color:var(--text-secondary);">
+                  in ${Math.round(r.next_wake_in_seconds || 30)}s
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+  `;
+}
+
+function renderSkillsTab() {
+  const skills = state.agentEngineSkills.length ? state.agentEngineSkills : [
+    {
+      id: "task-planning",
+      name: "Autonomous Task Planning & Decomposition",
+      category: "Orchestration",
+      description: "Standard procedure for decomposing high-level company goals into unambiguous, actionable child tasks with clear acceptance criteria.",
+      sop_rules: [
+        "Never create child tasks with descriptions that say 'see parent' — every task must be self-contained.",
+        "Declare all DAG dependencies explicitly before assigning tasks to prevent execution deadlocks.",
+        "Formulate specific, testable acceptance criteria for each subtask so verification can be 100% automated."
+      ]
+    },
+    {
+      id: "issue-triage",
+      name: "Deterministic Issue Triage & Prioritization",
+      category: "Operations",
+      description: "Lifecycle contract for processing incoming tasks, assigning priority buckets, and ensuring single-worker task locks.",
+      sop_rules: [
+        "Process tasks strictly in order: in_progress first, then in_review, then todo.",
+        "Always acquire an atomic lease (checkout) with run ID before commencing work; halt immediately on 409 Conflict.",
+        "Update issue status incrementally with evidence deltas to preserve an immutable timeline."
+      ]
+    },
+    {
+      id: "board-reporting",
+      name: "Executive Board Reporting & Approval Escalation",
+      category: "Governance",
+      description: "SOP for compiling high-signal briefings, unblocking stalled initiatives, and presenting structured proposals for owner sign-off.",
+      sop_rules: [
+        "Synthesize outcomes into three core metrics: Capital efficiency, SLA completion rate, and verified truth delta.",
+        "Present decisions in actionable multiple-choice format with clear risk/benefit analysis."
+      ]
+    },
+    {
+      id: "code-review-gate",
+      name: "Automated Code Review & Integrity Gate",
+      category: "Engineering",
+      description: "Enforces strict static verification, security scanning, and test pass requirements before accepting software changes.",
+      sop_rules: [
+        "Verify all files match formatting and lint standards with zero warnings.",
+        "Scan diffs for hardcoded credentials, bearer tokens, or private keys; reject immediately on detection."
+      ]
+    },
+    {
+      id: "incident-recovery",
+      name: "Autonomous Incident Recovery & Exponential Backoff",
+      category: "Resilience",
+      description: "Resilience protocol handling agent timeouts, API exhaustion (e.g. 429 errors), and state restoration.",
+      sop_rules: [
+        "Apply exponential backoff (base * 2^failures) with randomized symmetric jitter on API rate limit encounters.",
+        "On 5 consecutive unhandled failures, gracefully pause the agent and submit a diagnostic alert to the owner."
+      ]
+    }
+  ];
+
+  return `
+    <div style="margin-bottom:20px;">
+      <h3 style="font-size:16px; font-weight:600;">Paperclip Standard Operating Procedures (SOPs)</h3>
+      <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
+        Deterministic execution guidelines followed by all autonomous agents during mission dispatch.
+      </p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:18px;">
+      ${skills.map(s => `
+        <div class="card" style="border:1px solid var(--border-color); padding:18px; border-radius:var(--radius-lg); background:var(--bg-card);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+            <h4 style="font-size:15px; font-weight:700;">${s.name}</h4>
+            <span style="font-size:10.5px; background:rgba(59,130,246,0.15); color:var(--accent-blue); padding:2px 8px; border-radius:4px; font-weight:600;">
+              ${s.category}
+            </span>
+          </div>
+          <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin-bottom:12px;">
+            ${s.description}
+          </p>
+
+          <div style="background:var(--bg-surface); padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">MANDATORY INVARIANTS:</div>
+            <ul style="margin:0; padding-left:16px; font-size:11.5px; color:var(--text-primary); line-height:1.5;">
+              ${(s.sop_rules || []).map(r => `<li>${r}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Interactive API Handlers
+window.deploySquadToCompany = async function(teamId) {
+  const companySelect = document.getElementById('deployTargetCompanySelect');
+  const companyId = companySelect ? companySelect.value : (state.companies[0] ? state.companies[0].id : null);
+
+  showToast(`Deploying squad '${teamId}'...`, 'info');
+  try {
+    const res = await fetch('/api/agent-engine/teams/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_id: teamId, company_id: companyId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Successfully deployed ${data.team_name} with ${data.deployed_count} agents!`, 'success');
+      // Refresh workforce data
+      const empRes = await fetch('/api/employees').then(r => r.json()).catch(() => null);
+      if (empRes && empRes.employees) {
+        state.workforce = empRes.employees;
+      }
+      renderAgentEngine();
+    } else {
+      showToast(data.error || 'Failed to deploy squad', 'error');
+    }
+  } catch (err) {
+    showToast(`Error deploying squad: ${err.message}`, 'error');
+  }
+};
+
+window.triggerAutonomousHeartbeat = async function() {
+  showToast('Triggering autonomous heartbeat turn...', 'info');
+  try {
+    const res = await fetch('/api/agent-engine/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent_id: 'agent_ceo_001',
+        role: 'Chief Executive Officer (CEO)',
+        trigger: 'manual',
+        tasks: [
+          { id: 'tsk_audit', title: 'Execute Capital Allocation & Runway Audit', priority: 'urgent', status: 'todo' }
+        ]
+      })
+    });
+    const data = await res.json();
+    showToast(`Heartbeat turn executed for ${data.agent_id}. Status: ${data.status}`, 'success');
+    renderAgentEngine();
+  } catch (err) {
+    showToast(`Heartbeat error: ${err.message}`, 'error');
+  }
+};
+
+window.openNewDelegationPlanModal = function() {
+  openModal('Decompose Strategic Goal (Paperclip Engine)', `
+    <form onsubmit="submitNewDelegationPlan(event)">
+      <div class="form-group">
+        <label class="form-label">Strategic Goal Title</label>
+        <input type="text" id="delegationGoalTitle" class="form-input" required value="Launch Autonomous Client Onboarding Pipeline" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Lead Decomposing Agent</label>
+        <select id="delegationLeadAgent" class="form-select">
+          <option value="agent_ceo">Chief Executive Officer (CEO)</option>
+          <option value="agent_cto">Chief Technology Officer (CTO)</option>
+          <option value="agent_pm">Lead Product Manager</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="delegationRequiresApproval" checked />
+          <span style="font-size:13px; font-weight:600;">Require Executive Board Sign-off Before Assignment</span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="width:auto;">Generate DAG Plan</button>
+      </div>
+    </form>
+  `);
+};
+
+window.submitNewDelegationPlan = async function(e) {
+  e.preventDefault();
+  const title = document.getElementById('delegationGoalTitle').value;
+  const leadAgent = document.getElementById('delegationLeadAgent').value;
+  const requiresApproval = document.getElementById('delegationRequiresApproval').checked;
+
+  closeModal();
+  showToast('Decomposing goal into specialist tasks...', 'info');
+
+  try {
+    const res = await fetch('/api/agent-engine/delegate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        goal_title: title,
+        lead_agent_id: leadAgent,
+        requires_board_approval: requiresApproval,
+        subtasks: [
+          { title: "Design Architecture & Security Boundaries", target_role: "Chief Technology Officer (CTO)", priority: "high", dependencies: [] },
+          { title: "Author Feature PRD & Acceptance Criteria", target_role: "Lead Product Manager", priority: "high", dependencies: [] },
+          { title: "Implement Core Data Connectors", target_role: "Senior Fullstack Engineer", priority: "urgent", dependencies: ["s1"] },
+          { title: "Automate E2E Regression Verification", target_role: "QA & Reliability Engineer", priority: "medium", dependencies: ["s2"] }
+        ]
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Delegation plan formulated with DAG dependencies.', 'success');
+      state.agentEngineTab = 'delegation';
+      renderAgentEngine();
+    } else {
+      showToast(data.error || 'Failed to create plan', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+};
+
+window.approveDelegationPlan = async function(goalId) {
+  showToast('Approving delegation plan...', 'info');
+  try {
+    const res = await fetch('/api/agent-engine/plans/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal_id: goalId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Plan approved. Root tasks dispatched to specialist agents!', 'success');
+      renderAgentEngine();
+    }
+  } catch (err) {
+    showToast(`Approval failed: ${err.message}`, 'error');
+  }
+};
+
+window.simulateCompleteSubtask = async function(goalId, subtaskId) {
+  showToast('Completing subtask and checking dependency DAG...', 'info');
+  try {
+    const res = await fetch('/api/agent-engine/subtasks/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal_id: goalId, subtask_id: subtaskId, result: 'Verified and completed under contract' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.update.unblocked_tasks.length > 0) {
+        showToast(`Step completed! Unblocked ${data.update.unblocked_tasks.length} downstream tasks.`, 'success');
+      } else if (data.update.is_goal_complete) {
+        showToast('🎉 All tasks in DAG completed! High-level goal accomplished.', 'success');
+      } else {
+        showToast('Step marked complete.', 'info');
+      }
+      renderAgentEngine();
+    }
+  } catch (err) {
+    showToast(`Completion error: ${err.message}`, 'error');
+  }
+};
+
