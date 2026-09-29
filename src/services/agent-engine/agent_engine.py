@@ -1,8 +1,8 @@
 """
-RoboAssistant Company OS — Paperclip Agent Engine (Python Integration)
-Transplanted orchestration core:
+RoboAssistant Company OS — Agent Engine (Python Integration)
+Orchestration core:
 1. Heartbeat Loop: identity, approval follow-up, priority inbox, lease checkout, turn execution.
-2. State Machine: deterministic transition reducer and PRP event replay.
+2. State Machine: deterministic transition reducer and event replay.
 3. Task Delegation Engine: DAG decomposition, cycle detection, role-based assignment.
 4. Multi-Model Adapters: Gemini, Claude, Codex/OpenAI, and Local Process wrappers.
 5. Centralized Configuration: Secret isolation via SecretManager.
@@ -55,7 +55,7 @@ class AgentEngineConfigManager:
 
 
 class SessionStateMachine:
-    """Paperclip Session State Machine Reducer."""
+    """Session State Machine Reducer."""
     def __init__(self, fixture_name: str, identity: Dict[str, Any]):
         self.fixture_name = fixture_name
         self.identity = identity
@@ -109,7 +109,7 @@ class SessionStateMachine:
 
 
 class HeartbeatCoordinator:
-    """Implements Paperclip 8-step Heartbeat Protocol."""
+    """Implements 8-step Heartbeat Protocol."""
     def __init__(self):
         self.runs: Dict[str, Dict[str, Any]] = {}
         self.consecutive_failures: Dict[str, int] = {}

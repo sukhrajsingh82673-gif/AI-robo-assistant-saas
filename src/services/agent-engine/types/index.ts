@@ -1,10 +1,10 @@
 /**
  * RoboAssistant Agent Engine — Unified Protocol & Domain Types
- * Transplanted and adapted from Paperclip specification contracts.
+ * Core protocol and domain contracts for enterprise multi-agent execution.
  */
 
 // -------------------------------------------------------------
-// Protocol & Replay Types (Paperclip Runner Protocol)
+// Protocol & Replay Types (Agent Runner Protocol)
 // -------------------------------------------------------------
 
 export interface PrpIdentity {
@@ -99,7 +99,7 @@ export interface SequenceGap {
 }
 
 export interface SessionSnapshot {
-  schema: "paperclip.prp.session-snapshot.v1";
+  schema: "companyos.runtime.session-snapshot.v1";
   fixtureName: string;
   identity: PrpIdentity;
   capabilities: PrpCapabilities | PrpCapabilitiesV2;

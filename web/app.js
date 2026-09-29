@@ -3415,7 +3415,7 @@ window.submitAgentAssignment = function(e, agentId) {
 };
 
 // ==========================================================================
-// 6. PAPERCLIP AGENT ENGINE & AUTONOMOUS TEAMS MODULE
+// 6. ENTERPRISE AGENT ENGINE & AUTONOMOUS TEAMS MODULE
 // ==========================================================================
 state.agentEngineTab = 'teams';
 state.agentEnginePlans = [];
@@ -3431,7 +3431,7 @@ async function renderAgentEngine() {
     <div style="display:flex; justify-content:center; align-items:center; padding:60px;">
       <div style="text-align:center;">
         <div style="font-size:32px; margin-bottom:12px;">⚡</div>
-        <div style="color:var(--text-secondary); font-size:14px;">Synchronizing Paperclip Agent Engine...</div>
+        <div style="color:var(--text-secondary); font-size:14px;">Synchronizing Agent Engine & Virtual HQ...</div>
       </div>
     </div>
   `;
@@ -3462,13 +3462,13 @@ async function renderAgentEngine() {
     <div class="view-header" style="margin-bottom:24px;">
       <div class="view-header-title">
         <div style="display:flex; align-items:center; gap:12px;">
-          <h2 style="font-size:24px; font-weight:700;">Paperclip Autonomous Agent Engine</h2>
+          <h2 style="font-size:24px; font-weight:700;">Autonomous Agent Engine & Virtual HQ</h2>
           <span style="font-size:11px; font-weight:700; background:rgba(139,92,246,0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.4); padding:3px 10px; border-radius:12px;">
             CORE v2.4
           </span>
         </div>
         <p style="color:var(--text-secondary); font-size:13.5px; margin-top:4px;">
-          Autonomous multi-agent execution loop with PRP deterministic state machines, DAG task delegation, and pre-bundled specialized squads.
+          Autonomous multi-agent execution loop with deterministic state machines, DAG task delegation, and pre-bundled specialized squads.
         </p>
       </div>
 
@@ -3562,7 +3562,7 @@ function renderTeamsCatalogTab() {
       id: "core_executive_suite",
       name: "Core Executive Suite",
       category: "Leadership & Governance",
-      description: "Autonomous C-Suite governance team modeled after Paperclip's core executive structure. Coordinates cross-departmental execution, board reporting, and capital allocation.",
+      description: "Autonomous C-Suite governance team. Coordinates cross-departmental execution, board reporting, strategic alignment, and capital allocation.",
       icon: "👑",
       agents: [
         { role: "Chief Executive Officer (CEO)", department: "Executive", budget_limit: 10000, allowed_tools: ["task_planning", "board_reporting", "ceo_engine"] },
@@ -3610,7 +3610,7 @@ function renderTeamsCatalogTab() {
   return `
     <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
       <div>
-        <h3 style="font-size:16px; font-weight:600;">Paperclip Pre-Configured Autonomous Squads</h3>
+        <h3 style="font-size:16px; font-weight:600;">Enterprise Autonomous Squads Catalog</h3>
         <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
           Deploy full-fidelity specialist teams with pre-configured Digital Employment Contracts, tools, and reporting hierarchy in 1 click.
         </p>
@@ -3782,9 +3782,9 @@ function renderHeartbeatsTab() {
   return `
     <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
       <div>
-        <h3 style="font-size:16px; font-weight:600;">Autonomous Agent Heartbeat & PRP State Logs</h3>
+        <h3 style="font-size:16px; font-weight:600;">Autonomous Agent Heartbeat & State Machine Logs</h3>
         <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
-          Deterministic execution history tracked by the Paperclip Runner Protocol (PRP) state machine reducer.
+          Deterministic execution history tracked by the CompanyOS state machine reducer.
         </p>
       </div>
       <button class="btn-primary" onclick="triggerAutonomousHeartbeat()" style="font-size:12px; padding:6px 14px;">
@@ -3902,7 +3902,7 @@ function renderSkillsTab() {
 
   return `
     <div style="margin-bottom:20px;">
-      <h3 style="font-size:16px; font-weight:600;">Paperclip Standard Operating Procedures (SOPs)</h3>
+      <h3 style="font-size:16px; font-weight:600;">Enterprise Standard Operating Procedures (SOPs)</h3>
       <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
         Deterministic execution guidelines followed by all autonomous agents during mission dispatch.
       </p>
@@ -3986,7 +3986,7 @@ window.triggerAutonomousHeartbeat = async function() {
 };
 
 window.openNewDelegationPlanModal = function() {
-  openModal('Decompose Strategic Goal (Paperclip Engine)', `
+  openModal('Decompose Strategic Goal (TaskGraph Orchestrator)', `
     <form onsubmit="submitNewDelegationPlan(event)">
       <div class="form-group">
         <label class="form-label">Strategic Goal Title</label>

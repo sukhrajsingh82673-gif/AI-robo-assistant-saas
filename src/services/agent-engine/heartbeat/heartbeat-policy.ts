@@ -1,6 +1,5 @@
 /**
  * RoboAssistant Agent Engine — Heartbeat Scheduling & Execution Policy
- * Transplanted and adapted from Paperclip server services.
  * Uses centralized ConfigManager instead of direct environment reads.
  */
 

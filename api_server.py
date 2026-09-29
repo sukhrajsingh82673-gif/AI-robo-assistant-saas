@@ -53,8 +53,8 @@ from workloads.manufacturing import run_manufacturing_bottleneck_analysis
 from workloads.saas import run_saas_churn_analysis
 from workloads.personal import run_personal_file_hygiene
 from workloads.universal_computer import run_universal_capability_discovery_task
-from core.paperclip_catalog import PaperclipCatalogManager, BUNDLED_TEAMS
-from core.paperclip_skills import PaperclipSkillRegistry, SKILLS_CATALOG
+from core.team_catalog import EnterpriseTeamCatalog, BUNDLED_TEAMS
+from core.operating_skills import OperatingSkillRegistry, SKILLS_CATALOG
 from src.services.agent_engine import heartbeat_coordinator, delegation_engine, config_manager
 
 # Initialize Core Subsystems
@@ -221,12 +221,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/agent-engine/teams":
-            teams = PaperclipCatalogManager.list_teams()
+            teams = EnterpriseTeamCatalog.list_teams()
             self._send_json({"teams": teams})
             return
 
         elif path == "/api/agent-engine/skills":
-            skills = PaperclipSkillRegistry.list_skills()
+            skills = OperatingSkillRegistry.list_skills()
             self._send_json({"skills": skills})
             return
 
@@ -563,7 +563,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 company_id = companies[0].company_id if companies else None
             team_id = req_data.get("team_id", "core_executive_suite")
             try:
-                res = PaperclipCatalogManager.deploy_team_to_company(
+                res = EnterpriseTeamCatalog.deploy_team_to_company(
                     portfolio_manager=portfolio,
                     company_id=company_id,
                     team_id=team_id,

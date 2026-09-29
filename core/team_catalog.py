@@ -1,7 +1,6 @@
 """
-RoboAssistant Company OS — Paperclip Bundled Teams & Agent Catalog
-Transplanted from Paperclip's production team definitions and agent personas.
-Provides pre-configured autonomous teams ready for 1-click deployment into any company.
+RoboAssistant Company OS — Autonomous Teams & Agent Catalog
+Provides pre-configured enterprise specialist squads ready for 1-click deployment into any company.
 """
 
 from typing import Dict, List, Any, Optional
@@ -16,7 +15,7 @@ BUNDLED_TEAMS: Dict[str, Dict[str, Any]] = {
         "id": "core_executive_suite",
         "name": "Core Executive Suite",
         "category": "Leadership & Governance",
-        "description": "Autonomous C-Suite governance team modeled after Paperclip's core executive structure. Coordinates cross-departmental execution, board reporting, and capital allocation.",
+        "description": "Autonomous C-Suite governance team. Coordinates cross-departmental execution, board reporting, strategic alignment, and capital allocation.",
         "icon": "👑",
         "agents": [
             {
@@ -219,8 +218,8 @@ BUNDLED_TEAMS: Dict[str, Dict[str, Any]] = {
 }
 
 
-class PaperclipCatalogManager:
-    """Manages the catalog and deployment of bundled Paperclip agent teams."""
+class EnterpriseTeamCatalog:
+    """Manages the catalog and deployment of bundled autonomous agent teams."""
 
     @staticmethod
     def list_teams() -> List[Dict[str, Any]]:
@@ -315,3 +314,7 @@ class PaperclipCatalogManager:
             "deployed_count": len(deployed_agents),
             "agents": deployed_agents
         }
+
+# Aliases for backwards compatibility
+SquadCatalogManager = EnterpriseTeamCatalog
+TeamCatalogManager = EnterpriseTeamCatalog

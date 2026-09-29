@@ -1,6 +1,5 @@
 """
-RoboAssistant Company OS — Paperclip Operational Skills Catalog
-Transplanted from Paperclip's production skill guides and execution protocols.
+RoboAssistant Company OS — Operational Skills & SOPs Catalog
 Provides deterministic, standard operating procedures (SOPs) for autonomous agents.
 """
 
@@ -12,7 +11,7 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "name": "Autonomous Task Planning & Decomposition",
         "category": "Orchestration",
         "description": "Standard procedure for decomposing high-level company goals into unambiguous, actionable child tasks with clear acceptance criteria.",
-        "author": "Paperclip Core",
+        "author": "Enterprise Core",
         "version": "2.4.0",
         "sop_rules": [
             "Never create child tasks with descriptions that say 'see parent' — every task must be self-contained and independently executable.",
@@ -27,7 +26,7 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "name": "Deterministic Issue Triage & Prioritization",
         "category": "Operations",
         "description": "Lifecycle contract for processing incoming tasks, assigning priority buckets, and ensuring single-worker task locks.",
-        "author": "Paperclip Core",
+        "author": "Enterprise Core",
         "version": "1.8.0",
         "sop_rules": [
             "Process tasks strictly in order: in_progress tasks first, then in_review, then todo.",
@@ -42,7 +41,7 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "name": "Executive Board Reporting & Approval Escalation",
         "category": "Governance",
         "description": "SOP for compiling high-signal briefings, unblocking stalled initiatives, and presenting structured proposals for owner sign-off.",
-        "author": "Paperclip Core",
+        "author": "Enterprise Core",
         "version": "2.1.0",
         "sop_rules": [
             "Synthesize outcomes into three core metrics: Capital efficiency, SLA completion rate, and verified truth delta.",
@@ -56,7 +55,7 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "name": "Automated Code Review & Integrity Gate",
         "category": "Engineering",
         "description": "Enforces strict static verification, security scanning, and test pass requirements before accepting software changes.",
-        "author": "Paperclip Core",
+        "author": "Enterprise Core",
         "version": "3.0.0",
         "sop_rules": [
             "Verify all files match formatting and lint standards with zero warnings.",
@@ -70,7 +69,7 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "name": "Autonomous Incident Recovery & Exponential Backoff",
         "category": "Resilience",
         "description": "Resilience protocol handling agent timeouts, API exhaustion (e.g. 429 errors), and state restoration.",
-        "author": "Paperclip Core",
+        "author": "Enterprise Core",
         "version": "2.2.0",
         "sop_rules": [
             "Apply exponential backoff (base * 2^failures) with randomized symmetric jitter on API rate limit encounters.",
@@ -82,8 +81,8 @@ SKILLS_CATALOG: Dict[str, Dict[str, Any]] = {
 }
 
 
-class PaperclipSkillRegistry:
-    """Registry providing access to Paperclip operational skills."""
+class OperatingSkillRegistry:
+    """Registry providing access to enterprise operational skills."""
 
     @staticmethod
     def list_skills() -> List[Dict[str, Any]]:
@@ -92,3 +91,7 @@ class PaperclipSkillRegistry:
     @staticmethod
     def get_skill(skill_id: str) -> Optional[Dict[str, Any]]:
         return SKILLS_CATALOG.get(skill_id)
+
+# Aliases for backwards compatibility
+ExecutiveSkillRegistry = OperatingSkillRegistry
+SkillRegistry = OperatingSkillRegistry

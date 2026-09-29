@@ -1,6 +1,5 @@
 /**
  * RoboAssistant Agent Engine — Core Orchestration Entrypoint
- * Transplanted from Paperclip open architecture into RoboAssistant OS.
  *
  * Exposes:
  * - HeartbeatCoordinator & HeartbeatPolicy

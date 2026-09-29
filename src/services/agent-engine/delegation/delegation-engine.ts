@@ -1,6 +1,5 @@
 /**
  * RoboAssistant Agent Engine — Task Delegation & Orchestration Engine
- * Transplanted and adapted from Paperclip Board-Operator Delegation Model.
  *
  * Provides:
  * 1. Goal decomposition into specialized subtasks

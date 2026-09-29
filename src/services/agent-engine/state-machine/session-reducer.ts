@@ -1,6 +1,5 @@
 /**
  * RoboAssistant Agent Engine — Session State Machine Reducer
- * Transplanted from Paperclip Runner Protocol (PRP).
  *
  * Implements deterministic replay and projection over agent execution events,
  * maintaining timeline integrity, detecting sequence gaps, and tracking turn/item states.
@@ -276,7 +275,7 @@ export function createSessionSnapshotFromMetadata(input: {
   capabilities: PrpCapabilities | PrpCapabilitiesV2;
 }): SessionSnapshot {
   return {
-    schema: "paperclip.prp.session-snapshot.v1",
+    schema: "companyos.runtime.session-snapshot.v1",
     fixtureName: input.fixtureName,
     identity: structuredClone(input.identity),
     capabilities: structuredClone(input.capabilities),

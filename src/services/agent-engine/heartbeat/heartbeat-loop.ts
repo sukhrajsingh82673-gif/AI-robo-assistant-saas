@@ -1,6 +1,5 @@
 /**
  * RoboAssistant Agent Engine — Agent Heartbeat Execution Loop
- * Transplanted and adapted from Paperclip Heartbeat Protocol.
  *
  * Implements the core 8-step lifecycle:
  * 1. Identity Check
