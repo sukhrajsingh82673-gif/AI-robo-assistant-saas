@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZONATA — Universal AI Company OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50%' y='68%' font-size='60' font-weight='800' fill='white' text-anchor='middle'>Z</text></svg>" />
+</head>
+<body>
+
+  <!-- Mobile Drawer Backdrop Overlay -->
+  <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="toggleSidebarDrawer(false)"></div>
+
+  <!-- ========================================================================
+       1. AUTHENTICATION PAGE (Entry Point)
+       ======================================================================== -->
+  <div id="authContainer">
+    <!-- Rendered dynamically by app.js:renderAuth() -->
+  </div>
+
+  <!-- ========================================================================
+       2. MAIN SAAS SHELL (Post-Authentication)
+       ======================================================================== -->
+  <div id="appShell" style="display:none;">
+
+    <!-- Left Sidebar Navigation -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand">
+        <div class="brand-monogram">
+          <span class="monogram-letter">Z</span>
+        </div>
+        <div class="brand-meta">
+          <span class="brand-title">ZONATA</span>
+          <span class="brand-subtitle">AI Company OS</span>
+        </div>
+        <button class="sidebar-close-btn" onclick="toggleSidebarDrawer(false)" title="Close Navigation">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Navigation Menu: 5 Primary Core Areas -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Operations Control</div>
+
+        <button class="nav-item active" data-nav="overview" id="navItemOverview">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          </div>
+          <span class="nav-label">Overview</span>
+        </button>
+
+        <button class="nav-item" data-nav="company" id="navItemCompany">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
+          </div>
+          <span class="nav-label">Company</span>
+        </button>
+
+        <button class="nav-item" data-nav="ceo" id="navItemCeo">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <span class="nav-label">AI CEO</span>
+          <span class="nav-pill">Core</span>
+        </button>
+
+        <button class="nav-item" data-nav="tools" id="navItemTools">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <span class="nav-label">Tools & Factory</span>
+        </button>
+
+        <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
+
+        <button class="nav-item" data-nav="settings" id="navItemSettings">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <span class="nav-label">Settings</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Host Profile Card -->
+      <div class="sidebar-footer">
+        <div class="host-profile-card">
+          <div class="host-avatar" id="hostAvatarLetter">S</div>
+          <div class="host-meta">
+            <div class="host-name" id="hostNameDisplay">Sukhraj Singh</div>
+            <div class="host-role-badge">
+              <span class="pulse-indicator"></span>
+              <span>Host Online • tnt_primary</span>
+            </div>
+          </div>
+          <button class="host-action-btn" id="signOutBtn" title="Sign Out of Session">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Container -->
+    <div class="app-workspace">
+
+      <!-- Top Command Bar -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="topbar-menu-toggle" id="menuToggleBtn" onclick="toggleSidebarDrawer()" title="Toggle Navigation Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+
+          <!-- Contextual Breadcrumbs -->
+          <nav class="topbar-breadcrumbs" id="topbarBreadcrumbs" aria-label="Breadcrumb">
+            <span class="breadcrumb-item root">ZONATA</span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active" id="breadcrumbActive">Overview</span>
+          </nav>
+        </div>
+
+        <!-- Universal Command & Search Bar -->
+        <div class="topbar-center">
+          <div class="command-search-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="globalSearchInput" class="command-search-input" placeholder="Search companies, missions, agents, tools..." autocomplete="off" />
+            <kbd class="shortcut-badge">⌘K</kbd>
+          </div>
+        </div>
+
+        <!-- Topbar Controls: Context Switcher, Status, Theme, Notifications -->
+        <div class="topbar-right">
+          <!-- Global Company Context Switcher -->
+          <div class="company-context-selector-wrapper" title="Active Company Operating Context">
+            <svg class="context-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
+            <select id="globalCompanySelector" class="company-context-select" onchange="handleGlobalCompanyContextChange(this.value)">
+              <!-- Populated dynamically without duplicates -->
+            </select>
+          </div>
+
+          <!-- Autonomous System Status Indicator -->
+          <div class="status-indicator-pill" title="ZONATA Autonomous Execution Engine Status">
+            <span class="status-pulse-dot"></span>
+            <span class="status-text">Kernel Active</span>
+          </div>
+
+          <!-- Notifications Alert Trigger -->
+          <button class="topbar-icon-btn" onclick="showToast('2 pending owner approvals in Decision Room', 'warning')" title="Pending Approvals & Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="topbar-notification-badge"></span>
+          </button>
+
+          <!-- Theme Toggle (Dark / Light) -->
+          <button class="topbar-icon-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">
+            <svg class="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Workspace Views Container -->
+      <main class="workspace-content">
+        <div class="workspace-inner">
+          <section id="view-overview" class="view-section active"></section>
+          <section id="view-company" class="view-section"></section>
+          <section id="view-ceo" class="view-section"></section>
+          <section id="view-tools" class="view-section"></section>
+          <section id="view-settings" class="view-section"></section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL DIALOG CONTAINER
+       ======================================================================== -->
+  <div id="modalOverlay" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Modal Title</h3>
+        <button class="btn-close-modal" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modalBody">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>
