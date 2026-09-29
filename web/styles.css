@@ -1087,6 +1087,7 @@ canvas {
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 12px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .ceo-tab-btn {

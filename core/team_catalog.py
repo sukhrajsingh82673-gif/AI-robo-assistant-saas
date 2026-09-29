@@ -246,7 +246,12 @@ class EnterpriseTeamCatalog:
 
         company = portfolio_manager.get_company(company_id)
         if not company:
-            raise ValueError(f"Company '{company_id}' not found in portfolio")
+            comps = portfolio_manager.list_companies()
+            if comps:
+                company = comps[0]
+                company_id = company.company_id
+            else:
+                raise ValueError(f"Company '{company_id}' not found in portfolio")
 
         deployed_agents = []
         now = time.time()

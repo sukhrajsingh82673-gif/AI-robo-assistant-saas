@@ -558,9 +558,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/agent-engine/teams/deploy":
             company_id = req_data.get("company_id")
-            if not company_id:
-                companies = portfolio.list_companies()
-                company_id = companies[0].company_id if companies else None
+            companies = portfolio.list_companies()
+            if not company_id or not portfolio.get_company(company_id):
+                if companies:
+                    company_id = companies[0].company_id
+                else:
+                    comp = CompanyOnboardingEngine.onboard_new_company(
+                        name="CloudScale Digital SaaS",
+                        industry="Technology & SaaS"
+                    )
+                    portfolio.register_company(comp)
+                    company_id = comp.company_id
             team_id = req_data.get("team_id", "core_executive_suite")
             try:
                 res = EnterpriseTeamCatalog.deploy_team_to_company(
