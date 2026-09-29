@@ -14,6 +14,7 @@ import sys
 import urllib.parse
 import platform
 import time
+import uuid
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
@@ -52,6 +53,9 @@ from workloads.manufacturing import run_manufacturing_bottleneck_analysis
 from workloads.saas import run_saas_churn_analysis
 from workloads.personal import run_personal_file_hygiene
 from workloads.universal_computer import run_universal_capability_discovery_task
+from core.paperclip_catalog import PaperclipCatalogManager, BUNDLED_TEAMS
+from core.paperclip_skills import PaperclipSkillRegistry, SKILLS_CATALOG
+from src.services.agent_engine import heartbeat_coordinator, delegation_engine, config_manager
 
 # Initialize Core Subsystems
 LEDGER_FILE = os.path.join(BASE_DIR, "storage/evidence/audit_ledger.jsonl")
@@ -202,6 +206,38 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             q = urllib.parse.parse_qs(parsed.query).get("q", [""])[0]
             search_res = GlobalSearchEngine.search_all(tenant_id, q)
             self._send_json(search_res)
+            return
+
+        elif path == "/api/agent-engine/status":
+            self._send_json({
+                "status": "OPERATIONAL",
+                "default_adapter": config_manager.get("default_model_adapter", "gemini_local"),
+                "heartbeat_interval_seconds": config_manager.get("heartbeat_interval_seconds", 30),
+                "active_runs_count": len(heartbeat_coordinator.runs),
+                "active_plans_count": len(delegation_engine.plans),
+                "total_bundled_teams": len(BUNDLED_TEAMS),
+                "total_skills": len(SKILLS_CATALOG)
+            })
+            return
+
+        elif path == "/api/agent-engine/teams":
+            teams = PaperclipCatalogManager.list_teams()
+            self._send_json({"teams": teams})
+            return
+
+        elif path == "/api/agent-engine/skills":
+            skills = PaperclipSkillRegistry.list_skills()
+            self._send_json({"skills": skills})
+            return
+
+        elif path == "/api/agent-engine/plans":
+            plans = list(delegation_engine.plans.values())
+            self._send_json({"plans": plans})
+            return
+
+        elif path == "/api/agent-engine/heartbeats":
+            runs = list(heartbeat_coordinator.runs.values())
+            self._send_json({"runs": runs[-20:] if runs else []})
             return
 
         elif path == "/api/morning-meeting":
@@ -518,6 +554,93 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             nonce = req_data.get("nonce", f"nonce_{uuid.uuid4().hex}")
             res = WebhookSecurityGateway.verify_webhook(payload, sig, secret, ts, nonce)
             self._send_json(res)
+            return
+
+        elif path == "/api/agent-engine/teams/deploy":
+            company_id = req_data.get("company_id")
+            if not company_id:
+                companies = portfolio.list_companies()
+                company_id = companies[0].company_id if companies else None
+            team_id = req_data.get("team_id", "core_executive_suite")
+            try:
+                res = PaperclipCatalogManager.deploy_team_to_company(
+                    portfolio_manager=portfolio,
+                    company_id=company_id,
+                    team_id=team_id,
+                    tenant_id=tenant_id
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/agent-engine/heartbeat":
+            agent_id = req_data.get("agent_id", "agent_ceo_001")
+            role = req_data.get("role", "Chief Executive Officer (CEO)")
+            company_id = req_data.get("company_id")
+            if not company_id:
+                companies = portfolio.list_companies()
+                company_id = companies[0].company_id if companies else "comp_primary"
+            trigger = req_data.get("trigger", "manual")
+            tasks = req_data.get("tasks", [])
+            res = heartbeat_coordinator.execute_heartbeat_turn(
+                agent_id=agent_id,
+                company_id=company_id,
+                role=role,
+                trigger=trigger,
+                tasks=tasks
+            )
+            self._send_json(res)
+            return
+
+        elif path == "/api/agent-engine/delegate":
+            goal_id = req_data.get("goal_id", f"goal_{uuid.uuid4().hex[:8]}")
+            goal_title = req_data.get("goal_title", "Execute Strategic Growth Initiative")
+            lead_agent_id = req_data.get("lead_agent_id", "agent_ceo")
+            subtasks = req_data.get("subtasks", [])
+            requires_board_approval = req_data.get("requires_board_approval", False)
+            if not subtasks:
+                subtasks = [
+                    {"title": "Formulate Architectural Roadmap", "target_role": "Chief Technology Officer (CTO)", "priority": "high", "dependencies": []},
+                    {"title": "Draft Feature Specifications", "target_role": "Lead Product Manager", "priority": "high", "dependencies": []},
+                    {"title": "Implement Core API", "target_role": "Senior Fullstack Engineer", "priority": "urgent", "dependencies": ["s1"]},
+                    {"title": "Verify Security & CI/CD", "target_role": "QA & Reliability Engineer", "priority": "medium", "dependencies": ["s2"]}
+                ]
+            try:
+                plan = delegation_engine.create_delegation_plan(
+                    goal_id=goal_id,
+                    goal_title=goal_title,
+                    lead_agent_id=lead_agent_id,
+                    subtasks=subtasks,
+                    requires_board_approval=requires_board_approval
+                )
+                self._send_json({"success": True, "plan": plan})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/agent-engine/plans/approve":
+            goal_id = req_data.get("goal_id")
+            plan = delegation_engine.plans.get(goal_id)
+            if plan:
+                plan["approval_status"] = "approved"
+                for st in plan["subtasks"]:
+                    if st["status"] == "pending_approval":
+                        st["status"] = "assigned" if not st.get("dependencies") else "blocked"
+                self._send_json({"success": True, "plan": plan})
+            else:
+                self._send_json({"error": f"Plan '{goal_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/agent-engine/subtasks/complete":
+            goal_id = req_data.get("goal_id")
+            subtask_id = req_data.get("subtask_id")
+            result_text = req_data.get("result", "Completed successfully")
+            try:
+                res = delegation_engine.complete_subtask(goal_id, subtask_id, result_text)
+                self._send_json({"success": True, "update": res, "plan": delegation_engine.plans.get(goal_id)})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
             return
 
         elif path == "/api/handover/package":
