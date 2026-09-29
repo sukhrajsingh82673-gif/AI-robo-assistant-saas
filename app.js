@@ -19,7 +19,13 @@ const state = {
   activityLogs: [],
   ceoTab: 'employees',
   toolsCategory: 'all',
-  settingsTab: 'account'
+  settingsTab: 'account',
+  agentEnginePlans: [],
+  agentEngineTeams: [],
+  agentEngineSkills: [],
+  agentEngineRuns: [],
+  agentEngineStatus: null,
+  agentEngineSynced: false
 };
 
 // Default Sample Seed if local storage / API is initial
@@ -378,8 +384,12 @@ function toggleTheme() {
   showToast(`Switched to ${next} theme`, 'info');
 }
 
-// Main View Router
+// Main View Router (Directive 9: Overview, Company, AI CEO, Tools, Settings)
 function switchNav(navKey) {
+  if (navKey === 'agent-engine') {
+    state.ceoTab = 'squads';
+    navKey = 'ceo';
+  }
   state.activeNav = navKey;
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-nav') === navKey);
@@ -398,7 +408,6 @@ function switchNav(navKey) {
   else if (navKey === 'company') renderCompanySection();
   else if (navKey === 'ceo') renderCeoSection();
   else if (navKey === 'tools') renderToolsSection();
-  else if (navKey === 'agent-engine') renderAgentEngine();
   else if (navKey === 'settings') renderSettingsSection();
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1367,11 +1376,47 @@ window.openCompanyInCeo = function(cid) {
 };
 
 // ==========================================================================
-// 4. AI CEO SECTION (The Heart of the SaaS)
+// 4. AI CEO SECTION (The Heart of the SaaS & Universal Execution Intelligence)
 // ==========================================================================
+
+// Centralized Agent Engine & Autonomous Workforce Sync
+async function syncAgentEngineData() {
+  try {
+    const [stRes, tmRes, skRes, plRes, hbRes] = await Promise.all([
+      fetch('/api/agent-engine/status').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/teams').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/skills').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/plans').then(r => r.json()).catch(() => null),
+      fetch('/api/agent-engine/heartbeats').then(r => r.json()).catch(() => null),
+    ]);
+    if (stRes) state.agentEngineStatus = stRes;
+    if (tmRes && tmRes.teams) state.agentEngineTeams = tmRes.teams;
+    if (skRes && skRes.skills) state.agentEngineSkills = skRes.skills;
+    if (plRes && plRes.plans) state.agentEnginePlans = plRes.plans;
+    if (hbRes && hbRes.runs) state.agentEngineRuns = hbRes.runs;
+    state.agentEngineSynced = true;
+  } catch (err) {
+    console.warn("Could not sync agent-engine live API:", err);
+  }
+}
+
+window.refreshAutonomousEngineUI = async function() {
+  await syncAgentEngineData();
+  if (state.activeNav === 'ceo') {
+    renderCeoSection();
+  }
+};
+
 function renderCeoSection() {
   const container = document.getElementById('view-ceo');
   if (!container) return;
+
+  if (!state.agentEngineSynced) {
+    state.agentEngineSynced = true;
+    syncAgentEngineData().then(() => {
+      renderCeoSection();
+    });
+  }
 
   if (state.companies.length === 0) {
     container.innerHTML = `
@@ -1403,9 +1448,13 @@ function renderCeoSection() {
           <span>AI CEO — Central Operating Intelligence</span>
           <span class="badge badge-emerald">Managing: ${activeComp.name}</span>
         </h2>
-        <p>The AI CEO dynamically designs the organization, hires specialized AI employees on-demand, executes missions, and compiles verified reports.</p>
+        <p>The AI CEO dynamically designs the organization, orchestrates autonomous squads, executes DAG taskgraphs, and compiles verified reports.</p>
       </div>
-      <div style="display:flex; gap:10px;">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn-secondary" onclick="triggerAutonomousHeartbeat()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Heartbeat Pulse
+        </button>
         <button class="btn-secondary" onclick="openSimulateMissionModal()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Digital Twin Simulation
@@ -1442,9 +1491,13 @@ function renderCeoSection() {
             </div>
             ${c.id === activeComp.id ? `
               <div class="tree-children">
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('structure')">├── Structure (${c.departments.length} Depts)</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('employees')">├── AI Employees (${state.workforce.filter(w=>w.companyId===c.id).length})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('squads')">├── Autonomous Squads (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('taskgraph')">├── TaskGraph & DAG (${state.agentEnginePlans ? state.agentEnginePlans.length : 0})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('heartbeats')">├── Heartbeats & Logs (${state.agentEngineRuns ? state.agentEngineRuns.length : 0})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('skills')">├── Operational SOPs (${state.agentEngineSkills ? state.agentEngineSkills.length : 5})</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('missions')">├── Missions (${state.missions.filter(m=>m.companyId===c.id).length})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('structure')">├── Structure (${c.departments.length} Depts)</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('reports')">└── Verified Reports</div>
               </div>
             ` : ''}
@@ -1452,7 +1505,7 @@ function renderCeoSection() {
         `).join('')}
       </div>
 
-      <!-- Right Column: Subtabs (Employees, Missions, Reports, Structure) -->
+      <!-- Right Column: Subtabs (Employees, Squads, TaskGraph, Heartbeats, Skills, Missions, Structure, Reports) -->
       <div>
         <!-- Subnav Buttons -->
         <div class="ceo-subnav">
@@ -1460,17 +1513,33 @@ function renderCeoSection() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             AI Employees (${compWorkforce.length})
           </button>
+          <button class="ceo-tab-btn ${state.ceoTab === 'squads' ? 'active' : ''}" onclick="switchCeoTab('squads')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            Autonomous Squads (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})
+          </button>
+          <button class="ceo-tab-btn ${state.ceoTab === 'taskgraph' ? 'active' : ''}" onclick="switchCeoTab('taskgraph')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            TaskGraph & DAG (${state.agentEnginePlans ? state.agentEnginePlans.length : 0})
+          </button>
+          <button class="ceo-tab-btn ${state.ceoTab === 'heartbeats' ? 'active' : ''}" onclick="switchCeoTab('heartbeats')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Heartbeat & Logs (${state.agentEngineRuns ? state.agentEngineRuns.length : 0})
+          </button>
+          <button class="ceo-tab-btn ${state.ceoTab === 'skills' ? 'active' : ''}" onclick="switchCeoTab('skills')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Operational SOPs (${state.agentEngineSkills ? state.agentEngineSkills.length : 5})
+          </button>
           <button class="ceo-tab-btn ${state.ceoTab === 'missions' ? 'active' : ''}" onclick="switchCeoTab('missions')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Missions & Objectives (${compMissions.length})
           </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'reports' ? 'active' : ''}" onclick="switchCeoTab('reports')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Executive Reports
-          </button>
           <button class="ceo-tab-btn ${state.ceoTab === 'structure' ? 'active' : ''}" onclick="switchCeoTab('structure')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Organizational Structure
+            Structure
+          </button>
+          <button class="ceo-tab-btn ${state.ceoTab === 'reports' ? 'active' : ''}" onclick="switchCeoTab('reports')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Reports
           </button>
         </div>
 
@@ -1538,6 +1607,14 @@ function renderActiveCeoTab(comp, workforce, missions) {
         </div>
       </div>
     `;
+  } else if (state.ceoTab === 'squads') {
+    return renderTeamsCatalogTab();
+  } else if (state.ceoTab === 'taskgraph') {
+    return renderDelegationTab();
+  } else if (state.ceoTab === 'heartbeats') {
+    return renderHeartbeatsTab();
+  } else if (state.ceoTab === 'skills') {
+    return renderSkillsTab();
   } else if (state.ceoTab === 'missions') {
     return `
       <div>
@@ -3617,7 +3694,7 @@ function renderTeamsCatalogTab() {
       </div>
       <div>
         <select id="deployTargetCompanySelect" class="form-select" style="font-size:12px; padding:6px 12px; background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); border-radius:var(--radius-md);">
-          ${state.companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+          ${state.companies.map(c => `<option value="${c.id}" ${c.id === (state.activeCompanyId || c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -3953,7 +4030,7 @@ window.deploySquadToCompany = async function(teamId) {
       if (empRes && empRes.employees) {
         state.workforce = empRes.employees;
       }
-      renderAgentEngine();
+      refreshAutonomousEngineUI();
     } else {
       showToast(data.error || 'Failed to deploy squad', 'error');
     }
@@ -3979,7 +4056,7 @@ window.triggerAutonomousHeartbeat = async function() {
     });
     const data = await res.json();
     showToast(`Heartbeat turn executed for ${data.agent_id}. Status: ${data.status}`, 'success');
-    renderAgentEngine();
+    refreshAutonomousEngineUI();
   } catch (err) {
     showToast(`Heartbeat error: ${err.message}`, 'error');
   }
@@ -4045,8 +4122,8 @@ window.submitNewDelegationPlan = async function(e) {
     const data = await res.json();
     if (data.success) {
       showToast('Delegation plan formulated with DAG dependencies.', 'success');
-      state.agentEngineTab = 'delegation';
-      renderAgentEngine();
+      state.ceoTab = 'taskgraph';
+      refreshAutonomousEngineUI();
     } else {
       showToast(data.error || 'Failed to create plan', 'error');
     }
@@ -4066,7 +4143,7 @@ window.approveDelegationPlan = async function(goalId) {
     const data = await res.json();
     if (data.success) {
       showToast('Plan approved. Root tasks dispatched to specialist agents!', 'success');
-      renderAgentEngine();
+      refreshAutonomousEngineUI();
     }
   } catch (err) {
     showToast(`Approval failed: ${err.message}`, 'error');
@@ -4090,7 +4167,7 @@ window.simulateCompleteSubtask = async function(goalId, subtaskId) {
       } else {
         showToast('Step marked complete.', 'info');
       }
-      renderAgentEngine();
+      refreshAutonomousEngineUI();
     }
   } catch (err) {
     showToast(`Completion error: ${err.message}`, 'error');
