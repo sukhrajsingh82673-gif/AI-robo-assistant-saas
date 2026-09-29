@@ -1,6 +1,7 @@
 """
-RoboAssistant Company OS — Autonomous Teams & Agent Catalog
-Provides pre-configured enterprise specialist squads ready for 1-click deployment into any company.
+RoboAssistant Company OS — Autonomous Squad Templates & Capability Library
+Provides pre-configured reference squads for rapid prototyping while dynamic
+organization synthesis remains the authoritative default.
 """
 
 from typing import Dict, List, Any, Optional

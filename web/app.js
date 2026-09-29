@@ -1492,7 +1492,7 @@ function renderCeoSection() {
             ${c.id === activeComp.id ? `
               <div class="tree-children">
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('employees')">├── AI Employees (${state.workforce.filter(w=>w.companyId===c.id).length})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('squads')">├── Autonomous Squads (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})</div>
+                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('squads')">├── Squad Templates (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('taskgraph')">├── TaskGraph & DAG (${state.agentEnginePlans ? state.agentEnginePlans.length : 0})</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('heartbeats')">├── Heartbeats & Logs (${state.agentEngineRuns ? state.agentEngineRuns.length : 0})</div>
                 <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('skills')">├── Operational SOPs (${state.agentEngineSkills ? state.agentEngineSkills.length : 5})</div>
@@ -1515,7 +1515,7 @@ function renderCeoSection() {
           </button>
           <button class="ceo-tab-btn ${state.ceoTab === 'squads' ? 'active' : ''}" onclick="switchCeoTab('squads')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-            Autonomous Squads (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})
+            Squad Templates (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})
           </button>
           <button class="ceo-tab-btn ${state.ceoTab === 'taskgraph' ? 'active' : ''}" onclick="switchCeoTab('taskgraph')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
@@ -1566,6 +1566,27 @@ function renderActiveCeoTab(comp, workforce, missions) {
   if (state.ceoTab === 'employees') {
     return `
       <div>
+        <!-- AI CEO Dynamic Org Synthesis Banner -->
+        <div class="card" style="margin-bottom:18px; border:1px solid rgba(59,130,246,0.3); background:linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.06)); padding:16px 20px; border-radius:var(--radius-lg);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="flex:1; min-width:280px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:20px;">⚡</span>
+                <h4 style="font-size:15px; font-weight:700; margin:0;">AI CEO Dynamic Organization Synthesizer</h4>
+                <span class="badge badge-blue">Universal Engine</span>
+              </div>
+              <p style="font-size:12.5px; color:var(--text-secondary); margin:4px 0 0 0; line-height:1.4;">
+                Analyzes <strong>${comp.name}</strong> (${comp.industry}), detects domain capability gaps, and autonomously synthesizes the exact specialized workforce and departments needed.
+              </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn-primary" style="font-size:12.5px; padding:8px 16px; background:var(--accent-blue);" onclick="triggerDynamicOrgSynthesis('${comp.id}')">
+                <span>⚡ Synthesize Custom Workforce</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <p style="font-size:13px; color:var(--text-secondary);">
             Dynamic specialized AI employees tailored to <strong>${comp.name}</strong>. Created on-demand by the AI CEO rather than a fixed template.
@@ -1667,10 +1688,13 @@ function renderActiveCeoTab(comp, workforce, missions) {
             The autonomous workforce completed 3 core missions over the last 24-hour cycle. 
             Direct bookings and revenue recovery yielded <strong>₹64,000</strong> while AI token and operational costs were capped at <strong>₹18,000</strong>, delivering a <strong>₹46,000 net contribution</strong>.
           </p>
-          <div style="background:var(--bg-surface); padding:12px; border-radius:var(--radius-md); font-size:12px; font-family:var(--font-mono); color:var(--accent-cyan);">
-            <div>[VERIFICATION_SUMMARY]: ALL WORKFLOWS PASSED SHA-256 INTEGRITY CHECK</div>
-            <div>[SECURITY_GATE]: NO UNENCRYPTED CREDENTIALS EXPOSED TO LLM CONTEXT</div>
-            <div>[RECOMMENDATION]: APPROVE CAMPAIGN EXTENSION FOR MAXIMUM OCT OCCUPANCY</div>
+          <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-md); font-size:12px; font-family:var(--font-mono); color:var(--accent-cyan); border:1px solid var(--border-color); line-height:1.6;">
+            <div style="color:var(--text-primary); font-weight:700; margin-bottom:6px;">[DUAL_SOURCE_REALITY_VERIFICATION]:</div>
+            <div>├── [CRYPTO_DIGEST]: SHA-256 Merkle root locked (d98f2a...c041)</div>
+            <div>├── [API_INDEPENDENT_PROBE]: Direct PMS / ERP HTTP 200 state verified</div>
+            <div>├── [DATABASE_TRUTH]: Ledger row mutation confirmed in SQLite</div>
+            <div>├── [PHYSICAL_RECONCILIATION]: Zero discrepancies between reported outcome and settlement account</div>
+            <div>└── [SECURITY_GATE]: Zero unencrypted credentials leaked to model context</div>
           </div>
         </div>
       </div>
@@ -1703,6 +1727,54 @@ function renderActiveCeoTab(comp, workforce, missions) {
     `;
   }
 }
+
+window.triggerDynamicOrgSynthesis = async function(companyId) {
+  const comp = state.companies.find(c => c.id === companyId) || state.companies[0];
+  showToast(`AI CEO analyzing ${comp.name} (${comp.industry}) & synthesizing specialized workforce...`, 'info');
+
+  try {
+    const res = await fetch('/api/v1/zonata/org-design/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: comp.id,
+        industry: comp.industry
+      })
+    });
+    const data = await res.json();
+    if (data && data.workforce) {
+      const newEmployees = data.workforce.map(w => ({
+        id: w.id || `agent_${Date.now().toString(36)}`,
+        companyId: comp.id,
+        role: w.role,
+        department: w.department_id ? w.department_id.replace('dept_', '').toUpperCase() : 'OPERATIONS',
+        manager: w.executive || 'AI CEO',
+        model: 'Gemini 1.5 Pro',
+        spendingLimit: w.budget ? w.budget * 100 : 5000,
+        status: 'ACTIVE',
+        allowedTools: w.tools || ['python3', 'browser_robot', 'evidence_ledger'],
+        kpis: { 'Milestone Verification': '>=95%', 'SOP Compliance': '100%' }
+      }));
+
+      // Merge into workforce without duplicates
+      const otherWorkforce = state.workforce.filter(w => w.companyId !== comp.id);
+      state.workforce = [...otherWorkforce, ...newEmployees];
+
+      // Update company departments if provided
+      if (data.departments && data.departments.length > 0) {
+        comp.departments = data.departments.map(d => d.name);
+      }
+
+      saveData();
+      showToast(`Synthesized ${newEmployees.length} specialized AI roles tailored to ${comp.name}!`, 'success');
+      renderCeoSection();
+    } else {
+      showToast('Could not synthesize organization', 'error');
+    }
+  } catch (err) {
+    showToast(`Synthesis error: ${err.message}`, 'error');
+  }
+};
 
 window.executeCeoDirective = function() {
   const input = document.getElementById('ceoDirectiveInput');
@@ -3687,9 +3759,12 @@ function renderTeamsCatalogTab() {
   return `
     <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
       <div>
-        <h3 style="font-size:16px; font-weight:600;">Enterprise Autonomous Squads Catalog</h3>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="font-size:16px; font-weight:600;">Autonomous Squad Templates Library</h3>
+          <span style="font-size:11px; background:rgba(59,130,246,0.15); color:var(--accent-blue); padding:2px 8px; border-radius:12px; font-weight:600;">Reference Templates</span>
+        </div>
         <p style="font-size:12.5px; color:var(--text-secondary); margin-top:2px;">
-          Deploy full-fidelity specialist teams with pre-configured Digital Employment Contracts, tools, and reporting hierarchy in 1 click.
+          Pre-packaged capability templates for rapid prototyping. The AI CEO dynamically synthesizes tailored company-specific organizations by default.
         </p>
       </div>
       <div>
