@@ -254,10 +254,36 @@ function clearSession() {
   localStorage.removeItem('zonata_host_session');
 }
 
+// Strict Company Entity Deduplication Engine
+function sanitizeCompanies(companies) {
+  if (!Array.isArray(companies)) return [];
+  const seenNames = new Set();
+  const seenIds = new Set();
+  const result = [];
+  for (const c of companies) {
+    if (!c || !c.name) continue;
+    const nameNorm = c.name.trim().toLowerCase();
+    const idVal = c.id;
+    if (seenNames.has(nameNorm) || (idVal && seenIds.has(idVal))) {
+      continue;
+    }
+    seenNames.add(nameNorm);
+    if (idVal) seenIds.add(idVal);
+    result.push(c);
+  }
+  return result;
+}
+
 // Load Persistent or Seed Data
 function loadData() {
   const savedCompanies = localStorage.getItem('zonata_companies');
-  state.companies = savedCompanies ? JSON.parse(savedCompanies) : INITIAL_COMPANIES;
+  let loaded = savedCompanies ? JSON.parse(savedCompanies) : INITIAL_COMPANIES;
+  state.companies = sanitizeCompanies(loaded);
+  if (state.companies.length === 0) {
+    state.companies = sanitizeCompanies(INITIAL_COMPANIES);
+  }
+  // Immediately persist sanitized list to purge old duplicate localStorage entries
+  localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
   
   const savedWorkforce = localStorage.getItem('zonata_workforce');
   state.workforce = savedWorkforce ? JSON.parse(savedWorkforce) : INITIAL_WORKFORCE;
@@ -314,10 +340,16 @@ async function syncWithBackend() {
           researchDone: true
         }));
         
-        // Merge or replace cleanly
-        if (liveCompanies.length >= 3) {
-          state.companies = liveCompanies;
-          if (!state.activeCompanyId) state.activeCompanyId = state.companies[0].id;
+        const dedupedLive = sanitizeCompanies(liveCompanies);
+        if (dedupedLive.length > 0) {
+          state.companies = dedupedLive;
+          if (!state.activeCompanyId || !state.companies.some(c => c.id === state.activeCompanyId)) {
+            state.activeCompanyId = state.companies[0].id;
+          }
+          saveData();
+          populateGlobalCompanySelector();
+          updateBreadcrumbs();
+          renderActiveNavView();
         }
       }
     }
@@ -327,11 +359,103 @@ async function syncWithBackend() {
 }
 
 function saveData() {
+  state.companies = sanitizeCompanies(state.companies);
   localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
   localStorage.setItem('zonata_workforce', JSON.stringify(state.workforce));
   localStorage.setItem('zonata_missions', JSON.stringify(state.missions));
   localStorage.setItem('zonata_custom_tools', JSON.stringify(state.customTools));
   localStorage.setItem('zonata_settings', JSON.stringify(state.settings));
+}
+
+// Global Company Context Selector Controller
+function populateGlobalCompanySelector() {
+  const sel = document.getElementById('globalCompanySelector');
+  if (!sel) return;
+  const currentVal = state.activeCompanyId || '';
+  
+  let optionsHtml = `<option value="">All Companies (Group Portfolio)</option>`;
+  const deduped = sanitizeCompanies(state.companies);
+  deduped.forEach(c => {
+    const isSelected = c.id === currentVal ? 'selected' : '';
+    optionsHtml += `<option value="${c.id}" ${isSelected}>${c.name}</option>`;
+  });
+  sel.innerHTML = optionsHtml;
+}
+
+function handleGlobalCompanyContextChange(companyId) {
+  state.activeCompanyId = companyId || null;
+  populateGlobalCompanySelector();
+  updateBreadcrumbs();
+  
+  const comp = state.companies.find(c => c.id === companyId);
+  const label = comp ? comp.name : 'All Companies (Group Portfolio)';
+  showToast(`Context active: ${label}`, 'info');
+  
+  renderActiveNavView();
+}
+
+// Contextual Breadcrumbs Controller
+function updateBreadcrumbs() {
+  const breadcrumbsNav = document.getElementById('topbarBreadcrumbs');
+  if (!breadcrumbsNav) return;
+
+  const navLabels = {
+    overview: 'Overview',
+    company: 'Company',
+    ceo: 'AI CEO',
+    tools: 'Tools & Factory',
+    settings: 'Settings'
+  };
+  const activeNavLabel = navLabels[state.activeNav] || 'Overview';
+  
+  if (state.activeCompanyId) {
+    const comp = state.companies.find(c => c.id === state.activeCompanyId);
+    if (comp) {
+      breadcrumbsNav.innerHTML = `
+        <span class="breadcrumb-item root">ZONATA</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item" style="color:var(--text-secondary); cursor:pointer;" onclick="handleGlobalCompanyContextChange('')">${comp.name}</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item active">${activeNavLabel}</span>
+      `;
+      return;
+    }
+  }
+  
+  breadcrumbsNav.innerHTML = `
+    <span class="breadcrumb-item root">ZONATA</span>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item active">${activeNavLabel}</span>
+  `;
+}
+
+// Mobile & Tablet Drawer Controller
+function toggleSidebarDrawer(forceState) {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+
+  const shouldOpen = typeof forceState === 'boolean' 
+    ? forceState 
+    : !sidebar.classList.contains('drawer-open');
+
+  if (shouldOpen) {
+    sidebar.classList.add('drawer-open');
+    if (backdrop) backdrop.classList.add('active');
+  } else {
+    sidebar.classList.remove('drawer-open');
+    if (backdrop) backdrop.classList.remove('active');
+  }
+}
+
+// Helper to re-render the currently active view
+function renderActiveNavView() {
+  const navKey = state.activeNav;
+  if (navKey === 'overview') renderOverview();
+  else if (navKey === 'company') renderCompanySection();
+  else if (navKey === 'ceo') renderCeoSection();
+  else if (navKey === 'tools') renderToolsSection();
+  else if (navKey === 'settings') renderSettingsSection();
 }
 
 // Event Listeners
@@ -368,8 +492,16 @@ function setupEventListeners() {
     });
   }
 
-  // Modal ESC handler
+  // Universal Command Palette (⌘K / Ctrl+K) & Modal ESC handler
   document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const searchEl = document.getElementById('globalSearchInput');
+      if (searchEl) {
+        searchEl.focus();
+        searchEl.select();
+      }
+    }
     if (e.key === 'Escape') closeModal();
   });
 }
@@ -391,6 +523,10 @@ function switchNav(navKey) {
     navKey = 'ceo';
   }
   state.activeNav = navKey;
+  
+  // Close mobile drawer if open
+  toggleSidebarDrawer(false);
+
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-nav') === navKey);
   });
@@ -403,12 +539,8 @@ function switchNav(navKey) {
     activeSection.classList.add('active');
   }
 
-  // Render specific view contents
-  if (navKey === 'overview') renderOverview();
-  else if (navKey === 'company') renderCompanySection();
-  else if (navKey === 'ceo') renderCeoSection();
-  else if (navKey === 'tools') renderToolsSection();
-  else if (navKey === 'settings') renderSettingsSection();
+  updateBreadcrumbs();
+  renderActiveNavView();
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -430,9 +562,17 @@ function renderApp() {
     const hostNameEl = document.getElementById('hostNameDisplay');
     if (hostNameEl) hostNameEl.textContent = state.host.name || 'Owner / Host';
     
+    const hostAvatarLetter = document.getElementById('hostAvatarLetter');
+    if (hostAvatarLetter) {
+      const name = state.host.name || 'Owner';
+      hostAvatarLetter.textContent = name.charAt(0).toUpperCase();
+    }
+    
     const hostEmailEl = document.getElementById('hostEmailDisplay');
     if (hostEmailEl) hostEmailEl.textContent = state.host.email || 'host@zonata.internal';
 
+    populateGlobalCompanySelector();
+    updateBreadcrumbs();
     switchNav(state.activeNav);
   }
 }
@@ -1257,6 +1397,8 @@ window.submitOnboardExistingCompany = function(e) {
   state.workforce.unshift(specialist);
   state.activeCompanyId = newComp.id;
   saveData();
+  populateGlobalCompanySelector();
+  updateBreadcrumbs();
   closeModal();
   showToast(`Onboarded ${name}! AI CEO synthesized organization.`, 'success');
   renderCompanySection();
@@ -1305,6 +1447,8 @@ window.submitCreateNewCompany = function(e) {
   state.workforce.unshift(specialist);
   state.activeCompanyId = newComp.id;
   saveData();
+  populateGlobalCompanySelector();
+  updateBreadcrumbs();
   closeModal();
   showToast(`Created venture ${name}! AI CEO synthesized company hierarchy.`, 'success');
   renderCompanySection();

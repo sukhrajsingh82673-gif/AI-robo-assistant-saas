@@ -34,8 +34,13 @@ class CompanyPortfolioManager:
     def _load_existing_from_db(self):
         try:
             with db.get_connection() as conn:
-                rows = conn.execute("SELECT * FROM companies WHERE tenant_id = ?", (self.tenant_id,)).fetchall()
+                rows = conn.execute("SELECT * FROM companies WHERE tenant_id = ? ORDER BY created_at ASC", (self.tenant_id,)).fetchall()
+                seen_names = set()
                 for r in rows:
+                    name_norm = (r["name"] or "").strip().lower()
+                    if name_norm in seen_names:
+                        continue
+                    seen_names.add(name_norm)
                     cid = r["company_id"]
                     # Load departments
                     depts = [dr["name"] for dr in conn.execute("SELECT name FROM departments WHERE company_id = ?", (cid,)).fetchall()]
@@ -101,6 +106,19 @@ class CompanyPortfolioManager:
             pass
 
     def register_company(self, company: OperatingContext):
+        existing = self.get_company_by_name(company.name)
+        if existing and existing.company_id != company.company_id:
+            company.company_id = existing.company_id
+        elif not existing:
+            # Also check DB for this tenant
+            try:
+                with db.get_connection() as conn:
+                    db_row = conn.execute("SELECT company_id FROM companies WHERE tenant_id = ? AND lower(trim(name)) = lower(trim(?))", (self.tenant_id, company.name)).fetchone()
+                    if db_row:
+                        company.company_id = db_row["company_id"]
+            except Exception:
+                pass
+
         self.companies[company.company_id] = company
         now = time.time()
         with db.get_connection() as conn:
@@ -190,8 +208,22 @@ class CompanyPortfolioManager:
     def get_company(self, company_id: str) -> Optional[OperatingContext]:
         return self.companies.get(company_id)
 
+    def get_company_by_name(self, name: str) -> Optional[OperatingContext]:
+        name_clean = (name or "").strip().lower()
+        for c in self.companies.values():
+            if c.name.strip().lower() == name_clean:
+                return c
+        return None
+
     def list_companies(self) -> List[OperatingContext]:
-        return list(self.companies.values())
+        seen = set()
+        deduped = []
+        for c in self.companies.values():
+            name_norm = (c.name or "").strip().lower()
+            if name_norm not in seen:
+                seen.add(name_norm)
+                deduped.append(c)
+        return deduped
 
     def onboard_company(
         self,
@@ -201,6 +233,9 @@ class CompanyPortfolioManager:
         company_type: str = "NEW",
         operating_rules: Optional[List[str]] = None
     ) -> OperatingContext:
+        existing = self.get_company_by_name(name)
+        if existing:
+            return existing
         ctx = CompanyOnboardingEngine.onboard_new_company(
             name=name,
             industry=industry,
