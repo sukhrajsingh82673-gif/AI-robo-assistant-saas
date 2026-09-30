@@ -53,6 +53,13 @@
           <span class="nav-label">Overview</span>
         </button>
 
+        <button class="nav-item" data-nav="schedule" id="navItemSchedule">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <span class="nav-label">Schedule</span>
+        </button>
+
         <button class="nav-item" data-nav="company" id="navItemCompany">
           <div class="nav-icon-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
@@ -110,6 +117,13 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           </div>
           <span class="nav-label">Tools & Factory</span>
+        </button>
+
+        <button class="nav-item" data-nav="plugins" id="navItemPlugins">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          </div>
+          <span class="nav-label">Plugins & Connections</span>
         </button>
 
         <button class="nav-item" data-nav="settings" id="navItemSettings">
@@ -198,14 +212,17 @@
       <main class="workspace-content">
         <div class="workspace-inner">
           <section id="view-overview" class="view-section active"></section>
+          <section id="view-schedule" class="view-section"></section>
           <section id="view-company" class="view-section"></section>
           <section id="view-organization" class="view-section"></section>
           <section id="view-ceo" class="view-section"></section>
+          <section id="view-meeting" class="view-section"></section>
           <section id="view-workforce" class="view-section"></section>
           <section id="view-tasks" class="view-section"></section>
           <section id="view-processes" class="view-section"></section>
           <section id="view-trustgraph" class="view-section"></section>
           <section id="view-tools" class="view-section"></section>
+          <section id="view-plugins" class="view-section"></section>
           <section id="view-settings" class="view-section"></section>
         </div>
       </main>
@@ -230,10 +247,14 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer"></div>
 
+  <!-- Floating Live Assistant Container -->
+  <div id="floatingAssistantContainer" class="floating-assistant-container"></div>
+
   <!-- Reconstructed Subsystem Scripts -->
   <script src="company_context.js"></script>
   <script src="company_workspace.js"></script>
   <script src="ai_ceo_workspace.js"></script>
+  <script src="meeting_room_workspace.js"></script>
   <script src="org_workspace.js"></script>
   <script src="workforce_workspace.js"></script>
   <script src="taskmaker_workspace.js"></script>
@@ -241,6 +262,9 @@
   <script src="trustgraph_workspace.js"></script>
   <script src="settings_enterprise.js"></script>
   <script src="tools_factory.js"></script>
+  <script src="schedule_workspace.js"></script>
+  <script src="plugins_workspace.js"></script>
+  <script src="floating_assistant.js"></script>
   <script src="overview_workspace.js"></script>
   <!-- Application Script -->
   <script src="app.js"></script>

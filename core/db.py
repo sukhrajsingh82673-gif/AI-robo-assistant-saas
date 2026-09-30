@@ -688,6 +688,158 @@ CREATE TABLE IF NOT EXISTS zonata_competitor_profiles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_zonata_comp_company ON zonata_competitor_profiles(company_id);
+
+-- 38. Universal Schedules (SaaS-Wide Planning Layer)
+CREATE TABLE IF NOT EXISTS universal_schedules (
+    schedule_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    item_type TEXT NOT NULL, -- meeting, mission_milestone, deadline, process_run, budget_review, approval_deadline, coworker_task, ai_workforce_shift, customer_touchpoint, report_generation, reminder, maintenance, compliance_audit, desktop_automation, strategic_review
+    start_time REAL NOT NULL,
+    end_time REAL,
+    recurrence TEXT NOT NULL DEFAULT 'NONE', -- NONE, DAILY, WEEKLY, MONTHLY, CRON
+    priority TEXT NOT NULL DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, URGENT
+    status TEXT NOT NULL DEFAULT 'SCHEDULED', -- SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, BLOCKED
+    assigned_to TEXT,
+    related_entity_type TEXT,
+    related_entity_id TEXT,
+    conflict_detected INTEGER NOT NULL DEFAULT 0,
+    conflict_reason TEXT,
+    metadata JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedules_company ON universal_schedules(company_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_time ON universal_schedules(start_time);
+CREATE INDEX IF NOT EXISTS idx_schedules_type ON universal_schedules(item_type);
+
+-- 39. AI CEO Meeting Sessions
+CREATE TABLE IF NOT EXISTS ai_ceo_meetings (
+    meeting_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    host_user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Ready', -- Ready, Live, Paused, Ended
+    strategic_context TEXT,
+    video_connected INTEGER NOT NULL DEFAULT 0,
+    voice_connected INTEGER NOT NULL DEFAULT 0,
+    text_connected INTEGER NOT NULL DEFAULT 1,
+    summary TEXT,
+    created_at REAL NOT NULL,
+    ended_at REAL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ceo_meetings_company ON ai_ceo_meetings(company_id);
+CREATE INDEX IF NOT EXISTS idx_ceo_meetings_status ON ai_ceo_meetings(status);
+
+-- 40. AI CEO Meeting Transcripts
+CREATE TABLE IF NOT EXISTS ai_ceo_meeting_transcripts (
+    transcript_id TEXT PRIMARY KEY,
+    meeting_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    speaker TEXT NOT NULL, -- HOST, AI CEO, SYSTEM
+    mode TEXT NOT NULL DEFAULT 'TEXT', -- TEXT, VOICE, VIDEO, ACTION
+    message TEXT NOT NULL,
+    related_context TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(meeting_id) REFERENCES ai_ceo_meetings(meeting_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_meeting_transcripts ON ai_ceo_meeting_transcripts(meeting_id);
+
+-- 41. AI CEO Strategic Decisions & Directives
+CREATE TABLE IF NOT EXISTS ai_ceo_decisions (
+    decision_id TEXT PRIMARY KEY,
+    meeting_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PROPOSED', -- PROPOSED, APPROVED, REJECTED, EXECUTED
+    decision_type TEXT NOT NULL DEFAULT 'STRATEGIC', -- STRATEGIC, MISSION, APPROVAL, BUDGET, POLICY
+    action_required TEXT,
+    signed_grant_hash TEXT,
+    created_at REAL NOT NULL,
+    decided_at REAL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ceo_decisions_company ON ai_ceo_decisions(company_id);
+
+-- 42. Floating Assistant Coworker Tasks
+CREATE TABLE IF NOT EXISTS coworker_tasks (
+    task_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL', -- PERSONAL, COMPANY
+    prompt TEXT NOT NULL,
+    target_outcome TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'INITIATED', -- INITIATED, PLANNING, AWAITING_APPROVAL, APPROVED, EXECUTING, OBSERVING, VERIFYING, COMPLETED, FAILED, REVERTED
+    permission_tier TEXT NOT NULL DEFAULT 'SAFE_BROWSE', -- SAFE_BROWSE, DESKTOP_INPUT, FILE_WRITE, CREDENTIAL_ACCESS, FINANCIAL_ACTION
+    approval_status TEXT NOT NULL DEFAULT 'AUTO', -- AUTO, PENDING, APPROVED, DENIED
+    execution_log JSON,
+    receipt_id TEXT,
+    created_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_coworker_tasks_user ON coworker_tasks(tenant_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_coworker_tasks_status ON coworker_tasks(status);
+
+-- 43. System Plugins Catalog & State
+CREATE TABLE IF NOT EXISTS system_plugins (
+    plugin_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL, -- ANALYTICS, AUTOMATION, COMMUNICATION, SECURITY, DATA_INTELLIGENCE, STORAGE
+    version TEXT NOT NULL,
+    description TEXT NOT NULL,
+    author TEXT NOT NULL DEFAULT 'ZONATA Builtin',
+    installed INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    capabilities JSON,
+    config JSON,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_plugins_tenant ON system_plugins(tenant_id);
+
+-- 44. External Connections & Integrations
+CREATE TABLE IF NOT EXISTS external_connections (
+    connection_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    service_type TEXT NOT NULL, -- PMS, ERP, CRM, SLACK, EMAIL, BANKING, CUSTOM_API
+    connector_adapter TEXT NOT NULL,
+    auth_status TEXT NOT NULL DEFAULT 'CONNECTED', -- CONNECTED, DEGRADED, FAILED, DISCONNECTED
+    health_score REAL NOT NULL DEFAULT 100.0,
+    latency_ms INTEGER NOT NULL DEFAULT 45,
+    last_sync_at REAL,
+    field_mappings JSON,
+    permission_scope JSON,
+    endpoint_url TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_connections_company ON external_connections(company_id);
 """
 
 class Database:

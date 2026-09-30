@@ -99,6 +99,10 @@
             <!-- Top Actions & View Mode Toggle -->
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
               <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn-primary" style="font-size:12.5px; padding:7px 14px; background:linear-gradient(135deg, #7c3aed, #4f46e5); color:#fff; border:none;" onclick="window.navigateTo('/ceo/meeting')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                  Meeting Room
+                </button>
                 <button class="btn-secondary" style="font-size:12.5px; padding:7px 12px;" onclick="AiCeoWorkspace.openStrategyBriefingModal()">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   Strategy Briefing
@@ -129,6 +133,7 @@
           <div class="ceo-subnav" style="display:flex; gap:6px; border-bottom:1px solid var(--border-color); overflow-x:auto; padding-bottom:2px;">
             ${[
               { id: 'overview', label: 'Executive Overview' },
+              { id: 'meeting', label: '🎥 Meeting Room' },
               { id: 'priorities', label: `Priorities (${priorities.length})` },
               { id: 'decisions', label: `Decision Room (${decisions.length})` },
               { id: 'directives', label: 'Autonomous Directives' },
@@ -572,6 +577,10 @@
     }
 
     switchTab(tabId) {
+      if (tabId === 'meeting') {
+        if (window.navigateTo) window.navigateTo('/ceo/meeting');
+        return;
+      }
       this.activeTab = tabId;
       this.render();
     }

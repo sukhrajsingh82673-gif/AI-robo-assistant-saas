@@ -89,6 +89,15 @@ voice_agent = GovernedVoiceAgent(tenant_id="tnt_primary")
 business_causality = BusinessCausalityEngine(tenant_id="tnt_primary")
 workforce_intel = WorkforceIntelligenceEngine(tenant_id="tnt_primary")
 from core.overview_service import OverviewDataService
+from core.schedule_service import UniversalScheduleService
+from core.meeting_service import AiCeoMeetingService
+from core.assistant_service import FloatingAssistantService
+from core.plugins_service import PluginsAndConnectionsService
+
+schedule_service = UniversalScheduleService(tenant_id="tnt_primary")
+meeting_service = AiCeoMeetingService(tenant_id="tnt_primary")
+assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
+plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 
 
 
@@ -771,7 +780,136 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(default_settings)
             return
 
+        # =====================================================================
+        # Prompt 03: Universal Schedule Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/schedules/recommendations":
+            company_id = query_params.get("company_id", [None])[0]
+            recs = schedule_service.get_ai_ceo_recommendations(company_id)
+            self._send_json({"recommendations": recs})
+            return
+
+        elif path == "/api/schedules":
+            company_id = query_params.get("company_id", [None])[0]
+            item_type = query_params.get("item_type", [None])[0]
+            priority = query_params.get("priority", [None])[0]
+            status = query_params.get("status", [None])[0]
+            start_after = float(query_params.get("start_after", [0])[0]) if "start_after" in query_params else None
+            start_before = float(query_params.get("start_before", [0])[0]) if "start_before" in query_params else None
+            items = schedule_service.list_schedules(company_id, item_type, priority, status, start_after, start_before)
+            self._send_json({"schedules": items, "count": len(items)})
+            return
+
+        elif path.startswith("/api/schedules/"):
+            sched_id = path.split("/")[3]
+            item = schedule_service.get_schedule(sched_id)
+            if item:
+                self._send_json(item)
+            else:
+                self._send_json({"error": "Schedule not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Prompt 03: AI CEO Meeting Room Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/meetings/active":
+            company_id = query_params.get("company_id", ["comp_primary"])[0] or "comp_primary"
+            meeting = meeting_service.get_or_create_active_meeting(company_id)
+            self._send_json(meeting)
+            return
+
+        elif path == "/api/meetings/decisions":
+            company_id = query_params.get("company_id", [None])[0]
+            decisions = meeting_service.list_decisions(company_id)
+            self._send_json({"decisions": decisions})
+            return
+
+        elif path == "/api/meetings/reports":
+            company_id = query_params.get("company_id", ["comp_primary"])[0] or "comp_primary"
+            reports = meeting_service.get_shared_reports(company_id)
+            self._send_json(reports)
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/transcripts"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            transcripts = meeting_service.get_transcripts(meeting_id)
+            self._send_json({"meeting_id": meeting_id, "transcripts": transcripts})
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/reports"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            meeting = meeting_service.get_meeting(meeting_id)
+            cid = meeting["company_id"] if meeting else "comp_primary"
+            reports = meeting_service.get_shared_reports(cid)
+            self._send_json(reports)
+            return
+
+        elif path.startswith("/api/meetings/"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            meeting = meeting_service.get_meeting(meeting_id)
+            if meeting:
+                self._send_json(meeting)
+            else:
+                self._send_json({"error": "Meeting not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Prompt 03: Floating Live Assistant & Coworker Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/assistant/coworker/tasks":
+            ws_mode = query_params.get("workspace_mode", [None])[0]
+            tasks = assistant_service.list_coworker_tasks(ws_mode)
+            self._send_json({"tasks": tasks, "count": len(tasks)})
+            return
+
+        elif path.startswith("/api/assistant/coworker/tasks/"):
+            parts = path.split("/")
+            task_id = parts[5] if len(parts) > 5 else ""
+            task = assistant_service.get_coworker_task(task_id)
+            if task:
+                self._send_json(task)
+            else:
+                self._send_json({"error": "Task not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Prompt 03: Plugins & Connections Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/plugins":
+            category = query_params.get("category", [None])[0]
+            plugins = plugins_service.list_plugins(category)
+            self._send_json({"plugins": plugins, "count": len(plugins)})
+            return
+
+        elif path.startswith("/api/plugins/"):
+            plugin_id = path.split("/")[3]
+            plugin = plugins_service.get_plugin(plugin_id)
+            if plugin:
+                self._send_json(plugin)
+            else:
+                self._send_json({"error": "Plugin not found"}, status=404)
+            return
+
+        elif path == "/api/connections":
+            company_id = query_params.get("company_id", [None])[0]
+            conns = plugins_service.list_connections(company_id)
+            self._send_json({"connections": conns, "count": len(conns)})
+            return
+
+        elif path.startswith("/api/connections/"):
+            conn_id = path.split("/")[3]
+            conn = plugins_service.get_connection(conn_id)
+            if conn:
+                self._send_json(conn)
+            else:
+                self._send_json({"error": "Connection not found"}, status=404)
+            return
+
         # Fallback to static files in WEB_DIR or SPA index.html
+
         clean_path = path.lstrip('/')
         if not clean_path:
             clean_path = 'index.html'
@@ -1583,6 +1721,149 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(settings_file, "w") as f:
                 json.dump(req_data, f, indent=2)
             self._send_json({"success": True, "settings": req_data})
+            return
+
+        # =====================================================================
+        # Prompt 03: Universal Schedule POST Handlers
+        # =====================================================================
+        elif path == "/api/schedules/parse-nl":
+            text = req_data.get("text", "")
+            cid = req_data.get("company_id", "comp_primary")
+            parsed_schedule = schedule_service.parse_natural_language(text, cid)
+            self._send_json(parsed_schedule)
+            return
+
+        elif path == "/api/schedules":
+            new_item = schedule_service.create_schedule(req_data)
+            self._send_json({"success": True, "schedule": new_item})
+            return
+
+        elif path.startswith("/api/schedules/") and path.endswith("/update"):
+            parts = path.split("/")
+            sched_id = parts[3]
+            updated = schedule_service.update_schedule(sched_id, req_data)
+            if updated:
+                self._send_json({"success": True, "schedule": updated})
+            else:
+                self._send_json({"error": "Schedule not found"}, status=404)
+            return
+
+        elif path.startswith("/api/schedules/") and path.endswith("/delete"):
+            parts = path.split("/")
+            sched_id = parts[3]
+            ok = schedule_service.delete_schedule(sched_id)
+            self._send_json({"success": ok})
+            return
+
+        # =====================================================================
+        # Prompt 03: AI CEO Meeting Room POST Handlers
+        # =====================================================================
+        elif path.startswith("/api/meetings/") and path.endswith("/start"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            meeting = meeting_service.start_meeting(meeting_id)
+            self._send_json({"success": True, "meeting": meeting})
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/end"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            summary = req_data.get("summary")
+            meeting = meeting_service.end_meeting(meeting_id, summary)
+            self._send_json({"success": True, "meeting": meeting})
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/state"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            meeting = meeting_service.update_meeting_state(meeting_id, req_data)
+            self._send_json({"success": True, "meeting": meeting})
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/message"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            msg = req_data.get("message", "")
+            mode = req_data.get("mode", "TEXT")
+            res = meeting_service.send_host_message(meeting_id, msg, mode)
+            self._send_json({"success": True, **res})
+            return
+
+        elif path == "/api/meetings/decisions":
+            cid = req_data.get("company_id", "comp_primary")
+            title = req_data.get("title", "Executive Decision")
+            desc = req_data.get("description", "")
+            dtype = req_data.get("decision_type", "STRATEGIC")
+            mid = req_data.get("meeting_id")
+            cm = bool(req_data.get("create_mission", False))
+            dec = meeting_service.record_decision(cid, title, desc, dtype, mid, cm)
+            self._send_json({"success": True, "decision": dec})
+            return
+
+        # =====================================================================
+        # Prompt 03: Floating Live Assistant & Coworker POST Handlers
+        # =====================================================================
+        elif path == "/api/assistant/chat":
+            prompt = req_data.get("prompt", "")
+            cid = req_data.get("company_id")
+            uid = req_data.get("user_id", "usr_owner")
+            chat_res = assistant_service.handle_ai_chat(prompt, cid, uid)
+            self._send_json(chat_res)
+            return
+
+        elif path == "/api/assistant/coworker/task":
+            prompt = req_data.get("prompt", "")
+            ws_mode = req_data.get("workspace_mode", "PERSONAL")
+            cid = req_data.get("company_id")
+            uid = req_data.get("user_id", "usr_owner")
+            task_res = assistant_service.create_coworker_task(prompt, ws_mode, cid, uid)
+            self._send_json(task_res)
+            return
+
+        elif path.startswith("/api/assistant/coworker/tasks/") and path.endswith("/approve"):
+            parts = path.split("/")
+            task_id = parts[5] if len(parts) > 5 else ""
+            approved = bool(req_data.get("approved", True))
+            updated_task = assistant_service.approve_coworker_task(task_id, approved)
+            self._send_json({"success": True, "task": updated_task})
+            return
+
+        # =====================================================================
+        # Prompt 03: Plugins & Connections POST Handlers
+        # =====================================================================
+        elif path.startswith("/api/plugins/") and path.endswith("/toggle-install"):
+            parts = path.split("/")
+            plugin_id = parts[3]
+            install = bool(req_data.get("install", True))
+            plg = plugins_service.toggle_plugin_install(plugin_id, install)
+            self._send_json({"success": True, "plugin": plg})
+            return
+
+        elif path.startswith("/api/plugins/") and path.endswith("/toggle-enable"):
+            parts = path.split("/")
+            plugin_id = parts[3]
+            enable = bool(req_data.get("enable", True))
+            plg = plugins_service.toggle_plugin_enabled(plugin_id, enable)
+            self._send_json({"success": True, "plugin": plg})
+            return
+
+        elif path == "/api/connections":
+            conn = plugins_service.create_connection(req_data)
+            self._send_json({"success": True, "connection": conn})
+            return
+
+        elif path.startswith("/api/connections/") and path.endswith("/test"):
+            parts = path.split("/")
+            conn_id = parts[3]
+            res = plugins_service.test_connection(conn_id)
+            self._send_json({"success": True, **res})
+            return
+
+        elif path.startswith("/api/connections/") and path.endswith("/sync"):
+            parts = path.split("/")
+            conn_id = parts[3]
+            res = plugins_service.sync_connection(conn_id)
+            self._send_json({"success": True, **res})
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

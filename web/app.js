@@ -225,9 +225,17 @@ function updateBreadcrumbs() {
 
   const navLabels = {
     overview: 'Overview',
+    schedule: 'Universal Schedule',
     company: 'Company',
+    organization: 'Organization',
     ceo: 'AI CEO',
+    meeting: 'AI CEO Meeting Room',
+    workforce: 'AI Workforce',
+    tasks: 'TaskMaker',
+    processes: 'Processes',
+    trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
+    plugins: 'Plugins & Connections',
     settings: 'Settings'
   };
   const activeNavLabel = navLabels[state.activeNav] || 'Overview';
@@ -320,7 +328,10 @@ window.navigateTo = function(path) {
 
 function handleRoute(path) {
   let navKey = 'overview';
-  if (path.startsWith('/company') && path.includes('/organization')) navKey = 'organization';
+  if (path.startsWith('/schedule')) navKey = 'schedule';
+  else if (path.startsWith('/ceo/meeting') || path.startsWith('/meeting')) navKey = 'meeting';
+  else if (path.startsWith('/plugins') || path.startsWith('/connections')) navKey = 'plugins';
+  else if (path.startsWith('/company') && path.includes('/organization')) navKey = 'organization';
   else if (path.startsWith('/company') && path.includes('/workforce')) navKey = 'workforce';
   else if (path.startsWith('/company') && (path.includes('/tasks') || path.includes('/missions'))) navKey = 'tasks';
   else if (path.startsWith('/company') && path.includes('/processes')) navKey = 'processes';
@@ -353,7 +364,13 @@ function handleRoute(path) {
 
   updateBreadcrumbs();
 
-  if (navKey === 'company' && window.CompanyWorkspace) {
+  if (navKey === 'schedule' && window.ScheduleWorkspace) {
+    window.ScheduleWorkspace.render('view-schedule');
+  } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
+    window.MeetingRoomWorkspace.render('view-meeting');
+  } else if (navKey === 'plugins' && window.PluginsWorkspace) {
+    window.PluginsWorkspace.render('view-plugins');
+  } else if (navKey === 'company' && window.CompanyWorkspace) {
     window.CompanyWorkspace.render(path);
   } else if (navKey === 'organization' && window.OrgWorkspace) {
     window.OrgWorkspace.render('view-organization');
@@ -481,6 +498,10 @@ function renderApp() {
     populateGlobalCompanySelector();
     updateBreadcrumbs();
     switchNav(state.activeNav);
+
+    if (window.FloatingAssistant && window.FloatingAssistant.init) {
+      window.FloatingAssistant.init();
+    }
   }
 }
 
