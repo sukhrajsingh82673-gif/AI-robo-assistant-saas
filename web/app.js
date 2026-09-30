@@ -205,6 +205,9 @@ function populateGlobalCompanySelector() {
 
 function handleGlobalCompanyContextChange(companyId) {
   state.activeCompanyId = companyId || null;
+  if (window.CurrentCompanyContext && window.CurrentCompanyContext.getCompanyId() !== (companyId || null)) {
+    window.CurrentCompanyContext.setCompanyId(companyId || null);
+  }
   populateGlobalCompanySelector();
   updateBreadcrumbs();
   
@@ -667,6 +670,11 @@ window.showSecurityQuestionsModal = function() {
 function renderOverview() {
   const container = document.getElementById('view-overview');
   if (!container) return;
+
+  if (window.OverviewWorkspace) {
+    window.OverviewWorkspace.render('view-overview');
+    return;
+  }
 
   if (!state.companies || state.companies.length === 0) {
     if (window.CurrentCompanyContext) {

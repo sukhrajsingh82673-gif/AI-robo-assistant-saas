@@ -88,6 +88,9 @@ sales_workforce = AISalesWorkforce(tenant_id="tnt_primary")
 voice_agent = GovernedVoiceAgent(tenant_id="tnt_primary")
 business_causality = BusinessCausalityEngine(tenant_id="tnt_primary")
 workforce_intel = WorkforceIntelligenceEngine(tenant_id="tnt_primary")
+from core.overview_service import OverviewDataService
+
+
 
 # Zonata Universal AI CEO Subsystems
 from zonata.discovery import CompanyDiscoveryEngine
@@ -171,7 +174,25 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         query_params = urllib.parse.parse_qs(parsed.query)
         tenant_id = self._get_tenant_id()
 
-        if path == "/api/portfolio":
+        if path in ("/api/overview", "/api/overview/snapshot"):
+            cid = query_params.get("company_id", [None])[0]
+            if cid in ("", "ALL", "null", "undefined", "portfolio"):
+                cid = None
+            period = query_params.get("period", ["30d"])[0]
+            snapshot = OverviewDataService.get_snapshot(tenant_id, company_id=cid, period=period)
+            self._send_json(snapshot)
+            return
+
+        elif path == "/api/overview/explain-variance":
+            cid = query_params.get("company_id", [None])[0]
+            if cid in ("", "ALL", "null", "undefined", "portfolio"):
+                cid = None
+            metric = query_params.get("metric", ["revenue"])[0]
+            explanation = OverviewDataService.explain_variance(tenant_id, company_id=cid, metric=metric)
+            self._send_json(explanation)
+            return
+
+        elif path == "/api/portfolio":
             summary = portfolio.get_portfolio_summary()
             companies = [
                 {
@@ -777,7 +798,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             req_data = {}
 
-        if path == "/api/webhooks/verify":
+        if path == "/api/overview/explain-variance":
+            cid = req_data.get("company_id")
+            metric = req_data.get("metric", "revenue")
+            explanation = OverviewDataService.explain_variance(tenant_id, company_id=cid, metric=metric)
+            self._send_json(explanation)
+            return
+
+        elif path == "/api/webhooks/verify":
             secret = req_data.get("secret", "default_webhook_secret")
             payload = json.dumps(req_data.get("payload", {})).encode("utf-8")
             sig = req_data.get("signature", "")

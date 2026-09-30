@@ -43,14 +43,10 @@
             window.state.companies = this.companies;
           }
 
-          // If no active company selected, or active company no longer exists, select first
-          if (!this.activeCompanyId || !this.companies.some(c => c.id === this.activeCompanyId)) {
-            this.activeCompanyId = this.companies.length > 0 ? this.companies[0].id : null;
-            if (this.activeCompanyId) {
-              localStorage.setItem('zonata_active_company_id', this.activeCompanyId);
-            } else {
-              localStorage.removeItem('zonata_active_company_id');
-            }
+          // If active company ID is set but does not exist in loaded companies, reset
+          if (this.activeCompanyId && !this.companies.some(c => c.id === this.activeCompanyId)) {
+            this.activeCompanyId = null;
+            localStorage.removeItem('zonata_active_company_id');
           }
 
           this.activeCompany = this.companies.find(c => c.id === this.activeCompanyId) || null;
@@ -83,13 +79,18 @@
     }
 
     setCompanyId(id) {
-      if (!id || id === this.activeCompanyId) return;
-      this.activeCompanyId = id;
-      this.activeCompany = this.companies.find(c => c.id === id) || null;
-      localStorage.setItem('zonata_active_company_id', id);
+      const normalizedId = (id && id !== 'ALL') ? id : null;
+      if (normalizedId === this.activeCompanyId) return;
+      this.activeCompanyId = normalizedId;
+      this.activeCompany = this.companies.find(c => c.id === normalizedId) || null;
+      if (normalizedId) {
+        localStorage.setItem('zonata_active_company_id', normalizedId);
+      } else {
+        localStorage.removeItem('zonata_active_company_id');
+      }
 
       if (window.state) {
-        window.state.activeCompanyId = id;
+        window.state.activeCompanyId = normalizedId;
       }
 
       this.updateDropdown();
@@ -141,11 +142,13 @@
       }
 
       selector.disabled = false;
-      selector.innerHTML = this.companies.map(c => `
+      let opts = `<option value="" ${!this.activeCompanyId ? 'selected' : ''}>All Companies (Group Portfolio)</option>`;
+      opts += this.companies.map(c => `
         <option value="${c.id}" ${c.id === this.activeCompanyId ? 'selected' : ''}>
           ${c.name} (${c.industry || 'Operations'})
         </option>
       `).join('');
+      selector.innerHTML = opts;
     }
 
     renderEmptyState(container, title = 'No company connected', subtitle = 'Connect an existing company or create a new company to begin.') {
