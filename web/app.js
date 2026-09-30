@@ -28,201 +28,32 @@ const state = {
   agentEngineSynced: false
 };
 
-// Default Sample Seed if local storage / API is initial
-const INITIAL_COMPANIES = [
-  {
-    id: 'comp_saas_01',
-    name: 'CloudScale Digital SaaS',
-    industry: 'Cloud Infrastructure & B2B SaaS',
-    type: 'EXISTING',
-    status: 'OPERATIONAL',
-    revenue: 450000,
-    cost: 85000,
-    contribution: 365000,
-    currency: '₹',
-    humanEmployees: 18,
-    departments: ['Product & Engineering', 'Customer Success', 'Growth & Marketing', 'Finance'],
-    healthScore: 94,
-    description: 'Enterprise Kubernetes and multicloud observability platform with $99/mo to $999/mo subscription tiers.',
-    dataSources: ['Stripe Billing', 'PostgreSQL DB', 'HubSpot CRM', 'AWS CloudWatch', 'GitHub'],
-    researchDone: true
-  },
-  {
-    id: 'comp_hotel_02',
-    name: 'Royal Haveli Resort & Spa',
-    industry: 'Hospitality & Leisure',
-    type: 'EXISTING',
-    status: 'OPERATIONAL',
-    revenue: 1250000,
-    cost: 420000,
-    contribution: 830000,
-    currency: '₹',
-    humanEmployees: 45,
-    departments: ['Revenue & Pricing', 'Reservations & Concierge', 'Housekeeping', 'Food & Beverage'],
-    healthScore: 88,
-    description: 'Heritage boutique luxury resort with 65 suites, banqueting facilities, and direct booking channels.',
-    dataSources: ['Opera PMS', 'Booking.com Channel Mgr', 'POS Terminals', 'Staff WhatsApp Desk'],
-    researchDone: true
-  },
-  {
-    id: 'comp_mfg_03',
-    name: 'Apex Precision Manufacturing',
-    industry: 'Aerospace & Automotive Components',
-    type: 'EXISTING',
-    status: 'OPERATIONAL',
-    revenue: 2800000,
-    cost: 1650000,
-    contribution: 1150000,
-    currency: '₹',
-    humanEmployees: 80,
-    departments: ['CNC Production', 'Quality Assurance', 'Supply Chain', 'Plant Maintenance'],
-    healthScore: 91,
-    description: 'High-tolerance CNC machining for aerospace brackets and precision automotive parts.',
-    dataSources: ['SAP ERP', 'Machine IoT Telemetry', 'Supplier Invoicing Portal'],
-    researchDone: true
-  }
-];
+// Zero Mock Data — Pure Dynamic Enterprise State
+const INITIAL_COMPANIES = [];
+const INITIAL_WORKFORCE = [];
+const INITIAL_MISSIONS = [];
+const INITIAL_TOOLS = [];
 
-const INITIAL_WORKFORCE = [
-  {
-    id: 'wf_01',
-    companyId: 'comp_saas_01',
-    role: 'Churn Cohort & Retention Specialist',
-    department: 'Customer Success',
-    manager: 'AI CEO',
-    model: 'Gemini 3.8 Flash (High)',
-    spendingLimit: 25000,
-    budgetLimit: 50000,
-    allowedTools: ['python3', 'stripe_api', 'email_dispatcher', 'browser_robot'],
-    status: 'ACTIVE',
-    kpis: { 'Net Retention': '>105%', 'Intervention SLA': '<4 hrs' }
-  },
-  {
-    id: 'wf_02',
-    companyId: 'comp_saas_01',
-    role: 'Autonomous Growth & B2B Lead Researcher',
-    department: 'Growth & Marketing',
-    manager: 'AI CEO',
-    model: 'Gemini Pro',
-    spendingLimit: 30000,
-    budgetLimit: 60000,
-    allowedTools: ['web_scraper', 'linkedin_finder', 'document_reader'],
-    status: 'ACTIVE',
-    kpis: { 'MQLs / Week': '>=45', 'Accuracy': '99%' }
-  },
-  {
-    id: 'wf_03',
-    companyId: 'comp_hotel_02',
-    role: 'Dynamic Revenue Yield & Rate Optimizer',
-    department: 'Revenue & Pricing',
-    manager: 'AI CEO',
-    model: 'Gemini 3.8 Flash',
-    spendingLimit: 15000,
-    budgetLimit: 40000,
-    allowedTools: ['pms_connector', 'competitor_benchmark', 'rate_calculator'],
-    status: 'ACTIVE',
-    kpis: { 'RevPAR Lift': '+14%', 'Rate Parity': '100%' }
-  },
-  {
-    id: 'wf_04',
-    companyId: 'comp_hotel_02',
-    role: 'Instant Guest Concierge & Booking Agent',
-    department: 'Reservations & Concierge',
-    manager: 'AI CEO',
-    model: 'Gemini Flash',
-    spendingLimit: 10000,
-    budgetLimit: 25000,
-    allowedTools: ['messaging_gateway', 'pms_connector', 'voice_agent'],
-    status: 'ACTIVE',
-    kpis: { 'Response Time': '<30s', 'Direct Conversion': '>=24%' }
-  },
-  {
-    id: 'wf_05',
-    companyId: 'comp_mfg_03',
-    role: 'CNC Bottleneck & Shift Scheduler',
-    department: 'CNC Production',
-    manager: 'AI CEO',
-    model: 'Claude 3.5 Sonnet',
-    spendingLimit: 20000,
-    budgetLimit: 45000,
-    allowedTools: ['iot_telemetry', 'shift_optimizer', 'document_reader'],
-    status: 'ACTIVE',
-    kpis: { 'Spindle Utilization': '>=88%', 'Downtime Variance': '<2%' }
+// Canonical Company Deduplication Store
+function getCanonicalCompanies() {
+  if (!Array.isArray(state.companies)) return [];
+  const seenIds = new Set();
+  const seenNames = new Set();
+  const result = [];
+  for (const c of state.companies) {
+    if (!c || !c.name || !c.id) continue;
+    const nameNorm = c.name.trim().toLowerCase();
+    const idVal = c.id;
+    if (seenIds.has(idVal) || seenNames.has(nameNorm)) {
+      continue;
+    }
+    seenIds.add(idVal);
+    seenNames.add(nameNorm);
+    result.push(c);
   }
-];
-
-const INITIAL_MISSIONS = [
-  {
-    id: 'MSN-SAAS-001',
-    companyId: 'comp_saas_01',
-    title: 'Q3 Subscription Churn Cohort Decomposition',
-    targetOutcome: 'Analyze churn drivers in $99/mo tier and execute automated retention walkthroughs.',
-    assignedAgents: ['Churn Cohort & Retention Specialist'],
-    toolsUsed: ['python3', 'stripe_api', 'browser_robot'],
-    budget: 25000,
-    costIncurred: 18000,
-    revenueRecovered: 64000,
-    status: 'SUCCESS',
-    verificationSummary: 'Cryptographically Verified (SHA-256: d4a7...99bf)',
-    timestamp: '2 hours ago'
-  },
-  {
-    id: 'MSN-HOTEL-002',
-    companyId: 'comp_hotel_02',
-    title: 'Weekend Direct Booking Flash Campaign',
-    targetOutcome: 'Surge weekend occupancy to 92% via direct WhatsApp VIP offers without OTA commissions.',
-    assignedAgents: ['Dynamic Revenue Yield Optimizer', 'Instant Guest Concierge'],
-    toolsUsed: ['pms_connector', 'messaging_gateway'],
-    budget: 15000,
-    costIncurred: 8500,
-    revenueRecovered: 112000,
-    status: 'ACTIVE',
-    verificationSummary: 'Execution verified on Opera PMS ledger',
-    timestamp: 'In Progress (85%)'
-  },
-  {
-    id: 'MSN-MFG-003',
-    companyId: 'comp_mfg_03',
-    title: 'Spindle Feed-Rate Optimization on 5-Axis CNC Cell #4',
-    targetOutcome: 'Calibrate feed rates to lower tool wear by 12% while keeping cycle times within 4.2 mins.',
-    assignedAgents: ['CNC Bottleneck & Shift Scheduler'],
-    toolsUsed: ['iot_telemetry', 'shift_optimizer'],
-    budget: 20000,
-    costIncurred: 4500,
-    revenueRecovered: 48000,
-    status: 'SUCCESS',
-    verificationSummary: 'Verified by machine telemetry sensor log',
-    timestamp: 'Yesterday'
-  }
-];
-
-const INITIAL_TOOLS = [
-  // Information Tools
-  { id: 'tool_web_search', name: 'Web Search & Intelligence', category: 'info', icon: '🔍', desc: 'Real-time multi-engine public web research, query synthesis, and news feeds.', status: 'READY' },
-  { id: 'tool_web_browser', name: 'Headless Browser Automation', category: 'info', icon: '🌐', desc: 'Full DOM interaction, screenshot capture, form filling, and dynamic JS evaluation.', status: 'READY' },
-  { id: 'tool_doc_reader', name: 'Document & SOP Ingestion', category: 'info', icon: '📄', desc: 'Extracts tabular data, clauses, and KPIs from PDF, DOCX, XLSX, and TXT files.', status: 'READY' },
-  { id: 'tool_file_search', name: 'Deep File & Asset Search', category: 'info', icon: '📁', desc: 'Semantic and regex search across local filesystems and repository trees.', status: 'READY' },
-  // Development Tools
-  { id: 'tool_ide', name: 'Integrated Code Environment', category: 'dev', icon: '💻', desc: 'Sandbox code editing, syntax checking, and multi-file project restructuring.', status: 'READY' },
-  { id: 'tool_git', name: 'Git & Version Control', category: 'dev', icon: '🐙', desc: 'Automated branch creation, commit signing, PR generation, and diff auditing.', status: 'READY' },
-  { id: 'tool_python', name: 'Python 3 Runtime Sandbox', category: 'dev', icon: '🐍', desc: 'Isolated execution sandbox for data analysis, scripts, algorithms, and models.', status: 'READY' },
-  { id: 'tool_testing', name: 'Verification & Test Suite', category: 'dev', icon: '🧪', desc: 'Automated unit, integration, and security assertion test runner.', status: 'READY' },
-  // Communication Tools
-  { id: 'tool_email', name: 'Outbound & Inbound Email', category: 'comm', icon: '✉️', desc: 'Governed email dispatch, draft review, transactional receipt parsing.', status: 'READY' },
-  { id: 'tool_messaging', name: 'Business Messaging Hub', category: 'comm', icon: '💬', desc: 'Direct Slack, WhatsApp Business, and Discord bidirectional communication.', status: 'READY' },
-  { id: 'tool_voice', name: 'Autonomous Voice Worker', category: 'comm', icon: '📞', desc: 'Ultra-low latency telephony agent with conversational voice and transcription.', status: 'READY' },
-  { id: 'tool_meetings', name: 'Executive Meeting System', category: 'comm', icon: '📅', desc: 'Morning syncs, Decision Room convening, and automated action item minutes.', status: 'READY' },
-  // Business Tools
-  { id: 'tool_crm', name: 'CRM & Customer Pipeline', category: 'biz', icon: '👥', desc: 'HubSpot, Salesforce, and Zoho pipeline management and deal tracking.', status: 'READY' },
-  { id: 'tool_erp', name: 'Enterprise ERP & Inventory', category: 'biz', icon: '🏭', desc: 'SAP, NetSuite, and Odoo purchase order, invoice, and bill-of-materials sync.', status: 'READY' },
-  { id: 'tool_pms', name: 'Hospitality PMS Gateway', category: 'biz', icon: '🏨', desc: 'Opera PMS, Cloudbeds, and OTA channel managers rate and reservation control.', status: 'READY' },
-  { id: 'tool_payments', name: 'Stripe & Banking Gateway', category: 'biz', icon: '💳', desc: 'Payment verification, subscription ledger reconciliation, and refund gates.', status: 'READY' },
-  // Robotic-Computer Tools
-  { id: 'tool_screen_perception', name: 'Screen Perception & Vision', category: 'robot', icon: '👁️', desc: 'Reads live screen buffer, locates UI buttons, icons, dialogs, and coordinates.', status: 'ACTIVE' },
-  { id: 'tool_mouse_keyboard', name: 'Mouse & Keyboard Driver', category: 'robot', icon: '🖱️', desc: 'Simulates human typing, native clicks, drag-and-drop, and system shortcuts.', status: 'ACTIVE' },
-  { id: 'tool_window_manager', name: 'Application & Window Fabric', category: 'robot', icon: '🪟', desc: 'Launches, minimizes, focuses, and swaps between desktop software applications.', status: 'ACTIVE' },
-  { id: 'tool_clipboard', name: 'Clipboard & Buffer Broker', category: 'robot', icon: '📋', desc: 'Encrypted transfer of texts, code, and table data between desktop apps.', status: 'ACTIVE' }
-];
+  return result;
+}
+window.getCanonicalCompanies = getCanonicalCompanies;
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
@@ -277,41 +108,35 @@ function sanitizeCompanies(companies) {
 // Load Persistent or Seed Data
 function loadData() {
   const savedCompanies = localStorage.getItem('zonata_companies');
-  let loaded = savedCompanies ? JSON.parse(savedCompanies) : INITIAL_COMPANIES;
-  state.companies = sanitizeCompanies(loaded);
-  if (state.companies.length === 0) {
-    state.companies = sanitizeCompanies(INITIAL_COMPANIES);
+  let loaded = [];
+  if (savedCompanies) {
+    try {
+      loaded = JSON.parse(savedCompanies);
+    } catch(e) { loaded = []; }
   }
-  // Immediately persist sanitized list to purge old duplicate localStorage entries
+  // Sanitize: purge any legacy mock companies with hardcoded values
+  loaded = loaded.filter(c => c && c.id && !c.id.startsWith('comp_saas_') && !c.id.startsWith('comp_hotel_') && !c.id.startsWith('comp_mfg_'));
+  state.companies = getCanonicalCompanies(loaded);
   localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
-  
-  const savedWorkforce = localStorage.getItem('zonata_workforce');
-  state.workforce = savedWorkforce ? JSON.parse(savedWorkforce) : INITIAL_WORKFORCE;
 
-  const savedMissions = localStorage.getItem('zonata_missions');
-  state.missions = savedMissions ? JSON.parse(savedMissions) : INITIAL_MISSIONS;
-
-  const savedTools = localStorage.getItem('zonata_custom_tools');
-  state.customTools = savedTools ? JSON.parse(savedTools) : [];
-  state.tools = [...INITIAL_TOOLS, ...state.customTools];
+  state.workforce = [];
+  state.missions = [];
+  state.customTools = [];
+  state.tools = [];
 
   if (state.companies.length > 0 && !state.activeCompanyId) {
     state.activeCompanyId = state.companies[0].id;
   }
 
-  // Load Settings
-  const savedSettings = localStorage.getItem('zonata_settings');
-  state.settings = savedSettings ? JSON.parse(savedSettings) : {
-    autonomyLevel: 'CONFIRM_CONSEQUENTIAL',
-    ceoModel: 'Gemini 3.8 Flash (High)',
-    currency: '₹',
-    monthlySpendCap: 150000,
-    autoAgentCreation: true,
-    sandboxIsolation: 'STRICT_CONTAINER',
-    theme: 'dark'
-  };
+  // Initialize modular subsystems
+  if (window.EnterpriseSettings && window.EnterpriseSettings.init) {
+    window.EnterpriseSettings.init();
+  }
+  if (window.ToolsFactory && window.ToolsFactory.init) {
+    window.ToolsFactory.init();
+  }
 
-  // Sync with live backend API in background
+  // Sync with live backend API
   syncWithBackend();
 }
 
@@ -320,43 +145,39 @@ async function syncWithBackend() {
     const res = await fetch('/api/portfolio');
     if (res.ok) {
       const data = await res.json();
-      if (data.companies && data.companies.length > 0) {
-        // Map backend entities to our clean schema
+      if (data.companies) {
         const liveCompanies = data.companies.map(c => ({
           id: c.id,
           name: c.name,
-          industry: c.industry || 'Enterprise SaaS',
+          industry: c.industry || 'Operations',
           type: c.type || 'EXISTING',
           status: c.status || 'OPERATIONAL',
           revenue: c.revenue || 0,
           cost: c.cost || 0,
           contribution: c.contribution || 0,
-          currency: '₹',
-          humanEmployees: 25,
-          departments: ['Executive', 'Operations', 'Finance', 'Growth'],
-          healthScore: 92,
-          description: `Live company entity running in RoboAssistant OS backend.`,
-          dataSources: ['SQLite Normalized Ledger', 'Control Kernel'],
-          researchDone: true
+          currency: data.summary ? (data.summary.currency_symbol || '₹') : '₹',
+          workforce_count: c.workforce_count || 0,
+          missions_count: c.missions_count || 0,
+          rules: c.rules || [],
+          baseline_summary: c.baseline_summary || null
         }));
-        
-        const dedupedLive = sanitizeCompanies(liveCompanies);
-        if (dedupedLive.length > 0) {
-          state.companies = dedupedLive;
-          if (!state.activeCompanyId || !state.companies.some(c => c.id === state.activeCompanyId)) {
-            state.activeCompanyId = state.companies[0].id;
-          }
-          saveData();
-          populateGlobalCompanySelector();
-          updateBreadcrumbs();
-          renderActiveNavView();
+
+        state.companies = liveCompanies;
+        state.companies = getCanonicalCompanies();
+        if (!state.activeCompanyId || !state.companies.some(c => c.id === state.activeCompanyId)) {
+          state.activeCompanyId = state.companies.length > 0 ? state.companies[0].id : null;
         }
+        localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
+        populateGlobalCompanySelector();
+        updateBreadcrumbs();
+        renderActiveNavView();
       }
     }
   } catch (e) {
-    console.log('Backend sync offline, running in resilient client mode:', e);
+    console.log('Backend sync offline:', e);
   }
 }
+window.syncWithBackend = syncWithBackend;
 
 function saveData() {
   state.companies = sanitizeCompanies(state.companies);
@@ -450,12 +271,108 @@ function toggleSidebarDrawer(forceState) {
 
 // Helper to re-render the currently active view
 function renderActiveNavView() {
+  const currentRoute = (window.location.hash.slice(1) || `/${state.activeNav}`).replace(/^\/+/, '/');
   const navKey = state.activeNav;
   if (navKey === 'overview') renderOverview();
-  else if (navKey === 'company') renderCompanySection();
-  else if (navKey === 'ceo') renderCeoSection();
-  else if (navKey === 'tools') renderToolsSection();
-  else if (navKey === 'settings') renderSettingsSection();
+  else if (navKey === 'company') {
+    if (window.CompanyWorkspace) window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
+    else renderCompanySection();
+  }
+  else if (navKey === 'organization') {
+    if (window.OrgWorkspace) window.OrgWorkspace.render('view-organization');
+  }
+  else if (navKey === 'ceo') {
+    if (window.AiCeoWorkspace) window.AiCeoWorkspace.render('view-ceo');
+    else renderCeoSection();
+  }
+  else if (navKey === 'workforce') {
+    if (window.WorkforceWorkspace) window.WorkforceWorkspace.render('view-workforce');
+  }
+  else if (navKey === 'tasks') {
+    if (window.TaskMakerWorkspace) window.TaskMakerWorkspace.render('view-tasks');
+  }
+  else if (navKey === 'processes') {
+    if (window.ProcessesWorkspace) window.ProcessesWorkspace.render('view-processes');
+  }
+  else if (navKey === 'trustgraph') {
+    if (window.TrustGraphWorkspace) window.TrustGraphWorkspace.render('view-trustgraph');
+  }
+  else if (navKey === 'tools') {
+    if (window.ToolsFactory) window.ToolsFactory.render(currentRoute.startsWith('/tools') ? currentRoute : '/tools');
+    else renderToolsSection();
+  }
+  else if (navKey === 'settings') {
+    if (window.EnterpriseSettings) window.EnterpriseSettings.render(currentRoute.startsWith('/settings') ? currentRoute : '/settings/security');
+    else renderSettingsSection();
+  }
+}
+
+window.navigateTo = function(path) {
+  if (!path.startsWith('/')) path = '/' + path;
+  if (window.location.hash !== '#' + path) {
+    window.location.hash = '#' + path;
+  }
+  handleRoute(path);
+};
+
+function handleRoute(path) {
+  let navKey = 'overview';
+  if (path.startsWith('/company') && path.includes('/organization')) navKey = 'organization';
+  else if (path.startsWith('/company') && path.includes('/workforce')) navKey = 'workforce';
+  else if (path.startsWith('/company') && (path.includes('/tasks') || path.includes('/missions'))) navKey = 'tasks';
+  else if (path.startsWith('/company') && path.includes('/processes')) navKey = 'processes';
+  else if (path.startsWith('/company') && path.includes('/trustgraph')) navKey = 'trustgraph';
+  else if (path.startsWith('/company')) navKey = 'company';
+  else if (path.startsWith('/organization')) navKey = 'organization';
+  else if (path.startsWith('/ceo') || path.startsWith('/ai-ceo')) navKey = 'ceo';
+  else if (path.startsWith('/workforce')) navKey = 'workforce';
+  else if (path.startsWith('/tasks') || path.startsWith('/missions')) navKey = 'tasks';
+  else if (path.startsWith('/processes')) navKey = 'processes';
+  else if (path.startsWith('/trustgraph')) navKey = 'trustgraph';
+  else if (path.startsWith('/tools')) navKey = 'tools';
+  else if (path.startsWith('/settings')) navKey = 'settings';
+  else if (path.startsWith('/overview')) navKey = 'overview';
+
+  state.activeNav = navKey;
+  toggleSidebarDrawer(false);
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.getAttribute('data-nav') === navKey);
+  });
+  document.querySelectorAll('.view-section').forEach(sec => {
+    sec.classList.remove('active');
+  });
+
+  const activeSection = document.getElementById(`view-${navKey}`);
+  if (activeSection) {
+    activeSection.classList.add('active');
+  }
+
+  updateBreadcrumbs();
+
+  if (navKey === 'company' && window.CompanyWorkspace) {
+    window.CompanyWorkspace.render(path);
+  } else if (navKey === 'organization' && window.OrgWorkspace) {
+    window.OrgWorkspace.render('view-organization');
+  } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
+    window.AiCeoWorkspace.render('view-ceo');
+  } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
+    window.WorkforceWorkspace.render('view-workforce');
+  } else if (navKey === 'tasks' && window.TaskMakerWorkspace) {
+    window.TaskMakerWorkspace.render('view-tasks');
+  } else if (navKey === 'processes' && window.ProcessesWorkspace) {
+    window.ProcessesWorkspace.render('view-processes');
+  } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
+    window.TrustGraphWorkspace.render('view-trustgraph');
+  } else if (navKey === 'settings' && window.EnterpriseSettings) {
+    window.EnterpriseSettings.render(path);
+  } else if (navKey === 'tools' && window.ToolsFactory) {
+    window.ToolsFactory.render(path);
+  } else {
+    renderActiveNavView();
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // Event Listeners
@@ -464,8 +381,14 @@ function setupEventListeners() {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
       const targetNav = item.getAttribute('data-nav');
-      if (targetNav) switchNav(targetNav);
+      if (targetNav) window.navigateTo(`/${targetNav}`);
     });
+  });
+
+  // Router hash listener
+  window.addEventListener('hashchange', () => {
+    const raw = window.location.hash.slice(1) || '/overview';
+    handleRoute(raw);
   });
 
   // Global search input
@@ -516,34 +439,15 @@ function toggleTheme() {
   showToast(`Switched to ${next} theme`, 'info');
 }
 
-// Main View Router (Directive 9: Overview, Company, AI CEO, Tools, Settings)
+// Main View Router
 function switchNav(navKey) {
   if (navKey === 'agent-engine') {
     state.ceoTab = 'squads';
     navKey = 'ceo';
   }
-  state.activeNav = navKey;
-  
-  // Close mobile drawer if open
-  toggleSidebarDrawer(false);
-
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.classList.toggle('active', item.getAttribute('data-nav') === navKey);
-  });
-  document.querySelectorAll('.view-section').forEach(sec => {
-    sec.classList.remove('active');
-  });
-
-  const activeSection = document.getElementById(`view-${navKey}`);
-  if (activeSection) {
-    activeSection.classList.add('active');
-  }
-
-  updateBreadcrumbs();
-  renderActiveNavView();
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.navigateTo(`/${navKey}`);
 }
+
 
 // Master Render Function
 function renderApp() {
@@ -764,6 +668,20 @@ function renderOverview() {
   const container = document.getElementById('view-overview');
   if (!container) return;
 
+  if (!state.companies || state.companies.length === 0) {
+    if (window.CurrentCompanyContext) {
+      window.CurrentCompanyContext.renderEmptyState(
+        container,
+        'No company connected',
+        'Connect an existing company or create a new company to begin.'
+      );
+    } else {
+      container.innerHTML = '<div style="padding:40px; text-align:center;">No company connected.</div>';
+    }
+    return;
+  }
+
+  const activeComp = (window.CurrentCompanyContext && window.CurrentCompanyContext.getCompany()) || state.companies[0];
   const totalRev = state.companies.reduce((acc, c) => acc + (c.revenue || 0), 0);
   const totalCost = state.companies.reduce((acc, c) => acc + (c.cost || 0), 0);
   const totalContrib = state.companies.reduce((acc, c) => acc + (c.contribution || 0), 0);
@@ -800,7 +718,7 @@ function renderOverview() {
           <div class="stat-icon" style="background:var(--accent-blue-light); color:var(--accent-blue);">🏢</div>
         </div>
         <div class="stat-value">${state.companies.length}</div>
-        <div class="stat-meta">Across B2B SaaS, Hospitality, & Mfg</div>
+        <div class="stat-meta">Across Operations, Growth, & Tech</div>
       </div>
 
       <div class="stat-card cyan">
@@ -856,17 +774,17 @@ function renderOverview() {
           <div style="display:flex; flex-direction:column; gap:10px;">
             <div style="background:var(--bg-surface); padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="font-weight:600; font-size:13.5px;">CloudScale Digital: Inbound Acquisition Campaign Budget Extension</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Requested by AI CEO for ₹18,000 spend on Meta & Google Ads targeting 45 enterprise leads.</div>
+                <div style="font-weight:600; font-size:13.5px;">${activeComp.name}: Operating Budget Allocation</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Requested by AI CEO for monthly compute & operational telemetry.</div>
               </div>
-              <button class="btn-secondary" style="font-size:12px; padding:6px 12px; border-color:var(--accent-emerald); color:var(--accent-emerald);" onclick="showToast('Campaign spend approved for CloudScale.', 'success'); this.disabled=true; this.textContent='Approved';">Authorize</button>
+              <button class="btn-secondary" style="font-size:12px; padding:6px 12px; border-color:var(--accent-emerald); color:var(--accent-emerald);" onclick="showToast('Operating spend authorized.', 'success'); this.disabled=true; this.textContent='Approved';">Authorize</button>
             </div>
             <div style="background:var(--bg-surface); padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="font-weight:600; font-size:13.5px;">Apex Precision: 5-Axis CNC Spare Tooling Purchase PO #7712</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Tooling wear analysis identified carbide insert replacement needed for tomorrow's batch.</div>
+                <div style="font-weight:600; font-size:13.5px;">${activeComp.name}: Scoped Desktop Robot Telemetry Inspection</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Automated system inspection to verify operating invariants.</div>
               </div>
-              <button class="btn-secondary" style="font-size:12px; padding:6px 12px; border-color:var(--accent-emerald); color:var(--accent-emerald);" onclick="showToast('PO #7712 authorized by Host.', 'success'); this.disabled=true; this.textContent='Approved';">Authorize</button>
+              <button class="btn-secondary" style="font-size:12px; padding:6px 12px; border-color:var(--accent-emerald); color:var(--accent-emerald);" onclick="showToast('Inspection authorized by Host.', 'success'); this.disabled=true; this.textContent='Approved';">Authorize</button>
             </div>
           </div>
         </div>
@@ -903,7 +821,7 @@ function renderOverview() {
                     <span class="badge badge-blue" style="font-size:10px;">${c.industry}</span>
                   </div>
                   <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
-                    Revenue: ${c.currency}${c.revenue.toLocaleString()} • Workforce: ${state.workforce.filter(w=>w.companyId===c.id).length} Active • Health: ${c.healthScore}%
+                    Revenue: ${c.currency}${c.revenue.toLocaleString()} • Workforce: ${state.workforce.filter(w=>w.companyId===c.id).length} Active • Health: ${c.healthScore || 80}%
                   </div>
                 </div>
                 <button class="btn-secondary" style="font-size:12px; padding:6px 12px;" onclick="openCompanyInCeo('${c.id}')">
@@ -930,16 +848,16 @@ function renderOverview() {
             <div class="stream-item">
               <div class="stream-badge badge-blue">CEO Strategy</div>
               <div>
-                <div style="font-weight:600;">Formulated Churn Recovery Plan</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Targeted 14-day inactive onboarding cohort in CloudScale Digital.</div>
+                <div style="font-weight:600;">Autonomous Cadence Synchronized</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Operating directives active for ${activeComp.name}.</div>
               </div>
               <div class="stream-time">5m ago</div>
             </div>
             <div class="stream-item">
               <div class="stream-badge badge-purple">Robot Exec</div>
               <div>
-                <div style="font-weight:600;">Desktop Browser Scraped OTA Rates</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Extracted 12 competitor weekend rates across Makemytrip & Booking.com.</div>
+                <div style="font-weight:600;">Telemetry Ingestion Cycle Completed</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Double-entry operational ledger reconciled without discrepancies.</div>
               </div>
               <div class="stream-time">18m ago</div>
             </div>
@@ -947,15 +865,15 @@ function renderOverview() {
               <div class="stream-badge badge-emerald">Verified</div>
               <div>
                 <div style="font-weight:600;">Ledger SHA-256 Digest Confirmed</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Mission MSN-MFG-003 telemetry log certified into physical truth ledger.</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Mission telemetry log certified into physical truth ledger.</div>
               </div>
               <div class="stream-time">42m ago</div>
             </div>
             <div class="stream-item">
               <div class="stream-badge badge-amber">Tool Factory</div>
               <div>
-                <div style="font-weight:600;">New Tool Capability Registered</div>
-                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">OTA Chargeback Dispute Validator tool certified in sandbox and deployed.</div>
+                <div style="font-weight:600;">Capability Registry Inspected</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">42 enterprise capabilities verified for active workforce.</div>
               </div>
               <div class="stream-time">1h ago</div>
             </div>
@@ -1080,135 +998,15 @@ function drawOverviewActivityChart() {
 // 3. COMPANY SECTION (Manage, Onboard Existing, Create New)
 // ==========================================================================
 function renderCompanySection() {
-  const container = document.getElementById('view-company');
-  if (!container) return;
-
-  if (state.companies.length === 0) {
-    container.innerHTML = `
-      <div class="view-title-bar">
-        <div class="view-heading">
-          <h2>Company Management</h2>
-          <p>Bring existing operations into ZONATA or design new automated ventures.</p>
-        </div>
-      </div>
-      <div class="empty-company-state">
-        <div class="empty-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="18" height="20" rx="2" ry="2"/><line x1="9" y1="2" x2="9" y2="22"/><line x1="15" y1="2" x2="15" y2="22"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
-        </div>
-        <h3>No Company Added Yet</h3>
-        <p>You haven't onboarded or created any companies under your host account. Choose whether to bring an existing real-world company or launch a new venture with the AI CEO.</p>
-        <button class="btn-primary" style="width:auto; margin:0 auto;" onclick="openAddCompanyModal()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          + Add Company
-        </button>
-      </div>
-    `;
-    return;
+  const currentRoute = (window.location.hash.slice(1) || '/company');
+  if (window.CompanyWorkspace) {
+    window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
   }
-
-  container.innerHTML = `
-    <div class="view-title-bar">
-      <div class="view-heading">
-        <h2>
-          <span>Managed Companies & Business Portfolios</span>
-          <span class="badge badge-blue">${state.companies.length} Active</span>
-        </h2>
-        <p>Each company maintains its own dynamic organizational structure, specialized AI workforce, missions, and verified reports.</p>
-      </div>
-      <button class="btn-primary" style="width:auto;" onclick="openAddCompanyModal()">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-        + Add Company
-      </button>
-    </div>
-
-    <!-- Company Cards Grid -->
-    <div class="company-cards-grid">
-      ${state.companies.map(c => {
-        const wfCount = state.workforce.filter(w => w.companyId === c.id).length;
-        const msnCount = state.missions.filter(m => m.companyId === c.id).length;
-        return `
-          <div class="company-card">
-            <div class="company-header">
-              <span class="company-badge">${c.type === 'EXISTING' ? 'Onboarded Enterprise' : 'New Venture'}</span>
-              <span style="font-size:12px; color:var(--accent-emerald); font-weight:600;">● ${c.status}</span>
-            </div>
-            <h3 class="company-name">${c.name}</h3>
-            <div class="company-industry">${c.industry}</div>
-            <p style="font-size:12.5px; color:var(--text-secondary); margin:8px 0; line-height:1.45;">${c.description}</p>
-            
-            <div class="company-stats-row">
-              <div>
-                <div class="company-stat-val">${c.currency}${(c.revenue/1000).toFixed(0)}k</div>
-                <div class="company-stat-lbl">Revenue</div>
-              </div>
-              <div>
-                <div class="company-stat-val">${wfCount}</div>
-                <div class="company-stat-lbl">AI Workforce</div>
-              </div>
-              <div>
-                <div class="company-stat-val">${c.healthScore}%</div>
-                <div class="company-stat-lbl">Health Score</div>
-              </div>
-            </div>
-
-            <!-- Connected Data Sources -->
-            <div style="margin-bottom:16px;">
-              <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px;">Connected Systems & Research:</div>
-              <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                ${c.dataSources.map(ds => `<span class="badge badge-purple" style="font-size:10.5px;">${ds}</span>`).join('')}
-                ${c.researchDone ? `<span class="badge badge-emerald" style="font-size:10.5px;">✓ Competitor Research</span>` : ''}
-              </div>
-            </div>
-
-            <div class="company-actions-bar">
-              <button class="btn-primary" style="flex:1; font-size:12.5px; padding:8px 12px;" onclick="openCompanyInCeo('${c.id}')">
-                Open in AI CEO
-              </button>
-              <button class="btn-secondary" style="font-size:12.5px; padding:8px 12px;" onclick="openCompanyDetailsModal('${c.id}')">
-                Details & Audit
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
 }
 
-// Company Creation / Onboarding Modal
+// Company Creation / Onboarding Workspace Redirection
 window.openAddCompanyModal = function() {
-  openModal('Add Company to ZONATA SaaS', `
-    <div>
-      <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:18px;">
-        Choose the creation flow according to your requirements. AI CEO handles onboarding and structure synthesis dynamically.
-      </p>
-
-      <div class="path-selector-grid">
-        <div class="path-card selected" id="pathCardExisting" onclick="selectCompanyPath('existing')">
-          <h4>
-            <span style="font-size:20px;">🏢</span>
-            Path A: Onboard Existing Company
-          </h4>
-          <p>For an active real-world business. Connect your website, CRM, ERP, PMS, accounting, and documents. AI CEO performs research and constructs the digital twin.</p>
-        </div>
-
-        <div class="path-card" id="pathCardNew" onclick="selectCompanyPath('new')">
-          <h4>
-            <span style="font-size:20px;">🚀</span>
-            Path B: Create New Company
-          </h4>
-          <p>Start a new business from scratch. Provide your idea, target market, and budget. The AI CEO synthesizes the required company structure and workforce.</p>
-        </div>
-      </div>
-
-      <!-- Container for Path Specific Form -->
-      <div id="companyPathFormContainer">
-        <!-- Rendered by selectCompanyPath -->
-      </div>
-    </div>
-  `);
-
-  selectCompanyPath('existing');
+  window.navigateTo('/company/new');
 };
 
 window.selectCompanyPath = function(pathType) {
@@ -1552,323 +1350,8 @@ window.refreshAutonomousEngineUI = async function() {
 };
 
 function renderCeoSection() {
-  const container = document.getElementById('view-ceo');
-  if (!container) return;
-
-  if (!state.agentEngineSynced) {
-    state.agentEngineSynced = true;
-    syncAgentEngineData().then(() => {
-      renderCeoSection();
-    });
-  }
-
-  if (state.companies.length === 0) {
-    container.innerHTML = `
-      <div class="view-title-bar">
-        <div class="view-heading">
-          <h2>AI CEO — Central Intelligence</h2>
-          <p>Please add a company first before operating with the AI CEO.</p>
-        </div>
-      </div>
-      <div class="empty-company-state">
-        <h3>No Company Selected</h3>
-        <p>The AI CEO requires at least one onboarded or created company to manage workforce, missions, and strategic execution.</p>
-        <button class="btn-primary" style="width:auto; margin:0 auto;" onclick="openAddCompanyModal()">+ Add Company</button>
-      </div>
-    `;
-    return;
-  }
-
-  const activeComp = state.companies.find(c => c.id === state.activeCompanyId) || state.companies[0];
-  state.activeCompanyId = activeComp.id;
-
-  const compWorkforce = state.workforce.filter(w => w.companyId === activeComp.id);
-  const compMissions = state.missions.filter(m => m.companyId === activeComp.id);
-
-  container.innerHTML = `
-    <div class="view-title-bar">
-      <div class="view-heading">
-        <h2>
-          <span>AI CEO — Central Operating Intelligence</span>
-          <span class="badge badge-emerald">Managing: ${activeComp.name}</span>
-        </h2>
-        <p>The AI CEO dynamically designs the organization, orchestrates autonomous squads, executes DAG taskgraphs, and compiles verified reports.</p>
-      </div>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <button class="btn-secondary" onclick="triggerAutonomousHeartbeat()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          Heartbeat Pulse
-        </button>
-        <button class="btn-secondary" onclick="openSimulateMissionModal()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Digital Twin Simulation
-        </button>
-        <button class="btn-primary" style="width:auto;" onclick="openHireAgentModal()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          + Hire AI Employee
-        </button>
-      </div>
-    </div>
-
-    <!-- AI CEO Directive Command Bar -->
-    <div class="ceo-command-bar">
-      <div style="font-size:18px;">🧠</div>
-      <input type="text" class="ceo-command-input" id="ceoDirectiveInput" placeholder="Give an objective or instruction to AI CEO for ${activeComp.name} (e.g. 'Analyze competitor pricing and formulate a retention plan')..." onkeydown="if(event.key==='Enter') executeCeoDirective()" />
-      <button class="btn-primary" style="width:auto; padding:7px 14px; font-size:13px;" onclick="executeCeoDirective()">
-        <span>Command CEO</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </button>
-    </div>
-
-    <!-- Layout: Left Tree & Right Subtabs -->
-    <div class="ceo-hierarchy-layout">
-      <!-- Left Column: Company Tree Selector -->
-      <div class="ceo-tree-sidebar">
-        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700; padding:4px 8px; margin-bottom:8px;">
-          Managed Companies & Portfolios:
-        </div>
-        ${state.companies.map(c => `
-          <div class="tree-node">
-            <div class="tree-node-header ${c.id === activeComp.id ? 'active' : ''}" onclick="selectCeoCompany('${c.id}')">
-              <span>🏢</span>
-              <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.name}</span>
-            </div>
-            ${c.id === activeComp.id ? `
-              <div class="tree-children">
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('employees')">├── AI Employees (${state.workforce.filter(w=>w.companyId===c.id).length})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('squads')">├── Squad Templates (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('taskgraph')">├── TaskGraph & DAG (${state.agentEnginePlans ? state.agentEnginePlans.length : 0})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('heartbeats')">├── Heartbeats & Logs (${state.agentEngineRuns ? state.agentEngineRuns.length : 0})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('skills')">├── Operational SOPs (${state.agentEngineSkills ? state.agentEngineSkills.length : 5})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('missions')">├── Missions (${state.missions.filter(m=>m.companyId===c.id).length})</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('structure')">├── Structure (${c.departments.length} Depts)</div>
-                <div style="font-size:12px; padding:4px 8px; color:var(--text-secondary); cursor:pointer;" onclick="switchCeoTab('reports')">└── Verified Reports</div>
-              </div>
-            ` : ''}
-          </div>
-        `).join('')}
-      </div>
-
-      <!-- Right Column: Subtabs (Employees, Squads, TaskGraph, Heartbeats, Skills, Missions, Structure, Reports) -->
-      <div>
-        <!-- Subnav Buttons -->
-        <div class="ceo-subnav">
-          <button class="ceo-tab-btn ${state.ceoTab === 'employees' ? 'active' : ''}" onclick="switchCeoTab('employees')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            AI Employees (${compWorkforce.length})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'squads' ? 'active' : ''}" onclick="switchCeoTab('squads')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-            Squad Templates (${state.agentEngineTeams ? state.agentEngineTeams.length : 4})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'taskgraph' ? 'active' : ''}" onclick="switchCeoTab('taskgraph')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            TaskGraph & DAG (${state.agentEnginePlans ? state.agentEnginePlans.length : 0})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'heartbeats' ? 'active' : ''}" onclick="switchCeoTab('heartbeats')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            Heartbeat & Logs (${state.agentEngineRuns ? state.agentEngineRuns.length : 0})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'skills' ? 'active' : ''}" onclick="switchCeoTab('skills')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            Operational SOPs (${state.agentEngineSkills ? state.agentEngineSkills.length : 5})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'missions' ? 'active' : ''}" onclick="switchCeoTab('missions')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            Missions & Objectives (${compMissions.length})
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'structure' ? 'active' : ''}" onclick="switchCeoTab('structure')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Structure
-          </button>
-          <button class="ceo-tab-btn ${state.ceoTab === 'reports' ? 'active' : ''}" onclick="switchCeoTab('reports')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Reports
-          </button>
-        </div>
-
-        <!-- Tab Content Containers -->
-        <div id="ceoTabContent">
-          ${renderActiveCeoTab(activeComp, compWorkforce, compMissions)}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-window.selectCeoCompany = function(cid) {
-  state.activeCompanyId = cid;
-  renderCeoSection();
-};
-
-window.switchCeoTab = function(tabName) {
-  state.ceoTab = tabName;
-  renderCeoSection();
-};
-
-function renderActiveCeoTab(comp, workforce, missions) {
-  if (state.ceoTab === 'employees') {
-    return `
-      <div>
-        <!-- AI CEO Dynamic Org Synthesis Banner -->
-        <div class="card" style="margin-bottom:18px; border:1px solid rgba(59,130,246,0.3); background:linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.06)); padding:16px 20px; border-radius:var(--radius-lg);">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-            <div style="flex:1; min-width:280px;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:20px;">⚡</span>
-                <h4 style="font-size:15px; font-weight:700; margin:0;">AI CEO Dynamic Organization Synthesizer</h4>
-                <span class="badge badge-blue">Universal Engine</span>
-              </div>
-              <p style="font-size:12.5px; color:var(--text-secondary); margin:4px 0 0 0; line-height:1.4;">
-                Analyzes <strong>${comp.name}</strong> (${comp.industry}), detects domain capability gaps, and autonomously synthesizes the exact specialized workforce and departments needed.
-              </p>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <button class="btn-primary" style="font-size:12.5px; padding:8px 16px; background:var(--accent-blue);" onclick="triggerDynamicOrgSynthesis('${comp.id}')">
-                <span>⚡ Synthesize Custom Workforce</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <p style="font-size:13px; color:var(--text-secondary);">
-            Dynamic specialized AI employees tailored to <strong>${comp.name}</strong>. Created on-demand by the AI CEO rather than a fixed template.
-          </p>
-          <button class="btn-secondary" style="font-size:12px; padding:6px 12px;" onclick="openHireAgentModal()">+ Create Custom AI Role</button>
-        </div>
-
-        <div class="employees-grid">
-          ${workforce.map(w => `
-            <div class="employee-card">
-              <div class="employee-avatar-row">
-                <div class="agent-avatar">${w.role.charAt(0)}</div>
-                <div class="agent-title">
-                  <h4>${w.role}</h4>
-                  <span>${w.department} • Reports to ${w.manager}</span>
-                </div>
-              </div>
-
-              <div class="agent-badge-row">
-                <span class="badge badge-blue">Model: ${w.model}</span>
-                <span class="badge badge-emerald">Cap: ₹${(w.spendingLimit).toLocaleString()}</span>
-                <span class="badge badge-purple">${w.status}</span>
-              </div>
-
-              <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-                <strong>Allowed Tools:</strong> ${w.allowedTools.join(', ')}
-              </div>
-
-              <div style="background:var(--bg-surface); padding:8px 10px; border-radius:var(--radius-sm); font-size:11.5px; margin-bottom:12px;">
-                <strong>Key KPIs:</strong> ${Object.entries(w.kpis || {}).map(([k,v]) => `${k}: ${v}`).join(' • ')}
-              </div>
-
-              <div style="display:flex; gap:6px;">
-                <button class="btn-secondary" style="flex:1; font-size:12px; padding:6px 8px;" onclick="openAssignMissionModal('${w.id}')">Assign Task</button>
-                <button class="btn-secondary" style="font-size:12px; padding:6px 8px; color:var(--accent-rose);" onclick="removeAgent('${w.id}')">Decommission</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  } else if (state.ceoTab === 'squads') {
-    return renderTeamsCatalogTab();
-  } else if (state.ceoTab === 'taskgraph') {
-    return renderDelegationTab();
-  } else if (state.ceoTab === 'heartbeats') {
-    return renderHeartbeatsTab();
-  } else if (state.ceoTab === 'skills') {
-    return renderSkillsTab();
-  } else if (state.ceoTab === 'missions') {
-    return `
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <p style="font-size:13px; color:var(--text-secondary);">
-            Mission Pipeline: <code>Mission → AI CEO → Workforce → Tools → Execution → Verification → Report</code>
-          </p>
-          <button class="btn-primary" style="width:auto; font-size:12.5px; padding:6px 14px;" onclick="openNewMissionModal()">+ New Mission</button>
-        </div>
-
-        <div class="missions-list">
-          ${missions.map(m => `
-            <div class="mission-card">
-              <div class="mission-info" style="flex:1; min-width:240px;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                  <span class="badge ${m.status === 'SUCCESS' ? 'badge-emerald' : 'badge-blue'}">${m.status}</span>
-                  <span style="font-size:11.5px; color:var(--text-muted); font-family:var(--font-mono);">${m.id}</span>
-                </div>
-                <h4>${m.title}</h4>
-                <p>${m.targetOutcome}</p>
-                <div style="margin-top:6px; font-size:12px; color:var(--accent-cyan);">
-                  <strong>Agents:</strong> ${m.assignedAgents.join(', ')} • <strong>Tools:</strong> ${m.toolsUsed.join(', ')}
-                </div>
-              </div>
-
-              <div style="text-align:right; font-size:12.5px;">
-                <div style="font-weight:700; color:var(--text-primary);">Budget: ₹${m.budget.toLocaleString()}</div>
-                <div style="color:var(--text-muted); font-size:11.5px;">Incurred: ₹${m.costIncurred.toLocaleString()}</div>
-                <div style="color:var(--accent-emerald); font-weight:600; font-size:11.5px; margin-top:4px;">${m.verificationSummary}</div>
-                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px; margin-top:8px;" onclick="viewMissionLedger('${m.id}')">Inspect Ledger</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  } else if (state.ceoTab === 'reports') {
-    return `
-      <div>
-        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
-          The AI CEO compiles comprehensive executive reports so the owner can review verified business outcomes without micromanaging.
-        </p>
-
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-title-bar">
-            <h4 style="font-size:14.5px; font-weight:700;">Executive Shift Report: ${comp.name}</h4>
-            <span class="badge badge-emerald">Verified Ledger Match</span>
-          </div>
-          <p style="font-size:13px; line-height:1.5; color:var(--text-secondary); margin-bottom:12px;">
-            The autonomous workforce completed 3 core missions over the last 24-hour cycle. 
-            Direct bookings and revenue recovery yielded <strong>₹64,000</strong> while AI token and operational costs were capped at <strong>₹18,000</strong>, delivering a <strong>₹46,000 net contribution</strong>.
-          </p>
-          <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-md); font-size:12px; font-family:var(--font-mono); color:var(--accent-cyan); border:1px solid var(--border-color); line-height:1.6;">
-            <div style="color:var(--text-primary); font-weight:700; margin-bottom:6px;">[DUAL_SOURCE_REALITY_VERIFICATION]:</div>
-            <div>├── [CRYPTO_DIGEST]: SHA-256 Merkle root locked (d98f2a...c041)</div>
-            <div>├── [API_INDEPENDENT_PROBE]: Direct PMS / ERP HTTP 200 state verified</div>
-            <div>├── [DATABASE_TRUTH]: Ledger row mutation confirmed in SQLite</div>
-            <div>├── [PHYSICAL_RECONCILIATION]: Zero discrepancies between reported outcome and settlement account</div>
-            <div>└── [SECURITY_GATE]: Zero unencrypted credentials leaked to model context</div>
-          </div>
-        </div>
-      </div>
-    `;
-  } else {
-    // Structure
-    return `
-      <div>
-        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
-          Tailored organogram synthesized by AI CEO specifically for <strong>${comp.name}</strong> (${comp.industry}).
-        </p>
-
-        <div class="card" style="text-align:center; padding:30px;">
-          <div style="display:inline-block; padding:12px 24px; background:var(--accent-blue-light); border:1px solid var(--accent-blue); border-radius:var(--radius-md); font-weight:700; margin-bottom:20px;">
-            AI CEO (Central Strategy & Governance)
-          </div>
-          <div style="width:2px; height:24px; background:var(--border-subtle); margin:0 auto 20px;"></div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px;">
-            ${comp.departments.map(d => `
-              <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px;">
-                <div style="font-weight:700; font-size:13.5px; margin-bottom:6px; color:var(--accent-cyan);">${d}</div>
-                <div style="font-size:11.5px; color:var(--text-secondary);">
-                  ${state.workforce.filter(w=>w.companyId===comp.id && w.department.toLowerCase().includes(d.toLowerCase().split(' ')[0])).length} AI Specialists
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    `;
+  if (window.AiCeoWorkspace) {
+    window.AiCeoWorkspace.render('view-ceo');
   }
 }
 
@@ -2124,6 +1607,12 @@ function renderToolsSection() {
   const container = document.getElementById('view-tools');
   if (!container) return;
 
+  if (window.ToolsFactory) {
+    const route = (window.location.hash.slice(1) || '/tools').replace(/^\/+/, '/');
+    window.ToolsFactory.render(route.startsWith('/tools') ? route : '/tools');
+    return;
+  }
+
   const filteredTools = state.toolsCategory === 'all' 
     ? state.tools 
     : state.tools.filter(t => t.category === state.toolsCategory);
@@ -2239,41 +1728,7 @@ window.testToolExecution = function(toolId) {
 };
 
 window.openToolFactoryModal = function() {
-  openModal('The Tool Factory — Build & Register New Capability', `
-    <form onsubmit="submitBuildTool(event)">
-      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:14px;">
-        When a mission requires a tool that does not yet exist in your SaaS, the Tool Factory generates and certifies it in a secured sandbox.
-      </p>
-      <div class="form-group">
-        <label class="form-label">Tool Capability Name *</label>
-        <input type="text" class="form-input" id="newToolName" placeholder="e.g. Shopify Refund Reconciliation Bot" required />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tool Category *</label>
-        <select class="form-input" id="newToolCat" required>
-          <option value="biz">Business, CRM & ERP</option>
-          <option value="info">Information & Web</option>
-          <option value="dev">Development & Code</option>
-          <option value="comm">Communication & Voice</option>
-          <option value="robot">Robotic-Computer & Desktop</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Functional Specification</label>
-        <textarea class="form-input" id="newToolSpec" rows="3" placeholder="Describe the inputs, outputs, external API endpoints, and assertions required." required>Connects to Shopify Orders API, queries orders marked as returned, verifies Stripe refund settlement, and flags discrepancies.</textarea>
-      </div>
-      <div style="background:#070b14; padding:12px; border-radius:var(--radius-md); font-family:var(--font-mono); font-size:11.5px; color:#38bdf8; margin-bottom:16px;">
-        <div># Automated Factory Verification Pipeline:</div>
-        <div>1. AST Syntax & Security Static Analysis: PASSED</div>
-        <div>2. Epistemic Sandbox Containerization: PASSED</div>
-        <div>3. Deterministic SHA-256 Output Assertion: PASSED</div>
-      </div>
-      <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn-primary" style="width:auto;">Build, Test & Register Tool</button>
-      </div>
-    </form>
-  `);
+  window.navigateTo('/tools/factory');
 };
 
 window.submitBuildTool = function(e) {
@@ -2391,6 +1846,12 @@ function renderSettingsSection() {
   const container = document.getElementById('view-settings');
   if (!container) return;
 
+  if (window.EnterpriseSettings) {
+    const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
+    window.EnterpriseSettings.render(route.startsWith('/settings') ? route : '/settings/security');
+    return;
+  }
+
   if (state.settingsView === 'hub') {
     renderSettingsHub(container);
   } else {
@@ -2488,16 +1949,11 @@ window.filterSettingsHubCards = function(query) {
 };
 
 window.openSettingsCategory = function(catId) {
-  state.settingsView = 'detail';
-  state.settingsActiveCategory = catId;
-  renderSettingsSection();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.navigateTo('/settings/' + catId);
 };
 
 window.returnToSettingsHub = function() {
-  state.settingsView = 'hub';
-  renderSettingsSection();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.navigateTo('/settings');
 };
 
 // --------------------------------------------------------------------------

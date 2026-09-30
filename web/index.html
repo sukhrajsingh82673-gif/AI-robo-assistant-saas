@@ -42,7 +42,7 @@
         </button>
       </div>
 
-      <!-- Navigation Menu: 5 Primary Core Areas -->
+      <!-- Navigation Menu: Complete Company Operations & Platform Control -->
       <nav class="sidebar-nav">
         <div class="nav-section-label">Operations Control</div>
 
@@ -60,6 +60,13 @@
           <span class="nav-label">Company</span>
         </button>
 
+        <button class="nav-item" data-nav="organization" id="navItemOrganization">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="2" y="15" width="6" height="4" rx="1"/><rect x="9" y="15" width="6" height="4" rx="1"/><rect x="16" y="15" width="6" height="4" rx="1"/><path d="M12 7v4M5 15v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2M12 11v4"/></svg>
+          </div>
+          <span class="nav-label">Organization</span>
+        </button>
+
         <button class="nav-item" data-nav="ceo" id="navItemCeo">
           <div class="nav-icon-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -68,14 +75,42 @@
           <span class="nav-pill">Core</span>
         </button>
 
+        <button class="nav-item" data-nav="workforce" id="navItemWorkforce">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span class="nav-label">AI Workforce</span>
+        </button>
+
+        <button class="nav-item" data-nav="tasks" id="navItemTasks">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <span class="nav-label">TaskMaker</span>
+        </button>
+
+        <button class="nav-item" data-nav="processes" id="navItemProcesses">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <span class="nav-label">Processes</span>
+        </button>
+
+        <button class="nav-item" data-nav="trustgraph" id="navItemTrustGraph">
+          <div class="nav-icon-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <span class="nav-label">TrustGraph</span>
+        </button>
+
+        <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
+
         <button class="nav-item" data-nav="tools" id="navItemTools">
           <div class="nav-icon-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           </div>
           <span class="nav-label">Tools & Factory</span>
         </button>
-
-        <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
 
         <button class="nav-item" data-nav="settings" id="navItemSettings">
           <div class="nav-icon-box">
@@ -164,7 +199,12 @@
         <div class="workspace-inner">
           <section id="view-overview" class="view-section active"></section>
           <section id="view-company" class="view-section"></section>
+          <section id="view-organization" class="view-section"></section>
           <section id="view-ceo" class="view-section"></section>
+          <section id="view-workforce" class="view-section"></section>
+          <section id="view-tasks" class="view-section"></section>
+          <section id="view-processes" class="view-section"></section>
+          <section id="view-trustgraph" class="view-section"></section>
           <section id="view-tools" class="view-section"></section>
           <section id="view-settings" class="view-section"></section>
         </div>
@@ -190,6 +230,17 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer"></div>
 
+  <!-- Reconstructed Subsystem Scripts -->
+  <script src="company_context.js"></script>
+  <script src="company_workspace.js"></script>
+  <script src="ai_ceo_workspace.js"></script>
+  <script src="org_workspace.js"></script>
+  <script src="workforce_workspace.js"></script>
+  <script src="taskmaker_workspace.js"></script>
+  <script src="processes_workspace.js"></script>
+  <script src="trustgraph_workspace.js"></script>
+  <script src="settings_enterprise.js"></script>
+  <script src="tools_factory.js"></script>
   <!-- Application Script -->
   <script src="app.js"></script>
 </body>

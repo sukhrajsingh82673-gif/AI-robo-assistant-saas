@@ -1,0 +1,20 @@
+[
+  {
+    "id": "tool_custom_5e501f73",
+    "name": "Stripe Dispute Sync Bot",
+    "category": "Finance & Billing",
+    "source": "User Created",
+    "availability": "Available",
+    "permission": "AUDITED_TRANSACTIONAL",
+    "permissions_list": [
+      "Filesystem read"
+    ],
+    "version": "1.0.0",
+    "health": "Healthy",
+    "last_verified": "2026-09-30 09:20:11",
+    "runtime": "Python 3 Sandboxed",
+    "purpose": "",
+    "description": "User created tool synthesized through ZONATA Tool Factory.",
+    "created_at": 1790740211.4517303
+  }
+]
