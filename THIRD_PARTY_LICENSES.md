@@ -42,3 +42,28 @@ This project incorporates components, libraries, and architectural patterns lice
 - **Production Usage:** Persistent Agent Identities, Working Memory Blocks (Persona & Human), Scoped Memory Storage, Context Budget Compaction, Recall Buffers, and Cross-Session Executive Continuity, strictly governed by ZONATA Authority, PolicyEngine, ApprovalPipeline, and EvidenceLedger.
 - **Terms:** Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
+---
+
+### 5. Multimodal Perception, Interaction & Local-Assistant Capability Layer
+- **Package:** HAL9000
+- **Upstream Origin:** [shandar/HAL9000](https://github.com/shandar/HAL9000)
+- **Version Baseline:** 1.5.0 (Commit `1160f57f1b21ef0baa1b1353e6b0110617116e8b`)
+- **License:** MIT License
+- **Copyright:** (c) 2026 Shandar Junaid / Affordance Design Studio
+- **Integration Method:** Universal Multimodal Capability Runtime & Governed Adapter (`core/multimodal_capability_runtime.py`, `zonata/hal_multimodal_adapter.py`)
+- **Production Usage:** Multimodal human-computer interaction, vision observation, audio/STT processing, speech synthesis (TTS), local-first model routing, desktop robot integration, governed MCP provider, and execution state machine under strict ZONATA Authority, PolicyEngine, ApprovalPipeline, and EvidenceLedger.
+- **Terms:** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+## 6. LangGraph (langchain-ai/langgraph)
+- **Repository:** `https://github.com/langchain-ai/langgraph`
+- **Version Baseline:** 1.2.12 (Commit `f6e9ace6395b489778f80c65130d0d02bad4fd1d`)
+- **License:** MIT License
+- **Copyright:** (c) 2024 LangChain, Inc.
+- **Python Version Requirements:** >=3.10 (Running 3.14 on Linux Host)
+- **Direct Dependencies:** `langgraph-checkpoint>=4.1.0`, `langgraph-sdk>=0.4.2`, `langgraph-prebuilt>=1.1.0`, `pydantic>=2.7.4`, `langchain-core>=1.4.7`
+- **Transitive Dependencies:** `xxhash`, `typing-extensions`, `jsonpath-ng`
+- **Integration Method:** Governed Durable Workflow Runtime & LangGraph Provider (`core/durable_workflow_runtime.py`, `zonata/langgraph_adapter.py`)
+- **Governance Boundary:** Implements `WorkflowRuntimeProvider` abstraction. LangGraph provides durable execution, checkpoints, state graphs, human-in-the-loop interrupts, deterministic and agentic node compositions, and cyclic workflows without bypassing ZONATA PolicyEngine, AuthorityGateway, ApprovalEngine, or EvidenceLedger.
+- **Terms:** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+

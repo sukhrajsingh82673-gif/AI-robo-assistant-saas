@@ -89,43 +89,65 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Non-Negotiable Invariant**: `TASK_SUCCESS != BUSINESS_OUTCOME`.
 - Completing a task or launching a campaign is NOT business success. Revenue is only credited when verified transaction evidence is presented.
 
+### 8. Governed Multi-Agent Workforce (Agency Swarm — Project 01)
+- **Hierarchical Swarms**: AI CEO delegating to Agency Swarm specialist squads (Operations, Finance, Engineering) with directional role communication graphs.
+- **Directional Communication & Shared Instruction Firewalls**: Strict governance preventing cross-agent authority leaks.
+
+### 9. Stateful Agent Identity & Long-Horizon Memory (Letta — Project 02)
+- **Hierarchical Memory**: Block memory (`persona`, `human`), contextual Archival Memory, Recall Memory buffer.
+- **Zero-Secret Persistence Invariant**: Automated secret scanning blocking API keys, tokens, and credentials from persisting into memory blocks.
+
+### 10. Governed Multimodal Capability Layer (HAL AI — Project 03)
+- **16 Multimodal Capability Families**: `VISION`, `AUDIO_INPUT`, `SPEECH_TO_TEXT`, `TEXT_TO_SPEECH`, `SCREEN_OBSERVATION`, `SCREENSHOT`, `APPLICATION_CONTROL`, `FILE_ACCESS`, `CLIPBOARD`, `LOCAL_COMMAND`, `WEB_ACCESS`, `KNOWLEDGE`, `MEMORY`, `ARTIFACT`, `BACKGROUND_TASK`, `MCP`.
+- **19-State Governed Lifecycle Machine**: Tracking states from `IDLE`, `LISTENING`, `OBSERVING`, through `WAITING_FOR_APPROVAL`, `HOST_TAKEOVER`, to `COMPLETED` and `RECONCILING`.
+- **Governed MCP Gateway**: PolicyEngine gating all external MCP invocations (Cursor, Claude Code, Windsurf) with tenant/company isolation.
+- **Authoritative STOP KillSwitch & Host Takeover**: Instant halt of autonomous mutations upon user intervention.
+- **Epistemic Observation vs Evidence Ledger**: Strict invariant that `Observation != Truth` and `Screenshot != Business Success`.
+
+### 11. Governed Durable Workflow Runtime (LangGraph — Project 04)
+- **StateGraph Compilation & Hashing**: Compile workflow state graphs with deterministic nodes, agentic steps, conditional branches, cycles, and SHA-256 graph definition hashing.
+- **Zero-Secret Thread Checkpointer**: Thread-scoped durable persistence in SQLite with automated secret scrubbing (`SecretScanner`), state digests, and parent lineage tracking.
+- **Pregel Step Loop & Execution Invariants**: Step-by-step superstep execution with strict budget control, bounded loop iteration ceilings (`max_iterations`), and killswitch enforcement.
+- **Human-in-the-Loop Interruption & Resume**: Interrupt workflows requiring approval (`approve`, `reject`, `edit`), with immutable decision audit trails and state updates.
+- **Resilient Recovery & Reconciliation**: Classification into safe idempotent retries, non-idempotent blocks, and state reconciliation for ambiguous external outcomes.
+- **Deep System Integrations**: Seamless orchestration connecting AI CEO, Agency Swarm multi-agent delegations, Letta persistent identity memory, and HAL multimodal perception.
+
 ---
 
 ## 📁 Repository Structure
 
 ```
 .
-├── api_server.py                # Unified REST API & static Web UI server
-├── cli.py                       # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
-├── serve_web.py                 # Standalone web UI preview server
+├── api_server.py                    # Unified REST API & static Web UI server (including Workflow API)
+├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
+├── serve_web.py                     # Standalone web UI preview server
 ├── core/
-│   ├── truth_types.py           # Truth states, planning horizons, operational reasoning
-│   ├── ceo_engine.py            # CEO 2.0 continuous executive intelligence engine
-│   ├── executive_council.py     # Multi-role executive council challenge loops
-│   ├── ceo_chief_of_staff.py    # AI Chief of Staff inbox & dossier coordination
-│   ├── workforce_intelligence.py# Dynamic workforce gap detection & blueprints
-│   ├── employee_performance.py  # Governance-bounded performance tracking
-│   ├── host_fabric.py           # Universal Host Agent & quarantine boundary
-│   ├── desktop_robot.py         # Universal Desktop Robot (files, processes, screen)
-│   ├── browser_robot.py         # Browser Robot Execution Fabric
-│   ├── credential_broker.py     # Secret-isolated credential broker
-│   ├── session_broker.py        # Governed session broker & MFA handling
-│   ├── application_fabric.py    # Application discovery & automation adapters
-│   ├── software_manager.py      # Governed package installation/uninstallation
-│   ├── file_intelligence.py     # File taxonomy, checksums & untrusted data isolation
-│   ├── sales_workforce.py       # Commercial sales workforce & discount ceilings
-│   ├── voice_agent.py           # Epistemically separated Voice AI platform
-│   ├── event_engine.py          # Continuous enterprise event engine
-│   ├── interactive_meeting.py   # Daily interactive executive operating meeting
-│   ├── business_causality.py    # Attribution engine: Task Success vs Business Outcome
-│   ├── db.py                    # Multi-tenant SQLite database persistence
-│   ├── portfolio.py             # Multi-entity corporate portfolio engine
-│   ├── ceo.py & ceo_brain/      # Executive strategic command & cognitive reasoning
-│   ├── control_kernel.py        # Universal Control Kernel with evidence verification
-│   └── evidence_ledger.py       # Cryptographic Merkle audit ledger
-├── tests/                       # 58 verification tests (100% passing)
-├── web/                         # Single-page executive cockpit UI
-└── storage/                     # SQLite database and audit ledgers
+│   ├── durable_workflow_runtime.py  # LangGraph Governed Durable Workflow Runtime (StateGraph, Checkpointer)
+│   ├── multimodal_capability_runtime.py # HAL Governed Multimodal Runtime (16 families, 19 states)
+│   ├── stateful_agent_runtime.py    # Letta Stateful Agent Identity & Memory Runtime
+│   ├── workforce_orchestrator.py    # Agency Swarm Governed Workforce Runtime
+│   ├── ceo_engine.py                # CEO 2.0 continuous executive intelligence engine
+│   ├── executive_council.py         # Multi-role executive council challenge loops
+│   ├── host_fabric.py               # Universal Host Agent & quarantine boundary
+│   ├── desktop_robot.py             # Universal Desktop Robot (files, processes, screen)
+│   ├── control_kernel.py            # Universal Control Kernel with evidence verification
+│   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
+├── zonata/
+│   ├── langgraph_adapter.py         # LangGraph Workflow Adapter & Canonical Scenarios (A-K)
+│   ├── hal_multimodal_adapter.py    # HAL Capability Adapter & Workflows (Scenarios A-J)
+│   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
+│   └── workforce_adapter.py         # Agency Swarm Adapter
+├── tests/
+│   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
+│   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
+│   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
+│   └── test_*.py                    # 67 Unit & system regression tests
+├── web/
+│   ├── index.html                   # Single-page executive cockpit & Workflow Workspace
+│   ├── app.js                       # Frontend router and event wiring
+│   ├── workflow_workspace.js        # Workflow Workspace (Runs, Graphs, Checkpoints, Approvals)
+│   └── styles.css                   # Styles for cockpit, HUD, and workflow graph visualizations
+└── storage/                         # SQLite database and audit ledgers
 ```
 
 ---
@@ -180,7 +202,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 66/66 tests passing (100% pass rate).*
+*Current test suite: 222/222 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, and LangGraph Durable Workflows).*
 
 ---
 
@@ -192,3 +214,9 @@ python3 -m unittest discover tests
 4. **Sandbox Path Isolation**: Desktop robot mutations are strictly bounded to designated workspaces.
 5. **No Auto-Execution of Untrusted Data**: External downloads and customer content are treated strictly as data.
 6. **Task Success != Business Outcome**: Verified commercial transactions are required before recognizing revenue.
+7. **Workflow State != Authority**: Resuming a checkpoint or transitioning graph nodes never inherits or bypasses ZONATA approval and policy gates.
+8. **Checkpoint != Evidence**: Storing an intermediate or terminal execution state in SQLite is not business evidence; evidence requires cryptographic Merkle ledger sealing.
+9. **Graph Definition != Permission**: Defining an edge or cycle in a `StateGraph` does not authorize side effects or external mutations.
+10. **Model Output != Authorization**: An agent deciding to branch or iterate within a graph must still submit high-risk actions to the ZONATA Authority Gateway.
+11. **Retry != Safe Replay**: Non-idempotent operations are blocked from automated replay; ambiguous outcomes require state reconciliation.
+12. **Zero-Secret Persistence in Checkpoints**: Thread state checkpointers scrub all API tokens, bearer keys, and plaintext secrets before writing to disk.

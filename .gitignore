@@ -31,3 +31,7 @@ ENV/
 .DS_Store
 .idea/
 .vscode/
+
+# Sandboxed runtime files
+storage/sandbox/
+

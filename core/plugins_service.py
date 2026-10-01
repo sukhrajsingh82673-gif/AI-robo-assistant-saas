@@ -344,6 +344,26 @@ class PluginsAndConnectionsService:
                 "capabilities": ["sandbox_quarantine", "token_rate_limiter", "session_isolation"],
                 "installed": 1,
                 "enabled": 1
+            },
+            {
+                "id": "plg_hal_multimodal",
+                "name": "Local AI & Multimodal Perception Layer",
+                "category": "AUTOMATION",
+                "version": "1.5.0",
+                "description": "HAL9000 Governed multimodal provider: vision, hearing/STT, voice synthesis, desktop control, and MCP gateway.",
+                "capabilities": ["hal_vision", "hal_voice", "hal_desktop", "hal_local_model", "hal_mcp"],
+                "installed": 1,
+                "enabled": 1
+            },
+            {
+                "id": "plg_langgraph_runtime",
+                "name": "LangGraph Governed Durable Workflow Runtime",
+                "category": "WORKFLOW_RUNTIMES",
+                "version": "1.2.12",
+                "description": "LangGraph stateful workflow execution engine: StateGraph, checkpoints, interrupts, cycles, and recovery under ZONATA governance.",
+                "capabilities": ["state_graph", "checkpoints", "interrupts", "dynamic_cycles", "recovery_engine"],
+                "installed": 1,
+                "enabled": 1
             }
         ]
 

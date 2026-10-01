@@ -586,6 +586,38 @@ class StatefulAgentMemoryGateway:
             )
         return results
 
+    def get_memory_record(self, record_id: str) -> Optional[MemoryRecord]:
+        with db.get_connection() as conn:
+            r = conn.execute(
+                "SELECT * FROM stateful_memory_records WHERE record_id = ? AND tenant_id = ?",
+                (record_id, self.tenant_id)
+            ).fetchone()
+            if not r:
+                return None
+            conf = r["confidence"]
+            now = time.time()
+            if r["expires_at"] and r["expires_at"] < now:
+                conf = ConfidenceLevel.EXPIRED.value
+            return MemoryRecord(
+                record_id=r["record_id"],
+                tenant_id=r["tenant_id"],
+                scope=r["scope"],
+                scope_id=r["scope_id"],
+                memory_type=r["memory_type"],
+                category=r["category"],
+                memory_key=r["memory_key"],
+                content=r["content"],
+                source=r["source"],
+                confidence=conf,
+                version=r["version"],
+                superseded_by=r["superseded_by"],
+                expires_at=r["expires_at"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+                metadata=json.loads(r["metadata"]) if r["metadata"] else {}
+            )
+
+
     def get_agent_effective_memory(
         self,
         agent_id: str,

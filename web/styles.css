@@ -5010,4 +5010,173 @@ html, body {
     padding: 10px;
     border-radius: 50%;
   }
+
+  .assistant-flyout-window {
+    width: 96vw;
+    height: 85vh;
+    right: 2vw;
+    bottom: 60px;
+  }
 }
+
+/* ==========================================================================
+   HAL Multimodal Live Assistant HUD Styles (Requirement 43, 44, 45)
+   ========================================================================== */
+.multimodal-hud-container {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.multimodal-status-card {
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+}
+
+.multimodal-waveform-canvas {
+  width: 100%;
+  height: 48px;
+  background: #090d16;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+  padding: 0 8px;
+}
+
+.waveform-bar {
+  width: 4px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: height 0.1s ease;
+}
+
+.waveform-bar.active {
+  background: #ef4444;
+  animation: wavePulse 0.4s infinite alternate;
+}
+
+@keyframes wavePulse {
+  0% { height: 6px; }
+  100% { height: 38px; }
+}
+
+.multimodal-controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-hud-action {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-hud-action:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--text-muted);
+}
+
+.btn-hud-stop {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.btn-hud-stop:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+.btn-hud-takeover {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.btn-hud-takeover:hover {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.hud-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.hud-state-IDLE { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+.hud-state-OBSERVING { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.hud-state-EXECUTING { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+.hud-state-VERIFYING { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.hud-state-COMPLETED { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.hud-state-HOST_TAKEOVER { background: rgba(245, 158, 11, 0.25); color: #f59e0b; }
+.hud-state-BLOCKED, .hud-state-CANCELLED { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+/* Workflow Runtime Styles */
+.workflow-graph-canvas {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 16px 8px;
+}
+
+.workflow-node-pill {
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  min-width: 110px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.workflow-node-pill.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+}
+
+@media (max-width: 768px) {
+  .workflow-graph-canvas {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workflow-node-pill {
+    width: 100%;
+  }
+}
+
+

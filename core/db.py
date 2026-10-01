@@ -943,6 +943,266 @@ CREATE TABLE IF NOT EXISTS stateful_conversation_turns (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stateful_turns_session ON stateful_conversation_turns(session_id);
+
+-- 50. Multimodal Capabilities Registry (HAL9000 & ZONATA Native)
+CREATE TABLE IF NOT EXISTS multimodal_capabilities (
+    capability_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    provider TEXT NOT NULL, -- HAL9000, ZONATA_NATIVE, BROWSER_ROBOT, DESKTOP_ROBOT
+    family TEXT NOT NULL, -- VISION, AUDIO_INPUT, SPEECH_TO_TEXT, TEXT_TO_SPEECH, SCREEN_OBSERVATION, SCREENSHOT, APPLICATION_CONTROL, FILE_ACCESS, CLIPBOARD, LOCAL_COMMAND, WEB_ACCESS, KNOWLEDGE, MEMORY, ARTIFACT, BACKGROUND_TASK, MCP
+    name TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT '1.5.0',
+    platform TEXT NOT NULL DEFAULT 'CROSS_PLATFORM',
+    risk_level TEXT NOT NULL DEFAULT 'SAFE', -- SAFE, CONFIRM, DANGEROUS, CRITICAL
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+    permissions JSON,
+    execution_mode TEXT NOT NULL DEFAULT 'SANDBOX', -- SANDBOX, HOST, HYBRID
+    evidence_requirements JSON,
+    health_status TEXT NOT NULL DEFAULT 'HEALTHY', -- HEALTHY, DEGRADED, UNAVAILABLE
+    latency_ms INTEGER NOT NULL DEFAULT 15,
+    is_enabled INTEGER NOT NULL DEFAULT 1,
+    metadata JSON,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (tenant_id, capability_id),
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mm_caps_tenant ON multimodal_capabilities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mm_caps_family ON multimodal_capabilities(tenant_id, family);
+
+-- 51. Multimodal Execution Sessions & State Machine
+CREATE TABLE IF NOT EXISTS multimodal_execution_sessions (
+    session_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    workspace_id TEXT,
+    user_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    agent_id TEXT,
+    capability_id TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'IDLE', -- IDLE, LISTENING, OBSERVING, UNDERSTANDING, PLANNING, WAITING_FOR_PERMISSION, WAITING_FOR_APPROVAL, PREPARING, EXECUTING, PAUSED, HOST_TAKEOVER, VERIFYING, RECONCILING, COMPLETED, FAILED, BLOCKED, CANCELLED, AMBIGUOUS, RECOVERY_REQUIRED
+    host_takeover INTEGER NOT NULL DEFAULT 0,
+    killswitch_active INTEGER NOT NULL DEFAULT 0,
+    state_history JSON,
+    last_observation JSON,
+    last_verification JSON,
+    evidence_id TEXT,
+    started_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mm_sess_tenant ON multimodal_execution_sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mm_sess_state ON multimodal_execution_sessions(state);
+
+-- 52. Multimodal Observations Ledger (Screen, Webcam, Mic, Window with Redaction & Hashing)
+CREATE TABLE IF NOT EXISTS multimodal_observations (
+    observation_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    session_id TEXT NOT NULL,
+    task_id TEXT,
+    source TEXT NOT NULL, -- WEBCAM, SCREENSHOT, MICROPHONE, APP_WINDOW, SYSTEM_METRIC
+    observation_type TEXT NOT NULL, -- IMAGE, AUDIO_TRANSCRIPT, WINDOW_HIERARCHY, CLIPBOARD_TEXT, SYSTEM_STATE
+    raw_hash TEXT NOT NULL,
+    redacted_content TEXT,
+    sensitivity_classification TEXT NOT NULL DEFAULT 'INTERNAL', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED
+    confidence REAL NOT NULL DEFAULT 1.0,
+    metadata JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mm_obs_sess ON multimodal_observations(session_id);
+
+-- 53. Governed Multimodal Artifacts (SHA-256 Verified Outputs)
+CREATE TABLE IF NOT EXISTS multimodal_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    mission_id TEXT,
+    task_id TEXT,
+    creator_agent_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    artifact_type TEXT NOT NULL, -- DOCUMENT, CODE, HTML, DIAGRAM, REPORT, DATASET
+    version INTEGER NOT NULL DEFAULT 1,
+    content TEXT NOT NULL,
+    integrity_hash TEXT NOT NULL,
+    security_classification TEXT NOT NULL DEFAULT 'INTERNAL',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mm_artifacts_tenant ON multimodal_artifacts(tenant_id);
+
+-- 54. Governed MCP Gateway Invocations (Policy & Authority Audited)
+CREATE TABLE IF NOT EXISTS mcp_gateway_invocations (
+    invocation_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    client_id TEXT NOT NULL, -- claude_code, claude_desktop, cursor, external_mcp
+    tool_name TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    policy_evaluation TEXT NOT NULL DEFAULT 'ALLOWED', -- ALLOWED, BLOCKED, APPROVAL_REQUIRED
+    approval_status TEXT NOT NULL DEFAULT 'AUTO', -- AUTO, APPROVED, DENIED
+    execution_status TEXT NOT NULL DEFAULT 'SUCCESS', -- SUCCESS, FAILED, BLOCKED, CANCELLED
+    parameters JSON,
+    result_summary TEXT,
+    evidence_id TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_invocations_tenant ON mcp_gateway_invocations(tenant_id);
+
+-- 55. Governed Durable Workflows (LangGraph Runtime Core)
+CREATE TABLE IF NOT EXISTS workflows (
+    workflow_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    workspace_id TEXT,
+    mission_id TEXT,
+    task_id TEXT,
+    name TEXT NOT NULL,
+    workflow_version INTEGER NOT NULL DEFAULT 1,
+    runtime_provider TEXT NOT NULL DEFAULT 'LANGGRAPH', -- LANGGRAPH, ZONATA_NATIVE
+    status TEXT NOT NULL DEFAULT 'DRAFT', -- DRAFT, VALIDATING, QUEUED, STARTING, RUNNING, WAITING_FOR_APPROVAL, WAITING_FOR_INPUT, PAUSED, RECOVERING, VERIFYING, RECONCILING, COMPLETED, FAILED, BLOCKED, CANCELLED, AMBIGUOUS, EXPIRED, RECOVERY_REQUIRED
+    current_node TEXT,
+    state_version INTEGER NOT NULL DEFAULT 1,
+    owner TEXT NOT NULL DEFAULT 'AI CEO',
+    agent_id TEXT,
+    approval_state TEXT NOT NULL DEFAULT 'NONE', -- NONE, REQUIRED, PENDING, APPROVED, REJECTED
+    risk_level TEXT NOT NULL DEFAULT 'SAFE', -- SAFE, CONFIRM, DANGEROUS, CRITICAL
+    graph_definition JSON NOT NULL,
+    graph_definition_hash TEXT NOT NULL,
+    budget JSON,
+    timeout REAL DEFAULT 3600.0,
+    retry_policy JSON,
+    verification_policy JSON,
+    evidence_policy JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    started_at REAL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_tenant ON workflows(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_wf_company ON workflows(company_id);
+CREATE INDEX IF NOT EXISTS idx_wf_status ON workflows(status);
+
+-- 56. Governed Workflow Runs (Durable Execution Threads)
+CREATE TABLE IF NOT EXISTS workflow_runs (
+    run_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    workflow_version INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'RUNNING',
+    current_node TEXT,
+    step_count INTEGER NOT NULL DEFAULT 0,
+    iteration_counts JSON,
+    idempotency_keys JSON,
+    budget_spent JSON,
+    last_checkpoint_id TEXT,
+    error_message TEXT,
+    reconciliation_notes TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wfrun_wf ON workflow_runs(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_wfrun_thread ON workflow_runs(thread_id);
+
+-- 57. Governed Workflow Checkpoints (Zero-Secret Resumable State)
+CREATE TABLE IF NOT EXISTS workflow_checkpoints (
+    checkpoint_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    workflow_id TEXT NOT NULL,
+    parent_checkpoint_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    graph_version INTEGER NOT NULL,
+    state_version INTEGER NOT NULL,
+    current_node TEXT NOT NULL,
+    state_payload JSON NOT NULL,
+    state_digest TEXT NOT NULL,
+    step INTEGER NOT NULL DEFAULT 0,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wfchk_thread ON workflow_checkpoints(thread_id);
+CREATE INDEX IF NOT EXISTS idx_wfchk_run ON workflow_checkpoints(run_id);
+
+-- 58. Governed Workflow Events (Audit Trail & Live Observability)
+CREATE TABLE IF NOT EXISTS workflow_events (
+    event_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    node_id TEXT,
+    payload JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wfevt_wf ON workflow_events(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_wfevt_run ON workflow_events(run_id);
+
+-- 59. Governed Workflow Approvals (Human-in-the-Loop Integration)
+CREATE TABLE IF NOT EXISTS workflow_approvals (
+    approval_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    proposed_action TEXT NOT NULL,
+    parameters JSON NOT NULL,
+    modified_parameters JSON,
+    risk_level TEXT NOT NULL DEFAULT 'CONFIRM',
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    decision_reason TEXT,
+    decided_by TEXT,
+    created_at REAL NOT NULL,
+    decided_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wfappr_run ON workflow_approvals(run_id);
+CREATE INDEX IF NOT EXISTS idx_wfappr_status ON workflow_approvals(status);
+
+-- 60. Governed Workflow Resource Locks (Concurrency & Conflict Protection)
+CREATE TABLE IF NOT EXISTS workflow_resource_locks (
+    lock_id TEXT PRIMARY KEY,
+    resource_id TEXT NOT NULL,
+    resource_type TEXT NOT NULL, -- FILE, RECORD, CAPABILITY, TASK
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wflock_res ON workflow_resource_locks(resource_id);
 """
 
 class Database:

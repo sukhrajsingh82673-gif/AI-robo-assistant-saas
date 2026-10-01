@@ -128,6 +128,31 @@ from core.stateful_agent_runtime import (
     MemoryType,
     MemoryCategory
 )
+from core.multimodal_capability_runtime import (
+    multimodal_registry,
+    screen_observer,
+    hal_vision,
+    hal_hearing,
+    hal_voice,
+    governed_shell,
+    governed_files,
+    governed_artifacts,
+    governed_mcp,
+    execution_manager,
+    RedactionEngine,
+    MemoryFirewall,
+    CapabilityFamily,
+    ExecutionState
+)
+from zonata.hal_multimodal_adapter import hal_multimodal_adapter
+from core.durable_workflow_runtime import (
+    governed_workflow_runtime,
+    WorkflowState,
+    Command,
+    NodeType,
+    EdgeType
+)
+from zonata.langgraph_adapter import langgraph_adapter
 
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
@@ -732,6 +757,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     pass
 
+            # HAL Multimodal Capabilities (Requirement 41)
+            for mc in multimodal_registry.list_capabilities():
+                tools_list.append({
+                    "id": mc["capability_id"],
+                    "name": mc["name"],
+                    "category": f"Multimodal & {mc['family'].replace('_', ' ').title()}",
+                    "source": "HAL9000 Multimodal Layer",
+                    "availability": "Available" if mc["health_status"] == "HEALTHY" else mc["health_status"],
+                    "permission": "AUDITED_TRANSACTIONAL" if mc["requires_approval"] else "AUTOMATIC_IDEMPOTENT",
+                    "version": mc["version"],
+                    "platform": mc["platform"],
+                    "health": mc["health_status"].title(),
+                    "risk": mc["risk_level"],
+                    "dependencies": "OpenCV, PyAudio, Whisper, Edge-TTS",
+                    "license": "MIT License",
+                    "sandbox": mc["execution_mode"],
+                    "test_status": "Verified",
+                    "evidence_support": "Cryptographic SHA-256 Ledger",
+                    "last_verified": "Realtime",
+                    "description": f"Governed HAL capability ({mc['family']}). Risk: {mc['risk_level']}."
+                })
+
             self._send_json({"tools": tools_list})
             return
 
@@ -1009,6 +1056,108 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"results": [r.to_dict() for r in recs], "count": len(recs)})
             return
 
+        # =====================================================================
+        # HAL Multimodal Capability Layer Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/multimodal/capabilities":
+            family = query_params.get("family", [None])[0]
+            caps = multimodal_registry.list_capabilities(family=family)
+            self._send_json({"capabilities": caps, "count": len(caps)})
+            return
+
+        elif path == "/api/multimodal/status":
+            env = multimodal_registry._probe_environment()
+            caps = multimodal_registry.list_capabilities()
+            healthy_count = sum(1 for c in caps if c["health_status"] == "HEALTHY")
+            self._send_json({
+                "provider": "HAL9000 Multimodal Layer",
+                "version": "1.5.0",
+                "upstream_origin": "https://github.com/shandar/HAL9000",
+                "license": "MIT License",
+                "status": "OPERATIONAL",
+                "healthy_capabilities": healthy_count,
+                "total_capabilities": len(caps),
+                "environment_telemetry": env
+            })
+            return
+
+        elif path == "/api/multimodal/artifacts":
+            cid = query_params.get("company_id", [None])[0]
+            artifacts = governed_artifacts.list_artifacts(company_id=cid)
+            self._send_json({"artifacts": artifacts, "count": len(artifacts)})
+            return
+
+        elif path.startswith("/api/multimodal/sessions/"):
+            parts = path.split("/")
+            sess_id = parts[4]
+            sess = execution_manager.get_session(sess_id)
+            if sess:
+                self._send_json({"session": sess})
+            else:
+                self._send_json({"error": "Session not found"}, status=404)
+            return
+
+        elif path == "/api/workflows":
+            cid = query_params.get("company_id", [None])[0]
+            wfs = governed_workflow_runtime.list_workflows(company_id=cid)
+            self._send_json({"workflows": wfs, "count": len(wfs)})
+            return
+
+        elif path == "/api/workflows/approvals":
+            st = query_params.get("status", ["PENDING"])[0]
+            apprs = governed_workflow_runtime.list_approvals(status=st)
+            self._send_json({"approvals": apprs, "count": len(apprs)})
+            return
+
+        elif path == "/api/workflows/runs":
+            wf_id = query_params.get("workflow_id", [None])[0]
+            runs = governed_workflow_runtime.list_runs(workflow_id=wf_id)
+            self._send_json({"runs": runs, "count": len(runs)})
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/state"):
+            parts = path.split("/")
+            run_id = parts[4]
+            state = governed_workflow_runtime.get_run_state(run_id)
+            if state:
+                self._send_json({"run_state": state})
+            else:
+                self._send_json({"error": "Run not found"}, status=404)
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/events"):
+            parts = path.split("/")
+            run_id = parts[4]
+            evts = governed_workflow_runtime.list_events(run_id)
+            self._send_json({"events": evts, "count": len(evts)})
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/checkpoints"):
+            parts = path.split("/")
+            run_id = parts[4]
+            run_st = governed_workflow_runtime.get_run_state(run_id)
+            if run_st:
+                chks = governed_workflow_runtime.checkpointer.list_checkpoints(run_st["thread_id"])
+                self._send_json({"checkpoints": chks, "count": len(chks)})
+            else:
+                self._send_json({"error": "Run not found"}, status=404)
+            return
+
+        elif path.startswith("/api/workflows/"):
+            parts = path.split("/")
+            wf_id = parts[3]
+            compiled = governed_workflow_runtime.compiled_graphs.get(wf_id)
+            with db.get_connection() as conn:
+                wf_row = conn.execute("SELECT * FROM workflows WHERE workflow_id = ?", (wf_id,)).fetchone()
+            if wf_row:
+                self._send_json({
+                    "workflow": dict(wf_row),
+                    "compiled": bool(compiled),
+                    "definition_hash": wf_row["graph_definition_hash"]
+                })
+            else:
+                self._send_json({"error": "Workflow not found"}, status=404)
+            return
 
         # Fallback to static files in WEB_DIR or SPA index.html
 
@@ -2143,6 +2292,297 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": f"Unknown demo type '{demo_type}'"}, status=400)
                 return
             self._send_json({"success": True, "demonstration": res})
+            return
+
+        # =====================================================================
+        # HAL Multimodal Capability Layer Endpoints (POST)
+        # =====================================================================
+        elif path == "/api/multimodal/voice-to-ceo":
+            transcript = req_data.get("transcript", "")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            uid = req_data.get("user_id", "usr_owner")
+            res = hal_multimodal_adapter.voice_to_ceo(transcript, company_id=cid, host_user_id=uid)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/transcribe":
+            raw_text = req_data.get("audio_text", "")
+            res = hal_hearing.process_audio_transcript(raw_text)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/synthesize":
+            text = req_data.get("text", "")
+            voice = req_data.get("voice", "en-US-GuyNeural")
+            res = hal_voice.synthesize(text, voice=voice)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/observe/screen":
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            wtitle = req_data.get("window_title", "Active Desktop Workspace")
+            preview = req_data.get("content_preview", "Screen inspection showing enterprise metrics")
+            sid = req_data.get("session_id")
+            res = hal_multimodal_adapter.observe_screen(session_id=sid, company_id=cid, window_title=wtitle, content_preview=preview)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/observe/webcam":
+            blur = bool(req_data.get("blur_background", False))
+            res = hal_vision.capture_frame(blur_background=blur)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/coworker/execute":
+            prompt = req_data.get("prompt", "")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            ws_mode = req_data.get("workspace_mode", "COMPANY")
+            res = hal_multimodal_adapter.coworker_execute_report(prompt, company_id=cid, workspace_mode=ws_mode)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/action/controlled":
+            cmd = req_data.get("command", "")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            res = hal_multimodal_adapter.execute_controlled_action(cmd, company_id=cid)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/memory/sync":
+            content = req_data.get("content", "")
+            mtype = req_data.get("candidate_type", "OBSERVATION")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            res = hal_multimodal_adapter.sync_hal_candidate_memory_to_letta(content, candidate_type=mtype, company_id=cid)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/workforce/delegate":
+            obj = req_data.get("objective", "Execute multimodal task")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            res = hal_multimodal_adapter.delegate_workforce_multimodal_task(obj, company_id=cid)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/mcp/invoke":
+            client_id = req_data.get("client_id", "claude_code")
+            tool_name = req_data.get("tool_name", "")
+            params = req_data.get("parameters", {})
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            res = hal_multimodal_adapter.invoke_mcp_capability(client_id, tool_name, params, company_id=cid)
+            self._send_json(res)
+            return
+
+        elif path == "/api/multimodal/task/interrupt":
+            sid = req_data.get("session_id", "")
+            reason = req_data.get("reason", "Voice stop command")
+            res = execution_manager.trigger_killswitch(sid, reason=reason)
+            self._send_json({"success": True, "killswitch": res})
+            return
+
+        elif path == "/api/multimodal/task/takeover":
+            sid = req_data.get("session_id", "")
+            uid = req_data.get("user_id", "usr_owner")
+            res = execution_manager.trigger_host_takeover(sid, host_id=uid)
+            self._send_json({"success": True, "takeover": res})
+            return
+
+        elif path == "/api/multimodal/task/recover":
+            sid = req_data.get("session_id", "")
+            res = execution_manager.recover_from_crash(sid)
+            self._send_json({"success": True, "recovery": res})
+            return
+
+        elif path == "/api/multimodal/artifacts":
+            title = req_data.get("title", "Generated Artifact")
+            content = req_data.get("content", "")
+            atype = req_data.get("artifact_type", "DOCUMENT")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            art = governed_artifacts.create_artifact(title, content, artifact_type=atype, company_id=cid)
+            self._send_json({"success": True, "artifact": art})
+            return
+
+        elif path == "/api/multimodal/demo/scenarios":
+            scenario = req_data.get("scenario", "SCENARIO_A").upper()
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+
+            if scenario in ("A", "SCENARIO_A", "TEST_A"):
+                res = hal_multimodal_adapter.voice_to_ceo(
+                    "Analyze our Q3 gross margins and prepare an executive directive.",
+                    company_id=cid
+                )
+            elif scenario in ("B", "SCENARIO_B", "TEST_B"):
+                res = hal_multimodal_adapter.observe_screen(
+                    company_id=cid,
+                    window_title="ZONATA Executive Intelligence Center",
+                    content_preview="Live executive variance chart and active multi-agent squads"
+                )
+            elif scenario in ("C", "SCENARIO_C", "TEST_C"):
+                res = hal_multimodal_adapter.coworker_execute_report(
+                    "Open monthly executive summary and verify audit seal",
+                    company_id=cid
+                )
+            elif scenario in ("D", "SCENARIO_D", "TEST_D"):
+                res = hal_multimodal_adapter.coworker_execute_report(
+                    "Open browser and navigate to operational metrics",
+                    company_id=cid
+                )
+            elif scenario in ("E", "SCENARIO_E", "TEST_E"):
+                res = hal_multimodal_adapter.execute_controlled_action(
+                    "sudo rm -rf /etc/shadow",
+                    company_id=cid
+                )
+            elif scenario in ("F", "SCENARIO_F", "TEST_F"):
+                res = hal_multimodal_adapter.sync_hal_candidate_memory_to_letta(
+                    "Bearer sk-unauthorized-secret-key-that-must-be-blocked",
+                    candidate_type="FACT",
+                    company_id=cid
+                )
+            elif scenario in ("G", "SCENARIO_G", "TEST_G"):
+                res = hal_multimodal_adapter.delegate_workforce_multimodal_task(
+                    "Analyze operational pipeline bottlenecks using desktop observation",
+                    company_id=cid
+                )
+            elif scenario in ("H", "SCENARIO_H", "TEST_H"):
+                res = hal_multimodal_adapter.invoke_mcp_capability(
+                    "claude-code",
+                    "run_shell",
+                    {"command": "sudo rm -rf /"},
+                    company_id=cid
+                )
+            elif scenario in ("I", "SCENARIO_I", "TEST_I"):
+                res = hal_multimodal_adapter.run_crash_and_recovery_demonstration(company_id=cid)
+            elif scenario in ("J", "SCENARIO_J", "TEST_J"):
+                res = hal_multimodal_adapter.run_host_takeover_demonstration(company_id=cid)
+            else:
+                self._send_json({"error": f"Unknown scenario '{scenario}'"}, status=400)
+                return
+
+            self._send_json({"success": True, "scenario": scenario, "result": res})
+            return
+
+        elif path.startswith("/api/workflows/") and path.endswith("/run"):
+            parts = path.split("/")
+            wf_id = parts[3]
+            inputs = req_data.get("inputs", {})
+            ctx = req_data.get("context", {})
+            try:
+                res = governed_workflow_runtime.start_workflow(wf_id, inputs, ctx)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/pause"):
+            parts = path.split("/")
+            run_id = parts[4]
+            reason = req_data.get("reason", "API request")
+            res = governed_workflow_runtime.pause_workflow(run_id, reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/resume"):
+            parts = path.split("/")
+            run_id = parts[4]
+            cmd_data = req_data.get("command")
+            cmd = None
+            if cmd_data:
+                cmd = Command(resume=cmd_data.get("resume"), update=cmd_data.get("update"), goto=cmd_data.get("goto"))
+            res = governed_workflow_runtime.resume_workflow(run_id, command=cmd)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/cancel"):
+            parts = path.split("/")
+            run_id = parts[4]
+            reason = req_data.get("reason", "API request")
+            res = governed_workflow_runtime.cancel_workflow(run_id, reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/runs/") and path.endswith("/recover"):
+            parts = path.split("/")
+            run_id = parts[4]
+            res = governed_workflow_runtime.recover_workflow_run(run_id)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/approvals/") and path.endswith("/approve"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            actor = req_data.get("actor", "Host")
+            res = governed_workflow_runtime.approve_workflow(appr_id, actor=actor)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/approvals/") and path.endswith("/reject"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            actor = req_data.get("actor", "Host")
+            reason = req_data.get("reason", "Rejected via API")
+            res = governed_workflow_runtime.reject_workflow(appr_id, actor=actor, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/workflows/approvals/") and path.endswith("/edit"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            actor = req_data.get("actor", "Host")
+            params = req_data.get("parameters", {})
+            res = governed_workflow_runtime.edit_and_resume_workflow(appr_id, params, actor=actor)
+            self._send_json(res)
+            return
+
+        elif path == "/api/workflows/killswitch":
+            active = bool(req_data.get("active", True))
+            governed_workflow_runtime.set_killswitch(active)
+            self._send_json({"killswitch_active": active, "status": "KILLSWITCH_ENGAGED" if active else "KILLSWITCH_DISENGAGED"})
+            return
+
+        elif path == "/api/workflows/demo/scenarios":
+            scenario = req_data.get("scenario", "A").upper()
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+
+            if scenario in ("A", "SCENARIO_A", "TEST_A"):
+                res = langgraph_adapter.run_simple_workflow(company_id=cid)
+            elif scenario in ("B", "SCENARIO_B", "TEST_B"):
+                res = langgraph_adapter.run_long_running_workflow(company_id=cid)
+            elif scenario in ("C", "SCENARIO_C", "TEST_C"):
+                amount = float(req_data.get("amount", 25000.0))
+                res = langgraph_adapter.run_human_approval_workflow(amount=amount, company_id=cid)
+            elif scenario in ("D", "SCENARIO_D", "TEST_D"):
+                init_amt = float(req_data.get("initial_amount", 50000.0))
+                mod_amt = float(req_data.get("modified_amount", 12500.0))
+                res = langgraph_adapter.run_human_edit_workflow(initial_amount=init_amt, modified_amount=mod_amt, company_id=cid)
+            elif scenario in ("E", "SCENARIO_E", "TEST_E"):
+                res = langgraph_adapter.run_failure_recovery_workflow(company_id=cid)
+            elif scenario in ("F", "SCENARIO_F", "TEST_F"):
+                res = langgraph_adapter.run_ambiguous_transaction_workflow(company_id=cid)
+            elif scenario in ("G", "SCENARIO_G", "TEST_G"):
+                res = langgraph_adapter.run_loop_control_workflow(company_id=cid)
+            elif scenario in ("H", "SCENARIO_H", "TEST_H"):
+                directive = req_data.get("directive", "Audit Q3 operating margins")
+                res = langgraph_adapter.run_agency_swarm_workflow(directive=directive, company_id=cid)
+            elif scenario in ("I", "SCENARIO_I", "TEST_I"):
+                res = langgraph_adapter.run_letta_memory_workflow(company_id=cid)
+            elif scenario in ("J", "SCENARIO_J", "TEST_J"):
+                res = langgraph_adapter.run_hal_multimodal_workflow(company_id=cid)
+            elif scenario in ("K", "SCENARIO_K", "TEST_K"):
+                res = langgraph_adapter.run_killswitch_workflow(company_id=cid)
+            else:
+                self._send_json({"error": f"Unknown workflow scenario '{scenario}'"}, status=400)
+                return
+
+            self._send_json({"success": True, "scenario": scenario, "result": res})
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

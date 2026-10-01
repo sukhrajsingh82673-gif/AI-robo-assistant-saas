@@ -232,6 +232,7 @@ function updateBreadcrumbs() {
     meeting: 'AI CEO Meeting Room',
     workforce: 'AI Workforce',
     tasks: 'TaskMaker',
+    workflows: 'Workflow Runtime',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -380,6 +381,8 @@ function handleRoute(path) {
     window.WorkforceWorkspace.render('view-workforce');
   } else if (navKey === 'tasks' && window.TaskMakerWorkspace) {
     window.TaskMakerWorkspace.render('view-tasks');
+  } else if (navKey === 'workflows' && window.WorkflowWorkspace) {
+    window.WorkflowWorkspace.render('view-workflows');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
