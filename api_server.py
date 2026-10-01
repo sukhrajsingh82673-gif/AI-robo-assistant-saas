@@ -119,6 +119,15 @@ zonata_agent_factory = GovernedAgentFactory()
 from zonata.company_api_service import CompanyApiService
 company_api_service = CompanyApiService(portfolio)
 from zonata.agent_swarm_adapter import AgentWorkforceAdapter, workforce_planner
+from zonata.stateful_agent_adapter import stateful_agent_adapter
+from core.stateful_agent_runtime import (
+    stateful_memory_gateway,
+    SecurityException,
+    ConflictResolution,
+    MemoryScope,
+    MemoryType,
+    MemoryCategory
+)
 
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
@@ -932,6 +941,72 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/specialists/catalog":
             catalog = AgentWorkforceAdapter.get_specialist_catalog()
             self._send_json({"roles": catalog, "count": len(catalog)})
+            return
+
+        # =====================================================================
+        # Stateful Agent Identity & Memory Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/agents/stateful":
+            cid = query_params.get("company_id", [None])[0]
+            agents = stateful_memory_gateway.list_agents(company_id=cid)
+            self._send_json({"agents": [a.to_dict() for a in agents], "count": len(agents)})
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/memory"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            scope = query_params.get("scope", [None])[0]
+            scope_id = query_params.get("scope_id", [None])[0]
+            mtype = query_params.get("memory_type", [None])[0]
+            cat = query_params.get("category", [None])[0]
+            mkey = query_params.get("memory_key", [None])[0]
+            limit = int(query_params.get("limit", [50])[0])
+            
+            if scope or scope_id or mtype or cat or mkey:
+                records = stateful_memory_gateway.query_memory(
+                    scope=scope, scope_id=scope_id, memory_type=mtype,
+                    category=cat, memory_key=mkey, limit=limit
+                )
+            else:
+                cid = query_params.get("company_id", [None])[0]
+                records = stateful_memory_gateway.get_agent_effective_memory(agent_id, company_id=cid, limit=limit)
+            self._send_json({"records": [r.to_dict() for r in records], "count": len(records)})
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/conversations"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            stype = query_params.get("session_type", ["CHAT"])[0]
+            cid = query_params.get("company_id", [None])[0]
+            sess = stateful_memory_gateway.get_or_create_conversation_session(agent_id, session_type=stype, company_id=cid)
+            turns = stateful_memory_gateway.get_conversation_turns(sess["session_id"], limit=30)
+            self._send_json({"session": sess, "turns": turns, "turns_count": len(turns)})
+            return
+
+        elif path.startswith("/api/agents/stateful/"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            agent = stateful_memory_gateway.get_agent(agent_id)
+            if agent:
+                self._send_json({"agent": agent.to_dict()})
+            else:
+                self._send_json({"error": "Agent identity not found"}, status=404)
+            return
+
+        elif path == "/api/memory/conflicts":
+            scope_id = query_params.get("scope_id", [None])[0]
+            cstatus = query_params.get("status", ["OPEN"])[0]
+            conflicts = stateful_memory_gateway.list_conflicts(scope_id=scope_id, status=cstatus)
+            self._send_json({"conflicts": [c.to_dict() for c in conflicts], "count": len(conflicts)})
+            return
+
+        elif path == "/api/memory/search":
+            q = query_params.get("query", [""])[0]
+            scope = query_params.get("scope", [None])[0]
+            scope_id = query_params.get("scope_id", [None])[0]
+            limit = int(query_params.get("limit", [10])[0])
+            recs = stateful_memory_gateway.search_archival_memory(q, scope=scope, scope_id=scope_id, limit=limit)
+            self._send_json({"results": [r.to_dict() for r in recs], "count": len(recs)})
             return
 
 
@@ -1934,6 +2009,140 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 company_id=company_id
             )
             self._send_json({"success": True, "demonstration": demo_res})
+            return
+
+        # =====================================================================
+        # Stateful Agent Identity & Memory Endpoints (POST)
+        # =====================================================================
+        elif path == "/api/agents/stateful":
+            aid = req_data.get("agent_id") or f"agt_{uuid.uuid4().hex[:8]}"
+            name = req_data.get("name", "Specialist Agent")
+            role = req_data.get("role", "Specialist")
+            cid = req_data.get("company_id")
+            dept = req_data.get("department_id")
+            persona = req_data.get("persona_block", "")
+            human = req_data.get("human_block", "")
+            sys_inst = req_data.get("system_instructions", "")
+            m_conf = req_data.get("model_config")
+            tools = req_data.get("tools")
+            meta = req_data.get("metadata")
+            try:
+                agent = stateful_memory_gateway.register_or_get_agent(
+                    agent_id=aid, name=name, role=role, company_id=cid,
+                    department_id=dept, persona_block=persona, human_block=human,
+                    system_instructions=sys_inst, model_config=m_conf, tools=tools, metadata=meta
+                )
+                self._send_json({"success": True, "agent": agent.to_dict()})
+            except SecurityException as se:
+                self._send_json({"success": False, "error": str(se)}, status=400)
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/blocks"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            agent = stateful_memory_gateway.get_agent(agent_id)
+            if not agent:
+                self._send_json({"error": "Agent not found"}, status=404)
+                return
+            persona = req_data.get("persona_block")
+            human = req_data.get("human_block")
+            try:
+                agent.update_blocks(persona=persona, human=human)
+                self._send_json({"success": True, "agent": agent.to_dict()})
+            except SecurityException as se:
+                self._send_json({"success": False, "error": str(se)}, status=400)
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/memory"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            scope = req_data.get("scope", "AGENT")
+            scope_id = req_data.get("scope_id", agent_id)
+            key = req_data.get("memory_key") or req_data.get("key", "general_fact")
+            content = req_data.get("content", "")
+            mtype = req_data.get("memory_type", "CORE")
+            cat = req_data.get("category", "FACT")
+            source = req_data.get("source", f"AGENT:{agent_id}")
+            confidence = req_data.get("confidence", "VERIFIED")
+            expires = req_data.get("expires_at")
+            meta = req_data.get("metadata")
+
+            try:
+                rec = stateful_memory_gateway.store_memory(
+                    scope=scope, scope_id=scope_id, memory_key=key, content=content,
+                    memory_type=mtype, category=cat, source=source, confidence=confidence,
+                    expires_at=expires, metadata=meta
+                )
+                self._send_json({"success": True, "record": rec.to_dict()})
+            except SecurityException as se:
+                self._send_json({"success": False, "error": str(se), "security_violation": True}, status=400)
+            except ValueError as ve:
+                self._send_json({"success": False, "error": str(ve)}, status=400)
+            return
+
+        elif path.startswith("/api/memory/conflicts/") and path.endswith("/resolve"):
+            parts = path.split("/")
+            conflict_id = parts[4]
+            choice = req_data.get("choice", "USE_A")
+            resolved_by = req_data.get("resolved_by", "AI_CEO")
+            try:
+                res = stateful_memory_gateway.resolve_conflict(conflict_id, choice=choice, resolved_by=resolved_by)
+                self._send_json({"success": True, "resolution": res})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/conversations/turn"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            session_id = req_data.get("session_id")
+            if not session_id:
+                sess = stateful_memory_gateway.get_or_create_conversation_session(agent_id)
+                session_id = sess["session_id"]
+            role = req_data.get("role", "USER")
+            content = req_data.get("content", "")
+            tokens = int(req_data.get("tokens", 0))
+            try:
+                turn = stateful_memory_gateway.record_turn(session_id, role, content, tokens=tokens)
+                self._send_json({"success": True, "turn": turn})
+            except SecurityException as se:
+                self._send_json({"success": False, "error": str(se)}, status=400)
+            return
+
+        elif path.startswith("/api/agents/stateful/") and path.endswith("/conversations/compact"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            session_id = req_data.get("session_id")
+            if not session_id:
+                sess = stateful_memory_gateway.get_or_create_conversation_session(agent_id)
+                session_id = sess["session_id"]
+            max_recent = int(req_data.get("max_recent_turns", 6))
+            res = stateful_memory_gateway.compact_conversation_history(session_id, max_recent_turns=max_recent)
+            self._send_json({"success": True, "compaction": res})
+            return
+
+        elif path.startswith("/api/meetings/") and path.endswith("/sync-memory"):
+            parts = path.split("/")
+            meeting_id = parts[3]
+            try:
+                res = meeting_service.sync_meeting_to_memory(meeting_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path == "/api/stateful/demo/scenarios":
+            demo_type = req_data.get("demo_type", "SECTION_74")
+            companies = portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            if demo_type == "SECTION_74":
+                res = stateful_agent_adapter.run_executive_continuity_demonstration(cid)
+            elif demo_type == "SECTION_75":
+                res = stateful_agent_adapter.run_workforce_coordination_demonstration(cid)
+            else:
+                self._send_json({"error": f"Unknown demo type '{demo_type}'"}, status=400)
+                return
+            self._send_json({"success": True, "demonstration": res})
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

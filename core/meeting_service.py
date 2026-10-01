@@ -103,6 +103,19 @@ class AiCeoMeetingService:
             message=f"Meeting ended by Host. Summary recorded: {summary}",
             related_context="Session Ended"
         )
+
+        # Sync meeting summary into stateful agent memory
+        try:
+            from zonata.stateful_agent_adapter import StatefulAgentAdapter
+            adapter = StatefulAgentAdapter(tenant_id=self.tenant_id)
+            adapter.sync_meeting_summary_to_memory(
+                meeting_id=meeting_id,
+                company_id=self._get_company_id(meeting_id),
+                summary=summary
+            )
+        except Exception:
+            pass
+
         return self.get_meeting(meeting_id)
 
     def update_meeting_state(self, meeting_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -340,6 +353,18 @@ class AiCeoMeetingService:
             )
             related_ctx = "General Strategic Council"
 
+        # Augment with Stateful Agent Executive Memory
+        try:
+            from zonata.stateful_agent_adapter import StatefulAgentAdapter
+            adapter = StatefulAgentAdapter(tenant_id=self.tenant_id)
+            ctx = adapter.get_ceo_briefing_context(company_id)
+            active_mems = ctx.get("active_memories", [])
+            constraints = [m["content"] for m in active_mems if m.get("category") in ["CONSTRAINT", "DIRECTIVE"]]
+            if constraints:
+                response += f" Active Memory Directives: {'; '.join(constraints[:2])}."
+        except Exception:
+            pass
+
         return response, related_ctx, proposed_action
 
     def get_shared_reports(self, company_id: str) -> Dict[str, Any]:
@@ -473,6 +498,20 @@ class AiCeoMeetingService:
                 related_context="Decision Room Action"
             )
 
+        # Sync decision into stateful agent memory
+        try:
+            from zonata.stateful_agent_adapter import StatefulAgentAdapter
+            adapter = StatefulAgentAdapter(tenant_id=self.tenant_id)
+            adapter.sync_meeting_decision_to_memory(
+                meeting_id=meeting_id or "direct_executive",
+                company_id=company_id,
+                title=title,
+                description=description,
+                decision_type=decision_type
+            )
+        except Exception:
+            pass
+
         return {
             "decision_id": decision_id,
             "meeting_id": meeting_id,
@@ -484,6 +523,25 @@ class AiCeoMeetingService:
             "mission_id": mission_id,
             "created_at": now
         }
+
+    def sync_meeting_to_memory(self, meeting_id: str) -> Dict[str, Any]:
+        """Explicitly compiles meeting transcripts and decisions into persistent memory."""
+        meeting = self.get_meeting(meeting_id)
+        if not meeting:
+            raise ValueError("Meeting not found")
+        cid = meeting["company_id"]
+        transcripts = self.get_transcripts(meeting_id)
+        text_lines = [f"{t['speaker']}: {t['message']}" for t in transcripts[-10:]]
+        summary = meeting.get("summary") or "Executive meeting session concluded."
+
+        from zonata.stateful_agent_adapter import StatefulAgentAdapter
+        adapter = StatefulAgentAdapter(tenant_id=self.tenant_id)
+        rec = adapter.sync_meeting_summary_to_memory(
+            meeting_id=meeting_id,
+            company_id=cid,
+            summary=f"{summary} | Recent notes: {' ; '.join(text_lines[:5])}"
+        )
+        return {"success": True, "record_id": rec.record_id, "meeting_id": meeting_id}
 
     def list_decisions(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
         query = "SELECT * FROM ai_ceo_decisions WHERE tenant_id = ?"

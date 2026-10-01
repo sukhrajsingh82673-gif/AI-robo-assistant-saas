@@ -840,6 +840,109 @@ CREATE TABLE IF NOT EXISTS external_connections (
 );
 
 CREATE INDEX IF NOT EXISTS idx_connections_company ON external_connections(company_id);
+
+-- 45. Stateful Agent Identities & Working Memory Blocks
+CREATE TABLE IF NOT EXISTS stateful_agent_identities (
+    agent_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    department_id TEXT,
+    persona_block TEXT NOT NULL DEFAULT '',
+    human_block TEXT NOT NULL DEFAULT '',
+    system_instructions TEXT NOT NULL DEFAULT '',
+    model_config JSON,
+    tools JSON,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    metadata JSON,
+    PRIMARY KEY (tenant_id, agent_id),
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stateful_agent_tenant ON stateful_agent_identities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_stateful_agent_comp ON stateful_agent_identities(company_id);
+
+-- 46. Stateful Memory Records (Core, Working, Archival, Recall)
+CREATE TABLE IF NOT EXISTS stateful_memory_records (
+    record_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    scope TEXT NOT NULL, -- HOST, PERSONAL_WORKSPACE, TENANT, COMPANY, DEPARTMENT, WORKFORCE, AGENT, MISSION, PROJECT, MEETING
+    scope_id TEXT NOT NULL,
+    memory_type TEXT NOT NULL, -- CORE, WORKING, ARCHIVAL, RECALL, SYSTEM
+    category TEXT NOT NULL, -- FACT, PREFERENCE, CONSTRAINT, DIRECTIVE, GOAL, CONTEXT, DECISION, SUMMARY
+    memory_key TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'VERIFIED', -- VERIFIED, OBSERVED, HOST_PROVIDED, SYSTEM_DERIVED, AGENT_INFERRED, ESTIMATED, UNVERIFIED, EXPIRED
+    version INTEGER NOT NULL DEFAULT 1,
+    superseded_by TEXT,
+    expires_at REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stateful_mem_lookup ON stateful_memory_records(tenant_id, scope, scope_id);
+CREATE INDEX IF NOT EXISTS idx_stateful_mem_key ON stateful_memory_records(tenant_id, memory_key);
+CREATE INDEX IF NOT EXISTS idx_stateful_mem_type ON stateful_memory_records(tenant_id, memory_type);
+
+-- 47. Stateful Memory Conflicts & Epistemic Resolutions
+CREATE TABLE IF NOT EXISTS stateful_memory_conflicts (
+    conflict_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    scope_id TEXT NOT NULL,
+    memory_key TEXT NOT NULL,
+    record_a_id TEXT NOT NULL,
+    record_b_id TEXT NOT NULL,
+    conflict_details TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN, RESOLVED, DISMISSED
+    resolution_choice TEXT, -- USE_A, USE_B, ASK_CEO, DISMISS
+    resolved_at REAL,
+    resolved_by TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stateful_conflicts_tenant ON stateful_memory_conflicts(tenant_id, scope_id);
+CREATE INDEX IF NOT EXISTS idx_stateful_conflicts_status ON stateful_memory_conflicts(status);
+
+-- 48. Stateful Conversation Sessions (Continuous Executive & Worker Dialogue)
+CREATE TABLE IF NOT EXISTS stateful_conversation_sessions (
+    session_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    company_id TEXT,
+    session_type TEXT NOT NULL DEFAULT 'CHAT', -- MEETING, CHAT, COWORKER, WORKFORCE
+    title TEXT NOT NULL,
+    context_summary TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stateful_sessions_agent ON stateful_conversation_sessions(tenant_id, agent_id);
+
+-- 49. Stateful Conversation Turns (Recall Memory Buffer with Compaction Support)
+CREATE TABLE IF NOT EXISTS stateful_conversation_turns (
+    turn_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    role TEXT NOT NULL, -- HOST, USER, AGENT, SYSTEM, TOOL
+    content TEXT NOT NULL,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(session_id) REFERENCES stateful_conversation_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stateful_turns_session ON stateful_conversation_turns(session_id);
 """
 
 class Database:

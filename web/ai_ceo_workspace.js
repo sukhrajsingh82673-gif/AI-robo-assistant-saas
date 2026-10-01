@@ -134,6 +134,7 @@
             ${[
               { id: 'overview', label: 'Executive Overview' },
               { id: 'meeting', label: '🎥 Meeting Room' },
+              { id: 'memory', label: '🧠 Agent State & Memory' },
               { id: 'priorities', label: `Priorities (${priorities.length})` },
               { id: 'decisions', label: `Decision Room (${decisions.length})` },
               { id: 'directives', label: 'Autonomous Directives' },
@@ -182,7 +183,9 @@
     }
 
     renderActiveTabContent(comp, dims, priorities, decisions, timeline) {
-      if (this.activeTab === 'priorities') {
+      if (this.activeTab === 'memory') {
+        return this.renderStatefulMemoryTab(comp);
+      } else if (this.activeTab === 'priorities') {
         return this.renderPrioritiesTab(priorities);
       } else if (this.activeTab === 'decisions') {
         return this.renderDecisionsTab(decisions);
@@ -646,6 +649,460 @@
           </div>
         </div>
       `);
+    }
+
+    // =====================================================================
+    // Stateful Agent Identity, Memory & Long-Horizon Context
+    // =====================================================================
+    renderStatefulMemoryTab(comp) {
+      setTimeout(() => this.loadMemoryTabData(comp.id || (comp.company && comp.company.id)), 50);
+      return `
+        <div id="statefulMemoryContainer" style="display:flex; flex-direction:column; gap:20px;">
+          <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:30px; text-align:center; color:var(--text-secondary);">
+            <div class="spinner" style="margin:0 auto 12px auto;"></div>
+            Loading stateful agent identities and persistent memory...
+          </div>
+        </div>
+      `;
+    }
+
+    async loadMemoryTabData(companyId) {
+      const container = document.getElementById('statefulMemoryContainer');
+      if (!container) return;
+
+      const currentAgentId = this.selectedMemoryAgentId || 'agt_ai_ceo';
+      const scopeFilter = this.memoryFilterScope || '';
+      const typeFilter = this.memoryFilterType || '';
+
+      try {
+        const [agentsRes, currentAgentRes, memoriesRes, conflictsRes] = await Promise.all([
+          fetch('/api/agents/stateful'),
+          fetch(`/api/agents/stateful/${currentAgentId}`),
+          fetch(`/api/agents/stateful/${currentAgentId}/memory?company_id=${companyId || ''}&scope=${scopeFilter}&memory_type=${typeFilter}`),
+          fetch(`/api/memory/conflicts?status=OPEN`)
+        ]);
+
+        const agentsData = agentsRes.ok ? await agentsRes.json() : { agents: [] };
+        const currentAgentData = currentAgentRes.ok ? await currentAgentRes.json() : { agent: null };
+        const memoriesData = memoriesRes.ok ? await memoriesRes.json() : { records: [] };
+        const conflictsData = conflictsRes.ok ? await conflictsRes.json() : { conflicts: [] };
+
+        const agents = agentsData.agents || [];
+        const agent = currentAgentData.agent || {
+          agent_id: currentAgentId,
+          name: 'AI CEO',
+          role: 'Executive',
+          persona_block: '',
+          human_block: '',
+          model_config: { model: 'Gemini 3.8 Flash' }
+        };
+        const memories = memoriesData.records || [];
+        const conflicts = conflictsData.conflicts || [];
+
+        container.innerHTML = `
+          <!-- Header Bar: Agent Selector & Actions -->
+          <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:18px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:10px; background:rgba(139,92,246,0.15); display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--accent-purple);">
+                🧠
+              </div>
+              <div>
+                <div style="font-size:15px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                  <span>Stateful Agent Continuity</span>
+                  <span class="badge badge-purple" style="font-size:11px;">Persistent Context</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-secondary);">
+                  Multi-tier stateful memory (Core, Archival, Recall) governed by ZONATA Authority.
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent Selector -->
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Active Identity:</span>
+              <select class="form-input" style="padding:6px 12px; font-size:13px; font-weight:600; min-width:180px;" onchange="AiCeoWorkspace.selectMemoryAgent(this.value)">
+                ${agents.map(a => `
+                  <option value="${a.agent_id}" ${a.agent_id === currentAgentId ? 'selected' : ''}>
+                    ${a.name} (${a.role})
+                  </option>
+                `).join('')}
+              </select>
+              <button class="btn-secondary" style="font-size:12px; padding:6px 12px;" onclick="AiCeoWorkspace.openAddMemoryModal('${currentAgentId}')">
+                + Add Memory
+              </button>
+            </div>
+          </div>
+
+          <!-- Demonstrations & Proof Bar -->
+          <div style="background:linear-gradient(90deg, rgba(37,99,235,0.06), rgba(139,92,246,0.06)); border:1px solid rgba(139,92,246,0.25); border-radius:var(--radius-lg); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--text-primary);">Runtime Verification Scenarios</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Demonstrate multi-session executive continuity and conflict-resolved workforce coordination.</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-secondary" style="font-size:12px; padding:6px 14px; border-color:var(--accent-blue);" onclick="AiCeoWorkspace.runStatefulDemo('SECTION_74')">
+                ▶ Run Executive Continuity Demo
+              </button>
+              <button class="btn-secondary" style="font-size:12px; padding:6px 14px; border-color:var(--accent-purple);" onclick="AiCeoWorkspace.runStatefulDemo('SECTION_75')">
+                ▶ Run Conflict Coordination Demo
+              </button>
+            </div>
+          </div>
+
+          <!-- Demo Timeline Banner (If recently run) -->
+          <div id="statefulDemoResultContainer" style="display:none;"></div>
+
+          <!-- Open Conflicts Banner (If any) -->
+          ${conflicts.length > 0 ? `
+            <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.3); border-radius:var(--radius-lg); padding:16px 20px;">
+              <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:var(--accent-rose); margin-bottom:10px;">
+                <span>⚠️ Attention Required: ${conflicts.length} Contradictory Memory Conflicts</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                ${conflicts.map(c => `
+                  <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                    <div style="flex:1; min-width:280px;">
+                      <div style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">
+                        Key: <span style="color:var(--text-primary); font-family:monospace;">${c.memory_key}</span> (Scope: ${c.scope})
+                      </div>
+                      <div style="font-size:13px; color:var(--text-primary); margin:6px 0;">
+                        ${c.conflict_details}
+                      </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                      <button class="btn-secondary" style="font-size:11.5px; padding:5px 10px;" onclick="AiCeoWorkspace.resolveMemoryConflict('${c.conflict_id}', 'USE_A')">
+                        Keep Prior (A)
+                      </button>
+                      <button class="btn-secondary" style="font-size:11.5px; padding:5px 10px;" onclick="AiCeoWorkspace.resolveMemoryConflict('${c.conflict_id}', 'USE_B')">
+                        Accept New (B)
+                      </button>
+                      <button class="btn-primary" style="font-size:11.5px; padding:5px 10px;" onclick="AiCeoWorkspace.resolveMemoryConflict('${c.conflict_id}', 'ASK_CEO')">
+                        Escalate to CEO
+                      </button>
+                      <button class="btn-secondary" style="font-size:11.5px; padding:5px 10px;" onclick="AiCeoWorkspace.resolveMemoryConflict('${c.conflict_id}', 'DISMISS')">
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Working Memory Blocks: Persona & Human -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:18px;">
+            
+            <!-- Persona Block Card -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:18px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="font-size:14px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                  <span>Core Persona Block</span>
+                  <span class="badge badge-blue" style="font-size:10.5px;">Identity</span>
+                </div>
+                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="AiCeoWorkspace.saveWorkingBlocks('${agent.agent_id}')">
+                  Save Changes
+                </button>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+                Defines who this agent is, their mandate, operating tone, and core decision philosophy:
+              </div>
+              <textarea id="personaBlockInput_${agent.agent_id}" class="form-input" style="width:100%; height:110px; font-size:13px; line-height:1.5; resize:vertical; padding:10px;">${agent.persona_block || ''}</textarea>
+            </div>
+
+            <!-- Human Block Card -->
+            <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:18px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="font-size:14px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                  <span>Human Working Block</span>
+                  <span class="badge badge-emerald" style="font-size:10.5px;">Host Context</span>
+                </div>
+                <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px;" onclick="AiCeoWorkspace.saveWorkingBlocks('${agent.agent_id}')">
+                  Save Changes
+                </button>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+                What this agent knows about the Host preferences, executive communication, and boundaries:
+              </div>
+              <textarea id="humanBlockInput_${agent.agent_id}" class="form-input" style="width:100%; height:110px; font-size:13px; line-height:1.5; resize:vertical; padding:10px;">${agent.human_block || ''}</textarea>
+            </div>
+
+          </div>
+
+          <!-- Memory Records Explorer Card -->
+          <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+              <div>
+                <div style="font-size:15px; font-weight:700; color:var(--text-primary);">
+                  Scoped Memory Records (${memories.length})
+                </div>
+                <div style="font-size:12px; color:var(--text-secondary);">
+                  Persistent facts, constraints, directives, and decisions visible to ${agent.name}.
+                </div>
+              </div>
+
+              <!-- Filter Bar -->
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <select class="form-input" style="padding:6px 10px; font-size:12px;" onchange="AiCeoWorkspace.filterMemoryScope(this.value)">
+                  <option value="" ${!scopeFilter ? 'selected' : ''}>All Scopes</option>
+                  <option value="COMPANY" ${scopeFilter === 'COMPANY' ? 'selected' : ''}>Scope: COMPANY</option>
+                  <option value="AGENT" ${scopeFilter === 'AGENT' ? 'selected' : ''}>Scope: AGENT</option>
+                  <option value="MEETING" ${scopeFilter === 'MEETING' ? 'selected' : ''}>Scope: MEETING</option>
+                  <option value="TENANT" ${scopeFilter === 'TENANT' ? 'selected' : ''}>Scope: TENANT</option>
+                  <option value="PERSONAL_WORKSPACE" ${scopeFilter === 'PERSONAL_WORKSPACE' ? 'selected' : ''}>Scope: PERSONAL_WORKSPACE</option>
+                </select>
+
+                <select class="form-input" style="padding:6px 10px; font-size:12px;" onchange="AiCeoWorkspace.filterMemoryType(this.value)">
+                  <option value="" ${!typeFilter ? 'selected' : ''}>All Types</option>
+                  <option value="CORE" ${typeFilter === 'CORE' ? 'selected' : ''}>Type: CORE</option>
+                  <option value="ARCHIVAL" ${typeFilter === 'ARCHIVAL' ? 'selected' : ''}>Type: ARCHIVAL</option>
+                  <option value="RECALL" ${typeFilter === 'RECALL' ? 'selected' : ''}>Type: RECALL</option>
+                  <option value="WORKING" ${typeFilter === 'WORKING' ? 'selected' : ''}>Type: WORKING</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Memory List -->
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${memories.length === 0 ? `
+                <div style="padding:30px; text-align:center; color:var(--text-secondary); font-size:13px;">
+                  No memory records found for this scope and filter. Click "+ Add Memory" to create one.
+                </div>
+              ` : memories.map(m => `
+                <div style="background:var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px 16px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                  <div style="flex:1; min-width:280px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+                      <span class="badge ${m.category === 'GOAL' ? 'badge-emerald' : m.category === 'CONSTRAINT' ? 'badge-rose' : m.category === 'DECISION' ? 'badge-purple' : 'badge-blue'}" style="font-size:10px; font-weight:700;">
+                        ${m.category}
+                      </span>
+                      <span style="font-family:monospace; font-size:12.5px; font-weight:700; color:var(--text-primary);">
+                        ${m.memory_key}
+                      </span>
+                      <span style="font-size:11px; color:var(--text-muted); background:var(--bg-surface); padding:2px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                        ${m.scope}:${m.scope_id}
+                      </span>
+                      <span style="font-size:11px; color:var(--text-muted);">
+                        v${m.version}
+                      </span>
+                    </div>
+                    <div style="font-size:13.5px; color:var(--text-primary); line-height:1.5;">
+                      ${m.content}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:6px; display:flex; gap:12px; flex-wrap:wrap;">
+                      <span>Source: <strong>${m.source}</strong></span>
+                      <span>Confidence: <strong>${m.confidence}</strong></span>
+                      <span>Updated: ${new Date(m.updated_at * 1000).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        console.error('Failed to load memory tab data:', err);
+        container.innerHTML = `<div style="padding:30px; text-align:center; color:var(--accent-rose);">Failed to load memory data: ${err.message}</div>`;
+      }
+    }
+
+    selectMemoryAgent(agentId) {
+      this.selectedMemoryAgentId = agentId;
+      const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+      this.loadMemoryTabData(compId);
+    }
+
+    filterMemoryScope(scope) {
+      this.memoryFilterScope = scope;
+      const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+      this.loadMemoryTabData(compId);
+    }
+
+    filterMemoryType(mtype) {
+      this.memoryFilterType = mtype;
+      const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+      this.loadMemoryTabData(compId);
+    }
+
+    async saveWorkingBlocks(agentId) {
+      const persona = document.getElementById(`personaBlockInput_${agentId}`)?.value;
+      const human = document.getElementById(`humanBlockInput_${agentId}`)?.value;
+
+      try {
+        const res = await fetch(`/api/agents/stateful/${agentId}/blocks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona_block: persona, human_block: human })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Working memory blocks updated successfully', 'success');
+        } else {
+          showToast(data.error || 'Failed to update memory blocks', 'error');
+        }
+      } catch (e) {
+        showToast('Network error updating memory blocks', 'error');
+      }
+    }
+
+    async resolveMemoryConflict(conflictId, choice) {
+      try {
+        const res = await fetch(`/api/memory/conflicts/${conflictId}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice, resolved_by: 'AI_CEO' })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`Conflict resolved with choice: ${choice}`, 'success');
+          const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+          this.loadMemoryTabData(compId);
+        } else {
+          showToast(data.error || 'Failed to resolve conflict', 'error');
+        }
+      } catch (e) {
+        showToast('Network error resolving conflict', 'error');
+      }
+    }
+
+    openAddMemoryModal(agentId) {
+      if (!window.openModal) return;
+      const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
+
+      window.openModal('Add Persistent Memory Record', `
+        <div style="font-size:13.5px; line-height:1.5; color:var(--text-secondary); display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="display:block; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Memory Key (Identifier):</label>
+            <input type="text" id="newMemKey" class="form-input" style="width:100%;" placeholder="e.g. quarterly_hiring_plan" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label style="display:block; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Scope:</label>
+              <select id="newMemScope" class="form-input" style="width:100%;">
+                <option value="COMPANY">COMPANY (${compId})</option>
+                <option value="AGENT">AGENT (${agentId})</option>
+                <option value="MEETING">MEETING</option>
+                <option value="TENANT">TENANT</option>
+                <option value="PERSONAL_WORKSPACE">PERSONAL_WORKSPACE</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Category:</label>
+              <select id="newMemCat" class="form-input" style="width:100%;">
+                <option value="FACT">FACT</option>
+                <option value="CONSTRAINT">CONSTRAINT</option>
+                <option value="DIRECTIVE">DIRECTIVE</option>
+                <option value="GOAL">GOAL</option>
+                <option value="DECISION">DECISION</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style="display:block; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Memory Content:</label>
+            <textarea id="newMemContent" class="form-input" style="width:100%; height:90px;" placeholder="Enter persistent memory statement (API keys and raw passwords will be rejected by Secret Scanner)..."></textarea>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+            <button class="btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button class="btn-primary" onclick="AiCeoWorkspace.submitNewMemoryRecord('${agentId}', '${compId}')">Store Memory</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async submitNewMemoryRecord(agentId, companyId) {
+      const key = document.getElementById('newMemKey')?.value?.trim();
+      const scope = document.getElementById('newMemScope')?.value;
+      const cat = document.getElementById('newMemCat')?.value;
+      const content = document.getElementById('newMemContent')?.value?.trim();
+
+      if (!key || !content) {
+        showToast('Key and content are required', 'warning');
+        return;
+      }
+
+      const scopeId = scope === 'COMPANY' ? companyId : (scope === 'AGENT' ? agentId : 'general');
+
+      try {
+        const res = await fetch(`/api/agents/stateful/${agentId}/memory`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scope,
+            scope_id: scopeId,
+            memory_key: key,
+            content,
+            category: cat,
+            memory_type: 'CORE',
+            source: 'HOST_INPUT'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Memory record successfully stored', 'success');
+          if (window.closeModal) window.closeModal();
+          this.loadMemoryTabData(companyId);
+        } else {
+          showToast(data.error || 'Failed to store memory record', 'error');
+        }
+      } catch (e) {
+        showToast('Network error storing memory record', 'error');
+      }
+    }
+
+    async runStatefulDemo(demoType) {
+      const resultBox = document.getElementById('statefulDemoResultContainer');
+      if (resultBox) {
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = `
+          <div style="background:var(--bg-surface); border:1px solid var(--accent-purple); border-radius:var(--radius-lg); padding:16px 20px;">
+            <div style="display:flex; align-items:center; gap:10px; font-weight:700; color:var(--accent-purple); margin-bottom:8px;">
+              <span class="spinner" style="width:16px; height:16px;"></span>
+              Running ${demoType === 'SECTION_74' ? 'Executive Continuity' : 'Workforce Coordination'} Demonstration...
+            </div>
+            <div style="font-size:12.5px; color:var(--text-secondary);">Executing real database persistence, restart query, and verification steps.</div>
+          </div>
+        `;
+      }
+
+      try {
+        const compId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
+        const res = await fetch('/api/stateful/demo/scenarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ demo_type: demoType, company_id: compId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.demonstration) {
+          const demo = data.demonstration;
+          showToast(`${demoType} demo completed successfully!`, 'success');
+          if (resultBox) {
+            resultBox.innerHTML = `
+              <div style="background:var(--bg-surface); border:1px solid var(--accent-emerald); border-radius:var(--radius-lg); padding:18px 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <div style="font-size:14px; font-weight:700; color:var(--accent-emerald);">
+                    ✓ ${demo.scenario} — Status: ${demo.status}
+                  </div>
+                  <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="document.getElementById('statefulDemoResultContainer').style.display='none'">
+                    Close
+                  </button>
+                </div>
+                <div style="font-size:12.5px; color:var(--text-primary); display:flex; flex-direction:column; gap:6px;">
+                  ${demo.timeline.map((t, idx) => `
+                    <div style="display:flex; gap:10px; align-items:flex-start; font-family:monospace; font-size:12px;">
+                      <span style="color:var(--text-muted); min-width:24px;">#${idx+1}</span>
+                      <span class="badge badge-blue" style="font-size:10px; min-width:140px;">${t.step}</span>
+                      <span style="color:var(--text-primary); flex:1;">${JSON.stringify(t)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }
+          this.loadMemoryTabData(compId);
+        } else {
+          showToast(data.error || 'Demo execution failed', 'error');
+        }
+      } catch (e) {
+        showToast('Error executing stateful demo: ' + e.message, 'error');
+      }
     }
   }
 
