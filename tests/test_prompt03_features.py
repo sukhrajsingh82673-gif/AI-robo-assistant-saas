@@ -21,8 +21,9 @@ class TestPrompt03Features(unittest.TestCase):
         self.assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
         self.plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 
-        # Ensure comp_primary exists
+        # Ensure comp_primary exists and clean test schedule state
         with db.get_connection() as conn:
+            conn.execute("DELETE FROM universal_schedules WHERE tenant_id = 'tnt_primary'")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO companies (

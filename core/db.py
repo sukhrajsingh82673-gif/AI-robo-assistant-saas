@@ -1203,6 +1203,178 @@ CREATE TABLE IF NOT EXISTS workflow_resource_locks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wflock_res ON workflow_resource_locks(resource_id);
+
+-- 61. Governed Agent Interoperability Registry (A2A v1.0 Standard)
+CREATE TABLE IF NOT EXISTS a2a_agents (
+    agent_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    provider_name TEXT,
+    provider_url TEXT,
+    endpoint_url TEXT NOT NULL,
+    protocol_version TEXT NOT NULL DEFAULT '1.0',
+    supported_interfaces JSON NOT NULL,
+    capabilities JSON NOT NULL,
+    skills JSON NOT NULL,
+    authentication JSON,
+    trust_level TEXT NOT NULL DEFAULT 'DISCOVERED', -- UNKNOWN, DISCOVERED, VALIDATED, IDENTITY_VERIFIED, TRUSTED, RESTRICTED, SUSPENDED, BLOCKED
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', -- UNVERIFIED, VERIFIED, FAILED
+    role_type TEXT NOT NULL DEFAULT 'EXTERNAL_UNKNOWN', -- INTERNAL, EXTERNAL_TRUSTED, EXTERNAL_UNKNOWN, BLOCKED
+    owner TEXT,
+    organization TEXT,
+    environment TEXT NOT NULL DEFAULT 'PRODUCTION', -- PRODUCTION, STAGING, TEST
+    status TEXT NOT NULL DEFAULT 'OFFLINE', -- ONLINE, OFFLINE, DEGRADED, SUSPENDED, BLOCKED
+    last_health_check REAL,
+    reputation_metrics JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_agent_tenant ON a2a_agents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_a2a_agent_trust ON a2a_agents(trust_level);
+CREATE INDEX IF NOT EXISTS idx_a2a_agent_role ON a2a_agents(role_type);
+
+-- 62. Governed A2A Skills & Capability Governance
+CREATE TABLE IF NOT EXISTS a2a_skills (
+    skill_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    tags JSON,
+    risk_level TEXT NOT NULL DEFAULT 'SAFE', -- SAFE, CONFIRM, DANGEROUS, CRITICAL
+    permissions JSON,
+    approval_required INTEGER NOT NULL DEFAULT 0,
+    evidence_required INTEGER NOT NULL DEFAULT 1,
+    timeout REAL DEFAULT 300.0,
+    budget REAL DEFAULT 0.0,
+    allowed_companies JSON,
+    allowed_tenants JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(agent_id) REFERENCES a2a_agents(agent_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_skill_agent ON a2a_skills(agent_id);
+
+-- 63. Governed A2A Remote Tasks (Dual Correlation & Invariants)
+CREATE TABLE IF NOT EXISTS a2a_tasks (
+    task_id TEXT PRIMARY KEY,
+    zonata_request_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    workspace_id TEXT,
+    mission_id TEXT,
+    zonata_task_id TEXT,
+    workflow_id TEXT,
+    run_id TEXT,
+    agent_id TEXT NOT NULL,
+    skill_id TEXT,
+    requested_by TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    a2a_state TEXT NOT NULL DEFAULT 'TASK_STATE_SUBMITTED', -- TASK_STATE_SUBMITTED, TASK_STATE_WORKING, TASK_STATE_COMPLETED, TASK_STATE_FAILED, TASK_STATE_CANCELED, TASK_STATE_INPUT_REQUIRED, TASK_STATE_REJECTED, TASK_STATE_AUTH_REQUIRED
+    zonata_state TEXT NOT NULL DEFAULT 'SUBMITTED', -- DISCOVERED, VALIDATING, AUTHORIZED, SUBMITTED, WORKING, INPUT_REQUIRED, COMPLETED, FAILED, CANCELLED, REJECTED, AMBIGUOUS, RECONCILED
+    data_classification TEXT NOT NULL DEFAULT 'INTERNAL', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, PERSONAL, FINANCIAL, SECURITY_SENSITIVE
+    cost_spent REAL DEFAULT 0.0,
+    evidence_hash TEXT,
+    reconciliation_notes TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(agent_id) REFERENCES a2a_agents(agent_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_task_tenant ON a2a_tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_a2a_task_agent ON a2a_tasks(agent_id);
+CREATE INDEX IF NOT EXISTS idx_a2a_task_zonata ON a2a_tasks(zonata_request_id);
+
+-- 64. Governed A2A Message Exchange Audit
+CREATE TABLE IF NOT EXISTS a2a_messages (
+    message_id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    context_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    sender_agent_id TEXT NOT NULL,
+    recipient_agent_id TEXT NOT NULL,
+    role TEXT NOT NULL, -- ROLE_USER, ROLE_AGENT
+    parts JSON NOT NULL,
+    sanitized_content TEXT,
+    data_classification TEXT NOT NULL DEFAULT 'INTERNAL',
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(task_id) REFERENCES a2a_tasks(task_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_msg_task ON a2a_messages(task_id);
+
+-- 65. Governed A2A Artifacts & Quarantine Repository
+CREATE TABLE IF NOT EXISTS a2a_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    media_type TEXT,
+    sha256_hash TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    security_scan_status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, CLEAN, QUARANTINED, REJECTED
+    quarantine_reason TEXT,
+    parts JSON NOT NULL,
+    storage_path TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(task_id) REFERENCES a2a_tasks(task_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_art_task ON a2a_artifacts(task_id);
+CREATE INDEX IF NOT EXISTS idx_a2a_art_hash ON a2a_artifacts(sha256_hash);
+
+-- 66. Governed A2A Security Events Audit Ledger
+CREATE TABLE IF NOT EXISTS a2a_security_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    agent_id TEXT,
+    task_id TEXT,
+    event_type TEXT NOT NULL, -- PROMPT_INJECTION, SSRF_ATTEMPT, REPLAY_ATTEMPT, CROSS_TENANT_ATTEMPT, MALFORMED_AGENT_CARD, INVALID_SIGNATURE, AUTH_FAILURE, POLICY_VIOLATION, MALICIOUS_ARTIFACT, CREDENTIAL_LEAK_ATTEMPT
+    severity TEXT NOT NULL DEFAULT 'HIGH', -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON NOT NULL,
+    source_ip TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_sec_tenant ON a2a_security_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_a2a_sec_type ON a2a_security_events(event_type);
+
+-- 67. Governed A2A Inbound Published Agents
+CREATE TABLE IF NOT EXISTS a2a_published_agents (
+    published_id TEXT PRIMARY KEY,
+    internal_agent_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    visibility TEXT NOT NULL DEFAULT 'PRIVATE', -- PUBLIC, PARTNER, PRIVATE
+    allowed_organizations JSON,
+    allowed_tenants JSON,
+    allowed_skills JSON NOT NULL,
+    rate_limit_per_min INTEGER NOT NULL DEFAULT 60,
+    cost_per_task REAL DEFAULT 0.0,
+    approval_required INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, SUSPENDED
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_pub_tenant ON a2a_published_agents(tenant_id);
 """
 
 class Database:

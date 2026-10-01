@@ -364,6 +364,16 @@ class PluginsAndConnectionsService:
                 "capabilities": ["state_graph", "checkpoints", "interrupts", "dynamic_cycles", "recovery_engine"],
                 "installed": 1,
                 "enabled": 1
+            },
+            {
+                "id": "plg_a2a_interoperability",
+                "name": "Agent2Agent (A2A) Governed Interoperability Gateway",
+                "category": "AGENT_INTEROPERABILITY",
+                "version": "1.0.1",
+                "description": "A2A Protocol v1.0 interoperability runtime: agent discovery, Agent Cards, remote task delegation, streaming, and verification.",
+                "capabilities": ["a2a_discovery", "agent_cards", "task_delegation", "a2a_streaming", "artifact_quarantine", "trust_governance"],
+                "installed": 1,
+                "enabled": 1
             }
         ]
 

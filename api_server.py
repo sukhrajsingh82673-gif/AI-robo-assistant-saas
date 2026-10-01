@@ -153,6 +153,20 @@ from core.durable_workflow_runtime import (
     EdgeType
 )
 from zonata.langgraph_adapter import langgraph_adapter
+from core.a2a_interoperability_runtime import (
+    A2AGateway,
+    A2AKillSwitch,
+    AgentTrustLevel,
+    AgentRoleType,
+    A2ATaskState,
+    ZonataA2ATaskState,
+    DataClassification,
+    SecurityEventType
+)
+from zonata.a2a_adapter import A2ACanonicalScenarios, A2ACeoBridge
+
+a2a_gateway = A2AGateway("tnt_primary", "comp_primary")
+a2a_scenarios = A2ACanonicalScenarios("tnt_primary", "comp_primary")
 
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
@@ -1157,6 +1171,121 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
             else:
                 self._send_json({"error": "Workflow not found"}, status=404)
+            return
+
+        # =====================================================================
+        # A2A (AGENT2AGENT PROTOCOL) GET ENDPOINTS
+        # =====================================================================
+        elif path == "/.well-known/agent-card.json":
+            card = a2a_gateway.server_adapter.generate_agent_card(host_url=f"http://{self.headers.get('Host', 'localhost:8080')}")
+            self._send_json(card)
+            return
+
+        elif path == "/api/a2a/agents":
+            trust = query_params.get("trust_level", [None])[0]
+            role = query_params.get("role_type", [None])[0]
+            query = "SELECT * FROM a2a_agents WHERE tenant_id = ?"
+            params = [tenant_id]
+            if trust:
+                query += " AND trust_level = ?"
+                params.append(trust)
+            if role:
+                query += " AND role_type = ?"
+                params.append(role)
+            query += " ORDER BY created_at DESC"
+            with db.get_connection() as conn:
+                rows = conn.execute(query, params).fetchall()
+                agents = []
+                for r in rows:
+                    ag = dict(r)
+                    ag["supported_interfaces"] = json.loads(ag["supported_interfaces"]) if ag.get("supported_interfaces") else []
+                    ag["capabilities"] = json.loads(ag["capabilities"]) if ag.get("capabilities") else {}
+                    ag["skills"] = json.loads(ag["skills"]) if ag.get("skills") else []
+                    ag["reputation_metrics"] = json.loads(ag["reputation_metrics"]) if ag.get("reputation_metrics") else {}
+                    agents.append(ag)
+            self._send_json({"agents": agents, "count": len(agents)})
+            return
+
+        elif path.startswith("/api/a2a/agents/"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            with db.get_connection() as conn:
+                r = conn.execute("SELECT * FROM a2a_agents WHERE agent_id = ? AND tenant_id = ?", (agent_id, tenant_id)).fetchone()
+                if not r:
+                    self._send_json({"error": "Agent not found"}, status=404)
+                    return
+                ag = dict(r)
+                ag["supported_interfaces"] = json.loads(ag["supported_interfaces"]) if ag.get("supported_interfaces") else []
+                ag["capabilities"] = json.loads(ag["capabilities"]) if ag.get("capabilities") else {}
+                ag["skills"] = json.loads(ag["skills"]) if ag.get("skills") else []
+                ag["reputation_metrics"] = json.loads(ag["reputation_metrics"]) if ag.get("reputation_metrics") else {}
+                skills_rows = conn.execute("SELECT * FROM a2a_skills WHERE agent_id = ?", (agent_id,)).fetchall()
+                ag["registered_skills"] = [dict(s) for s in skills_rows]
+            self._send_json({"agent": ag})
+            return
+
+        elif path == "/api/a2a/tasks":
+            with db.get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM a2a_tasks WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 100",
+                    (tenant_id,)
+                ).fetchall()
+            self._send_json({"tasks": [dict(r) for r in rows], "count": len(rows)})
+            return
+
+        elif path.startswith("/api/a2a/tasks/") or path.startswith("/a2a/tasks/"):
+            parts = path.split("/")
+            task_id = parts[4] if path.startswith("/api/") else parts[3]
+            try:
+                task_data = a2a_gateway.client_adapter.get_task(task_id)
+                self._send_json({"task": task_data})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=404)
+            return
+
+        elif path == "/api/a2a/approvals":
+            with db.get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM approvals WHERE tenant_id = ? AND status = 'PENDING' ORDER BY requested_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            self._send_json({"approvals": [dict(r) for r in rows], "count": len(rows)})
+            return
+
+        elif path == "/api/a2a/security/events":
+            with db.get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM a2a_security_events WHERE tenant_id = ? ORDER BY timestamp DESC LIMIT 100",
+                    (tenant_id,)
+                ).fetchall()
+                evts = []
+                for r in rows:
+                    e = dict(r)
+                    e["details"] = json.loads(e["details"]) if e.get("details") else {}
+                    evts.append(e)
+            self._send_json({"security_events": evts, "count": len(evts)})
+            return
+
+        elif path == "/api/a2a/metrics":
+            metrics = a2a_gateway.get_operational_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/a2a/published":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM a2a_published_agents WHERE tenant_id = ?", (tenant_id,)).fetchall()
+                pubs = []
+                for r in rows:
+                    p = dict(r)
+                    p["allowed_skills"] = json.loads(p["allowed_skills"]) if p.get("allowed_skills") else []
+                    pubs.append(p)
+            self._send_json({"published_agents": pubs, "count": len(pubs)})
+            return
+
+        elif path == "/api/a2a/ceo/report":
+            ceo_bridge = A2ACeoBridge(tenant_id, "comp_primary")
+            report = ceo_bridge.generate_external_delegations_report()
+            self._send_json(report)
             return
 
         # Fallback to static files in WEB_DIR or SPA index.html
@@ -2583,6 +2712,193 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             self._send_json({"success": True, "scenario": scenario, "result": res})
+            return
+
+        # =====================================================================
+        # A2A (AGENT2AGENT PROTOCOL) POST ENDPOINTS
+        # =====================================================================
+        elif path in ("/a2a/message:send", "/message:send"):
+            try:
+                res = a2a_gateway.client_adapter.send_message(req_data)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/a2a/tasks/") and path.endswith(":cancel"):
+            parts = path.split("/")
+            task_id = parts[2].split(":")[0]
+            try:
+                res = a2a_gateway.client_adapter.cancel_task(task_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/a2a/agents/discover":
+            card = req_data.get("agent_card") or req_data
+            source = req_data.get("source", "MANUAL")
+            allow_loopback = bool(req_data.get("allow_test_loopback", False))
+            ok, agent_id, errs = a2a_gateway.discover_agent(card, source=source, allow_test_loopback=allow_loopback)
+            if ok:
+                self._send_json({"success": True, "agent_id": agent_id, "message": "Agent registered"})
+            else:
+                self._send_json({"success": False, "errors": errs}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/agents/") and path.endswith("/trust"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            trust_lvl = req_data.get("trust_level", AgentTrustLevel.DISCOVERED.value)
+            try:
+                a2a_gateway.trust_service.set_agent_trust(agent_id, AgentTrustLevel(trust_lvl))
+                self._send_json({"success": True, "agent_id": agent_id, "trust_level": trust_lvl})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/agents/") and path.endswith("/block"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            a2a_gateway.trust_service.set_agent_trust(agent_id, AgentTrustLevel.BLOCKED)
+            self._send_json({"success": True, "agent_id": agent_id, "status": "BLOCKED"})
+            return
+
+        elif path.startswith("/api/a2a/agents/") and path.endswith("/health"):
+            parts = path.split("/")
+            agent_id = parts[4]
+            now = time.time()
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE a2a_agents SET last_health_check = ?, status = 'ONLINE' WHERE agent_id = ? AND tenant_id = ?",
+                    (now, agent_id, tenant_id)
+                )
+                conn.commit()
+            self._send_json({"success": True, "agent_id": agent_id, "status": "ONLINE", "timestamp": now})
+            return
+
+        elif path == "/api/a2a/tasks/delegate":
+            agent_id = req_data.get("agent_id")
+            skill_name = req_data.get("skill_name", "General Task")
+            params = req_data.get("parameters", {})
+            req_by = req_data.get("requested_by", "AI CEO")
+            class_str = req_data.get("data_classification", "INTERNAL")
+            classification = DataClassification(class_str) if class_str in DataClassification.__members__ else DataClassification.INTERNAL
+            try:
+                res = a2a_gateway.delegate_task(
+                    agent_id=agent_id,
+                    skill_name=skill_name,
+                    parameters=params,
+                    requested_by=req_by,
+                    data_classification=classification
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/tasks/") and path.endswith("/cancel"):
+            parts = path.split("/")
+            task_id = parts[4]
+            try:
+                res = a2a_gateway.client_adapter.cancel_task(task_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/tasks/") and path.endswith("/reconcile"):
+            parts = path.split("/")
+            task_id = parts[4]
+            verified_state = req_data.get("verified_state", A2ATaskState.TASK_STATE_COMPLETED.value)
+            try:
+                res = a2a_gateway.client_adapter.reconcile_ambiguous_task(task_id, verified_external_state=verified_state)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/tasks/") and path.endswith("/push"):
+            parts = path.split("/")
+            task_id = parts[4]
+            auth_token = self.headers.get("Authorization")
+            try:
+                res = a2a_gateway.handle_push_notification(task_id, req_data, auth_token=auth_token)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/a2a/approvals/") and path.endswith("/approve"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            actor = req_data.get("actor", "Owner")
+            res = ApprovalPipeline.decide_request(
+                tenant_id=tenant_id,
+                request_id=appr_id,
+                approver_user={"user_id": actor, "role": "OWNER"},
+                approved=True
+            )
+            self._send_json({"success": True, "approval": res})
+            return
+
+        elif path.startswith("/api/a2a/approvals/") and path.endswith("/reject"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            actor = req_data.get("actor", "Owner")
+            reason = req_data.get("reason", "Rejected by policy")
+            res = ApprovalPipeline.decide_request(
+                tenant_id=tenant_id,
+                request_id=appr_id,
+                approver_user={"user_id": actor, "role": "OWNER"},
+                approved=False,
+                rejection_reason=reason
+            )
+            self._send_json({"success": True, "approval": res})
+            return
+
+        elif path == "/api/a2a/published":
+            pub_id = a2a_gateway.server_adapter.publish_agent(
+                internal_agent_id=req_data.get("internal_agent_id", "agent_ceo"),
+                display_name=req_data.get("display_name", "Published Agent"),
+                description=req_data.get("description", "A2A Endpoint for ZONATA"),
+                skills=req_data.get("skills", []),
+                rate_limit_per_min=int(req_data.get("rate_limit_per_min", 60)),
+                cost_per_task=float(req_data.get("cost_per_task", 0.0)),
+                approval_required=bool(req_data.get("approval_required", False))
+            )
+            self._send_json({"success": True, "published_id": pub_id})
+            return
+
+        elif path == "/api/a2a/killswitch":
+            active = bool(req_data.get("active", True))
+            if active:
+                A2AKillSwitch.activate(tenant_id)
+            else:
+                A2AKillSwitch.deactivate(tenant_id)
+            self._send_json({"killswitch_active": active, "status": "KILLSWITCH_ENGAGED" if active else "KILLSWITCH_DISENGAGED"})
+            return
+
+        elif path == "/api/a2a/demo/scenarios":
+            scenario = req_data.get("scenario", "A").upper()
+            sc_map = {
+                "A": a2a_scenarios.scenario_a_discover_external_agent,
+                "B": a2a_scenarios.scenario_b_delegate_simple_task,
+                "C": a2a_scenarios.scenario_c_long_running_async_task,
+                "D": a2a_scenarios.scenario_d_sensitive_action_approval,
+                "E": a2a_scenarios.scenario_e_prompt_injection_defense,
+                "F": a2a_scenarios.scenario_f_malicious_agent_card_defense,
+                "G": a2a_scenarios.scenario_g_ambiguous_outcome_reconciliation,
+                "H": a2a_scenarios.scenario_h_tenant_isolation,
+                "I": a2a_scenarios.scenario_i_killswitch_override,
+                "J": a2a_scenarios.scenario_j_langgraph_a2a_workflow
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown A2A scenario '{scenario}'"}, status=400)
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

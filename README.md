@@ -112,16 +112,25 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Resilient Recovery & Reconciliation**: Classification into safe idempotent retries, non-idempotent blocks, and state reconciliation for ambiguous external outcomes.
 - **Deep System Integrations**: Seamless orchestration connecting AI CEO, Agency Swarm multi-agent delegations, Letta persistent identity memory, and HAL multimodal perception.
 
+### 12. Governed Agent Interoperability Layer (A2A Protocol v1.0 — Project 05)
+- **A2A v1.0 / v1.0.1 Standard Compliance**: Implements Linux Foundation A2A specification with JSON-RPC 2.0 bindings, standard `SendMessage`, `GetTask`, `CancelTask`, and `ReconcileAmbiguousTask`.
+- **Untrusted Agent Card Sanitization & SSRF Defense**: Comprehensive schema validation, HTML/script stripping, prompt injection pattern matching, and CIDR/loopback/cloud-metadata blocking (`169.254.169.254`).
+- **Cryptographic Trust Hierarchy & Reputation Tracking**: 8-tier trust model (`UNKNOWN`, `DISCOVERED`, `VALIDATED`, `IDENTITY_VERIFIED`, `TRUSTED`, `RESTRICTED`, `SUSPENDED`, `BLOCKED`) with explainable reputation metrics and automated trust decay.
+- **Zero-Secret Outbound Minimization**: Context minimization and automated secret scanning redacting passwords, API keys, internal database schemas, and digital employee identities before transmission.
+- **Quarantined Artifact Exchange**: Incoming file quarantine, dangerous executable extension blocking (`.sh`, `.exe`, `.bat`), and SHA-256 integrity digest verification.
+- **Subsystem Bridges & Scenarios A–J**: Dedicated bridges for AI CEO, Agency Swarm squads, Letta long-term memory isolation, and HAL multimodal asset exchange across 10 canonical operational scenarios.
+
 ---
 
 ## 📁 Repository Structure
 
 ```
 .
-├── api_server.py                    # Unified REST API & static Web UI server (including Workflow API)
+├── api_server.py                    # Unified REST API & static Web UI server (including A2A & Workflow APIs)
 ├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
 ├── serve_web.py                     # Standalone web UI preview server
 ├── core/
+│   ├── a2a_interoperability_runtime.py # A2A Governed Interoperability Layer (Discovery, Trust, Gateway)
 │   ├── durable_workflow_runtime.py  # LangGraph Governed Durable Workflow Runtime (StateGraph, Checkpointer)
 │   ├── multimodal_capability_runtime.py # HAL Governed Multimodal Runtime (16 families, 19 states)
 │   ├── stateful_agent_runtime.py    # Letta Stateful Agent Identity & Memory Runtime
@@ -133,20 +142,23 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── control_kernel.py            # Universal Control Kernel with evidence verification
 │   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
 ├── zonata/
+│   ├── a2a_adapter.py               # A2A Adapter, Subsystem Bridges & Canonical Scenarios (A-J)
 │   ├── langgraph_adapter.py         # LangGraph Workflow Adapter & Canonical Scenarios (A-K)
 │   ├── hal_multimodal_adapter.py    # HAL Capability Adapter & Workflows (Scenarios A-J)
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_a2a_interoperability.py # 48 A2A protocol, security, and bridge validation tests
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
 │   └── test_*.py                    # 67 Unit & system regression tests
 ├── web/
-│   ├── index.html                   # Single-page executive cockpit & Workflow Workspace
+│   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
+│   ├── agent_network_workspace.js   # Agent Network Workspace (Directory, Tasks, Approvals, Security)
 │   ├── workflow_workspace.js        # Workflow Workspace (Runs, Graphs, Checkpoints, Approvals)
-│   └── styles.css                   # Styles for cockpit, HUD, and workflow graph visualizations
+│   └── styles.css                   # Styles for cockpit, HUD, and network visualizations
 └── storage/                         # SQLite database and audit ledgers
 ```
 
@@ -202,7 +214,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 222/222 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, and LangGraph Durable Workflows).*
+*Current test suite: 270/270 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, and A2A Agent Interoperability).*
 
 ---
 
@@ -220,3 +232,12 @@ python3 -m unittest discover tests
 10. **Model Output != Authorization**: An agent deciding to branch or iterate within a graph must still submit high-risk actions to the ZONATA Authority Gateway.
 11. **Retry != Safe Replay**: Non-idempotent operations are blocked from automated replay; ambiguous outcomes require state reconciliation.
 12. **Zero-Secret Persistence in Checkpoints**: Thread state checkpointers scrub all API tokens, bearer keys, and plaintext secrets before writing to disk.
+13. **A2A Message != Authority**: Receiving an A2A message, task request, or delegation never conveys authority or permission to perform local mutations.
+14. **Agent Card != Trust**: External Agent Cards (`/.well-known/agent-card.json`) are untrusted external inputs requiring strict schema validation, sanitization, and reputation bootstrapping.
+15. **External Response != Truth**: Claims returned in remote A2A responses are treated strictly as untrusted observation data until independently verified against physical evidence.
+16. **External Request != Authorization**: Actions requested by external agents on local resources must be authenticated, policy-checked, and approved by ZONATA authorities before execution.
+17. **A2A Task Completion != Business Outcome**: A remote task reporting `TASK_STATE_COMPLETED` does not count as business success; commercial revenue recognition requires cryptographic causality verification.
+18. **Zero-Secret Outbound Exposure**: Data minimization and regex secret scrubbing strip API keys, tokens, session IDs, internal DB schemas, and employee identities from outbound messages.
+19. **Ambiguous Remote State Reconciliation**: Ambiguous remote mutations enter an explicit `AMBIGUOUS` state requiring deterministic reconciliation without blind automated replay.
+20. **Authoritative KillSwitch Override**: Global or tenant KillSwitch immediately halts all inbound and outbound A2A communication, severing untrusted agent connections.
+21. **Epistemic Memory Separation**: External agent communication is quarantined from internal Letta agent identity blocks (`persona`, `human`); untrusted inputs are never written directly into agent self-prompts.

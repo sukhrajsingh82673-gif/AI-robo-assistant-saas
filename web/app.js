@@ -233,6 +233,7 @@ function updateBreadcrumbs() {
     workforce: 'AI Workforce',
     tasks: 'TaskMaker',
     workflows: 'Workflow Runtime',
+    'agent-network': 'Agent Network (A2A)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -383,6 +384,8 @@ function handleRoute(path) {
     window.TaskMakerWorkspace.render('view-tasks');
   } else if (navKey === 'workflows' && window.WorkflowWorkspace) {
     window.WorkflowWorkspace.render('view-workflows');
+  } else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
+    window.AgentNetworkWorkspace.render('view-agent-network');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
