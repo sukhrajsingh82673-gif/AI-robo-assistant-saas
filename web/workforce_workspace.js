@@ -10,6 +10,7 @@
   class WorkforceWorkspaceManager {
     constructor() {
       this.workforce = [];
+      this.dynamicSquads = [];
       this.selectedEmployee = null;
       this.activeDetailTab = 'overview';
       this.statusFilter = 'ALL';
@@ -41,10 +42,17 @@
     async loadWorkforce(companyId) {
       this.loading = true;
       try {
-        const res = await fetch(`/api/companies/${companyId}/workforce`);
-        if (res.ok) {
-          const data = await res.json();
+        const [resWf, resSq] = await Promise.all([
+          fetch(`/api/companies/${companyId}/workforce`),
+          fetch(`/api/workforces?company_id=${companyId}`)
+        ]);
+        if (resWf.ok) {
+          const data = await resWf.json();
           this.workforce = Array.isArray(data.workforce) ? data.workforce : [];
+        }
+        if (resSq.ok) {
+          const sqData = await resSq.json();
+          this.dynamicSquads = Array.isArray(sqData.workforces) ? sqData.workforces : [];
         }
       } catch (e) {
         console.error('Failed to load workforce:', e);
@@ -52,6 +60,7 @@
         this.loading = false;
       }
     }
+
 
     renderWorkspace(container) {
       const comp = window.CurrentCompanyContext.getCompany() || { name: 'Company' };
@@ -87,6 +96,92 @@
             </div>
           </div>
 
+          <!-- Governed Dynamic Specialist Squads (Mission Workforces) -->
+          <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:20px 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="badge badge-emerald" style="font-size:11px;">MULTI-AGENT SQUADS</span>
+                  <span style="font-size:12px; color:var(--text-muted);">Directional Orchestration</span>
+                </div>
+                <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:6px 0 2px 0;">
+                  Governed Specialist Squads (${this.dynamicSquads.length} Active Missions)
+                </h2>
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:0;">
+                  Dynamic multi-agent teams synthesized on-demand for complex objectives. Coordinated with directional flows and verified against ZONATA Evidence Ledger.
+                </p>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-secondary" style="font-size:12px; padding:6px 12px; border-color:var(--accent-blue);" onclick="WorkforceWorkspace.runDemonstration()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Run Controlled Demo (Sales Bottlenecks)
+                </button>
+                <button class="btn-primary" style="font-size:12px; padding:6px 14px;" onclick="WorkforceWorkspace.openMissionModal()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                  + Synthesize Mission Squad
+                </button>
+              </div>
+            </div>
+
+            ${this.dynamicSquads.length === 0 ? `
+              <div style="background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:var(--radius-md); padding:24px; text-align:center;">
+                <p style="font-size:13px; color:var(--text-secondary); margin:0 0 12px 0;">
+                  No dynamic mission squads currently active for this company.
+                </p>
+                <button class="btn-secondary" style="font-size:12px;" onclick="WorkforceWorkspace.runDemonstration()">
+                  Run Controlled Demonstration
+                </button>
+              </div>
+            ` : `
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px;">
+                ${this.dynamicSquads.map(sq => {
+                  const isQuarantined = sq.status === 'QUARANTINED';
+                  const isCompleted = sq.status === 'COMPLETED';
+                  const statusBadge = isQuarantined ? 'badge-amber' : isCompleted ? 'badge-emerald' : 'badge-blue';
+                  const evidenceCount = sq.runtime_state ? sq.runtime_state.evidence_count : 0;
+                  return `
+                    <div style="background:rgba(255,255,255,0.03); border:1px solid ${isQuarantined?'rgba(239,68,68,0.4)':'var(--border-color)'}; border-radius:var(--radius-md); padding:16px;">
+                      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                        <div>
+                          <span class="badge ${statusBadge}" style="font-size:10px;">${sq.status}</span>
+                          <span style="font-size:11px; color:var(--text-muted); margin-left:6px;">${sq.workforce_id}</span>
+                        </div>
+                        ${!isQuarantined && !isCompleted ? `
+                          <button style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; cursor:pointer;" onclick="WorkforceWorkspace.killSquad('${sq.workforce_id}')">
+                            KILL SWITCH
+                          </button>
+                        ` : ''}
+                      </div>
+
+                      <h4 style="font-size:14px; font-weight:700; color:var(--text-primary); margin:0 0 8px 0;">
+                        ${sq.objective || 'Mission Squad'}
+                      </h4>
+
+                      <div style="margin-bottom:12px;">
+                        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Specialists (${sq.specialists ? sq.specialists.length : 0}):</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                          ${(sq.specialists || []).map(sp => `
+                            <span class="badge badge-purple" style="font-size:10.5px;">${sp.role || sp.name}</span>
+                          `).join('')}
+                        </div>
+                      </div>
+
+                      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px; font-size:11.5px; color:var(--text-secondary);">
+                        <div>
+                          <span style="color:var(--text-primary); font-weight:600;">${evidenceCount}</span> evidence sealed
+                        </div>
+                        <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="WorkforceWorkspace.viewSquadDetails('${sq.workforce_id}')">
+                          View Execution & Evidence
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
           <!-- Filter Pills -->
           <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
             ${['ALL', 'ACTIVE', 'PROVISIONING', 'PENDING_APPROVAL', 'PAUSED', 'PROPOSED'].map(st => `
@@ -95,6 +190,7 @@
               </button>
             `).join('')}
           </div>
+
 
           <!-- Workforce Grid or Empty State -->
           ${filtered.length === 0 ? `
@@ -417,7 +513,198 @@
         showToast('Agent provisioning logged', 'info');
       }
     }
+
+    async runDemonstration() {
+      const compId = window.CurrentCompanyContext.getCompanyId() || 'cmp_primary';
+      showToast('Dispatching Section 72 Governed Demonstration...', 'info');
+      try {
+        const res = await fetch('/api/workforces/demo/sales-bottlenecks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: compId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast('Demonstration executed! Sealed 3 evidence packages in ledger.', 'success');
+          await this.loadWorkforce(compId);
+          this.render();
+          this.viewSquadDetails(data.demonstration.workforce_id);
+        } else {
+          showToast('Failed to run demonstration', 'error');
+        }
+      } catch (e) {
+        showToast('Error during demonstration run: ' + e.message, 'error');
+      }
+    }
+
+    openMissionModal() {
+      if (!window.openModal) return;
+      window.openModal(`
+        <h2 style="font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">
+          Synthesize Dynamic Mission Squad
+        </h2>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:20px;">
+          AI CEO will analyze your objective, select specialized roles, configure directional collaboration flows, and execute governed mission steps.
+        </p>
+        <form onsubmit="WorkforceWorkspace.submitMissionPlan(event)">
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Mission Objective *</label>
+            <textarea id="missionObj" class="form-input" rows="3" placeholder="e.g. Research the Indian hospitality market and prepare a strategy for increasing direct bookings." required style="resize:vertical;"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:18px;">
+            <label class="form-label">Compute Budget Limit ($)</label>
+            <input type="number" id="missionBudget" class="form-input" value="100" />
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Synthesize & Run Squad</button>
+          </div>
+        </form>
+      `);
+    }
+
+    async submitMissionPlan(event) {
+      event.preventDefault();
+      const objective = document.getElementById('missionObj').value;
+      const budget_usd = parseFloat(document.getElementById('missionBudget').value || '100');
+      const compId = window.CurrentCompanyContext.getCompanyId() || 'cmp_primary';
+      window.closeModal();
+      showToast('Synthesizing dynamic specialist squad...', 'info');
+
+      try {
+        const planRes = await fetch('/api/workforces/plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objective, company_id: compId, budget_usd })
+        });
+        if (planRes.ok) {
+          const planData = await planRes.json();
+          const wfId = planData.workforce.workforce_id;
+          showToast(`Squad ${wfId} synthesized. Executing governed turn...`, 'info');
+
+          const execRes = await fetch(`/api/workforces/${wfId}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          if (execRes.ok) {
+            showToast(`Mission squad completed! Sealed evidence packages.`, 'success');
+            await this.loadWorkforce(compId);
+            this.render();
+            this.viewSquadDetails(wfId);
+          } else {
+            showToast('Squad execution encountered error', 'error');
+            await this.loadWorkforce(compId);
+            this.render();
+          }
+        }
+      } catch (e) {
+        showToast('Failed to synthesize squad: ' + e.message, 'error');
+      }
+    }
+
+    async killSquad(workforceId) {
+      if (!confirm(`Are you sure you want to engage the emergency KILL SWITCH for workforce ${workforceId}? All active operations will be quarantined.`)) return;
+      try {
+        const res = await fetch(`/api/workforces/${workforceId}/kill`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'HOST_MANUAL_KILL_SWITCH' })
+        });
+        if (res.ok) {
+          showToast(`Workforce ${workforceId} quarantined via Kill Switch.`, 'warning');
+          const compId = window.CurrentCompanyContext.getCompanyId();
+          await this.loadWorkforce(compId);
+          this.render();
+        }
+      } catch (e) {
+        showToast('Kill switch error: ' + e.message, 'error');
+      }
+    }
+
+    async viewSquadDetails(workforceId) {
+      if (!window.openModal) return;
+      showToast('Loading workforce telemetry and evidence...', 'info');
+      try {
+        const res = await fetch(`/api/workforces/${workforceId}`);
+        if (!res.ok) throw new Error('Failed to fetch details');
+        const data = await res.json();
+        const sq = data.workforce;
+        const result = sq.result || {};
+        const findings = result.findings || [];
+        const recs = result.recommendations || [];
+        const evidenceRefs = result.evidence_refs || [];
+
+        window.openModal(`
+          <div style="max-height:80vh; overflow-y:auto; padding-right:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div>
+                <span class="badge ${sq.status==='COMPLETED'?'badge-emerald':sq.status==='QUARANTINED'?'badge-amber':'badge-blue'}">${sq.status}</span>
+                <h2 style="font-size:18px; font-weight:700; color:var(--text-primary); margin:6px 0 2px 0;">${sq.objective}</h2>
+                <div style="font-size:12px; color:var(--text-secondary);">Workforce ID: ${sq.workforce_id} | Mission: ${sq.mission_id}</div>
+              </div>
+            </div>
+
+            <!-- Invariant Notice -->
+            <div style="background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.2); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px; font-size:12px; color:var(--text-secondary);">
+              <strong style="color:var(--text-primary);">Constitutional Invariant:</strong> TASK_SUCCESS != BUSINESS_OUTCOME.
+              Execution status is <strong>${result.task_success ? 'SUCCEEDED' : 'PENDING'}</strong>, but business outcome requires verified financial ledger proof.
+            </div>
+
+            <!-- Squad Specialists -->
+            <h3 style="font-size:13px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin:0 0 8px 0;">Assigned Specialists</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-bottom:16px;">
+              ${(sq.specialists || []).map(s => `
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px;">
+                  <div style="font-weight:700; font-size:13px; color:var(--text-primary);">${s.role}</div>
+                  <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">${s.name}</div>
+                  <span class="badge badge-purple" style="font-size:10px;">${s.status}</span>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Findings -->
+            <h3 style="font-size:13px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin:0 0 8px 0;">Governed Findings (${findings.length})</h3>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+              ${findings.length === 0 ? '<div style="font-size:12px; color:var(--text-secondary);">No findings recorded.</div>' : findings.map(f => {
+                const b = f.bottleneck || f.item || f;
+                return `
+                  <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; font-size:12.5px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                      <strong style="color:var(--text-primary);">${b.stage || b.process || 'Finding'}</strong>
+                      <span class="badge badge-blue" style="font-size:10px;">${f.epistemic_state || 'OBSERVATION'}</span>
+                    </div>
+                    <div style="color:var(--text-secondary);">${b.reason || b.trend || JSON.stringify(b)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- Evidence Packages Sealed -->
+            <h3 style="font-size:13px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin:0 0 8px 0;">Evidence Packages Sealed in Ledger (${evidenceRefs.length})</h3>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+              ${evidenceRefs.length === 0 ? '<div style="font-size:12px; color:var(--text-secondary);">Pending evidence seal.</div>' : evidenceRefs.map(ref => `
+                <span class="badge badge-emerald" style="font-family:monospace; font-size:11px;">🛡️ ${ref}</span>
+              `).join('')}
+            </div>
+
+            <!-- Recommendations -->
+            <h3 style="font-size:13px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin:0 0 8px 0;">Actionable Recommendations</h3>
+            <ul style="padding-left:18px; margin:0 0 16px 0; font-size:12.5px; color:var(--text-secondary);">
+              ${recs.map(r => `<li style="margin-bottom:6px;"><strong style="color:var(--text-primary);">${r.action || r}</strong> ${r.impact ? `[Impact: ${r.impact}, Effort: ${r.effort}]` : ''}</li>`).join('')}
+            </ul>
+
+            <div style="display:flex; justify-content:flex-end;">
+              <button class="btn-secondary" onclick="window.closeModal()">Close</button>
+            </div>
+          </div>
+        `);
+      } catch (e) {
+        showToast('Error loading details: ' + e.message, 'error');
+      }
+    }
   }
 
   window.WorkforceWorkspace = new WorkforceWorkspaceManager();
 })();
+

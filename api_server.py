@@ -118,6 +118,7 @@ zonata_org_designer = OrganizationDesignEngine()
 zonata_agent_factory = GovernedAgentFactory()
 from zonata.company_api_service import CompanyApiService
 company_api_service = CompanyApiService(portfolio)
+from zonata.agent_swarm_adapter import AgentWorkforceAdapter, workforce_planner
 
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
@@ -907,6 +908,32 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "Connection not found"}, status=404)
             return
+
+        # =====================================================================
+        # Governed Multi-Agent Workforce Orchestrator Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/workforces":
+            company_id = query_params.get("company_id", [None])[0]
+            workforces = AgentWorkforceAdapter.list_workforces(tenant_id, company_id)
+            self._send_json({"workforces": workforces, "count": len(workforces)})
+            return
+
+        elif path.startswith("/api/workforces/"):
+            parts = path.split("/")
+            if len(parts) >= 4 and parts[3] and not parts[3].startswith("demo"):
+                workforce_id = parts[3]
+                try:
+                    details = AgentWorkforceAdapter.get_workforce_details(workforce_id)
+                    self._send_json({"success": True, "workforce": details})
+                except KeyError:
+                    self._send_json({"error": "Workforce not found"}, status=404)
+                return
+
+        elif path == "/api/specialists/catalog":
+            catalog = AgentWorkforceAdapter.get_specialist_catalog()
+            self._send_json({"roles": catalog, "count": len(catalog)})
+            return
+
 
         # Fallback to static files in WEB_DIR or SPA index.html
 
@@ -1866,7 +1893,51 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"success": True, **res})
             return
 
+        # =====================================================================
+        # Governed Multi-Agent Workforce Orchestrator Endpoints (POST)
+        # =====================================================================
+        elif path == "/api/workforces/plan":
+            objective = req_data.get("objective", "General Business Investigation")
+            company_id = req_data.get("company_id", "cmp_primary")
+            budget_usd = float(req_data.get("budget_usd", 100.0))
+            plan = AgentWorkforceAdapter.create_mission_workforce(
+                tenant_id=tenant_id,
+                company_id=company_id,
+                mission_objective=objective,
+                budget_usd=budget_usd
+            )
+            self._send_json({"success": True, "workforce": plan})
+            return
+
+        elif path.startswith("/api/workforces/") and path.endswith("/execute"):
+            parts = path.split("/")
+            workforce_id = parts[3]
+            try:
+                res = AgentWorkforceAdapter.execute_workforce(workforce_id, req_data.get("parameters"))
+                self._send_json({"success": True, "result": res.to_dict()})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/workforces/") and path.endswith("/kill"):
+            parts = path.split("/")
+            workforce_id = parts[3]
+            reason = req_data.get("reason", "HOST_EMERGENCY_KILL_SWITCH")
+            success = AgentWorkforceAdapter.kill_workforce(workforce_id, reason=reason)
+            self._send_json({"success": success, "workforce_id": workforce_id, "quarantined": True})
+            return
+
+        elif path == "/api/workforces/demo/sales-bottlenecks":
+            company_id = req_data.get("company_id", "cmp_demo")
+            demo_res = AgentWorkforceAdapter.run_sales_bottleneck_demonstration(
+                tenant_id=tenant_id,
+                company_id=company_id
+            )
+            self._send_json({"success": True, "demonstration": demo_res})
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
+
 
 def run_server(port=8080):
     socketserver.TCPServer.allow_reuse_address = True
