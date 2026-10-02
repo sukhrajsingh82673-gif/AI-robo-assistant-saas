@@ -220,6 +220,8 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_adversarial_security_and_chaos.py # 11 Adversarial security, tenant isolation, and chaos recovery tests
+│   ├── test_enterprise_load_benchmarks.py # 4 Controlled concurrency benchmarks (10, 50, 100, 500 agents)
 │   ├── test_nango_integration.py    # 22 Nango external integration, webhook, sync, killswitch & scenario tests
 │   ├── test_temporal_durable_execution.py # 20 Temporal durable execution, saga, killswitch & scenario tests
 │   ├── test_browser_use_execution.py # 27 Browser Use real-browser execution, security & scenario tests
@@ -229,7 +231,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
-│   └── test_*.py                    # 73 Unit & system regression tests (408 tests total across suite)
+│   └── test_*.py                    # 73 Unit & system regression tests (423 tests total across suite)
 ├── web/
 │   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
@@ -296,7 +298,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 408/408 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, Temporal Governed Durable Execution Layer, and Nango Governed External System Connectivity & Integration Layer).*
+*Current test suite: 423/423 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, Temporal Governed Durable Execution Layer, Nango Governed External System Connectivity & Integration Layer, Enterprise Adversarial Security & Chaos Engineering, and Concurrency Load Benchmarks).*
 
 ---
 

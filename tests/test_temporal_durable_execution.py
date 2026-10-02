@@ -54,6 +54,9 @@ class TestTemporalDurableExecution(unittest.TestCase):
         self.gateway = TemporalDurableExecutionGateway(self.tenant_id, self.company_id)
         self.scenarios = TemporalCanonicalScenarios(self.tenant_id, self.company_id)
         TemporalKillSwitch.reset_all()
+        with db.get_connection() as conn:
+            conn.execute("UPDATE temporal_workers SET status = 'ONLINE', heartbeat_at = ? WHERE tenant_id = ?", (time.time(), self.tenant_id))
+            conn.commit()
 
     def tearDown(self):
         TemporalKillSwitch.reset_all()
