@@ -163,6 +163,25 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (long-running company mission durability), LangGraph (durable node execution underneath graph orchestration), Browser Use (durable web execution with retry governance), OpenHands (durable workspace task recovery), and MCP (governed durable tool execution). Canonical test suite covers Standard Durable Mission (Scenario 01), Activity Failure & Exponential Retry (Scenario 02), Human Approval Wait (Scenario 03), Emergency Multi-Scope KillSwitch (Scenario 04), Prompt Injection & Secret Scrubbing (Scenario 05), Saga Multi-Step Rollback (Scenario 06), Unknown Outcome Ambiguous Mutation Reconciliation (Scenario 07), LangGraph + Temporal Hybrid Pipeline (Scenario 08), Crash & Restart Recovery (Scenario 09), and Section 85 Grand Acceptance Test (Scenario 10).
 - **Dedicated Web Cockpit**: Fully interactive Governed Durable Execution Center (`web/temporal_workspace.js`) with KPI metrics, Durable Processes view, Mission Timeline, Execution Workers & Queues, Human Approval Waits, Reconciliations & Sagas, Security & Audit, and Live Canonical Scenario Runner.
 
+### 17. Governed External System Connectivity & Integration Layer (Nango — Project 10)
+- **Universal Business System Connectivity**: Integrates official Nango (`NangoHQ/nango`) architectural patterns as a governed external connectivity layer connecting ZONATA with over 1,000+ real-world enterprise business systems (Salesforce, HubSpot, Stripe, QuickBooks, Google Workspace, Slack, Jira, GitHub, Shopify, Zendesk).
+- **Architectural Hierarchy & Distinction**:
+  - `Agency Swarm = WHO WORKS` (autonomous role squads)
+  - `Letta = WHAT AGENTS REMEMBER` (persistent identities & memory blocks)
+  - `HAL AI = HOW ZONATA PERCEIVES LOCALLY` (computer perception & desktop robot)
+  - `LangGraph = HOW AGENT REASONING FLOWS` (cyclic cognitive graphs)
+  - `A2A = HOW AGENTS COMMUNICATE` (agent-to-agent protocol)
+  - `MCP = HOW AGENTS ACCESS TOOLS/DATA` (tool protocol)
+  - `OpenHands = HOW ZONATA OPERATES WORKSPACES` (code & environment execution)
+  - `Browser Use = HOW ZONATA OPERATES WEBSITES` (real-browser web computer)
+  - `Temporal = HOW ZONATA EXECUTES LONG-RUNNING PROCESSES` (durable execution infrastructure)
+  - `Nango = HOW ZONATA CONNECTS TO REAL BUSINESS SYSTEMS` (enterprise SaaS APIs, OAuth, webhooks, sync)
+  - `ZONATA = WHO IS AUTHORIZED, WHAT IS ALLOWED, WHAT ACTUALLY HAPPENED, AND WHETHER THE BUSINESS OUTCOME IS VERIFIED`.
+- **15-Stage Governed Execution Pipeline**: Strict multi-tenant isolation, Context Firewall (prompt injection defense, regex secret scrubbing), Multi-Scope KillSwitch (Global, Tenant, Company, Mission, Agent, Capability, Provider, Connection), Rate Limit Governor (fairness across tenants), Action Risk Classification (`READ_ONLY`, `LOW_RISK`, `DATA_ENTRY`, `BUSINESS_MUTATION`, `FINANCIAL`, `PRIVILEGED`, `DESTRUCTIVE`, `IRREVERSIBLE`), Human Approval Escalation for financial operations, Idempotency enforcement, physical verification, Merkle Evidence Ledger sealing, and Business Causality Engine linkage (`TASK_SUCCESS != BUSINESS_OUTCOME`).
+- **Inbound Webhook Gateway & Data Sync Engine**: HMAC SHA-256 signature verification, 300s replay attack defense, duplicate payload suppression, initial/incremental syncs with cursor checkpoints, data minimization, and immutable provenance metadata (`SOURCE_SYSTEM`, `SOURCE_PROVIDER`, `SOURCE_OBJECT`, `SOURCE_ID`, `SOURCE_CONNECTION`, `SYNC_TIME`, `SYNC_RUN`, `TENANT`, `COMPANY`).
+- **First-Class UNKNOWN_OUTCOME Protocol**: Network timeouts or ambiguous provider responses trigger explicit `UNKNOWN_OUTCOME` state reconciliation instead of blind automated replays.
+- **Dedicated Web Cockpit**: Fully interactive Governed External Integrations Center (`web/nango_workspace.js`) with KPI metrics, Integration Catalog, Connected Systems & Health, Data Sync Engine, Webhooks Gateway, Capability Registry, Security & Rate Limits, and Live Canonical Scenario Runner.
+
 ---
 
 ## 📁 Repository Structure
@@ -173,6 +192,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 ├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
 ├── serve_web.py                     # Standalone web UI preview server
 ├── core/
+│   ├── nango_integration_runtime.py # Nango Governed External System Connectivity Layer (Gateway, OAuth, Webhooks, Sync)
 │   ├── temporal_durable_execution_runtime.py # Temporal Governed Durable Execution Layer (Gateway, Sagas, KillSwitch, Workers)
 │   ├── browser_use_execution_runtime.py # Browser Use Governed Real-Browser Runtime (Gateway, Sessions, SSRF Firewall, DOM & Viewport)
 │   ├── openhands_execution_runtime.py # OpenHands Governed Workspace Runtime (Gateway, Sandboxes, Command Classifier)
@@ -189,6 +209,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── control_kernel.py            # Universal Control Kernel with evidence verification
 │   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
 ├── zonata/
+│   ├── nango_adapter.py             # Nango Adapter, Subsystem Bridges & Canonical Scenarios (01-10 & Section 95)
 │   ├── temporal_adapter.py          # Temporal Adapter, Subsystem Bridges & Canonical Scenarios (01-10 & Section 85)
 │   ├── browser_use_adapter.py       # Browser Use Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-10 & Section 80)
 │   ├── openhands_adapter.py         # OpenHands Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-08 & Section 79)
@@ -199,6 +220,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_nango_integration.py    # 22 Nango external integration, webhook, sync, killswitch & scenario tests
 │   ├── test_temporal_durable_execution.py # 20 Temporal durable execution, saga, killswitch & scenario tests
 │   ├── test_browser_use_execution.py # 27 Browser Use real-browser execution, security & scenario tests
 │   ├── test_openhands_execution.py  # 27 OpenHands workspace execution & scenario tests
@@ -207,10 +229,11 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
-│   └── test_*.py                    # 73 Unit & system regression tests (386 tests total across suite)
+│   └── test_*.py                    # 73 Unit & system regression tests (408 tests total across suite)
 ├── web/
 │   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
+│   ├── nango_workspace.js           # Governed External Integrations Center (Catalog, Connections, Sync, Webhooks, Scenarios)
 │   ├── temporal_workspace.js        # Governed Durable Execution Center (Processes, Workers, Queues, Approvals, Scenarios)
 │   ├── browser_workspace.js         # Browser Execution Cockpit (Sessions, Actions, Viewport, Artifacts, Scenarios)
 │   ├── openhands_workspace.js       # Agent Execution Workspace (Executions, Workspaces, Approvals, Scenarios)
@@ -273,7 +296,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 386/386 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, and Temporal Governed Durable Execution Layer).*
+*Current test suite: 408/408 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, Temporal Governed Durable Execution Layer, and Nango Governed External System Connectivity & Integration Layer).*
 
 ---
 
@@ -334,5 +357,15 @@ python3 -m unittest discover tests
 53. **Event History != Business Truth**: Recorded Temporal event history is execution telemetry, not cryptographically verified evidence of business outcome.
 54. **Ambiguous Mutation Protocol**: Any mutating activity with an unknown outcome (`UNKNOWN_OUTCOME`) must halt and trigger explicit state reconciliation, never blind automatic retry.
 55. **Authoritative Temporal KillSwitch**: Multi-scope killswitches (Global, Tenant, Company, Mission, Workflow, Worker, Queue, Activity, Agent) unconditionally terminate workflow execution, cancel pending activities, and reject new tasks.
+56. **External Connection != Authorization**: Holding a valid OAuth connection or API credential to a third-party business system does not grant permission to perform arbitrary queries or mutations.
+57. **External Capability != Permission**: Registration of a provider capability (e.g., `stripe:charge`, `salesforce:update_deal`) in the capability registry does not confer authority to invoke it.
+58. **External Execution != Business Outcome**: Receiving an HTTP 200/201 response or successful payload from an external SaaS API does not prove that a real-world commercial outcome was achieved (`TASK_SUCCESS != BUSINESS_OUTCOME`).
+59. **External API Response != Ground Truth**: Data returned by third-party SaaS endpoints is treated strictly as untrusted observation data until independently verified and sealed into the Merkle Evidence Ledger.
+60. **Webhook Event != Authority**: Receiving an external inbound webhook event (e.g., `payment_intent.succeeded`) never triggers automated side effects or state transitions without HMAC SHA-256 signature verification, replay protection, and authority approval.
+61. **Synced Record != Ground Truth**: Data synchronized via Nango sync jobs represents external mirrored state, not immutable internal business truth; synced records are marked with provenance metadata and require validation before driving business decisions.
+62. **Zero Plaintext Credential Exposure**: Agents, workflows, and prompts handle strictly opaque credential handles (`cred_nango_<provider>_<hex>`); plaintext refresh tokens and client secrets remain permanently sealed in the CredentialVault.
+63. **Non-Idempotent Mutation Reconciliation**: Any mutation against an external SaaS system resulting in an ambiguous outcome (`UNKNOWN_OUTCOME`) is strictly forbidden from automatic retry and must undergo deterministic state reconciliation.
+64. **Elastic License 2.0 Architectural Boundary**: Nango is consumed strictly as an internal backend connectivity adapter; ZONATA never re-exports or resells Nango as a hosted managed integration service, maintaining strict ELv2 compliance.
+65. **Authoritative Integration KillSwitch**: Multi-scope killswitches (Global, Tenant, Company, Mission, Agent, Capability, Provider, Connection) unconditionally sever external API communication, reject outbound requests, and drop inbound webhooks immediately.
 
 

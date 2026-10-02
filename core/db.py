@@ -2195,6 +2195,232 @@ CREATE TABLE IF NOT EXISTS temporal_schedules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_temp_sched_tenant ON temporal_schedules(tenant_id);
+
+-- ============================================================================
+-- 10. Nango External System Connectivity & Integration Layer (Project 10)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS nango_runtimes (
+    runtime_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ONLINE', -- ONLINE, OFFLINE, DEGRADED, MAINTENANCE
+    version TEXT NOT NULL DEFAULT '0.64.0',
+    adapter_version TEXT NOT NULL DEFAULT '1.0.0',
+    nango_host TEXT DEFAULT 'http://localhost:3003',
+    secret_key_ref TEXT,
+    config JSON,
+    last_heartbeat REAL NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_rt_tenant ON nango_runtimes(tenant_id);
+
+CREATE TABLE IF NOT EXISTS nango_providers (
+    provider_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL, -- CRM, ERP, HRIS, ACCOUNTING, MARKETING, COMMUNICATION, PAYMENTS, STORAGE, TICKETING, DEVOPS, ECOMMERCE
+    auth_mode TEXT NOT NULL DEFAULT 'OAUTH2', -- OAUTH2, OAUTH1, API_KEY, BASIC
+    docs_url TEXT,
+    supported_scopes JSON,
+    default_config JSON,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_prov_cat ON nango_providers(category);
+
+CREATE TABLE IF NOT EXISTS nango_connections (
+    connection_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    connection_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- DISCOVER, INSTALL, AUTHORIZE, CONNECT, VALIDATE, ACTIVE, DEGRADED, REAUTH_REQUIRED, DISCONNECTED, REVOKED
+    auth_type TEXT NOT NULL DEFAULT 'OAUTH2',
+    credential_ref TEXT NOT NULL,
+    granted_scopes JSON,
+    metadata JSON,
+    health_status TEXT NOT NULL DEFAULT 'HEALTHY', -- HEALTHY, DEGRADED, AUTH_REQUIRED, RATE_LIMITED, PROVIDER_ERROR, CONFIGURATION_ERROR, DISCONNECTED, REVOKED, UNKNOWN
+    last_health_check REAL NOT NULL,
+    last_sync_at REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(provider_id) REFERENCES nango_providers(provider_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_conn_tenant ON nango_connections(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_nango_conn_comp ON nango_connections(company_id);
+CREATE INDEX IF NOT EXISTS idx_nango_conn_prov ON nango_connections(provider_id);
+CREATE INDEX IF NOT EXISTS idx_nango_conn_status ON nango_connections(status);
+
+CREATE TABLE IF NOT EXISTS nango_capabilities (
+    capability_id TEXT PRIMARY KEY,
+    provider_id TEXT NOT NULL,
+    action_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    risk_class TEXT NOT NULL DEFAULT 'LOW_RISK', -- READ_ONLY, LOW_RISK, DATA_ENTRY, BUSINESS_MUTATION, FINANCIAL, PRIVILEGED, DESTRUCTIVE, IRREVERSIBLE
+    required_scope TEXT,
+    required_role TEXT NOT NULL DEFAULT 'OPERATOR',
+    idempotency_strategy TEXT NOT NULL DEFAULT 'IDEMPOTENCY_KEY', -- IDEMPOTENCY_KEY, EXTERNAL_ID, DEDUPLICATION, NONE
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(provider_id) REFERENCES nango_providers(provider_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_cap_prov ON nango_capabilities(provider_id);
+CREATE INDEX IF NOT EXISTS idx_nango_cap_risk ON nango_capabilities(risk_class);
+
+CREATE TABLE IF NOT EXISTS nango_executions (
+    execution_id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    capability_id TEXT,
+    action_name TEXT NOT NULL,
+    risk_class TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'SCHEDULED', -- SCHEDULED, IN_PROGRESS, SUCCESS, FAILED, TIMED_OUT, UNKNOWN_OUTCOME, AWAITING_APPROVAL, CANCELLED
+    idempotency_key TEXT,
+    input_payload JSON,
+    response_payload JSON,
+    error_message TEXT,
+    latency_ms REAL NOT NULL DEFAULT 0.0,
+    evidence_ledger_id TEXT,
+    outcome_status TEXT DEFAULT 'PENDING',
+    created_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(connection_id) REFERENCES nango_connections(connection_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_exec_conn ON nango_executions(connection_id);
+CREATE INDEX IF NOT EXISTS idx_nango_exec_status ON nango_executions(status);
+CREATE INDEX IF NOT EXISTS idx_nango_exec_idemp ON nango_executions(idempotency_key);
+
+CREATE TABLE IF NOT EXISTS nango_webhooks (
+    webhook_id TEXT PRIMARY KEY,
+    connection_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    signature TEXT,
+    payload_digest TEXT NOT NULL,
+    payload_data JSON,
+    status TEXT NOT NULL DEFAULT 'RECEIVED', -- RECEIVED, VERIFIED, REJECTED, PROCESSED, DEAD_LETTER
+    error_reason TEXT,
+    mission_id TEXT,
+    temporal_workflow_id TEXT,
+    created_at REAL NOT NULL,
+    processed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_wh_tenant ON nango_webhooks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_nango_wh_status ON nango_webhooks(status);
+
+CREATE TABLE IF NOT EXISTS nango_sync_jobs (
+    sync_job_id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    sync_type TEXT NOT NULL DEFAULT 'INCREMENTAL', -- INITIAL, INCREMENTAL, WEBHOOK_TRIGGERED, SCHEDULED, MANUAL
+    status TEXT NOT NULL DEFAULT 'IDLE', -- IDLE, RUNNING, COMPLETED, FAILED, PAUSED, RECONCILING
+    cursor TEXT,
+    frequency_seconds INTEGER NOT NULL DEFAULT 3600,
+    last_run_at REAL,
+    next_run_at REAL,
+    records_processed INTEGER NOT NULL DEFAULT 0,
+    records_created INTEGER NOT NULL DEFAULT 0,
+    records_updated INTEGER NOT NULL DEFAULT 0,
+    records_rejected INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(connection_id) REFERENCES nango_connections(connection_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_sync_conn ON nango_sync_jobs(connection_id);
+CREATE INDEX IF NOT EXISTS idx_nango_sync_status ON nango_sync_jobs(status);
+
+CREATE TABLE IF NOT EXISTS nango_sync_records (
+    record_id TEXT PRIMARY KEY,
+    sync_job_id TEXT NOT NULL,
+    connection_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    object_type TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    data_payload JSON,
+    provenance_meta JSON, -- SOURCE_SYSTEM, SOURCE_PROVIDER, SOURCE_OBJECT, SOURCE_ID, SOURCE_CONNECTION, SYNC_TIME, SYNC_RUN, TENANT, COMPANY
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(sync_job_id) REFERENCES nango_sync_jobs(sync_job_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_rec_sync ON nango_sync_records(sync_job_id);
+CREATE INDEX IF NOT EXISTS idx_nango_rec_ext ON nango_sync_records(external_id);
+
+CREATE TABLE IF NOT EXISTS nango_rate_limits (
+    rate_limit_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    window_seconds INTEGER NOT NULL DEFAULT 60,
+    max_requests INTEGER NOT NULL DEFAULT 120,
+    current_requests INTEGER NOT NULL DEFAULT 0,
+    remaining_quota INTEGER NOT NULL DEFAULT 120,
+    reset_at REAL NOT NULL,
+    backoff_seconds REAL NOT NULL DEFAULT 0.0,
+    last_throttled_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_rl_tenant ON nango_rate_limits(tenant_id);
+
+CREATE TABLE IF NOT EXISTS nango_security_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    connection_id TEXT,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_sec_tenant ON nango_security_events(tenant_id);
+
+CREATE TABLE IF NOT EXISTS nango_reconciliations (
+    reconciliation_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    connection_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    external_id TEXT,
+    idempotency_key TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RECONCILED, ESCALATED, FAILED
+    pre_state JSON,
+    observed_state JSON,
+    post_state JSON,
+    resolution TEXT,
+    created_at REAL NOT NULL,
+    resolved_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_nango_rec_conn ON nango_reconciliations(connection_id);
+CREATE INDEX IF NOT EXISTS idx_nango_rec_status ON nango_reconciliations(status);
 """
 
 class Database:

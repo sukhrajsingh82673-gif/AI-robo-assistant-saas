@@ -238,6 +238,7 @@ function updateBreadcrumbs() {
     'openhands-execution': 'Agent Execution (OpenHands)',
     'browser-execution': 'Browser Use (Governed Web Layer)',
     'temporal-durable': 'Durable Execution (Temporal Engine)',
+    'nango-integrations': 'External Integrations (Nango Engine)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -401,6 +402,9 @@ function handleRoute(path) {
   } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
     const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
     mgr.render('view-temporal-durable');
+  } else if (navKey === 'nango-integrations' && (window.nangoWorkspace || window.NangoWorkspaceManager)) {
+    const mgr = window.nangoWorkspace || new window.NangoWorkspaceManager();
+    mgr.render('view-nango-integrations');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {

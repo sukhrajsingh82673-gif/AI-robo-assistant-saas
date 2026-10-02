@@ -242,6 +242,24 @@ from zonata.temporal_adapter import TemporalCanonicalScenarios, TemporalCeoBridg
 temporal_gateway = TemporalDurableExecutionGateway("tnt_primary", "comp_primary")
 temporal_scenarios = TemporalCanonicalScenarios("tnt_primary", "comp_primary")
 
+# Nango (Governed External System Connectivity & Integration Layer - Project 10)
+from core.nango_integration_runtime import (
+    ExternalIntegrationGateway,
+    IntegrationKillSwitch,
+    IntegrationSecurityBoundary,
+    ActionRiskClass,
+    ConnectionStatus,
+    HealthStatus,
+    ExecutionStatus,
+    SyncType,
+    WebhookStatus,
+    SecurityException as NangoSecurityException
+)
+from zonata.nango_adapter import NangoCanonicalScenarios, NangoCeoBridge
+
+nango_gateway = ExternalIntegrationGateway("tnt_primary", "comp_primary")
+nango_scenarios = NangoCanonicalScenarios("tnt_primary", "comp_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -1707,6 +1725,110 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "KILLSWITCH_ENGAGED" if killed else "OPERATIONAL"
             })
             return
+
+        # --- NANGO EXTERNAL INTEGRATION API (Project 10) ---
+        elif path == "/api/nango/providers":
+            cat = query_params.get("category", [None])[0]
+            providers = nango_gateway.list_providers(category=cat)
+            self._send_json({"providers": providers, "count": len(providers)})
+            return
+
+        elif path == "/api/nango/connections":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            conns = gw.list_connections()
+            self._send_json({"connections": conns, "count": len(conns)})
+            return
+
+        elif path.startswith("/api/nango/connections/") and len(path.split("/")) == 5:
+            conn_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            conn_data = gw.get_connection(conn_id)
+            if conn_data:
+                self._send_json({"connection": conn_data})
+            else:
+                self._send_json({"error": f"Connection '{conn_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/nango/capabilities":
+            prov = query_params.get("provider", [None])[0]
+            with db.get_connection() as c:
+                if prov:
+                    rows = c.execute("SELECT * FROM nango_capabilities WHERE provider_id = ? AND is_active = 1", (prov,)).fetchall()
+                else:
+                    rows = c.execute("SELECT * FROM nango_capabilities WHERE is_active = 1").fetchall()
+                self._send_json({"capabilities": [dict(r) for r in rows]})
+            return
+
+        elif path == "/api/nango/executions":
+            limit = int(query_params.get("limit", [50])[0])
+            with db.get_connection() as c:
+                rows = c.execute(
+                    "SELECT * FROM nango_executions WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (tenant_id, limit)
+                ).fetchall()
+                execs = []
+                for r in rows:
+                    item = dict(r)
+                    item["input_payload"] = json.loads(item["input_payload"]) if item.get("input_payload") else {}
+                    item["response_payload"] = json.loads(item["response_payload"]) if item.get("response_payload") else {}
+                    execs.append(item)
+                self._send_json({"executions": execs, "count": len(execs)})
+            return
+
+        elif path == "/api/nango/webhooks":
+            limit = int(query_params.get("limit", [50])[0])
+            with db.get_connection() as c:
+                rows = c.execute(
+                    "SELECT * FROM nango_webhooks WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (tenant_id, limit)
+                ).fetchall()
+                whs = []
+                for r in rows:
+                    item = dict(r)
+                    item["payload_data"] = json.loads(item["payload_data"]) if item.get("payload_data") else {}
+                    whs.append(item)
+                self._send_json({"webhooks": whs, "count": len(whs)})
+            return
+
+        elif path == "/api/nango/sync-jobs":
+            with db.get_connection() as c:
+                rows = c.execute("SELECT * FROM nango_sync_jobs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50", (tenant_id,)).fetchall()
+                self._send_json({"sync_jobs": [dict(r) for r in rows]})
+            return
+
+        elif path == "/api/nango/sync-records":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            conn_id = query_params.get("connection_id", [None])[0]
+            model = query_params.get("model", [None])[0]
+            limit = int(query_params.get("limit", [50])[0])
+            records = gw.get_sync_records(conn_id, model, limit)
+            self._send_json({"sync_records": records, "count": len(records)})
+            return
+
+        elif path == "/api/nango/metrics":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            metrics = gw.get_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/nango/killswitch":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            prov_id = query_params.get("provider_id", ["salesforce"])[0]
+            halted, reason = IntegrationKillSwitch.is_halted(tenant_id=tenant_id, company_id=company_id, provider_id=prov_id)
+            self._send_json({
+                "killswitch_active": halted,
+                "reason": reason,
+                "tenant_id": tenant_id,
+                "company_id": company_id,
+                "provider_id": prov_id,
+                "status": "HALTED" if halted else "OPERATIONAL"
+            })
+            return
+
 
 
         # Fallback to static files in WEB_DIR or SPA index.html
@@ -4145,6 +4267,139 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": f"Unknown Temporal scenario '{scenario}'"}, status=400)
             return
 
+        # --- NANGO EXTERNAL INTEGRATION API (Project 10 POST) ---
+        elif path == "/api/nango/connections":
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            prov_id = req_data.get("provider_id", "salesforce")
+            conn_key = req_data.get("connection_key")
+            auth_type = req_data.get("auth_type", "OAUTH2")
+            scopes = req_data.get("scopes", ["default.read"])
+            meta = req_data.get("metadata", {})
+            conn_res = gw.create_connection(prov_id, conn_key, auth_type, scopes, meta)
+            self._send_json({"success": True, "connection": conn_res})
+            return
+
+        elif path.startswith("/api/nango/connections/") and path.endswith("/test"):
+            conn_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            ok, msg = gw.test_connection(conn_id)
+            self._send_json({"success": ok, "message": msg, "connection_id": conn_id})
+            return
+
+        elif path.startswith("/api/nango/connections/") and path.endswith("/sync"):
+            conn_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            model = req_data.get("model", "contacts")
+            limit = int(req_data.get("limit", 50))
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            sync_res = gw.trigger_sync(conn_id, model, limit=limit)
+            self._send_json({"success": True, "sync": sync_res})
+            return
+
+        elif path == "/api/nango/execute":
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            conn_id = req_data.get("connection_id")
+            action = req_data.get("action", "READ_CONTACT")
+            params = req_data.get("parameters", {})
+            idemp_key = req_data.get("idempotency_key")
+            mission_id = req_data.get("mission_id")
+            agent_id = req_data.get("agent_id")
+            appr_override = req_data.get("approved_by_owner", False)
+            if not conn_id:
+                self._send_json({"error": "Missing connection_id"}, status=400)
+                return
+            try:
+                exec_res = gw.execute_action(
+                    connection_id=conn_id,
+                    action_name=action,
+                    params=params,
+                    idempotency_key=idemp_key,
+                    mission_id=mission_id,
+                    agent_id=agent_id,
+                    require_approval_override=appr_override
+                )
+                self._send_json({"success": True, "execution": exec_res})
+            except NangoSecurityException as se:
+                self._send_json({"error": str(se), "security_blocked": True}, status=403)
+            return
+
+        elif path.startswith("/api/nango/webhooks/"):
+            prov_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            raw_body = json.dumps(req_data)
+            headers_dict = {k: v for k, v in self.headers.items()}
+            res = gw.receive_webhook(prov_id, headers_dict, raw_body)
+            self._send_json({"success": True, "webhook": res})
+            return
+
+        elif path == "/api/nango/reconcile":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            rec_id = req_data.get("reconciliation_id")
+            obs_state = req_data.get("observed_state", {})
+            res_type = req_data.get("resolution", "RECONCILED_SUCCESS")
+            if not rec_id:
+                self._send_json({"error": "Missing reconciliation_id"}, status=400)
+                return
+            rec_res = gw.reconcile_unknown_outcome(rec_id, obs_state, res_type)
+            self._send_json({"success": True, "reconciliation": rec_res})
+            return
+
+        elif path == "/api/nango/killswitch":
+            scope = req_data.get("scope", "PROVIDER").upper()
+            target_id = req_data.get("target_id", "salesforce")
+            action = req_data.get("action", "halt").lower()
+            reason = req_data.get("reason", "Operator invoked killswitch")
+            if action == "halt":
+                IntegrationKillSwitch.halt(scope, target_id, reason, halted_by="API_ADMIN")
+            else:
+                IntegrationKillSwitch.resume(scope, target_id)
+            self._send_json({
+                "killswitch_updated": True,
+                "scope": scope,
+                "target_id": target_id,
+                "action": action
+            })
+            return
+
+        elif path == "/api/nango/demo/scenarios":
+            scenario = str(req_data.get("scenario", "SECTION_95")).upper()
+            sc_map = {
+                "TEST_01": nango_scenarios.test_01_standard_connection_lifecycle_and_read,
+                "1": nango_scenarios.test_01_standard_connection_lifecycle_and_read,
+                "TEST_02": nango_scenarios.test_02_business_mutation_with_idempotency_key,
+                "2": nango_scenarios.test_02_business_mutation_with_idempotency_key,
+                "TEST_03": nango_scenarios.test_03_human_approval_escalation,
+                "3": nango_scenarios.test_03_human_approval_escalation,
+                "TEST_04": nango_scenarios.test_04_multi_scope_killswitch_enforcement,
+                "4": nango_scenarios.test_04_multi_scope_killswitch_enforcement,
+                "TEST_05": nango_scenarios.test_05_context_firewall_and_secret_scrubbing,
+                "5": nango_scenarios.test_05_context_firewall_and_secret_scrubbing,
+                "TEST_06": nango_scenarios.test_06_inbound_webhook_verification,
+                "6": nango_scenarios.test_06_inbound_webhook_verification,
+                "TEST_07": nango_scenarios.test_07_governed_data_synchronization,
+                "7": nango_scenarios.test_07_governed_data_synchronization,
+                "TEST_08": nango_scenarios.test_08_unknown_outcome_and_reconciliation,
+                "8": nango_scenarios.test_08_unknown_outcome_and_reconciliation,
+                "TEST_09": nango_scenarios.test_09_cross_tenant_isolation,
+                "9": nango_scenarios.test_09_cross_tenant_isolation,
+                "TEST_10": nango_scenarios.test_10_section_95_grand_acceptance_test,
+                "10": nango_scenarios.test_10_section_95_grand_acceptance_test,
+                "SECTION_95": nango_scenarios.test_10_section_95_grand_acceptance_test,
+                "95": nango_scenarios.test_10_section_95_grand_acceptance_test
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown Nango scenario '{scenario}'"}, status=400)
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
 
     def do_DELETE(self):
@@ -4160,6 +4415,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             sess_id = path.split("/")[4]
             ok = browser_gateway.close_session(sess_id)
             self._send_json({"success": ok, "session_id": sess_id})
+            return
+        elif path.startswith("/api/nango/connections/") and len(path.split("/")) == 5:
+            conn_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            gw = ExternalIntegrationGateway(tenant_id, company_id)
+            ok = gw.disconnect_connection(conn_id)
+            self._send_json({"success": ok, "connection_id": conn_id})
             return
         self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
 

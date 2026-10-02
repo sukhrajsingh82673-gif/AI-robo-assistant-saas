@@ -962,6 +962,88 @@ class OverviewDataService:
             }
 
             # -------------------------------------------------------------
+            # 13e. External Integration & Connectivity Telemetry (Nango - Project 10)
+            # -------------------------------------------------------------
+            nango_total_conn = cur.execute(
+                "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_active_conn = cur.execute(
+                "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND status = 'ACTIVE'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_healthy_conn = cur.execute(
+                "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'HEALTHY'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_degraded_conn = cur.execute(
+                "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'DEGRADED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_reauth_conn = cur.execute(
+                "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'AUTH_REQUIRED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_total_execs = cur.execute(
+                "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_success_execs = cur.execute(
+                "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'SUCCESS'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_pending_appr = cur.execute(
+                "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'AWAITING_APPROVAL'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_unknown_outcomes = cur.execute(
+                "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'UNKNOWN_OUTCOME'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_reconciled = cur.execute(
+                "SELECT COUNT(*) FROM nango_reconciliations WHERE tenant_id = ? AND status = 'RECONCILED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_sync_records = cur.execute(
+                "SELECT COUNT(*) FROM nango_sync_records WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_webhooks = cur.execute(
+                "SELECT COUNT(*) FROM nango_webhooks WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_sec_events = cur.execute(
+                "SELECT COUNT(*) FROM nango_security_events WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            nango_avg_lat = cur.execute(
+                "SELECT AVG(latency_ms) FROM nango_executions WHERE tenant_id = ? AND status = 'SUCCESS'",
+                (tenant_id,)
+            ).fetchone()[0] or 0.0
+
+            has_nango_activity = bool(nango_total_conn > 0 or nango_total_execs > 0 or nango_sync_records > 0)
+            nango_success_rate = round((nango_success_execs / max(1, nango_total_execs)) * 100.0, 1) if nango_total_execs > 0 else 100.0
+
+            nango_data = {
+                "total_connections": nango_total_conn,
+                "active_connections": nango_active_conn,
+                "healthy_connections": nango_healthy_conn,
+                "degraded_connections": nango_degraded_conn,
+                "reauth_required_connections": nango_reauth_conn,
+                "total_executions": nango_total_execs,
+                "success_rate_pct": nango_success_rate,
+                "pending_approvals": nango_pending_appr,
+                "unknown_outcomes": nango_unknown_outcomes,
+                "reconciled_count": nango_reconciled,
+                "total_sync_records": nango_sync_records,
+                "webhook_events": nango_webhooks,
+                "security_events": nango_sec_events,
+                "average_latency_ms": round(nango_avg_lat, 2),
+                "has_activity": has_nango_activity,
+                "status_text": "No external system connections yet" if not has_nango_activity else f"{nango_active_conn} active connections ({nango_healthy_conn} healthy), {nango_total_execs} API operations across {nango_sync_records} synced records"
+            }
+
+            # -------------------------------------------------------------
             # 14. AI-Generated Executive Insights (With Epistemic Provenance)
             # -------------------------------------------------------------
             insights = []
@@ -1146,6 +1228,7 @@ class OverviewDataService:
                 "openhands": openhands_data,
                 "browser": browser_data,
                 "temporal": temporal_data,
+                "nango": nango_data,
                 "data_quality": data_quality,
                 "intelligence": {
                     "has_data": len(insights) > 0,
