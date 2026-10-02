@@ -248,13 +248,43 @@ class ZonataActionGateway:
 
     def _step_18_reconcile_if_needed(self, envelope: ActionEnvelope, verification_status: str, raw_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if verification_status == OutcomeStatus.UNKNOWN_OUTCOME:
+            from core.unknown_outcome_engine import unknown_outcome_engine
+            rec = unknown_outcome_engine.register_unknown_outcome(
+                action_id=envelope.action_id,
+                tenant_id=envelope.tenant_id,
+                company_id=envelope.company_id,
+                employee_id=envelope.agent_id,
+                target_system=envelope.target,
+                mutation_type=envelope.capability_id,
+                parameters=envelope.parameters or {},
+                idempotency_key=envelope.idempotency_key
+            )
             return {
                 "reconciliation_status": "RECONCILIATION_REQUIRED",
+                "record_id": rec.record_id,
                 "reason": "External mutation returned ambiguous state. Blind retry blocked."
             }
         return None
 
     def _step_19_seal_evidence(self, envelope: ActionEnvelope, verification_status: str, raw_result: Dict[str, Any], observation: Dict[str, Any]) -> Dict[str, Any]:
+        # Record causal step in DataLineageGraph
+        try:
+            from core.data_lineage_graph import data_lineage_graph
+            data_lineage_graph.record_step(
+                tenant_id=envelope.tenant_id,
+                company_id=envelope.company_id,
+                source_id=envelope.agent_id,
+                source_type="AI_EMPLOYEE",
+                source_label=f"Employee {envelope.agent_id}",
+                target_id=envelope.action_id,
+                target_type="ACTION",
+                target_label=envelope.capability_id,
+                relationship="EXECUTED_ACTION",
+                metadata={"risk_class": envelope.risk_class, "status": verification_status}
+            )
+        except Exception:
+            pass
+
         return evidence_service.record_event(
             tenant_id=envelope.tenant_id,
             company_id=envelope.company_id,

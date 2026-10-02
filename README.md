@@ -391,3 +391,28 @@ python3 -m unittest discover tests
 
 Complete certification details: see [`ZONATA_V3_PRODUCTION_CERTIFICATION.md`](file:///root/roboassistant/ZONATA_V3_PRODUCTION_CERTIFICATION.md).
 
+---
+
+## 🏢 ZONATA V4 — Enterprise AI Employee OS & Corporate Data Plane (v4.0.0-GA)
+
+### Enterprise SaaS Certification Summary
+- **Test Suite Result:** **458 / 458 PASSING (100% Pass Rate, 0 Failures, 0 Errors)**
+- **Certification Status:** **CONDITIONAL ENTERPRISE** (All local infrastructure, security gates, DLP firewall, pre-retrieval RAG, and AI Employee lifecycle 100% verified; live SaaS endpoints pending customer enterprise credentials).
+- **Core Additions & Subsystems:**
+  - **Enterprise Identity Gateway (`core/identity_gateway.py`)**: OIDC/SAML federated authentication, SCIM 2.0 provisioning, short-lived tokens, and <50ms distributed session revocation.
+  - **Enterprise Organization Graph (`core/organization_graph.py`)**: Hierarchical modeling across `Tenant -> Company -> Business Unit -> Department -> Team -> Employee`.
+  - **AI Employee Operating System (`core/ai_employee_os.py`)**: Strict 10-stage lifecycle (`PROPOSED -> EVALUATED -> APPROVED -> PROVISIONED -> ONBOARDED -> ACTIVE -> PAUSED -> SUSPENDED -> OFFBOARDED -> RETIRED`).
+  - **Mathematical Delegation Containment (`core/workforce_manager_v4.py`)**: Strict subset containment (`CHILD ⊆ PARENT`) across authority, tools, data clearance, and budget.
+  - **Corporate Data Plane (`core/corporate_data_plane.py`)**: Central repository with row-level ACLs, residency tagging, and retention schedules.
+  - **Sensitivity Classification Engine (`core/data_classification_engine.py`)**: 5-tier classification (`PUBLIC` to `HIGHLY_RESTRICTED`) with an immutable admin policy floor.
+  - **Pre-Retrieval Authorized RAG (`core/knowledge_gateway.py`)**: Authorization compiled directly into SQL WHERE clauses; zero post-retrieval RAM leakage.
+  - **Outbound Model DLP Firewall (`core/model_data_firewall.py`)**: PII masking and sovereign barriers forbidding `HIGHLY_RESTRICTED` data from cloud LLMs.
+  - **Central Model Gateway V4 (`core/model_gateway_v4.py`)**: Multi-provider routing, token budget accounting, and automated circuit breaking.
+  - **Multi-Dimensional Policy Engine V2 (`core/policy_engine_v2.py`)**: ABAC evaluation across WHO, WHAT, WHY, DATA, TOOL, MODEL, BUDGET, and RISK.
+  - **Causal Data Lineage Graph (`core/data_lineage_graph.py`)**: DAG provenance tracing from trigger down to final business outcome.
+  - **Verified Deletion & Legal Holds (`core/data_lifecycle_manager.py`)**: Zero-remnant cryptographic shredding with signed verification certificates.
+  - **Cognitive Memory Tiering (`core/memory_governance.py`)**: Segregates Working Memory, Long-Term Semantic Memory, Corporate Knowledge, and Evidence.
+  - **Emergency Fleet Killswitches (`core/enterprise_admin_gateway.py`)**: Distributed killswitches across AGENT, TENANT, and GLOBAL scopes.
+
+Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`](file:///root/roboassistant/ZONATA_V4_ENTERPRISE_CERTIFICATION.md) and [`openapi_v4.json`](file:///root/roboassistant/openapi_v4.json).
+

@@ -1,0 +1,96 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ZONATA Universal AI Company Operating System - V4 Enterprise API",
+    "version": "4.0.0",
+    "description": "Enterprise AI Employee OS, Corporate Data Plane, ABAC Governance, Pre-Retrieval RAG, & Causal Lineage API."
+  },
+  "paths": {
+    "/api/v4/identity/token": {
+      "post": {
+        "summary": "Issue or elevate short-lived enterprise token",
+        "responses": {
+          "200": { "description": "Token issued" },
+          "403": { "description": "Identity inactive or offboarded" }
+        }
+      }
+    },
+    "/scim/v2/Users": {
+      "post": { "summary": "SCIM 2.0 User Provisioning" },
+      "get": { "summary": "SCIM 2.0 List Users" }
+    },
+    "/scim/v2/Users/{id}": {
+      "patch": { "summary": "SCIM 2.0 Update User Attributes" },
+      "delete": { "summary": "SCIM 2.0 Offboard and Revoke Identity" }
+    },
+    "/api/v4/org/hierarchy": {
+      "get": { "summary": "Fetch organization hierarchy tree" }
+    },
+    "/api/v4/employees/propose": {
+      "post": {
+        "summary": "Propose new AI Employee (Stage 1)",
+        "responses": { "201": { "description": "AI Employee proposed" } }
+      }
+    },
+    "/api/v4/employees/{id}/advance": {
+      "post": {
+        "summary": "Advance AI Employee lifecycle state",
+        "responses": { "200": { "description": "State advanced" } }
+      }
+    },
+    "/api/v4/employees/{id}/delegate": {
+      "post": {
+        "summary": "Delegate mission to child AI worker with containment checks",
+        "responses": { "201": { "description": "Child worker created" } }
+      }
+    },
+    "/api/v4/data/ingest": {
+      "post": {
+        "summary": "Ingest and auto-classify corporate data object",
+        "responses": { "201": { "description": "Object ingested and indexed" } }
+      }
+    },
+    "/api/v4/data/{id}/legal-hold": {
+      "post": {
+        "summary": "Apply or release legal hold on corporate data object",
+        "responses": { "200": { "description": "Legal hold updated" } }
+      }
+    },
+    "/api/v4/data/{id}/purge": {
+      "delete": {
+        "summary": "Cryptographically purge data object and verify zero remnants",
+        "responses": { "200": { "description": "Data permanently purged with evidence certificate" } }
+      }
+    },
+    "/api/v4/knowledge/retrieve": {
+      "post": {
+        "summary": "Pre-retrieval permission-aware RAG search",
+        "responses": { "200": { "description": "Authorized knowledge chunks with citations" } }
+      }
+    },
+    "/api/v4/model/invoke": {
+      "post": {
+        "summary": "Invoke central AI model gateway with pre-flight DLP scanning",
+        "responses": { "200": { "description": "Model response with token cost accounting" } }
+      }
+    },
+    "/api/v4/policy/evaluate": {
+      "post": {
+        "summary": "Evaluate request against ABAC policy engine across 8 dimensions",
+        "responses": { "200": { "description": "Policy decision (ALLOW, REQUIRE_APPROVAL, DENY, ESCALATE)" } }
+      }
+    },
+    "/api/v4/lineage/trail/{target_id}": {
+      "get": {
+        "summary": "Retrieve causal provenance chain back to origin",
+        "responses": { "200": { "description": "Lineage DAG trail" } }
+      }
+    },
+    "/api/v4/admin/killswitch": {
+      "post": {
+        "summary": "Trip distributed emergency killswitch across AGENT, TENANT, or GLOBAL scope",
+        "responses": { "200": { "description": "Killswitch engaged" } }
+      }
+    }
+  }
+}
