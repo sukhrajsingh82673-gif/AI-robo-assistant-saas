@@ -1,0 +1,136 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ZONATA Universal AI Company Operating System - V7 Workforce API",
+    "version": "7.0.0",
+    "description": "Universal & Project-Specific Employee Templates, SOP Policy Compilation, Operational KPI/KRA Engine, 24-Stage Employee Factory, CEO Workforce Control, and Colleague Collaboration API."
+  },
+  "paths": {
+    "/api/v7/employee-templates": {
+      "post": {
+        "summary": "Create new Universal or Project-Specific Employee Template",
+        "responses": {
+          "201": { "description": "Template created with immutable V1.0.0 specification" }
+        }
+      },
+      "get": {
+        "summary": "List Employee Templates filtered by tenant, company, or type",
+        "responses": {
+          "200": { "description": "List of templates" }
+        }
+      }
+    },
+    "/api/v7/employee-templates/{id}": {
+      "get": {
+        "summary": "Retrieve template specification (latest or pinned version)",
+        "responses": {
+          "200": { "description": "Template specification" },
+          "404": { "description": "Template not found" }
+        }
+      }
+    },
+    "/api/v7/employee-templates/{id}/versions": {
+      "post": {
+        "summary": "Publish immutable new version of template without mutating previous versions",
+        "responses": {
+          "201": { "description": "New template version published" }
+        }
+      }
+    },
+    "/api/v7/employee-templates/{id}/approve": {
+      "post": {
+        "summary": "Executive or Human-in-the-Loop approval for template version",
+        "responses": {
+          "200": { "description": "Template version approved" }
+        }
+      }
+    },
+    "/api/v7/sop/compile": {
+      "post": {
+        "summary": "Ingest raw SOP text and compile into structured responsibilities, constraints, and provenance rules",
+        "responses": {
+          "200": { "description": "Structured SOP compilation result with ambiguity flags" }
+        }
+      }
+    },
+    "/api/v7/employees/from-template": {
+      "post": {
+        "summary": "Instantiate and provision an active AI Employee via the 24-stage Employee Factory",
+        "responses": {
+          "201": { "description": "AI Employee provisioned, activated, and onboarded" },
+          "403": { "description": "FactoryStageFailed (Security, budget, or policy violation)" }
+        }
+      }
+    },
+    "/api/v7/employees/{id}/kpi": {
+      "get": {
+        "summary": "List registered KPIs and historical measurements for an employee",
+        "responses": {
+          "200": { "description": "KPI definitions and measurement history" }
+        }
+      },
+      "post": {
+        "summary": "Record verified physical outcome measurement against an employee's KPI",
+        "responses": {
+          "201": { "description": "Measurement recorded with variance and status" }
+        }
+      }
+    },
+    "/api/v7/employees/{id}/performance": {
+      "get": {
+        "summary": "Retrieve continuous aggregate performance review (PERFORMING, DEGRADED, REVIEW_REQUIRED, UNDERPERFORMING)",
+        "responses": {
+          "200": { "description": "Performance report and health score" }
+        }
+      }
+    },
+    "/api/v7/employees/{id}/succession": {
+      "post": {
+        "summary": "Execute controlled succession ceremony (retires predecessor, activates successor, transfers approved memory)",
+        "responses": {
+          "200": { "description": "Succession executed" }
+        }
+      }
+    },
+    "/api/v7/ceo/workforce/discover": {
+      "post": {
+        "summary": "Discover available active employees and pre-built specialists matching capabilities",
+        "responses": {
+          "200": { "description": "Matching workforce inventory and capacity" }
+        }
+      }
+    },
+    "/api/v7/ceo/workforce/plan": {
+      "post": {
+        "summary": "Plan and assign mission preventing workforce proliferation",
+        "responses": {
+          "200": { "description": "CEOWorkforceDecisionRecord created" }
+        }
+      }
+    },
+    "/api/v7/ceo/command": {
+      "post": {
+        "summary": "Execute natural language CEO command translated into governed workforce actions",
+        "responses": {
+          "200": { "description": "Action executed" }
+        }
+      }
+    },
+    "/api/v7/collaboration/teams": {
+      "post": {
+        "summary": "Form mission team uniting Template Employees and Pre-built Specialists as colleagues",
+        "responses": {
+          "201": { "description": "Mission team formed" }
+        }
+      }
+    },
+    "/api/v7/collaboration/conflict/resolve": {
+      "post": {
+        "summary": "Resolve worker disagreement using policy hierarchy and evidence instead of model confidence",
+        "responses": {
+          "200": { "description": "Conflict resolution ruling sealed" }
+        }
+      }
+    }
+  }
+}

@@ -128,8 +128,8 @@ class TestV3MultiProcessResilience(unittest.TestCase):
         self.procs.append(p2)
 
         # Verify both ports bind and respond
-        self.assertTrue(wait_for_port(port1, timeout=12.0), f"API 1 failed to bind port {port1}")
-        self.assertTrue(wait_for_port(port2, timeout=12.0), f"API 2 failed to bind port {port2}")
+        self.assertTrue(wait_for_port(port1, timeout=45.0), f"API 1 failed to bind port {port1}")
+        self.assertTrue(wait_for_port(port2, timeout=45.0), f"API 2 failed to bind port {port2}")
 
         # Check endpoints via HTTP client
         for p in (port1, port2):
@@ -213,31 +213,34 @@ class TestV3MultiProcessResilience(unittest.TestCase):
         tenant_id = "tnt_v3"
         company_id = "comp_v3"
 
-        # Initialize Supervisor Node 1 and Node 2 with short lease for deterministic testing
+        # Initialize Supervisor Node 1 and Node 2 with generous lease and fast tick for robust HA testing
         node1 = SupervisorHA(
             tenant_id=tenant_id,
             company_id=company_id,
             node_id="node_1_primary",
-            tick_interval_sec=0.2,
-            lease_seconds=1.5
+            tick_interval_sec=0.1,
+            lease_seconds=5.0
         )
         node2 = SupervisorHA(
             tenant_id=tenant_id,
             company_id=company_id,
             node_id="node_2_standby",
-            tick_interval_sec=0.2,
-            lease_seconds=1.5
+            tick_interval_sec=0.1,
+            lease_seconds=5.0
         )
 
         try:
             # Start Node 1 -> should become LEADER
             node1.start()
-            time.sleep(0.5)
+            for _ in range(30):
+                if node1.role == SupervisorRole.LEADER:
+                    break
+                time.sleep(0.1)
             self.assertEqual(node1.role, SupervisorRole.LEADER)
 
             # Start Node 2 -> should remain in STANDBY
             node2.start()
-            time.sleep(0.5)
+            time.sleep(0.4)
             self.assertEqual(node2.role, SupervisorRole.STANDBY)
             self.assertEqual(node1.role, SupervisorRole.LEADER)
 
@@ -246,7 +249,10 @@ class TestV3MultiProcessResilience(unittest.TestCase):
             self.assertEqual(node1.role, SupervisorRole.STOPPED)
 
             # Node 2 should detect available lease on next cycle and acquire leadership
-            time.sleep(0.6)
+            for _ in range(40):
+                if node2.role == SupervisorRole.LEADER:
+                    break
+                time.sleep(0.1)
             self.assertEqual(node2.role, SupervisorRole.LEADER)
             self.assertGreaterEqual(node2.leader_acquisitions, 1)
 

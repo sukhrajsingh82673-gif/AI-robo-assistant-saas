@@ -302,5 +302,41 @@ class AIEmployeeRegistry:
                 metadata=json.loads(row["metadata"]) if row["metadata"] else {}
             )
 
+    def list_employees(self, tenant_id: str, company_id: Optional[str] = None) -> List[AIEmployee]:
+        with engine.connection(workload=WorkloadType.READ) as conn:
+            query = "SELECT * FROM ai_employees WHERE tenant_id = ?"
+            params = [tenant_id]
+            if company_id:
+                query += " AND company_id = ?"
+                params.append(company_id)
+            rows = conn.execute(query, params).fetchall()
+            return [
+                AIEmployee(
+                    employee_id=row["employee_id"],
+                    tenant_id=row["tenant_id"],
+                    company_id=row["company_id"],
+                    name=row["name"],
+                    role_tier=row["role_tier"],
+                    template_id=row["template_id"],
+                    version=row["version"],
+                    department_id=row["department_id"],
+                    team_id=row["team_id"],
+                    supervisor_id=row["supervisor_id"],
+                    capabilities=json.loads(row["capabilities"]),
+                    allowed_tools=json.loads(row["allowed_tools"]),
+                    allowed_data_domains=json.loads(row["allowed_data_domains"]),
+                    allowed_systems=json.loads(row["allowed_systems"]),
+                    authority=AuthorityScope.from_dict(json.loads(row["authority_scope"])),
+                    allocated_budget_usd=row["allocated_budget_usd"],
+                    spent_budget_usd=row["spent_budget_usd"],
+                    lifecycle_state=row["lifecycle_state"],
+                    health_status=row["health_status"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    metadata=json.loads(row["metadata"]) if row["metadata"] else {}
+                )
+                for row in rows
+            ]
+
 # Global singleton
 ai_employee_registry = AIEmployeeRegistry()

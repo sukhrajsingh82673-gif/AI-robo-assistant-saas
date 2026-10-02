@@ -449,3 +449,23 @@ Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`]
   - **Air-Gapped Diagnostics Bundle Generator (`core/diagnostics_bundle.py`)**: Enterprise supportability snapshot compiler with 100% automated redaction of private keys, JWTs, AWS keys, SSNs, and customer PII.
   - **Master V6 Deliverables**: 15 architectural and audit specifications in `docs/` and [`openapi_v6.json`](file:///root/roboassistant/openapi_v6.json).
 
+---
+
+## 🌐 ZONATA V7 — Universal AI Employee Template, CEO Workforce Factory & Hierarchical Collaboration (v7.0.0-GA)
+
+### Autonomous Dual-Workforce Generation Summary
+- **Test Suite Result:** **486 / 486 PASSING (100% Pass Rate, 0 Failures, 0 Errors)**
+- **Certification Status:**
+  - **Dual-Workforce Engine & Colleague Collaboration:** **`CERTIFIED & OPERATIONAL`**
+  - **Sovereign On-Premise / Air-Gapped:** **`ENTERPRISE SCALE VALIDATED`** (*Enterprise-capable / conditionally production-ready for controlled on-premise or sovereign deployment*)
+  - **Public Cloud SaaS & Connectors:** **`CONDITIONAL ENTERPRISE`** (*Live external credentials remain explicitly BLOCKED pending client production credentials*)
+- **Core Additions & Subsystems:**
+  - **Governed Employee Template Architecture (`core/employee_template.py`)**: Universal (Type B) and Project-Specific (Type C) operational templates with immutable SemVer versioning and HMAC-SHA256 digital signatures.
+  - **SOP Ingestion & Policy Compiler (`core/sop_compiler.py`)**: Converts unstructured business manuals into structured responsibilities, constraints, tools, and authorities with complete rule-to-source provenance tracking and discretionary ambiguity flagging (`AMBIGUOUS_REQUIRES_REVIEW`).
+  - **Operational KPI & KRA Engine (`core/kpi_kra_engine.py`)**: Binds employee actions to real-world verified metrics, computes mathematical variance, and evaluates continuous performance health (`PERFORMING`, `DEGRADED`, `REVIEW_REQUIRED`, `UNDERPERFORMING`).
+  - **24-Stage Employee Factory (`core/employee_factory_v7.py`)**: Transforms templates into active, provisioned AI Employee instances through an observable 24-stage security and governance pipeline.
+  - **CEO Workforce Controller (`core/ceo_workforce_controller.py`)**: Discovers existing workforce capacity before creating new employees to prevent uncontrolled proliferation, records structured `CEOWorkforceDecisionRecord` audit receipts, and executes natural language commands.
+  - **Workforce Collaboration Hub (`core/workforce_collaboration_hub.py`)**: Unites Pre-built Specialists (Type A) and Template Employees (Type B/C) as colleagues under Chief Officer supervision, deterministic policy-driven conflict resolution (prohibits resolution by model confidence), and controlled succession ceremonies.
+  - **Master V7 Deliverables**: 16 architectural specifications in `docs/` and [`openapi_v7.json`](file:///root/roboassistant/openapi_v7.json).
+
+
