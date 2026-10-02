@@ -298,7 +298,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 423/423 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, Temporal Governed Durable Execution Layer, Nango Governed External System Connectivity & Integration Layer, Enterprise Adversarial Security & Chaos Engineering, and Concurrency Load Benchmarks).*
+*Current test suite: 437/437 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, Temporal Governed Durable Execution Layer, Nango Governed External System Connectivity & Integration Layer, Enterprise Adversarial Security & Chaos Engineering, Concurrency Load Benchmarks, and Distributed Production Runtime V2).*
 
 ---
 

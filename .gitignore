@@ -36,3 +36,4 @@ ENV/
 storage/sandbox/
 storage/workspaces/
 storage/browser_artifacts/
+storage/object_store/

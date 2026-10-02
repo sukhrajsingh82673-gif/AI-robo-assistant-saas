@@ -100,6 +100,7 @@ schedule_service = UniversalScheduleService(tenant_id="tnt_primary")
 meeting_service = AiCeoMeetingService(tenant_id="tnt_primary")
 assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
 plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
+from core.production_api import api_handler
 
 
 
@@ -384,6 +385,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "timestamp": time.time()
             })
+            return
+
+        if path.startswith("/api/v2/"):
+            headers_dict = {k: v for k, v in self.headers.items()}
+            status_code, resp_headers, body = api_handler.handle_request("GET", path, headers_dict, b"")
+            self._send_json(body, status=status_code)
             return
 
         try:
@@ -1939,6 +1946,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             req_data = json.loads(body.decode('utf-8'))
         except Exception:
             req_data = {}
+
+        # Route v2 Asynchronous Command & Dispatch Endpoints
+        if path.startswith("/api/v2/"):
+            headers_dict = {k: v for k, v in self.headers.items()}
+            status_code, resp_headers, resp_body = api_handler.handle_request("POST", path, headers_dict, body)
+            self._send_json(resp_body, status=status_code)
+            return
 
         # Public Authentication & Token Issuance Endpoints
         if path in ("/api/auth/token", "/api/auth/login"):

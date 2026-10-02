@@ -167,6 +167,17 @@ class UserManager:
             return None
 
     @staticmethod
+    def create_session_token(tenant_id: str, user_id: str = "admin", role: str = UserRole.OWNER, company_id: str = "comp_primary") -> str:
+        user = {
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "company_id": company_id,
+            "role": role,
+            "permissions": ["*"]
+        }
+        return UserManager.generate_token(user)
+
+    @staticmethod
     def get_or_create_dev_token(tenant_id: str = "tnt_primary", company_id: str = "comp_primary") -> str:
         """Issues an authenticated developer token for local/dev workloads."""
         user = {
@@ -177,6 +188,8 @@ class UserManager:
             "permissions": ["*"]
         }
         return UserManager.generate_token(user, expires_in_seconds=86400 * 30)
+
+token_manager = UserManager
 
 class AuthorizationEnforcer:
     @staticmethod
