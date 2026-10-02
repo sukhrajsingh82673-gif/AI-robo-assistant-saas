@@ -1,0 +1,149 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ZONATA Universal AI Company Operating System - V5 Enterprise Reality API",
+    "version": "5.0.0",
+    "description": "Production Operations, M2M Service Identity, SCIM 2.0 Directory Lifecycle, Anti-Laundering Approval Binding, Multi-Layer Deletion Verification, Controlled Tenant Export & Offboarding API."
+  },
+  "paths": {
+    "/api/v5/identity/user-token": {
+      "post": {
+        "summary": "Issue or elevate short-lived enterprise user token",
+        "responses": {
+          "200": { "description": "Token issued" },
+          "403": { "description": "Identity inactive or offboarded" }
+        }
+      }
+    },
+    "/api/v5/identity/service-token": {
+      "post": {
+        "summary": "Issue short-lived signed M2M service token",
+        "responses": {
+          "200": { "description": "Service token issued" },
+          "401": { "description": "Unauthorized microservice identity" }
+        }
+      }
+    },
+    "/api/v5/identity/service-token/verify": {
+      "post": {
+        "summary": "Verify M2M service token against audience, tenant, and replay nonce",
+        "responses": {
+          "200": { "description": "Claims verified" },
+          "403": { "description": "ServiceSecurityViolation (Replay, Expired, Wrong Audience)" }
+        }
+      }
+    },
+    "/scim/v2/Users": {
+      "post": { "summary": "SCIM 2.0 User Provisioning" },
+      "get": { "summary": "SCIM 2.0 List Users" }
+    },
+    "/scim/v2/Users/{id}": {
+      "patch": { "summary": "SCIM 2.0 Update User Attributes & Role Synchronization" },
+      "delete": { "summary": "SCIM 2.0 Offboard and Sever Identity Authority (<10ms SLO)" }
+    },
+    "/api/v5/approval/bind": {
+      "post": {
+        "summary": "Cryptographically bind human executive approval to exact parameters (Anti-Laundering)",
+        "responses": {
+          "201": { "description": "Bound approval certificate issued" }
+        }
+      }
+    },
+    "/api/v5/approval/verify": {
+      "post": {
+        "summary": "Verify action parameters against bound approval certificate",
+        "responses": {
+          "200": { "description": "Parameters match approved hash" },
+          "403": { "description": "ApprovalLaunderingError (Parameter tampering detected)" }
+        }
+      }
+    },
+    "/api/v5/data/ingest": {
+      "post": {
+        "summary": "Ingest corporate data object with SHA-256 hash and sensitivity classification",
+        "responses": { "201": { "description": "Object ingested and indexed" } }
+      }
+    },
+    "/api/v5/data/{id}/legal-hold": {
+      "post": {
+        "summary": "Apply or release corporate litigation legal hold",
+        "responses": { "200": { "description": "Legal hold updated" } }
+      }
+    },
+    "/api/v5/data/{id}/purge": {
+      "delete": {
+        "summary": "Execute verified multi-layer purge (relational overwrite, index shredding, cache eviction)",
+        "responses": {
+          "200": { "description": "Purge completed" },
+          "403": { "description": "LegalHoldViolationError (Deletion blocked by active hold)" }
+        }
+      }
+    },
+    "/api/v5/data/{id}/deletion-proof": {
+      "get": {
+        "summary": "Inspect and prove multi-layer deletion status across DB, vector chunks, cache, and scratch",
+        "responses": { "200": { "description": "Multi-layer deletion certificate" } }
+      }
+    },
+    "/api/v5/knowledge/retrieve": {
+      "post": {
+        "summary": "Pre-retrieval permission-aware RAG search with SQL-level department/clearance pushdown",
+        "responses": { "200": { "description": "Authorized knowledge chunks with citations" } }
+      }
+    },
+    "/api/v5/model/invoke": {
+      "post": {
+        "summary": "Invoke central model gateway with outbound DLP firewall and token cost accounting",
+        "responses": {
+          "200": { "description": "Model response" },
+          "403": { "description": "ModelSecurityException (High-clearance data blocked from cloud)" }
+        }
+      }
+    },
+    "/api/v5/policy/evaluate": {
+      "post": {
+        "summary": "Evaluate request against 8-dimensional ABAC policy engine",
+        "responses": { "200": { "description": "Policy decision" } }
+      }
+    },
+    "/api/v5/workforce/{id}/delegate": {
+      "post": {
+        "summary": "Delegate mission to child AI worker with mathematical subset containment checks",
+        "responses": {
+          "201": { "description": "Child worker created" },
+          "403": { "description": "DelegationViolationError (Exceeds parent scope or budget)" }
+        }
+      }
+    },
+    "/api/v5/unknown-outcome/reconcile": {
+      "post": {
+        "summary": "Execute deterministic reconciliation for ambiguous mutations without blind retries",
+        "responses": { "200": { "description": "Reconciliation resolved (CONFIRMED_SUCCESS / FAILURE / ESCALATION)" } }
+      }
+    },
+    "/api/v5/admin/tenant/{id}/export": {
+      "get": {
+        "summary": "Export complete tenant data archive with zero cross-tenant contamination",
+        "responses": { "200": { "description": "Tenant archive" } }
+      }
+    },
+    "/api/v5/admin/tenant/{id}/offboard": {
+      "post": {
+        "summary": "Execute formal 9-step tenant offboarding sequence",
+        "responses": { "200": { "description": "Tenant offboarded and verified purged" } }
+      }
+    },
+    "/api/v5/admin/killswitch": {
+      "post": {
+        "summary": "Trip distributed emergency killswitch across AGENT, TENANT, or GLOBAL scope (<5ms)",
+        "responses": { "200": { "description": "Killswitch engaged" } }
+      }
+    },
+    "/api/v5/telemetry/slo": {
+      "get": {
+        "summary": "Query real-time measured SLO metrics (P50/P95/P99 latencies, revocation time, error rate)",
+        "responses": { "200": { "description": "SLO metrics" } }
+      }
+    }
+  }
+}
