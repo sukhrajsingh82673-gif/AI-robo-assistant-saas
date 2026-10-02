@@ -1,0 +1,205 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ZONATA Universal AI Company Operating System - V6 Enterprise Scale & Autonomous Workforce API",
+    "version": "6.0.0",
+    "description": "Enterprise Scale Workforce Scheduling, DAG Dependency Resolution, Autonomy Levels 0-5 Governance, Dynamic Sovereign Model Routing, Multi-Tenant Resource Quotas, Employee Health Monitoring, and Air-Gapped Sanitized Diagnostics Bundle API."
+  },
+  "paths": {
+    "/api/v6/workforce/schedule": {
+      "post": {
+        "summary": "Enqueue enterprise mission with priority tier and DAG dependencies",
+        "responses": {
+          "201": { "description": "Mission enqueued in priority schedule" },
+          "400": { "description": "CyclicDependencyError" }
+        }
+      },
+      "get": {
+        "summary": "Dispatch next highest-priority task with satisfied dependencies and available AI employee",
+        "responses": {
+          "200": { "description": "Dispatched task assignment" },
+          "204": { "description": "No tasks ready or concurrency cap reached" }
+        }
+      }
+    },
+    "/api/v6/workforce/task/{id}/complete": {
+      "post": {
+        "summary": "Complete scheduled task and trigger DAG resolution for unblocking downstream tasks",
+        "responses": {
+          "200": { "description": "Task completed and downstream DAG nodes evaluated" }
+        }
+      }
+    },
+    "/api/v6/workforce/employee/{id}/health": {
+      "get": {
+        "summary": "Retrieve operational vitals and health status (HEALTHY, DEGRADED, REVIEW_REQUIRED, SUSPENDED, TERMINATED)",
+        "responses": {
+          "200": { "description": "Employee health vitals" }
+        }
+      },
+      "post": {
+        "summary": "Record mission execution outcome and automatically evaluate health transitions",
+        "responses": {
+          "200": { "description": "Updated health state" }
+        }
+      }
+    },
+    "/api/v6/workforce/employee/{id}/unsuspend": {
+      "post": {
+        "summary": "Supervisor administrative review and clearance of employee suspension",
+        "responses": {
+          "200": { "description": "Employee returned to HEALTHY state" }
+        }
+      }
+    },
+    "/api/v6/tenant/{id}/quota": {
+      "get": {
+        "summary": "Inspect active tenant resource utilization against quotas (missions, agents, tokens, storage, daily tools)",
+        "responses": {
+          "200": { "description": "Tenant quota utilization snapshot" }
+        }
+      },
+      "put": {
+        "summary": "Configure tenant resource quotas to prevent noisy-neighbor starvation",
+        "responses": {
+          "200": { "description": "Quotas updated" }
+        }
+      }
+    },
+    "/api/v6/autonomy/evaluate": {
+      "post": {
+        "summary": "Evaluate tool invocation against Autonomy Levels 0 to 5 and risk classification",
+        "responses": {
+          "200": { "description": "Action permitted" },
+          "403": { "description": "AutonomyViolationError (Mutation barred or approval required)" }
+        }
+      }
+    },
+    "/api/v6/autonomy/delegate": {
+      "post": {
+        "summary": "Validate hierarchical delegation containment (Child Autonomy <= Parent Autonomy)",
+        "responses": {
+          "200": { "description": "Delegation verified compliant" },
+          "403": { "description": "DelegationViolationError" }
+        }
+      }
+    },
+    "/api/v6/model/route": {
+      "post": {
+        "summary": "Dynamically route model request enforcing sovereign air-gap residency for RESTRICTED data",
+        "responses": {
+          "200": { "description": "Model routed and executed" },
+          "503": { "description": "All providers degraded" }
+        }
+      }
+    },
+    "/api/v6/support/diagnostics-bundle": {
+      "post": {
+        "summary": "Generate air-gapped support diagnostic bundle with 100% PII and credential scrubbing",
+        "responses": {
+          "200": { "description": "Sanitized diagnostic bundle" }
+        }
+      }
+    },
+    "/api/v5/identity/user-token": {
+      "post": {
+        "summary": "Issue or elevate short-lived enterprise user token",
+        "responses": {
+          "200": { "description": "Token issued" },
+          "403": { "description": "Identity inactive or offboarded" }
+        }
+      }
+    },
+    "/api/v5/identity/service-token": {
+      "post": {
+        "summary": "Issue short-lived signed M2M service token",
+        "responses": {
+          "200": { "description": "Service token issued" },
+          "401": { "description": "Unauthorized microservice identity" }
+        }
+      }
+    },
+    "/scim/v2/Users": {
+      "post": { "summary": "SCIM 2.0 User Provisioning" },
+      "get": { "summary": "SCIM 2.0 List Users" }
+    },
+    "/scim/v2/Users/{id}": {
+      "patch": { "summary": "SCIM 2.0 Update User Attributes & Role Synchronization" },
+      "delete": { "summary": "SCIM 2.0 Offboard and Sever Identity Authority (<10ms SLO)" }
+    },
+    "/api/v5/approval/bind": {
+      "post": {
+        "summary": "Cryptographically bind human executive approval to exact parameters (Anti-Laundering)",
+        "responses": {
+          "201": { "description": "Bound approval certificate issued" }
+        }
+      }
+    },
+    "/api/v5/approval/verify": {
+      "post": {
+        "summary": "Verify action parameters against bound approval certificate",
+        "responses": {
+          "200": { "description": "Parameters match approved hash" },
+          "403": { "description": "ApprovalLaunderingError (Parameter tampering detected)" }
+        }
+      }
+    },
+    "/api/v5/data/ingest": {
+      "post": {
+        "summary": "Ingest corporate data object with SHA-256 hash and sensitivity classification",
+        "responses": { "201": { "description": "Object ingested and indexed" } }
+      }
+    },
+    "/api/v5/data/{id}/legal-hold": {
+      "post": {
+        "summary": "Apply or release corporate litigation legal hold",
+        "responses": { "200": { "description": "Legal hold updated" } }
+      }
+    },
+    "/api/v5/data/{id}/purge": {
+      "delete": {
+        "summary": "Execute verified multi-layer purge (relational overwrite, index shredding, cache eviction)",
+        "responses": {
+          "200": { "description": "Purge completed" },
+          "403": { "description": "LegalHoldViolationError (Deletion blocked by active hold)" }
+        }
+      }
+    },
+    "/api/v5/data/{id}/deletion-proof": {
+      "get": {
+        "summary": "Inspect and prove multi-layer deletion status across DB, vector chunks, cache, and scratch",
+        "responses": { "200": { "description": "Multi-layer deletion certificate" } }
+      }
+    },
+    "/api/v5/knowledge/retrieve": {
+      "post": {
+        "summary": "Pre-retrieval permission-aware RAG search with SQL-level department/clearance pushdown",
+        "responses": { "200": { "description": "Authorized knowledge chunks with citations" } }
+      }
+    },
+    "/api/v5/policy/evaluate": {
+      "post": {
+        "summary": "Evaluate request against 8-dimensional ABAC policy engine",
+        "responses": { "200": { "description": "Policy decision" } }
+      }
+    },
+    "/api/v5/unknown-outcome/reconcile": {
+      "post": {
+        "summary": "Execute deterministic reconciliation for ambiguous mutations without blind retries",
+        "responses": { "200": { "description": "Reconciliation resolved (CONFIRMED_SUCCESS / FAILURE / ESCALATION)" } }
+      }
+    },
+    "/api/v5/admin/tenant/{id}/offboard": {
+      "post": {
+        "summary": "Execute formal 9-step tenant offboarding sequence",
+        "responses": { "200": { "description": "Tenant offboarded and verified purged" } }
+      }
+    },
+    "/api/v5/admin/killswitch": {
+      "post": {
+        "summary": "Trip distributed emergency killswitch across AGENT, TENANT, or GLOBAL scope (<5ms)",
+        "responses": { "200": { "description": "Killswitch engaged" } }
+      }
+    }
+  }
+}
