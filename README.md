@@ -128,6 +128,17 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Bi-Directional Interoperability**: Acts as both a governed MCP Client (consuming external enterprise MCP servers) and an inbound governed MCP Server (`/mcp` endpoint) exposing curated, policy-filtered ZONATA capabilities to external clients (Claude Desktop, Cursor, IDEs).
 - **Dedicated Web Cockpit**: Fully interactive MCP Network Workspace (`web/mcp_workspace.js`) with KPI metrics, server health & lifecycle controls, schema inspectors, administrator overrides, audit logs, and one-click Section 73 Canonical Acceptance Test execution.
 
+### 14. Governed Agent Execution Runtime (OpenHands — Project 07)
+- **Execution Engine Layer**: Integrates OpenHands Software Agent SDK and Agent Server architectural patterns as a governed execution runtime beneath ZONATA's existing AI CEO → Agency Swarm → TaskMaker → LangGraph hierarchy.
+- **Architectural Distinction**: Preserves clean boundary:
+  - `A2A = Agent ↔ Agent` (Project 05, agent interoperability)
+  - `MCP = Agent ↔ Tool / Data / System` (Project 06, tool/data protocol)
+  - `OpenHands = How an agent performs complex software engineering, computer operation, and workspace tasks safely` (Project 07)
+- **15-Stage Governed Execution Pipeline**: Multi-scope KillSwitch verification (Global, Tenant, Company, Execution, Workspace, Agent), Tenant & Company isolation, Context Firewall (prompt injection defense, credential scrubbing), Workspace provisioning & path validation, deterministic Command Risk Classification (`READ_ONLY`, `SAFE_WRITE`, `MUTATING_BUILD`, `NETWORK_OUTBOUND`, `DANGEROUS_SYSTEM`), JIT Credential Isolation, PolicyEngine determination, Authority Gateway evaluation, Human Approval interception (`ApprovalEngine`), isolated command execution with timeouts and output truncation, physical reality verification, and cryptographic Merkle Evidence Ledger sealing.
+- **Business Causality Engine Non-Negotiable Invariant**: `TASK_SUCCESS != BUSINESS_OUTCOME`. A successful command (`exit code 0`), passing test suite, or completed execution status does NOT constitute commercial business success until verified against transaction evidence and causal lineage.
+- **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (autonomous engineering missions), Agency Swarm squads, Letta stateful memory, LangGraph durable workflow nodes, and governed MCP tools. Canonical test suite covers Software Task, MCP + OpenHands, Human Approval, Multi-Scope KillSwitch, Malicious Repo Prompt Injection defense, Non-idempotent Mutation Reconciliation, Multi-Tenant Workspace Isolation, Self-Improvement branch protection, and Section 79 Grand Acceptance Scenario.
+- **Dedicated Web Cockpit**: Fully interactive Agent Execution Cockpit (`web/openhands_workspace.js`) with KPI metrics, Execution history, Workspace inspector, Artifacts viewer with SHA-256 digests, Security Center, and Live Canonical Scenario Runner.
+
 ---
 
 ## 📁 Repository Structure
@@ -226,7 +237,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 270/270 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, and A2A Agent Interoperability).*
+*Current test suite: 339/339 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, and OpenHands Governed Agent Execution Runtime).*
 
 ---
 
@@ -253,3 +264,16 @@ python3 -m unittest discover tests
 19. **Ambiguous Remote State Reconciliation**: Ambiguous remote mutations enter an explicit `AMBIGUOUS` state requiring deterministic reconciliation without blind automated replay.
 20. **Authoritative KillSwitch Override**: Global or tenant KillSwitch immediately halts all inbound and outbound A2A communication, severing untrusted agent connections.
 21. **Epistemic Memory Separation**: External agent communication is quarantined from internal Letta agent identity blocks (`persona`, `human`); untrusted inputs are never written directly into agent self-prompts.
+22. **OpenHands Agent != Authority**: The agent execution runtime is an execution worker, never an autonomous authority or decision-making layer.
+23. **OpenHands Tool != Permission**: Availability of bash execution, file editing, or tools does not convey business permission.
+24. **Workspace != Trusted Environment**: Sandboxes and repositories are untrusted workspaces; all files and dependencies are subject to security scanning and isolation.
+25. **Terminal Access != Authorization**: Executing a command requires risk classification; dangerous system commands are forbidden and privileged commands require human approval.
+26. **File Access != Permission**: All file operations are constrained to the assigned workspace directory; path traversal (`../`) and symlink escapes are strictly blocked.
+27. **Code Execution != Business Authorization**: Running code or building artifacts is strictly an operational step, never an authorized business transaction.
+28. **Agent Decision != Policy Decision**: Agent internal reasoning or planning cannot override ZONATA policy rules, spending limits, or tenant boundaries.
+29. **Agent Success != Business Success**: A completed agent run does not constitute business outcome achievement.
+30. **Command Success != Desired Outcome**: An exit code of 0 does not prove that the intended business outcome was satisfied.
+31. **Generated Code != Verified Code**: Synthesized code must undergo independent physical reality verification before being accepted.
+32. **Test Pass != Production Safety**: Passing local tests in a workspace does not authorize deployment or merging into production branches without human governance approval.
+33. **Workspace State != Evidence**: Files resting on disk in a workspace do not constitute audit evidence; evidence requires cryptographic Merkle ledger sealing.
+

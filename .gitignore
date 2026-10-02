@@ -34,4 +34,4 @@ ENV/
 
 # Sandboxed runtime files
 storage/sandbox/
-
+storage/workspaces/

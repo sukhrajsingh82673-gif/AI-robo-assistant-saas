@@ -235,6 +235,7 @@ function updateBreadcrumbs() {
     workflows: 'Workflow Runtime',
     'agent-network': 'Agent Network (A2A)',
     'mcp-network': 'MCP Network (Tools & Systems)',
+    'openhands-execution': 'Agent Execution (OpenHands)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -389,6 +390,9 @@ function handleRoute(path) {
     window.AgentNetworkWorkspace.render('view-agent-network');
   } else if (navKey === 'mcp-network' && window.McpWorkspace) {
     window.McpWorkspace.render('view-mcp-network');
+  } else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
+    const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
+    mgr.render('view-openhands-execution');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {

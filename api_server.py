@@ -188,6 +188,23 @@ mcp_gateway = MCPGateway("tnt_primary", "comp_primary")
 mcp_scenarios = McpCanonicalScenarios("tnt_primary", "comp_primary")
 mcp_inbound_server = ZonataMcpServer("tnt_primary", "comp_primary")
 
+# OpenHands (Governed Agent Execution Runtime - Project 07)
+from core.openhands_execution_runtime import (
+    OpenHandsRuntimeGateway,
+    OpenHandsKillSwitch,
+    OpenHandsExecutionStatus,
+    WorkspaceClass,
+    WorkspaceType,
+    NetworkScope,
+    CommandRiskClass,
+    OpenHandsSecurityEventType,
+    SecurityException as OpenHandsSecurityException
+)
+from zonata.openhands_adapter import OpenHandsCanonicalScenarios, OpenHandsCeoBridge
+
+openhands_gateway = OpenHandsRuntimeGateway("tnt_primary", "comp_primary")
+openhands_scenarios = OpenHandsCanonicalScenarios("tnt_primary", "comp_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -1441,6 +1458,56 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "authoritative_killswitch": True
                 },
                 "status": "CONFORMANT"
+            })
+            return
+
+        # =====================================================================
+        # Governed OpenHands Execution Runtime Endpoints (GET - Project 07)
+        # =====================================================================
+        elif path == "/api/openhands/executions":
+            limit = int(query_params.get("limit", [50])[0])
+            execs = openhands_gateway.list_executions(limit=limit)
+            self._send_json({"executions": execs, "count": len(execs)})
+            return
+
+        elif path.startswith("/api/openhands/executions/") and len(path.split("/")) == 5:
+            exec_id = path.split("/")[4]
+            ex = openhands_gateway.get_execution(exec_id)
+            if not ex:
+                self._send_json({"error": "OpenHands execution record not found"}, status=404)
+                return
+            self._send_json({"execution": ex})
+            return
+
+        elif path == "/api/openhands/workspaces":
+            limit = int(query_params.get("limit", [50])[0])
+            workspaces = openhands_gateway.list_workspaces(limit=limit)
+            self._send_json({"workspaces": workspaces, "count": len(workspaces)})
+            return
+
+        elif path == "/api/openhands/artifacts":
+            exec_id = query_params.get("execution_id", [None])[0]
+            limit = int(query_params.get("limit", [50])[0])
+            artifacts = openhands_gateway.list_artifacts(execution_id=exec_id, limit=limit)
+            self._send_json({"artifacts": artifacts, "count": len(artifacts)})
+            return
+
+        elif path == "/api/openhands/security/events":
+            limit = int(query_params.get("limit", [50])[0])
+            events = openhands_gateway.list_security_events(limit=limit)
+            self._send_json({"security_events": events, "count": len(events)})
+            return
+
+        elif path == "/api/openhands/metrics":
+            metrics = openhands_gateway.get_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/openhands/killswitch":
+            self._send_json({
+                "killswitch_active": OpenHandsKillSwitch.is_active(tenant_id),
+                "tenant_id": tenant_id,
+                "status": "KILLSWITCH_ENGAGED" if OpenHandsKillSwitch.is_active(tenant_id) else "OPERATIONAL"
             })
             return
 
@@ -3295,6 +3362,151 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"success": True, "scenario": scenario, "result": res})
             else:
                 self._send_json({"error": f"Unknown MCP scenario '{scenario}'"}, status=400)
+            return
+
+        # =====================================================================
+        # Governed OpenHands Execution Runtime Endpoints (POST - Project 07)
+        # =====================================================================
+        elif path == "/api/openhands/executions":
+            agent_id = req_data.get("agent_id", "agt_developer")
+            prompt = req_data.get("task_prompt", "Inspect and execute task")
+            ws_type_str = req_data.get("workspace_type", "EPHEMERAL")
+            ws_class_str = req_data.get("workspace_class", "SANDBOX")
+            net_scope_str = req_data.get("network_scope", "RESTRICTED")
+            mission_id = req_data.get("mission_id")
+            workflow_id = req_data.get("workflow_id")
+            task_id = req_data.get("task_id")
+            ctx = req_data.get("scoped_context", {})
+            try:
+                ex = openhands_gateway.create_execution(
+                    agent_id=agent_id,
+                    task_prompt=prompt,
+                    workspace_type=WorkspaceType(ws_type_str),
+                    workspace_class=WorkspaceClass(ws_class_str),
+                    network_scope=NetworkScope(net_scope_str),
+                    mission_id=mission_id,
+                    workflow_id=workflow_id,
+                    task_id=task_id,
+                    scoped_context=ctx
+                )
+                self._send_json(ex)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/openhands/executions/command":
+            exec_id = req_data.get("execution_id")
+            command = req_data.get("command")
+            timeout = int(req_data.get("timeout_seconds", 30))
+            try:
+                res = openhands_gateway.run_command(exec_id, command, timeout_seconds=timeout)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/openhands/executions/") and path.endswith("/complete"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            summary = req_data.get("result_summary", "Completed execution")
+            test_cmd = req_data.get("expected_test_command")
+            file_chk = req_data.get("expected_file_snippet")
+            try:
+                res = openhands_gateway.complete_execution(
+                    execution_id=exec_id,
+                    result_summary=summary,
+                    expected_test_command=test_cmd,
+                    expected_file_snippet=tuple(file_chk) if file_chk else None
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/openhands/executions/") and path.endswith("/pause"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            ok = openhands_gateway.pause_execution(exec_id)
+            self._send_json({"success": ok, "execution_id": exec_id})
+            return
+
+        elif path.startswith("/api/openhands/executions/") and path.endswith("/resume"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            ok = openhands_gateway.resume_execution(exec_id)
+            self._send_json({"success": ok, "execution_id": exec_id})
+            return
+
+        elif path.startswith("/api/openhands/executions/") and path.endswith("/cancel"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            reason = req_data.get("reason", "Cancelled by user")
+            ok = openhands_gateway.cancel_execution(exec_id, reason=reason)
+            self._send_json({"success": ok, "execution_id": exec_id})
+            return
+
+        elif path.startswith("/api/openhands/approvals/") and path.endswith("/approve"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            approver = req_data.get("approver", "Administrator")
+            ok = openhands_gateway.approve_operation(appr_id, approver_name=approver)
+            self._send_json({"success": ok, "approval_id": appr_id})
+            return
+
+        elif path.startswith("/api/openhands/approvals/") and path.endswith("/reject"):
+            parts = path.split("/")
+            appr_id = parts[4]
+            approver = req_data.get("approver", "Administrator")
+            ok = openhands_gateway.reject_operation(appr_id, approver_name=approver)
+            self._send_json({"success": ok, "approval_id": appr_id})
+            return
+
+        elif path == "/api/openhands/killswitch":
+            active = bool(req_data.get("active", True))
+            scope = req_data.get("scope", "TENANT")
+            exec_id = req_data.get("execution_id")
+            ws_id = req_data.get("workspace_id")
+            agent_id = req_data.get("agent_id")
+            if active:
+                OpenHandsKillSwitch.activate(tenant_id=tenant_id, execution_id=exec_id, workspace_id=ws_id, agent_id=agent_id)
+            else:
+                OpenHandsKillSwitch.deactivate(tenant_id=tenant_id, execution_id=exec_id, workspace_id=ws_id, agent_id=agent_id)
+            self._send_json({
+                "success": True,
+                "killswitch_active": active,
+                "status": "KILLSWITCH_ENGAGED" if active else "OPERATIONAL",
+                "scope": scope
+            })
+            return
+
+        elif path == "/api/openhands/demo/scenarios":
+            scenario = req_data.get("scenario", "SECTION_79").upper()
+            sc_map = {
+                "TEST_01": openhands_scenarios.test_01_software_task,
+                "1": openhands_scenarios.test_01_software_task,
+                "TEST_02": openhands_scenarios.test_02_mcp_and_openhands,
+                "2": openhands_scenarios.test_02_mcp_and_openhands,
+                "TEST_03": openhands_scenarios.test_03_human_approval,
+                "3": openhands_scenarios.test_03_human_approval,
+                "TEST_04": openhands_scenarios.test_04_killswitch,
+                "4": openhands_scenarios.test_04_killswitch,
+                "TEST_05": openhands_scenarios.test_05_malicious_repository,
+                "5": openhands_scenarios.test_05_malicious_repository,
+                "TEST_06": openhands_scenarios.test_06_unknown_mutation_reconciliation,
+                "6": openhands_scenarios.test_06_unknown_mutation_reconciliation,
+                "TEST_07": openhands_scenarios.test_07_tenant_isolation,
+                "7": openhands_scenarios.test_07_tenant_isolation,
+                "TEST_08": openhands_scenarios.test_08_self_improvement,
+                "8": openhands_scenarios.test_08_self_improvement,
+                "SECTION_79": openhands_scenarios.section_79_acceptance_scenario,
+                "79": openhands_scenarios.section_79_acceptance_scenario
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown OpenHands scenario '{scenario}'"}, status=400)
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

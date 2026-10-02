@@ -1585,6 +1585,194 @@ CREATE TABLE IF NOT EXISTS mcp_published_capabilities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mcp_pub_tenant ON mcp_published_capabilities(tenant_id);
+
+-- 76. Governed OpenHands Execution Runtimes
+CREATE TABLE IF NOT EXISTS openhands_runtimes (
+    runtime_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    runtime_type TEXT NOT NULL, -- LOCAL_HOST, REMOTE_LINUX, CONTAINER, VM, CLOUD_WORKER
+    host_id TEXT NOT NULL,
+    version TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ONLINE', -- ONLINE, BUSY, OFFLINE, QUARANTINED
+    health_status TEXT NOT NULL DEFAULT 'HEALTHY', -- HEALTHY, DEGRADED, UNHEALTHY
+    resource_capacity JSON,
+    active_executions INTEGER NOT NULL DEFAULT 0,
+    security_profile JSON,
+    last_heartbeat REAL NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_runtime_tenant ON openhands_runtimes(tenant_id);
+
+-- 77. Governed OpenHands Isolated Workspaces
+CREATE TABLE IF NOT EXISTS openhands_workspaces (
+    workspace_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    workflow_id TEXT,
+    task_id TEXT,
+    agent_id TEXT NOT NULL,
+    runtime_id TEXT NOT NULL,
+    workspace_type TEXT NOT NULL DEFAULT 'EPHEMERAL', -- EPHEMERAL, PERSISTENT
+    workspace_class TEXT NOT NULL DEFAULT 'SANDBOX', -- READ_ONLY, SANDBOX, DEVELOPMENT, TEST, STAGING, PRODUCTION
+    path TEXT NOT NULL,
+    base_image TEXT,
+    filesystem_scope JSON,
+    network_scope TEXT NOT NULL DEFAULT 'RESTRICTED', -- NONE, ALLOWLIST, RESTRICTED, FULL
+    credential_scope JSON,
+    resource_limits JSON,
+    expires_at REAL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, PAUSED, EXPIRED, DESTROYED
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_ws_tenant ON openhands_workspaces(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_oh_ws_company ON openhands_workspaces(company_id);
+
+-- 78. Governed OpenHands Executions
+CREATE TABLE IF NOT EXISTS openhands_executions (
+    execution_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    workflow_id TEXT,
+    task_id TEXT,
+    agent_id TEXT NOT NULL,
+    runtime_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    execution_status TEXT NOT NULL, -- REQUESTED, POLICY_CHECK, AUTHORITY_CHECK, APPROVAL_CHECK, WORKSPACE_PREPARING, INITIALIZING, RUNNING, WAITING, VERIFYING, COMPLETED, DENIED, CANCELLED, TIMEOUT, FAILED, TERMINATED, UNKNOWN, RECONCILIATION_REQUIRED, VERIFICATION_FAILED
+    policy_decision TEXT NOT NULL, -- ALLOW, REQUIRE_HUMAN_APPROVAL, DENY
+    authority_decision TEXT NOT NULL, -- AUTHORIZED, DENIED, SUSPENDED_FOR_APPROVAL
+    approval_id TEXT,
+    task_prompt TEXT NOT NULL,
+    scoped_context JSON,
+    result_summary TEXT,
+    files_changed JSON,
+    tests_passed INTEGER NOT NULL DEFAULT 0,
+    tests_failed INTEGER NOT NULL DEFAULT 0,
+    verification_id TEXT,
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', -- UNVERIFIED, VERIFIED, VERIFICATION_FAILED
+    evidence_id TEXT,
+    sha256_digest TEXT,
+    causality_chain_id TEXT,
+    business_outcome TEXT,
+    cost_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_spent REAL NOT NULL DEFAULT 0.0,
+    latency_ms REAL NOT NULL DEFAULT 0.0,
+    loop_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_exec_tenant ON openhands_executions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_oh_exec_ws ON openhands_executions(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_oh_exec_status ON openhands_executions(execution_status);
+
+-- 79. Governed OpenHands Terminal Commands
+CREATE TABLE IF NOT EXISTS openhands_commands (
+    command_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    command TEXT NOT NULL,
+    working_directory TEXT NOT NULL,
+    risk_class TEXT NOT NULL, -- READ_ONLY, LOW_RISK, MUTATING, PRIVILEGED, DESTRUCTIVE, IRREVERSIBLE
+    policy_decision TEXT NOT NULL, -- ALLOW, REQUIRE_HUMAN_APPROVAL, DENY
+    authority_decision TEXT NOT NULL, -- AUTHORIZED, DENIED, SUSPENDED_FOR_APPROVAL
+    exit_code INTEGER,
+    stdout_sample TEXT,
+    stderr_sample TEXT,
+    latency_ms REAL NOT NULL DEFAULT 0.0,
+    sha256_digest TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_cmd_exec ON openhands_commands(execution_id);
+
+-- 80. Governed OpenHands Event Stream
+CREATE TABLE IF NOT EXISTS openhands_events (
+    event_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, -- agent_started, workspace_created, tool_requested, tool_started, tool_completed, command_started, command_completed, file_created, file_modified, file_deleted, test_started, test_completed, artifact_created, error, warning, approval_requested, approval_granted, approval_denied, verification_started, verification_completed, execution_completed, execution_failed
+    payload JSON NOT NULL,
+    correlation_id TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_ev_exec ON openhands_events(execution_id);
+CREATE INDEX IF NOT EXISTS idx_oh_ev_type ON openhands_events(event_type);
+
+-- 81. Governed OpenHands Artifact Registry
+CREATE TABLE IF NOT EXISTS openhands_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    artifact_type TEXT NOT NULL, -- CODE, PATCH, DIFF, REPORT, LOG, DATA, TEST_REPORT, BUILD
+    path TEXT NOT NULL,
+    sha256_digest TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    classification TEXT NOT NULL DEFAULT 'INTERNAL', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', -- UNVERIFIED, VERIFIED, REJECTED
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_art_exec ON openhands_artifacts(execution_id);
+CREATE INDEX IF NOT EXISTS idx_oh_art_tenant ON openhands_artifacts(tenant_id);
+
+-- 82. Governed OpenHands Security Events
+CREATE TABLE IF NOT EXISTS openhands_security_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    execution_id TEXT,
+    workspace_id TEXT,
+    event_type TEXT NOT NULL, -- COMMAND_BLOCKED, TOOL_BLOCKED, WORKSPACE_ESCAPE_ATTEMPT, PATH_TRAVERSAL, SECRET_DETECTION, PROMPT_INJECTION, MALICIOUS_REPOSITORY, UNAUTHORIZED_NETWORK, CREDENTIAL_ATTEMPT, RESOURCE_EXHAUSTION, RUNTIME_FAILURE, POLICY_VIOLATION, KILLSWITCH_TRIGGERED
+    severity TEXT NOT NULL DEFAULT 'HIGH', -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON NOT NULL,
+    source TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_sec_tenant ON openhands_security_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_oh_sec_type ON openhands_security_events(event_type);
+
+-- 83. Governed OpenHands Human-in-the-Loop Approvals
+CREATE TABLE IF NOT EXISTS openhands_approvals (
+    approval_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    operation_type TEXT NOT NULL, -- COMMAND_EXECUTION, FILE_MUTATION, DEPLOYMENT, GIT_PUSH, PACKAGE_INSTALLATION
+    details JSON NOT NULL,
+    risk_level TEXT NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED
+    requested_by TEXT NOT NULL,
+    approved_by TEXT,
+    approval_scope TEXT NOT NULL DEFAULT 'SINGLE_EXECUTION', -- SINGLE_EXECUTION, SCOPED, PERMANENT
+    expires_at REAL NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_oh_appr_exec ON openhands_approvals(execution_id);
+CREATE INDEX IF NOT EXISTS idx_oh_appr_status ON openhands_approvals(status);
 """
 
 class Database:

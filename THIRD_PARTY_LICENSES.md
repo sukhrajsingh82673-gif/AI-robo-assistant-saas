@@ -91,6 +91,15 @@ This project incorporates components, libraries, and architectural patterns lice
 - **Governance Boundary:** Implements `ToolInteropProvider` / `MCPToolInteropProvider` abstraction. MCP operates as the standardized Agent ↔ Tool / Data / System interoperability protocol connecting ZONATA with external CRM, ERP, PMS, databases, files, and SaaS endpoints. It provides server registration, tool/resource/prompt discovery, governed tool invocation, streaming HTTP, stdio subprocesses, and inbound MCP hosting without granting external tools authority, permission, memory access, or credentials. All remote tool interactions pass through ZONATA PolicyEngine, Authority Gateway, ApprovalEngine, EvidenceLedger, KillSwitch, and Business Causality Engine (`TASK_SUCCESS != BUSINESS_OUTCOME`).
 - **Terms:** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
+---
 
-
-
+## 9. OpenHands (OpenHands/OpenHands & OpenHands/software-agent-sdk)
+- **Repositories:** `https://github.com/OpenHands/OpenHands` and `https://github.com/OpenHands/software-agent-sdk`
+- **Architectural Baseline:** Software Agent SDK / Agent Server / Ephemeral & Persistent Workspaces / Event Stream / Governed Execution Runtime
+- **License:** MIT License
+- **Copyright:** (c) 2024-2026 OpenHands Authors
+- **Python Version Requirements:** >=3.10 (Running 3.14 on Linux Host)
+- **Direct Dependencies:** Standard library `urllib`, `json`, `hashlib`, `uuid`, `re`, `subprocess`, `os`, `shutil`, `threading` (Zero-bloat governed runtime)
+- **Integration Method:** Governed Agent Execution Runtime Gateway & OpenHands Provider (`core/openhands_execution_runtime.py`, `zonata/openhands_adapter.py`)
+- **Governance Boundary:** Implements `AgentExecutionProvider` abstraction. OpenHands operates as a governed agent execution and workspace runtime beneath ZONATA's existing AI CEO → Agency Swarm → TaskMaker → LangGraph hierarchy. It provides sandboxed workspace isolation, safe file mutations, deterministic command risk classification, artifact registry, and security event auditing without granting agents autonomous business authority or unmonitored system access. All execution lifecycles pass through the ZONATA Multi-Scope KillSwitch, Context Firewall, Command Risk Classifier, Human Approval Escalation, PolicyEngine, Merkle Evidence Ledger sealing, and Business Causality Engine (`TASK_SUCCESS != BUSINESS_OUTCOME`).
+- **Terms:** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

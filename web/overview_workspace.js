@@ -170,6 +170,11 @@
             ${this.renderMcpLayerHtml(snap)}
           </div>
 
+          <!-- 9c. GOVERNED AGENT EXECUTION (OpenHands - Section 49) -->
+          <div style="margin-bottom: 20px;">
+            ${this.renderOpenHandsLayerHtml(snap)}
+          </div>
+
           <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
           <div class="overview-grid-2col">
             ${this.renderExecutiveInsightsHtml(snap)}
@@ -1333,6 +1338,92 @@
           <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px; font-size:12px; color:var(--text-secondary); flex-wrap:wrap; gap:8px;">
             <span>Stateless Protocol Core (2026-07-28) • Sovereign Governance Enforced</span>
             <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('mcp-network')" style="font-size:11px; padding:4px 10px;">Inspect MCP Network →</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 13c. GOVERNED AGENT EXECUTION RUNTIME (OpenHands - Section 49)
+    // =========================================================================
+    renderOpenHandsLayerHtml(snap) {
+      const oh = snap.openhands || {
+        active_executions: 0,
+        completed_executions: 0,
+        failed_executions: 0,
+        total_executions: 0,
+        average_execution_time_ms: 0,
+        verification_success_rate: 100,
+        policy_blocks: 0,
+        approval_requests: 0,
+        active_workspaces: 0,
+        artifacts_created: 0,
+        security_events: 0,
+        has_activity: false
+      };
+
+      if (!oh.has_activity) {
+        return `
+          <div class="overview-card">
+            <div class="card-title-bar">
+              <div>
+                <h3 class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  Governed Agent Execution Runtime (OpenHands)
+                </h3>
+                <p class="card-subtitle">Autonomous workspaces, software engineering tasks & sandboxed terminal operations.</p>
+              </div>
+              <span class="badge" style="background:rgba(107,114,128,0.15); color:#9ca3af;">No Activity</span>
+            </div>
+            <div style="padding:24px; text-align:center; color:var(--text-secondary);">
+              <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">⚙️</div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No OpenHands execution activity yet</div>
+              <div style="font-size:13px; max-width:380px; margin:0 auto 16px auto;">Dispatch an engineering mission or run a verification scenario to execute inside isolated sandboxes.</div>
+              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('openhands-execution')" style="font-size:12px; padding:6px 14px;">Open Execution Center</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="overview-card">
+          <div class="card-title-bar">
+            <div>
+              <h3 class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                Governed Agent Execution Runtime (OpenHands)
+              </h3>
+              <p class="card-subtitle">Autonomous workspaces, software engineering & sandboxed terminal execution.</p>
+            </div>
+            <span class="badge badge-emerald">${oh.completed_executions} Completed Tasks</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:16px;">
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Active Runs</div>
+              <div style="font-size:18px; font-weight:700; color:#38bdf8; font-family:var(--font-mono);">${oh.active_executions}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Workspaces</div>
+              <div style="font-size:18px; font-weight:700; color:var(--text-primary); font-family:var(--font-mono);">${oh.active_workspaces}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Artifacts</div>
+              <div style="font-size:18px; font-weight:700; color:#f59e0b; font-family:var(--font-mono);">${oh.artifacts_created}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Verification</div>
+              <div style="font-size:18px; font-weight:700; color:#10b981; font-family:var(--font-mono);">${oh.verification_success_rate}%</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Threats Blocked</div>
+              <div style="font-size:18px; font-weight:700; color:${oh.security_events > 0 ? '#ef4444' : 'var(--text-secondary)'}; font-family:var(--font-mono);">${oh.security_events}</div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary);">
+            <span>${oh.status_text}</span>
+            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('openhands-execution')" style="font-size:11px; padding:4px 10px;">Inspect Execution Center →</button>
           </div>
         </div>
       `;

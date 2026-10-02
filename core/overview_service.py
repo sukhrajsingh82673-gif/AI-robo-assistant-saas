@@ -773,6 +773,74 @@ class OverviewDataService:
             }
 
             # -------------------------------------------------------------
+            # 13c. Governed OpenHands Execution Runtime (Project 07, Section 49)
+            # -------------------------------------------------------------
+            oh_active_exec = cur.execute(
+                "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status IN ('RUNNING', 'WAITING', 'WORKSPACE_PREPARING', 'INITIALIZING', 'VERIFYING')",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_completed_exec = cur.execute(
+                "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status = 'COMPLETED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_failed_exec = cur.execute(
+                "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status IN ('FAILED', 'DENIED', 'CANCELLED', 'TERMINATED', 'TIMEOUT', 'VERIFICATION_FAILED')",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_avg_time = cur.execute(
+                "SELECT AVG(latency_ms) FROM openhands_commands WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_verif_total = cur.execute(
+                "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND verification_status != 'UNVERIFIED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_verif_succ = cur.execute(
+                "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_verif_rate = round((oh_verif_succ / oh_verif_total * 100.0) if oh_verif_total > 0 else 100.0, 1)
+            oh_policy_blocks = cur.execute(
+                "SELECT COUNT(*) FROM openhands_security_events WHERE tenant_id = ? AND event_type IN ('COMMAND_BLOCKED', 'TOOL_BLOCKED', 'POLICY_VIOLATION')",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_approval_reqs = cur.execute(
+                "SELECT COUNT(*) FROM openhands_approvals WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_active_ws = cur.execute(
+                "SELECT COUNT(*) FROM openhands_workspaces WHERE tenant_id = ? AND status = 'ACTIVE'",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_artifacts = cur.execute(
+                "SELECT COUNT(*) FROM openhands_artifacts WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            oh_sec_events = cur.execute(
+                "SELECT COUNT(*) FROM openhands_security_events WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+
+            has_oh_activity = bool(oh_active_exec > 0 or oh_completed_exec > 0 or oh_failed_exec > 0 or oh_active_ws > 0 or oh_artifacts > 0)
+
+            openhands_data = {
+                "active_executions": oh_active_exec,
+                "completed_executions": oh_completed_exec,
+                "failed_executions": oh_failed_exec,
+                "total_executions": oh_active_exec + oh_completed_exec + oh_failed_exec,
+                "average_execution_time_ms": round(float(oh_avg_time or 0.0), 2),
+                "verification_success_rate": oh_verif_rate,
+                "policy_blocks": oh_policy_blocks,
+                "approval_requests": oh_approval_reqs,
+                "active_workspaces": oh_active_ws,
+                "artifacts_created": oh_artifacts,
+                "mcp_calls": 0,
+                "security_events": oh_sec_events,
+                "has_activity": has_oh_activity,
+                "status_text": "No OpenHands execution activity yet" if not has_oh_activity else f"{oh_completed_exec} completed, {oh_active_exec} active executions across {oh_active_ws} workspaces"
+            }
+
+            # -------------------------------------------------------------
             # 14. AI-Generated Executive Insights (With Epistemic Provenance)
             # -------------------------------------------------------------
             insights = []
@@ -954,6 +1022,7 @@ class OverviewDataService:
                 "technology": tech_data,
                 "agent_network": agent_network_data,
                 "mcp": mcp_data,
+                "openhands": openhands_data,
                 "data_quality": data_quality,
                 "intelligence": {
                     "has_data": len(insights) > 0,
