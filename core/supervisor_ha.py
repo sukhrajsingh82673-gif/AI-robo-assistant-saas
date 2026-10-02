@@ -218,3 +218,24 @@ class CompanySupervisorHA:
                 """, (self.tenant_id, self.company_id, self.node_id, self.tick_count, "HEALTHY", now))
         except Exception:
             pass
+
+SupervisorHA = CompanySupervisorHA
+
+if __name__ == "__main__":
+    import sys
+    import uuid
+    import signal
+    node_id = sys.argv[1] if len(sys.argv) > 1 else f"sup_{uuid.uuid4().hex[:6]}"
+    tenant_id = sys.argv[2] if len(sys.argv) > 2 else "tnt_primary"
+    company_id = sys.argv[3] if len(sys.argv) > 3 else "comp_primary"
+    supervisor = SupervisorHA(tenant_id=tenant_id, company_id=company_id, node_id=node_id, tick_interval_sec=2.0)
+
+    def handle_sig(sig, frame):
+        supervisor.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, handle_sig)
+    signal.signal(signal.SIGTERM, handle_sig)
+    supervisor.start()
+    while supervisor.running:
+        time.sleep(1.0)

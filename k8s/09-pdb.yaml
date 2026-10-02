@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zonata-api-pdb
+  namespace: zonata-system
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zonata-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zonata-worker-pdb
+  namespace: zonata-system
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zonata-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zonata-supervisor-pdb
+  namespace: zonata-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zonata-supervisor

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zonata-config
+  namespace: zonata-system
+  labels:
+    app.kubernetes.io/name: zonata
+data:
+  ZONATA_ENV: "PRODUCTION"
+  ZONATA_STRICT_CONFIG: "true"
+  ZONATA_DISTRIBUTED_MODE: "true"
+  ZONATA_DB_DRIVER: "postgres"
+  LOG_LEVEL: "INFO"
+  PORT: "8080"
+  SUPERVISOR_TICK_SECONDS: "5.0"
+  SUPERVISOR_LEASE_SECONDS: "15.0"
+  ACTION_TIMEOUT_SECONDS: "30.0"
+  RATE_LIMIT_API_PER_MINUTE: "1000"
+  DEFAULT_MAX_AGENTS_STARTER: "25"
+  DEFAULT_MAX_AGENTS_PRO: "100"
+  DEFAULT_MAX_AGENTS_ENTERPRISE: "500"
+  DEFAULT_MAX_AGENTS_HYPERSCALE: "5000"

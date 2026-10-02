@@ -8,6 +8,7 @@ import time
 import json
 import uuid
 import hashlib
+import threading
 from typing import Dict, Optional, Any
 from dataclasses import dataclass, asdict
 
@@ -124,6 +125,7 @@ class AsynchronousCommandBus:
     and guarantees that HTTP handlers never synchronously execute long-running tasks.
     """
     def __init__(self):
+        self._claim_lock = threading.RLock()
         self._init_db()
 
     def _init_db(self):
@@ -188,33 +190,38 @@ class AsynchronousCommandBus:
         from core.distributed_coordination import coordination
         now = time.time()
 
-        with engine.transaction(workload=WorkloadType.WRITE) as conn:
-            query = "SELECT action_id, envelope_payload FROM async_command_queue WHERE status = 'QUEUED'"
-            params = []
-            if tenant_id:
-                query += " AND tenant_id = ?"
-                params.append(tenant_id)
-            query += " ORDER BY created_at ASC LIMIT 1"
+        with self._claim_lock:
+            with engine.transaction(workload=WorkloadType.WRITE) as conn:
+                query = "SELECT action_id, envelope_payload FROM async_command_queue WHERE status = 'QUEUED'"
+                params = []
+                if tenant_id:
+                    query += " AND tenant_id = ?"
+                    params.append(tenant_id)
+                query += " ORDER BY created_at ASC LIMIT 1"
 
-            cursor = conn.execute(query, params)
-            row = cursor.fetchone()
-            if not row:
-                return None
+                cursor = conn.execute(query, params)
+                row = cursor.fetchone()
+                if not row:
+                    return None
 
-            action_id = row[0]
-            envelope_data = json.loads(row[1])
+                action_id = row[0]
+                envelope_data = json.loads(row[1])
 
-            # Transition state to ASSIGNED
-            conn.execute("""
-            UPDATE async_command_queue
-            SET status = 'ASSIGNED', worker_id = ?, updated_at = ?
-            WHERE action_id = ?
-            """, (worker_id, now, action_id))
+                # Transition state to ASSIGNED with atomic compare-and-swap
+                cur = conn.execute("""
+                UPDATE async_command_queue
+                SET status = 'ASSIGNED', worker_id = ?, updated_at = ?
+                WHERE action_id = ? AND status = 'QUEUED'
+                """, (worker_id, now, action_id))
 
-            if tenant_id:
-                coordination.decrement_backpressure(f"queue_depth:{tenant_id}")
+                if hasattr(cur, 'rowcount') and cur.rowcount == 0:
+                    # Concurrently claimed by another worker
+                    return None
 
-            return ActionEnvelope.from_dict(envelope_data)
+                if tenant_id:
+                    coordination.decrement_backpressure(f"queue_depth:{tenant_id}")
+
+                return ActionEnvelope.from_dict(envelope_data)
 
     def mark_completed(self, action_id: str, result: Dict[str, Any]):
         from core.database_engine import engine, WorkloadType
@@ -252,5 +259,35 @@ class AsynchronousCommandBus:
                 "completed_at": row[4]
             }
 
+    def run_worker(self, worker_id: Optional[str] = None, poll_interval: float = 0.5, max_iterations: Optional[int] = None):
+        """Run continuous asynchronous worker processing loop."""
+        from core.action_gateway import ZonataActionGateway
+        worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
+        iterations = 0
+        logger.info(f"Asynchronous worker '{worker_id}' started.")
+        while True:
+            if max_iterations is not None and iterations >= max_iterations:
+                break
+            iterations += 1
+            try:
+                envelope = self.fetch_next(worker_id=worker_id)
+                if envelope:
+                    try:
+                        gateway = ZonataActionGateway()
+                        result = gateway.execute_action(envelope)
+                        self.mark_completed(envelope.action_id, result)
+                    except Exception as exec_err:
+                        self.mark_failed(envelope.action_id, str(exec_err))
+                else:
+                    time.sleep(poll_interval)
+            except Exception as e:
+                logger.error(f"Worker loop error: {e}")
+                time.sleep(poll_interval)
+
 # Global asynchronous command bus instance
 command_bus = AsynchronousCommandBus()
+
+if __name__ == "__main__":
+    import sys
+    worker_id = sys.argv[2] if len(sys.argv) > 2 else f"worker_{uuid.uuid4().hex[:8]}"
+    command_bus.run_worker(worker_id=worker_id)

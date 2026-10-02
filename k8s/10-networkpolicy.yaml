@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zonata-default-deny-ingress
+  namespace: zonata-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-api
+  namespace: zonata-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zonata-api
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-supervisor-db-egress
+  namespace: zonata-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: zonata-operating-system
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 5432 # Postgres
+        - protocol: TCP
+          port: 6379 # Redis
+        - protocol: TCP
+          port: 7233 # Temporal
+        - protocol: TCP
+          port: 443  # External HTTPS (Nango, LLM, MCP, SaaS)
+        - protocol: UDP
+          port: 53   # DNS

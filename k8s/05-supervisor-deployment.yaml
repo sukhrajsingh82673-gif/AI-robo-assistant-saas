@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zonata-supervisor
+  namespace: zonata-system
+  labels:
+    app.kubernetes.io/name: zonata-supervisor
+    app.kubernetes.io/component: ha-reconciliation
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zonata-supervisor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zonata-supervisor
+        app.kubernetes.io/component: ha-reconciliation
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: zonata-supervisor
+          image: zonata/supervisor:v3.0.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: zonata-config
+            - secretRef:
+                name: zonata-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
