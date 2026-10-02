@@ -899,6 +899,69 @@ class OverviewDataService:
             }
 
             # -------------------------------------------------------------
+            # 13.5 Temporal Governed Durable Execution Layer (Project 09)
+            # -------------------------------------------------------------
+            temp_total_wf = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_active_wf = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'RUNNING'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_completed_wf = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'COMPLETED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_failed_wf = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'FAILED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_awaiting_appr = cur.execute(
+                "SELECT COUNT(*) FROM temporal_approvals WHERE tenant_id = ? AND status = 'PENDING'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_unknown_outcomes = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'UNKNOWN_OUTCOME'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_reconciled = cur.execute(
+                "SELECT COUNT(*) FROM temporal_reconciliations WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_workers = cur.execute(
+                "SELECT COUNT(*) FROM temporal_workers WHERE tenant_id = ? AND status = 'ONLINE'",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_queues = cur.execute(
+                "SELECT COUNT(*) FROM temporal_task_queues WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            temp_sec_events = cur.execute(
+                "SELECT COUNT(*) FROM temporal_security_events WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+
+            has_temp_activity = bool(temp_total_wf > 0 or temp_workers > 0)
+            temp_recovery_rate = round((temp_completed_wf / max(1, temp_completed_wf + temp_failed_wf)) * 100.0, 1) if (temp_completed_wf + temp_failed_wf) > 0 else 100.0
+
+            temporal_data = {
+                "total_workflows": temp_total_wf,
+                "active_workflows": temp_active_wf,
+                "completed_workflows": temp_completed_wf,
+                "failed_workflows": temp_failed_wf,
+                "pending_approvals": temp_awaiting_appr,
+                "unknown_outcomes": temp_unknown_outcomes,
+                "reconciled_count": temp_reconciled,
+                "workers_online": temp_workers,
+                "task_queues_count": temp_queues,
+                "security_events": temp_sec_events,
+                "recovery_rate_pct": temp_recovery_rate,
+                "has_activity": has_temp_activity,
+                "status_text": "No durable process activity yet" if not has_temp_activity else f"{temp_completed_wf} completed, {temp_active_wf} active workflows across {temp_workers} execution workers"
+            }
+
+            # -------------------------------------------------------------
             # 14. AI-Generated Executive Insights (With Epistemic Provenance)
             # -------------------------------------------------------------
             insights = []
@@ -1082,6 +1145,7 @@ class OverviewDataService:
                 "mcp": mcp_data,
                 "openhands": openhands_data,
                 "browser": browser_data,
+                "temporal": temporal_data,
                 "data_quality": data_quality,
                 "intelligence": {
                     "has_data": len(insights) > 0,

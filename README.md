@@ -151,6 +151,18 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (autonomous web competitive intelligence), Agency Swarm squads, Letta stateful memory, LangGraph durable workflow nodes, OpenHands dual-agent coordination, and governed MCP tools. Canonical test suite covers Read-Only Extraction (Test 01), Form Submission & Merkle Proof (Test 02), Financial Mutation Human Approval (Test 03), Emergency Multi-Scope KillSwitch (Test 04), Prompt Injection Defense (Test 05), SSRF & Private Network Blocking (Test 06), OpenHands + Browser Dual-Agent Workflow (Test 07), Multi-Tab Coordination (Test 08), Unknown Mutation Reconciliation (Test 09), and Section 80 Grand Acceptance Test (Test 10).
 - **Dedicated Web Cockpit**: Fully interactive Browser Execution Cockpit (`web/browser_workspace.js`) with KPI metrics, Execution history, Session manager, Step-by-step action stream, Screenshots & Artifacts registry with SHA-256 digests, Security Center, and Live Canonical Scenario Runner.
 
+### 16. Governed Durable Execution & Long-Running Mission Reliability Layer (Temporal — Project 09)
+- **Durable Execution Engine**: Integrates official Temporal (`temporalio/temporal` & `temporalio/sdk-python`) architectural patterns as a governed durable execution and mission reliability layer subordinate to ZONATA's existing AI CEO → Agency Swarm / Workforce → Mission → TaskMaker → LangGraph hierarchy.
+- **Architectural Distinction**:
+  - `LangGraph = Governed Agent & Workflow Graph Orchestration Layer` (cyclic cognitive flows, node composition, graph state)
+  - `Temporal = Governed Durable Execution & Infrastructure Reliability Layer` (state durability across crashes, host restarts, activity retries, sagas, long waits)
+  - `Temporal is strictly subordinate to ZONATA governance` (`capability != authority`, `model output != authorization`, `retry != permission`, `durability != business success`, `TASK_SUCCESS != BUSINESS_OUTCOME`).
+- **24-Interface Governed Gateway**: Complete abstraction (`TemporalDurableExecutionGateway`) exposing `startWorkflow`, `signalWorkflow`, `updateWorkflow`, `queryWorkflow`, `cancelWorkflow`, `terminateWorkflow`, `pauseWorkflow`, `resumeWorkflow`, `getWorkflowStatus`, `getWorkflowHistory`, `startActivity`, `retryActivity`, `scheduleWorkflow`, `awaitHumanApproval`, `awaitExternalEvent`, `registerWorker`, `unregisterWorker`, `heartbeatWorker`, `reconcileWorkflow`, `recoverWorkflow`, `continueAsNew`, `createChildWorkflow`, `executeCompensation`, and `verifyOutcome`.
+- **Multi-Scope KillSwitch & Security Boundary**: Authoritative immediate halts across 9 distinct scopes (Global, Tenant, Company, Mission, Workflow, Worker, Queue, Activity, Agent). Automated Context Firewall with prompt injection neutralization and regex credential scrubbing (`[REDACTED_CREDENTIAL]`, `[REDACTED_CREDENTIAL_HANDLE]`).
+- **Saga Compensation & Non-Idempotent Reconciliation**: LIFO reverse compensation for failed distributed workflows (`SagaCompensationCoordinator`). Explicit `UNKNOWN_OUTCOME` protocol prohibiting blind replay on financial or mutating activities, requiring state reconciliation.
+- **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (long-running company mission durability), LangGraph (durable node execution underneath graph orchestration), Browser Use (durable web execution with retry governance), OpenHands (durable workspace task recovery), and MCP (governed durable tool execution). Canonical test suite covers Standard Durable Mission (Scenario 01), Activity Failure & Exponential Retry (Scenario 02), Human Approval Wait (Scenario 03), Emergency Multi-Scope KillSwitch (Scenario 04), Prompt Injection & Secret Scrubbing (Scenario 05), Saga Multi-Step Rollback (Scenario 06), Unknown Outcome Ambiguous Mutation Reconciliation (Scenario 07), LangGraph + Temporal Hybrid Pipeline (Scenario 08), Crash & Restart Recovery (Scenario 09), and Section 85 Grand Acceptance Test (Scenario 10).
+- **Dedicated Web Cockpit**: Fully interactive Governed Durable Execution Center (`web/temporal_workspace.js`) with KPI metrics, Durable Processes view, Mission Timeline, Execution Workers & Queues, Human Approval Waits, Reconciliations & Sagas, Security & Audit, and Live Canonical Scenario Runner.
+
 ---
 
 ## 📁 Repository Structure
@@ -161,6 +173,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 ├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
 ├── serve_web.py                     # Standalone web UI preview server
 ├── core/
+│   ├── temporal_durable_execution_runtime.py # Temporal Governed Durable Execution Layer (Gateway, Sagas, KillSwitch, Workers)
 │   ├── browser_use_execution_runtime.py # Browser Use Governed Real-Browser Runtime (Gateway, Sessions, SSRF Firewall, DOM & Viewport)
 │   ├── openhands_execution_runtime.py # OpenHands Governed Workspace Runtime (Gateway, Sandboxes, Command Classifier)
 │   ├── mcp_interoperability_runtime.py # MCP Governed Interoperability Layer (Gateway, Transports, Firewall, Inbound Server)
@@ -176,6 +189,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── control_kernel.py            # Universal Control Kernel with evidence verification
 │   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
 ├── zonata/
+│   ├── temporal_adapter.py          # Temporal Adapter, Subsystem Bridges & Canonical Scenarios (01-10 & Section 85)
 │   ├── browser_use_adapter.py       # Browser Use Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-10 & Section 80)
 │   ├── openhands_adapter.py         # OpenHands Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-08 & Section 79)
 │   ├── mcp_adapter.py               # MCP Adapter, Subsystem Bridges & Canonical Scenarios (A-J & Section 73)
@@ -185,6 +199,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_temporal_durable_execution.py # 20 Temporal durable execution, saga, killswitch & scenario tests
 │   ├── test_browser_use_execution.py # 27 Browser Use real-browser execution, security & scenario tests
 │   ├── test_openhands_execution.py  # 27 OpenHands workspace execution & scenario tests
 │   ├── test_mcp_interoperability.py # 36 MCP protocol, transport, firewall, security & scenario tests
@@ -192,10 +207,11 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
-│   └── test_*.py                    # 73 Unit & system regression tests (366 tests total across suite)
+│   └── test_*.py                    # 73 Unit & system regression tests (386 tests total across suite)
 ├── web/
 │   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
+│   ├── temporal_workspace.js        # Governed Durable Execution Center (Processes, Workers, Queues, Approvals, Scenarios)
 │   ├── browser_workspace.js         # Browser Execution Cockpit (Sessions, Actions, Viewport, Artifacts, Scenarios)
 │   ├── openhands_workspace.js       # Agent Execution Workspace (Executions, Workspaces, Approvals, Scenarios)
 │   ├── mcp_workspace.js             # MCP Network Workspace (Servers, Tools, Resources, Evidence, Scenarios)
@@ -257,7 +273,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 366/366 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, and Browser Use Governed Real-Browser Execution Layer).*
+*Current test suite: 386/386 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, Browser Use Governed Real-Browser Execution Layer, and Temporal Governed Durable Execution Layer).*
 
 ---
 
@@ -308,5 +324,15 @@ python3 -m unittest discover tests
 43. **Non-idempotent Web Action Reconciliation**: Web requests with ambiguous connection outcomes (timeouts, network drops) are marked `RECONCILIATION_REQUIRED` and prohibited from automatic repeated re-execution.
 44. **Authoritative Browser KillSwitch**: Multi-scope killswitches (Global, Tenant, Company, Session, Execution, Domain, Agent) instantly terminate active browser processes, disconnect contexts, and reject pending commands.
 45. **Cryptographic Merkle Sealing**: Every completed browser execution, action sequence, and visual artifact must be sealed into the tamper-evident Merkle Evidence Ledger with SHA-256 proofs before outcome attestation.
+46. **Temporal Workflow != Authorization**: An orchestration definition or running Temporal workflow does not grant authority to bypass ZONATA PolicyEngine or Authority Gateway.
+47. **Temporal Activity != Authorization**: Execution of a Temporal activity step is subordinate to governance checks; tool possession is not permission.
+48. **Worker != Authority**: A registered Temporal worker is an execution resource, never a policy authority or decision-making entity.
+49. **Retry != Permission**: Automatic activity retries must never re-execute unapproved or non-idempotent actions without re-evaluation.
+50. **Replay != Reauthorization**: Deterministic workflow history replay must not cause duplicate side effects or bypass human approval gates.
+51. **Durability != Business Success**: Durable execution across crashes is an infrastructure guarantee, not business outcome achievement (`TASK_SUCCESS != BUSINESS_OUTCOME`).
+52. **Temporal Completion != Business Completion**: Workflow or activity completion in Temporal does not verify that business truth was established.
+53. **Event History != Business Truth**: Recorded Temporal event history is execution telemetry, not cryptographically verified evidence of business outcome.
+54. **Ambiguous Mutation Protocol**: Any mutating activity with an unknown outcome (`UNKNOWN_OUTCOME`) must halt and trigger explicit state reconciliation, never blind automatic retry.
+55. **Authoritative Temporal KillSwitch**: Multi-scope killswitches (Global, Tenant, Company, Mission, Workflow, Worker, Queue, Activity, Agent) unconditionally terminate workflow execution, cancel pending activities, and reject new tasks.
 
 

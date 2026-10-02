@@ -1963,6 +1963,238 @@ CREATE TABLE IF NOT EXISTS browser_approvals (
 
 CREATE INDEX IF NOT EXISTS idx_br_appr_exec ON browser_approvals(execution_id);
 CREATE INDEX IF NOT EXISTS idx_br_appr_status ON browser_approvals(status);
+
+-- 62. Temporal Durable Execution Runtime (Project 09)
+CREATE TABLE IF NOT EXISTS temporal_runtimes (
+    cluster_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    server_address TEXT NOT NULL,
+    namespace TEXT NOT NULL DEFAULT 'default',
+    version TEXT NOT NULL DEFAULT '1.26.2',
+    status TEXT NOT NULL DEFAULT 'ONLINE',
+    tls_enabled INTEGER NOT NULL DEFAULT 0,
+    metrics JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS temporal_workers (
+    worker_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    task_queue TEXT NOT NULL,
+    capability_scope JSON,
+    status TEXT NOT NULL DEFAULT 'ONLINE', -- ONLINE, BUSY, PAUSED, OFFLINE, QUARANTINED
+    runtime_version TEXT NOT NULL,
+    worker_version TEXT NOT NULL,
+    supported_activities JSON,
+    max_concurrent_activities INTEGER NOT NULL DEFAULT 10,
+    max_concurrent_workflows INTEGER NOT NULL DEFAULT 10,
+    heartbeat_at REAL NOT NULL,
+    created_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_worker_tenant ON temporal_workers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_temp_worker_queue ON temporal_workers(task_queue);
+CREATE INDEX IF NOT EXISTS idx_temp_worker_status ON temporal_workers(status);
+
+CREATE TABLE IF NOT EXISTS temporal_task_queues (
+    queue_name TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    workload_type TEXT NOT NULL, -- BROWSER, OPENHANDS, MCP, A2A, AI, FINANCIAL, DOCUMENTS, RESEARCH, INTERNAL
+    security_level TEXT NOT NULL DEFAULT 'STANDARD', -- STANDARD, HIGH_RISK, PRIVILEGED, FINANCIAL
+    concurrency_limit INTEGER NOT NULL DEFAULT 20,
+    rate_limit_per_minute INTEGER NOT NULL DEFAULT 600,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    description TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_queue_tenant ON temporal_task_queues(tenant_id);
+
+CREATE TABLE IF NOT EXISTS temporal_workflows (
+    workflow_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    workflow_type TEXT NOT NULL,
+    task_queue TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'RUNNING', -- RUNNING, COMPLETED, FAILED, CANCELLED, TERMINATED, CONTINUED_AS_NEW, TIMED_OUT, PAUSED, AWAITING_APPROVAL, RECONCILIATION_REQUIRED, UNKNOWN_OUTCOME
+    workflow_version TEXT NOT NULL DEFAULT 'v1.0.0',
+    runtime_version TEXT NOT NULL DEFAULT '1.26.2',
+    input_payload JSON,
+    result_payload JSON,
+    error_message TEXT,
+    idempotency_key TEXT,
+    execution_budget JSON,
+    resource_usage JSON,
+    verification_status TEXT DEFAULT 'UNVERIFIED', -- UNVERIFIED, VERIFIED, FAILED
+    evidence_package_id TEXT,
+    parent_workflow_id TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_wf_tenant ON temporal_workflows(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_temp_wf_comp ON temporal_workflows(company_id);
+CREATE INDEX IF NOT EXISTS idx_temp_wf_mission ON temporal_workflows(mission_id);
+CREATE INDEX IF NOT EXISTS idx_temp_wf_status ON temporal_workflows(status);
+CREATE INDEX IF NOT EXISTS idx_temp_wf_idemp ON temporal_workflows(idempotency_key);
+
+CREATE TABLE IF NOT EXISTS temporal_activity_executions (
+    activity_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    task_queue TEXT NOT NULL,
+    worker_id TEXT,
+    status TEXT NOT NULL DEFAULT 'SCHEDULED', -- SCHEDULED, STARTED, COMPLETED, FAILED, TIMED_OUT, CANCELLED, AWAITING_APPROVAL, RECONCILING, UNKNOWN_OUTCOME
+    risk_class TEXT NOT NULL DEFAULT 'SAFE_RETRY', -- READ_ONLY, SAFE_RETRY, IDEMPOTENT_MUTATION, NON_IDEMPOTENT_MUTATION, FINANCIAL_MUTATION, DESTRUCTIVE, IRREVERSIBLE
+    attempt INTEGER NOT NULL DEFAULT 1,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    backoff_seconds REAL NOT NULL DEFAULT 1.0,
+    timeout_seconds REAL NOT NULL DEFAULT 30.0,
+    heartbeat_timeout_seconds REAL NOT NULL DEFAULT 10.0,
+    idempotency_key TEXT,
+    input_payload JSON,
+    result_payload JSON,
+    error_message TEXT,
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+    approval_id TEXT,
+    outcome_status TEXT DEFAULT 'PENDING',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(workflow_id) REFERENCES temporal_workflows(workflow_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_act_wf ON temporal_activity_executions(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_temp_act_status ON temporal_activity_executions(status);
+CREATE INDEX IF NOT EXISTS idx_temp_act_idemp ON temporal_activity_executions(idempotency_key);
+
+CREATE TABLE IF NOT EXISTS temporal_workflow_events (
+    event_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    event_index INTEGER NOT NULL,
+    payload JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(workflow_id) REFERENCES temporal_workflows(workflow_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_ev_wf ON temporal_workflow_events(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_temp_ev_idx ON temporal_workflow_events(workflow_id, event_index);
+
+CREATE TABLE IF NOT EXISTS temporal_approvals (
+    approval_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    activity_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    step_name TEXT NOT NULL,
+    required_role TEXT NOT NULL DEFAULT 'OWNER',
+    risk_level TEXT NOT NULL DEFAULT 'HIGH',
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, CANCELLED, TIMED_OUT
+    requested_action JSON,
+    decided_by TEXT,
+    decision_reason TEXT,
+    requested_at REAL NOT NULL,
+    decided_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY(workflow_id) REFERENCES temporal_workflows(workflow_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_appr_wf ON temporal_approvals(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_temp_appr_status ON temporal_approvals(status);
+
+CREATE TABLE IF NOT EXISTS temporal_reconciliations (
+    reconciliation_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    activity_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    external_ref TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RECONCILED, ESCALATED, FAILED
+    pre_state JSON,
+    external_observed_state JSON,
+    post_reconciled_state JSON,
+    resolution TEXT,
+    created_at REAL NOT NULL,
+    resolved_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_rec_wf ON temporal_reconciliations(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_temp_rec_status ON temporal_reconciliations(status);
+
+CREATE TABLE IF NOT EXISTS temporal_compensations (
+    compensation_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    activity_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    saga_step TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, EXECUTED, FAILED, CANCELLED
+    action_type TEXT NOT NULL,
+    compensation_payload JSON,
+    result JSON,
+    created_at REAL NOT NULL,
+    executed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_comp_wf ON temporal_compensations(workflow_id);
+
+CREATE TABLE IF NOT EXISTS temporal_security_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    workflow_id TEXT,
+    activity_id TEXT,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_sec_tenant ON temporal_security_events(tenant_id);
+
+CREATE TABLE IF NOT EXISTS temporal_schedules (
+    schedule_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    cron_expression TEXT,
+    interval_seconds INTEGER,
+    workflow_type TEXT NOT NULL,
+    task_queue TEXT NOT NULL,
+    input_payload JSON,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, PAUSED, DELETED
+    last_run_at REAL,
+    next_run_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_sched_tenant ON temporal_schedules(tenant_id);
 """
 
 class Database:

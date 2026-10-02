@@ -222,6 +222,26 @@ from zonata.browser_use_adapter import BrowserUseCanonicalScenarios, BrowserUseC
 browser_gateway = BrowserExecutionGateway("tnt_primary", "comp_primary")
 browser_scenarios = BrowserUseCanonicalScenarios("tnt_primary", "comp_primary")
 
+# Temporal (Governed Durable Execution & Long-Running Mission Reliability Layer - Project 09)
+from core.temporal_durable_execution_runtime import (
+    TemporalDurableExecutionGateway,
+    TemporalKillSwitch,
+    TemporalWorkflowStatus,
+    TemporalActivityStatus,
+    ActivityRiskClass,
+    WorkflowEventType,
+    TemporalSecurityEventType,
+    ExecutionRoute,
+    DurableMissionEngine,
+    ExecutionBudget,
+    RetryPolicy,
+    SecurityException as TemporalSecurityException
+)
+from zonata.temporal_adapter import TemporalCanonicalScenarios, TemporalCeoBridge
+
+temporal_gateway = TemporalDurableExecutionGateway("tnt_primary", "comp_primary")
+temporal_scenarios = TemporalCanonicalScenarios("tnt_primary", "comp_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -1600,6 +1620,85 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/browser/killswitch":
             company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
             killed, reason = BrowserKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
+            self._send_json({
+                "killswitch_active": killed,
+                "reason": reason,
+                "tenant_id": tenant_id,
+                "company_id": company_id,
+                "status": "KILLSWITCH_ENGAGED" if killed else "OPERATIONAL"
+            })
+            return
+
+        # =====================================================================
+        # Governed Temporal Durable Execution Layer Endpoints (GET - Project 09)
+        # =====================================================================
+        elif path == "/api/temporal/clusters":
+            self._send_json({
+                "clusters": [{
+                    "cluster_id": "cls_zonata_temporal_primary",
+                    "name": "Zonata Sovereign Temporal Cluster",
+                    "server_version": "1.26.2",
+                    "sdk_version": "1.7.0",
+                    "status": "ONLINE",
+                    "namespace": "default",
+                    "durable_storage": "SQLite Normalized Durable Engine"
+                }]
+            })
+            return
+
+        elif path == "/api/temporal/workers":
+            workers = temporal_gateway.list_workers()
+            self._send_json({"workers": workers, "count": len(workers)})
+            return
+
+        elif path == "/api/temporal/queues":
+            queues = temporal_gateway.list_queues()
+            self._send_json({"queues": queues, "count": len(queues)})
+            return
+
+        elif path == "/api/temporal/workflows":
+            limit = int(query_params.get("limit", [50])[0])
+            status = query_params.get("status", [None])[0]
+            workflows = temporal_gateway.list_workflows(status=status, limit=limit)
+            self._send_json({"workflows": workflows, "count": len(workflows)})
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/history"):
+            parts = path.split("/")
+            wf_id = parts[4]
+            history = temporal_gateway.get_workflow_history(wf_id)
+            self._send_json({"history": history, "count": len(history), "workflow_id": wf_id})
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and len(path.split("/")) == 5:
+            wf_id = path.split("/")[4]
+            wf = temporal_gateway.get_workflow_status(wf_id)
+            if wf:
+                self._send_json(wf)
+            else:
+                self._send_json({"error": f"Workflow '{wf_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/temporal/approvals":
+            status = query_params.get("status", [None])[0]
+            approvals = temporal_gateway.list_approvals(status=status)
+            self._send_json({"approvals": approvals, "count": len(approvals)})
+            return
+
+        elif path == "/api/temporal/security/events":
+            limit = int(query_params.get("limit", [50])[0])
+            events = temporal_gateway.list_security_events(limit=limit)
+            self._send_json({"security_events": events, "count": len(events)})
+            return
+
+        elif path == "/api/temporal/metrics":
+            metrics = temporal_gateway.get_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/temporal/killswitch":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            killed, reason = TemporalKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
             self._send_json({
                 "killswitch_active": killed,
                 "reason": reason,
@@ -3797,6 +3896,253 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"success": True, "scenario": scenario, "result": res})
             else:
                 self._send_json({"error": f"Unknown Browser Use scenario '{scenario}'"}, status=400)
+            return
+
+        # =====================================================================
+        # Governed Temporal Durable Execution Layer Endpoints (POST - Project 09)
+        # =====================================================================
+        elif path == "/api/temporal/workflows":
+            wf_type = req_data.get("workflow_type", "StandardDurableWorkflow")
+            input_payload = req_data.get("input_payload", {})
+            task_queue = req_data.get("task_queue", "zonata.ai")
+            mission_id = req_data.get("mission_id")
+            idempotency_key = req_data.get("idempotency_key")
+            try:
+                wf = temporal_gateway.start_workflow(
+                    workflow_type=wf_type,
+                    input_payload=input_payload,
+                    task_queue=task_queue,
+                    mission_id=mission_id,
+                    idempotency_key=idempotency_key
+                )
+                self._send_json(wf)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/signal"):
+            wf_id = path.split("/")[4]
+            sig_name = req_data.get("signal_name", "EXTERNAL_UPDATE")
+            sig_payload = req_data.get("payload", {})
+            try:
+                res = temporal_gateway.signal_workflow(wf_id, sig_name, sig_payload)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/update"):
+            wf_id = path.split("/")[4]
+            upd_name = req_data.get("update_name", "UPDATE_CONFIG")
+            upd_payload = req_data.get("payload", {})
+            try:
+                res = temporal_gateway.update_workflow(wf_id, upd_name, upd_payload)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/query"):
+            wf_id = path.split("/")[4]
+            q_name = req_data.get("query_name", "status")
+            try:
+                res = temporal_gateway.query_workflow(wf_id, q_name)
+                self._send_json({"result": res, "workflow_id": wf_id, "query": q_name})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/pause"):
+            wf_id = path.split("/")[4]
+            reason = req_data.get("reason", "Governor override")
+            try:
+                res = temporal_gateway.pause_workflow(wf_id, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/resume"):
+            wf_id = path.split("/")[4]
+            try:
+                res = temporal_gateway.resume_workflow(wf_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/cancel"):
+            wf_id = path.split("/")[4]
+            reason = req_data.get("reason", "User requested cancel")
+            try:
+                res = temporal_gateway.cancel_workflow(wf_id, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/terminate"):
+            wf_id = path.split("/")[4]
+            reason = req_data.get("reason", "Administrative termination")
+            try:
+                res = temporal_gateway.terminate_workflow(wf_id, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workflows/") and path.endswith("/reconcile"):
+            wf_id = path.split("/")[4]
+            act_id = req_data.get("activity_id")
+            ext_ref = req_data.get("external_ref")
+            entity_type = req_data.get("entity_type", "GENERIC_MUTATION")
+            obs_state = req_data.get("observed_state")
+            try:
+                res = temporal_gateway.reconcile_workflow(
+                    workflow_id=wf_id,
+                    activity_id=act_id,
+                    external_ref=ext_ref,
+                    entity_type=entity_type,
+                    observed_external_state=obs_state
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/temporal/activities":
+            wf_id = req_data.get("workflow_id")
+            act_type = req_data.get("activity_type", "StandardActivity")
+            inp = req_data.get("input_payload", {})
+            risk_str = req_data.get("risk_class", "SAFE_RETRY")
+            risk_class = getattr(ActivityRiskClass, risk_str, ActivityRiskClass.SAFE_RETRY)
+            idemp_key = req_data.get("idempotency_key")
+            try:
+                act = temporal_gateway.start_activity(
+                    workflow_id=wf_id,
+                    activity_type=act_type,
+                    input_payload=inp,
+                    risk_class=risk_class,
+                    idempotency_key=idemp_key
+                )
+                self._send_json(act)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/activities/") and path.endswith("/retry"):
+            act_id = path.split("/")[4]
+            reason = req_data.get("reason", "Retry requested")
+            try:
+                res = temporal_gateway.retry_activity(act_id, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/activities/") and path.endswith("/complete"):
+            act_id = path.split("/")[4]
+            res_payload = req_data.get("result", {})
+            try:
+                res = temporal_gateway.complete_activity(act_id, res_payload)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/temporal/workers/register":
+            w_id = req_data.get("worker_id", f"wrk_custom_{uuid.uuid4().hex[:6]}")
+            queue = req_data.get("task_queue", "zonata.ai")
+            caps = req_data.get("capability_scope", ["GENERAL"])
+            acts = req_data.get("supported_activities", ["general_task"])
+            try:
+                w = temporal_gateway.register_worker(w_id, queue, caps, acts)
+                self._send_json(w)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/temporal/workers/") and path.endswith("/heartbeat"):
+            w_id = path.split("/")[4]
+            ok = temporal_gateway.heartbeat_worker(w_id)
+            self._send_json({"success": ok, "worker_id": w_id})
+            return
+
+        elif path.startswith("/api/temporal/approvals/") and path.endswith("/decide"):
+            appr_id = path.split("/")[4]
+            approved = bool(req_data.get("approved", True))
+            decided_by = req_data.get("decided_by", "OWNER")
+            reason = req_data.get("reason", "Approved by operator")
+            try:
+                res = temporal_gateway.decide_approval(appr_id, approved=approved, decided_by=decided_by, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/temporal/killswitch":
+            active = bool(req_data.get("active", True))
+            scope = str(req_data.get("scope", "GLOBAL")).upper()
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            if active:
+                if scope == "GLOBAL":
+                    TemporalKillSwitch.trip_global()
+                elif scope == "TENANT":
+                    TemporalKillSwitch.trip_tenant(tenant_id)
+                elif scope == "COMPANY":
+                    TemporalKillSwitch.trip_company(company_id)
+                elif scope == "WORKFLOW":
+                    TemporalKillSwitch.trip_workflow(req_data.get("workflow_id", ""))
+                elif scope == "WORKER":
+                    TemporalKillSwitch.trip_worker(req_data.get("worker_id", ""))
+                elif scope == "QUEUE":
+                    TemporalKillSwitch.trip_queue(req_data.get("task_queue", ""))
+                elif scope == "ACTIVITY":
+                    TemporalKillSwitch.trip_activity(req_data.get("activity_id", ""))
+            else:
+                TemporalKillSwitch.reset_all()
+            killed, k_reason = TemporalKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
+            self._send_json({
+                "success": True,
+                "killswitch_active": killed,
+                "status": "KILLSWITCH_ENGAGED" if killed else "OPERATIONAL",
+                "scope": scope,
+                "reason": k_reason
+            })
+            return
+
+        elif path == "/api/temporal/demo/scenarios":
+            scenario = str(req_data.get("scenario", "SECTION_85")).upper()
+            sc_map = {
+                "TEST_01": temporal_scenarios.test_01_durable_workflow_crash_recovery,
+                "1": temporal_scenarios.test_01_durable_workflow_crash_recovery,
+                "TEST_02": temporal_scenarios.test_02_retry_governance_and_non_idempotent_blocks,
+                "2": temporal_scenarios.test_02_retry_governance_and_non_idempotent_blocks,
+                "TEST_03": temporal_scenarios.test_03_first_class_unknown_outcome_reconciliation,
+                "3": temporal_scenarios.test_03_first_class_unknown_outcome_reconciliation,
+                "TEST_04": temporal_scenarios.test_04_multi_day_human_approval_wait,
+                "4": temporal_scenarios.test_04_multi_day_human_approval_wait,
+                "TEST_05": temporal_scenarios.test_05_multi_scope_killswitch_enforcement,
+                "5": temporal_scenarios.test_05_multi_scope_killswitch_enforcement,
+                "TEST_06": temporal_scenarios.test_06_zero_credential_leakage,
+                "6": temporal_scenarios.test_06_zero_credential_leakage,
+                "TEST_07": temporal_scenarios.test_07_strict_tenant_isolation,
+                "7": temporal_scenarios.test_07_strict_tenant_isolation,
+                "TEST_08": temporal_scenarios.test_08_langgraph_temporal_hybrid,
+                "8": temporal_scenarios.test_08_langgraph_temporal_hybrid,
+                "TEST_09": temporal_scenarios.test_09_multi_layer_integration,
+                "9": temporal_scenarios.test_09_multi_layer_integration,
+                "SECTION_85": temporal_scenarios.test_10_section_85_grand_acceptance_test,
+                "85": temporal_scenarios.test_10_section_85_grand_acceptance_test,
+                "TEST_10": temporal_scenarios.test_10_section_85_grand_acceptance_test,
+                "10": temporal_scenarios.test_10_section_85_grand_acceptance_test
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown Temporal scenario '{scenario}'"}, status=400)
             return
 
         self._send_json({"error": "Endpoint not found"}, status=404)

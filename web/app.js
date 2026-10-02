@@ -237,6 +237,7 @@ function updateBreadcrumbs() {
     'mcp-network': 'MCP Network (Tools & Systems)',
     'openhands-execution': 'Agent Execution (OpenHands)',
     'browser-execution': 'Browser Use (Governed Web Layer)',
+    'temporal-durable': 'Durable Execution (Temporal Engine)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -397,6 +398,9 @@ function handleRoute(path) {
   } else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
     const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
     mgr.render('view-browser-execution');
+  } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
+    const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
+    mgr.render('view-temporal-durable');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {

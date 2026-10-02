@@ -5212,4 +5212,24 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   Temporal Governed Durable Execution Styles (Project 09)
+   ========================================================================== */
+.temporal-workspace-root {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.wf-item-card:hover {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+.temporal-timeline-card {
+  transition: all 0.2s ease;
+}
+
+.temporal-timeline-card:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
 
