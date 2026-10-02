@@ -137,3 +137,11 @@ class EvidenceLedger:
             if curr["prev_hash"] != prev["sha256_digest"]:
                 return False
         return True
+
+    def get_evidence(self, evidence_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a sealed evidence package by evidence_id."""
+        for record in self.chain:
+            if record.get("evidence_id") == evidence_id:
+                return record
+        return None
+

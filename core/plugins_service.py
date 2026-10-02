@@ -122,7 +122,14 @@ class PluginsAndConnectionsService:
 
         if not rows:
             self._seed_canonical_connections(company_id or "comp_primary")
-            return self.list_connections(company_id)
+            with db.get_connection() as conn:
+                params = [self.tenant_id]
+                query = "SELECT * FROM external_connections WHERE tenant_id = ?"
+                if company_id and company_id != "all":
+                    query += " AND (company_id = ? OR company_id = 'all')"
+                    params.append(company_id)
+                query += " ORDER BY created_at DESC"
+                rows = conn.execute(query, params).fetchall()
 
         connections = []
         for r in rows:
@@ -143,6 +150,38 @@ class PluginsAndConnectionsService:
                 "endpoint_url": r["endpoint_url"],
                 "created_at": r["created_at"]
             })
+
+        # Also include registered MCP Servers as first-class connections (Section 28)
+        with db.get_connection() as conn:
+            mcp_rows = conn.execute(
+                "SELECT * FROM mcp_servers WHERE tenant_id = ? ORDER BY created_at DESC",
+                (self.tenant_id,)
+            ).fetchall()
+            for ms in mcp_rows:
+                connections.append({
+                    "connection_id": ms["server_id"],
+                    "company_id": ms["company_id"],
+                    "name": ms["display_name"],
+                    "service_type": "MCP_SERVER",
+                    "connector_adapter": f"mcp_{ms['transport']}_adapter",
+                    "auth_status": "AUTHENTICATED" if ms["trust_state"] in ("TRUSTED", "VALIDATED", "IDENTITY_VERIFIED") else "UNVERIFIED",
+                    "health_score": 98 if ms["health_status"] == "HEALTHY" else 45,
+                    "latency_ms": 12.0,
+                    "last_sync_at": ms["last_verified"] or ms["last_seen"],
+                    "field_mappings": {"protocol": ms["protocol_version"], "transport": ms["transport"]},
+                    "permission_scope": {
+                        "level": ms["trust_state"],
+                        "allow_write": True,
+                        "isolated_vault": True,
+                        "data_classification": ms["data_classification"]
+                    },
+                    "endpoint_url": ms["endpoint"],
+                    "created_at": ms["created_at"],
+                    "is_mcp": True,
+                    "trust_state": ms["trust_state"],
+                    "status": ms["status"]
+                })
+
         return connections
 
     def create_connection(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -431,6 +470,6 @@ class PluginsAndConnectionsService:
                         created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, 'CONNECTED', 99.1, 38, ?, ?, '{"level":"READ_ONLY_VISIBILITY"}', ?, ?, ?)
                     """,
-                    (c["id"], self.tenant_id, company_id, c["name"], c["service_type"], c["adapter"], now - 1800, json.dumps(c["mappings"]), c["endpoint"], now, now)
+                    (f"{c['id']}_{self.tenant_id}", self.tenant_id, company_id, c["name"], c["service_type"], c["adapter"], now - 1800, json.dumps(c["mappings"]), c["endpoint"], now, now)
                 )
             conn.commit()

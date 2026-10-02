@@ -740,6 +740,39 @@ class OverviewDataService:
             }
 
             # -------------------------------------------------------------
+            # 13b. Governed Model Context Protocol (MCP - Project 06, Section 48)
+            # -------------------------------------------------------------
+            mcp_srv_count = cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
+            mcp_active_conn = cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ? AND status = 'ONLINE'", (tenant_id,)).fetchone()[0]
+            mcp_avail_caps = cur.execute("SELECT COUNT(*) FROM mcp_tools WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
+            mcp_tool_invocations = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
+            mcp_success_execs = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'VERIFIED'", (tenant_id,)).fetchone()[0]
+            mcp_failed_execs = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status NOT IN ('VERIFIED', 'APPROVAL_REQUIRED')", (tenant_id,)).fetchone()[0]
+            mcp_awaiting_approval = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'APPROVAL_REQUIRED'", (tenant_id,)).fetchone()[0]
+            mcp_policy_blocks = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'POLICY_DENIED'", (tenant_id,)).fetchone()[0]
+            mcp_sec_events = cur.execute("SELECT COUNT(*) FROM mcp_security_events WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
+            mcp_verif_success = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'", (tenant_id,)).fetchone()[0]
+            mcp_unknown_outcomes = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'UNKNOWN'", (tenant_id,)).fetchone()[0]
+
+            has_mcp_activity = bool(mcp_tool_invocations > 0 or mcp_srv_count > 0)
+
+            mcp_data = {
+                "mcp_servers": mcp_srv_count,
+                "active_connections": mcp_active_conn,
+                "available_capabilities": mcp_avail_caps,
+                "tool_invocations": mcp_tool_invocations,
+                "successful_executions": mcp_success_execs,
+                "failed_executions": mcp_failed_execs,
+                "awaiting_approval": mcp_awaiting_approval,
+                "policy_blocks": mcp_policy_blocks,
+                "security_events": mcp_sec_events,
+                "verification_success": mcp_verif_success,
+                "unknown_outcomes": mcp_unknown_outcomes,
+                "has_activity": has_mcp_activity,
+                "status_text": "No MCP activity yet" if not has_mcp_activity else f"{mcp_tool_invocations} governed invocations across {mcp_srv_count} servers"
+            }
+
+            # -------------------------------------------------------------
             # 14. AI-Generated Executive Insights (With Epistemic Provenance)
             # -------------------------------------------------------------
             insights = []
@@ -920,6 +953,7 @@ class OverviewDataService:
                 "risk": risk_data,
                 "technology": tech_data,
                 "agent_network": agent_network_data,
+                "mcp": mcp_data,
                 "data_quality": data_quality,
                 "intelligence": {
                     "has_data": len(insights) > 0,

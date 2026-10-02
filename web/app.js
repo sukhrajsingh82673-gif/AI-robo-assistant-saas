@@ -234,6 +234,7 @@ function updateBreadcrumbs() {
     tasks: 'TaskMaker',
     workflows: 'Workflow Runtime',
     'agent-network': 'Agent Network (A2A)',
+    'mcp-network': 'MCP Network (Tools & Systems)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -386,6 +387,8 @@ function handleRoute(path) {
     window.WorkflowWorkspace.render('view-workflows');
   } else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
     window.AgentNetworkWorkspace.render('view-agent-network');
+  } else if (navKey === 'mcp-network' && window.McpWorkspace) {
+    window.McpWorkspace.render('view-mcp-network');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {

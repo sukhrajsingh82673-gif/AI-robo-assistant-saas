@@ -165,6 +165,11 @@
             ${this.renderDataQualityHtml(snap)}
           </div>
 
+          <!-- 9b. GOVERNED INTEROPERABILITY (MCP - Section 48) -->
+          <div style="margin-bottom: 20px;">
+            ${this.renderMcpLayerHtml(snap)}
+          </div>
+
           <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
           <div class="overview-grid-2col">
             ${this.renderExecutiveInsightsHtml(snap)}
@@ -1230,6 +1235,104 @@
             <span>Merkle Chain: <strong>${dq.merkle_integrity}</strong></span>
             <span>Verified Blocks: <strong>${dq.verified_records}</strong></span>
             <span>Conflicting: <strong>${dq.conflicting_records}</strong></span>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 13b. GOVERNED MODEL CONTEXT PROTOCOL (MCP - Section 48)
+    // =========================================================================
+    renderMcpLayerHtml(snap) {
+      const mcp = snap.mcp || {
+        mcp_servers: 0,
+        active_connections: 0,
+        available_capabilities: 0,
+        tool_invocations: 0,
+        successful_executions: 0,
+        failed_executions: 0,
+        awaiting_approval: 0,
+        policy_blocks: 0,
+        security_events: 0,
+        verification_success: 0,
+        unknown_outcomes: 0,
+        has_activity: false
+      };
+
+      if (!mcp.has_activity) {
+        return `
+          <div class="overview-card">
+            <div class="card-title-bar">
+              <div>
+                <h3 class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  Governed MCP Interoperability Layer
+                </h3>
+                <p class="card-subtitle">Model Context Protocol 2026-07-28 enterprise tool, data & system connectivity.</p>
+              </div>
+              <span class="badge" style="background:rgba(107,114,128,0.15); color:#9ca3af;">No Activity</span>
+            </div>
+            <div style="padding:24px; text-align:center; color:var(--text-secondary);">
+              <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">🔌</div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No MCP activity yet</div>
+              <div style="font-size:13px; max-width:360px; margin:0 auto 16px auto;">Register an external MCP server or discover PMS/ERP tools to begin governed execution.</div>
+              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('mcp-network')" style="font-size:12px; padding:6px 14px;">Open MCP Network</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="overview-card">
+          <div class="card-title-bar">
+            <div>
+              <h3 class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Governed MCP Interoperability Layer
+              </h3>
+              <p class="card-subtitle">Model Context Protocol 2026-07-28 enterprise tool & system connectivity.</p>
+            </div>
+            <span class="badge badge-emerald">${mcp.active_connections} Active Connections</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:16px;">
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">MCP Servers</div>
+              <div style="font-size:18px; font-weight:700; color:var(--text-primary); font-family:var(--font-mono);">${mcp.mcp_servers}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Capabilities</div>
+              <div style="font-size:18px; font-weight:700; color:var(--text-primary); font-family:var(--font-mono);">${mcp.available_capabilities}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Invocations</div>
+              <div style="font-size:18px; font-weight:700; color:#3b82f6; font-family:var(--font-mono);">${mcp.tool_invocations}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Verified Success</div>
+              <div style="font-size:18px; font-weight:700; color:#10b981; font-family:var(--font-mono);">${mcp.verification_success}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Awaiting Approval</div>
+              <div style="font-size:18px; font-weight:700; color:${mcp.awaiting_approval > 0 ? '#f59e0b' : 'var(--text-primary)'}; font-family:var(--font-mono);">${mcp.awaiting_approval}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Policy Blocks</div>
+              <div style="font-size:18px; font-weight:700; color:${mcp.policy_blocks > 0 ? '#ef4444' : 'var(--text-primary)'}; font-family:var(--font-mono);">${mcp.policy_blocks}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Security Events</div>
+              <div style="font-size:18px; font-weight:700; color:${mcp.security_events > 0 ? '#ef4444' : 'var(--text-primary)'}; font-family:var(--font-mono);">${mcp.security_events}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Unknown Outcomes</div>
+              <div style="font-size:18px; font-weight:700; color:${mcp.unknown_outcomes > 0 ? '#f59e0b' : 'var(--text-primary)'}; font-family:var(--font-mono);">${mcp.unknown_outcomes}</div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px; font-size:12px; color:var(--text-secondary); flex-wrap:wrap; gap:8px;">
+            <span>Stateless Protocol Core (2026-07-28) • Sovereign Governance Enforced</span>
+            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('mcp-network')" style="font-size:11px; padding:4px 10px;">Inspect MCP Network →</button>
           </div>
         </div>
       `;

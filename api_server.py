@@ -168,6 +168,26 @@ from zonata.a2a_adapter import A2ACanonicalScenarios, A2ACeoBridge
 a2a_gateway = A2AGateway("tnt_primary", "comp_primary")
 a2a_scenarios = A2ACanonicalScenarios("tnt_primary", "comp_primary")
 
+# MCP (Model Context Protocol - Project 06)
+from core.mcp_interoperability_runtime import (
+    MCPGateway,
+    MCPKillSwitch,
+    MCPTrustState,
+    MCPToolRiskClass,
+    MCPExecutionStatus,
+    MCPDataClassification,
+    MCPSecurityEventType,
+    MCPTransportType,
+    SecurityException as MCPSecurityException,
+    ZonataMcpServer,
+    MCP_PROTOCOL_VERSION
+)
+from zonata.mcp_adapter import McpCanonicalScenarios, McpCeoBridge
+
+mcp_gateway = MCPGateway("tnt_primary", "comp_primary")
+mcp_scenarios = McpCanonicalScenarios("tnt_primary", "comp_primary")
+mcp_inbound_server = ZonataMcpServer("tnt_primary", "comp_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -1286,6 +1306,142 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             ceo_bridge = A2ACeoBridge(tenant_id, "comp_primary")
             report = ceo_bridge.generate_external_delegations_report()
             self._send_json(report)
+            return
+
+        # =====================================================================
+        # MCP (MODEL CONTEXT PROTOCOL - PROJECT 06) GET ENDPOINTS
+        # =====================================================================
+        elif path == "/api/mcp/servers":
+            trust = query_params.get("trust_state", [None])[0]
+            servers = mcp_gateway.list_servers()
+            if trust:
+                servers = [s for s in servers if s.get("trust_state") == trust]
+            self._send_json({"servers": servers, "count": len(servers)})
+            return
+
+        elif path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
+            server_id = path.split("/")[4]
+            srv = mcp_gateway.get_server(server_id)
+            if not srv:
+                self._send_json({"error": "MCP server not found"}, status=404)
+                return
+            with db.get_connection() as conn:
+                tools = conn.execute("SELECT * FROM mcp_tools WHERE server_id = ?", (server_id,)).fetchall()
+                resources = conn.execute("SELECT * FROM mcp_resources WHERE server_id = ?", (server_id,)).fetchall()
+                prompts = conn.execute("SELECT * FROM mcp_prompts WHERE server_id = ?", (server_id,)).fetchall()
+                sec_events = conn.execute("SELECT * FROM mcp_security_events WHERE server_id = ? ORDER BY timestamp DESC LIMIT 20", (server_id,)).fetchall()
+            srv["tools"] = [dict(t) for t in tools]
+            srv["resources"] = [dict(r) for r in resources]
+            srv["prompts"] = [dict(p) for p in prompts]
+            srv["security_events"] = [dict(se) for se in sec_events]
+            self._send_json({"server": srv})
+            return
+
+        elif path == "/api/mcp/tools":
+            server_id = query_params.get("server_id", [None])[0]
+            risk = query_params.get("risk_class", [None])[0]
+            tools = mcp_gateway.list_tools(server_id=server_id)
+            if risk:
+                tools = [t for t in tools if t.get("risk_class") == risk]
+            self._send_json({"tools": tools, "count": len(tools)})
+            return
+
+        elif path.startswith("/api/mcp/tools/") and len(path.split("/")) == 5:
+            tool_id = path.split("/")[4]
+            t = mcp_gateway.get_tool(tool_id)
+            if not t:
+                self._send_json({"error": "MCP tool not found"}, status=404)
+                return
+            self._send_json({"tool": t})
+            return
+
+        elif path == "/api/mcp/resources":
+            server_id = query_params.get("server_id", [None])[0]
+            with db.get_connection() as conn:
+                if server_id:
+                    rows = conn.execute("SELECT * FROM mcp_resources WHERE tenant_id = ? AND server_id = ?", (tenant_id, server_id)).fetchall()
+                else:
+                    rows = conn.execute("SELECT * FROM mcp_resources WHERE tenant_id = ?", (tenant_id,)).fetchall()
+            self._send_json({"resources": [dict(r) for r in rows], "count": len(rows)})
+            return
+
+        elif path == "/api/mcp/prompts":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM mcp_prompts WHERE tenant_id = ?", (tenant_id,)).fetchall()
+            self._send_json({"prompts": [dict(r) for r in rows], "count": len(rows)})
+            return
+
+        elif path == "/api/mcp/tasks":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM mcp_tasks WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50", (tenant_id,)).fetchall()
+            self._send_json({"tasks": [dict(r) for r in rows], "count": len(rows)})
+            return
+
+        elif path == "/api/mcp/executions":
+            limit = int(query_params.get("limit", [50])[0])
+            execs = mcp_gateway.list_executions(limit=limit)
+            self._send_json({"executions": execs, "count": len(execs)})
+            return
+
+        elif path.startswith("/api/mcp/executions/") and path.endswith("/evidence"):
+            exec_id = path.split("/")[4]
+            ev = mcp_gateway.get_execution_evidence(exec_id)
+            if not ev:
+                self._send_json({"error": "Evidence not found for execution"}, status=404)
+                return
+            self._send_json({"evidence": ev})
+            return
+
+        elif path.startswith("/api/mcp/executions/") and len(path.split("/")) == 5:
+            exec_id = path.split("/")[4]
+            ex = mcp_gateway.get_execution(exec_id)
+            if not ex:
+                self._send_json({"error": "Execution record not found"}, status=404)
+                return
+            self._send_json({"execution": ex})
+            return
+
+        elif path == "/api/mcp/security/events":
+            limit = int(query_params.get("limit", [50])[0])
+            events = mcp_gateway.list_security_events(limit=limit)
+            self._send_json({"security_events": events, "count": len(events)})
+            return
+
+        elif path == "/api/mcp/metrics":
+            metrics = mcp_gateway.get_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/mcp/published":
+            pubs = mcp_inbound_server.list_published()
+            self._send_json({"published_capabilities": pubs, "count": len(pubs)})
+            return
+
+        elif path == "/api/mcp/killswitch":
+            self._send_json({
+                "killswitch_active": MCPKillSwitch.is_active(tenant_id),
+                "tenant_id": tenant_id,
+                "status": "KILLSWITCH_ENGAGED" if MCPKillSwitch.is_active(tenant_id) else "OPERATIONAL"
+            })
+            return
+
+        elif path == "/api/mcp/conformance":
+            self._send_json({
+                "protocol_version": MCP_PROTOCOL_VERSION,
+                "specification_release": "2026-07-28",
+                "stateless_core": True,
+                "supported_transports": ["streamable_http", "stdio"],
+                "supported_extensions": ["tasks"],
+                "security_controls": {
+                    "ssrf_protection": True,
+                    "prompt_injection_firewall": True,
+                    "data_minimization": True,
+                    "independent_verification": True,
+                    "merkle_evidence_ledger": True,
+                    "authoritative_killswitch": True
+                },
+                "status": "CONFORMANT"
+            })
             return
 
         # Fallback to static files in WEB_DIR or SPA index.html
@@ -2901,7 +3057,258 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": f"Unknown A2A scenario '{scenario}'"}, status=400)
             return
 
+        # =====================================================================
+        # MCP (MODEL CONTEXT PROTOCOL - PROJECT 06) POST ENDPOINTS
+        # =====================================================================
+        elif path in ("/mcp", "/api/mcp/endpoint", "/api/mcp/server/endpoint"):
+            try:
+                res = mcp_inbound_server.handle_jsonrpc(req_data, caller_identity=self.headers.get("X-Client-ID", "external_ai"))
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"jsonrpc": "2.0", "id": req_data.get("id"), "error": {"code": -32603, "message": str(e)}}, status=500)
+            return
+
+        elif path in ("/api/mcp/servers", "/api/mcp/servers/discover"):
+            display_name = req_data.get("display_name", "External MCP Server")
+            endpoint = req_data.get("endpoint", "")
+            description = req_data.get("description", "")
+            transport = req_data.get("transport", "streamable_http")
+            allow_loopback = bool(req_data.get("allow_test_loopback", False))
+            token = req_data.get("auth_token")
+
+            ok, srv_id, errs = mcp_gateway.register_server(
+                display_name=display_name,
+                endpoint=endpoint,
+                description=description,
+                transport=MCPTransportType(transport) if transport in [t.value for t in MCPTransportType] else MCPTransportType.STREAMABLE_HTTP,
+                auth_token=token,
+                allow_test_loopback=allow_loopback
+            )
+            if ok:
+                self._send_json({"success": True, "server_id": srv_id, "message": f"Server {display_name} registered in DISCOVERED trust state"})
+            else:
+                self._send_json({"success": False, "errors": errs}, status=400)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/validate"):
+            parts = path.split("/")
+            server_id = parts[4]
+            ok, msg = mcp_gateway.validate_server(server_id)
+            self._send_json({"success": ok, "message": msg})
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/trust"):
+            parts = path.split("/")
+            server_id = parts[4]
+            state_str = req_data.get("trust_state", "TRUSTED")
+            reason = req_data.get("reason", "Admin state update")
+            try:
+                mcp_gateway.set_server_trust(server_id, MCPTrustState(state_str), reason=reason)
+                self._send_json({"success": True, "server_id": server_id, "trust_state": state_str})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/test"):
+            parts = path.split("/")
+            server_id = parts[4]
+            res = mcp_gateway.test_server_connection(server_id)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/refresh"):
+            parts = path.split("/")
+            server_id = parts[4]
+            res = mcp_gateway.refresh_server_capabilities(server_id)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/suspend"):
+            parts = path.split("/")
+            server_id = parts[4]
+            reason = req_data.get("reason", "Administrative suspension")
+            res = mcp_gateway.suspend_server(server_id, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/block"):
+            parts = path.split("/")
+            server_id = parts[4]
+            reason = req_data.get("reason", "Administrative quarantine block")
+            res = mcp_gateway.block_server(server_id, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/reauthorize"):
+            parts = path.split("/")
+            server_id = parts[4]
+            reason = req_data.get("reason", "Administrative reauthorization")
+            res = mcp_gateway.reauthorize_server(server_id, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/servers/") and path.endswith("/disconnect"):
+            parts = path.split("/")
+            server_id = parts[4]
+            ok = mcp_gateway.disconnect_server(server_id)
+            self._send_json({"success": ok, "server_id": server_id})
+            return
+
+        elif path == "/api/mcp/tools":
+            server_id = req_data.get("server_id")
+            name = req_data.get("name")
+            desc = req_data.get("description", "")
+            in_schema = req_data.get("input_schema")
+            out_schema = req_data.get("output_schema")
+            risk = req_data.get("risk_class")
+            appr = req_data.get("approval_requirement")
+            idemp = bool(req_data.get("idempotency", True))
+            try:
+                tid = mcp_gateway.register_tool(
+                    server_id=server_id,
+                    name=name,
+                    description=desc,
+                    input_schema=in_schema,
+                    output_schema=out_schema,
+                    override_risk=MCPToolRiskClass(risk) if risk else None,
+                    override_approval=appr,
+                    idempotency=idemp
+                )
+                self._send_json({"success": True, "tool_id": tid})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/mcp/tools/") and path.endswith("/override"):
+            parts = path.split("/")
+            tool_id = parts[4]
+            actor = req_data.get("actor", "admin")
+            updates = req_data.get("updates") or req_data
+            try:
+                updated_tool = mcp_gateway.override_tool(tool_id, updates, actor_id=actor)
+                self._send_json({"success": True, "tool": updated_tool})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path == "/api/mcp/tools/invoke":
+            server_id = req_data.get("server_id")
+            tool_name = req_data.get("tool_name") or req_data.get("tool_id")
+            arguments = req_data.get("arguments", {})
+            context = req_data.get("context", {})
+            try:
+                res = mcp_gateway.invoke_tool(
+                    server_id=server_id,
+                    tool_name_or_id=tool_name,
+                    arguments=arguments,
+                    context=context
+                )
+                self._send_json(res)
+            except MCPSecurityException as se:
+                self._send_json({"success": False, "status": "DENIED", "error": str(se)}, status=403)
+            except Exception as e:
+                self._send_json({"success": False, "status": "TOOL_FAILED", "error": str(e)}, status=500)
+            return
+
+        elif path == "/api/mcp/resources/read":
+            resource_id = req_data.get("resource_id")
+            context = req_data.get("context", {})
+            try:
+                res = mcp_gateway.read_resource(resource_id, context=context)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/mcp/executions/") and path.endswith("/verify"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            res = mcp_gateway.verify_execution(exec_id)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/mcp/executions/") and path.endswith("/cancel"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            reason = req_data.get("reason", "Cancelled by user")
+            res = mcp_gateway.cancel_execution(exec_id, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path == "/api/mcp/killswitch":
+            active = bool(req_data.get("active", True))
+            scope = req_data.get("scope", "TENANT")
+            server_id = req_data.get("server_id")
+            tool_id = req_data.get("tool_id")
+            agent_id = req_data.get("agent_id")
+            if active:
+                MCPKillSwitch.activate(tenant_id=tenant_id, server_id=server_id, tool_id=tool_id, agent_id=agent_id)
+            else:
+                MCPKillSwitch.deactivate(tenant_id=tenant_id, server_id=server_id, tool_id=tool_id, agent_id=agent_id)
+            self._send_json({
+                "success": True,
+                "killswitch_active": active,
+                "status": "KILLSWITCH_ENGAGED" if active else "OPERATIONAL",
+                "scope": scope
+            })
+            return
+
+        elif path == "/api/mcp/published":
+            cap_id = req_data.get("capability_id", "cap_general")
+            name = req_data.get("name", "Inbound Capability")
+            desc = req_data.get("description", "")
+            schema = req_data.get("schema_definition", {"type": "object"})
+            vis = req_data.get("visibility", "PRIVATE")
+            rate = int(req_data.get("rate_limit_per_min", 60))
+            appr = bool(req_data.get("approval_required", False))
+            pub_id = mcp_inbound_server.publish_capability(
+                capability_id=cap_id,
+                name=name,
+                description=desc,
+                schema_definition=schema,
+                visibility=vis,
+                rate_limit_per_min=rate,
+                approval_required=appr
+            )
+            self._send_json({"success": True, "published_id": pub_id})
+            return
+
+        elif path == "/api/mcp/demo/scenarios":
+            scenario = req_data.get("scenario", "SECTION_73").upper()
+            sc_map = {
+                "A": mcp_scenarios.scenario_a_server_discovery_and_trust,
+                "B": mcp_scenarios.scenario_b_governed_tool_execution,
+                "C": mcp_scenarios.scenario_c_mutation_human_approval,
+                "D": mcp_scenarios.scenario_d_financial_policy_threshold,
+                "E": mcp_scenarios.scenario_e_prompt_injection_firewall,
+                "F": mcp_scenarios.scenario_f_ssrf_blocking,
+                "G": mcp_scenarios.scenario_g_timeout_unknown_reconciliation,
+                "H": mcp_scenarios.scenario_h_tenant_and_company_isolation,
+                "I": mcp_scenarios.scenario_i_killswitch_override,
+                "J": mcp_scenarios.scenario_j_langgraph_durable_mcp_workflow,
+                "SECTION_73": mcp_scenarios.scenario_acceptance_pms_cancellation_recovery,
+                "73": mcp_scenarios.scenario_acceptance_pms_cancellation_recovery
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown MCP scenario '{scenario}'"}, status=400)
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
+
+    def do_DELETE(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        tenant_id = self.headers.get("X-Tenant-ID", "tnt_primary")
+        if path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
+            server_id = path.split("/")[4]
+            ok = mcp_gateway.disconnect_server(server_id)
+            self._send_json({"success": ok, "server_id": server_id})
+            return
+        self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
 
 
 def run_server(port=8080):

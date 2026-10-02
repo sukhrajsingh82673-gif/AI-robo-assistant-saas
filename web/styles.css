@@ -5179,4 +5179,37 @@ html, body {
   }
 }
 
+/* =========================================================================
+   MCP NETWORK (PROJECT 06 — MODEL CONTEXT PROTOCOL) STYLES
+   ========================================================================= */
+
+.mcp-tab-btn {
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
+}
+
+.mcp-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.mcp-tab-btn.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .mcp-tab-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
 

@@ -1375,6 +1375,216 @@ CREATE TABLE IF NOT EXISTS a2a_published_agents (
 );
 
 CREATE INDEX IF NOT EXISTS idx_a2a_pub_tenant ON a2a_published_agents(tenant_id);
+
+-- 68. Governed MCP Servers Registry
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    server_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    endpoint TEXT NOT NULL,
+    transport TEXT NOT NULL DEFAULT 'STREAMABLE_HTTP', -- STREAMABLE_HTTP, STDIO
+    protocol_version TEXT NOT NULL DEFAULT '2026-07-28',
+    server_version TEXT DEFAULT '1.0.0',
+    identity TEXT,
+    authentication_type TEXT DEFAULT 'NONE', -- NONE, BEARER, OAUTH2, API_KEY
+    credential_reference TEXT,
+    trust_state TEXT NOT NULL DEFAULT 'DISCOVERED', -- UNKNOWN, DISCOVERED, VALIDATING, VALIDATED, IDENTITY_VERIFIED, TRUSTED, RESTRICTED, SUSPENDED, BLOCKED
+    risk_classification TEXT NOT NULL DEFAULT 'READ_ONLY', -- READ_ONLY, LOW_RISK_MUTATION, BUSINESS_MUTATION, FINANCIAL, PRIVILEGED, SECURITY_SENSITIVE, DESTRUCTIVE, IRREVERSIBLE
+    data_classification TEXT NOT NULL DEFAULT 'INTERNAL', -- PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, FINANCIAL, SECURITY_SENSITIVE
+    allowed_tools JSON,
+    allowed_resources JSON,
+    allowed_prompts JSON,
+    allowed_operations JSON,
+    allowed_companies JSON,
+    allowed_agents JSON,
+    allowed_workflows JSON,
+    rate_limit INTEGER DEFAULT 60,
+    budget_limit REAL DEFAULT 0.0,
+    timeout_policy REAL DEFAULT 30.0,
+    approval_policy TEXT DEFAULT 'STANDARD',
+    verification_policy TEXT DEFAULT 'PHYSICAL_VERIFICATION',
+    status TEXT NOT NULL DEFAULT 'ONLINE', -- ONLINE, OFFLINE, QUARANTINED, SUSPENDED
+    health_status TEXT NOT NULL DEFAULT 'HEALTHY',
+    reputation_metrics JSON,
+    last_seen REAL NOT NULL,
+    last_verified REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_tenant ON mcp_servers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_trust ON mcp_servers(trust_state);
+
+-- 69. Governed MCP Tools
+CREATE TABLE IF NOT EXISTS mcp_tools (
+    tool_id TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    input_schema JSON,
+    output_schema JSON,
+    risk_class TEXT NOT NULL DEFAULT 'READ_ONLY',
+    data_classification TEXT NOT NULL DEFAULT 'INTERNAL',
+    required_scopes JSON,
+    required_permissions JSON,
+    allowed_agents JSON,
+    allowed_workflows JSON,
+    approval_requirement INTEGER NOT NULL DEFAULT 0,
+    verification_requirement INTEGER NOT NULL DEFAULT 1,
+    cost_model REAL DEFAULT 0.0,
+    rate_limit INTEGER DEFAULT 60,
+    timeout REAL DEFAULT 30.0,
+    reversibility INTEGER NOT NULL DEFAULT 1,
+    idempotency INTEGER NOT NULL DEFAULT 1,
+    side_effect_class TEXT DEFAULT 'NONE',
+    status TEXT NOT NULL DEFAULT 'AVAILABLE',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(server_id) REFERENCES mcp_servers(server_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_tools_server ON mcp_tools(server_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_tools_tenant ON mcp_tools(tenant_id);
+
+-- 70. Governed MCP Resources
+CREATE TABLE IF NOT EXISTS mcp_resources (
+    resource_id TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    uri TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    mime_type TEXT DEFAULT 'application/json',
+    data_classification TEXT NOT NULL DEFAULT 'INTERNAL',
+    required_scopes JSON,
+    approval_required INTEGER NOT NULL DEFAULT 0,
+    metadata JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(server_id) REFERENCES mcp_servers(server_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_resources_server ON mcp_resources(server_id);
+
+-- 71. Governed MCP Prompts
+CREATE TABLE IF NOT EXISTS mcp_prompts (
+    prompt_id TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    arguments_schema JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(server_id) REFERENCES mcp_servers(server_id) ON DELETE CASCADE
+);
+
+-- 72. Governed MCP Long-Running Tasks (Tasks Extension)
+CREATE TABLE IF NOT EXISTS mcp_tasks (
+    task_id TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    tool_id TEXT NOT NULL,
+    client_task_id TEXT,
+    status TEXT NOT NULL DEFAULT 'SUBMITTED', -- SUBMITTED, WORKING, COMPLETED, FAILED, CANCELLED, INPUT_REQUIRED
+    external_ref TEXT,
+    progress REAL DEFAULT 0.0,
+    input_payload JSON,
+    result JSON,
+    error_message TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(server_id) REFERENCES mcp_servers(server_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_tasks_server ON mcp_tasks(server_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_tasks_tenant ON mcp_tasks(tenant_id);
+
+-- 73. Governed MCP Execution Traces & Invocations
+CREATE TABLE IF NOT EXISTS mcp_executions (
+    execution_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    mission_id TEXT,
+    workflow_id TEXT,
+    thread_id TEXT,
+    agent_id TEXT NOT NULL,
+    server_id TEXT NOT NULL,
+    tool_id TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    arguments JSON,
+    sanitized_arguments JSON,
+    policy_decision TEXT NOT NULL, -- ALLOW, REQUIRE_HUMAN_APPROVAL, DENY
+    authority_decision TEXT NOT NULL, -- AUTHORIZED, DENIED, SUSPENDED_FOR_APPROVAL
+    approval_id TEXT,
+    execution_status TEXT NOT NULL, -- DISCOVERY_FAILED, AUTH_FAILED, POLICY_DENIED, AUTHORITY_DENIED, APPROVAL_REQUIRED, APPROVAL_EXPIRED, CONNECTION_FAILED, TOOL_FAILED, TIMEOUT, CANCELLED, UNKNOWN, RECONCILIATION_REQUIRED, VERIFICATION_FAILED, VERIFIED
+    response_raw JSON,
+    response_sanitized JSON,
+    verification_id TEXT,
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+    evidence_id TEXT,
+    sha256_digest TEXT,
+    causality_chain_id TEXT,
+    business_outcome TEXT,
+    latency_ms REAL NOT NULL DEFAULT 0.0,
+    cost_spent REAL DEFAULT 0.0,
+    error_message TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_exec_tenant ON mcp_executions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_exec_server ON mcp_executions(server_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_exec_tool ON mcp_executions(tool_id);
+
+-- 74. Governed MCP Security Center Events
+CREATE TABLE IF NOT EXISTS mcp_security_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    server_id TEXT,
+    tool_id TEXT,
+    event_type TEXT NOT NULL, -- UNTRUSTED_SERVER, INVALID_AUTH, EXPIRED_TOKEN, INVALID_ISSUER, SCOPE_VIOLATION, UNAUTHORIZED_TOOL, PROMPT_INJECTION, MALICIOUS_RESOURCE, UNEXPECTED_DATA, CREDENTIAL_EXPOSURE_ATTEMPT, TOOL_SCHEMA_ANOMALY, SERVER_IDENTITY_CHANGE, PROTOCOL_MISMATCH, POLICY_VIOLATION, TENANT_ISOLATION_VIOLATION, SSRF_ATTEMPT
+    severity TEXT NOT NULL DEFAULT 'HIGH', -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON NOT NULL,
+    source_ip TEXT,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_sec_tenant ON mcp_security_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_sec_type ON mcp_security_events(event_type);
+
+-- 75. Governed ZONATA Inbound Published MCP Capabilities
+CREATE TABLE IF NOT EXISTS mcp_published_capabilities (
+    published_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    schema_definition JSON NOT NULL,
+    visibility TEXT NOT NULL DEFAULT 'PRIVATE', -- PUBLIC, PARTNER, PRIVATE
+    allowed_clients JSON,
+    rate_limit_per_min INTEGER NOT NULL DEFAULT 60,
+    approval_required INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, INACTIVE, SUSPENDED
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_pub_tenant ON mcp_published_capabilities(tenant_id);
 """
 
 class Database:

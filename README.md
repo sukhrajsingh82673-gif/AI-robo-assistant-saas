@@ -120,16 +120,25 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Quarantined Artifact Exchange**: Incoming file quarantine, dangerous executable extension blocking (`.sh`, `.exe`, `.bat`), and SHA-256 integrity digest verification.
 - **Subsystem Bridges & Scenarios A–J**: Dedicated bridges for AI CEO, Agency Swarm squads, Letta long-term memory isolation, and HAL multimodal asset exchange across 10 canonical operational scenarios.
 
+### 13. Governed Tool & System Interoperability Layer (Model Context Protocol / MCP — Project 06)
+- **Standard Compliance**: Implements the official Model Context Protocol (MCP) 2026-07-28 specification with normative stateless protocol core, JSON-RPC 2.0 bindings, Streamable HTTP transport, and stdio subprocess execution.
+- **Architectural Separation**: Strict distinction permanently preserved: `A2A = Agent ↔ Agent` (Project 05) vs `MCP = Agent ↔ Tool / Data / System` (Project 06, governing CRM, ERP, PMS, databases, files, and SaaS).
+- **15-Stage Governed Tool Invocation Pipeline**: Pre-execution validation (`DISCOVERED` → `VALIDATED` → `TRUSTED`), multi-scope KillSwitch check (global, tenant, company, server, tool, agent), SSRF/cloud-metadata inspection, argument data minimization, JIT credential injection, PolicyEngine evaluation, Authority Gateway check, ApprovalEngine escalation, Merkle Evidence Ledger sealing, and independent physical reality verification.
+- **Business Causality Engine Non-Negotiable Invariant**: `TASK_SUCCESS != BUSINESS_OUTCOME`. A successful MCP response (e.g. `200 OK` or `{"status": "COMPLETED"}`) does NOT constitute business success until verified against transaction evidence.
+- **Bi-Directional Interoperability**: Acts as both a governed MCP Client (consuming external enterprise MCP servers) and an inbound governed MCP Server (`/mcp` endpoint) exposing curated, policy-filtered ZONATA capabilities to external clients (Claude Desktop, Cursor, IDEs).
+- **Dedicated Web Cockpit**: Fully interactive MCP Network Workspace (`web/mcp_workspace.js`) with KPI metrics, server health & lifecycle controls, schema inspectors, administrator overrides, audit logs, and one-click Section 73 Canonical Acceptance Test execution.
+
 ---
 
 ## 📁 Repository Structure
 
 ```
 .
-├── api_server.py                    # Unified REST API & static Web UI server (including A2A & Workflow APIs)
+├── api_server.py                    # Unified REST API & static Web UI server (including MCP, A2A & Workflow APIs)
 ├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
 ├── serve_web.py                     # Standalone web UI preview server
 ├── core/
+│   ├── mcp_interoperability_runtime.py # MCP Governed Interoperability Layer (Gateway, Transports, Firewall, Inbound Server)
 │   ├── a2a_interoperability_runtime.py # A2A Governed Interoperability Layer (Discovery, Trust, Gateway)
 │   ├── durable_workflow_runtime.py  # LangGraph Governed Durable Workflow Runtime (StateGraph, Checkpointer)
 │   ├── multimodal_capability_runtime.py # HAL Governed Multimodal Runtime (16 families, 19 states)
@@ -142,20 +151,23 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── control_kernel.py            # Universal Control Kernel with evidence verification
 │   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
 ├── zonata/
+│   ├── mcp_adapter.py               # MCP Adapter, Subsystem Bridges & Canonical Scenarios (A-J & Section 73)
 │   ├── a2a_adapter.py               # A2A Adapter, Subsystem Bridges & Canonical Scenarios (A-J)
 │   ├── langgraph_adapter.py         # LangGraph Workflow Adapter & Canonical Scenarios (A-K)
 │   ├── hal_multimodal_adapter.py    # HAL Capability Adapter & Workflows (Scenarios A-J)
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_mcp_interoperability.py # 36 MCP protocol, transport, firewall, security & scenario tests
 │   ├── test_a2a_interoperability.py # 48 A2A protocol, security, and bridge validation tests
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
-│   └── test_*.py                    # 67 Unit & system regression tests
+│   └── test_*.py                    # 73 Unit & system regression tests (312 tests total across suite)
 ├── web/
 │   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
+│   ├── mcp_workspace.js             # MCP Network Workspace (Servers, Tools, Resources, Evidence, Scenarios)
 │   ├── agent_network_workspace.js   # Agent Network Workspace (Directory, Tasks, Approvals, Security)
 │   ├── workflow_workspace.js        # Workflow Workspace (Runs, Graphs, Checkpoints, Approvals)
 │   └── styles.css                   # Styles for cockpit, HUD, and network visualizations

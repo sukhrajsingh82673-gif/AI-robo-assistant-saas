@@ -78,5 +78,19 @@ This project incorporates components, libraries, and architectural patterns lice
 - **Governance Boundary:** Implements `AgentInteropProvider` abstraction. A2A operates as an interoperability communication protocol connecting ZONATA with external/independent agents. It provides agent discovery, Agent Cards, capability discovery, remote task delegation, and streaming without granting external agents authority, permission, memory access, or credentials. All remote interactions pass through ZONATA PolicyEngine, AuthorityGateway, ApprovalEngine, EvidenceLedger, and KillSwitch.
 - **Terms:** Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
+---
+
+## 8. Model Context Protocol (MCP) (modelcontextprotocol/modelcontextprotocol)
+- **Repository:** `https://github.com/modelcontextprotocol/modelcontextprotocol`
+- **Specification Release:** `2026-07-28` (Normative Stateless Protocol Core, Streamable HTTP + stdio Transports, Tasks Extension)
+- **License:** MIT License
+- **Copyright:** (c) 2024-2026 Anthropic PBC & Model Context Protocol Authors
+- **Python Version Requirements:** >=3.10 (Running 3.14 on Linux Host)
+- **Direct Dependencies:** Standard library `urllib`, `json`, `hashlib`, `hmac`, `uuid`, `re`, `subprocess`, `threading` (Zero-bloat governed runtime)
+- **Integration Method:** Governed Tool/Data Interoperability Gateway & MCP Provider (`core/mcp_interoperability_runtime.py`, `zonata/mcp_adapter.py`)
+- **Governance Boundary:** Implements `ToolInteropProvider` / `MCPToolInteropProvider` abstraction. MCP operates as the standardized Agent ↔ Tool / Data / System interoperability protocol connecting ZONATA with external CRM, ERP, PMS, databases, files, and SaaS endpoints. It provides server registration, tool/resource/prompt discovery, governed tool invocation, streaming HTTP, stdio subprocesses, and inbound MCP hosting without granting external tools authority, permission, memory access, or credentials. All remote tool interactions pass through ZONATA PolicyEngine, Authority Gateway, ApprovalEngine, EvidenceLedger, KillSwitch, and Business Causality Engine (`TASK_SUCCESS != BUSINESS_OUTCOME`).
+- **Terms:** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+
 
 
