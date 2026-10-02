@@ -35,3 +35,4 @@ ENV/
 # Sandboxed runtime files
 storage/sandbox/
 storage/workspaces/
+storage/browser_artifacts/

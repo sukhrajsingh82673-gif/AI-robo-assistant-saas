@@ -205,6 +205,23 @@ from zonata.openhands_adapter import OpenHandsCanonicalScenarios, OpenHandsCeoBr
 openhands_gateway = OpenHandsRuntimeGateway("tnt_primary", "comp_primary")
 openhands_scenarios = OpenHandsCanonicalScenarios("tnt_primary", "comp_primary")
 
+# Browser Use (Governed Autonomous Browser Execution Layer - Project 08)
+from core.browser_use_execution_runtime import (
+    BrowserExecutionGateway,
+    BrowserKillSwitch,
+    BrowserExecutionStatus,
+    BrowserActionType,
+    BrowserActionRiskClass,
+    BrowserProfileType,
+    BrowserDomainPolicyMode,
+    BrowserSecurityEventType,
+    SecurityException as BrowserSecurityException
+)
+from zonata.browser_use_adapter import BrowserUseCanonicalScenarios, BrowserUseCeoBridge
+
+browser_gateway = BrowserExecutionGateway("tnt_primary", "comp_primary")
+browser_scenarios = BrowserUseCanonicalScenarios("tnt_primary", "comp_primary")
+
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
 connector_registry.register(HospitalityPMSConnector())
@@ -1510,6 +1527,88 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "KILLSWITCH_ENGAGED" if OpenHandsKillSwitch.is_active(tenant_id) else "OPERATIONAL"
             })
             return
+
+        # =====================================================================
+        # Governed Browser Use Execution Layer Endpoints (GET - Project 08)
+        # =====================================================================
+        elif path == "/api/browser/sessions":
+            limit = int(query_params.get("limit", [50])[0])
+            status = query_params.get("status", [None])[0]
+            sessions = browser_gateway.list_sessions(status=status, limit=limit)
+            self._send_json({"sessions": sessions, "count": len(sessions)})
+            return
+
+        elif path.startswith("/api/browser/sessions/") and len(path.split("/")) == 5:
+            sess_id = path.split("/")[4]
+            session = browser_gateway.get_session(sess_id)
+            if session:
+                self._send_json(session)
+            else:
+                self._send_json({"error": f"Session '{sess_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/browser/executions":
+            limit = int(query_params.get("limit", [50])[0])
+            sess_id = query_params.get("session_id", [None])[0]
+            status = query_params.get("status", [None])[0]
+            execs = browser_gateway.list_executions(session_id=sess_id, status=status, limit=limit)
+            self._send_json({"executions": execs, "count": len(execs)})
+            return
+
+        elif path.startswith("/api/browser/executions/") and path.endswith("/history"):
+            parts = path.split("/")
+            exec_id = parts[4]
+            actions = browser_gateway.list_actions(exec_id)
+            self._send_json({"actions": actions, "count": len(actions), "execution_id": exec_id})
+            return
+
+        elif path.startswith("/api/browser/executions/") and len(path.split("/")) == 5:
+            exec_id = path.split("/")[4]
+            ex = browser_gateway.get_execution(exec_id)
+            if ex:
+                self._send_json(ex)
+            else:
+                self._send_json({"error": f"Execution '{exec_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/browser/artifacts":
+            limit = int(query_params.get("limit", [50])[0])
+            exec_id = query_params.get("execution_id", [None])[0]
+            sess_id = query_params.get("session_id", [None])[0]
+            artifacts = browser_gateway.list_artifacts(execution_id=exec_id, session_id=sess_id, limit=limit)
+            self._send_json({"artifacts": artifacts, "count": len(artifacts)})
+            return
+
+        elif path == "/api/browser/security/events":
+            limit = int(query_params.get("limit", [50])[0])
+            events = browser_gateway.list_security_events(limit=limit)
+            self._send_json({"security_events": events, "count": len(events)})
+            return
+
+        elif path == "/api/browser/metrics":
+            metrics = browser_gateway.get_metrics()
+            self._send_json({"metrics": metrics})
+            return
+
+        elif path == "/api/browser/approvals":
+            limit = int(query_params.get("limit", [50])[0])
+            status = query_params.get("status", [None])[0]
+            approvals = browser_gateway.list_approvals(status=status, limit=limit)
+            self._send_json({"approvals": approvals, "count": len(approvals)})
+            return
+
+        elif path == "/api/browser/killswitch":
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            killed, reason = BrowserKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
+            self._send_json({
+                "killswitch_active": killed,
+                "reason": reason,
+                "tenant_id": tenant_id,
+                "company_id": company_id,
+                "status": "KILLSWITCH_ENGAGED" if killed else "OPERATIONAL"
+            })
+            return
+
 
         # Fallback to static files in WEB_DIR or SPA index.html
 
@@ -3509,6 +3608,197 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": f"Unknown OpenHands scenario '{scenario}'"}, status=400)
             return
 
+        # =====================================================================
+        # Governed Browser Use Execution Layer Endpoints (POST - Project 08)
+        # =====================================================================
+        elif path == "/api/browser/sessions":
+            profile_type = req_data.get("profile_type", "EPHEMERAL")
+            user_agent = req_data.get("user_agent", "ZonataGovernedBrowser/1.0")
+            allowed_domains = req_data.get("allowed_domains", [])
+            blocked_domains = req_data.get("blocked_domains", [])
+            sess = browser_gateway.create_session(
+                profile_type=profile_type,
+                user_agent=user_agent,
+                allowed_domains=allowed_domains,
+                blocked_domains=blocked_domains
+            )
+            self._send_json(sess)
+            return
+
+        elif path.startswith("/api/browser/sessions/") and path.endswith("/close"):
+            sess_id = path.split("/")[4]
+            ok = browser_gateway.close_session(sess_id)
+            self._send_json({"success": ok, "session_id": sess_id})
+            return
+
+        elif path == "/api/browser/executions":
+            session_id = req_data.get("session_id")
+            mission_id = req_data.get("mission_id", "mis_browser_direct")
+            task_id = req_data.get("task_id")
+            invoking_agent_id = req_data.get("invoking_agent_id", "agent_ceo")
+            goal = req_data.get("goal", "Inspect web portal")
+            initial_url = req_data.get("initial_url", "https://zonata.local/dashboard")
+            max_actions = int(req_data.get("max_actions", 25))
+            timeout_seconds = int(req_data.get("timeout_seconds", 300))
+            try:
+                ex = browser_gateway.create_execution(
+                    session_id=session_id,
+                    mission_id=mission_id,
+                    task_id=task_id,
+                    invoking_agent_id=invoking_agent_id,
+                    goal=goal,
+                    initial_url=initial_url,
+                    max_actions=max_actions,
+                    timeout_seconds=timeout_seconds
+                )
+                self._send_json(ex)
+            except BrowserSecurityException as bse:
+                self._send_json({"error": str(bse), "security_violation": True}, status=403)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/browser/navigate":
+            execution_id = req_data.get("execution_id")
+            url = req_data.get("url")
+            try:
+                res = browser_gateway.navigate(execution_id, url)
+                self._send_json(res)
+            except BrowserSecurityException as bse:
+                self._send_json({"error": str(bse), "security_violation": True}, status=403)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/browser/action":
+            execution_id = req_data.get("execution_id")
+            action_type = req_data.get("action_type")
+            selector = req_data.get("selector", "")
+            parameters = req_data.get("parameters", {})
+            human_intent = req_data.get("human_intent", "")
+            try:
+                res = browser_gateway.execute_action(
+                    execution_id=execution_id,
+                    action_type=action_type,
+                    selector=selector,
+                    parameters=parameters,
+                    human_intent=human_intent
+                )
+                self._send_json(res)
+            except BrowserSecurityException as bse:
+                self._send_json({"error": str(bse), "security_violation": True}, status=403)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/browser/executions/") and path.endswith("/complete"):
+            exec_id = path.split("/")[4]
+            outcome_summary = req_data.get("outcome_summary", "Completed successfully")
+            verification_evidence = req_data.get("verification_evidence", {})
+            try:
+                res = browser_gateway.complete_execution(
+                    execution_id=exec_id,
+                    outcome_summary=outcome_summary,
+                    verification_evidence=verification_evidence
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/browser/executions/") and path.endswith("/cancel"):
+            exec_id = path.split("/")[4]
+            reason = req_data.get("reason", "User requested cancellation")
+            ok = browser_gateway.cancel_execution(exec_id, reason=reason)
+            self._send_json({"success": ok, "execution_id": exec_id})
+            return
+
+        elif path.startswith("/api/browser/approvals/") and path.endswith("/approve"):
+            appr_id = path.split("/")[4]
+            approver = req_data.get("approver", "usr_executive")
+            try:
+                res = browser_gateway.approve_action(appr_id, approver_id=approver)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/browser/approvals/") and path.endswith("/reject"):
+            appr_id = path.split("/")[4]
+            rejector = req_data.get("rejector", "usr_executive")
+            reason = req_data.get("reason", "Security policy violation")
+            try:
+                res = browser_gateway.reject_action(appr_id, rejector_id=rejector, reason=reason)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/browser/killswitch":
+            active = bool(req_data.get("active", True))
+            scope = str(req_data.get("scope", "GLOBAL")).upper()
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            if active:
+                if scope == "GLOBAL":
+                    BrowserKillSwitch.trip_global()
+                elif scope == "TENANT":
+                    BrowserKillSwitch.trip_tenant(tenant_id)
+                elif scope == "COMPANY":
+                    BrowserKillSwitch.trip_company(company_id)
+                elif scope == "SESSION":
+                    BrowserKillSwitch.trip_session(req_data.get("session_id", ""))
+                elif scope == "EXECUTION":
+                    BrowserKillSwitch.trip_execution(req_data.get("execution_id", ""))
+                elif scope == "DOMAIN":
+                    BrowserKillSwitch.trip_domain(req_data.get("domain", ""))
+                elif scope == "AGENT":
+                    BrowserKillSwitch.trip_agent(req_data.get("agent_id", ""))
+            else:
+                BrowserKillSwitch.reset_all()
+            killed, k_reason = BrowserKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
+            self._send_json({
+                "success": True,
+                "killswitch_active": killed,
+                "status": "KILLSWITCH_ENGAGED" if killed else "OPERATIONAL",
+                "scope": scope,
+                "reason": k_reason
+            })
+            return
+
+        elif path == "/api/browser/demo/scenarios":
+            scenario = str(req_data.get("scenario", "SECTION_80")).upper()
+            sc_map = {
+                "TEST_01": browser_scenarios.test_01_information_extraction,
+                "1": browser_scenarios.test_01_information_extraction,
+                "TEST_02": browser_scenarios.test_02_sensitive_mutation,
+                "2": browser_scenarios.test_02_sensitive_mutation,
+                "TEST_03": browser_scenarios.test_03_prompt_injection,
+                "3": browser_scenarios.test_03_prompt_injection,
+                "TEST_04": browser_scenarios.test_04_unknown_result_reconciliation,
+                "4": browser_scenarios.test_04_unknown_result_reconciliation,
+                "TEST_05": browser_scenarios.test_05_tenant_isolation,
+                "5": browser_scenarios.test_05_tenant_isolation,
+                "TEST_06": browser_scenarios.test_06_killswitch,
+                "6": browser_scenarios.test_06_killswitch,
+                "TEST_07": browser_scenarios.test_07_openhands_and_browser,
+                "7": browser_scenarios.test_07_openhands_and_browser,
+                "TEST_08": browser_scenarios.test_08_mcp_and_browser,
+                "8": browser_scenarios.test_08_mcp_and_browser,
+                "TEST_09": browser_scenarios.test_09_a2a_and_browser,
+                "9": browser_scenarios.test_09_a2a_and_browser,
+                "SECTION_80": browser_scenarios.test_10_complete_zonata_grand_acceptance,
+                "80": browser_scenarios.test_10_complete_zonata_grand_acceptance,
+                "TEST_10": browser_scenarios.test_10_complete_zonata_grand_acceptance,
+                "10": browser_scenarios.test_10_complete_zonata_grand_acceptance
+            }
+            fn = sc_map.get(scenario)
+            if fn:
+                res = fn()
+                self._send_json({"success": True, "scenario": scenario, "result": res})
+            else:
+                self._send_json({"error": f"Unknown Browser Use scenario '{scenario}'"}, status=400)
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
 
     def do_DELETE(self):
@@ -3519,6 +3809,11 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             server_id = path.split("/")[4]
             ok = mcp_gateway.disconnect_server(server_id)
             self._send_json({"success": ok, "server_id": server_id})
+            return
+        elif path.startswith("/api/browser/sessions/") and len(path.split("/")) == 5:
+            sess_id = path.split("/")[4]
+            ok = browser_gateway.close_session(sess_id)
+            self._send_json({"success": ok, "session_id": sess_id})
             return
         self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
 

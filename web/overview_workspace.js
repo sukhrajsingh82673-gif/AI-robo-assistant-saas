@@ -175,6 +175,11 @@
             ${this.renderOpenHandsLayerHtml(snap)}
           </div>
 
+          <!-- 9d. GOVERNED BROWSER EXECUTION (Browser Use - Section 80) -->
+          <div style="margin-bottom: 20px;">
+            ${this.renderBrowserLayerHtml(snap)}
+          </div>
+
           <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
           <div class="overview-grid-2col">
             ${this.renderExecutiveInsightsHtml(snap)}
@@ -1424,6 +1429,93 @@
           <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary);">
             <span>${oh.status_text}</span>
             <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('openhands-execution')" style="font-size:11px; padding:4px 10px;">Inspect Execution Center →</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 13d. GOVERNED AUTONOMOUS BROWSER RUNTIME (Browser Use - Section 80)
+    // =========================================================================
+    renderBrowserLayerHtml(snap) {
+      const br = snap.browser || {
+        active_sessions: 0,
+        total_executions: 0,
+        completed_executions: 0,
+        failed_executions: 0,
+        awaiting_approval: 0,
+        blocked_operations: 0,
+        verification_success_rate: 100,
+        unknown_outcomes: 0,
+        approved_domains: 5,
+        security_events: 0,
+        killswitch_active: false,
+        has_activity: false,
+        status_text: "Governed Browser Execution Layer operational"
+      };
+
+      if (!br.has_activity) {
+        return `
+          <div class="overview-card">
+            <div class="card-title-bar">
+              <div>
+                <h3 class="card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  Governed Autonomous Browser Layer (Browser Use)
+                </h3>
+                <p class="card-subtitle">Real-browser web automation, multi-tab sessions, prompt-injection defense & Merkle proof sealing.</p>
+              </div>
+              <span class="badge" style="background:rgba(107,114,128,0.15); color:#9ca3af;">No Activity</span>
+            </div>
+            <div style="padding:24px; text-align:center; color:var(--text-secondary);">
+              <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">🌐</div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No browser execution activity yet</div>
+              <div style="font-size:13px; max-width:380px; margin:0 auto 16px auto;">Dispatch a web navigation task or run canonical verification scenarios to inspect real browser actions.</div>
+              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('browser-execution')" style="font-size:12px; padding:6px 14px;">Open Browser Cockpit</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="overview-card">
+          <div class="card-title-bar">
+            <div>
+              <h3 class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Governed Autonomous Browser Layer (Browser Use)
+              </h3>
+              <p class="card-subtitle">Real-browser web automation, multi-tab sessions, prompt-injection defense & Merkle proof sealing.</p>
+            </div>
+            <span class="badge badge-emerald">${br.completed_executions} Completed Tasks</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:16px;">
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Active Sessions</div>
+              <div style="font-size:18px; font-weight:700; color:#38bdf8; font-family:var(--font-mono);">${br.active_sessions}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Runs Completed</div>
+              <div style="font-size:18px; font-weight:700; color:#10b981; font-family:var(--font-mono);">${br.completed_executions}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Awaiting Approval</div>
+              <div style="font-size:18px; font-weight:700; color:${br.awaiting_approval > 0 ? '#f59e0b' : 'var(--text-secondary)'}; font-family:var(--font-mono);">${br.awaiting_approval}</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Verification</div>
+              <div style="font-size:18px; font-weight:700; color:#a78bfa; font-family:var(--font-mono);">${br.verification_success_rate}%</div>
+            </div>
+            <div style="background:var(--bg-tertiary, #1f2937); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Threats Blocked</div>
+              <div style="font-size:18px; font-weight:700; color:${br.blocked_operations > 0 ? '#ef4444' : 'var(--text-secondary)'}; font-family:var(--font-mono);">${br.blocked_operations}</div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary);">
+            <span>${br.status_text}</span>
+            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('browser-execution')" style="font-size:11px; padding:4px 10px;">Inspect Browser Cockpit →</button>
           </div>
         </div>
       `;

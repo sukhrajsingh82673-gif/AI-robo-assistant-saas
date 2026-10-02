@@ -236,6 +236,7 @@ function updateBreadcrumbs() {
     'agent-network': 'Agent Network (A2A)',
     'mcp-network': 'MCP Network (Tools & Systems)',
     'openhands-execution': 'Agent Execution (OpenHands)',
+    'browser-execution': 'Browser Use (Governed Web Layer)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
     tools: 'Tools & Factory',
@@ -393,6 +394,9 @@ function handleRoute(path) {
   } else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
     const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
     mgr.render('view-openhands-execution');
+  } else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
+    const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
+    mgr.render('view-browser-execution');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {

@@ -1773,6 +1773,196 @@ CREATE TABLE IF NOT EXISTS openhands_approvals (
 
 CREATE INDEX IF NOT EXISTS idx_oh_appr_exec ON openhands_approvals(execution_id);
 CREATE INDEX IF NOT EXISTS idx_oh_appr_status ON openhands_approvals(status);
+
+-- 84. Governed Browser Execution Runtimes
+CREATE TABLE IF NOT EXISTS browser_runtimes (
+    runtime_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    browser_type TEXT NOT NULL DEFAULT 'chromium', -- chromium, firefox, webkit, cdp
+    browser_version TEXT NOT NULL DEFAULT 'latest',
+    playwright_version TEXT NOT NULL DEFAULT '1.49.0',
+    host TEXT NOT NULL DEFAULT 'localhost',
+    endpoint_url TEXT,
+    security_profile TEXT NOT NULL DEFAULT 'ISOLATED', -- ISOLATED, HARDENED, CUSTOM
+    capacity INTEGER NOT NULL DEFAULT 10,
+    active_sessions INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'HEALTHY', -- HEALTHY, DEGRADED, UNHEALTHY, DRAINING
+    created_at REAL NOT NULL,
+    last_health_check REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_rt_tenant ON browser_runtimes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_br_rt_status ON browser_runtimes(status);
+
+-- 85. Governed Browser Sessions
+CREATE TABLE IF NOT EXISTS browser_sessions (
+    session_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    mission_id TEXT,
+    workflow_id TEXT,
+    task_id TEXT,
+    profile_id TEXT NOT NULL DEFAULT 'EPHEMERAL', -- EPHEMERAL, PERSONAL, COMPANY, APPLICATION, AUTOMATION
+    runtime_id TEXT NOT NULL,
+    browser_type TEXT NOT NULL DEFAULT 'chromium',
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, PAUSED, CLOSED, EXPIRED, TERMINATED
+    current_url TEXT NOT NULL DEFAULT 'about:blank',
+    current_domain TEXT NOT NULL DEFAULT '',
+    active_tab_id TEXT NOT NULL DEFAULT 'tab_primary',
+    tabs_json JSON NOT NULL DEFAULT '[]',
+    auth_state TEXT NOT NULL DEFAULT 'UNAUTHENTICATED', -- UNAUTHENTICATED, AUTHENTICATED, PRIVILEGED_AUTHENTICATED
+    credential_scope TEXT,
+    domain_policy TEXT NOT NULL DEFAULT 'ALLOWLIST', -- BLOCK_ALL, ALLOWLIST, APPROVED_DOMAINS, RESTRICTED, FULL
+    allowed_domains_json JSON NOT NULL DEFAULT '[]',
+    navigation_count INTEGER NOT NULL DEFAULT 0,
+    action_count INTEGER NOT NULL DEFAULT 0,
+    max_duration_seconds INTEGER NOT NULL DEFAULT 3600,
+    max_tabs INTEGER NOT NULL DEFAULT 5,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    last_activity REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_sess_tenant ON browser_sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_br_sess_status ON browser_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_br_sess_agent ON browser_sessions(agent_id);
+
+-- 86. Governed Browser Executions
+CREATE TABLE IF NOT EXISTS browser_executions (
+    execution_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    mission_id TEXT,
+    workflow_id TEXT,
+    task_prompt TEXT NOT NULL,
+    execution_status TEXT NOT NULL DEFAULT 'REQUESTED', -- REQUESTED, POLICY_CHECK, AUTHORITY_CHECK, APPROVAL_CHECK, SESSION_PREPARATION, BROWSER_INITIALIZATION, NAVIGATION, OBSERVE, PLAN, ACTION, OBSERVE_POST, VERIFY, COMPLETE, DENIED, AUTH_FAILED, NAVIGATION_FAILED, ACTION_FAILED, TIMEOUT, CANCELLED, BLOCKED, UNKNOWN, RECONCILIATION_REQUIRED, VERIFICATION_FAILED
+    current_stage TEXT NOT NULL DEFAULT 'REQUESTED',
+    current_url TEXT NOT NULL DEFAULT 'about:blank',
+    actions_planned INTEGER NOT NULL DEFAULT 0,
+    actions_completed INTEGER NOT NULL DEFAULT 0,
+    actions_blocked INTEGER NOT NULL DEFAULT 0,
+    approval_status TEXT NOT NULL DEFAULT 'NONE', -- NONE, PENDING, APPROVED, REJECTED
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', -- UNVERIFIED, VERIFIED, VERIFICATION_FAILED, UNKNOWN, RECONCILIATION_REQUIRED
+    evidence_id TEXT,
+    result_summary TEXT,
+    error_message TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_exec_tenant ON browser_executions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_br_exec_status ON browser_executions(execution_status);
+CREATE INDEX IF NOT EXISTS idx_br_exec_session ON browser_executions(session_id);
+
+-- 87. Governed Browser Actions
+CREATE TABLE IF NOT EXISTS browser_actions (
+    action_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    action_type TEXT NOT NULL, -- NAVIGATE, CLICK, DOUBLE_CLICK, TYPE, SELECT, SCROLL, PRESS_KEY, SWITCH_TAB, OPEN_TAB, CLOSE_TAB, UPLOAD, DOWNLOAD, WAIT, EXTRACT, SCREENSHOT, SUBMIT_FORM
+    target_selector TEXT,
+    target_url TEXT,
+    parameters_json JSON NOT NULL DEFAULT '{}',
+    risk_class TEXT NOT NULL DEFAULT 'READ_ONLY', -- READ_ONLY, LOW_RISK_INTERACTION, DATA_ENTRY, BUSINESS_MUTATION, FINANCIAL, PRIVILEGED, DESTRUCTIVE, IRREVERSIBLE
+    policy_decision TEXT NOT NULL DEFAULT 'PERMITTED', -- PERMITTED, BLOCKED, APPROVAL_REQUIRED
+    approval_id TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RUNNING, COMPLETED, FAILED, BLOCKED, CANCELLED
+    result_data_json JSON,
+    error TEXT,
+    duration_ms REAL NOT NULL DEFAULT 0.0,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_act_exec ON browser_actions(execution_id);
+CREATE INDEX IF NOT EXISTS idx_br_act_type ON browser_actions(action_type);
+
+-- 88. Governed Browser Events
+CREATE TABLE IF NOT EXISTS browser_events (
+    event_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, -- SESSION_CREATED, NAVIGATION, ACTION_EXECUTED, OBSERVATION, APPROVAL_REQUESTED, KILLSWITCH_TRIGGERED, VERIFIED, STATE_CHANGED
+    payload_json JSON NOT NULL DEFAULT '{}',
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_evt_exec ON browser_events(execution_id);
+
+-- 89. Governed Browser Artifacts
+CREATE TABLE IF NOT EXISTS browser_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    artifact_type TEXT NOT NULL, -- SCREENSHOT, DOWNLOADED_FILE, EXTRACTED_DATA, DOM_SNAPSHOT, HAR_RECORDING
+    rel_path TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    sha256_digest TEXT NOT NULL,
+    redacted BOOLEAN NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_art_exec ON browser_artifacts(execution_id);
+
+-- 90. Governed Browser Security Events
+CREATE TABLE IF NOT EXISTS browser_security_events (
+    event_id TEXT PRIMARY KEY,
+    execution_id TEXT,
+    session_id TEXT,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, -- UNAUTHORIZED_DOMAIN, PROMPT_INJECTION, SSRF_ATTEMPT, CREDENTIAL_HARVESTING_ATTEMPT, LOCALHOST_ACCESS_ATTEMPT, DANGEROUS_DOWNLOAD, SENSITIVE_UPLOAD_BLOCKED, TENANT_ISOLATION_VIOLATION, KILLSWITCH_TERMINATION, DOM_MANIPULATION_ANOMALY
+    severity TEXT NOT NULL DEFAULT 'HIGH', -- LOW, MEDIUM, HIGH, CRITICAL
+    details JSON NOT NULL,
+    source TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_sec_tenant ON browser_security_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_br_sec_type ON browser_security_events(event_type);
+
+-- 91. Governed Browser Human-in-the-Loop Approvals
+CREATE TABLE IF NOT EXISTS browser_approvals (
+    approval_id TEXT PRIMARY KEY,
+    execution_id TEXT NOT NULL,
+    action_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    target_domain TEXT NOT NULL,
+    target_url TEXT NOT NULL,
+    action_description TEXT NOT NULL,
+    risk_class TEXT NOT NULL, -- FINANCIAL, PRIVILEGED, DESTRUCTIVE, IRREVERSIBLE, BUSINESS_MUTATION
+    financial_exposure REAL NOT NULL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED
+    decision_by TEXT,
+    decision_reason TEXT,
+    created_at REAL NOT NULL,
+    decided_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_br_appr_exec ON browser_approvals(execution_id);
+CREATE INDEX IF NOT EXISTS idx_br_appr_status ON browser_approvals(status);
 """
 
 class Database:

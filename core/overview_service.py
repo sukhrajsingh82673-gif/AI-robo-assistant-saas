@@ -841,6 +841,64 @@ class OverviewDataService:
             }
 
             # -------------------------------------------------------------
+            # 13d. Governed Browser Use Execution Layer (Project 08, Section 64)
+            # -------------------------------------------------------------
+            br_active_sess = cur.execute(
+                "SELECT COUNT(*) FROM browser_sessions WHERE tenant_id = ? AND status = 'ACTIVE'",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_total_exec = cur.execute(
+                "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_completed_exec = cur.execute(
+                "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status = 'COMPLETE'",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_failed_exec = cur.execute(
+                "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status IN ('DENIED', 'AUTH_FAILED', 'NAVIGATION_FAILED', 'ACTION_FAILED', 'TIMEOUT', 'CANCELLED', 'BLOCKED', 'VERIFICATION_FAILED', 'TERMINATED')",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_awaiting_appr = cur.execute(
+                "SELECT COUNT(*) FROM browser_approvals WHERE tenant_id = ? AND status = 'PENDING'",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_blocked_ops = cur.execute(
+                "SELECT COUNT(*) FROM browser_security_events WHERE tenant_id = ?",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_verif_succ = cur.execute(
+                "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_unknown_outcomes = cur.execute(
+                "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status IN ('UNKNOWN', 'RECONCILIATION_REQUIRED')",
+                (tenant_id,)
+            ).fetchone()[0]
+            br_sec_events = br_blocked_ops
+
+            has_br_activity = bool(br_total_exec > 0 or br_active_sess > 0)
+            br_verif_rate = round((br_verif_succ / max(1, br_completed_exec)) * 100.0, 1) if br_completed_exec > 0 else 100.0
+
+            browser_data = {
+                "active_sessions": br_active_sess,
+                "browser_executions": br_total_exec,
+                "total_executions": br_total_exec,
+                "completed": br_completed_exec,
+                "completed_executions": br_completed_exec,
+                "failed": br_failed_exec,
+                "failed_executions": br_failed_exec,
+                "awaiting_approval": br_awaiting_appr,
+                "blocked": br_blocked_ops,
+                "verification_success": br_verif_rate,
+                "unknown_outcomes": br_unknown_outcomes,
+                "approved_domains": 5,
+                "security_events": br_sec_events,
+                "has_activity": has_br_activity,
+                "status_text": "No browser execution activity yet" if not has_br_activity else f"{br_completed_exec} completed, {br_active_sess} active sessions across approved domains"
+            }
+
+            # -------------------------------------------------------------
             # 14. AI-Generated Executive Insights (With Epistemic Provenance)
             # -------------------------------------------------------------
             insights = []
@@ -1023,6 +1081,7 @@ class OverviewDataService:
                 "agent_network": agent_network_data,
                 "mcp": mcp_data,
                 "openhands": openhands_data,
+                "browser": browser_data,
                 "data_quality": data_quality,
                 "intelligence": {
                     "has_data": len(insights) > 0,

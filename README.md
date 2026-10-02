@@ -139,6 +139,18 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (autonomous engineering missions), Agency Swarm squads, Letta stateful memory, LangGraph durable workflow nodes, and governed MCP tools. Canonical test suite covers Software Task, MCP + OpenHands, Human Approval, Multi-Scope KillSwitch, Malicious Repo Prompt Injection defense, Non-idempotent Mutation Reconciliation, Multi-Tenant Workspace Isolation, Self-Improvement branch protection, and Section 79 Grand Acceptance Scenario.
 - **Dedicated Web Cockpit**: Fully interactive Agent Execution Cockpit (`web/openhands_workspace.js`) with KPI metrics, Execution history, Workspace inspector, Artifacts viewer with SHA-256 digests, Security Center, and Live Canonical Scenario Runner.
 
+### 15. Governed Autonomous Browser & Web-Computer Execution Layer (Browser Use — Project 08)
+- **Real-Browser Automation Engine**: Integrates Browser Use (`browser-use/browser-use`) architectural patterns as a governed web interaction runtime beneath ZONATA's existing AI CEO → Agency Swarm → TaskMaker → LangGraph hierarchy.
+- **Architectural Separation**: Clean boundaries permanently preserved across the 4 execution layers:
+  - `A2A = Agent ↔ Agent` (Project 05, agent-to-agent interoperability)
+  - `MCP = Agent ↔ Tool / Data / System` (Project 06, tool & system interoperability)
+  - `OpenHands = Governed Workspace / Code / Terminal Execution` (Project 07, software & environment operation)
+  - `Browser Use = Governed Real-Browser & Web Application Interaction` (Project 08, real web interaction & verification)
+- **15-Stage Governed Browser Execution Pipeline**: Multi-Scope KillSwitch verification (Global, Tenant, Company, Session, Execution, Domain, Agent), Domain Policy & SSRF enforcement (blocking RFC1918, 127.0.0.1, 169.254.169.254, file://), Web Content Security Boundary (prompt injection neutralization, regex secret scrubbing), Action Risk Classifier (`READ_ONLY`, `LOW_RISK_NAV`, `FORM_INPUT`, `AUTHENTICATED_INTERACTION`, `HIGH_RISK_MUTATION`, `FINANCIAL_MUTATION`), Human Approval Escalation via `ApprovalEngine`, sandboxed Playwright/deterministic session execution, visual DOM/screenshot artifact capture, and cryptographic Merkle Evidence Ledger sealing.
+- **Business Causality Engine Non-Negotiable Invariant**: `TASK_SUCCESS != BUSINESS_OUTCOME`. A successful page load (`200 OK`), completed form submission, or DOM interaction does NOT constitute commercial business success until verified against transaction evidence and causal lineage.
+- **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (autonomous web competitive intelligence), Agency Swarm squads, Letta stateful memory, LangGraph durable workflow nodes, OpenHands dual-agent coordination, and governed MCP tools. Canonical test suite covers Read-Only Extraction (Test 01), Form Submission & Merkle Proof (Test 02), Financial Mutation Human Approval (Test 03), Emergency Multi-Scope KillSwitch (Test 04), Prompt Injection Defense (Test 05), SSRF & Private Network Blocking (Test 06), OpenHands + Browser Dual-Agent Workflow (Test 07), Multi-Tab Coordination (Test 08), Unknown Mutation Reconciliation (Test 09), and Section 80 Grand Acceptance Test (Test 10).
+- **Dedicated Web Cockpit**: Fully interactive Browser Execution Cockpit (`web/browser_workspace.js`) with KPI metrics, Execution history, Session manager, Step-by-step action stream, Screenshots & Artifacts registry with SHA-256 digests, Security Center, and Live Canonical Scenario Runner.
+
 ---
 
 ## 📁 Repository Structure
@@ -149,6 +161,8 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 ├── cli.py                           # Unified CLI Cockpit (cycle, council, meeting, telemetry, causality)
 ├── serve_web.py                     # Standalone web UI preview server
 ├── core/
+│   ├── browser_use_execution_runtime.py # Browser Use Governed Real-Browser Runtime (Gateway, Sessions, SSRF Firewall, DOM & Viewport)
+│   ├── openhands_execution_runtime.py # OpenHands Governed Workspace Runtime (Gateway, Sandboxes, Command Classifier)
 │   ├── mcp_interoperability_runtime.py # MCP Governed Interoperability Layer (Gateway, Transports, Firewall, Inbound Server)
 │   ├── a2a_interoperability_runtime.py # A2A Governed Interoperability Layer (Discovery, Trust, Gateway)
 │   ├── durable_workflow_runtime.py  # LangGraph Governed Durable Workflow Runtime (StateGraph, Checkpointer)
@@ -162,6 +176,8 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── control_kernel.py            # Universal Control Kernel with evidence verification
 │   └── evidence_ledger.py           # Cryptographic Merkle audit ledger
 ├── zonata/
+│   ├── browser_use_adapter.py       # Browser Use Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-10 & Section 80)
+│   ├── openhands_adapter.py         # OpenHands Adapter, Subsystem Bridges & Canonical Scenarios (Tests 01-08 & Section 79)
 │   ├── mcp_adapter.py               # MCP Adapter, Subsystem Bridges & Canonical Scenarios (A-J & Section 73)
 │   ├── a2a_adapter.py               # A2A Adapter, Subsystem Bridges & Canonical Scenarios (A-J)
 │   ├── langgraph_adapter.py         # LangGraph Workflow Adapter & Canonical Scenarios (A-K)
@@ -169,15 +185,19 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 │   ├── stateful_agent_adapter.py    # Letta Stateful Memory Adapter
 │   └── workforce_adapter.py         # Agency Swarm Adapter
 ├── tests/
+│   ├── test_browser_use_execution.py # 27 Browser Use real-browser execution, security & scenario tests
+│   ├── test_openhands_execution.py  # 27 OpenHands workspace execution & scenario tests
 │   ├── test_mcp_interoperability.py # 36 MCP protocol, transport, firewall, security & scenario tests
 │   ├── test_a2a_interoperability.py # 48 A2A protocol, security, and bridge validation tests
 │   ├── test_durable_workflow.py     # 55 LangGraph durable workflow & governance tests
 │   ├── test_hal_multimodal.py       # 50 HAL Multimodal integration & scenario tests
 │   ├── test_stateful_agent_memory.py# 50 Letta stateful memory tests
-│   └── test_*.py                    # 73 Unit & system regression tests (312 tests total across suite)
+│   └── test_*.py                    # 73 Unit & system regression tests (366 tests total across suite)
 ├── web/
 │   ├── index.html                   # Single-page executive cockpit & Workspaces
 │   ├── app.js                       # Frontend router and event wiring
+│   ├── browser_workspace.js         # Browser Execution Cockpit (Sessions, Actions, Viewport, Artifacts, Scenarios)
+│   ├── openhands_workspace.js       # Agent Execution Workspace (Executions, Workspaces, Approvals, Scenarios)
 │   ├── mcp_workspace.js             # MCP Network Workspace (Servers, Tools, Resources, Evidence, Scenarios)
 │   ├── agent_network_workspace.js   # Agent Network Workspace (Directory, Tasks, Approvals, Security)
 │   ├── workflow_workspace.js        # Workflow Workspace (Runs, Graphs, Checkpoints, Approvals)
@@ -237,7 +257,7 @@ python3 cli.py zonata-mission "Increase hotel direct bookings and eliminate OTA 
 ```bash
 python3 -m unittest discover tests
 ```
-*Current test suite: 339/339 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, and OpenHands Governed Agent Execution Runtime).*
+*Current test suite: 366/366 tests passing (100% pass rate across Agency Swarm, Letta, HAL Multimodal, LangGraph Durable Workflows, A2A Agent Interoperability, Model Context Protocol / MCP, OpenHands Governed Agent Execution Runtime, and Browser Use Governed Real-Browser Execution Layer).*
 
 ---
 
@@ -276,4 +296,17 @@ python3 -m unittest discover tests
 31. **Generated Code != Verified Code**: Synthesized code must undergo independent physical reality verification before being accepted.
 32. **Test Pass != Production Safety**: Passing local tests in a workspace does not authorize deployment or merging into production branches without human governance approval.
 33. **Workspace State != Evidence**: Files resting on disk in a workspace do not constitute audit evidence; evidence requires cryptographic Merkle ledger sealing.
+34. **Browser Use != Authority**: Browser automation is an execution instrument, never an independent business authority or decision-maker.
+35. **Browser Session != Permission**: Holding an active browser session does not authorize navigating to unapproved endpoints or executing arbitrary interactions.
+36. **Login Session != Business Authorization**: An authenticated web portal session or stored cookie does not authorize financial, commercial, or privileged mutations without ZONATA governance approval.
+37. **Click != Permission**: Ability to interact with a button or hyperlink (`element.click()`) does not convey permission to perform the underlying real-world action.
+38. **Form Submission != Business Success**: Successful HTTP POST or form dispatch does not prove the intended commercial outcome occurred.
+39. **DOM Text != Truth**: Text retrieved from a web page DOM is untrusted external perception data, subject to prompt-injection neutralization and independent verification.
+40. **Prompt Injection Defense**: Adversarial commands embedded within web content (`"ignore previous instructions and..."`) are treated strictly as passive data and stripped of execution power.
+41. **SSRF Defense Invariant**: Browser navigation is strictly prohibited from accessing internal loopbacks (`127.0.0.1`), RFC1918 private subnets, cloud metadata endpoints (`169.254.169.254`), or local file schemes (`file://`).
+42. **Human-in-the-Loop Financial Escalation**: Any web action involving checkout, payment processing, price alteration, refund issuance, or legal contracts immediately halts in `AWAITING_APPROVAL` status.
+43. **Non-idempotent Web Action Reconciliation**: Web requests with ambiguous connection outcomes (timeouts, network drops) are marked `RECONCILIATION_REQUIRED` and prohibited from automatic repeated re-execution.
+44. **Authoritative Browser KillSwitch**: Multi-scope killswitches (Global, Tenant, Company, Session, Execution, Domain, Agent) instantly terminate active browser processes, disconnect contexts, and reject pending commands.
+45. **Cryptographic Merkle Sealing**: Every completed browser execution, action sequence, and visual artifact must be sealed into the tamper-evident Merkle Evidence Ledger with SHA-256 proofs before outcome attestation.
+
 
