@@ -42,8 +42,16 @@ from .self_extension import SelfExtensionEngine
 from .qualification_harness import ProviderQualificationHarness
 from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
 from .db_store import CoworkerDBStore
+from .fleet import (
+    GovernedNodeRegistry, GovernedFleetRouter, RemoteNodeWorkerAgent,
+    WorkerNodeProfile, NodeTaskAssignment, NodeTaskResult,
+    NodePlatform, NodeType
+)
+from .hermes_agent import HermesAgenticOrchestrator, HermesToolCall, HermesStepResult
+from .soak import SupervisorEnduranceRunner, FailureInjectionEngine, SoakTelemetryMetrics
 
 class UniversalCoworkerEngine:
+
     """
     Master Engine for the ZONATA Universal AI Co-worker Fabric.
     Executes multi-capability missions across desktop, browser, API, RPA, and visual CUAs
@@ -101,9 +109,21 @@ class UniversalCoworkerEngine:
         self.supervisor = WorkerSupervisor()
         self.recovery_engine = RecoveryEngine(self.provider_reg)
 
+        # 8. Governed Distributed Worker Fleet & Node Routing
+        self.node_registry = GovernedNodeRegistry()
+        self.fleet_router = GovernedFleetRouter(self.node_registry)
+
+        # 9. Hermes Agentic Orchestrator & Multi-Step Reasoning
+        self.hermes = HermesAgenticOrchestrator(self)
+
+        # 10. 24x7 Soak Endurance Runner & Chaos Failure Injector
+        self.soak_runner = SupervisorEnduranceRunner(self)
+        self.chaos_injector = FailureInjectionEngine(self)
+
         # In-memory execution graphs & DB persistence
         self._active_graphs: Dict[str, ExecutionGraph] = {}
         self.store = CoworkerDBStore(db_path)
+
 
     def create_coworker(self, role_or_prompt: str) -> CoworkerProfile:
         """Instantiates and registers a new AI Co-worker profile."""

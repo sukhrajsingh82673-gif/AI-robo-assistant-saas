@@ -231,6 +231,8 @@ class CoworkerProfile:
     budget_limit: float = 50.0
     status: str = "ACTIVE"
     created_at: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class ExecutionLease:

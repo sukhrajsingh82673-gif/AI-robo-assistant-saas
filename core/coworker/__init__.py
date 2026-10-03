@@ -30,9 +30,18 @@ from .worker_managers import (
     TerminalWorkerManager
 )
 from .providers.terminal_provider import TerminalProvider
+from .providers.openclaw_provider import OpenClawWebProvider
 from .tool_discovery import ToolDiscoveryEngine, ToolCandidate
 from .self_extension import SelfExtensionEngine, SelfExtensionResult
 from .qualification_harness import ProviderQualificationHarness, ProviderQualificationResult
+from .fleet import (
+    GovernedNodeRegistry, GovernedFleetRouter, RemoteNodeWorkerAgent,
+    WorkerNodeRegistrationRequest, WorkerNodeProfile, NodeTaskAssignment,
+    NodeTaskResult, NodePlatform, NodeType, NodeState, SecurityPosture
+)
+
+from .hermes_agent import HermesAgenticOrchestrator, HermesToolCall, HermesStepResult
+from .soak import SupervisorEnduranceRunner, FailureInjectionEngine, SoakTelemetryMetrics
 from .engine import UniversalCoworkerEngine
 
 __all__ = [
@@ -83,11 +92,28 @@ __all__ = [
     "FileWorkerManager",
     "TerminalWorkerManager",
     "TerminalProvider",
+    "OpenClawWebProvider",
     "ToolDiscoveryEngine",
     "ToolCandidate",
     "SelfExtensionEngine",
     "SelfExtensionResult",
     "ProviderQualificationHarness",
     "ProviderQualificationResult",
+    "GovernedNodeRegistry",
+    "GovernedFleetRouter",
+    "RemoteNodeWorkerAgent",
+    "WorkerNodeProfile",
+    "NodeTaskAssignment",
+    "NodeTaskResult",
+    "NodePlatform",
+    "NodeType",
+    "NodeState",
+    "HermesAgenticOrchestrator",
+    "HermesToolCall",
+    "HermesStepResult",
+    "SupervisorEnduranceRunner",
+    "FailureInjectionEngine",
+    "SoakTelemetryMetrics",
     "UniversalCoworkerEngine"
 ]
+

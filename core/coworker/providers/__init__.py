@@ -14,6 +14,7 @@ from .playwright_provider import PlaywrightProvider
 from .rpa_providers import RobocorpProvider, OpenRPAProvider
 from .api_mcp_provider import APIMCPProvider
 from .terminal_provider import TerminalProvider
+from .openclaw_provider import OpenClawWebProvider
 
 __all__ = [
     "OpenAdaptProvider",
@@ -28,5 +29,7 @@ __all__ = [
     "RobocorpProvider",
     "OpenRPAProvider",
     "APIMCPProvider",
-    "TerminalProvider"
+    "TerminalProvider",
+    "OpenClawWebProvider"
 ]
+

@@ -12,7 +12,8 @@ from .providers import (
     WindowsDesktopProvider, MacOSDesktopProvider, LinuxDesktopProvider,
     ComputerUseMCPProvider, PlaywrightProvider,
     RobocorpProvider, OpenRPAProvider, APIMCPProvider,
-    AgentSProvider, UITARSProvider, TerminalProvider
+    AgentSProvider, UITARSProvider, TerminalProvider,
+    OpenClawWebProvider
 )
 
 class ProviderRegistry:
@@ -27,6 +28,7 @@ class ProviderRegistry:
         providers: List[CapabilityProvider] = [
             APIMCPProvider(),
             TerminalProvider(),
+            OpenClawWebProvider(),
             PlaywrightProvider(),
             OpenAdaptProvider(),
             LinuxDesktopProvider(),
@@ -40,6 +42,7 @@ class ProviderRegistry:
         ]
         for p in providers:
             self.register(p)
+
 
     def register(self, provider: CapabilityProvider):
         self._providers[provider.providerId()] = provider
