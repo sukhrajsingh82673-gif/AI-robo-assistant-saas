@@ -38,3 +38,7 @@ storage/sandbox/
 storage/workspaces/
 storage/browser_artifacts/
 storage/object_store/
+storage/backups/
+storage/*.bak
+storage/evidence/test_*
+storage/evidence/*test*

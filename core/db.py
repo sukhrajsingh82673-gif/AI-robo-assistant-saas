@@ -2704,6 +2704,475 @@ CREATE TABLE IF NOT EXISTS executive_approval_queue (
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_exec_appr_tc ON executive_approval_queue(tenant_id, company_id);
+
+-- 15. Transactional Outbox for Reliable Event & Mutation Publishing
+CREATE TABLE IF NOT EXISTS transactional_outbox (
+    outbox_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    aggregate_type TEXT NOT NULL,
+    aggregate_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    payload JSON NOT NULL,
+    idempotency_key TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    last_error TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    published_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_status ON transactional_outbox(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_outbox_idempotency ON transactional_outbox(idempotency_key);
+
+-- 16. External Action Reconciliation Receipts
+CREATE TABLE IF NOT EXISTS reconciliation_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    action_id TEXT NOT NULL,
+    system_type TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    expected_state JSON NOT NULL,
+    actual_state JSON NOT NULL,
+    reconciliation_status TEXT NOT NULL,
+    evidence_digest TEXT NOT NULL,
+    evidence_classification TEXT NOT NULL DEFAULT 'LOCAL_REAL_EXECUTION',
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_reconcil_tc ON reconciliation_receipts(tenant_id, system_type);
+
+-- 17. Executive Incident Engine
+CREATE TABLE IF NOT EXISTS executive_incidents (
+    incident_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    category TEXT NOT NULL,
+    current_state TEXT NOT NULL DEFAULT 'DETECTED',
+    description TEXT NOT NULL,
+    evidence_ref TEXT,
+    containment_action TEXT,
+    postmortem JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    closed_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_tc ON executive_incidents(tenant_id, current_state);
+
+-- 18. Executive Policy / Decision Boundary Rules
+CREATE TABLE IF NOT EXISTS executive_policy_rules (
+    rule_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    action_category TEXT NOT NULL,
+    max_amount_inr REAL NOT NULL DEFAULT 0.0,
+    requires_human_approval INTEGER NOT NULL DEFAULT 0,
+    dual_key_required INTEGER NOT NULL DEFAULT 0,
+    is_forbidden INTEGER NOT NULL DEFAULT 0,
+    description TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_policy_rules ON executive_policy_rules(tenant_id, role, action_category);
+
+
+
+-- Additional Canonical Subsystem Tables
+CREATE TABLE IF NOT EXISTS company_processes (
+        process_id TEXT PRIMARY KEY,
+        company_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        category TEXT,
+        trigger_type TEXT,
+        sla TEXT,
+        owner_role TEXT,
+        stages TEXT,
+        status TEXT,
+        created_at REAL
+    );
+
+CREATE TABLE IF NOT EXISTS mission_tasks (
+        task_id TEXT PRIMARY KEY,
+        mission_id TEXT NOT NULL,
+        company_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        assigned_agent TEXT,
+        stage TEXT,
+        dependencies TEXT,
+        state TEXT,
+        tool_requirements TEXT,
+        evidence_hash TEXT,
+        created_at REAL,
+        completed_at REAL
+    );
+
+CREATE TABLE IF NOT EXISTS auth_revoked_tokens (
+            token_id TEXT PRIMARY KEY,
+            revoked_at REAL NOT NULL,
+            reason TEXT DEFAULT 'LOGOUT_OR_REVOCATION'
+        );
+
+CREATE TABLE IF NOT EXISTS supervisor_heartbeats (
+            heartbeat_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            company_id TEXT NOT NULL,
+            tick_number INTEGER NOT NULL,
+            health_score REAL,
+            active_schedules INTEGER DEFAULT 0,
+            active_workers INTEGER DEFAULT 0,
+            disk_status TEXT,
+            anomalies_detected INTEGER DEFAULT 0,
+            timestamp REAL NOT NULL
+        );
+
+CREATE TABLE IF NOT EXISTS governed_agents (
+            agent_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            version TEXT DEFAULT '1.0.0',
+            tenant_id TEXT NOT NULL,
+            company_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            parent_agent_id TEXT,
+            delegation_depth INTEGER DEFAULT 0,
+            capabilities TEXT DEFAULT '[]',
+            allowed_tools TEXT DEFAULT '[]',
+            resource_budget TEXT DEFAULT '{}',
+            lifecycle_state TEXT NOT NULL,
+            health_status TEXT DEFAULT 'HEALTHY',
+            is_quarantined INTEGER DEFAULT 0,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+        );
+
+CREATE TABLE IF NOT EXISTS governed_tools (
+            tool_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            version TEXT DEFAULT '1.0.0',
+            tenant_id TEXT NOT NULL,
+            company_id TEXT NOT NULL,
+            source_type TEXT DEFAULT 'SYNTHESIZED',
+            risk_class TEXT NOT NULL,
+            input_schema TEXT DEFAULT '{}',
+            output_schema TEXT DEFAULT '{}',
+            filesystem_policy TEXT DEFAULT 'SANDBOX_ONLY',
+            network_policy TEXT DEFAULT 'BLOCKED',
+            lifecycle_state TEXT NOT NULL,
+            security_status TEXT DEFAULT 'PENDING_SCAN',
+            created_at REAL NOT NULL,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+        );
+
+CREATE TABLE IF NOT EXISTS tenant_agent_quotas (
+            tenant_id TEXT PRIMARY KEY,
+            max_agents INTEGER DEFAULT 100,
+            max_child_per_parent INTEGER DEFAULT 5,
+            max_delegation_depth INTEGER DEFAULT 4,
+            max_concurrent_missions INTEGER DEFAULT 20,
+            max_tool_calls INTEGER DEFAULT 100,
+            max_runtime_sec INTEGER DEFAULT 3600,
+            max_token_budget INTEGER DEFAULT 1000000,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+        );
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            checksum TEXT NOT NULL,
+            applied_at REAL NOT NULL,
+            execution_time_ms REAL NOT NULL,
+            status TEXT NOT NULL
+        );
+
+CREATE TABLE IF NOT EXISTS optimistic_lock_registry (
+    table_name TEXT PRIMARY KEY,
+    version_column TEXT NOT NULL DEFAULT 'version',
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS async_command_queue (
+                action_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                mission_id TEXT,
+                workflow_id TEXT,
+                agent_id TEXT NOT NULL,
+                capability_id TEXT NOT NULL,
+                risk_class TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'QUEUED', -- QUEUED, ASSIGNED, EXECUTING, COMPLETED, FAILED, TIMED_OUT, UNKNOWN_OUTCOME
+                envelope_payload JSON NOT NULL,
+                worker_id TEXT,
+                result_payload JSON,
+                error_message TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                completed_at REAL
+            );
+
+CREATE TABLE IF NOT EXISTS agent_packages (
+                package_id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                version TEXT NOT NULL,
+                role TEXT NOT NULL,
+                package_payload JSON NOT NULL,
+                package_hash TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'CANDIDATE', -- CANDIDATE, CANARY, ACTIVE, DEPRECATED, ROLLED_BACK
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS tool_packages (
+                tool_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                version TEXT NOT NULL,
+                risk_class TEXT NOT NULL,
+                source_code TEXT NOT NULL,
+                sandbox_profile JSON NOT NULL,
+                signature TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'CANDIDATE', -- CANDIDATE, TESTING, ACTIVE, REVOKED
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS organization_nodes (
+                node_id TEXT PRIMARY KEY,
+                node_type TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                parent_id TEXT,
+                metadata JSON,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS organization_edges (
+                edge_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                relation_type TEXT NOT NULL, -- REPORTS_TO, MEMBER_OF, MANAGES, SHARED_SERVICE_WITH
+                metadata JSON,
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS corporate_data_objects (
+                object_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                data_class TEXT NOT NULL,
+                source_system TEXT NOT NULL,
+                source_object_id TEXT NOT NULL,
+                classification_level TEXT NOT NULL,
+                sensitivity_categories JSON NOT NULL,
+                owner_identity_id TEXT NOT NULL,
+                acl JSON NOT NULL,
+                content_hash TEXT NOT NULL,
+                raw_content TEXT NOT NULL,
+                residency_region TEXT NOT NULL DEFAULT 'US-EAST',
+                retention_days INTEGER NOT NULL DEFAULT 365,
+                legal_hold INTEGER NOT NULL DEFAULT 0,
+                deletion_state TEXT NOT NULL DEFAULT 'ACTIVE',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                provenance JSON
+            );
+
+CREATE TABLE IF NOT EXISTS knowledge_index_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                object_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                text_content TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                classification_level TEXT NOT NULL,
+                allowed_departments JSON NOT NULL,
+                allowed_roles JSON NOT NULL,
+                allowed_identities JSON NOT NULL,
+                source_system TEXT NOT NULL,
+                deletion_state TEXT NOT NULL DEFAULT 'ACTIVE',
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS lineage_nodes (
+                node_id TEXT PRIMARY KEY,
+                node_type TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                label TEXT NOT NULL,
+                attributes JSON NOT NULL,
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS lineage_edges (
+                edge_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                relationship TEXT NOT NULL,
+                metadata JSON,
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS enterprise_budgets (
+                entity_id TEXT PRIMARY KEY,
+                entity_type TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                allocated_usd REAL NOT NULL,
+                spent_usd REAL NOT NULL DEFAULT 0.0,
+                soft_limit_pct REAL NOT NULL DEFAULT 80.0,
+                hard_limit_pct REAL NOT NULL DEFAULT 100.0,
+                is_frozen INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS security_incidents (
+                incident_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                source_entity_id TEXT NOT NULL,
+                description TEXT NOT NULL,
+                details JSON NOT NULL,
+                is_mitigated INTEGER NOT NULL DEFAULT 0,
+                timestamp REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS governed_memory_records (
+                record_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                tier TEXT NOT NULL,
+                trust_state TEXT NOT NULL DEFAULT 'UNVERIFIED',
+                content TEXT NOT NULL,
+                confidence_score REAL NOT NULL DEFAULT 0.5,
+                source_reference TEXT,
+                is_authoritative INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                expires_at REAL
+            );
+
+CREATE TABLE IF NOT EXISTS agent_evaluation_runs (
+                eval_id TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                version TEXT NOT NULL,
+                security_score REAL NOT NULL,
+                policy_compliance_score REAL NOT NULL,
+                hallucination_rate REAL NOT NULL,
+                cost_efficiency_score REAL NOT NULL,
+                passed_all_safety_gates INTEGER NOT NULL,
+                evaluation_details JSON NOT NULL,
+                evaluated_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS immutable_agent_packages (
+                package_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                template_id TEXT NOT NULL,
+                agent_version TEXT NOT NULL,
+                prompt_hash TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                tool_package_hashes JSON NOT NULL,
+                policy_version TEXT NOT NULL,
+                composite_package_hash TEXT NOT NULL,
+                certified_for_production INTEGER NOT NULL,
+                created_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS unknown_outcomes (
+                record_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                target_system TEXT NOT NULL,
+                mutation_type TEXT NOT NULL,
+                parameters JSON NOT NULL,
+                idempotency_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING_RECONCILIATION',
+                reconciliation_attempts INTEGER NOT NULL DEFAULT 0,
+                reconciliation_result JSON,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS external_idp_directory (
+                scim_id TEXT PRIMARY KEY,
+                external_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                groups JSON NOT NULL,
+                roles JSON NOT NULL,
+                department TEXT NOT NULL,
+                active INTEGER NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+CREATE TABLE IF NOT EXISTS workforce_scheduler_queue (
+                task_id TEXT PRIMARY KEY,
+                mission_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                department TEXT NOT NULL,
+                priority INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'QUEUED', -- QUEUED, RUNNING, COMPLETED, SUSPENDED, TIMED_OUT
+                assigned_employee_id TEXT,
+                budget_usd REAL NOT NULL,
+                dependencies JSON NOT NULL,
+                created_at REAL NOT NULL,
+                dispatched_at REAL,
+                completed_at REAL
+            );
+
+CREATE TABLE IF NOT EXISTS tenant_resource_quotas (
+                tenant_id TEXT PRIMARY KEY,
+                max_active_missions INTEGER NOT NULL DEFAULT 100,
+                max_ai_employees INTEGER NOT NULL DEFAULT 50,
+                max_tokens_per_minute INTEGER NOT NULL DEFAULT 500000,
+                max_tool_calls_daily INTEGER NOT NULL DEFAULT 50000,
+                max_storage_bytes INTEGER NOT NULL DEFAULT 53687091200,
+                current_active_missions INTEGER NOT NULL DEFAULT 0,
+                current_ai_employees INTEGER NOT NULL DEFAULT 0,
+                tokens_used_this_minute INTEGER NOT NULL DEFAULT 0,
+                minute_window_epoch INTEGER NOT NULL DEFAULT 0,
+                daily_tool_calls INTEGER NOT NULL DEFAULT 0,
+                day_window_epoch INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            );
+
+-- 19. Disaster Recovery Manifests
+CREATE TABLE IF NOT EXISTS disaster_recovery_manifests (
+    manifest_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    backup_type TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    sha256_checksum TEXT NOT NULL,
+    merkle_root TEXT NOT NULL,
+    record_counts JSON NOT NULL,
+    verification_status TEXT NOT NULL DEFAULT 'VERIFIED',
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dr_manifests ON disaster_recovery_manifests(tenant_id, created_at);
 """
 
 class Database:
