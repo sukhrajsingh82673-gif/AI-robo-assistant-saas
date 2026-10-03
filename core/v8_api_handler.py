@@ -173,6 +173,26 @@ class V8ApiHandler:
                 "zero_mock_compliance": True
             }, 200
 
+        elif path == "/api/v8/production/gates":
+            from core.production_gates import ProductionCertificationGates
+            report = ProductionCertificationGates.evaluate_all_gates()
+            return report, 200
+
+        elif path == "/api/v8/production/alerts":
+            from core.alerting_engine import AlertingEngine
+            alerts = AlertingEngine(tenant_id=tenant_id).evaluate_active_alerts()
+            return {"active_alerts": alerts, "count": len(alerts)}, 200
+
+        elif path == "/api/v8/production/slos":
+            from core.observability_stack import sre_metrics, SLOTracker
+            slos = SLOTracker.evaluate_slos(sre_metrics)
+            return {"slo_report": slos}, 200
+
+        elif path == "/api/v8/production/independent-verify":
+            from independent_verification.verify_production_unit import IndependentProductionVerifier
+            res = IndependentProductionVerifier().run_all_independent_verifications()
+            return res, 200
+
         return None
 
     @classmethod

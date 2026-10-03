@@ -402,6 +402,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
             return
 
+        if path == "/metrics":
+            from core.observability_stack import sre_metrics
+            content = sre_metrics.scrape_prometheus_format()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain; version=0.0.4; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(content.encode('utf-8'))
+            return
+
         if path == "/api/auth/me":
             ctx = self._get_auth_context()
             self._send_json({"authenticated": True, "context": ctx})

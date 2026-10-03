@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ZonataProductionConfigSchema",
+  "type": "object",
+  "required": [
+    "ZONATA_ENV",
+    "ZONATA_SOVEREIGN_TENANT",
+    "DATABASE_DIALECT",
+    "SECRET_VAULT_KEY",
+    "APPLICATION_SIGNING_KEY",
+    "SOVEREIGN_ROOT_KEY_ID"
+  ],
+  "properties": {
+    "ZONATA_ENV": {
+      "type": "string",
+      "enum": ["development", "staging", "production"]
+    },
+    "ZONATA_SOVEREIGN_TENANT": {
+      "type": "string",
+      "minLength": 4
+    },
+    "DATABASE_DIALECT": {
+      "type": "string",
+      "enum": ["sqlite", "postgresql"]
+    },
+    "DATABASE_URL": {
+      "type": "string"
+    },
+    "SECRET_VAULT_KEY": {
+      "type": "string",
+      "minLength": 32
+    },
+    "APPLICATION_SIGNING_KEY": {
+      "type": "string",
+      "minLength": 32
+    },
+    "SOVEREIGN_ROOT_KEY_ID": {
+      "type": "string",
+      "minLength": 8
+    },
+    "ALLOWED_ORIGINS": {
+      "type": "string"
+    },
+    "DEBUG": {
+      "type": "boolean",
+      "default": false
+    },
+    "MAX_WORKFORCE_AGENTS": {
+      "type": "integer",
+      "default": 100
+    },
+    "MAX_DAILY_BUDGET_INR": {
+      "type": "number",
+      "default": 500000.0
+    }
+  }
+}

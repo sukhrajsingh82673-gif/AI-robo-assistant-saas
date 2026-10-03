@@ -15,6 +15,7 @@ from .db import db
 logger = logging.getLogger("ZonataReconciliation")
 
 class ReconciliationStatus:
+    UNKNOWN = "UNKNOWN"             # Request was sent but timeout occurred; state undetermined
     MATCHED = "MATCHED"             # Remote state matches expected state exactly
     DRIFTED = "DRIFTED"             # Remote state differs from expected mutation
     NOT_FOUND = "NOT_FOUND"         # Mutation did not reach or execute on remote system
@@ -131,6 +132,54 @@ class ExternalActionReconciliationEngine:
             "actual_state": actual_data
         }
 
+    def record_unknown_outcome(
+        self,
+        action_id: str,
+        system_type: str,
+        idempotency_key: str,
+        expected_state: Dict[str, Any],
+        error_context: str
+    ) -> Dict[str, Any]:
+        """
+        Records an action whose remote execution status is UNKNOWN (e.g. HTTP timeout post-send).
+        Never treats timeout as automatic FAILURE or automatic SUCCESS.
+        """
+        receipt_id = f"rcp_unk_{uuid.uuid4().hex[:8]}"
+        now = time.time()
+        actual_data = {"error": error_context, "resolution_pending": True}
+
+        evidence_payload = {
+            "action_id": action_id,
+            "system_type": system_type,
+            "idempotency_key": idempotency_key,
+            "status": ReconciliationStatus.UNKNOWN,
+            "timestamp": now
+        }
+        digest = hashlib.sha256(json.dumps(evidence_payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO reconciliation_receipts (
+                    receipt_id, tenant_id, action_id, system_type,
+                    idempotency_key, expected_state, actual_state,
+                    reconciliation_status, evidence_digest,
+                    evidence_classification, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL_REAL_EXECUTION', ?)
+            """, (
+                receipt_id, self.tenant_id, action_id, system_type,
+                idempotency_key, json.dumps(expected_state), json.dumps(actual_data),
+                ReconciliationStatus.UNKNOWN, digest, now
+            ))
+            conn.commit()
+
+        return {
+            "receipt_id": receipt_id,
+            "action_id": action_id,
+            "status": ReconciliationStatus.UNKNOWN,
+            "digest": digest,
+            "requires_reconciliation": True
+        }
+
     def get_receipt(self, receipt_id: str) -> Optional[Dict[str, Any]]:
         with db.get_connection() as conn:
             row = conn.execute(
@@ -143,3 +192,4 @@ class ExternalActionReconciliationEngine:
             res["expected_state"] = json.loads(res["expected_state"])
             res["actual_state"] = json.loads(res["actual_state"])
             return res
+

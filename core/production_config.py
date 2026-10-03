@@ -1,161 +1,140 @@
 """
-ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
-Production Configuration & Strict Fail-Closed Environment Validator
-Enforces zero-trust configuration, credential entropy, network policies,
-and fail-closed invariants for enterprise deployment.
+ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM — V10
+Production Environment & Startup Preflight Engine
+Validates configuration integrity, rejects unsafe defaults, and enforces fail-closed posture.
 """
 
 import os
 import sys
+import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, List, Optional, Any, Tuple
 
-logger = logging.getLogger("zonata.config.production")
+logger = logging.getLogger("zonata.config")
 
-class EnvironmentType:
-    DEVELOPMENT = "DEVELOPMENT"
-    TESTING = "TESTING"
-    STAGING = "STAGING"
-    PRODUCTION = "PRODUCTION"
-
-class ProductionConfigurationError(Exception):
-    """Raised when production configuration fails security or operational invariants."""
+class ConfigurationError(Exception):
+    """Raised when environment or security configuration violates production standards."""
     pass
 
-class ProductionConfig:
+class ProductionConfigValidator:
     """
-    Centralized configuration engine with fail-closed validation.
-    Ensures that staging and production clusters cannot boot with insecure defaults,
-    placeholder secrets, missing coordinators, or unencrypted storage.
+    Enforces strict production configuration gates:
+    - Fails closed if mandatory production controls are missing.
+    - Rejects debug mode, development keys, weak passwords, and open CORS in production.
     """
 
-    DEFAULT_DEV_SECRETS = {
-        "zonata_secret_key_v2_distributed",
-        "default_secret_key",
-        "changeme",
-        "admin",
-        "secret",
-        "password",
-        "12345678"
+    FORBIDDEN_DEV_SECRETS = {
+        "changeme", "password", "admin", "123456", "secret",
+        "dev_key", "test_key", "default", "replace_with_secure_password"
     }
 
-    def __init__(self):
-        self.env = os.environ.get("ZONATA_ENV", os.environ.get("APP_ENV", EnvironmentType.DEVELOPMENT)).upper()
-        self.is_prod = self.env in (EnvironmentType.PRODUCTION, EnvironmentType.STAGING)
-        self.strict_mode = os.environ.get("ZONATA_STRICT_CONFIG", "false").lower() in ("true", "1", "yes")
+    @classmethod
+    def get_environment(cls) -> str:
+        return os.environ.get("ZONATA_ENV", "development").lower().strip()
 
-    def get_environment(self) -> str:
-        return self.env
+    @classmethod
+    def is_production(cls) -> bool:
+        return cls.get_environment() == "production"
 
-    def is_production(self) -> bool:
-        return self.is_prod
-
-    def validate(self, raise_on_failure: Optional[bool] = None) -> Dict[str, Any]:
+    @classmethod
+    def validate_environment(cls, env_vars: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
-        Run comprehensive configuration validation checks.
-        If raise_on_failure is True (or if running in PRODUCTION and strict_mode is True),
-        raises ProductionConfigurationError on any critical invariant failure.
+        Validates environment against production standards.
+        Raises ConfigurationError if in production and invalid.
         """
-        should_raise = raise_on_failure if raise_on_failure is not None else (self.is_prod and self.strict_mode)
-        
-        checks: Dict[str, Dict[str, Any]] = {}
-        critical_failures: List[str] = []
+        env = env_vars if env_vars is not None else dict(os.environ)
+        current_env = env.get("ZONATA_ENV", "development").lower().strip()
+        errors: List[str] = []
         warnings: List[str] = []
 
-        # 1. Auth Secret & Token Entropy
-        auth_secret = os.environ.get("ZONATA_AUTH_SECRET", os.environ.get("SECRET_KEY", ""))
-        if not auth_secret:
-            if self.is_prod:
-                critical_failures.append("ZONATA_AUTH_SECRET is unset in production environment.")
-                checks["auth_secret"] = {"status": "FAIL", "reason": "Missing required secret key"}
-            else:
-                warnings.append("ZONATA_AUTH_SECRET unset; using local development secret.")
-                checks["auth_secret"] = {"status": "WARN", "reason": "Development fallback active"}
-        elif auth_secret in self.DEFAULT_DEV_SECRETS:
-            if self.is_prod:
-                critical_failures.append("ZONATA_AUTH_SECRET uses an insecure default/placeholder value.")
-                checks["auth_secret"] = {"status": "FAIL", "reason": "Insecure default secret"}
-            else:
-                checks["auth_secret"] = {"status": "WARN", "reason": "Known dev default secret"}
-        elif len(auth_secret) < 32:
-            if self.is_prod:
-                critical_failures.append("ZONATA_AUTH_SECRET entropy insufficient (must be >= 32 characters).")
-                checks["auth_secret"] = {"status": "FAIL", "reason": "Entropy length < 32"}
-            else:
-                checks["auth_secret"] = {"status": "PASS", "length": len(auth_secret)}
-        else:
-            checks["auth_secret"] = {"status": "PASS", "length": len(auth_secret)}
+        if current_env == "production":
+            # 1. Debug mode check
+            debug_val = env.get("DEBUG", "false").lower()
+            if debug_val in ("true", "1", "yes"):
+                errors.append("DEBUG mode must be FALSE in production environment.")
 
-        # 2. Database Configuration
-        db_url = os.environ.get("DATABASE_URL", "")
-        db_driver = os.environ.get("ZONATA_DB_DRIVER", "sqlite").lower()
-        if self.is_prod:
-            if not db_url and db_driver != "postgres":
-                warnings.append("DATABASE_URL unset in production; verifying local pooled engine.")
-                checks["database"] = {"status": "WARN", "driver": db_driver}
-            else:
-                checks["database"] = {"status": "PASS", "driver": db_driver, "url_configured": bool(db_url)}
-        else:
-            checks["database"] = {"status": "PASS", "driver": db_driver, "dev_mode": True}
+            # 2. Master Key and Vault Key checks
+            vault_key = env.get("SECRET_VAULT_KEY", "")
+            if not vault_key or len(vault_key) < 32:
+                errors.append("SECRET_VAULT_KEY must be at least 32 characters in production.")
+            if vault_key.lower() in cls.FORBIDDEN_DEV_SECRETS:
+                errors.append("SECRET_VAULT_KEY is using an insecure or default value.")
 
-        # 3. Redis / Distributed Coordination
-        redis_url = os.environ.get("REDIS_URL", "")
-        distributed_mode = os.environ.get("ZONATA_DISTRIBUTED_MODE", "true").lower() in ("true", "1", "yes")
-        if self.is_prod and distributed_mode and not redis_url:
-            warnings.append("REDIS_URL unset; distributed coordination using resilient local memory fallback.")
-            checks["redis"] = {"status": "WARN", "mode": "memory_coordination_fallback"}
-        else:
-            checks["redis"] = {"status": "PASS", "configured": bool(redis_url)}
+            signing_key = env.get("APPLICATION_SIGNING_KEY", "")
+            if not signing_key or len(signing_key) < 32:
+                errors.append("APPLICATION_SIGNING_KEY must be at least 32 characters in production.")
+            if signing_key.lower() in cls.FORBIDDEN_DEV_SECRETS:
+                errors.append("APPLICATION_SIGNING_KEY is using an insecure or default value.")
 
-        # 4. Temporal Cluster Configuration
-        temporal_host = os.environ.get("TEMPORAL_HOST", "")
-        if self.is_prod and not temporal_host:
-            warnings.append("TEMPORAL_HOST unset; long-running missions using durable local SQLite runtime.")
-            checks["temporal"] = {"status": "WARN", "mode": "local_sqlite_durable_runtime"}
-        else:
-            checks["temporal"] = {"status": "PASS", "host": temporal_host or "local"}
+            # 3. Sovereign Root Key
+            root_key_id = env.get("SOVEREIGN_ROOT_KEY_ID", "")
+            if not root_key_id:
+                errors.append("SOVEREIGN_ROOT_KEY_ID must be specified in production.")
 
-        # 5. Object Storage (S3 / MinIO)
-        s3_bucket = os.environ.get("S3_BUCKET", os.environ.get("STORAGE_BUCKET", ""))
-        checks["object_storage"] = {
-            "status": "PASS" if s3_bucket or not self.is_prod else "WARN",
-            "bucket": s3_bucket or "local_filesystem_storage"
+            # 4. Database configuration check
+            db_dialect = env.get("DATABASE_DIALECT", "sqlite").lower()
+            if db_dialect == "postgresql":
+                db_url = env.get("DATABASE_URL", "")
+                if not db_url:
+                    errors.append("DATABASE_URL must be specified when DATABASE_DIALECT is postgresql.")
+                elif any(bad in db_url.lower() for bad in cls.FORBIDDEN_DEV_SECRETS):
+                    errors.append("DATABASE_URL contains an insecure default password.")
+
+            # 5. Ingress CORS check
+            cors = env.get("ALLOWED_ORIGINS", "")
+            if cors == "*":
+                errors.append("ALLOWED_ORIGINS cannot be '*' wildcard in production.")
+
+        if errors:
+            raise ConfigurationError(f"Production Configuration Validation Failed:\n" + "\n".join(f" - {e}" for e in errors))
+
+        return {
+            "valid": len(errors) == 0,
+            "environment": current_env,
+            "errors": errors,
+            "warnings": warnings
         }
 
-        # 6. Third-Party SaaS Credentials (Nango, MCP, etc.)
-        nango_secret = os.environ.get("NANGO_SECRET_KEY", "")
-        checks["nango_integration"] = {
-            "status": "CONFIGURED" if nango_secret else "CONDITIONAL_SIMULATED",
-            "has_credentials": bool(nango_secret)
+    @classmethod
+    def run_startup_preflight(cls) -> Dict[str, Any]:
+        """
+        Executes preflight checks on DB engine, storage, and secret vault.
+        """
+        results: Dict[str, Any] = {}
+        all_passed = True
+
+        # 1. Environment Config Validation
+        try:
+            env_res = cls.validate_environment()
+            results["environment_config"] = {"status": "PASS", "details": env_res}
+        except Exception as e:
+            results["environment_config"] = {"status": "FAIL", "error": str(e)}
+            all_passed = False
+
+        # 2. Database Connectivity
+        try:
+            from core.db import db
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT 1")
+                row = cur.fetchone()
+                val = row[0] if row else None
+            results["database_connectivity"] = {"status": "PASS", "ping": val}
+        except Exception as e:
+            results["database_connectivity"] = {"status": "FAIL", "error": str(e)}
+            all_passed = False
+
+        # 3. Storage & Directories
+        storage_dirs = ["storage", "storage/evidence", "storage/backups"]
+        dir_status = {}
+        for d in storage_dirs:
+            p = os.path.join(os.getcwd(), d)
+            os.makedirs(p, exist_ok=True)
+            dir_status[d] = "WRITABLE" if os.access(p, os.W_OK) else "NOT_WRITABLE"
+        results["storage_directories"] = {"status": "PASS", "directories": dir_status}
+
+        return {
+            "preflight_status": "READY" if all_passed else "PREFLIGHT_FAILED",
+            "passed": all_passed,
+            "checks": results
         }
-
-        # 7. Agent Resource Governor Limits
-        checks["governor"] = {
-            "status": "PASS",
-            "max_agents_starter": 25,
-            "max_agents_pro": 100,
-            "max_agents_enterprise": 500,
-            "max_agents_hyperscale": 5000
-        }
-
-        summary = {
-            "environment": self.env,
-            "is_production": self.is_prod,
-            "strict_mode": self.strict_mode,
-            "all_passed": len(critical_failures) == 0,
-            "critical_failures_count": len(critical_failures),
-            "critical_failures": critical_failures,
-            "warnings_count": len(warnings),
-            "warnings": warnings,
-            "checks": checks
-        }
-
-        if should_raise and critical_failures:
-            error_msg = f"Production fail-closed validation failed with {len(critical_failures)} critical error(s): " + "; ".join(critical_failures)
-            logger.error(error_msg)
-            raise ProductionConfigurationError(error_msg)
-
-        return summary
-
-# Global singleton
-prod_config = ProductionConfig()
