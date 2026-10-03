@@ -92,3 +92,21 @@ class CapabilityProvider(ABC):
     def shutdown(self) -> None:
         """Gracefully halts worker sessions, drivers, or child processes."""
         pass
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Returns structured metadata about upstream repository, commit, license, dependencies, and integration status."""
+        return {
+            "provider_id": self.providerId(),
+            "provider_version": getattr(self, "_version", "1.0.0"),
+            "repository": getattr(self, "_repository", "unknown"),
+            "commit": getattr(self, "_commit", "HEAD"),
+            "license": getattr(self, "_license", "Apache-2.0"),
+            "supported_platforms": self.platforms(),
+            "model_dependencies": getattr(self, "_model_dependencies", []),
+            "runtime_dependencies": getattr(self, "_runtime_dependencies", []),
+            "capabilities": self.capabilities(),
+            "health": self.health().value,
+            "security_status": getattr(self, "_security_status", "GOVERNED_BY_ZONATA"),
+            "integration_status": getattr(self, "_integration_status", "ADAPTER_ONLY")
+        }
+

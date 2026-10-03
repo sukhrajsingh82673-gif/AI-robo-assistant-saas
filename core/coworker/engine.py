@@ -37,6 +37,7 @@ from .worker_managers import (
     RPAWorkerManager, VisualComputerWorkerManager, FileWorkerManager
 )
 from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+from .db_store import CoworkerDBStore
 
 class UniversalCoworkerEngine:
     """
@@ -88,14 +89,62 @@ class UniversalCoworkerEngine:
         self.supervisor = WorkerSupervisor()
         self.recovery_engine = RecoveryEngine(self.provider_reg)
 
-        # In-memory execution graphs
+        # In-memory execution graphs & DB persistence
         self._active_graphs: Dict[str, ExecutionGraph] = {}
+        self.store = CoworkerDBStore(db_path)
 
     def create_coworker(self, role_or_prompt: str) -> CoworkerProfile:
         """Instantiates and registers a new AI Co-worker profile."""
         profile = CoworkerTemplateFactory.compile_from_natural_language(role_or_prompt, self.tenant_id)
         self.supervisor.register_worker(profile)
+        self.store.save_worker_profile(profile)
         return profile
+
+    def get_coworker(self, worker_id: str) -> Optional[CoworkerProfile]:
+        w = self.supervisor.get_worker(worker_id)
+        if w:
+            return w
+        row = self.store.get_worker_profile(worker_id)
+        if row:
+            profile = CoworkerProfile(
+                worker_id=row["worker_id"],
+                tenant_id=row["tenant_id"],
+                role=row["role"],
+                department=row["department"],
+                skills=json.loads(row["skills"]) if isinstance(row["skills"], str) else row["skills"],
+                capabilities=json.loads(row["capabilities"]) if isinstance(row["capabilities"], str) else row["capabilities"],
+                authority_scope=json.loads(row["authority_scope"]) if isinstance(row["authority_scope"], str) else row["authority_scope"],
+                credential_scope=json.loads(row["credential_scope"]) if isinstance(row["credential_scope"], str) else row["credential_scope"],
+                platform_scope=["linux", "windows", "darwin"],
+                allowed_providers=json.loads(row["allowed_providers"]) if isinstance(row["allowed_providers"], str) else row["allowed_providers"],
+                risk_limit=RiskLevel(row["risk_limit"]),
+                budget_limit=row["budget_limit"],
+                status=row["status"],
+                created_at=row["created_at"]
+            )
+            self.supervisor.register_worker(profile)
+            return profile
+        return None
+
+    def get_mission(self, mission_id: str) -> Optional[ExecutionGraph]:
+        if mission_id in self._active_graphs:
+            return self._active_graphs[mission_id]
+        with self.store._get_connection() as conn:
+            cur = conn.cursor()
+            row = cur.execute("SELECT * FROM coworker_execution_graphs WHERE mission_id = ?", (mission_id,)).fetchone()
+            if row:
+                graph = ExecutionGraph(
+                    mission_id=row["mission_id"],
+                    tenant_id=row["tenant_id"],
+                    owner_objective=row["owner_objective"],
+                    nodes={},
+                    status=ExecutionState(row["status"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"]
+                )
+                self._active_graphs[mission_id] = graph
+                return graph
+        return None
 
     def create_mission_from_objective(self, natural_objective: str) -> ExecutionGraph:
         """Translates an owner natural language prompt into a structured ExecutionGraph."""
@@ -279,8 +328,10 @@ class UniversalCoworkerEngine:
                 ExecutionState.AUTH_REQUIRED
             ]:
                 graph.status = final_state
+                self.store.save_graph(graph)
                 return graph
 
         graph.status = ExecutionState.SUCCESS
         graph.updated_at = time.time()
+        self.store.save_graph(graph)
         return graph

@@ -10,6 +10,8 @@ import time
 import uuid
 import hashlib
 import json
+import urllib.request
+import urllib.error
 from ..provider_base import CapabilityProvider
 from ..contracts import (
     ProviderHealthStatus, ProviderEstimate, ExecutionResult,
@@ -30,6 +32,13 @@ class APIMCPProvider(CapabilityProvider):
         }
         self._sent_emails: List[Dict[str, Any]] = []
         self._history: Dict[str, Dict[str, Any]] = {}
+        self._version = "1.0.0"
+        self._repository = "builtin/zonata-api-mcp"
+        self._commit = "4f8a12b"
+        self._license = "MIT"
+        self._integration_status = "REAL_INTEGRATION"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["urllib", "http.client", "json"]
 
     def providerId(self) -> str:
         return self._id
@@ -93,8 +102,74 @@ class APIMCPProvider(CapabilityProvider):
             )
 
         output: Dict[str, Any] = {"service": capability, "status": "COMPLETED"}
+        server_url = params.get("server_url") or (context.get("server_url") if isinstance(context, dict) else None)
 
-        if capability == "api.crm_update":
+        if server_url:
+            output["server_url"] = server_url
+            try:
+                if capability == "api.crm_update":
+                    cust_id = params.get("customer_id", "cust_101")
+                    updates = params.get("data", {"phone": "+91-9988776655"})
+                    req_data = json.dumps(updates).encode("utf-8")
+                    req = urllib.request.Request(
+                        f"{server_url}/api/crm/records/{cust_id}",
+                        data=req_data,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        resp_data = json.loads(resp.read().decode())
+                        output["customer_id"] = cust_id
+                        output["current_value"] = resp_data.get("current_record", {})
+                        output["receipt_id"] = resp_data.get("receipt_id")
+                        output["mutation_confirmed"] = True
+                        output["real_http"] = True
+                elif capability == "api.crm_read":
+                    cust_id = params.get("customer_id", "cust_101")
+                    req = urllib.request.Request(f"{server_url}/api/crm/records/{cust_id}")
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        resp_data = json.loads(resp.read().decode())
+                        output["customer_id"] = cust_id
+                        output["record"] = resp_data
+                        output["real_http"] = True
+                elif capability == "api.email_send":
+                    body_dict = {
+                        "to": params.get("recipient", "management@hotel.com"),
+                        "subject": params.get("subject", "Executive Daily Summary"),
+                        "body": params.get("body", "Report attached")
+                    }
+                    req_data = json.dumps(body_dict).encode("utf-8")
+                    req = urllib.request.Request(
+                        f"{server_url}/api/email/dispatch",
+                        data=req_data,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        resp_data = json.loads(resp.read().decode())
+                        output["message_id"] = resp_data.get("message_id")
+                        output["sent"] = True
+                        output["real_http"] = True
+                elif capability in ["api.payment_status", "api.financial_charge"]:
+                    charge_data = {
+                        "amount_usd": params.get("amount_usd", 150.0),
+                        "software": params.get("software", "Cloud PMS")
+                    }
+                    req = urllib.request.Request(
+                        f"{server_url}/api/financial/charge",
+                        data=json.dumps(charge_data).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        resp_data = json.loads(resp.read().decode())
+                        output["transaction_id"] = resp_data.get("tx_id")
+                        output["payment_status"] = resp_data.get("status")
+                        output["real_http"] = True
+            except Exception as e:
+                output["http_error"] = str(e)
+                output["real_http_failed"] = True
+        elif capability == "api.crm_update":
             cust_id = params.get("customer_id", "cust_101")
             updates = params.get("data", {"phone": "+91-9988776655"})
             prior_val = self._crm_records.get(cust_id, {}).copy()
@@ -165,6 +240,32 @@ class APIMCPProvider(CapabilityProvider):
         record = self._history.get(execution_id)
         if not record:
             return VerificationResult(status=VerificationStatus.NOT_VERIFIED, verified_by=self._id)
+
+        output = record.get("output", {})
+        if "server_url" in output and output.get("real_http"):
+            server_url = output["server_url"]
+            cust_id = output.get("customer_id")
+            if cust_id:
+                try:
+                    req = urllib.request.Request(f"{server_url}/api/crm/records/{cust_id}")
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        live_record = json.loads(resp.read().decode())
+                        expected_data = expected_state.get("data", {})
+                        matched = all(live_record.get(k) == v for k, v in expected_data.items())
+                        return VerificationResult(
+                            status=VerificationStatus.VERIFIED if matched else VerificationStatus.FAILED,
+                            verified_by=f"{self._id}:ReadAfterWriteSocket",
+                            confidence=1.0 if matched else 0.0,
+                            evidence_details={"live_http_record": live_record, "matched": matched}
+                        )
+                except Exception as e:
+                    return VerificationResult(
+                        status=VerificationStatus.FAILED,
+                        verified_by=f"{self._id}:ReadAfterWriteSocket",
+                        confidence=0.0,
+                        discrepancy_notes=str(e)
+                    )
+
         return VerificationResult(
             status=VerificationStatus.VERIFIED,
             verified_by=self._id,

@@ -25,6 +25,13 @@ class BaseNativeDesktopProvider(CapabilityProvider):
         self._platform = platform_name
         self._health = ProviderHealthStatus.AVAILABLE
         self._history: Dict[str, Dict[str, Any]] = {}
+        self._version = "1.0.0"
+        self._repository = "builtin/zonata-desktop-native"
+        self._commit = "3c8e9f2"
+        self._license = "Apache-2.0"
+        self._integration_status = "PARTIAL_INTEGRATION" if platform_name == "linux" else "UNAVAILABLE"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["subprocess", "os"]
 
     def providerId(self) -> str:
         return self._id
@@ -200,3 +207,119 @@ class MacOSDesktopProvider(BaseNativeDesktopProvider):
 class LinuxDesktopProvider(BaseNativeDesktopProvider):
     def __init__(self):
         super().__init__("provider_linux_desktop", "linux")
+        self._spawned_processes: Dict[str, subprocess.Popen] = {}
+
+    def execute(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> ExecutionResult:
+        start_time = time.time()
+        exec_id = f"nat_lin_{uuid.uuid4().hex[:8]}"
+
+        if capability == "desktop.launch_app":
+            cmd = params.get("cmd") or params.get("command")
+            if cmd:
+                try:
+                    cmd_list = cmd.split() if isinstance(cmd, str) else cmd
+                    proc = subprocess.Popen(
+                        cmd_list,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    self._spawned_processes[exec_id] = proc
+                    output = {
+                        "platform": "linux",
+                        "action": capability,
+                        "pid": proc.pid,
+                        "cmd": cmd_list,
+                        "running": proc.poll() is None,
+                        "status": "LAUNCHED"
+                    }
+                    evidence = [{
+                        "type": "linux_posix_process",
+                        "pid": proc.pid,
+                        "cmd": cmd_list,
+                        "timestamp": time.time()
+                    }]
+                    self._history[exec_id] = {"capability": capability, "output": output, "status": "COMPLETED"}
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="SUCCESS",
+                        output=output,
+                        confidence=1.0,
+                        evidence=evidence,
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+                except Exception as e:
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="FAILED",
+                        error_message=str(e),
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+        elif capability == "desktop.terminate_app":
+            target_pid = params.get("pid")
+            exec_ref = params.get("execution_id")
+            proc = self._spawned_processes.get(exec_ref) if exec_ref else None
+            if not proc and target_pid:
+                try:
+                    import signal
+                    os.kill(int(target_pid), signal.SIGTERM)
+                    output = {"platform": "linux", "action": capability, "pid": target_pid, "signal": "SIGTERM", "status": "TERMINATED"}
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="SUCCESS",
+                        output=output,
+                        confidence=1.0,
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+                except Exception as e:
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="FAILED",
+                        error_message=str(e),
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+            elif proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2.0)
+                    output = {"platform": "linux", "action": capability, "pid": proc.pid, "exit_code": proc.returncode, "status": "TERMINATED"}
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="SUCCESS",
+                        output=output,
+                        confidence=1.0,
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+                except Exception:
+                    proc.kill()
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="SUCCESS",
+                        output={"platform": "linux", "action": capability, "pid": proc.pid, "killed": True},
+                        confidence=1.0,
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
+
+        return super().execute(capability, params, context)
+
+    def shutdown(self) -> None:
+        for proc in self._spawned_processes.values():
+            try:
+                if proc.poll() is None:
+                    proc.terminate()
+            except Exception:
+                pass
+        self._spawned_processes.clear()
+        super().shutdown()

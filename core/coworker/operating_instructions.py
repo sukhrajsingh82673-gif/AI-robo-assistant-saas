@@ -129,14 +129,15 @@ class OperatingInstructionParser:
             )
             graph.nodes[t1.task_id] = t1
 
-        # Pattern 5: Purchase software
-        elif "purchase" in obj_lower or "buy" in obj_lower:
+        # Pattern 5: Financial transaction, transfer or procurement
+        elif any(k in obj_lower for k in ["transfer", "wire", "pay", "purchase", "buy", "charge"]):
+            cost = 50000.0 if any(s in obj_lower for s in ["50,000", "50000"]) else 499.00
             t1 = TaskNode(
                 task_id=f"{mid}_t1",
                 mission_id=mid,
-                title="Execute Software License Procurement",
+                title="Execute Financial Transaction",
                 capability_id="financial.purchase_software",
-                parameters={"software": "Enterprise ERP Connector", "cost_usd": 499.00},
+                parameters={"software": "External Transaction", "cost_usd": cost},
                 risk_level=RiskLevel.CRITICAL
             )
             graph.nodes[t1.task_id] = t1

@@ -85,7 +85,8 @@ class IndependentVerificationEngine:
         if "output_file" in expected_state or "exported_file" in output:
             target_path = output.get("exported_file", expected_state.get("output_file"))
             if target_path and os.path.exists(target_path):
-                file_hash = hashlib.sha256(open(target_path, "rb").read()).hexdigest()
+                with open(target_path, "rb") as f_hash:
+                    file_hash = hashlib.sha256(f_hash.read()).hexdigest()
                 return VerificationResult(
                     status=VerificationStatus.VERIFIED,
                     verified_by="IndependentVerificationEngine",
@@ -119,7 +120,7 @@ class IndependentVerificationEngine:
                 )
 
         # 5. Visual CUA Verification (Always partially verified unless corroborated)
-        if "visual" in execution_result.provider_id:
+        if any(k in execution_result.provider_id for k in ["visual", "ui_tars", "agent_s"]):
             return VerificationResult(
                 status=VerificationStatus.PARTIALLY_VERIFIED,
                 verified_by="IndependentVerificationEngine",

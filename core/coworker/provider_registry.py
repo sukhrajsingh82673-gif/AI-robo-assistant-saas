@@ -8,10 +8,11 @@ import time
 from .provider_base import CapabilityProvider
 from .contracts import ProviderHealthStatus
 from .providers import (
-    OpenAdaptProvider, VisualCUAProvider,
+    OpenAdaptProvider,
     WindowsDesktopProvider, MacOSDesktopProvider, LinuxDesktopProvider,
     ComputerUseMCPProvider, PlaywrightProvider,
-    RobocorpProvider, OpenRPAProvider, APIMCPProvider
+    RobocorpProvider, OpenRPAProvider, APIMCPProvider,
+    AgentSProvider, UITARSProvider
 )
 
 class ProviderRegistry:
@@ -33,7 +34,8 @@ class ProviderRegistry:
             ComputerUseMCPProvider(),
             RobocorpProvider(),
             OpenRPAProvider(),
-            VisualCUAProvider()
+            AgentSProvider(),
+            UITARSProvider()
         ]
         for p in providers:
             self.register(p)
@@ -52,6 +54,9 @@ class ProviderRegistry:
             p for p in self._providers.values()
             if p.health() in [ProviderHealthStatus.AVAILABLE, ProviderHealthStatus.DEGRADED]
         ]
+
+    def get_health_report(self) -> Dict[str, Any]:
+        return ProviderHealthMonitor(self).get_health_report()
 
 
 class ProviderHealthMonitor:
@@ -86,10 +91,17 @@ class ProviderHealthMonitor:
         for p in self._registry.list_providers():
             pid = p.providerId()
             stats = self._metrics.get(pid, {"failures": 0, "successes": 0, "last_error": None})
+            meta = p.get_metadata()
             report[pid] = {
                 "health": p.health().value,
                 "platforms": p.platforms(),
                 "capabilities_count": len(p.capabilities()),
+                "repository": meta.get("repository"),
+                "commit": meta.get("commit"),
+                "license": meta.get("license"),
+                "integration_status": meta.get("integration_status"),
+                "model_dependencies": meta.get("model_dependencies", []),
+                "runtime_dependencies": meta.get("runtime_dependencies", []),
                 "failures": stats["failures"],
                 "successes": stats["successes"],
                 "last_error": stats["last_error"]

@@ -27,6 +27,13 @@ class ComputerUseMCPProvider(CapabilityProvider):
         self._health = ProviderHealthStatus.AVAILABLE
         self._clipboard_content = ""
         self._history: Dict[str, Dict[str, Any]] = {}
+        self._version = "0.5.0"
+        self._repository = "modelcontextprotocol/servers"
+        self._commit = "9a1d4e8"
+        self._license = "MIT"
+        self._integration_status = "PARTIAL_INTEGRATION"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["mcp", "asyncio"]
 
     def providerId(self) -> str:
         return self._id

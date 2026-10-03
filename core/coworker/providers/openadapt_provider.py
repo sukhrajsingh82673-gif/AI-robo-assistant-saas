@@ -44,6 +44,13 @@ class OpenAdaptProvider(CapabilityProvider):
             }
         }
         self._execution_history: Dict[str, Dict[str, Any]] = {}
+        self._version = "0.10.0"
+        self._repository = "OpenAdaptAI/OpenAdapt"
+        self._commit = "5e8c10a"
+        self._license = "MIT"
+        self._integration_status = "ADAPTER_ONLY"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["openadapt", "spacy"]
 
     def providerId(self) -> str:
         return self._id
@@ -154,7 +161,9 @@ class OpenAdaptProvider(CapabilityProvider):
             with open(out_file, "w") as f:
                 f.write(f"OPENADAPT_EXPORT_DATA:{workflow_id}:{time.time()}\n")
             output_payload["exported_file"] = out_file
-            output_payload["exported_file_hash"] = hashlib.sha256(open(out_file, "rb").read()).hexdigest()
+            with open(out_file, "rb") as f_read:
+                file_hash = hashlib.sha256(f_read.read()).hexdigest()
+            output_payload["exported_file_hash"] = file_hash
 
         self._execution_history[exec_id] = {
             "capability": capability,

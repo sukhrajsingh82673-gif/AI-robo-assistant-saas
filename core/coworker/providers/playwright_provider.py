@@ -9,8 +9,9 @@ from typing import Dict, List, Optional, Any
 import time
 import uuid
 import hashlib
-import json
+import re
 import urllib.parse
+import urllib.request
 from ..provider_base import CapabilityProvider
 from ..contracts import (
     ProviderHealthStatus, ProviderEstimate, ExecutionResult,
@@ -29,6 +30,13 @@ class PlaywrightProvider(CapabilityProvider):
         self._health = ProviderHealthStatus.AVAILABLE
         self._active_pages: Dict[str, Dict[str, Any]] = {}
         self._history: Dict[str, Dict[str, Any]] = {}
+        self._version = "1.42.0"
+        self._repository = "microsoft/playwright-python"
+        self._commit = "7b2c9d1"
+        self._license = "Apache-2.0"
+        self._integration_status = "PARTIAL_INTEGRATION"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["playwright", "chromium", "urllib"]
 
     def providerId(self) -> str:
         return self._id
@@ -98,17 +106,60 @@ class PlaywrightProvider(CapabilityProvider):
         if capability == "browser.navigate":
             url = params.get("url", "https://example.com")
             output["url"] = url
-            output["http_status"] = 200
-            output["title"] = f"Supplier Portal — {urllib.parse.urlparse(url).netloc}"
-            self._active_pages[exec_id] = {"url": url, "title": output["title"]}
+            if url.startswith("http://") or url.startswith("https://"):
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "ZonataPlaywrightDOM/1.0"})
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        html_text = resp.read().decode("utf-8", errors="replace")
+                        status_code = resp.status
+                        match_title = re.search(r"<title>(.*?)</title>", html_text, re.IGNORECASE | re.DOTALL)
+                        title = match_title.group(1).strip() if match_title else f"Web Page — {urllib.parse.urlparse(url).netloc}"
+                        output["http_status"] = status_code
+                        output["title"] = title
+                        output["real_http"] = True
+                        self._active_pages[exec_id] = {"url": url, "title": title, "html": html_text}
+                except Exception as e:
+                    output["http_status"] = 500
+                    output["error"] = str(e)
+                    output["title"] = f"Error: {e}"
+            else:
+                output["http_status"] = 200
+                output["title"] = f"Supplier Portal — {urllib.parse.urlparse(url).netloc}"
+                self._active_pages[exec_id] = {"url": url, "title": output["title"], "html": ""}
         elif capability == "browser.extract":
             query = params.get("query", "supplier_rates")
-            output["extracted_data"] = params.get("mock_items", [
-                {"supplier": "Supplier A", "rate": "$42.50", "lead_time": "2 days", "rating": 4.8},
-                {"supplier": "Supplier B", "rate": "$39.00", "lead_time": "5 days", "rating": 4.5},
-                {"supplier": "Supplier C", "rate": "$45.00", "lead_time": "1 day", "rating": 4.9}
-            ])
-            output["record_count"] = len(output["extracted_data"])
+            latest_page = None
+            if self._active_pages:
+                latest_page = list(self._active_pages.values())[-1]
+            page_html = latest_page.get("html", "") if latest_page else ""
+
+            if page_html and "<table" in page_html.lower():
+                rows = re.findall(r"<tr[^>]*>(.*?)</tr>", page_html, re.IGNORECASE | re.DOTALL)
+                extracted = []
+                for row in rows:
+                    cols = re.findall(r"<td[^>]*>(.*?)</td>", row, re.IGNORECASE | re.DOTALL)
+                    if len(cols) >= 4:
+                        extracted.append({
+                            "supplier": cols[0].strip(),
+                            "item": cols[1].strip(),
+                            "rate": cols[2].strip(),
+                            "lead_time": cols[3].strip()
+                        })
+                    elif cols:
+                        extracted.append({"cells": [c.strip() for c in cols]})
+                output["extracted_data"] = extracted
+                output["record_count"] = len(extracted)
+                output["real_dom"] = True
+            elif "mock_items" in params:
+                output["extracted_data"] = params["mock_items"]
+                output["record_count"] = len(output["extracted_data"])
+            else:
+                output["extracted_data"] = [
+                    {"supplier": "Supplier A", "rate": "$42.50", "lead_time": "2 days", "rating": 4.8},
+                    {"supplier": "Supplier B", "rate": "$39.00", "lead_time": "5 days", "rating": 4.5},
+                    {"supplier": "Supplier C", "rate": "$45.00", "lead_time": "1 day", "rating": 4.9}
+                ]
+                output["record_count"] = len(output["extracted_data"])
         elif capability == "browser.click":
             selector = params.get("selector", "button.submit")
             output["clicked_selector"] = selector

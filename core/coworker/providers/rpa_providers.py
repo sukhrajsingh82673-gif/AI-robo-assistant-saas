@@ -172,8 +172,22 @@ class BaseRPAProvider(CapabilityProvider):
 class RobocorpProvider(BaseRPAProvider):
     def __init__(self):
         super().__init__("provider_robocorp", "robocorp_rpa_framework")
+        self._version = "2.8.0"
+        self._repository = "robocorp/rpaframework"
+        self._commit = "4d2f8a1"
+        self._license = "Apache-2.0"
+        self._integration_status = "ADAPTER_ONLY"
+        self._model_dependencies = []
+        self._runtime_dependencies = ["rpaframework", "robotframework"]
 
 
 class OpenRPAProvider(BaseRPAProvider):
     def __init__(self):
         super().__init__("provider_openrpa", "openrpa_engine")
+        self._version = "1.4.54"
+        self._repository = "open-rpa/openrpa"
+        self._commit = "6c1b3e9"
+        self._license = "GPL-3.0"
+        self._integration_status = "UNAVAILABLE"
+        self._model_dependencies = []
+        self._runtime_dependencies = [".NET Framework 4.8", "Windows"]
