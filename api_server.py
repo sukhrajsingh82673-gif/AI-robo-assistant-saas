@@ -1914,6 +1914,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 
+        # ZONATA V8: AI CEO Executive Operating Layer Routes
+        if path.startswith("/api/v8/"):
+            from core.v8_api_handler import V8ApiHandler
+            c_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            v8_res = V8ApiHandler.handle_get(path, query_params, tenant_id, c_id)
+            if v8_res:
+                data, code = v8_res
+                self._send_json(data, status=code)
+                return
+
         # Fallback to static files in WEB_DIR or SPA index.html
 
         clean_path = path.lstrip('/')
@@ -4543,6 +4553,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": f"Unknown Nango scenario '{scenario}'"}, status=400)
             return
+
+        # ZONATA V8: AI CEO Executive Operating Layer Routes
+        if path.startswith("/api/v8/"):
+            from core.v8_api_handler import V8ApiHandler
+            t_id = self.headers.get("X-Tenant-ID", "tnt_primary")
+            c_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            v8_res = V8ApiHandler.handle_post(path, req_data, t_id, c_id)
+            if v8_res:
+                data, code = v8_res
+                self._send_json(data, status=code)
+                return
 
         self._send_json({"error": "Endpoint not found"}, status=404)
 

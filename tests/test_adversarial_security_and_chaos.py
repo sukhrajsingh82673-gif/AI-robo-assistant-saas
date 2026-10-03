@@ -64,6 +64,8 @@ class TestAdversarialSecurityAndChaos(unittest.TestCase):
 
     def test_03_anti_explosion_delegation_loop_defense(self):
         """Attacker attempts to create runaway recursive child agents exceeding depth limit."""
+        with db.get_connection() as conn:
+            conn.execute("DELETE FROM governed_agents WHERE tenant_id = ? AND (name LIKE 'Child %' OR name = 'Root Agent' OR name = 'Explosion Child')", (self.tenant_id,))
         root_agent = GovernedAgentFactory.create_agent(
             self.tenant_id, self.company_id, "Root Agent", "OPERATOR"
         )

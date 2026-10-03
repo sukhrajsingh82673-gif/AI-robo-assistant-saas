@@ -2421,6 +2421,289 @@ CREATE TABLE IF NOT EXISTS nango_reconciliations (
 
 CREATE INDEX IF NOT EXISTS idx_nango_rec_conn ON nango_reconciliations(connection_id);
 CREATE INDEX IF NOT EXISTS idx_nango_rec_status ON nango_reconciliations(status);
+
+-- =========================================================================
+-- ZONATA V8: AI CEO Executive Operating Layer & Corporate Operating System
+-- =========================================================================
+
+-- 1. Corporate Objectives
+CREATE TABLE IF NOT EXISTS corporate_objectives (
+    objective_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    provenance TEXT NOT NULL DEFAULT 'OWNER_DEFINED', -- OWNER_DEFINED, CEO_PROPOSED, DATA_DERIVED, AI_INFERRED
+    time_horizon TEXT NOT NULL DEFAULT 'QUARTERLY', -- IMMEDIATE, TODAY, MONTHLY, QUARTERLY, ANNUAL, STRATEGIC
+    target_dimensions JSON,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- PROPOSED, ACTIVE, ACHIEVED, DEVIATED, CANCELLED, REVISED
+    parent_objective_id TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_corp_obj_tc ON corporate_objectives(tenant_id, company_id);
+
+-- 2. Strategic Plans
+CREATE TABLE IF NOT EXISTS strategic_plans (
+    strategy_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    objective_id TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT '1.0.0',
+    title TEXT NOT NULL,
+    rationale TEXT,
+    assumptions JSON,
+    constraints JSON,
+    dependencies JSON,
+    required_capabilities JSON,
+    required_workforce JSON,
+    required_budget REAL DEFAULT 0.0,
+    expected_outcomes JSON,
+    milestones JSON,
+    risks JSON,
+    review_date REAL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- DRAFT, PROPOSED, ACTIVE, SUPERSEDED, ACHIEVED, ABANDONED
+    owner TEXT NOT NULL DEFAULT 'AI_CEO',
+    evidence_refs JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_strat_plans_tc ON strategic_plans(tenant_id, company_id);
+
+-- 3. Strategy Versions (Never overwrite strategic history)
+CREATE TABLE IF NOT EXISTS strategy_versions (
+    version_id TEXT PRIMARY KEY,
+    strategy_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    previous_version TEXT,
+    new_version TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    evidence JSON,
+    affected_objectives JSON,
+    affected_departments JSON,
+    affected_workforce JSON,
+    affected_missions JSON,
+    approval_id TEXT,
+    ceo_version TEXT NOT NULL DEFAULT 'V8.0.0',
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_strat_vers_strat ON strategy_versions(strategy_id);
+
+-- 4. Strategic Priorities (P0 Critical, P1 Strategic, P2 Operational, P3 Opportunistic)
+CREATE TABLE IF NOT EXISTS strategic_priorities (
+    priority_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    item_type TEXT NOT NULL, -- OBJECTIVE, STRATEGY, MISSION, DEPARTMENT
+    item_id TEXT NOT NULL,
+    priority_level TEXT NOT NULL, -- P0, P1, P2, P3
+    reason TEXT,
+    evidence_ref TEXT,
+    decision_record_id TEXT,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_strat_prio_tc ON strategic_priorities(tenant_id, company_id);
+
+-- 5. Department Objectives
+CREATE TABLE IF NOT EXISTS department_objectives (
+    dept_obj_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    corporate_objective_id TEXT NOT NULL,
+    department TEXT NOT NULL,
+    chief_officer_role TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    kpi_targets JSON,
+    kra_targets JSON,
+    allocated_budget REAL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_dept_obj_tc ON department_objectives(tenant_id, company_id);
+
+-- 6. Executive State Persistence
+CREATE TABLE IF NOT EXISTS executive_state (
+    state_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    snapshot JSON NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    last_loop_stage TEXT NOT NULL DEFAULT 'OBSERVE',
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_exec_state_tc ON executive_state(tenant_id, company_id);
+
+-- 7. Executive Decisions
+CREATE TABLE IF NOT EXISTS executive_decisions (
+    decision_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    decision_type TEXT NOT NULL,
+    problem_statement TEXT,
+    alternatives_considered JSON,
+    selected_option TEXT,
+    rationale TEXT,
+    constraints JSON,
+    authority_required TEXT,
+    approval_status TEXT NOT NULL DEFAULT 'PROPOSED', -- PROPOSED, PENDING_APPROVAL, APPROVED, REJECTED, EXECUTING, EXECUTED, VERIFIED, FAILED, ESCALATED, UNKNOWN
+    approval_id TEXT,
+    execution_status TEXT NOT NULL DEFAULT 'PENDING',
+    evidence_refs JSON,
+    outcome JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_dec_tc ON executive_decisions(tenant_id, company_id);
+
+-- 8. Executive Decision Evidence
+CREATE TABLE IF NOT EXISTS executive_decision_evidence (
+    id TEXT PRIMARY KEY,
+    decision_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    evidence_type TEXT NOT NULL,
+    source TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'VERIFIED', -- VERIFIED, PARTIAL, UNVERIFIED, CONFLICTING, STALE, UNKNOWN
+    evidence_data JSON,
+    sha256_digest TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_evid_dec ON executive_decision_evidence(decision_id);
+
+-- 9. Executive Risks
+CREATE TABLE IF NOT EXISTS executive_risks (
+    risk_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    probability REAL NOT NULL DEFAULT 0.5,
+    impact REAL NOT NULL DEFAULT 0.5,
+    severity TEXT NOT NULL DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, CRITICAL
+    affected_objective_id TEXT,
+    affected_mission_id TEXT,
+    owner TEXT NOT NULL,
+    mitigation TEXT,
+    contingency TEXT,
+    status TEXT NOT NULL DEFAULT 'IDENTIFIED', -- IDENTIFIED, MONITORED, MITIGATED, ACCEPTED, ESCALATED, MATERIALIZED, CLOSED
+    evidence_ref TEXT,
+    review_date REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_risks_tc ON executive_risks(tenant_id, company_id);
+
+-- 10. Executive Opportunities
+CREATE TABLE IF NOT EXISTS executive_opportunities (
+    opportunity_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    source TEXT NOT NULL,
+    estimated_value REAL DEFAULT 0.0,
+    confidence REAL DEFAULT 0.5,
+    required_resources JSON,
+    strategic_alignment TEXT,
+    risks JSON,
+    deadline REAL,
+    owner TEXT,
+    status TEXT NOT NULL DEFAULT 'DISCOVERED', -- DISCOVERED, ASSESSED, PROPOSED, APPROVED, PURSUING, REALIZED, ABANDONED
+    evidence_ref TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_opps_tc ON executive_opportunities(tenant_id, company_id);
+
+-- 11. Executive Resource Allocations
+CREATE TABLE IF NOT EXISTS executive_resource_allocations (
+    allocation_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    scope_type TEXT NOT NULL, -- COMPANY, DEPARTMENT, MISSION, EMPLOYEE
+    scope_id TEXT NOT NULL,
+    parent_allocation_id TEXT,
+    budget_limit REAL NOT NULL DEFAULT 0.0,
+    committed_spend REAL NOT NULL DEFAULT 0.0,
+    actual_spend REAL NOT NULL DEFAULT 0.0,
+    currency TEXT NOT NULL DEFAULT '₹',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_res_tc ON executive_resource_allocations(tenant_id, company_id);
+
+-- 12. Executive Observations
+CREATE TABLE IF NOT EXISTS executive_observations (
+    observation_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    observation_type TEXT NOT NULL, -- NORMAL, DEVIATION, RISK, OPPORTUNITY, BLOCKED, UNKNOWN, STALE_DATA
+    category TEXT NOT NULL,
+    metric_name TEXT,
+    baseline_value REAL,
+    target_value REAL,
+    actual_value REAL,
+    variance REAL,
+    trend TEXT,
+    summary TEXT NOT NULL,
+    details JSON,
+    confidence TEXT NOT NULL DEFAULT 'VERIFIED',
+    evidence_ref TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_obs_tc ON executive_observations(tenant_id, company_id);
+
+-- 13. Executive Reports
+CREATE TABLE IF NOT EXISTS executive_reports (
+    report_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    report_type TEXT NOT NULL, -- DAILY_BRIEF, WEEKLY_REVIEW, MONTHLY_STRATEGIC, INCIDENT_ANALYSIS, END_TO_END_ACCEPTANCE
+    title TEXT NOT NULL,
+    content JSON NOT NULL,
+    summary TEXT,
+    status TEXT NOT NULL DEFAULT 'DRAFT', -- DRAFT, PUBLISHED, ARCHIVED
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_reports_tc ON executive_reports(tenant_id, company_id);
+
+-- 14. Executive Approval Queue
+CREATE TABLE IF NOT EXISTS executive_approval_queue (
+    approval_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    decision_id TEXT,
+    action_type TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+    parameters JSON,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, EXPIRED
+    resolved_by TEXT,
+    resolution_reason TEXT,
+    created_at REAL NOT NULL,
+    resolved_at REAL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_exec_appr_tc ON executive_approval_queue(tenant_id, company_id);
 """
 
 class Database:

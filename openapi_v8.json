@@ -1,0 +1,274 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ZONATA Universal AI Company Operating System - V8 AI CEO Executive Operating Layer API",
+    "version": "8.0.0",
+    "description": "Persistent Authoritative Executive State, Corporate Objectives, Versioned Strategy Plans, Strategic Priorities P0-P3, Department Objectives, Governed Workforce Planning, Result-Oriented Missions, Closed-Loop Control Loop, KPI Deviation Telemetry, Cryptographic Decision Records, and Human Owner Approval Queue."
+  },
+  "paths": {
+    "/api/v8/executive-state": {
+      "get": {
+        "summary": "Retrieve persistent, versioned authoritative ExecutiveState snapshot",
+        "parameters": [
+          { "name": "X-Tenant-ID", "in": "header", "required": false, "schema": { "type": "string" } },
+          { "name": "X-Company-ID", "in": "header", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Structured executive state snapshot including company, vision, strategy, workforce, finance, risk, and decisions" }
+        }
+      }
+    },
+    "/api/v8/objectives": {
+      "get": {
+        "summary": "List structured Corporate Objectives filtered by status",
+        "responses": {
+          "200": { "description": "List of Corporate Objectives with provenance and measurable dimensions" }
+        }
+      },
+      "post": {
+        "summary": "Compile high-level Human Owner intent into structured, measurable Corporate Objective",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intent": { "type": "string" },
+                  "time_horizon": { "type": "string", "enum": ["IMMEDIATE", "TODAY", "MONTHLY", "QUARTERLY", "ANNUAL", "STRATEGIC"] }
+                },
+                "required": ["intent"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Compiled Corporate Objective with measurable targets" }
+        }
+      }
+    },
+    "/api/v8/strategy": {
+      "get": {
+        "summary": "List active Strategic Plans or get specific strategy by strategy_id",
+        "responses": {
+          "200": { "description": "Strategic Plan details including assumptions, constraints, capabilities, and expected outcomes" }
+        }
+      },
+      "post": {
+        "summary": "Formulate new Strategic Plan or adjust existing strategy with immutable version increment",
+        "responses": {
+          "201": { "description": "Strategic Plan formulated or adjusted with version receipt" }
+        }
+      }
+    },
+    "/api/v8/strategy/versions": {
+      "get": {
+        "summary": "Retrieve immutable version history and audit receipts for a strategy",
+        "parameters": [
+          { "name": "strategy_id", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Chronological strategy versions with reason, evidence, and affected scopes" }
+        }
+      }
+    },
+    "/api/v8/priorities": {
+      "get": {
+        "summary": "List structural priorities across objectives, strategies, and missions",
+        "responses": {
+          "200": { "description": "Priorities classified P0-Critical, P1-Strategic, P2-Operational, P3-Opportunistic" }
+        }
+      },
+      "post": {
+        "summary": "Set structural priority backed by an immutable ExecutiveDecisionRecord",
+        "responses": {
+          "200": { "description": "Priority updated with sealed decision record id" }
+        }
+      }
+    },
+    "/api/v8/departments": {
+      "get": {
+        "summary": "List Department Objectives under Chief Officer accountability",
+        "responses": {
+          "200": { "description": "Department objectives with KPI targets and allocated budget" }
+        }
+      },
+      "post": {
+        "summary": "Derive bounded Department Objectives from parent Corporate Objective",
+        "responses": {
+          "201": { "description": "Decomposed department objectives created for COO, CRO, CMO, CFO, CTO" }
+        }
+      }
+    },
+    "/api/v8/workforce-plan": {
+      "post": {
+        "summary": "Execute 6-tier workforce capacity discovery and planning before employee synthesis",
+        "responses": {
+          "200": { "description": "Workforce planning result with assigned specialists or template employee synthesis" }
+        }
+      }
+    },
+    "/api/v8/missions": {
+      "get": {
+        "summary": "List result-oriented governed missions",
+        "responses": {
+          "200": { "description": "Missions list with KPIs, KRAs, acceptance criteria, and outcome status" }
+        }
+      },
+      "post": {
+        "summary": "Create governed mission or seal mission completion with physical verification evidence",
+        "responses": {
+          "201": { "description": "Mission created or completed with SHA-256 evidence package" }
+        }
+      }
+    },
+    "/api/v8/decisions": {
+      "get": {
+        "summary": "List authoritative Executive Decision Records",
+        "responses": {
+          "200": { "description": "Decisions with alternatives considered, rationale, and authority required" }
+        }
+      },
+      "post": {
+        "summary": "Formulate executive decision with cryptographic evidence binding",
+        "responses": {
+          "201": { "description": "Decision recorded; routed to Approval Queue if financial/structural threshold exceeded" }
+        }
+      }
+    },
+    "/api/v8/approvals": {
+      "get": {
+        "summary": "List pending decisions awaiting Human Owner authorization",
+        "responses": {
+          "200": { "description": "Pending approval items with risk level and financial parameters" }
+        }
+      }
+    },
+    "/api/v8/approvals/resolve": {
+      "post": {
+        "summary": "Human Owner grants or rejects approval for a pending executive decision",
+        "responses": {
+          "200": { "description": "Decision approval status resolved and execution status updated" }
+        }
+      }
+    },
+    "/api/v8/resources": {
+      "get": {
+        "summary": "List hierarchical budget allocations across Tenant -> Company -> Department -> Mission",
+        "responses": {
+          "200": { "description": "Allocations with committed and actual expenditures" }
+        }
+      },
+      "post": {
+        "summary": "Allocate budget adhering to strict parent containment constraints",
+        "responses": {
+          "201": { "description": "Resource allocation created" }
+        }
+      }
+    },
+    "/api/v8/risks": {
+      "get": {
+        "summary": "List identified enterprise risks with probability, impact, and severity",
+        "responses": {
+          "200": { "description": "Risk register" }
+        }
+      },
+      "post": {
+        "summary": "Identify and log enterprise risk with mitigation and contingency plans",
+        "responses": {
+          "201": { "description": "Risk created and scored" }
+        }
+      }
+    },
+    "/api/v8/opportunities": {
+      "get": {
+        "summary": "List commercial and operational opportunities",
+        "responses": {
+          "200": { "description": "Opportunities with estimated value and confidence score" }
+        }
+      },
+      "post": {
+        "summary": "Record newly discovered commercial opportunity",
+        "responses": {
+          "201": { "description": "Opportunity logged and aligned with strategy" }
+        }
+      }
+    },
+    "/api/v8/observations": {
+      "get": {
+        "summary": "List structured telemetry observations (NORMAL, DEVIATION, RISK, OPPORTUNITY, UNKNOWN)",
+        "responses": {
+          "200": { "description": "Observations telemetry" }
+        }
+      }
+    },
+    "/api/v8/performance": {
+      "get": {
+        "summary": "Evaluate operational scorecard for AI CEO governance",
+        "responses": {
+          "200": { "description": "Performance scorecard with decision verification rate, mission success, and compliance" }
+        }
+      }
+    },
+    "/api/v8/control-loop/state": {
+      "get": {
+        "summary": "Get current stage of the 11-stage persistent executive control loop",
+        "responses": {
+          "200": { "description": "Current loop stage (OBSERVE to REPORT) and loop sequence" }
+        }
+      }
+    },
+    "/api/v8/control-loop/tick": {
+      "post": {
+        "summary": "Advance executive control loop by a single stage or execute full 11-stage cycle",
+        "responses": {
+          "200": { "description": "Control loop execution result and next stage transition" }
+        }
+      }
+    },
+    "/api/v8/reports": {
+      "get": {
+        "summary": "List published Executive Briefs and Strategic Reviews",
+        "responses": {
+          "200": { "description": "List of executive reports" }
+        }
+      },
+      "post": {
+        "summary": "Generate Daily Executive Brief, Weekly Review, or Monthly Strategic Report",
+        "responses": {
+          "201": { "description": "Report generated and persisted" }
+        }
+      }
+    },
+    "/api/v8/chat": {
+      "post": {
+        "summary": "Natural language executive interaction with deterministic evidence retrieval",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Executive response with structured data and evidence references" }
+        }
+      }
+    },
+    "/api/v8/scenario/run": {
+      "post": {
+        "summary": "Execute complete 22-step closed-loop sovereign acceptance scenario",
+        "responses": {
+          "200": { "description": "Full end-to-end execution audit trail from Objective to Strategy Adjustment" }
+        }
+      }
+    }
+  }
+}
