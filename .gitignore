@@ -42,3 +42,4 @@ storage/backups/
 storage/*.bak
 storage/evidence/test_*
 storage/evidence/*test*
+storage/reports/

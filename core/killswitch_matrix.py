@@ -76,19 +76,42 @@ class KillSwitchMatrix:
 
     def deactivate(
         self,
-        switch_id: str,
+        switch_id_or_level: str,
+        target_id: Optional[str] = None,
         deactivated_by: str = "HUMAN_OWNER"
     ) -> bool:
-        """Disengages an active KillSwitch."""
+        """Disengages an active KillSwitch by switch_id or (level, target_id)."""
         now = time.time()
         with db.get_connection() as conn:
-            res = conn.execute("""
-                UPDATE enterprise_killswitch_matrix
-                SET is_active = 0, deactivated_at = ?, deactivated_by = ?
-                WHERE switch_id = ?
-            """, (now, deactivated_by, switch_id))
+            if target_id is not None:
+                res = conn.execute("""
+                    UPDATE enterprise_killswitch_matrix
+                    SET is_active = 0, deactivated_at = ?, deactivated_by = ?
+                    WHERE level = ? AND (target_id = ? OR target_id = '*') AND is_active = 1
+                """, (now, deactivated_by, switch_id_or_level, target_id))
+            else:
+                res = conn.execute("""
+                    UPDATE enterprise_killswitch_matrix
+                    SET is_active = 0, deactivated_at = ?, deactivated_by = ?
+                    WHERE (switch_id = ? OR level = ?) AND is_active = 1
+                """, (now, deactivated_by, switch_id_or_level, switch_id_or_level))
             conn.commit()
             return res.rowcount > 0
+
+    def is_activated(self, level: str, target_id: Optional[str] = None) -> bool:
+        """Checks if a KillSwitch is currently active at level (and optional target)."""
+        with db.get_connection() as conn:
+            if target_id and target_id != "*":
+                row = conn.execute("""
+                    SELECT 1 FROM enterprise_killswitch_matrix
+                    WHERE level = ? AND (target_id = ? OR target_id = '*') AND is_active = 1
+                """, (level, target_id)).fetchone()
+            else:
+                row = conn.execute("""
+                    SELECT 1 FROM enterprise_killswitch_matrix
+                    WHERE level = ? AND is_active = 1
+                """, (level,)).fetchone()
+            return row is not None
 
     def assert_can_execute(
         self,

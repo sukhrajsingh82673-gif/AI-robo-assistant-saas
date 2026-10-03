@@ -193,6 +193,67 @@ class V8ApiHandler:
             res = IndependentProductionVerifier().run_all_independent_verifications()
             return res, 200
 
+        # 17. Universal AI Co-worker Fabric GET Endpoints
+        elif path == "/api/v8/coworker/profiles":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            # Ensure standard default workers are pre-loaded
+            if not engine.supervisor.list_workers():
+                engine.create_coworker("Hotel Revenue Specialist")
+                engine.create_coworker("Enterprise Procurement")
+                engine.create_coworker("Legacy Desktop Operator")
+            workers = engine.supervisor.list_workers()
+            return {
+                "workers": [
+                    {
+                        "worker_id": w.worker_id,
+                        "role": w.role,
+                        "department": w.department,
+                        "status": w.status,
+                        "skills": w.skills,
+                        "capabilities": w.capabilities,
+                        "risk_limit": w.risk_limit.value,
+                        "budget_limit": w.budget_limit
+                    }
+                    for w in workers
+                ],
+                "count": len(workers)
+            }, 200
+
+        elif path == "/api/v8/coworker/capabilities":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            caps = engine.capability_reg.list_capabilities()
+            return {
+                "capabilities": [
+                    {
+                        "capability_id": c.capability_id,
+                        "name": c.name,
+                        "description": c.description,
+                        "category": c.category.value,
+                        "preferred_provider": c.preferred_provider,
+                        "risk_level": c.risk_level.value,
+                        "cost_class": c.cost_class.value,
+                        "latency_class": c.latency_class.value,
+                        "requires_human_approval": c.requires_human_approval
+                    }
+                    for c in caps
+                ],
+                "count": len(caps)
+            }, 200
+
+        elif path == "/api/v8/coworker/providers":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            report = engine.health_monitor.get_health_report()
+            return {"providers": report, "count": len(report)}, 200
+
+        elif path == "/api/v8/coworker/watchdog":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            cycle = engine.supervisor.run_watchdog_cycle()
+            return {"watchdog": cycle}, 200
+
         return None
 
     @classmethod
@@ -416,5 +477,66 @@ class V8ApiHandler:
             outbox = TransactionalOutboxManager(tenant_id=tenant_id)
             metrics = outbox.process_all_pending(publish_handler=lambda e: True)
             return {"success": True, "metrics": metrics}, 200
+
+        # 17. Universal AI Co-worker Fabric POST Endpoints
+        elif path == "/api/v8/coworker/profiles":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            role_prompt = body.get("role_prompt") or body.get("role", "Hotel Revenue Specialist")
+            profile = engine.create_coworker(role_prompt)
+            return {
+                "success": True,
+                "profile": {
+                    "worker_id": profile.worker_id,
+                    "role": profile.role,
+                    "department": profile.department,
+                    "skills": profile.skills,
+                    "capabilities": profile.capabilities,
+                    "risk_limit": profile.risk_limit.value
+                }
+            }, 201
+
+        elif path == "/api/v8/coworker/missions":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            objective = body.get("objective", "Check hotel bookings and update revenue spreadsheet")
+            worker_role = body.get("worker_role", "Hotel Revenue Specialist")
+            auto_approve = bool(body.get("auto_approve", False))
+
+            worker = engine.create_coworker(worker_role)
+            graph = engine.create_mission_from_objective(objective)
+            completed_graph = engine.execute_mission(graph, worker, auto_approve_human_tasks=auto_approve)
+
+            results_summary = {}
+            for t_id, node in completed_graph.nodes.items():
+                results_summary[t_id] = {
+                    "title": node.title,
+                    "capability": node.capability_id,
+                    "provider": node.selected_provider,
+                    "state": node.state.value,
+                    "verification": node.verification.status.value if node.verification else "NONE"
+                }
+
+            return {
+                "success": True,
+                "mission_id": completed_graph.mission_id,
+                "final_state": completed_graph.status.value,
+                "task_count": len(completed_graph.nodes),
+                "tasks": results_summary
+            }, 200
+
+        elif path == "/api/v8/coworker/takeover":
+            from core.coworker import UniversalCoworkerEngine
+            engine = UniversalCoworkerEngine.get_instance(tenant_id)
+            action = body.get("action", "takeover")  # "takeover" or "return"
+            session_id = body.get("session_id", "sess_default")
+
+            if action == "takeover":
+                engine.takeover_mgr.initialize_session(session_id, body.get("worker_id", "worker_01"))
+                success, msg = engine.takeover_mgr.human_takeover(session_id, current_ai_state=body.get("current_state", {}))
+            else:
+                success, msg = engine.takeover_mgr.return_control_to_ai(session_id, final_observed_state=body.get("observed_state", {}))
+
+            return {"success": success, "message": msg, "session_id": session_id}, 200
 
         return None
