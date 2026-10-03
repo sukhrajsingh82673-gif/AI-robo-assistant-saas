@@ -34,8 +34,12 @@ from .template_factory import CoworkerTemplateFactory
 from .operating_instructions import OperatingInstructionParser, DeterministicSafetyRuleEngine
 from .worker_managers import (
     DesktopWorkerManager, BrowserWorkerManager, APIWorkerManager,
-    RPAWorkerManager, VisualComputerWorkerManager, FileWorkerManager
+    RPAWorkerManager, VisualComputerWorkerManager, FileWorkerManager,
+    TerminalWorkerManager
 )
+from .tool_discovery import ToolDiscoveryEngine
+from .self_extension import SelfExtensionEngine
+from .qualification_harness import ProviderQualificationHarness
 from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
 from .db_store import CoworkerDBStore
 
@@ -74,18 +78,26 @@ class UniversalCoworkerEngine:
         self.rpa_mgr = RPAWorkerManager(self.provider_reg)
         self.visual_mgr = VisualComputerWorkerManager(self.provider_reg)
         self.file_mgr = FileWorkerManager(self.provider_reg)
+        self.terminal_mgr = TerminalWorkerManager(self.provider_reg)
 
-        # 4. Governance, Safety & Authentication
+        # 4. Tool Discovery & Self-Extension
+        self.tool_discovery = ToolDiscoveryEngine(tenant_id)
+        self.self_extension = SelfExtensionEngine(
+            self.capability_reg, self.provider_reg, self.tool_discovery, self.router, tenant_id
+        )
+        self.qualification_harness = ProviderQualificationHarness(self.provider_reg)
+
+        # 5. Governance, Safety & Authentication
         self.credential_authority = CredentialAuthority(tenant_id)
         self.policy_evaluator = CoworkerPolicyEvaluator(tenant_id)
         self.killswitch = KillSwitchMatrix(tenant_id)
         self.takeover_mgr = HumanTakeoverManager()
 
-        # 5. Verification & Evidence
+        # 6. Verification & Evidence
         self.verifier = IndependentVerificationEngine(tenant_id)
         self.evidence_adapter = EvidenceLedgerAdapter(tenant_id)
 
-        # 6. 24x7 Operations & Supervision
+        # 7. 24x7 Operations & Supervision
         self.supervisor = WorkerSupervisor()
         self.recovery_engine = RecoveryEngine(self.provider_reg)
 
@@ -260,6 +272,9 @@ class UniversalCoworkerEngine:
             selected_provider,
             fallback_ids
         )
+        if task.idempotency_key and not exec_res.idempotency_key:
+            exec_res.idempotency_key = task.idempotency_key
+
 
         # 8. Observe and Independently Verify
         task.state = ExecutionState.VERIFY
@@ -335,3 +350,20 @@ class UniversalCoworkerEngine:
         graph.updated_at = time.time()
         self.store.save_graph(graph)
         return graph
+
+    def self_extend(self, capability_request: str) -> Any:
+        """AI CEO requests a capability: system discovers, sandboxes, qualifies and routes."""
+        return self.self_extension.request_capability(capability_request)
+
+    def discover_tools(self, query: str) -> List[Any]:
+        return self.tool_discovery.discover_tools(query)
+
+    def qualify_all_providers(self, test_server_url: Optional[str] = None) -> Dict[str, Any]:
+        results = self.qualification_harness.qualify_all(test_server_url=test_server_url)
+        return {pid: res.to_dict() for pid, res in results.items()}
+
+    def get_reality_matrix(self) -> List[Dict[str, Any]]:
+        if not self.qualification_harness._results:
+            self.qualification_harness.qualify_all()
+        return self.qualification_harness.generate_provider_reality_matrix()
+

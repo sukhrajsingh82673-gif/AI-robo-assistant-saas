@@ -12,7 +12,7 @@ from .providers import (
     WindowsDesktopProvider, MacOSDesktopProvider, LinuxDesktopProvider,
     ComputerUseMCPProvider, PlaywrightProvider,
     RobocorpProvider, OpenRPAProvider, APIMCPProvider,
-    AgentSProvider, UITARSProvider
+    AgentSProvider, UITARSProvider, TerminalProvider
 )
 
 class ProviderRegistry:
@@ -26,6 +26,7 @@ class ProviderRegistry:
         # Register standard default providers
         providers: List[CapabilityProvider] = [
             APIMCPProvider(),
+            TerminalProvider(),
             PlaywrightProvider(),
             OpenAdaptProvider(),
             LinuxDesktopProvider(),

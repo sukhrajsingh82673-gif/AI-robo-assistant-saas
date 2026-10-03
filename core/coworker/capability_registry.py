@@ -1,12 +1,21 @@
 """
 ZONATA Universal AI Co-worker Fabric — Capability Registry
 Implements the machine-readable capability registry mapping capabilities to
-categories, risk levels, authorization requirements, and supported providers.
+categories, risk levels, schemas, authorization requirements, verification methods,
+and supported providers.
+
+Invariants:
+- AVAILABLE != INSTALLED != RUNNABLE != HEALTHY != QUALIFIED.
+- Every capability has comprehensive machine-readable metadata.
 """
 
 from typing import Dict, List, Optional, Any
+import time
+
 from .contracts import (
-    CapabilityDefinition, CapabilityCategory, RiskLevel, CostClass, LatencyClass
+    CapabilityDefinition, CapabilityCategory, RiskLevel, CostClass, LatencyClass,
+    ProviderHealthStatus, QualificationStatus, DeterminismLevel, ReproducibilityLevel,
+    CapabilityAvailabilityStatus
 )
 
 class CapabilityRegistry:
@@ -29,14 +38,34 @@ class CapabilityRegistry:
             providers=["provider_openadapt", "provider_robocorp", "provider_ui_tars"],
             preferred_provider="provider_openadapt",
             fallback_providers=["provider_linux_desktop", "provider_windows_desktop", "provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.MEDIUM,
             requires_authorization=True,
             requires_human_approval=False,
             requires_verification=True,
             supports_rollback=True,
             supports_dry_run=True,
+            supports_idempotency=True,
+            timeout_sec=120.0,
             cost_class=CostClass.LOW,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"workflow_id": {"type": "string"}, "app_name": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"status": {"type": "string"}, "steps_completed": {"type": "integer"}}},
+            required_permissions=["desktop:execute_workflow"],
+            required_credentials=[],
+            verification_methods=["read_after_write_inspection", "window_state_check"],
+            rollback_methods=["reverse_action_replay"],
+            idempotency_strategy="workflow_session_token",
+            estimated_cost=0.001,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.ADAPTER_ONLY,
+            evidence_requirements=["execution_log", "output_hash"]
         ))
 
         self.register(CapabilityDefinition(
@@ -47,12 +76,32 @@ class CapabilityRegistry:
             providers=["provider_linux_desktop", "provider_windows_desktop", "provider_macos_desktop", "provider_computer_use_mcp"],
             preferred_provider="provider_linux_desktop",
             fallback_providers=["provider_computer_use_mcp", "provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=False,
             requires_human_approval=False,
             requires_verification=False,
+            supports_rollback=False,
+            supports_dry_run=True,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.SUB_SECOND
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"app_name": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"tree": {"type": "object"}}},
+            required_permissions=[],
+            required_credentials=[],
+            verification_methods=["tree_structure_validation"],
+            rollback_methods=[],
+            idempotency_strategy="cache_snapshot",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["execution_log"]
         ))
 
         self.register(CapabilityDefinition(
@@ -63,12 +112,30 @@ class CapabilityRegistry:
             providers=["provider_linux_desktop", "provider_windows_desktop", "provider_macos_desktop", "provider_computer_use_mcp", "provider_ui_tars"],
             preferred_provider="provider_linux_desktop",
             fallback_providers=["provider_computer_use_mcp", "provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=True,
             requires_verification=True,
             supports_rollback=False,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"element_id": {"type": "string"}, "app_name": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"status": {"type": "string"}, "clicked_element": {"type": "string"}}},
+            required_permissions=["desktop:click"],
+            required_credentials=[],
+            verification_methods=["element_focus_check"],
+            rollback_methods=[],
+            idempotency_strategy="element_state_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["execution_log", "output_hash"]
         ))
 
         # 2. Browser Capabilities
@@ -80,12 +147,30 @@ class CapabilityRegistry:
             providers=["provider_playwright", "provider_computer_use_mcp", "provider_ui_tars"],
             preferred_provider="provider_playwright",
             fallback_providers=["provider_computer_use_mcp", "provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=True,
             requires_verification=True,
             supports_rollback=False,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"url": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"status": {"type": "string"}, "url": {"type": "string"}, "title": {"type": "string"}}},
+            required_permissions=["browser:navigate"],
+            required_credentials=[],
+            verification_methods=["dom_readiness_check", "http_status_code"],
+            rollback_methods=[],
+            idempotency_strategy="url_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.PARTIALLY_QUALIFIED,
+            evidence_requirements=["navigation_receipt", "dom_title"]
         ))
 
         self.register(CapabilityDefinition(
@@ -96,11 +181,29 @@ class CapabilityRegistry:
             providers=["provider_playwright", "provider_ui_tars"],
             preferred_provider="provider_playwright",
             fallback_providers=["provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=False,
             requires_verification=True,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"query": {"type": "string"}, "selector": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"extracted_data": {"type": "array"}}},
+            required_permissions=[],
+            required_credentials=[],
+            verification_methods=["record_count_verification", "data_schema_validation"],
+            rollback_methods=[],
+            idempotency_strategy="content_digest",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.PARTIALLY_QUALIFIED,
+            evidence_requirements=["output_hash", "record_count"]
         ))
 
         # 3. API Capabilities (API-First execution)
@@ -112,13 +215,31 @@ class CapabilityRegistry:
             providers=["provider_api_mcp", "provider_playwright", "provider_ui_tars"],
             preferred_provider="provider_api_mcp",
             fallback_providers=["provider_playwright", "provider_openadapt", "provider_ui_tars"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.MEDIUM,
             requires_authorization=True,
             requires_human_approval=False,
             requires_verification=True,
             supports_rollback=True,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.SUB_SECOND
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"customer_id": {"type": "string"}, "data": {"type": "object"}}},
+            output_schema={"type": "object", "properties": {"status": {"type": "string"}, "mutation_confirmed": {"type": "boolean"}}},
+            required_permissions=["crm:write"],
+            required_credentials=["api_key_crm"],
+            verification_methods=["read_after_write_socket", "audit_trail_check"],
+            rollback_methods=["restore_previous_state"],
+            idempotency_strategy="transaction_idempotency_key",
+            estimated_cost=0.0001,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["http_response_receipt", "read_after_write_evidence"]
         ))
 
         self.register(CapabilityDefinition(
@@ -129,11 +250,29 @@ class CapabilityRegistry:
             providers=["provider_api_mcp", "provider_playwright"],
             preferred_provider="provider_api_mcp",
             fallback_providers=["provider_playwright"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=False,
             requires_verification=False,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.SUB_SECOND
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"customer_id": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"profile": {"type": "object"}}},
+            required_permissions=["crm:read"],
+            required_credentials=["api_key_crm"],
+            verification_methods=["payload_checksum"],
+            rollback_methods=[],
+            idempotency_strategy="query_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["query_hash"]
         ))
 
         self.register(CapabilityDefinition(
@@ -144,13 +283,31 @@ class CapabilityRegistry:
             providers=["provider_api_mcp", "provider_playwright"],
             preferred_provider="provider_api_mcp",
             fallback_providers=["provider_playwright"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.MEDIUM,
             requires_authorization=True,
             requires_human_approval=True,  # Policy-gated
             requires_verification=True,
             supports_rollback=False,
             cost_class=CostClass.LOW,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"message_id": {"type": "string"}, "sent": {"type": "boolean"}}},
+            required_permissions=["email:send"],
+            required_credentials=["smtp_auth"],
+            verification_methods=["smtp_receipt_verification", "outbox_ledger_check"],
+            rollback_methods=[],
+            idempotency_strategy="message_hash",
+            estimated_cost=0.0002,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["mail_receipt_id", "body_sha256"]
         ))
 
         # 4. RPA Capabilities
@@ -162,12 +319,30 @@ class CapabilityRegistry:
             providers=["provider_robocorp", "provider_openrpa", "provider_openadapt"],
             preferred_provider="provider_robocorp",
             fallback_providers=["provider_openrpa", "provider_openadapt"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.LOW,
             requires_authorization=True,
             requires_verification=True,
             supports_rollback=True,
             cost_class=CostClass.FREE,
-            latency_class=LatencyClass.FAST
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"file_path": {"type": "string"}, "updates": {"type": "object"}}},
+            output_schema={"type": "object", "properties": {"cells_updated": {"type": "integer"}, "file": {"type": "string"}}},
+            required_permissions=["file:write"],
+            required_credentials=[],
+            verification_methods=["file_hash_verification", "read_back_cells"],
+            rollback_methods=["restore_file_backup"],
+            idempotency_strategy="file_content_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["file_sha256", "update_receipt"]
         ))
 
         # 5. Visual Computer-Use Capabilities
@@ -179,11 +354,29 @@ class CapabilityRegistry:
             providers=["provider_ui_tars", "provider_agent_s"],
             preferred_provider="provider_ui_tars",
             fallback_providers=["provider_agent_s"],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.HIGH,
             requires_authorization=True,
             requires_verification=True,
             cost_class=CostClass.HIGH,
-            latency_class=LatencyClass.SLOW
+            latency_class=LatencyClass.SLOW,
+            input_schema={"type": "object", "properties": {"screenshot_base64": {"type": "string"}, "instruction": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"coordinates": {"type": "array"}, "action": {"type": "string"}}},
+            required_permissions=["vision:screen_capture"],
+            required_credentials=["vlm_api_token"],
+            verification_methods=["visual_grounding_verification", "physical_truth_check"],
+            rollback_methods=[],
+            idempotency_strategy="image_hash",
+            estimated_cost=0.015,
+            determinism_level=DeterminismLevel.STOCHASTIC,
+            reproducibility_level=ReproducibilityLevel.APPROXIMATE,
+            health_status=ProviderHealthStatus.UNAVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="NOT_INSTALLED",
+            runtime_status="BLOCKED_EXTERNAL_DEPENDENCY",
+            qualification_status=QualificationStatus.BLOCKED_EXTERNAL_DEPENDENCY,
+            evidence_requirements=["bounding_box_digest", "model_confidence"]
         ))
 
         # 6. High-Risk Financial & Purchasing
@@ -195,13 +388,313 @@ class CapabilityRegistry:
             providers=["provider_api_mcp"],
             preferred_provider="provider_api_mcp",
             fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
             risk_level=RiskLevel.CRITICAL,
             requires_authorization=True,
             requires_human_approval=True,  # Mandatory human sign-off
             requires_verification=True,
             supports_rollback=False,
             cost_class=CostClass.HIGH,
-            latency_class=LatencyClass.MEDIUM
+            latency_class=LatencyClass.MEDIUM,
+            input_schema={"type": "object", "properties": {"amount": {"type": "number"}, "vendor": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"transaction_id": {"type": "string"}, "receipt": {"type": "object"}}},
+            required_permissions=["finance:purchase"],
+            required_credentials=["payment_gateway_secret"],
+            verification_methods=["bank_receipt_verification", "accounting_reconciliation"],
+            rollback_methods=["request_refund"],
+            idempotency_strategy="bank_idempotency_uuid",
+            estimated_cost=0.05,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["bank_receipt", "human_approval_signature"]
+        ))
+
+        # 7. Governed Terminal / Shell Capabilities
+        self.register(CapabilityDefinition(
+            capability_id="terminal.inspect_filesystem",
+            name="Inspect Workspace Filesystem",
+            description="Safely inspects directories, files, and disk metadata under path containment",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=False,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"path": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"path": {"type": "string"}, "count": {"type": "integer"}, "entries": {"type": "array"}}},
+            required_permissions=["filesystem:read"],
+            required_credentials=[],
+            verification_methods=["filesystem_stat_check"],
+            rollback_methods=[],
+            idempotency_strategy="path_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["directory_listing_hash"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.inspect_environment",
+            name="Inspect Execution Environment",
+            description="Inspects host OS, CPU, memory, load average, and Python runtime safely",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=False,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object"},
+            output_schema={"type": "object", "properties": {"system": {"type": "string"}, "release": {"type": "string"}, "machine": {"type": "string"}}},
+            required_permissions=[],
+            required_credentials=[],
+            verification_methods=["platform_uname_check"],
+            rollback_methods=[],
+            idempotency_strategy="system_snapshot",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["environment_fingerprint"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.inspect_software",
+            name="Inspect Installed Software & Tools",
+            description="Audits installed CLI tools, package managers, and binaries on the host",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=False,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"tools": {"type": "array"}}},
+            output_schema={"type": "object", "properties": {"software": {"type": "object"}}},
+            required_permissions=[],
+            required_credentials=[],
+            verification_methods=["which_binary_check"],
+            rollback_methods=[],
+            idempotency_strategy="software_fingerprint",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["software_manifest_hash"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.file_operation",
+            name="Governed File Create, Edit & Rollback",
+            description="Performs sandboxed file operations with automatic SHA-256 pre/post hashing and backup snapshots",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.MEDIUM,
+            requires_authorization=True,
+            requires_human_approval=False,
+            requires_verification=True,
+            supports_rollback=True,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"action": {"type": "string"}, "file_path": {"type": "string"}, "content": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"action": {"type": "string"}, "file_path": {"type": "string"}, "post_sha256": {"type": "string"}}},
+            required_permissions=["filesystem:write"],
+            required_credentials=[],
+            verification_methods=["sha256_disk_verification"],
+            rollback_methods=["restore_from_backup_snapshot"],
+            idempotency_strategy="content_sha256",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["pre_sha256", "post_sha256", "backup_path"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.run_command",
+            name="Execute Governed Shell Command",
+            description="Executes shell command with policy filtering, AST scanning, and independent side-effect verification",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.HIGH,
+            requires_authorization=True,
+            requires_human_approval=False,  # High risk, evaluated by policy
+            requires_verification=True,
+            supports_rollback=True,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"command": {"type": "string"}, "cwd": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"exit_code": {"type": "integer"}, "stdout": {"type": "string"}, "stderr": {"type": "string"}}},
+            required_permissions=["terminal:execute"],
+            required_credentials=[],
+            verification_methods=["exit_code_and_side_effect_check"],
+            rollback_methods=["inverse_command_execution"],
+            idempotency_strategy="command_hash",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["command_hash", "stdout_digest", "exit_code"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.inspect_git",
+            name="Inspect Git Status & History",
+            description="Executes governed git read commands to audit commits, branches, and diffs",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=False,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"subcommand": {"type": "string"}, "repo_path": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"output": {"type": "string"}, "exit_code": {"type": "integer"}}},
+            required_permissions=["git:read"],
+            required_credentials=[],
+            verification_methods=["git_rev_parse"],
+            rollback_methods=[],
+            idempotency_strategy="head_commit_sha",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.EXACT,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["git_head_sha"]
+        ))
+
+        self.register(CapabilityDefinition(
+            capability_id="terminal.diagnose_failure",
+            name="Diagnose Command or Process Failure",
+            description="Analyzes non-zero exit codes, stderr logs, and system symptoms to generate remediation guidance",
+            category=CapabilityCategory.TERMINAL,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=False,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.SUB_SECOND,
+            input_schema={"type": "object", "properties": {"exit_code": {"type": "integer"}, "error_text": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"diagnosis": {"type": "string"}, "remediation": {"type": "string"}}},
+            required_permissions=[],
+            required_credentials=[],
+            verification_methods=[],
+            rollback_methods=[],
+            idempotency_strategy="error_fingerprint",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["diagnostic_report"]
+        ))
+
+        # 8. Web / Open-Source Tool Discovery Capabilities
+        self.register(CapabilityDefinition(
+            capability_id="discovery.search_tools",
+            name="Discover Open-Source Capabilities",
+            description="Discovers tools and libraries from approved Git repos, package registries, and MCP catalogs",
+            category=CapabilityCategory.DISCOVERY,
+            providers=["provider_terminal"],
+            preferred_provider="provider_terminal",
+            fallback_providers=[],
+            supported_platforms=["linux", "windows", "darwin"],
+            platforms=["linux", "windows", "darwin"],
+            risk_level=RiskLevel.LOW,
+            requires_authorization=False,
+            requires_human_approval=False,
+            requires_verification=True,
+            supports_rollback=False,
+            cost_class=CostClass.FREE,
+            latency_class=LatencyClass.FAST,
+            input_schema={"type": "object", "properties": {"query": {"type": "string"}, "source": {"type": "string"}}},
+            output_schema={"type": "object", "properties": {"candidates": {"type": "array"}}},
+            required_permissions=["discovery:search"],
+            required_credentials=[],
+            verification_methods=["manifest_validation"],
+            rollback_methods=[],
+            idempotency_strategy="query_digest",
+            estimated_cost=0.0,
+            determinism_level=DeterminismLevel.DETERMINISTIC,
+            reproducibility_level=ReproducibilityLevel.HIGH,
+            health_status=ProviderHealthStatus.AVAILABLE,
+            availability_status="AVAILABLE",
+            installation_status="INSTALLED",
+            runtime_status="RUNNABLE",
+            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            evidence_requirements=["discovery_manifest"]
         ))
 
     def register(self, definition: CapabilityDefinition):
@@ -220,3 +713,21 @@ class CapabilityRegistry:
         if not cap:
             return []
         return cap.providers
+
+    def get_qualified_capabilities(self) -> List[CapabilityDefinition]:
+        """Returns all capabilities that are REAL_PRODUCTION_QUALIFIED."""
+        return [
+            cap for cap in self._registry.values()
+            if cap.qualification_status == QualificationStatus.REAL_PRODUCTION_QUALIFIED
+        ]
+
+    def get_capabilities_by_status(self, qualification_status: QualificationStatus) -> List[CapabilityDefinition]:
+        return [
+            cap for cap in self._registry.values()
+            if cap.qualification_status == qualification_status
+        ]
+
+    def update_qualification_status(self, capability_id: str, status: QualificationStatus):
+        cap = self.get_capability(capability_id)
+        if cap:
+            cap.qualification_status = status

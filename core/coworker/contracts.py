@@ -16,8 +16,36 @@ class CapabilityCategory(str, Enum):
     API = "API"
     RPA = "RPA"
     VISUAL_CUA = "VISUAL_CUA"
+    TERMINAL = "TERMINAL"
+    DISCOVERY = "DISCOVERY"
     FILE = "FILE"
     SYSTEM = "SYSTEM"
+
+
+class CapabilityAvailabilityStatus(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    INSTALLED = "INSTALLED"
+    RUNNABLE = "RUNNABLE"
+    HEALTHY = "HEALTHY"
+    QUALIFIED = "QUALIFIED"
+
+class QualificationStatus(str, Enum):
+    REAL_PRODUCTION_QUALIFIED = "REAL_PRODUCTION_QUALIFIED"
+    PARTIALLY_QUALIFIED = "PARTIALLY_QUALIFIED"
+    ADAPTER_ONLY = "ADAPTER_ONLY"
+    BLOCKED_EXTERNAL_DEPENDENCY = "BLOCKED_EXTERNAL_DEPENDENCY"
+    UNAVAILABLE = "UNAVAILABLE"
+
+class DeterminismLevel(str, Enum):
+    DETERMINISTIC = "DETERMINISTIC"
+    STOCHASTIC = "STOCHASTIC"
+    SEMI_DETERMINISTIC = "SEMI_DETERMINISTIC"
+
+class ReproducibilityLevel(str, Enum):
+    EXACT = "EXACT"
+    HIGH = "HIGH"
+    APPROXIMATE = "APPROXIMATE"
+    LOW = "LOW"
 
 class RiskLevel(str, Enum):
     LOW = "LOW"
@@ -46,6 +74,16 @@ class ProviderHealthStatus(str, Enum):
     CRASHED = "CRASHED"
 
 class ExecutionState(str, Enum):
+    # 7 Required Mutation / Idempotency States
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    UNCERTAIN = "UNCERTAIN"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    CANCELLED = "CANCELLED"
+
+    # Governance Pipeline Lifecycle States
     DISCOVER = "DISCOVER"
     UNDERSTAND = "UNDERSTAND"
     CHECK_CAPABILITIES = "CHECK_CAPABILITIES"
@@ -104,6 +142,7 @@ class CapabilityDefinition:
     preferred_provider: str
     fallback_providers: List[str] = field(default_factory=list)
     supported_platforms: List[str] = field(default_factory=lambda: ["linux", "windows", "darwin"])
+    platforms: List[str] = field(default_factory=lambda: ["linux", "windows", "darwin"])
     risk_level: RiskLevel = RiskLevel.LOW
     requires_authorization: bool = True
     requires_human_approval: bool = False
@@ -115,7 +154,30 @@ class CapabilityDefinition:
     retry_policy: Dict[str, Any] = field(default_factory=lambda: {"max_retries": 3, "backoff_factor": 2.0})
     cost_class: CostClass = CostClass.LOW
     latency_class: LatencyClass = LatencyClass.FAST
+    input_schema: Dict[str, Any] = field(default_factory=dict)
+    output_schema: Dict[str, Any] = field(default_factory=dict)
+    required_permissions: List[str] = field(default_factory=list)
+    required_credentials: List[str] = field(default_factory=list)
+    verification_methods: List[str] = field(default_factory=lambda: ["independent_inspection"])
+    rollback_methods: List[str] = field(default_factory=list)
+    idempotency_strategy: str = "idempotency_key"
+    estimated_cost: float = 0.0
+    determinism_level: DeterminismLevel = DeterminismLevel.DETERMINISTIC
+    reproducibility_level: ReproducibilityLevel = ReproducibilityLevel.HIGH
+    health_status: ProviderHealthStatus = ProviderHealthStatus.AVAILABLE
+    availability_status: str = "AVAILABLE"
+    installation_status: str = "INSTALLED"
+    runtime_status: str = "RUNNABLE"
+    last_success: Optional[float] = None
+    last_failure: Optional[float] = None
+    qualification_status: QualificationStatus = QualificationStatus.REAL_PRODUCTION_QUALIFIED
     evidence_requirements: List[str] = field(default_factory=lambda: ["execution_log", "output_hash"])
+
+    def __post_init__(self):
+        if not self.platforms and self.supported_platforms:
+            self.platforms = list(self.supported_platforms)
+        elif not self.supported_platforms and self.platforms:
+            self.supported_platforms = list(self.platforms)
 
 @dataclass
 class ProviderEstimate:
@@ -209,3 +271,16 @@ class ExecutionGraph:
     status: ExecutionState = ExecutionState.PLAN
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+
+@dataclass
+class RoutingDecision:
+    decision_id: str
+    tenant_id: str
+    requested_capability: str
+    candidate_providers: List[str]
+    selected_provider: str
+    reason: Dict[str, Any]
+    fallbacks: List[str]
+    platform: str = "linux"
+    timestamp: float = field(default_factory=time.time)
+

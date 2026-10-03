@@ -10,6 +10,7 @@ import time
 import uuid
 import hashlib
 import os
+import sys
 import subprocess
 from ..provider_base import CapabilityProvider
 from ..contracts import (
@@ -197,11 +198,57 @@ class BaseNativeDesktopProvider(CapabilityProvider):
 class WindowsDesktopProvider(BaseNativeDesktopProvider):
     def __init__(self):
         super().__init__("provider_windows_desktop", "windows")
+        self._version = "1.0.0"
+        self._repository = "builtin/zonata-windows-native"
+        self._commit = "8d3e2a1"
+        self._license = "Apache-2.0"
+        self._runtime_dependencies = ["Windows UI Automation", ".NET Framework 4.8"]
+        self._is_native = sys.platform == "win32"
+        self._integration_status = "REAL_INTEGRATION" if self._is_native else "UNAVAILABLE"
+        self._health = ProviderHealthStatus.AVAILABLE if self._is_native else ProviderHealthStatus.UNAVAILABLE
+
+    def platforms(self) -> List[str]:
+        return ["windows"]
+
+    def execute(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> ExecutionResult:
+        if sys.platform != "win32":
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=f"win_blocked_{uuid.uuid4().hex[:8]}",
+                status="BLOCKED_EXTERNAL_DEPENDENCY",
+                error_message="WindowsDesktopProvider requires native Windows OS host with Microsoft UI Automation subsystem",
+                duration_ms=0.0
+            )
+        return super().execute(capability, params, context)
 
 
 class MacOSDesktopProvider(BaseNativeDesktopProvider):
     def __init__(self):
         super().__init__("provider_macos_desktop", "darwin")
+        self._version = "1.0.0"
+        self._repository = "builtin/zonata-macos-native"
+        self._commit = "7f2c1b9"
+        self._license = "Apache-2.0"
+        self._runtime_dependencies = ["AppleScript", "AXUIElement", "Quartz"]
+        self._is_native = sys.platform == "darwin"
+        self._integration_status = "REAL_INTEGRATION" if self._is_native else "UNAVAILABLE"
+        self._health = ProviderHealthStatus.AVAILABLE if self._is_native else ProviderHealthStatus.UNAVAILABLE
+
+    def platforms(self) -> List[str]:
+        return ["darwin"]
+
+    def execute(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> ExecutionResult:
+        if sys.platform != "darwin":
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=f"mac_blocked_{uuid.uuid4().hex[:8]}",
+                status="BLOCKED_EXTERNAL_DEPENDENCY",
+                error_message="MacOSDesktopProvider requires native macOS host with AXUIElement / AppleScript subsystem",
+                duration_ms=0.0
+            )
+        return super().execute(capability, params, context)
 
 
 class LinuxDesktopProvider(BaseNativeDesktopProvider):

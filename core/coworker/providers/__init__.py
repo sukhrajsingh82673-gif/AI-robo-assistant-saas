@@ -13,6 +13,7 @@ from .computer_use_mcp_provider import ComputerUseMCPProvider
 from .playwright_provider import PlaywrightProvider
 from .rpa_providers import RobocorpProvider, OpenRPAProvider
 from .api_mcp_provider import APIMCPProvider
+from .terminal_provider import TerminalProvider
 
 __all__ = [
     "OpenAdaptProvider",
@@ -26,5 +27,6 @@ __all__ = [
     "PlaywrightProvider",
     "RobocorpProvider",
     "OpenRPAProvider",
-    "APIMCPProvider"
+    "APIMCPProvider",
+    "TerminalProvider"
 ]

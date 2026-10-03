@@ -40,6 +40,10 @@ storage/browser_artifacts/
 storage/object_store/
 storage/backups/
 storage/*.bak
+storage/*.bak*
 storage/evidence/test_*
 storage/evidence/*test*
+storage/evidence/debug_*
 storage/reports/
+storage/voice_output/
+*.bundle

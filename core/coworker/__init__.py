@@ -6,7 +6,9 @@ from .contracts import (
     CapabilityCategory, RiskLevel, CostClass, LatencyClass,
     ProviderHealthStatus, ExecutionState, VerificationStatus, SupervisedControlMode,
     CapabilityDefinition, ProviderEstimate, ExecutionResult, VerificationResult,
-    CoworkerProfile, ExecutionLease, TaskNode, ExecutionGraph
+    CoworkerProfile, ExecutionLease, TaskNode, ExecutionGraph,
+    CapabilityAvailabilityStatus, QualificationStatus, DeterminismLevel,
+    ReproducibilityLevel, RoutingDecision
 )
 from .provider_base import CapabilityProvider
 from .capability_registry import CapabilityRegistry
@@ -24,8 +26,13 @@ from .template_factory import CoworkerTemplateFactory
 from .operating_instructions import OperatingInstructionParser, DeterministicSafetyRuleEngine
 from .worker_managers import (
     DesktopWorkerManager, BrowserWorkerManager, APIWorkerManager,
-    RPAWorkerManager, VisualComputerWorkerManager, FileWorkerManager
+    RPAWorkerManager, VisualComputerWorkerManager, FileWorkerManager,
+    TerminalWorkerManager
 )
+from .providers.terminal_provider import TerminalProvider
+from .tool_discovery import ToolDiscoveryEngine, ToolCandidate
+from .self_extension import SelfExtensionEngine, SelfExtensionResult
+from .qualification_harness import ProviderQualificationHarness, ProviderQualificationResult
 from .engine import UniversalCoworkerEngine
 
 __all__ = [
@@ -45,6 +52,11 @@ __all__ = [
     "ExecutionLease",
     "TaskNode",
     "ExecutionGraph",
+    "CapabilityAvailabilityStatus",
+    "QualificationStatus",
+    "DeterminismLevel",
+    "ReproducibilityLevel",
+    "RoutingDecision",
     "CapabilityProvider",
     "CapabilityRegistry",
     "ProviderRegistry",
@@ -69,5 +81,13 @@ __all__ = [
     "RPAWorkerManager",
     "VisualComputerWorkerManager",
     "FileWorkerManager",
+    "TerminalWorkerManager",
+    "TerminalProvider",
+    "ToolDiscoveryEngine",
+    "ToolCandidate",
+    "SelfExtensionEngine",
+    "SelfExtensionResult",
+    "ProviderQualificationHarness",
+    "ProviderQualificationResult",
     "UniversalCoworkerEngine"
 ]

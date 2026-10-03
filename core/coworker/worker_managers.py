@@ -67,3 +67,10 @@ class FileWorkerManager(BaseDomainWorkerManager):
     """Manages sandboxed file operations, reports, CSV merges, and checksums."""
     def __init__(self, provider_reg: ProviderRegistry):
         super().__init__("FileWorkerManager", CapabilityCategory.FILE, provider_reg)
+
+
+class TerminalWorkerManager(BaseDomainWorkerManager):
+    """Manages governed shell, developer tooling, git, and system diagnostics."""
+    def __init__(self, provider_reg: ProviderRegistry):
+        super().__init__("TerminalWorkerManager", CapabilityCategory.TERMINAL, provider_reg)
+

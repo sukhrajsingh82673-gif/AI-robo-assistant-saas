@@ -188,6 +188,26 @@ class OpenRPAProvider(BaseRPAProvider):
         self._repository = "open-rpa/openrpa"
         self._commit = "6c1b3e9"
         self._license = "GPL-3.0"
-        self._integration_status = "UNAVAILABLE"
+        import sys
+        self._is_native = sys.platform == "win32"
+        self._integration_status = "REAL_INTEGRATION" if self._is_native else "UNAVAILABLE"
+        self._health = ProviderHealthStatus.AVAILABLE if self._is_native else ProviderHealthStatus.UNAVAILABLE
         self._model_dependencies = []
-        self._runtime_dependencies = [".NET Framework 4.8", "Windows"]
+        self._runtime_dependencies = [".NET Framework 4.8", "Windows UI Automation", "Windows OS"]
+
+    def platforms(self) -> List[str]:
+        return ["windows"]
+
+    def execute(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> ExecutionResult:
+        import sys
+        if sys.platform != "win32":
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=f"openrpa_blocked_{uuid.uuid4().hex[:8]}",
+                status="BLOCKED_EXTERNAL_DEPENDENCY",
+                error_message="OpenRPAProvider requires native Windows environment with Microsoft .NET Framework 4.8",
+                duration_ms=0.0
+            )
+        return super().execute(capability, params, context)
+
