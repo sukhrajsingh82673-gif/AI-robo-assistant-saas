@@ -41,7 +41,7 @@ class DisasterRecoveryManager:
         # 1. Perform online SQLite backup
         with db.get_connection() as src_conn:
             dest_conn = sqlite3.connect(dest_path)
-            src_conn.backup(dest_conn, pages=100)
+            src_conn.backup(dest_conn)
             dest_conn.close()
 
         # 2. Compute SHA-256 checksum

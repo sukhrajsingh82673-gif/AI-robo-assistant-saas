@@ -20,6 +20,8 @@ class CapabilityCategory(str, Enum):
     DISCOVERY = "DISCOVERY"
     FILE = "FILE"
     SYSTEM = "SYSTEM"
+    ENGINEERING = "ENGINEERING"
+    REASONING = "REASONING"
 
 
 class CapabilityAvailabilityStatus(str, Enum):

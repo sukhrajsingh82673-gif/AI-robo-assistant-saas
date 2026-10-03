@@ -49,6 +49,11 @@ from .fleet import (
 )
 from .hermes_agent import HermesAgenticOrchestrator, HermesToolCall, HermesStepResult
 from .soak import SupervisorEnduranceRunner, FailureInjectionEngine, SoakTelemetryMetrics
+from .runtimes import WorkerRuntimeRouter
+from .subworkers import SubWorkerCoordinator, SubWorkerRole
+from .memory_tier import GovernedMemoryManager, MemoryTier
+from .background_dispatcher import BackgroundMissionDispatcher, BackgroundMission
+from .dashboard import CoworkerDashboardService
 
 class UniversalCoworkerEngine:
 
@@ -119,6 +124,25 @@ class UniversalCoworkerEngine:
         # 10. 24x7 Soak Endurance Runner & Chaos Failure Injector
         self.soak_runner = SupervisorEnduranceRunner(self)
         self.chaos_injector = FailureInjectionEngine(self)
+
+        # 11. Multi-Runtime Routing & Specialized Worker Runtimes
+        self.runtime_router = WorkerRuntimeRouter(tenant_id)
+
+        # 12. Parallel Sub-Worker Coordination
+        self.subworker_coordinator = SubWorkerCoordinator(tenant_id)
+
+        # 13. Multi-Tiered Memory Architecture (Business, Operational, Task, Skill, Episodic)
+        self.memory_manager = GovernedMemoryManager(tenant_id)
+
+        # 14. One-Prompt Background Mission Dispatcher
+        self.background_dispatcher = BackgroundMissionDispatcher(
+            subworker_coord=self.subworker_coordinator,
+            runtime_router=self.runtime_router,
+            tenant_id=tenant_id
+        )
+
+        # 15. Unified Observability Dashboard Service
+        self.dashboard = CoworkerDashboardService(self)
 
         # In-memory execution graphs & DB persistence
         self._active_graphs: Dict[str, ExecutionGraph] = {}

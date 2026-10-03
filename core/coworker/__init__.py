@@ -44,6 +44,17 @@ from .hermes_agent import HermesAgenticOrchestrator, HermesToolCall, HermesStepR
 from .soak import SupervisorEnduranceRunner, FailureInjectionEngine, SoakTelemetryMetrics
 from .engine import UniversalCoworkerEngine
 
+from .runtimes import (
+    WorkerRuntime, RuntimeSession, SessionState, BackgroundJob, JobStatus,
+    HermesWorkerRuntime, HermesSkillAdapter, HermesMCPAdapter, HermesComputerUseAdapter,
+    OpenHandsWorkerRuntime, OpenClawWorkerRuntime, BrowserWorkerRuntime,
+    ComputerUseWorkerRuntime, WorkerRuntimeRouter
+)
+from .subworkers import SubWorkerCoordinator, SubWorkerRole, SubWorkerAssignment
+from .memory_tier import GovernedMemoryManager, MemoryTier, MemoryRecord
+from .background_dispatcher import BackgroundMissionDispatcher, BackgroundMission
+from .dashboard import CoworkerDashboardService
+
 __all__ = [
     "CapabilityCategory",
     "RiskLevel",
@@ -114,6 +125,29 @@ __all__ = [
     "SupervisorEnduranceRunner",
     "FailureInjectionEngine",
     "SoakTelemetryMetrics",
-    "UniversalCoworkerEngine"
+    "UniversalCoworkerEngine",
+    "WorkerRuntime",
+    "RuntimeSession",
+    "SessionState",
+    "BackgroundJob",
+    "JobStatus",
+    "HermesWorkerRuntime",
+    "HermesSkillAdapter",
+    "HermesMCPAdapter",
+    "HermesComputerUseAdapter",
+    "OpenHandsWorkerRuntime",
+    "OpenClawWorkerRuntime",
+    "BrowserWorkerRuntime",
+    "ComputerUseWorkerRuntime",
+    "WorkerRuntimeRouter",
+    "SubWorkerCoordinator",
+    "SubWorkerRole",
+    "SubWorkerAssignment",
+    "GovernedMemoryManager",
+    "MemoryTier",
+    "MemoryRecord",
+    "BackgroundMissionDispatcher",
+    "BackgroundMission",
+    "CoworkerDashboardService"
 ]
 
