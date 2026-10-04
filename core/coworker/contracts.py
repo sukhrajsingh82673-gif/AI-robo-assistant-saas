@@ -174,6 +174,51 @@ class CapabilityDefinition:
     last_failure: Optional[float] = None
     qualification_status: QualificationStatus = QualificationStatus.REAL_PRODUCTION_QUALIFIED
     evidence_requirements: List[str] = field(default_factory=lambda: ["execution_log", "output_hash"])
+    architectures: List[str] = field(default_factory=lambda: ["x86_64", "aarch64", "arm64"])
+    required_resources: Dict[str, Any] = field(default_factory=lambda: {"cpu_cores": 1, "ram_mb": 512, "gpu_required": False})
+    worker_types: List[str] = field(default_factory=lambda: ["STANDARD_WORKER"])
+    runtime_versions: Dict[str, str] = field(default_factory=dict)
+    license: str = "Apache-2.0"
+    security_status: str = "VERIFIED_SAFE"
+    success_rate: float = 1.0
+
+    @property
+    def health(self) -> str:
+        return self.health_status.value if hasattr(self.health_status, 'value') else str(self.health_status)
+
+    @property
+    def cost(self) -> float:
+        return self.estimated_cost
+
+    @property
+    def latency(self) -> str:
+        return self.latency_class.value if hasattr(self.latency_class, 'value') else str(self.latency_class)
+
+    def to_canonical_dict(self) -> Dict[str, Any]:
+        """Exports all 20 canonical fields specified in ZONATA Universal Capability Specification."""
+        return {
+            "capability_id": self.capability_id,
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "risk_level": self.risk_level.value if hasattr(self.risk_level, 'value') else str(self.risk_level),
+            "platforms": self.platforms,
+            "architectures": self.architectures,
+            "required_resources": self.required_resources,
+            "required_credentials": self.required_credentials,
+            "providers": self.providers,
+            "worker_types": self.worker_types,
+            "runtime_versions": self.runtime_versions,
+            "health": self.health,
+            "qualification_status": self.qualification_status.value if hasattr(self.qualification_status, 'value') else str(self.qualification_status),
+            "license": self.license,
+            "security_status": self.security_status,
+            "cost": self.cost,
+            "latency": self.latency,
+            "success_rate": self.success_rate,
+            "evidence_requirements": self.evidence_requirements
+        }
 
     def __post_init__(self):
         if not self.platforms and self.supported_platforms:

@@ -21,6 +21,8 @@
       this.realityMatrix = [];
       this.dashboard = null;
       this.terminalHistory = [];
+      this.nodes = [];
+      this.recoveryEvents = [];
       this.isPolling = false;
       this.pollInterval = null;
     }
@@ -35,12 +37,14 @@
 
     async refreshData(silent = false) {
       try {
-        const [dashRes, msnRes, appRes, artRes, matRes] = await Promise.all([
+        const [dashRes, msnRes, appRes, artRes, matRes, nodeRes, recRes] = await Promise.all([
           fetch('/api/coworker/dashboard').then(r => r.json()).catch(() => null),
           fetch('/api/coworker/missions').then(r => r.json()).catch(() => ({ missions: [] })),
           fetch('/api/coworker/approvals').then(r => r.json()).catch(() => ({ approvals: [] })),
           fetch('/api/coworker/artifacts').then(r => r.json()).catch(() => ({ artifacts: [] })),
-          fetch('/api/coworker/reality-matrix').then(r => r.json()).catch(() => ({ reality_matrix: [] }))
+          fetch('/api/coworker/reality-matrix').then(r => r.json()).catch(() => ({ reality_matrix: [] })),
+          fetch('/api/coworker/nodes').then(r => r.json()).catch(() => ({ nodes: [] })),
+          fetch('/api/coworker/recovery/events').then(r => r.json()).catch(() => ({ events: [] }))
         ]);
 
         if (dashRes) this.dashboard = dashRes;
@@ -48,6 +52,8 @@
         if (appRes && appRes.approvals) this.approvals = appRes.approvals;
         if (artRes && artRes.artifacts) this.artifacts = artRes.artifacts;
         if (matRes && matRes.reality_matrix) this.realityMatrix = matRes.reality_matrix;
+        if (nodeRes && nodeRes.nodes) this.nodes = nodeRes.nodes;
+        if (recRes && recRes.events) this.recoveryEvents = recRes.events;
 
         if (!this.currentMissionId && this.missions.length > 0) {
           this.currentMissionId = this.missions[0].mission_id;
@@ -91,8 +97,13 @@
       el.innerHTML = `
         <div class="workspace-page-header">
           <div>
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:4px 12px; background:rgba(37,99,235,0.15); border:1px solid #3b82f6; border-radius:20px; font-size:0.75rem; color:#93c5fd; font-weight:600; margin-bottom:10px;">
+              <span>🧠 AI CEO = BRAIN</span>
+              <span style="opacity:0.5;">|</span>
+              <span>⚡ CO-WORKER = HANDS / BODY</span>
+            </div>
             <h1 class="page-title">ZONATA AI Assistant</h1>
-            <p class="page-subtitle">Your sovereign AI companion and front door to the Universal AI Co-Worker execution engine.</p>
+            <p class="page-subtitle">Your sovereign AI companion and front door to the Universal AI Co-Worker execution fabric.</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.openScheduleModal()">
@@ -124,9 +135,14 @@
                 Run as autonomous background mission
               </label>
             </div>
-            <button class="btn btn-primary" id="btnSubmitAssistant" onclick="window.AssistantCoworkerWorkspace.submitAssistantObjective()" style="padding:10px 24px; font-weight:600;">
-              🚀 Delegate to Co-Worker
-            </button>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary" onclick="window.AssistantCoworkerWorkspace.submitCeoObjective()" style="padding:10px 18px; font-weight:600;">
+                🧠 Dispatch from AI CEO
+              </button>
+              <button class="btn btn-primary" id="btnSubmitAssistant" onclick="window.AssistantCoworkerWorkspace.submitAssistantObjective()" style="padding:10px 24px; font-weight:600;">
+                🚀 Delegate to Co-Worker
+              </button>
+            </div>
           </div>
 
           <!-- Quick Action Chips -->
@@ -209,6 +225,41 @@
           btn.disabled = false;
           btn.textContent = '🚀 Delegate to Co-Worker';
         }
+      }
+    }
+
+    async submitCeoObjective() {
+      const input = document.getElementById('assistantObjectiveInput');
+      if (!input || !input.value.trim()) {
+        showToast('Please enter a strategic objective for the AI CEO.', 'warning');
+        return;
+      }
+
+      const objective = input.value.trim();
+      showToast('Dispatching Strategic Directive from AI CEO Brain...', 'info');
+
+      try {
+        const res = await fetch('/api/coworker/ceo/mission', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            objective,
+            business_context: { priority: "HIGH", strategy: "autonomous_delivery" },
+            budget: 50.0
+          })
+        });
+        const data = await res.json();
+        if (data.mission_id) {
+          showToast(`AI CEO Mission initiated: ${data.mission_id} (${data.execution_status})`, 'success');
+          this.currentMissionId = data.mission_id;
+          input.value = '';
+          await this.refreshData();
+          window.navigateTo('/coworker');
+        } else {
+          showToast(`Error: ${data.error || 'Failed to dispatch CEO mission'}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Request failed: ${err.message}`, 'error');
       }
     }
 
@@ -952,6 +1003,105 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- Fleet Worker Nodes & Bootstrapping -->
+        <div class="card" style="margin-top:24px;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 class="card-title">Distributed Worker Fleet & Node Fabric</h3>
+              <p style="font-size:0.8rem; color:#94a3b8; margin:0;">Zero-mock fleet nodes across Linux, Windows, macOS, GPU, and Cloud environments.</p>
+            </div>
+            <span class="badge badge-primary">${(this.nodes || []).length} Nodes Connected</span>
+          </div>
+          <div class="card-body">
+            <div style="background:#090d16; border:1px solid #334155; border-radius:8px; padding:14px; margin-bottom:18px;">
+              <div style="font-size:0.8rem; font-weight:600; color:#93c5fd; margin-bottom:6px;">⚡ Connect Any Machine to Fleet (Bootstrap Agent):</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <code style="flex:1; background:#020617; color:#38bdf8; padding:8px 12px; border-radius:6px; font-size:0.8rem; user-select:all; overflow-x:auto;">curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret</code>
+                <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText('curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret'); showToast('Bootstrap command copied!', 'info');">Copy</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Node ID</th>
+                    <th>Type</th>
+                    <th>Platform</th>
+                    <th>Architecture</th>
+                    <th>State</th>
+                    <th>Capabilities</th>
+                    <th>GPU / Display</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background:rgba(37,99,235,0.05);">
+                    <td><strong>control_plane_local</strong> <span class="badge badge-primary" style="font-size:0.65rem;">HOST</span></td>
+                    <td>LINUX_NODE</td>
+                    <td>linux</td>
+                    <td>aarch64</td>
+                    <td><span class="badge badge-success">HEALTHY</span></td>
+                    <td>17 Capabilities (Terminal, Hermes, OpenClaw, Workspace)</td>
+                    <td>Headless (Zero-Mock PRoot)</td>
+                  </tr>
+                  ${(this.nodes || []).map(n => `
+                    <tr>
+                      <td><strong>${n.node_id}</strong></td>
+                      <td>${n.node_type}</td>
+                      <td>${n.platform}</td>
+                      <td>${n.architecture}</td>
+                      <td><span class="badge ${n.state === 'AUTHORIZED' ? 'badge-success' : 'badge-warning'}">${n.state}</span></td>
+                      <td>${(n.capabilities || []).length} Capabilities</td>
+                      <td>${n.gpu_availability ? 'GPU' : 'No GPU'} | ${n.display_availability ? 'Display' : 'Headless'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Failure & Universal Fallback Events -->
+        <div class="card" style="margin-top:24px;">
+          <div class="card-header">
+            <h3 class="card-title">Universal Fallback & Recovery Events</h3>
+          </div>
+          <div class="card-body">
+            ${(this.recoveryEvents && this.recoveryEvents.length > 0) ? `
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Event ID</th>
+                      <th>Mission</th>
+                      <th>Failed Target</th>
+                      <th>State</th>
+                      <th>Fallback Action</th>
+                      <th>Reconciliation Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.recoveryEvents.map(e => `
+                      <tr>
+                        <td><code>${e.event_id}</code></td>
+                        <td>${e.mission_id}</td>
+                        <td>${e.failed_provider} @ ${e.failed_node}</td>
+                        <td><span class="badge ${e.state === 'RECOVERED' ? 'badge-success' : 'badge-warning'}">${e.state}</span></td>
+                        <td>${e.fallback_provider || 'None'}</td>
+                        <td style="font-size:0.8rem; color:#94a3b8;">${e.notes || e.error_message}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div style="text-align:center; padding:24px; color:#94a3b8;">
+                No unrecovered failure events. All execution pipelines operating cleanly.
+              </div>
+            `}
           </div>
         </div>
       `;

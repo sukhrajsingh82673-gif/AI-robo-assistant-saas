@@ -54,6 +54,15 @@ from .subworkers import SubWorkerCoordinator, SubWorkerRole, SubWorkerAssignment
 from .memory_tier import GovernedMemoryManager, MemoryTier, MemoryRecord
 from .background_dispatcher import BackgroundMissionDispatcher, BackgroundMission
 from .dashboard import CoworkerDashboardService
+from .ceo_coworker_bridge import AICeoCoworkerBridge, AICeoMissionRequest, AICeoMissionResponse
+from .universal_worker_contract import UniversalWorkerContract, WorkerMetadata, UniversalWorkerAdapter
+from .controllers import (
+    GovernedTerminalController, GovernedBrowserController,
+    GovernedComputerController, GovernedApiController,
+    GovernedMCPController, MCPServerRegistration,
+    GovernedA2AController, GovernedArtifactManager, GovernedArtifact,
+    UniversalRecoveryController, FailureState, FailureEvent
+)
 
 __all__ = [
     "CapabilityCategory",
@@ -148,6 +157,24 @@ __all__ = [
     "MemoryRecord",
     "BackgroundMissionDispatcher",
     "BackgroundMission",
-    "CoworkerDashboardService"
+    "CoworkerDashboardService",
+    "AICeoCoworkerBridge",
+    "AICeoMissionRequest",
+    "AICeoMissionResponse",
+    "UniversalWorkerContract",
+    "WorkerMetadata",
+    "UniversalWorkerAdapter",
+    "GovernedTerminalController",
+    "GovernedBrowserController",
+    "GovernedComputerController",
+    "GovernedApiController",
+    "GovernedMCPController",
+    "MCPServerRegistration",
+    "GovernedA2AController",
+    "GovernedArtifactManager",
+    "GovernedArtifact",
+    "UniversalRecoveryController",
+    "FailureState",
+    "FailureEvent"
 ]
 

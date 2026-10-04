@@ -41,7 +41,7 @@ class CoworkerDashboardService:
                     "node_id": n.node_id,
                     "platform": n.platform.value if hasattr(n.platform, "value") else str(n.platform),
                     "node_type": n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type),
-                    "status": n.status.value if hasattr(n.status, "value") else str(n.status),
+                    "status": (n.state.value if hasattr(n.state, "value") else str(n.state)) if hasattr(n, "state") else str(getattr(n, "status", "REGISTERED")),
                     "last_heartbeat_sec_ago": round(time.time() - n.last_heartbeat, 1)
                 })
 

@@ -1262,6 +1262,38 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        elif path == "/api/coworker/nodes":
+            nodes_list = []
+            for nid, node in coworker_engine.node_registry._nodes.items():
+                nodes_list.append(node.to_dict())
+            self._send_json({"nodes": nodes_list, "count": len(nodes_list)})
+            return
+
+        elif path == "/api/coworker/nodes/bootstrap.py":
+            agent_file = os.path.join(BASE_DIR, "core", "coworker", "fleet", "node_agent.py")
+            if os.path.exists(agent_file):
+                with open(agent_file, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/x-python")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self._send_json({"error": "Bootstrap agent not found"}, status=404)
+            return
+
+        elif path == "/api/coworker/recovery/events":
+            mid = query_params.get("mission_id", [None])[0]
+            events = coworker_engine.recovery_controller.get_events(mid)
+            self._send_json({"events": events, "count": len(events)})
+            return
+
+        elif path == "/api/coworker/mcp/servers":
+            servers = coworker_engine.mcp_controller.list_servers()
+            self._send_json({"servers": servers, "count": len(servers)})
+            return
+
         # =====================================================================
         # Prompt 03: Plugins & Connections Endpoints (GET)
         # =====================================================================
@@ -3149,6 +3181,105 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 coworker_engine.background_dispatcher.stop_mission(mid)
             self._send_json({"success": True, "approval_id": app_id, "decision": decision})
+            return
+
+        elif path == "/api/coworker/nodes/register":
+            from core.coworker.fleet.node_contracts import (
+                WorkerNodeRegistrationRequest, NodeType, NodePlatform, SecurityPosture
+            )
+            node_id = req_data.get("node_id", f"node_{uuid.uuid4().hex[:6]}")
+            tenant_scope = req_data.get("tenant_scope", "tnt_primary")
+            platform_str = req_data.get("platform", "linux")
+            try:
+                plat = NodePlatform(platform_str)
+            except Exception:
+                plat = NodePlatform.LINUX
+
+            node_type_str = req_data.get("node_type", "LINUX_NODE")
+            try:
+                ntype = NodeType(node_type_str)
+            except Exception:
+                ntype = NodeType.LINUX_NODE
+
+            reg_req = WorkerNodeRegistrationRequest(
+                node_id=node_id,
+                tenant_scope=tenant_scope,
+                node_type=ntype,
+                platform=plat,
+                architecture=req_data.get("architecture", platform.machine()),
+                os_version=req_data.get("os_version", platform.version()),
+                runtime_version=req_data.get("runtime_version", "1.0.0-GA"),
+                capabilities=req_data.get("capabilities", ["terminal.shell_command"]),
+                installed_providers=req_data.get("installed_providers", ["provider_terminal"]),
+                gpu_availability=bool(req_data.get("gpu_availability", False)),
+                display_availability=bool(req_data.get("display_availability", False)),
+                registration_secret=req_data.get("registration_secret", "")
+            )
+            ok, auth_token, profile = coworker_engine.node_registry.register_node(reg_req)
+            if ok:
+                coworker_engine.node_registry.authorize_node(node_id)
+                self._send_json({
+                    "success": True,
+                    "node_id": node_id,
+                    "auth_token": auth_token,
+                    "status": "AUTHORIZED",
+                    "capabilities_count": len(reg_req.capabilities)
+                })
+            else:
+                self._send_json({"success": False, "error": auth_token}, status=400)
+            return
+
+        elif path == "/api/coworker/nodes/heartbeat":
+            node_id = req_data.get("node_id", "")
+            metrics = req_data.get("metrics", {})
+            ok = coworker_engine.node_registry.record_heartbeat(node_id, metrics)
+            self._send_json({"success": ok, "status": "ACKNOWLEDGED" if ok else "NODE_UNKNOWN"})
+            return
+
+        elif path == "/api/coworker/ceo/mission":
+            from core.coworker.ceo_coworker_bridge import AICeoMissionRequest
+            req = AICeoMissionRequest(
+                objective=req_data.get("objective", "Execute strategic directive"),
+                business_context=req_data.get("business_context", {}),
+                success_criteria=req_data.get("success_criteria", []),
+                constraints=req_data.get("constraints", []),
+                priority=req_data.get("priority", "HIGH"),
+                authority=req_data.get("authority", "AUTOMATIC_IDEMPOTENT"),
+                budget=float(req_data.get("budget", 50.0)),
+                tenant_id=req_data.get("tenant_id", "tnt_primary"),
+                company_id=req_data.get("company_id", "comp_primary")
+            )
+            ceo_resp = coworker_engine.execute_ceo_mission(req)
+            self._send_json(ceo_resp.to_dict())
+            return
+
+        elif path == "/api/coworker/browser/extract":
+            url = req_data.get("url", "")
+            res = coworker_engine.browser_controller.navigate_and_extract(url)
+            self._send_json(res)
+            return
+
+        elif path == "/api/coworker/mcp/execute":
+            srv_id = req_data.get("server_id", "")
+            tool = req_data.get("tool", "")
+            args = req_data.get("arguments", {})
+            res = coworker_engine.mcp_controller.execute_tool(srv_id, tool, args)
+            self._send_json(res)
+            return
+
+        elif path == "/api/coworker/a2a/send":
+            agent_id = req_data.get("target_agent", "")
+            mtype = req_data.get("message_type", "QUERY")
+            payload = req_data.get("content", {})
+            res = coworker_engine.a2a_controller.send_agent_message(agent_id, mtype, payload)
+            self._send_json(res)
+            return
+
+        elif path == "/api/coworker/recovery/reconcile":
+            event_id = req_data.get("event_id", "")
+            resolution = req_data.get("resolution", "Approved manual progression")
+            ok = coworker_engine.recovery_controller.reconcile_uncertain_task(event_id, resolution)
+            self._send_json({"success": ok, "event_id": event_id, "status": "RECONCILED" if ok else "NOT_FOUND"})
             return
 
         # =====================================================================

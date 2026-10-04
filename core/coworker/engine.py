@@ -54,6 +54,15 @@ from .subworkers import SubWorkerCoordinator, SubWorkerRole
 from .memory_tier import GovernedMemoryManager, MemoryTier
 from .background_dispatcher import BackgroundMissionDispatcher, BackgroundMission
 from .dashboard import CoworkerDashboardService
+from .ceo_coworker_bridge import AICeoCoworkerBridge, AICeoMissionRequest, AICeoMissionResponse
+from .universal_worker_contract import UniversalWorkerContract, WorkerMetadata, UniversalWorkerAdapter
+from .controllers import (
+    GovernedTerminalController, GovernedBrowserController,
+    GovernedComputerController, GovernedApiController,
+    GovernedMCPController, GovernedA2AController,
+    GovernedArtifactManager, UniversalRecoveryController
+)
+from .fleet import NodeSecurityProtocol
 
 class UniversalCoworkerEngine:
 
@@ -145,9 +154,27 @@ class UniversalCoworkerEngine:
         # 15. Unified Observability Dashboard Service
         self.dashboard = CoworkerDashboardService(self)
 
+        # 16. AI CEO ↔ Co-Worker Strategic Execution Bridge
+        self.ceo_bridge = AICeoCoworkerBridge(self)
+
+        # 17. Governed Execution Controllers
+        self.terminal_controller = GovernedTerminalController(tenant_id)
+        self.browser_controller = GovernedBrowserController(tenant_id)
+        self.computer_controller = GovernedComputerController(tenant_id)
+        self.api_controller = GovernedApiController(tenant_id)
+        self.mcp_controller = GovernedMCPController(tenant_id)
+        self.a2a_controller = GovernedA2AController(tenant_id)
+        self.artifact_manager = GovernedArtifactManager()
+        self.recovery_controller = UniversalRecoveryController(tenant_id)
+        self.node_security = NodeSecurityProtocol(tenant_id)
+
         # In-memory execution graphs & DB persistence
         self._active_graphs: Dict[str, ExecutionGraph] = {}
         self.store = CoworkerDBStore(db_path)
+
+    def execute_ceo_mission(self, req: AICeoMissionRequest) -> AICeoMissionResponse:
+        """Executes a strategic mission dispatched by the AI CEO."""
+        return self.ceo_bridge.execute_ceo_mission(req)
 
 
     def create_coworker(self, role_or_prompt: str) -> CoworkerProfile:

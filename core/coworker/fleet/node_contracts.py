@@ -15,7 +15,10 @@ class NodePlatform(str, Enum):
     WINDOWS = "windows"
     MACOS = "darwin"
     ANDROID_PROOT = "android_proot"
+    IOS_APPLE_SESSION = "ios_apple_session"
     CLOUD_CONTAINER = "cloud_container"
+    SERVER = "server"
+    EDGE = "edge"
 
 class NodeType(str, Enum):
     LINUX_NODE = "LINUX_NODE"
@@ -24,6 +27,12 @@ class NodeType(str, Enum):
     GPU_NODE = "GPU_NODE"
     BROWSER_NODE = "BROWSER_NODE"
     DESKTOP_NODE = "DESKTOP_NODE"
+    CLOUD_NODE = "CLOUD_NODE"
+    CONTAINER_NODE = "CONTAINER_NODE"
+    VM_NODE = "VM_NODE"
+    SERVER_NODE = "SERVER_NODE"
+    EDGE_NODE = "EDGE_NODE"
+    APPLE_SESSION_NODE = "APPLE_SESSION_NODE"
 
 class NodeState(str, Enum):
     REGISTERED = "REGISTERED"
@@ -82,6 +91,10 @@ class WorkerNodeProfile:
     active_leases: List[str] = field(default_factory=list)
     auth_token_hash: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def status(self) -> NodeState:
+        return self.state
 
     def to_dict(self) -> Dict[str, Any]:
         return {
