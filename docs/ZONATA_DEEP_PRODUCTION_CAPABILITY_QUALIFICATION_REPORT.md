@@ -241,26 +241,30 @@ All 20 new API routes were integrated into `api_server.py` and validated on `htt
 
 | HTTP Method | Endpoint | Description | Verification Status |
 |:---|:---|:---|:---:|
-| `GET` | `/telemetry/trace` | Inspect distributed trace details & span graph | **200 OK** |
-| `GET` | `/telemetry/metrics` | Export metrics in Prometheus exposition format | **200 OK** |
-| `GET` | `/evaluations/benchmark` | Retrieve agent evaluation benchmarks & scores | **200 OK** |
-| `GET` | `/langfuse/generations` | Query LLM generations, latencies & costs | **200 OK** |
-| `GET` | `/auth/token-info` | Validate Keycloak OIDC token & claims | **200 OK** |
-| `GET` | `/vault/lease-status` | Inspect HashiCorp Vault dynamic lease status | **200 OK** |
-| `GET` | `/storage/presigned-url` | Generate HMAC-signed S3 pre-signed download/upload URL | **200 OK** |
-| `GET` | `/billing/usage` | Inspect tenant usage ledger & quota consumption | **200 OK** |
-| `GET` | `/analytics/funnels` | Retrieve 8-stage SaaS conversion funnel metrics | **200 OK** |
-| `GET` | `/events/replay` | Replay historical events from NATS JetStream | **200 OK** |
-| `POST` | `/telemetry/span` | Record an OpenTelemetry span with 9-stage correlation | **200 OK** |
-| `POST` | `/evaluations/run` | Execute an agent evaluation suite across 7 dimensions | **200 OK** |
-| `POST` | `/langfuse/trace` | Ingest LLM prompt generation trace into Langfuse engine | **200 OK** |
-| `POST` | `/auth/validate` | Authenticate bearer token and provision JIT identity | **200 OK** |
-| `POST` | `/openfga/check` | Perform fine-grained ReBAC relationship check | **200 OK** |
-| `POST` | `/vault/request-lease` | Request dynamic scoped credential lease from Vault | **200 OK** |
-| `POST` | `/storage/upload` | Ingest large binary artifact into MinIO / S3 storage | **200 OK** |
-| `POST` | `/billing/meter` | Record metered resource usage into billing ledger | **200 OK** |
-| `POST` | `/analytics/event` | Track product analytics event with PII scrubbing | **200 OK** |
-| `POST` | `/events/publish` | Publish event to persistent NATS JetStream topic | **200 OK** |
+| `GET` | `/api/telemetry/spans` | Inspect distributed trace details & span graph | **200 OK** |
+| `GET` | `/api/telemetry/metrics` | Export metrics in Prometheus exposition format | **200 OK** |
+| `GET` | `/api/evaluations/reports` | Retrieve agent evaluation benchmarks & scores | **200 OK** |
+| `GET` | `/api/langfuse/generations` | Query LLM generations, latencies & costs | **200 OK** |
+| `GET` | `/api/langfuse/analytics` | LLM observability analytics and token consumption | **200 OK** |
+| `GET` | `/api/openfga/relations` | Evaluate ReBAC relationship tuples | **200 OK** |
+| `GET` | `/api/vault/leases` | Inspect HashiCorp Vault dynamic lease status | **200 OK** |
+| `GET` | `/api/storage/presigned` | Generate HMAC-signed S3 pre-signed download/upload URL | **200 OK** |
+| `GET` | `/api/billing/usage` | Inspect tenant usage ledger & quota consumption | **200 OK** |
+| `GET` | `/api/events/replay` | Replay historical events from NATS JetStream | **200 OK** |
+| `POST` | `/api/telemetry/spans` | Record an OpenTelemetry span with 9-stage correlation | **200 OK** |
+| `POST` | `/api/evaluations/run` | Execute an agent evaluation suite across 7 dimensions | **200 OK** |
+| `POST` | `/api/evaluations/cases` | Register benchmark test cases | **200 OK** |
+| `POST` | `/api/langfuse/generations` | Ingest LLM prompt generation trace into Langfuse engine | **200 OK** |
+| `POST` | `/api/openfga/check` | Perform fine-grained ReBAC relationship check | **200 OK** |
+| `POST` | `/api/vault/leases` | Request dynamic scoped credential lease from Vault | **200 OK** |
+| `POST` | `/api/vault/revoke` | Revoke active dynamic credential leases instantly | **200 OK** |
+| `POST` | `/api/keycloak/validate` | Authenticate bearer token and provision JIT identity | **200 OK** |
+| `POST` | `/api/events/publish` | Publish event to persistent NATS JetStream topic | **200 OK** |
+| `POST` | `/api/billing/record` | Record metered resource usage into billing ledger | **200 OK** |
+| `POST` | `/api/billing/upgrade` | Upgrade tenant tier entitlement plan | **200 OK** |
+| `POST` | `/api/posthog/events` | Track product analytics event with PII scrubbing | **200 OK** |
+| `POST` | `/api/posthog/funnels` | Calculate 8-stage SaaS conversion funnel | **200 OK** |
+| `POST` | `/api/storage/upload` | Ingest large binary artifact into MinIO / S3 storage | **200 OK** |
 
 ---
 

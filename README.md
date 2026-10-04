@@ -569,16 +569,16 @@ ZONATA integrates 15 production-grade technologies, subordinate to ZONATA Sovere
 15. **Supply-Chain Security & SBOM:** Cryptographically signed Software Bill of Materials (SBOM), package checksum verification, tool quarantine, and vulnerability provenance tracking.
 
 ### New API Endpoints (`api_server.py`)
-- `GET /telemetry/trace`, `POST /telemetry/span`, `GET /telemetry/metrics`
-- `GET /evaluations/benchmark`, `POST /evaluations/run`
-- `GET /langfuse/generations`, `POST /langfuse/trace`
-- `GET /auth/token-info`, `POST /auth/validate`
-- `POST /openfga/check`
-- `GET /vault/lease-status`, `POST /vault/request-lease`
-- `GET /storage/presigned-url`, `POST /storage/upload`
-- `GET /billing/usage`, `POST /billing/meter`
-- `GET /analytics/funnels`, `POST /analytics/event`
-- `GET /events/replay`, `POST /events/publish`
+- **OpenTelemetry:** `GET /api/telemetry/spans`, `POST /api/telemetry/spans`, `GET /api/telemetry/metrics`
+- **Agent Evaluations:** `GET /api/evaluations/reports`, `POST /api/evaluations/run`, `POST /api/evaluations/cases`
+- **Langfuse LLM Observability:** `GET /api/langfuse/generations`, `POST /api/langfuse/generations`, `GET /api/langfuse/analytics`, `POST /api/langfuse/prompts`
+- **OpenFGA ReBAC:** `GET /api/openfga/relations`, `POST /api/openfga/tuples`, `POST /api/openfga/check`
+- **HashiCorp Vault Broker:** `GET /api/vault/leases`, `POST /api/vault/leases`, `POST /api/vault/revoke`
+- **Keycloak IdP:** `POST /api/keycloak/validate`, `POST /api/keycloak/revoke`
+- **NATS JetStream:** `GET /api/events/replay`, `POST /api/events/publish`
+- **SaaS Billing & Metering:** `GET /api/billing/usage`, `POST /api/billing/record`, `POST /api/billing/upgrade`
+- **PostHog SaaS Analytics:** `POST /api/posthog/events`, `POST /api/posthog/feature-flags`, `POST /api/posthog/funnels`
+- **MinIO / S3 Storage:** `GET /api/storage/presigned`, `POST /api/storage/upload`
 
 
 
