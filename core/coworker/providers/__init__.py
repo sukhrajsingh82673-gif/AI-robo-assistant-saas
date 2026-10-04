@@ -15,6 +15,8 @@ from .rpa_providers import RobocorpProvider, OpenRPAProvider
 from .api_mcp_provider import APIMCPProvider
 from .terminal_provider import TerminalProvider
 from .openclaw_provider import OpenClawWebProvider
+from .web_scraping_family import WebScrapingFamilyProvider
+from .computer_use_open_source import ComputerUseOpenSourceRouter
 
 __all__ = [
     "OpenAdaptProvider",
@@ -30,6 +32,9 @@ __all__ = [
     "OpenRPAProvider",
     "APIMCPProvider",
     "TerminalProvider",
-    "OpenClawWebProvider"
+    "OpenClawWebProvider",
+    "WebScrapingFamilyProvider",
+    "ComputerUseOpenSourceRouter"
 ]
+
 

@@ -13,7 +13,8 @@ from .providers import (
     ComputerUseMCPProvider, PlaywrightProvider,
     RobocorpProvider, OpenRPAProvider, APIMCPProvider,
     AgentSProvider, UITARSProvider, TerminalProvider,
-    OpenClawWebProvider
+    OpenClawWebProvider, WebScrapingFamilyProvider,
+    ComputerUseOpenSourceRouter
 )
 
 class ProviderRegistry:
@@ -29,6 +30,8 @@ class ProviderRegistry:
             APIMCPProvider(),
             TerminalProvider(),
             OpenClawWebProvider(),
+            WebScrapingFamilyProvider(),
+            ComputerUseOpenSourceRouter(),
             PlaywrightProvider(),
             OpenAdaptProvider(),
             LinuxDesktopProvider(),
@@ -40,6 +43,7 @@ class ProviderRegistry:
             AgentSProvider(),
             UITARSProvider()
         ]
+
         for p in providers:
             self.register(p)
 

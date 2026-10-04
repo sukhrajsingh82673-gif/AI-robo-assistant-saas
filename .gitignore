@@ -49,3 +49,4 @@ storage/voice_output/
 storage/terminal_backups/
 storage/soak_telemetry.json
 *.bundle
+supplier_evaluation_report.json

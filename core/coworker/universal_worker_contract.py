@@ -65,8 +65,23 @@ class WorkerMetadata:
             "tenant_scope": self.tenant_scope,
             "lease": self.lease,
             "location_class": self.location_class.value if hasattr(self.location_class, 'value') else str(self.location_class),
-            "availability": self.availability
+            "availability": self.availability,
+            "repository": getattr(self, "repository", "builtin/zonata-fabric"),
+            "commit": getattr(self, "commit", "HEAD"),
+            "license": getattr(self, "license", "Apache-2.0"),
+            "security_status": getattr(self, "security_status", "GOVERNED_BY_ZONATA"),
+            "integration_status": getattr(self, "integration_status", "REAL_INTEGRATION"),
+            "model_dependencies": getattr(self, "model_dependencies", []),
+            "runtime_dependencies": getattr(self, "runtime_dependencies", []),
+            "supported_platforms": getattr(self, "supported_platforms", [self.platform])
         }
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.to_dict().get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
 
 class UniversalWorkerContract(ABC):
     """

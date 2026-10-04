@@ -76,9 +76,14 @@ class AICeoCoworkerBridge:
     verifies deliverables independently, and seals cryptographic proof into the corporate ledger.
     """
 
-    def __init__(self, coworker_engine: Any):
-        self.engine = coworker_engine
-        self.tenant_id = getattr(coworker_engine, "tenant_id", "tnt_primary")
+    def __init__(self, coworker_engine: Any = None, tenant_id: str = "tnt_primary"):
+        if coworker_engine is None:
+            from .engine import UniversalCoworkerEngine
+            self.engine = UniversalCoworkerEngine(tenant_id=tenant_id)
+        else:
+            self.engine = coworker_engine
+        self.tenant_id = getattr(self.engine, "tenant_id", tenant_id)
+
 
     def execute_ceo_mission(self, req: AICeoMissionRequest) -> AICeoMissionResponse:
         """

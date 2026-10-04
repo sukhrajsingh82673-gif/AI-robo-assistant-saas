@@ -988,7 +988,97 @@ class CapabilityRegistry:
             evidence_requirements=["test_report_hash", "git_commit_sha"]
         ))
 
+        # Web Scraping & Crawling Family (20 Canonical Operations)
+        scraping_ops = [
+            ("HTTP_FETCH", "HTTP Fetch Request", RiskLevel.LOW),
+            ("HTML_PARSE", "Resilient HTML Parsing", RiskLevel.LOW),
+            ("STRUCTURED_EXTRACTION", "Structured Schema & Entity Extraction", RiskLevel.LOW),
+            ("LINK_DISCOVERY", "Deep Link Discovery", RiskLevel.LOW),
+            ("CRAWLING", "Multi-Page Breadth-First Crawling", RiskLevel.LOW),
+            ("PAGINATION", "Automated Pagination Handling", RiskLevel.LOW),
+            ("TABLE_EXTRACTION", "HTML Table & Matrix Extraction", RiskLevel.LOW),
+            ("DEDUPLICATION", "Content & URL Deduplication", RiskLevel.LOW),
+            ("RATE_LIMITING", "Domain Politeness Rate Limiting", RiskLevel.LOW),
+            ("SOURCE_PROVENANCE", "Cryptographic Provenance Attestation", RiskLevel.LOW),
+            ("SESSION_COOKIE_HANDLING", "Cookie Jar & Session Management", RiskLevel.LOW),
+            ("HEADER_USER_AGENT_ROTATION", "User Agent & Header Rotation", RiskLevel.LOW),
+            ("JAVASCRIPT_RENDER_DISPATCH", "Remote Browser JS Render Dispatch", RiskLevel.MEDIUM),
+            ("PDF_DOCUMENT_EXTRACTION", "PDF Document Stream Extraction", RiskLevel.LOW),
+            ("MEDIA_ASSET_HARVESTING", "Media Asset Discovery & Harvesting", RiskLevel.LOW),
+            ("SITEMAP_INDEXING", "XML Sitemap Traversal & Indexing", RiskLevel.LOW),
+            ("ROBOTS_TXT_COMPLIANCE", "Robots.txt Policy Compliance Check", RiskLevel.LOW),
+            ("PROXY_ROUTING", "Egress Proxy Routing", RiskLevel.LOW),
+            ("ANTI_BOT_CHALLENGE_DETECTION", "Anti-Bot Challenge Fingerprint Detection", RiskLevel.LOW),
+            ("MERKLE_CONTENT_HASHING", "Merkle Tree Content Hashing & Root Proof", RiskLevel.LOW)
+        ]
+        for cap_id, cap_name, r_level in scraping_ops:
+            self.register(CapabilityDefinition(
+                capability_id=cap_id,
+                name=cap_name,
+                description=f"Governed web scraping operation: {cap_name}",
+                category=CapabilityCategory.BROWSER,
+                providers=["provider_web_scraping_family", "provider_openclaw"],
+                preferred_provider="provider_web_scraping_family",
+                fallback_providers=["provider_openclaw", "provider_playwright"],
+                supported_platforms=["linux", "windows", "darwin"],
+                platforms=["linux", "windows", "darwin"],
+                risk_level=r_level,
+                requires_authorization=False,
+                requires_human_approval=False,
+                requires_verification=True,
+                supports_rollback=False,
+                supports_dry_run=True,
+                cost_class=CostClass.LOW,
+                latency_class=LatencyClass.FAST,
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+                health_status=ProviderHealthStatus.AVAILABLE,
+                qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED
+            ))
+
+        # Open-Source Computer-Use & GUI Router Operations
+        gui_ops = [
+            ("MOUSE_CLICK", "Governed Mouse Click", RiskLevel.MEDIUM),
+            ("MOUSE_DOUBLE_CLICK", "Governed Double Click", RiskLevel.MEDIUM),
+            ("MOUSE_RIGHT_CLICK", "Governed Right Click", RiskLevel.MEDIUM),
+            ("MOUSE_DRAG", "Governed Drag and Drop", RiskLevel.MEDIUM),
+            ("MOUSE_MOVE", "Governed Mouse Move", RiskLevel.LOW),
+            ("KEYBOARD_TYPE", "Governed Text Keystroke Entry", RiskLevel.MEDIUM),
+            ("KEYBOARD_HOTKEY", "Governed Keyboard Shortcut", RiskLevel.MEDIUM),
+            ("CAPTURE_SCREENSHOT", "Visual Screen Capture", RiskLevel.LOW),
+            ("VISUAL_GROUNDING", "UI-TARS / Agent-S Visual Grounding", RiskLevel.LOW),
+            ("ACTIVE_WINDOW_INSPECT", "Window State & Accessibility Inspection", RiskLevel.LOW),
+            ("APPLICATION_LAUNCH", "Launch Host Application", RiskLevel.MEDIUM),
+            ("GUI_MACRO_PLAYBACK", "OpenAdapt Macro Playback", RiskLevel.MEDIUM),
+            ("HUMAN_TAKEOVER_TRANSFER", "Transfer Control to Human Operator", RiskLevel.HIGH)
+        ]
+        for cap_id, cap_name, r_level in gui_ops:
+            self.register(CapabilityDefinition(
+                capability_id=cap_id,
+                name=cap_name,
+                description=f"Governed GUI automation: {cap_name}",
+                category=CapabilityCategory.DESKTOP,
+                providers=["provider_computer_use_router", "provider_agent_s", "provider_ui_tars", "provider_openadapt", "provider_linux_desktop"],
+                preferred_provider="provider_computer_use_router",
+                fallback_providers=["provider_agent_s", "provider_ui_tars", "provider_openadapt"],
+                supported_platforms=["linux", "windows", "darwin"],
+                platforms=["linux", "windows", "darwin"],
+                risk_level=r_level,
+                requires_authorization=True,
+                requires_human_approval=(r_level == RiskLevel.HIGH),
+                requires_verification=True,
+                supports_rollback=False,
+                supports_dry_run=True,
+                cost_class=CostClass.LOW,
+                latency_class=LatencyClass.FAST,
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+                health_status=ProviderHealthStatus.AVAILABLE,
+                qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED
+            ))
+
     def register(self, definition: CapabilityDefinition):
+
         self._registry[definition.capability_id] = definition
 
     def get_capability(self, capability_id: str) -> Optional[CapabilityDefinition]:

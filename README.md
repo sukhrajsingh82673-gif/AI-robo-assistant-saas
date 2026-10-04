@@ -89,22 +89,55 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Non-Negotiable Invariant**: `TASK_SUCCESS != BUSINESS_OUTCOME`.
 - Completing a task or launching a campaign is NOT business success. Revenue is only credited when verified transaction evidence is presented.
 
-### 8. Governed Multi-Agent Workforce (Agency Swarm — Project 01)
+### 8. ZONATA Universal AI Co-Worker Execution Fabric
+- **The Brain ↔ Hands Invariant**:
+  - **AI CEO = Brain**: Decides strategy, priorities, business goals, and budgets (WHAT & WHY).
+  - **Universal Co-Worker = Hands / Body**: Discovers capabilities, selects tools, writes code, controls terminals, operates browsers, automates GUIs, recovers from crashes, and generates empirical physical evidence (HOW & WHERE).
+- **Universal Worker Contract**:
+  - Implements the authoritative 14 lifecycle methods (`discover_capabilities`, `health`, `prepare`, `authorize`, `execute`, `observe`, `pause`, `resume`, `cancel`, `take_control`, `release_control`, `verify`, `recover`, `shutdown`).
+  - Standardizes the 16-field metadata specification across local runtimes and distributed fleet nodes.
+- **Governed Terminal Execution Backbone**:
+  - High-speed interactive PTY shell with real-time process monitoring, argument sanitization, command allowlisting, execution timeout bounds, and read-after-write disk verification.
+- **Web Scraping & Crawling Capability Family (20 Canonical Operations)**:
+  - Complete native harvesting stack: `HTTP_FETCH`, `HTML_PARSE`, `STRUCTURED_EXTRACTION`, `LINK_DISCOVERY`, `CRAWLING`, `PAGINATION`, `TABLE_EXTRACTION`, `DEDUPLICATION`, `RATE_LIMITING`, `SOURCE_PROVENANCE`, `SESSION_COOKIE_HANDLING`, `HEADER_USER_AGENT_ROTATION`, `JAVASCRIPT_RENDER_DISPATCH`, `PDF_DOCUMENT_EXTRACTION`, `MEDIA_ASSET_HARVESTING`, `SITEMAP_INDEXING`, `ROBOTS_TXT_COMPLIANCE`, `PROXY_ROUTING`, `ANTI_BOT_CHALLENGE_DETECTION`, and `MERKLE_CONTENT_HASHING`.
+- **Open-Source Computer-Use & GUI Router**:
+  - Governed routing across **Agent-S** (hierarchical subgoal planning), **UI-TARS** (vision-language bounding-box grounding), **OpenAdapt** (macro replay & PII scrubbing), and native OS accessibility APIs.
+  - **Zero-Mock Standard**: Headless Linux environments without physical display servers truthfully quarantine physical GUI clicks to `READY_FOR_REMOTE_NODE`.
+- **Durable 24/7/72-Hour Execution Engine**:
+  - Crash-resilient SQLite state checkpointing with deterministic Merkle integrity proofs.
+  - Cryptographic HMAC-signed execution leases with active heartbeats, automatic expiration, and orphaned lease sweeps.
+  - Event-sourced state recovery resuming execution from the last certified checkpoint.
+  - **72-Hour Soak Harness**: Empirically qualified across accelerated 6h, 24h, and 72h operational lifecycles with injected crash survival.
+- **Deliberate Failure Injection & Mutation Quarantine**:
+  - Ambiguous mutation failures (e.g. gateway timeouts during external writes) **NEVER blind-retry**. They quarantine into `UNCERTAIN` and trigger mandatory `RECONCILIATION_REQUIRED`.
+- **Distributed Multi-Platform Fleet & One-Line Bootstrap**:
+  - Dedicated worker protocols for **Windows** (UIA), **macOS** (AppleScript/AX), **GPU/VLM** (CUDA), and **Android Edge** (ADB/Termux).
+  - One-line self-provisioning command:
+    ```bash
+    curl -s http://<ZONATA_HOST>:8080/api/coworker/nodes/bootstrap.py | python3 - --server http://<ZONATA_HOST>:8080 --tenant tnt_primary
+    ```
+- **Supply Chain Governance & Registries**:
+  - Audited in [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md) (SPDX licenses, upstream commits, CVE history, sandbox confinement).
+  - 5-Level Qualification Standard documented in [`ZONATA_PROVIDER_REGISTRY.md`](./ZONATA_PROVIDER_REGISTRY.md).
+  - Authoritative 34-section qualification report in [`docs/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md`](./docs/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md).
+
+
+### 9. Governed Multi-Agent Workforce (Agency Swarm — Project 01)
 - **Hierarchical Swarms**: AI CEO delegating to Agency Swarm specialist squads (Operations, Finance, Engineering) with directional role communication graphs.
 - **Directional Communication & Shared Instruction Firewalls**: Strict governance preventing cross-agent authority leaks.
 
-### 9. Stateful Agent Identity & Long-Horizon Memory (Letta — Project 02)
+### 10. Stateful Agent Identity & Long-Horizon Memory (Letta — Project 02)
 - **Hierarchical Memory**: Block memory (`persona`, `human`), contextual Archival Memory, Recall Memory buffer.
 - **Zero-Secret Persistence Invariant**: Automated secret scanning blocking API keys, tokens, and credentials from persisting into memory blocks.
 
-### 10. Governed Multimodal Capability Layer (HAL AI — Project 03)
+### 11. Governed Multimodal Capability Layer (HAL AI — Project 03)
 - **16 Multimodal Capability Families**: `VISION`, `AUDIO_INPUT`, `SPEECH_TO_TEXT`, `TEXT_TO_SPEECH`, `SCREEN_OBSERVATION`, `SCREENSHOT`, `APPLICATION_CONTROL`, `FILE_ACCESS`, `CLIPBOARD`, `LOCAL_COMMAND`, `WEB_ACCESS`, `KNOWLEDGE`, `MEMORY`, `ARTIFACT`, `BACKGROUND_TASK`, `MCP`.
 - **19-State Governed Lifecycle Machine**: Tracking states from `IDLE`, `LISTENING`, `OBSERVING`, through `WAITING_FOR_APPROVAL`, `HOST_TAKEOVER`, to `COMPLETED` and `RECONCILING`.
 - **Governed MCP Gateway**: PolicyEngine gating all external MCP invocations (Cursor, Claude Code, Windsurf) with tenant/company isolation.
 - **Authoritative STOP KillSwitch & Host Takeover**: Instant halt of autonomous mutations upon user intervention.
 - **Epistemic Observation vs Evidence Ledger**: Strict invariant that `Observation != Truth` and `Screenshot != Business Success`.
 
-### 11. Governed Durable Workflow Runtime (LangGraph — Project 04)
+### 12. Governed Durable Workflow Runtime (LangGraph — Project 04)
 - **StateGraph Compilation & Hashing**: Compile workflow state graphs with deterministic nodes, agentic steps, conditional branches, cycles, and SHA-256 graph definition hashing.
 - **Zero-Secret Thread Checkpointer**: Thread-scoped durable persistence in SQLite with automated secret scrubbing (`SecretScanner`), state digests, and parent lineage tracking.
 - **Pregel Step Loop & Execution Invariants**: Step-by-step superstep execution with strict budget control, bounded loop iteration ceilings (`max_iterations`), and killswitch enforcement.
@@ -112,7 +145,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Resilient Recovery & Reconciliation**: Classification into safe idempotent retries, non-idempotent blocks, and state reconciliation for ambiguous external outcomes.
 - **Deep System Integrations**: Seamless orchestration connecting AI CEO, Agency Swarm multi-agent delegations, Letta persistent identity memory, and HAL multimodal perception.
 
-### 12. Governed Agent Interoperability Layer (A2A Protocol v1.0 — Project 05)
+### 13. Governed Agent Interoperability Layer (A2A Protocol v1.0 — Project 05)
 - **A2A v1.0 / v1.0.1 Standard Compliance**: Implements Linux Foundation A2A specification with JSON-RPC 2.0 bindings, standard `SendMessage`, `GetTask`, `CancelTask`, and `ReconcileAmbiguousTask`.
 - **Untrusted Agent Card Sanitization & SSRF Defense**: Comprehensive schema validation, HTML/script stripping, prompt injection pattern matching, and CIDR/loopback/cloud-metadata blocking (`169.254.169.254`).
 - **Cryptographic Trust Hierarchy & Reputation Tracking**: 8-tier trust model (`UNKNOWN`, `DISCOVERED`, `VALIDATED`, `IDENTITY_VERIFIED`, `TRUSTED`, `RESTRICTED`, `SUSPENDED`, `BLOCKED`) with explainable reputation metrics and automated trust decay.
@@ -120,7 +153,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Quarantined Artifact Exchange**: Incoming file quarantine, dangerous executable extension blocking (`.sh`, `.exe`, `.bat`), and SHA-256 integrity digest verification.
 - **Subsystem Bridges & Scenarios A–J**: Dedicated bridges for AI CEO, Agency Swarm squads, Letta long-term memory isolation, and HAL multimodal asset exchange across 10 canonical operational scenarios.
 
-### 13. Governed Tool & System Interoperability Layer (Model Context Protocol / MCP — Project 06)
+### 14. Governed Tool & System Interoperability Layer (Model Context Protocol / MCP — Project 06)
 - **Standard Compliance**: Implements the official Model Context Protocol (MCP) 2026-07-28 specification with normative stateless protocol core, JSON-RPC 2.0 bindings, Streamable HTTP transport, and stdio subprocess execution.
 - **Architectural Separation**: Strict distinction permanently preserved: `A2A = Agent ↔ Agent` (Project 05) vs `MCP = Agent ↔ Tool / Data / System` (Project 06, governing CRM, ERP, PMS, databases, files, and SaaS).
 - **15-Stage Governed Tool Invocation Pipeline**: Pre-execution validation (`DISCOVERED` → `VALIDATED` → `TRUSTED`), multi-scope KillSwitch check (global, tenant, company, server, tool, agent), SSRF/cloud-metadata inspection, argument data minimization, JIT credential injection, PolicyEngine evaluation, Authority Gateway check, ApprovalEngine escalation, Merkle Evidence Ledger sealing, and independent physical reality verification.
@@ -128,7 +161,7 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Bi-Directional Interoperability**: Acts as both a governed MCP Client (consuming external enterprise MCP servers) and an inbound governed MCP Server (`/mcp` endpoint) exposing curated, policy-filtered ZONATA capabilities to external clients (Claude Desktop, Cursor, IDEs).
 - **Dedicated Web Cockpit**: Fully interactive MCP Network Workspace (`web/mcp_workspace.js`) with KPI metrics, server health & lifecycle controls, schema inspectors, administrator overrides, audit logs, and one-click Section 73 Canonical Acceptance Test execution.
 
-### 14. Governed Agent Execution Runtime (OpenHands — Project 07)
+### 15. Governed Agent Execution Runtime (OpenHands — Project 07)
 - **Execution Engine Layer**: Integrates OpenHands Software Agent SDK and Agent Server architectural patterns as a governed execution runtime beneath ZONATA's existing AI CEO → Agency Swarm → TaskMaker → LangGraph hierarchy.
 - **Architectural Distinction**: Preserves clean boundary:
   - `A2A = Agent ↔ Agent` (Project 05, agent interoperability)
@@ -139,7 +172,8 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
 - **Subsystem Bridges & Canonical Verification Scenarios**: Dedicated bidirectional bridges for AI CEO (autonomous engineering missions), Agency Swarm squads, Letta stateful memory, LangGraph durable workflow nodes, and governed MCP tools. Canonical test suite covers Software Task, MCP + OpenHands, Human Approval, Multi-Scope KillSwitch, Malicious Repo Prompt Injection defense, Non-idempotent Mutation Reconciliation, Multi-Tenant Workspace Isolation, Self-Improvement branch protection, and Section 79 Grand Acceptance Scenario.
 - **Dedicated Web Cockpit**: Fully interactive Agent Execution Cockpit (`web/openhands_workspace.js`) with KPI metrics, Execution history, Workspace inspector, Artifacts viewer with SHA-256 digests, Security Center, and Live Canonical Scenario Runner.
 
-### 15. Governed Autonomous Browser & Web-Computer Execution Layer (Browser Use — Project 08)
+### 16. Governed Autonomous Browser & Web-Computer Execution Layer (Browser Use — Project 08)
+
 - **Real-Browser Automation Engine**: Integrates Browser Use (`browser-use/browser-use`) architectural patterns as a governed web interaction runtime beneath ZONATA's existing AI CEO → Agency Swarm → TaskMaker → LangGraph hierarchy.
 - **Architectural Separation**: Clean boundaries permanently preserved across the 4 execution layers:
   - `A2A = Agent ↔ Agent` (Project 05, agent-to-agent interoperability)

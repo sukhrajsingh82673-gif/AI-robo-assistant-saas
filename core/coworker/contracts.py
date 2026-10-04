@@ -127,12 +127,14 @@ class VerificationStatus(str, Enum):
 class SupervisedControlMode(str, Enum):
     AI_CONTROL = "AI_CONTROL"
     HUMAN_CONTROL = "HUMAN_CONTROL"
+    HUMAN_TAKEOVER = "HUMAN_TAKEOVER"
     PAUSED = "PAUSED"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
     AUTH_REQUIRED = "AUTH_REQUIRED"
     VERIFYING = "VERIFYING"
     FAILED = "FAILED"
     RECOVERING = "RECOVERING"
+
 
 @dataclass
 class CapabilityDefinition:

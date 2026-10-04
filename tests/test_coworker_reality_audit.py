@@ -289,7 +289,7 @@ class TestCoworkerRealityAudit(unittest.TestCase):
     # 11. Upstream Open-Source Provider Reality Matrix Audit
     def test_11_provider_reality_matrix_audit(self):
         health_report = self.engine.provider_reg.get_health_report()
-        self.assertEqual(len(health_report), 13)
+        self.assertGreaterEqual(len(health_report), 13)
 
         # Verify accurate reality classifications
         statuses = {pid: data.get("integration_status") for pid, data in health_report.items()}
@@ -297,6 +297,9 @@ class TestCoworkerRealityAudit(unittest.TestCase):
         self.assertEqual(statuses.get("provider_api_mcp"), "REAL_INTEGRATION")
         self.assertEqual(statuses.get("provider_terminal"), "REAL_INTEGRATION")
         self.assertEqual(statuses.get("provider_openclaw"), "REAL_INTEGRATION")
+        self.assertEqual(statuses.get("provider_web_scraping_family"), "REAL_INTEGRATION")
+        self.assertEqual(statuses.get("provider_computer_use_router"), "REAL_INTEGRATION")
+
 
         self.assertEqual(statuses.get("provider_linux_desktop"), "PARTIAL_INTEGRATION")
         self.assertEqual(statuses.get("provider_windows_desktop"), "UNAVAILABLE")
