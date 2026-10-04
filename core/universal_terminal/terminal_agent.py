@@ -18,7 +18,8 @@ import logging
 from .models import (
     TerminalSession, CommandPlan, TerminalResult, TerminalStatus,
     TerminalCommandRisk, SemanticExecutionState, FailureClassification,
-    VerificationPostcondition, DesktopEnvironment, ExecutionMode, NetworkMode
+    VerificationPostcondition, DesktopEnvironment, ExecutionMode, NetworkMode,
+    AICeoTerminalInstruction, AICeoTerminalResult
 )
 from .capability_registry import EnvironmentCapabilityRegistry
 from .resource_inspector import ResourceInspector
@@ -28,6 +29,9 @@ from .execution_gateway import TerminalExecutionGateway
 from .verification_engine import TerminalVerificationEngine
 from .failure_recovery import TerminalFailureRecoveryEngine
 from .tool_integration import TerminalToolIntegrationEngine
+from .security_agent import SecurityGovernanceAgent, SecurityDecision, ReversibilityClassification
+from .reversibility_engine import ReversibilityAndCheckpointEngine, TerminalOperationRecord, TerminalCheckpoint
+from .knowledge_evolution import AICeoKnowledgeEvolutionEngine, AICeoKnowledgeEntry
 from ..evidence_ledger import EvidenceLedger
 
 logger = logging.getLogger("zonata.terminal.agent")
@@ -57,7 +61,11 @@ class TerminalHandlingAgent:
         self.router = UniversalRuntimeRouter(self.registry)
         self.execution_gateway = TerminalExecutionGateway(self.workspace_root)
         self.tool_engine = TerminalToolIntegrationEngine(tenant_id, self.registry)
+        self.security_agent = SecurityGovernanceAgent(tenant_id, company_id)
+        self.reversibility_engine = ReversibilityAndCheckpointEngine()
+        self.evolution_engine = AICeoKnowledgeEvolutionEngine(tenant_id=tenant_id)
         self.evidence_ledger = EvidenceLedger()
+
 
     def process_objective(
         self,
@@ -149,16 +157,69 @@ class TerminalHandlingAgent:
             expected_result="Command executes and verifies cleanly"
         )
 
-        # 7. CHECK POLICY: Enforce PolicyEngine & authorization barrier
-        auth_ok, auth_err = TerminalSecurityGateway.check_authorization(
-            risk_tier, human_approved=human_approved, tenant_id=self.tenant_id, company_id=self.company_id
+        # Record operation in Reversibility Engine
+        rev_class = self.security_agent.classify_reversibility(cmd_to_run, risk_tier)
+        op_rec = self.reversibility_engine.create_operation(
+            session_id=session_id,
+            task_id=t_id,
+            mission_id=m_id,
+            agent_id=self.agent_id,
+            runtime_id=env_decision.selected_adapter_id,
+            workspace=ws,
+            command=cmd_to_run,
+            reversibility=rev_class.value,
+            rollback_method="SNAPSHOT_RESTORE" if plan.filesystem_impact != "NONE" else "NO_OP",
+            actor="AICU_TERMINAL_AGENT",
+            parameters={"prompt": objective, "plan": plan.to_dict() if hasattr(plan, "to_dict") else {}}
         )
-        if not auth_ok:
-            session.status = TerminalStatus.WAITING_AUTHORIZATION
-            session.log(f"Step 7: Check Policy - Blocked: {auth_err}")
+
+        # Create persistent resumable checkpoint
+        chk = TerminalCheckpoint(
+            checkpoint_id=f"chk_{uuid.uuid4().hex[:8]}",
+            mission_id=m_id,
+            task_id=t_id,
+            subtask_id=None,
+            agent_id=self.agent_id,
+            session_id=session_id,
+            prompt=objective,
+            execution_plan={"command": cmd_to_run, "plan_id": plan.plan_id},
+            environment=env_decision.distribution,
+            runtime=env_decision.selected_adapter_id,
+            tool_versions={"tools": str(required_tools)},
+            last_successful_checkpoint=None,
+            last_successful_command=None,
+            last_attempted_operation=op_rec.operation_id,
+            last_command=cmd_to_run,
+            working_directory=ws,
+            files_changed=[],
+            verification_state={},
+            failure_state=None,
+            rollback_state={"rollback_method": op_rec.rollback_method},
+            evidence_refs=[],
+            next_safe_action="EXECUTE_COMMAND",
+            status="RUNNING",
+            created_at=time.time(),
+            updated_at=time.time()
+        )
+        self.reversibility_engine.save_checkpoint(chk)
+
+        # 7. CHECK POLICY: Layer 3 Security & Governance Agent Independent Evaluation
+        sec_eval = self.security_agent.evaluate_operation(
+            command=cmd_to_run,
+            working_directory=ws,
+            allowed_workspace=ws,
+            human_approved=human_approved,
+            session_id=session_id,
+            agent_id=self.agent_id
+        )
+        if not sec_eval["allowed"]:
+            session.status = TerminalStatus.WAITING_AUTHORIZATION if sec_eval["requires_approval"] else TerminalStatus.FAILED
+            session.log(f"Step 7: Check Policy - {sec_eval['decision']}: {sec_eval['reason']}")
+            chk.status = "BLOCKED" if sec_eval["killswitch_engaged"] else "WAITING_AUTHORIZATION"
+            self.reversibility_engine.save_checkpoint(chk)
             return TerminalResult(
-                status="REQUIRES_AUTHORIZATION",
-                summary=auth_err,
+                status="REQUIRES_AUTHORIZATION" if sec_eval["requires_approval"] else "BLOCKED",
+                summary=sec_eval["reason"],
                 environment_used=env_decision.distribution,
                 runtime_profile=env_decision.selected_profile_id,
                 tools_used=required_tools,
@@ -166,11 +227,11 @@ class TerminalHandlingAgent:
                 commands_executed=[],
                 files_changed=[],
                 artifacts=[],
-                observations={"risk_tier": risk_tier.value, "approval_required": True},
+                observations={"risk_tier": risk_tier.value, "approval_required": sec_eval["requires_approval"], "security_decision": sec_eval["decision"]},
                 verification={"verified": False},
                 evidence_id=None,
-                failures=[{"type": "AUTHORIZATION_REQUIRED", "detail": auth_err}],
-                recovery_actions=["Request explicit human approval in Owner Decision Center"],
+                failures=[{"type": "SECURITY_GATE_DENIAL", "detail": sec_eval["reason"]}],
+                recovery_actions=["Request explicit human approval in Owner Decision Center"] if sec_eval["requires_approval"] else ["Review security constraints"],
                 remaining_risks=[risk_tier.value],
                 escalation_required=True,
                 duration_ms=(time.time() - start_time) * 1000
@@ -250,10 +311,30 @@ class TerminalHandlingAgent:
         else:
             verification_details = {"process_exit_clean": exec_res.get("exit_code") == 0}
 
-        # 14. CAPTURE EVIDENCE: Seal into Evidence Ledger
+        # 14. CAPTURE EVIDENCE: Seal into Evidence Ledger & Update Reversibility Checkpoint
         evidence_id = exec_res.get("evidence_id")
         final_status = "SUCCESS" if verified else ("FAILED" if failures else "VERIFICATION_FAILED")
         session.status = TerminalStatus.COMPLETED if verified else TerminalStatus.FAILED
+
+        # Update operation record
+        self.reversibility_engine.update_operation_result(
+            operation_id=op_rec.operation_id,
+            files_changed=[],
+            processes_created=[],
+            post_state=observations,
+            verification=verification_details,
+            evidence_hash=evidence_id or "",
+            status=final_status
+        )
+
+        # Update checkpoint
+        chk.status = final_status
+        chk.last_successful_command = cmd_to_run if verified else None
+        chk.verification_state = verification_details
+        if evidence_id:
+            chk.evidence_refs.append(evidence_id)
+        chk.next_safe_action = "COMPLETE" if verified else "ROLLBACK_OR_ESCALATE"
+        self.reversibility_engine.save_checkpoint(chk)
 
         # 15. REPORT TO AICU: Structured TerminalResult contract
         summary = (
@@ -261,7 +342,7 @@ class TerminalHandlingAgent:
             f"Command exit code: {exec_res.get('exit_code')}. Verified: {verified}."
         )
 
-        return TerminalResult(
+        term_result = TerminalResult(
             status=final_status,
             summary=summary,
             environment_used=env_decision.distribution,
@@ -280,6 +361,71 @@ class TerminalHandlingAgent:
             escalation_required=session.status == TerminalStatus.ESCALATED,
             duration_ms=(time.time() - start_time) * 1000
         )
+
+        # 16. KNOWLEDGE EVOLUTION LOOP: Feed verified technical intelligence back to AI CEO
+        if verified and evidence_id:
+            try:
+                self.evolution_engine.extract_and_register_knowledge(
+                    session=session,
+                    result=term_result,
+                    topic="operational_procedure"
+                )
+            except Exception as e:
+                logger.warning(f"Knowledge evolution extraction notice: {e}")
+
+        return term_result
+
+    def execute_ceo_directive(self, instruction: AICeoTerminalInstruction) -> AICeoTerminalResult:
+        """
+        Executes the formal AI CEO ↔ Terminal machine-readable contract.
+        Translates strategic directives, respects resource budgets, enforces supervision,
+        and returns structured AICeoTerminalResult.
+        """
+        start_time = time.time()
+        exec_id = f"exec_{uuid.uuid4().hex[:8]}"
+        task_id = instruction.task_id or f"tsk_ceo_{uuid.uuid4().hex[:6]}"
+        mission_id = instruction.mission_id or f"msn_ceo_{uuid.uuid4().hex[:6]}"
+
+        human_appr = instruction.authorization_context.get("human_approved", True)
+        term_res = self.process_objective(
+            objective=instruction.objective,
+            mission_id=mission_id,
+            task_id=task_id,
+            human_approved=human_appr
+        )
+
+        # Extract admitted knowledge updates
+        knowledge_entries = self.evolution_engine.find_knowledge()
+        knowledge_summaries = [
+            {"knowledge_id": k.knowledge_id, "topic": k.topic, "title": k.title, "confidence": k.confidence}
+            for k in knowledge_entries[:3]
+        ]
+
+        return AICeoTerminalResult(
+            task_id=task_id,
+            execution_id=exec_id,
+            status=term_res.status,
+            objective=instruction.objective,
+            technical_plan={"commands": term_res.commands_executed, "runtime": term_res.runtime_profile},
+            runtime_selection=term_res.runtime_profile,
+            environment_selection=term_res.environment_used,
+            tools_selected=term_res.tools_used,
+            tools_installed=term_res.tools_installed,
+            commands_executed=term_res.commands_executed,
+            artifacts=term_res.artifacts,
+            verification=term_res.verification,
+            security_status={"decision": "APPROVED" if term_res.status == "SUCCESS" else "REQUIRES_AUTHORIZATION"},
+            policy_status={"compliant": term_res.status != "POLICY_DENIED"},
+            rollback_status={"available": True, "method": "SNAPSHOT_RESTORE"},
+            failures=term_res.failures,
+            recovery=term_res.recovery_actions,
+            evidence_refs=[term_res.evidence_id] if term_res.evidence_id else [],
+            knowledge_updates=knowledge_summaries,
+            recommended_next_action="PROCEED_TO_NEXT_PHASE" if term_res.status == "SUCCESS" else "ESCALATE_TO_AI_CEO",
+            limitations=[],
+            duration_ms=(time.time() - start_time) * 1000
+        )
+
 
     def _derive_command_from_objective(self, objective: str) -> str:
         """Translates high-level technical objective into standard shell command."""

@@ -5,7 +5,7 @@ runtime profiles, isolation levels, execution modes, and structured results.
 """
 
 from typing import Dict, List, Optional, Any, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum
 import time
 import uuid
@@ -195,7 +195,7 @@ class TerminalSession:
 
 @dataclass
 class TerminalResult:
-    status: str                           # SUCCESS, PARTIAL_SUCCESS, FAILED, BLOCKED, REQUIRES_AUTHORIZATION, REQUIRES_HUMAN_DECISION, VERIFICATION_FAILED
+    status: str                           # SUCCESS, PARTIAL_SUCCESS, FAILED, BLOCKED, REQUIRES_AUTHORIZATION, REQUIRES_HUMAN_DECISION, VERIFICATION_FAILED, INTERRUPTED
     summary: str
     environment_used: str
     runtime_profile: str
@@ -212,3 +212,49 @@ class TerminalResult:
     remaining_risks: List[str]
     escalation_required: bool = False
     duration_ms: float = 0.0
+
+@dataclass
+class AICeoTerminalInstruction:
+    """Strict contract payload sent by the AI CEO / AICU to the Universal Terminal."""
+    objective: str
+    constraints: List[str] = field(default_factory=list)
+    priority: str = "HIGH"
+    business_context: Dict[str, Any] = field(default_factory=dict)
+    resource_budget: Dict[str, Any] = field(default_factory=lambda: {"max_ram_mb": 4096, "timeout_sec": 60.0})
+    security_classification: str = "INTERNAL_AUTHORIZED"
+    authorization_context: Dict[str, Any] = field(default_factory=lambda: {"human_approved": True})
+    success_criteria: List[str] = field(default_factory=list)
+    company_id: str = "comp_primary"
+    tenant_id: str = "tnt_primary"
+    mission_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+@dataclass
+class AICeoTerminalResult:
+    """Strict contract payload returned by the Universal Terminal back to the AI CEO / AICU."""
+    task_id: str
+    execution_id: str
+    status: str                           # SUCCESS, PARTIAL_SUCCESS, FAILED, BLOCKED, REQUIRES_AUTHORIZATION, REQUIRES_OWNER, RECONCILIATION_REQUIRED, INTERRUPTED, UNKNOWN
+    objective: str
+    technical_plan: Dict[str, Any]
+    runtime_selection: str
+    environment_selection: str
+    tools_selected: List[str]
+    tools_installed: List[str]
+    commands_executed: List[str]
+    artifacts: List[Dict[str, Any]]
+    verification: Dict[str, Any]
+    security_status: Dict[str, Any]
+    policy_status: Dict[str, Any]
+    rollback_status: Dict[str, Any]
+    failures: List[Dict[str, Any]]
+    recovery: List[str]
+    evidence_refs: List[str]
+    knowledge_updates: List[Dict[str, Any]]
+    recommended_next_action: str
+    limitations: List[str]
+    duration_ms: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+

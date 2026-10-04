@@ -107,7 +107,8 @@ from core.coworker.runtimes.terminal_runtime import TerminalWorkerRuntime, Termi
 from core.universal_terminal import (
     UniversalTerminal, TerminalHandlingAgent, TerminalHealthService,
     ResourceInspector, UniversalRuntimeRouter, CommandPlan,
-    VerificationPostcondition, EnvironmentCapabilityRegistry
+    VerificationPostcondition, EnvironmentCapabilityRegistry,
+    AICeoTerminalInstruction, AICeoTerminalResult
 )
 
 coworker_engine = UniversalCoworkerEngine.get_instance(tenant_id="tnt_primary")
@@ -1241,6 +1242,27 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/terminal/tools":
             tools = universal_terminal.registry.list_tools()
             self._send_json({"tools": tools, "count": len(tools)})
+            return
+
+        elif path == "/api/terminal/checkpoints":
+            session_id = query_params.get("session_id", [None])[0]
+            if session_id:
+                chk = universal_terminal.get_resumable_checkpoint(session_id)
+                self._send_json({"checkpoint": chk})
+            else:
+                self._send_json({"error": "Missing session_id query parameter"}, status=400)
+            return
+
+        elif path == "/api/terminal/knowledge/evolution":
+            topic = query_params.get("topic", [None])[0]
+            entries = universal_terminal.get_evolution_knowledge(topic=topic)
+            self._send_json({"knowledge": entries, "count": len(entries)})
+            return
+
+        elif path == "/api/terminal/tools/sbom":
+            tool_id = query_params.get("tool_id", [None])[0]
+            sbom_entries = universal_terminal.get_sbom(tool_id=tool_id)
+            self._send_json({"sbom": sbom_entries, "count": len(sbom_entries)})
             return
 
 
@@ -3275,6 +3297,46 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             snap_id = req_data.get("snapshot_id", "")
             ok = universal_terminal.execution_gateway.rollback(snap_id)
             self._send_json({"success": ok, "snapshot_id": snap_id})
+            return
+
+        elif path == "/api/terminal/ceo/directive":
+            obj = req_data.get("objective", "")
+            tenant = req_data.get("tenant_id") or "tnt_primary"
+            instruction = AICeoTerminalInstruction(
+                objective=obj,
+                constraints=req_data.get("constraints", []),
+                priority=req_data.get("priority", "HIGH"),
+                business_context=req_data.get("business_context", {}),
+                resource_budget=req_data.get("resource_budget", {"max_ram_mb": 4096, "timeout_sec": 60.0}),
+                security_classification=req_data.get("security_classification", "INTERNAL_AUTHORIZED"),
+                authorization_context=req_data.get("authorization_context", {"human_approved": True}),
+                success_criteria=req_data.get("success_criteria", []),
+                company_id=req_data.get("company_id", "comp_primary"),
+                tenant_id=tenant,
+                mission_id=req_data.get("mission_id"),
+                task_id=req_data.get("task_id")
+            )
+            result = universal_terminal.execute_ceo_directive(instruction)
+            self._send_json(result.to_dict())
+            return
+
+        elif path == "/api/terminal/checkpoints/resume":
+            checkpoint_id = req_data.get("checkpoint_id", "")
+            if not checkpoint_id:
+                self._send_json({"status": "FAILED", "error": "Missing checkpoint_id"}, status=400)
+                return
+            res = universal_terminal.resume_checkpoint(checkpoint_id)
+            self._send_json(res)
+            return
+
+        elif path == "/api/terminal/diagnostics/dossier":
+            operation_id = req_data.get("operation_id", "")
+            error_detail = req_data.get("error_detail")
+            if not operation_id:
+                self._send_json({"error": "Missing operation_id"}, status=400)
+                return
+            dossier = universal_terminal.get_diagnostic_dossier(operation_id, error_detail=error_detail)
+            self._send_json(dossier)
             return
 
 

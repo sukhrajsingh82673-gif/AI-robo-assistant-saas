@@ -238,3 +238,10 @@ class EnvironmentCapabilityRegistry:
         if not prof:
             return False
         return tool_id in prof.preinstalled_tools or tool_id in self._tools_catalog
+
+    def is_installed(self, tool_id: str) -> bool:
+        """Checks if a tool is active, registered, and not quarantined."""
+        tool = self.get_tool(tool_id)
+        if not tool:
+            return False
+        return tool.get("trust") not in ["QUARANTINED", "REVOKED"]

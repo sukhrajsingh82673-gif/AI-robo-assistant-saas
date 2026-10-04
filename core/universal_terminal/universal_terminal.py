@@ -20,7 +20,7 @@ from .models import (
     TerminalSession, CommandPlan, TerminalResult, TerminalStatus,
     TerminalCommandRisk, SemanticExecutionState, FileSnapshot,
     VerificationPostcondition, ProcessInfo, RuntimeProfile, NetworkMode,
-    IsolationLevel, DesktopEnvironment
+    IsolationLevel, DesktopEnvironment, AICeoTerminalInstruction, AICeoTerminalResult
 )
 from .capability_registry import EnvironmentCapabilityRegistry
 from .resource_inspector import ResourceInspector
@@ -55,6 +55,9 @@ class UniversalTerminal:
         self.execution_gateway = TerminalExecutionGateway(self.workspace_root)
         self.tool_engine = TerminalToolIntegrationEngine(tenant_id, self.registry)
         self.agent = TerminalHandlingAgent(tenant_id, company_id, workspace_root=self.workspace_root)
+        self.security_agent = self.agent.security_agent
+        self.reversibility_engine = self.agent.reversibility_engine
+        self.evolution_engine = self.agent.evolution_engine
 
         self._sessions: Dict[str, TerminalSession] = {}
         self._artifacts_dir = os.path.join(self.workspace_root, "storage", "terminal_artifacts")
@@ -340,6 +343,8 @@ class UniversalTerminal:
             raise ValueError(f"Session {session_id} not found")
         return self.execution_gateway.create_snapshot(sess, target_path)
 
+    create_snapshot = snapshot
+
     def rollback(self, session_id: str, snapshot_id: str) -> bool:
         return self.execution_gateway.rollback(snapshot_id)
 
@@ -350,3 +355,51 @@ class UniversalTerminal:
             sess.log("Session destroyed and sandboxes cleared.")
             return True
         return False
+
+    # 23. AI CEO Contract: execute_ceo_directive()
+    def execute_ceo_directive(self, instruction: AICeoTerminalInstruction) -> AICeoTerminalResult:
+        """Executes high-level AI CEO / AICU strategic directives."""
+        return self.agent.execute_ceo_directive(instruction)
+
+    # 24. Exact Failure Recovery Semantics: get_diagnostic_dossier()
+    def get_diagnostic_dossier(self, operation_id: str, error_detail: Optional[str] = None) -> Dict[str, Any]:
+        """Answers all 22 diagnostic questions required by Section 11."""
+        return self.agent.reversibility_engine.generate_diagnostic_dossier(operation_id, error_detail)
+
+    # 25. Checkpoint & Resume
+    def get_resumable_checkpoint(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves latest resumable checkpoint for a session."""
+        chk = self.agent.reversibility_engine.get_latest_session_checkpoint(session_id)
+        return chk.to_dict() if chk else None
+
+    def resume_checkpoint(self, checkpoint_id: str) -> Dict[str, Any]:
+        """Resumes execution from a previously recorded checkpoint."""
+        chk = self.agent.reversibility_engine.get_checkpoint(checkpoint_id)
+        if not chk:
+            return {"status": "FAILED", "error": f"Checkpoint '{checkpoint_id}' not found"}
+
+        # Re-evaluate next safe action
+        logger.info(f"RESUMING EXECUTION from Checkpoint: {checkpoint_id}, Prompt: '{chk.prompt}'")
+        res = self.agent.process_objective(
+            objective=chk.prompt,
+            mission_id=chk.mission_id,
+            task_id=chk.task_id,
+            human_approved=True,
+            custom_workspace=chk.working_directory
+        )
+        return {
+            "status": "RESUMED",
+            "checkpoint_id": checkpoint_id,
+            "execution_result": res.__dict__
+        }
+
+    # 26. Governed Knowledge Evolution Queries
+    def get_evolution_knowledge(self, topic: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Queries verified technical intelligence admitted into AI CEO knowledge base."""
+        entries = self.agent.evolution_engine.find_knowledge(topic=topic)
+        return [e.to_dict() for e in entries]
+
+    # 27. Software Bill of Materials (SBOM) Queries
+    def get_sbom(self, tool_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Queries verified Tool Factory Software Bill of Materials (SBOM) records."""
+        return self.tool_engine.get_sbom(tool_id=tool_id)
