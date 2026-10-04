@@ -233,7 +233,7 @@ class EnvironmentCapabilityRegistry:
     def list_tools(self) -> List[Dict[str, Any]]:
         return list(self._tools_catalog.values())
 
-    def is_tool_available(self, tool_id: str, profile_id: str) -> bool:
+    def is_tool_available(self, tool_id: str, profile_id: str = "profile_linux_dev") -> bool:
         prof = self.get_profile(profile_id)
         if not prof:
             return False

@@ -123,5 +123,64 @@ class TerminalVerificationEngine:
             except Exception as e:
                 return False, str(e), f"Command check error: {str(e)}"
 
+        # 7. FILE_REGEX_MATCH
+        elif c_type == "FILE_REGEX_MATCH":
+            path, pattern = exp if isinstance(exp, (list, tuple)) else (exp, ".*")
+            if not os.path.exists(path):
+                return False, None, f"File {path} does not exist for regex verification."
+            import re
+            try:
+                with open(path, "r", errors="ignore") as f:
+                    content = f.read()
+                matched = bool(re.search(pattern, content))
+                return matched, matched, f"Regex '{pattern}' matched={matched} in {path}"
+            except Exception as e:
+                return False, str(e), f"Regex check error: {str(e)}"
+
+        # 8. DIR_CONTAINS_FILES
+        elif c_type == "DIR_CONTAINS_FILES":
+            directory, expected_files = exp if isinstance(exp, (list, tuple)) else (exp, [])
+            if not os.path.isdir(directory):
+                return False, None, f"Directory {directory} does not exist."
+            actual_files = set(os.listdir(directory))
+            missing = [f for f in expected_files if f not in actual_files]
+            passed = (len(missing) == 0)
+            return passed, list(actual_files)[:10], f"Directory contains required files. Missing={missing}"
+
+        # 9. PROCESS_RUNNING
+        elif c_type == "PROCESS_RUNNING":
+            proc_identifier = str(exp)
+            # Check ps output
+            try:
+                proc = subprocess.run("ps aux", shell=True, capture_output=True, text=True, timeout=5)
+                passed = proc_identifier in proc.stdout
+                return passed, passed, f"Process '{proc_identifier}' running={passed}"
+            except Exception as e:
+                return False, str(e), f"Process check error: {str(e)}"
+
+        # 10. JSON_FIELD_MATCH
+        elif c_type == "JSON_FIELD_MATCH":
+            path, field_name, expected_val = exp
+            if not os.path.exists(path):
+                return False, None, f"File {path} does not exist."
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+                actual_val = data.get(field_name)
+                passed = (actual_val == expected_val)
+                return passed, actual_val, f"JSON field '{field_name}' match={passed} (actual: {actual_val}, expected: {expected_val})"
+            except Exception as e:
+                return False, str(e), f"JSON check error: {str(e)}"
+
+        # 11. NO_FAILING_TESTS
+        elif c_type == "NO_FAILING_TESTS":
+            cmd = str(exp)
+            try:
+                proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+                out = proc.stdout + proc.stderr
+                passed = (proc.returncode == 0) and ("FAILED" not in out) and ("ERROR" not in out)
+                return passed, proc.returncode, f"Test execution returned code={proc.returncode}, clean={passed}"
+            except Exception as e:
+                return False, str(e), f"Test suite run error: {str(e)}"
 
         return False, None, f"Unknown check type: {c_type}"

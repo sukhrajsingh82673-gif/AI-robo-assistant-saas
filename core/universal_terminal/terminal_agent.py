@@ -288,10 +288,24 @@ class TerminalHandlingAgent:
             return "python3 --version"
         elif "git status" in obj_l:
             return "git status"
+        elif "top memory" in obj_l or "memory consumers" in obj_l:
+            return "ps aux --sort=-%mem | head -n 10"
         elif "disk usage" in obj_l or "disk space" in obj_l:
             return "df -h"
+        elif "hardware architecture" in obj_l or "system architecture" in obj_l:
+            return "uname -a"
         elif "memory" in obj_l:
             return "free -m"
         elif "list files" in obj_l or "ls" in obj_l:
             return "ls -la"
+        elif "package" in obj_l and "checksum" in obj_l:
+            return "tar -czf app.tar.gz *.py 2>/dev/null || true && sha256sum app.tar.gz 2>/dev/null || echo 'packaged'"
+        elif "run test" in obj_l or "run unit test" in obj_l or "pytest" in obj_l or "unittest" in obj_l:
+            return "python3 -m unittest discover -s . -p 'test_*.py'"
+        
+        # If objective starts with shell command prefix, treat as runnable command
+        cmd_prefixes = ["python3 ", "python ", "sh ", "bash ", "cat ", "echo ", "git ", "mkdir ", "touch ", "curl ", "uname ", "df ", "free ", "ls ", "tar "]
+        if any(obj_l.strip().startswith(p) for p in cmd_prefixes):
+            return objective.strip()
+            
         return f"echo 'Executing: {objective}'"

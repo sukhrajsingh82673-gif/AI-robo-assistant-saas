@@ -27,7 +27,9 @@ class ResourceInspector:
         cpu_info = cls._get_cpu_info()
         virt_info = cls._get_virtualization_info()
         container_info = cls._get_container_info()
+        display_info = cls._get_display_info()
         load_avg = cls._get_load_average()
+        substrate_matrix = cls._build_substrate_matrix(virt_info, container_info, display_info)
 
         return {
             "timestamp": time.time(),
@@ -40,6 +42,8 @@ class ResourceInspector:
             "disk": disk_info,
             "virtualization": virt_info,
             "containers": container_info,
+            "display": display_info,
+            "substrate_matrix": substrate_matrix,
             "load_average": load_avg,
             "is_resource_constrained": ram_info["total_mb"] < 2048 or disk_info["free_mb"] < 2048
         }
@@ -118,8 +122,59 @@ class ResourceInspector:
         }
 
     @classmethod
+    def _get_display_info(cls) -> Dict[str, Any]:
+        display_env = os.environ.get("DISPLAY")
+        wayland_env = os.environ.get("WAYLAND_DISPLAY")
+        has_xvfb = shutil.which("Xvfb") is not None
+        has_xephyr = shutil.which("Xephyr") is not None
+        has_xdotool = shutil.which("xdotool") is not None
+        has_scrot = shutil.which("scrot") is not None
+        return {
+            "display_env": display_env,
+            "wayland_env": wayland_env,
+            "xvfb_available": has_xvfb,
+            "xephyr_available": has_xephyr,
+            "xdotool_available": has_xdotool,
+            "scrot_available": has_scrot,
+            "virtual_display_supported": has_xvfb or display_env is not None or wayland_env is not None
+        }
+
+    @classmethod
+    def _build_substrate_matrix(cls, virt_info: Dict[str, Any], container_info: Dict[str, Any], display_info: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "host_sandbox": {
+                "available": True,
+                "status": "OPERATIONAL",
+                "isolation": "PROCESS_WORKSPACE"
+            },
+            "container": {
+                "available": container_info.get("rootless_container_supported", False),
+                "status": "OPERATIONAL" if container_info.get("rootless_container_supported", False) else "UNAVAILABLE_FALLBACK_SANDBOX",
+                "isolation": "NAMESPACE_OR_ROOTLESS",
+                "checked_engines": ["docker", "podman", "bubblewrap"]
+            },
+            "micro_vm": {
+                "available": virt_info.get("kvm_available", False),
+                "status": "OPERATIONAL" if virt_info.get("kvm_available", False) else "UNAVAILABLE_NO_KVM",
+                "isolation": "HARDWARE_HYPERVISOR",
+                "device_kvm": os.path.exists("/dev/kvm")
+            },
+            "desktop_gui": {
+                "available": display_info.get("virtual_display_supported", False),
+                "status": "OPERATIONAL" if display_info.get("virtual_display_supported", False) else "HEADLESS_DEGRADED",
+                "isolation": "VIRTUAL_DISPLAY_BUFFER"
+            },
+            "remote_linux": {
+                "available": True,
+                "status": "REQUIRES_ENDPOINT",
+                "isolation": "NETWORK_NODE"
+            }
+        }
+
+    @classmethod
     def _get_load_average(cls) -> List[float]:
         try:
             return list(os.getloadavg())
         except Exception:
             return [0.1, 0.1, 0.1]
+

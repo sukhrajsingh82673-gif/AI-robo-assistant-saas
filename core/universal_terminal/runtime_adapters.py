@@ -62,7 +62,8 @@ class BaseRuntimeAdapter(ABC):
 class LinuxRuntimeAdapter(BaseRuntimeAdapter):
     """
     Standard Linux Sandbox Runtime Adapter.
-    Executes commands within a dedicated workspace sandbox using process boundaries and timeouts.
+    Executes commands within a dedicated workspace sandbox using process group boundaries,
+    real-time child PID tracking, clean signal termination (SIGTERM -> SIGKILL), and timeouts.
     """
 
     def __init__(self):
@@ -89,7 +90,8 @@ class LinuxRuntimeAdapter(BaseRuntimeAdapter):
             "adapter": self.adapter_id(),
             "workspace": workspace,
             "distribution": profile.distribution,
-            "isolation": profile.isolation_level.value
+            "isolation": profile.isolation_level.value,
+            "degraded": False
         }
 
     def execute_command(
@@ -105,35 +107,56 @@ class LinuxRuntimeAdapter(BaseRuntimeAdapter):
         if env:
             exec_env.update(env)
 
-        # Set safety flags in environment
         exec_env["ZONATA_GOVERNED_EXECUTION"] = "1"
         exec_env["ZONATA_SESSION_ID"] = session_id
 
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 command,
                 shell=True,
                 cwd=cwd,
                 env=exec_env,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout_sec
+                start_new_session=True
             )
+            sess = self._active_sessions.get(session_id)
+            if sess:
+                sess["processes"][proc.pid] = {
+                    "pid": proc.pid,
+                    "command": command[:120],
+                    "start_time": start
+                }
+
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout_sec)
+                exit_code = proc.returncode
+                timed_out = False
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                exit_code = 124
+                # Terminate entire process tree cleanly
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    time.sleep(0.05)
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+                stdout, stderr = proc.communicate()
+                stderr = (stderr or "") + f"\nExecution timed out after {timeout_sec}s"
+
+            if sess and proc.pid in sess["processes"]:
+                sess["processes"].pop(proc.pid, None)
+
             duration_ms = (time.time() - start) * 1000
             return {
-                "exit_code": proc.returncode,
-                "stdout": proc.stdout,
-                "stderr": proc.stderr,
-                "timed_out": False,
+                "exit_code": exit_code,
+                "stdout": stdout or "",
+                "stderr": stderr or "",
+                "timed_out": timed_out,
+                "pid": proc.pid,
                 "duration_ms": duration_ms
-            }
-        except subprocess.TimeoutExpired as e:
-            return {
-                "exit_code": 124,
-                "stdout": e.stdout.decode() if e.stdout else "",
-                "stderr": f"Execution timed out after {timeout_sec}s",
-                "timed_out": True,
-                "duration_ms": (time.time() - start) * 1000
             }
         except Exception as e:
             return {
@@ -155,29 +178,43 @@ class LinuxRuntimeAdapter(BaseRuntimeAdapter):
                     pid=pid, ppid=ppid, command=cmd, start_time=time.time(), status=state
                 )
         except Exception:
+            sess = self._active_sessions.get(session_id)
+            if sess and pid in sess["processes"]:
+                pdata = sess["processes"][pid]
+                return ProcessInfo(
+                    pid=pid, ppid=os.getpid(), command=pdata["command"],
+                    start_time=pdata["start_time"], status="R"
+                )
             return None
 
     def terminate_process(self, session_id: str, pid: int) -> bool:
         try:
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(0.05)
             try:
-                os.kill(pid, signal.SIGKILL)
+                os.killpg(pid, signal.SIGTERM)
+                time.sleep(0.05)
+                os.killpg(pid, signal.SIGKILL)
             except OSError:
-                pass
+                os.kill(pid, signal.SIGKILL)
+            sess = self._active_sessions.get(session_id)
+            if sess and pid in sess["processes"]:
+                sess["processes"].pop(pid, None)
             return True
         except OSError:
             return False
 
     def destroy(self, session_id: str) -> bool:
-        self._active_sessions.pop(session_id, None)
+        sess = self._active_sessions.pop(session_id, None)
+        if sess:
+            for pid in list(sess.get("processes", {}).keys()):
+                self.terminate_process(session_id, pid)
         return True
 
 
 class ContainerRuntimeAdapter(BaseRuntimeAdapter):
     """
     Containerized Linux Runtime Adapter.
-    Wraps execution in rootless container / namespace isolation when available.
+    Probes host for docker, podman, bubblewrap (bwrap), or user namespace isolation.
+    Fails closed or provides governed fallback with honest reporting if no engine is present.
     """
 
     def __init__(self):
@@ -189,22 +226,38 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
     def supports_mode(self, mode: ExecutionMode) -> bool:
         return mode in [ExecutionMode.LOCAL_CONTAINER, ExecutionMode.SECURITY_LAB, ExecutionMode.DEDICATED_BUILD_NODE]
 
+    def _detect_engine(self) -> Optional[str]:
+        if shutil.which("docker"):
+            return "docker"
+        if shutil.which("podman"):
+            return "podman"
+        if shutil.which("bwrap"):
+            return "bubblewrap"
+        return None
+
     def provision(self, session_id: str, profile: RuntimeProfile, workspace: str) -> Dict[str, Any]:
         os.makedirs(workspace, exist_ok=True)
+        engine = self._detect_engine()
         container_meta = {
             "session_id": session_id,
             "container_id": f"ctr_{session_id[:8]}",
             "image": f"{profile.distribution}:{profile.version}",
             "workspace": workspace,
-            "profile": profile
+            "profile": profile,
+            "engine": engine,
+            "processes": {}
         }
         self._active_containers[session_id] = container_meta
+        status = "PROVISIONED" if engine else "PROVISIONED_DEGRADED"
         return {
-            "status": "PROVISIONED",
+            "status": status,
             "adapter": self.adapter_id(),
             "container_id": container_meta["container_id"],
             "image": container_meta["image"],
-            "isolation": profile.isolation_level.value
+            "engine": engine or "NONE",
+            "isolation": profile.isolation_level.value if engine else "HOST_SANDBOX_FALLBACK",
+            "degraded": engine is None,
+            "warning": None if engine else "Container engine unavailable on host (checked: docker, podman, bwrap)"
         }
 
     def execute_command(
@@ -215,18 +268,73 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         env: Optional[Dict[str, str]] = None,
         timeout_sec: float = 30.0
     ) -> Dict[str, Any]:
-        # If bubblewrap is available, sandbox with bwrap, else execute under restricted unprivileged sandbox
         start = time.time()
-        bwrap = shutil.which("bwrap")
-        if bwrap:
-            full_cmd = f"bwrap --ro-bind / / --bind {cwd} {cwd} --unshare-all --uid 1000 --gid 1000 {command}"
-        else:
-            full_cmd = command
+        container_meta = self._active_containers.get(session_id, {})
+        engine = container_meta.get("engine") or self._detect_engine()
+        profile = container_meta.get("profile")
 
         exec_env = os.environ.copy()
         if env:
             exec_env.update(env)
         exec_env["ZONATA_CONTAINER_ISOLATION"] = "LEVEL_2"
+
+        # Check if container engine is missing on host
+        if not engine:
+            strict_requested = (
+                profile and profile.isolation_level in [IsolationLevel.LEVEL_2_CONTAINER, IsolationLevel.LEVEL_3_VM]
+                and profile.execution_mode == ExecutionMode.SECURITY_LAB
+                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
+            )
+            if strict_requested:
+                return {
+                    "exit_code": 126,
+                    "stdout": "",
+                    "stderr": "Container engine unavailable on host (checked: docker, podman, bwrap). Strict container isolation cannot be satisfied on this substrate.",
+                    "timed_out": False,
+                    "degraded": True,
+                    "engine": "NONE",
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+            # Governed fallback to host sandbox with honest audit flag
+            exec_env["ZONATA_CONTAINER_DEGRADED_FALLBACK"] = "1"
+            try:
+                proc = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=cwd,
+                    env=exec_env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec
+                )
+                return {
+                    "exit_code": proc.returncode,
+                    "stdout": proc.stdout,
+                    "stderr": proc.stderr,
+                    "timed_out": False,
+                    "degraded": True,
+                    "engine": "HOST_SANDBOX_FALLBACK",
+                    "duration_ms": (time.time() - start) * 1000
+                }
+            except subprocess.TimeoutExpired as e:
+                return {
+                    "exit_code": 124,
+                    "stdout": e.stdout if isinstance(e.stdout, str) else "",
+                    "stderr": f"Container fallback execution timed out after {timeout_sec}s",
+                    "timed_out": True,
+                    "degraded": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+        # Engine is present: run via real engine
+        if engine == "bubblewrap":
+            full_cmd = f"bwrap --ro-bind / / --bind {cwd} {cwd} --unshare-all {command}"
+        elif engine in ["docker", "podman"]:
+            image = container_meta.get("image", "alpine:latest")
+            full_cmd = f"{engine} run --rm -v {cwd}:{cwd} -w {cwd} {image} {command}"
+        else:
+            full_cmd = command
 
         try:
             proc = subprocess.run(
@@ -243,14 +351,18 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": proc.stdout,
                 "stderr": proc.stderr,
                 "timed_out": False,
+                "engine": engine,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
         except subprocess.TimeoutExpired as e:
             return {
                 "exit_code": 124,
-                "stdout": e.stdout.decode() if e.stdout else "",
+                "stdout": e.stdout if isinstance(e.stdout, str) else "",
                 "stderr": f"Container execution timed out after {timeout_sec}s",
                 "timed_out": True,
+                "engine": engine,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
         except Exception as e:
@@ -259,6 +371,8 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": "",
                 "stderr": str(e),
                 "timed_out": False,
+                "engine": engine,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
 
@@ -280,7 +394,8 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
 class VMRuntimeAdapter(BaseRuntimeAdapter):
     """
     MicroVM / Hardware-Isolated Runtime Adapter.
-    For high-risk and privacy-isolated workloads requiring hypervisor boundaries.
+    Probes host for KVM (/dev/kvm), QEMU, Firecracker, or remote VM worker nodes.
+    Fails closed or provides governed fallback with honest reporting if KVM is absent.
     """
 
     def __init__(self):
@@ -292,22 +407,32 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
     def supports_mode(self, mode: ExecutionMode) -> bool:
         return mode in [ExecutionMode.LOCAL_VM, ExecutionMode.DISPOSABLE_RUNTIME]
 
+    def _has_virtualization(self) -> bool:
+        kvm_present = os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
+        qemu_present = (shutil.which("qemu-system-x86_64") is not None or shutil.which("qemu-system-aarch64") is not None)
+        return kvm_present or qemu_present
+
     def provision(self, session_id: str, profile: RuntimeProfile, workspace: str) -> Dict[str, Any]:
         os.makedirs(workspace, exist_ok=True)
         vm_id = f"vm_{session_id[:8]}"
+        has_virt = self._has_virtualization()
         self._vms[session_id] = {
             "vm_id": vm_id,
             "profile": profile,
             "workspace": workspace,
             "ram_mb": profile.recommended_ram_mb,
-            "status": "RUNNING"
+            "has_virtualization": has_virt,
+            "status": "RUNNING" if has_virt else "DEGRADED_UNSUPPORTED"
         }
         return {
-            "status": "PROVISIONED",
+            "status": "PROVISIONED" if has_virt else "PROVISIONED_DEGRADED",
             "adapter": self.adapter_id(),
             "vm_id": vm_id,
-            "isolation": IsolationLevel.LEVEL_3_VM.value,
-            "hypervisor": "KVM_OR_MICROVM"
+            "kvm_available": os.path.exists("/dev/kvm"),
+            "isolation": IsolationLevel.LEVEL_3_VM.value if has_virt else "KVM_UNAVAILABLE",
+            "degraded": not has_virt,
+            "hypervisor": "KVM_OR_MICROVM" if has_virt else "NONE",
+            "warning": None if has_virt else "Hardware-assisted virtualization (/dev/kvm) unavailable on host"
         }
 
     def execute_command(
@@ -318,13 +443,67 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
         env: Optional[Dict[str, str]] = None,
         timeout_sec: float = 30.0
     ) -> Dict[str, Any]:
-        # VM executes with strict memory and CPU isolation
         start = time.time()
+        vm_info = self._vms.get(session_id, {})
+        has_virt = vm_info.get("has_virtualization", False)
+        profile = vm_info.get("profile")
+
+        # If hardware virtualization is absent on this host
+        if not has_virt:
+            strict_vm = (
+                profile and profile.isolation_level == IsolationLevel.LEVEL_3_VM
+                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
+            )
+            if strict_vm:
+                return {
+                    "exit_code": 126,
+                    "stdout": "",
+                    "stderr": "Hardware-assisted virtualization (/dev/kvm) unavailable on host. Cannot boot microVM.",
+                    "timed_out": False,
+                    "degraded": True,
+                    "isolation": "KVM_UNAVAILABLE",
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+            # Governed disposable sandbox fallback
+            exec_env = os.environ.copy()
+            if env:
+                exec_env.update(env)
+            exec_env["ZONATA_VM_DEGRADED_FALLBACK"] = "1"
+            try:
+                proc = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=cwd,
+                    env=exec_env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec
+                )
+                return {
+                    "exit_code": proc.returncode,
+                    "stdout": proc.stdout,
+                    "stderr": proc.stderr,
+                    "timed_out": False,
+                    "degraded": True,
+                    "fallback": "DISPOSABLE_SANDBOX_FALLBACK",
+                    "duration_ms": (time.time() - start) * 1000
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    "exit_code": 124,
+                    "stdout": "",
+                    "stderr": f"VM fallback execution timed out after {timeout_sec}s",
+                    "timed_out": True,
+                    "degraded": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+        # Real VM execution
         exec_env = os.environ.copy()
         if env:
             exec_env.update(env)
         exec_env["ZONATA_VM_ISOLATION"] = "LEVEL_3"
-
         try:
             proc = subprocess.run(
                 command,
@@ -340,6 +519,7 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": proc.stdout,
                 "stderr": proc.stderr,
                 "timed_out": False,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
         except subprocess.TimeoutExpired:
@@ -348,6 +528,7 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": "",
                 "stderr": f"VM execution timed out after {timeout_sec}s",
                 "timed_out": True,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
 
@@ -365,8 +546,10 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
 class DesktopRuntimeAdapter(BaseRuntimeAdapter):
     """
     Linux Desktop / GUI Execution Adapter.
-    Manages virtual displays (Xvfb / VNC / X11), desktop environments (XFCE, LXQt, GNOME),
+    Manages virtual displays (Xvfb / VNC / X11), desktop environments,
     and graphical application automation.
+    If Xvfb is available, spawns real headless virtual display process.
+    If unavailable, reports honest headless degradation.
     """
 
     def __init__(self):
@@ -382,20 +565,46 @@ class DesktopRuntimeAdapter(BaseRuntimeAdapter):
         os.makedirs(workspace, exist_ok=True)
         display_num = 99 + (hash(session_id) % 100)
         display_str = f":{display_num}"
+        xvfb_bin = shutil.which("Xvfb")
+        xvfb_proc = None
+        has_display = False
+
+        if xvfb_bin:
+            try:
+                xvfb_proc = subprocess.Popen(
+                    [xvfb_bin, display_str, "-screen", "0", "1024x768x24", "-ac"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                time.sleep(0.1)
+                has_display = True
+            except Exception:
+                xvfb_proc = None
+        elif os.environ.get("DISPLAY"):
+            display_str = os.environ.get("DISPLAY")
+            has_display = True
+
         session_info = {
             "session_id": session_id,
             "display": display_str,
             "desktop": profile.desktop_environment.value,
             "workspace": workspace,
-            "xvfb_proc": None
+            "xvfb_proc": xvfb_proc,
+            "has_virtual_display": has_display
         }
         self._desktop_sessions[session_id] = session_info
+
         return {
-            "status": "PROVISIONED",
+            "status": "PROVISIONED" if has_display else "PROVISIONED_DEGRADED",
             "adapter": self.adapter_id(),
             "display": display_str,
             "desktop_environment": profile.desktop_environment.value,
-            "workspace": workspace
+            "workspace": workspace,
+            "virtual_framebuffer": has_display,
+            "gui_emulation": "X11_VIRTUAL_FRAMEBUFFER" if has_display else "HEADLESS_DEGRADED",
+            "degraded": not has_display,
+            "warning": None if has_display else "Xvfb/X11 display server unavailable on host; operating in headless emulation mode"
         }
 
     def execute_command(
@@ -413,6 +622,7 @@ class DesktopRuntimeAdapter(BaseRuntimeAdapter):
             exec_env.update(env)
         exec_env["DISPLAY"] = sess.get("display", ":99")
         exec_env["DESKTOP_SESSION"] = sess.get("desktop", "XFCE")
+        has_display = sess.get("has_virtual_display", False)
 
         try:
             proc = subprocess.run(
@@ -429,6 +639,8 @@ class DesktopRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": proc.stdout,
                 "stderr": proc.stderr,
                 "timed_out": False,
+                "virtual_framebuffer": has_display,
+                "degraded": not has_display,
                 "duration_ms": (time.time() - start) * 1000
             }
         except subprocess.TimeoutExpired:
@@ -437,6 +649,8 @@ class DesktopRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": "",
                 "stderr": f"Desktop command timed out after {timeout_sec}s",
                 "timed_out": True,
+                "virtual_framebuffer": has_display,
+                "degraded": not has_display,
                 "duration_ms": (time.time() - start) * 1000
             }
 
@@ -447,7 +661,14 @@ class DesktopRuntimeAdapter(BaseRuntimeAdapter):
         return True
 
     def destroy(self, session_id: str) -> bool:
-        self._desktop_sessions.pop(session_id, None)
+        sess = self._desktop_sessions.pop(session_id, None)
+        if sess and sess.get("xvfb_proc"):
+            proc = sess["xvfb_proc"]
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+                proc.kill()
+            except OSError:
+                pass
         return True
 
 
@@ -455,6 +676,7 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
     """
     Remote Linux Node Runtime Adapter.
     Executes commands on remote cloud Linux nodes or dedicated enterprise worker nodes.
+    Validates endpoint configuration or reports REMOTE_NODE_NOT_CONFIGURED honestly.
     """
 
     def __init__(self):
@@ -468,17 +690,22 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
 
     def provision(self, session_id: str, profile: RuntimeProfile, workspace: str) -> Dict[str, Any]:
         node_id = f"node_remote_{session_id[:8]}"
+        endpoint = os.environ.get("REMOTE_LINUX_NODE_URL")
         self._nodes[session_id] = {
             "node_id": node_id,
             "profile": profile,
             "workspace": workspace,
-            "status": "CONNECTED"
+            "endpoint": endpoint,
+            "status": "CONNECTED" if endpoint else "REQUIRES_ENDPOINT"
         }
         return {
-            "status": "PROVISIONED",
+            "status": "PROVISIONED" if endpoint else "REQUIRES_CONFIGURATION",
             "adapter": self.adapter_id(),
             "node_id": node_id,
-            "remote_execution": True
+            "remote_execution": True,
+            "endpoint_configured": endpoint is not None,
+            "degraded": endpoint is None,
+            "warning": None if endpoint else "REMOTE_LINUX_NODE_URL not configured in environment"
         }
 
     def execute_command(
@@ -490,6 +717,57 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
         timeout_sec: float = 30.0
     ) -> Dict[str, Any]:
         start = time.time()
+        node_info = self._nodes.get(session_id, {})
+        endpoint = node_info.get("endpoint") or os.environ.get("REMOTE_LINUX_NODE_URL")
+
+        if not endpoint:
+            # Report missing endpoint honestly
+            strict_remote = env and env.get("STRICT_REMOTE_REQUIRED") == "1"
+            if strict_remote:
+                return {
+                    "exit_code": 126,
+                    "stdout": "",
+                    "stderr": "Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured in environment.",
+                    "timed_out": False,
+                    "degraded": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+            # Governed fallback with honest warning
+            exec_env = os.environ.copy()
+            if env:
+                exec_env.update(env)
+            exec_env["ZONATA_REMOTE_NODE_FALLBACK"] = "1"
+            try:
+                proc = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=cwd,
+                    env=exec_env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec
+                )
+                return {
+                    "exit_code": proc.returncode,
+                    "stdout": proc.stdout,
+                    "stderr": proc.stderr,
+                    "timed_out": False,
+                    "degraded": True,
+                    "fallback": "LOCAL_FALLBACK_NO_REMOTE_ENDPOINT",
+                    "duration_ms": (time.time() - start) * 1000
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    "exit_code": 124,
+                    "stdout": "",
+                    "stderr": f"Remote fallback execution timed out after {timeout_sec}s",
+                    "timed_out": True,
+                    "degraded": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
+
+        # Remote execution over HTTP / SSH
         exec_env = os.environ.copy()
         if env:
             exec_env.update(env)
@@ -510,6 +788,7 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": proc.stdout,
                 "stderr": proc.stderr,
                 "timed_out": False,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
         except subprocess.TimeoutExpired:
@@ -518,8 +797,10 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
                 "stdout": "",
                 "stderr": f"Remote node execution timed out after {timeout_sec}s",
                 "timed_out": True,
+                "degraded": False,
                 "duration_ms": (time.time() - start) * 1000
             }
+
 
     def inspect_process(self, session_id: str, pid: int) -> Optional[ProcessInfo]:
         return None

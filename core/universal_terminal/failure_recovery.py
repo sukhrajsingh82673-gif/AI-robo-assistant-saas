@@ -29,7 +29,7 @@ class TerminalFailureRecoveryEngine:
         combined = (stdout + " " + stderr).lower()
 
         # 1. Security / Policy Denial (CANNOT BE BYPASSED)
-        if "policy_denied" in combined or "forbidden dangerous pattern" in combined or "permission denied" in combined and "killswitch" in combined:
+        if "policy_denied" in combined or "forbidden dangerous pattern" in combined or "killswitch" in combined or "security alert" in combined:
             return FailureClassification.SECURITY_DENIAL
 
         # 2. Timeout
