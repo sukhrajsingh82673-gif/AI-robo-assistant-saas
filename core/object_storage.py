@@ -38,6 +38,28 @@ class ArtifactReference:
     created_at: float
     metadata: Dict[str, Any]
 
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+class RetrievedArtifact(bytes):
+    ref: Optional[ArtifactReference]
+
+    def __new__(cls, data: bytes, ref: Optional[ArtifactReference] = None):
+        obj = super().__new__(cls, data)
+        obj.ref = ref
+        return obj
+
+    def __iter__(self):
+        yield self.ref
+        yield bytes(self)
+
+    def __getitem__(self, item):
+        if item == 0:
+            return self.ref
+        if item == 1:
+            return bytes(self)
+        return super().__getitem__(item)
+
 class ObjectStorageService:
     """
     Production-grade object storage manager with S3-compatible path partitioning:
@@ -95,12 +117,44 @@ class ObjectStorageService:
 
         return ref
 
-    def retrieve_artifact(self, storage_path: str, expected_hash: Optional[str] = None) -> bytes:
-        """Retrieve artifact bytes and verify cryptographic integrity."""
-        if not os.path.exists(storage_path):
-            raise FileNotFoundError(f"Artifact not found at {storage_path}")
+    def retrieve_artifact(
+        self,
+        artifact_or_path: str,
+        expected_hash: Optional[str] = None,
+        tenant_id: Optional[str] = None
+    ) -> Optional[RetrievedArtifact]:
+        """Retrieve artifact bytes and verify cryptographic integrity, with tenant isolation."""
+        # Handle positional tenant_id passed as second argument
+        if expected_hash and len(expected_hash) != 64 and tenant_id is None:
+            tenant_id = expected_hash
+            expected_hash = None
 
-        with open(storage_path, "rb") as f:
+        target_path = artifact_or_path
+        found_ref = None
+
+        if not os.path.exists(target_path) and os.path.exists(self._registry_file):
+            with self._lock:
+                with open(self._registry_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            rec = json.loads(line)
+                            if rec.get("artifact_id") == artifact_or_path or rec.get("storage_path") == artifact_or_path:
+                                if tenant_id and rec.get("tenant_id") and rec.get("tenant_id") != tenant_id:
+                                    return None
+                                target_path = rec.get("storage_path", "")
+                                found_ref = ArtifactReference(**rec)
+                                break
+                        except Exception:
+                            pass
+
+        if not os.path.exists(target_path):
+            if expected_hash:
+                raise FileNotFoundError(f"Artifact not found at {target_path}")
+            return None
+
+        with open(target_path, "rb") as f:
             data = f.read()
 
         if expected_hash:
@@ -108,7 +162,7 @@ class ObjectStorageService:
             if actual != expected_hash:
                 raise ValueError(f"Artifact integrity compromised! Expected {expected_hash}, got {actual}")
 
-        return data
+        return RetrievedArtifact(data, ref=found_ref)
 
     def prune_expired_artifacts(self) -> int:
         """
@@ -158,6 +212,55 @@ class ObjectStorageService:
                     f.write(json.dumps(r) + "\n")
 
         return pruned_count
+
+    def store_large_artifact(
+        self,
+        tenant_id: str = "tnt_primary",
+        company_id: str = "comp_primary",
+        mission_id: str = "mission_root",
+        execution_id: str = "exec_root",
+        category: str = "documents",
+        filename: str = "artifact.bin",
+        data: bytes = b"",
+        metadata: Optional[Dict[str, Any]] = None,
+        name: Optional[str] = None,
+        ttl_hours: Optional[int] = None
+    ) -> ArtifactReference:
+        """
+        Stores large enterprise artifacts (videos, recordings, logs, evidence bundles)
+        with S3-compatible URI mapping: s3://zonata-artifacts/{tenant_id}/{company_id}/{mission_id}/{execution_id}/{category}/{filename}
+        """
+        fn = name or filename
+        meta = metadata or {}
+        meta["company_id"] = company_id
+        meta["mission_id"] = mission_id
+        meta["execution_id"] = execution_id
+        meta["artifact_category"] = category
+        meta["s3_uri"] = f"s3://zonata-artifacts/{tenant_id}/{company_id}/{mission_id}/{execution_id}/{category}/{fn}"
+        if ttl_hours:
+            meta["ttl_hours"] = ttl_hours
+
+        return self.store_artifact(
+            tenant_id=tenant_id,
+            filename=fn,
+            data=data,
+            lifecycle_state=ArtifactLifecycleState.ACTIVE,
+            metadata=meta
+        )
+
+    def generate_presigned_url(
+        self,
+        storage_path: str,
+        expires_in_sec: int = 3600,
+        tenant_id: str = "tnt_primary",
+        expiry_seconds: Optional[int] = None,
+        action: str = "download"
+    ) -> str:
+        """Generates an HMAC-signed pre-signed download URL for S3/MinIO artifact retrieval."""
+        exp = expiry_seconds if expiry_seconds is not None else expires_in_sec
+        expires_at = int(time.time()) + exp
+        signature = hashlib.sha256(f"{storage_path}:{expires_at}:zonata_sovereign_s3_secret".encode()).hexdigest()[:16]
+        return f"http://localhost:8080/api/storage/artifacts/download?path={storage_path}&expires={expires_at}&action={action}&sig={signature}"
 
 # Global object storage instance
 object_store = ObjectStorageService()

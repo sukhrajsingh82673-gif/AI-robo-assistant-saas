@@ -284,7 +284,20 @@ connector_registry.register(AccountingConnector())
 connector_registry.register(PaymentGatewayConnector())
 agent_bus = AgentCommunicationBus()
 
+# Universal AI Company OS SaaS Infrastructure Engines
+from core.opentelemetry_engine import opentelemetry_engine, opentelemetry_tracer, CorrelationContext, SpanKind, SpanStatus, StatusCode
+from core.langfuse_engine import langfuse_engine
+from core.openfga_engine import openfga_engine
+from core.nats_jetstream import jetstream_engine, nats_broker
+from core.vault_client import vault_client
+from core.keycloak_idp import keycloak_idp
+from core.agent_evaluation import agent_evaluation_engine
+from core.saas_billing import saas_billing_engine, SubscriptionTier
+from core.posthog_analytics import posthog_analytics
+from core.object_storage import object_store
+
 WEB_DIR = os.path.join(BASE_DIR, "web")
+
 
 def get_real_system_host():
     """Inspects the actual execution machine environment."""
@@ -628,6 +641,81 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             usage = UsageMeteringEngine.get_tenant_usage_summary(tenant_id)
             self._send_json({"usage": usage})
             return
+
+        elif path == "/api/telemetry/spans":
+            trace_id = query_params.get("trace_id", [None])[0]
+            spans = opentelemetry_engine.tracer.get_spans(tenant_id=tenant_id, trace_id=trace_id)
+            self._send_json({"spans": [s.to_dict() for s in spans], "count": len(spans)})
+            return
+
+        elif path == "/api/telemetry/metrics":
+            summary = opentelemetry_engine.metrics.get_metrics_summary()
+            self._send_json({"metrics": summary})
+            return
+
+        elif path == "/api/langfuse/generations":
+            m_id = query_params.get("mission_id", [None])[0]
+            a_id = query_params.get("agent_id", [None])[0]
+            generations = langfuse_engine.get_generations(tenant_id=tenant_id, mission_id=m_id, agent_id=a_id)
+            self._send_json({"generations": generations, "count": len(generations)})
+            return
+
+        elif path == "/api/langfuse/analytics":
+            analytics = langfuse_engine.get_analytics(tenant_id=tenant_id)
+            self._send_json(analytics)
+            return
+
+        elif path == "/api/openfga/relations":
+            user = query_params.get("user", [""])[0]
+            obj = query_params.get("object", [""])[0]
+            rels = openfga_engine.list_relations(user=user, object=obj, tenant_id=tenant_id)
+            self._send_json({"user": user, "object": obj, "relations": rels})
+            return
+
+        elif path == "/api/vault/leases":
+            leases = vault_client.list_active_leases(tenant_id=tenant_id)
+            self._send_json({"leases": leases, "count": len(leases)})
+            return
+
+        elif path == "/api/events/replay":
+            stream = query_params.get("stream", ["ZONATA_MISSIONS"])[0]
+            filter_sub = query_params.get("filter_subject", [None])[0]
+            limit_val = int(query_params.get("limit", [50])[0])
+            msgs = jetstream_engine.replay_stream(stream_name=stream, filter_subject=filter_sub, tenant_id=tenant_id, limit=limit_val)
+            self._send_json({"stream": stream, "messages": [m if isinstance(m, dict) else m.to_dict() for m in msgs], "count": len(msgs)})
+            return
+
+        elif path == "/api/evaluations/reports":
+            test_id = query_params.get("test_id", [None])[0]
+            agent_id = query_params.get("agent_id", [None])[0]
+            reports = agent_evaluation_engine.list_reports(test_id=test_id, agent_id=agent_id)
+            self._send_json({"reports": reports, "count": len(reports)})
+            return
+
+        elif path == "/api/billing/usage":
+            snapshot = saas_billing_engine.get_or_create_tenant(tenant_id=tenant_id)
+            self._send_json(snapshot.to_dict())
+            return
+
+        elif path == "/api/analytics/posthog/funnel":
+            funnel = posthog_analytics.get_funnel_summary(tenant_id=tenant_id)
+            self._send_json({"funnel": funnel})
+            return
+
+        elif path == "/api/analytics/posthog/flags":
+            key = query_params.get("key", [""])[0]
+            distinct_id = query_params.get("distinct_id", ["anon"])[0]
+            enabled = posthog_analytics.is_feature_enabled(key, distinct_id=distinct_id, tenant_id=tenant_id)
+            self._send_json({"key": key, "enabled": enabled, "distinct_id": distinct_id})
+            return
+
+        elif path == "/api/storage/artifacts/download":
+            artifact_id = query_params.get("artifact_id", [""])[0]
+            expiry = int(query_params.get("expiry_seconds", [3600])[0])
+            url = object_store.generate_presigned_url(artifact_id, tenant_id=tenant_id, expiry_seconds=expiry, action="download")
+            self._send_json({"artifact_id": artifact_id, "download_url": url, "expires_in": expiry})
+            return
+
 
         elif path == "/api/ceo/intelligence":
             companies = portfolio.list_companies()
@@ -5124,7 +5212,205 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(data, status=code)
                 return
 
+        # OpenTelemetry Trace Span Endpoint
+        elif path == "/api/telemetry/trace":
+            name = req_data.get("name", "span_operation")
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            span = opentelemetry_engine.start_trace(
+                span_name=name,
+                tenant_id=tenant,
+                company_id=company,
+                mission_id=req_data.get("mission_id"),
+                execution_id=req_data.get("execution_id"),
+                task_id=req_data.get("task_id"),
+                agent_id=req_data.get("agent_id"),
+                tool_id=req_data.get("tool_id"),
+                evidence_id=req_data.get("evidence_id")
+            )
+            for k, v in req_data.get("attributes", {}).items():
+                span.set_attribute(k, v)
+            opentelemetry_engine.finish_span(span)
+            self._send_json({"success": True, "span": span.to_dict()})
+            return
+
+        # Langfuse LLM Generation Endpoint
+        elif path == "/api/langfuse/generations":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            gen = langfuse_engine.record_generation(
+                name=req_data.get("name", "llm_completion"),
+                model=req_data.get("model", "gpt-4o"),
+                prompt=req_data.get("prompt", ""),
+                completion=req_data.get("completion", ""),
+                prompt_tokens=int(req_data.get("prompt_tokens", 0)),
+                completion_tokens=int(req_data.get("completion_tokens", 0)),
+                latency_ms=float(req_data.get("latency_ms", 50.0)),
+                tenant_id=tenant,
+                company_id=company,
+                mission_id=req_data.get("mission_id"),
+                agent_id=req_data.get("agent_id")
+            )
+            self._send_json({"success": True, "generation": gen.to_dict()})
+            return
+
+        # OpenFGA Relationship Authorization Endpoints
+        elif path == "/api/openfga/check":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            user = req_data.get("user", "")
+            relation = req_data.get("relation", "")
+            obj = req_data.get("object", "")
+            allowed = openfga_engine.check(user=user, relation=relation, object=obj, tenant_id=tenant)
+            self._send_json({"allowed": allowed, "user": user, "relation": relation, "object": obj})
+            return
+
+        elif path == "/api/openfga/tuples":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            user = req_data.get("user", "")
+            relation = req_data.get("relation", "")
+            obj = req_data.get("object", "")
+            action = req_data.get("action", "write")
+            if action == "delete":
+                ok = openfga_engine.delete_tuple(user=user, relation=relation, object=obj, tenant_id=tenant)
+            else:
+                ok = openfga_engine.write_tuple(user=user, relation=relation, object=obj, tenant_id=tenant)
+            self._send_json({"success": bool(ok), "tuple": {"user": user, "relation": relation, "object": obj}})
+            return
+
+        # Vault Scoped Dynamic Credential Leases
+        elif path == "/api/vault/lease":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            agent_id = req_data.get("agent_id", "agent_worker")
+            target_system = req_data.get("target_system", "postgres_db")
+            actions = req_data.get("required_actions", ["read"])
+            ttl = int(req_data.get("ttl_seconds", 300))
+            lease = vault_client.issue_scoped_lease(
+                agent_id=agent_id,
+                tenant_id=tenant,
+                target_system=target_system,
+                required_actions=actions,
+                ttl_seconds=ttl
+            )
+            self._send_json({"success": True, "lease": lease.to_dict()})
+            return
+
+        elif path == "/api/vault/revoke":
+            lease_id = req_data.get("lease_id", "")
+            reason = req_data.get("reason", "API request")
+            ok = vault_client.revoke_lease(lease_id=lease_id, reason=reason)
+            self._send_json({"success": ok, "lease_id": lease_id})
+            return
+
+        # Keycloak Identity Authentication & Revocation
+        elif path == "/api/keycloak/auth":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            token_str = req_data.get("token", "")
+            res = keycloak_idp.authenticate_token(token_str)
+            self._send_json(res.to_dict())
+            return
+
+        elif path == "/api/keycloak/revoke":
+            session_id = req_data.get("session_id", "")
+            keycloak_idp.revoke_session(session_id)
+            self._send_json({"success": True, "session_id": session_id})
+            return
+
+        # NATS JetStream Event Publish
+        elif path == "/api/events/publish":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            subject = req_data.get("subject", "zonata.events.general")
+            data = req_data.get("data", {})
+            msg = jetstream_engine.publish(subject=subject, data=data, tenant_id=tenant, company_id=company)
+            self._send_json({"success": True, "message": msg.to_dict()})
+            return
+
+        # Agent Evaluation Run Endpoint
+        elif path == "/api/evaluations/run":
+            test_id = req_data.get("test_id", "tc_general_benchmark")
+            agent_id = req_data.get("agent_id", "agent_worker")
+            model = req_data.get("model", "gpt-4o")
+            actual_output = req_data.get("actual_output", "")
+            tools_used = req_data.get("actual_tools_used", [])
+            latency = float(req_data.get("latency_sec", 1.0))
+            cost = float(req_data.get("cost_usd", 0.005))
+            pol_pass = req_data.get("policy_violations", 0)
+            ev_id = req_data.get("evidence_id")
+            report = agent_evaluation_engine.evaluate_execution(
+                test_case_id=test_id,
+                agent_id=agent_id,
+                model=model,
+                actual_output=actual_output,
+                actual_tools_used=tools_used,
+                latency_sec=latency,
+                cost_usd=cost,
+                policy_violation_count=pol_pass,
+                evidence_id=ev_id,
+                execution_id=req_data.get("execution_id")
+            )
+            self._send_json({"success": True, "report": report.to_dict()})
+            return
+
+        # SaaS Billing Plan Upgrade & Usage Record
+        elif path == "/api/billing/upgrade":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tier_str = req_data.get("tier", "pro").upper()
+            try:
+                tier = SubscriptionTier[tier_str]
+            except KeyError:
+                tier = SubscriptionTier.PRO
+            snapshot = saas_billing_engine.upgrade_plan(tenant_id=tenant, new_tier=tier)
+            self._send_json({"success": True, "tenant": snapshot.to_dict()})
+            return
+
+        elif path == "/api/billing/record":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            metric = req_data.get("metric", "api_call")
+            amount = float(req_data.get("amount", 1.0))
+            cost = float(req_data.get("cost_usd", 0.0))
+            saas_billing_engine.record_usage(tenant_id=tenant, metric=metric, amount=amount, cost_usd=cost)
+            self._send_json({"success": True, "tenant_id": tenant, "metric": metric, "amount": amount})
+            return
+
+        # PostHog Product Analytics Capture
+        elif path == "/api/analytics/posthog/capture":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            distinct_id = req_data.get("distinct_id", "usr_anon")
+            event_name = req_data.get("event_name", "page_view")
+            properties = req_data.get("properties", {})
+            event = posthog_analytics.capture(
+                distinct_id=distinct_id,
+                event_name=event_name,
+                properties=properties,
+                tenant_id=tenant,
+                company_id=company
+            )
+            self._send_json({"success": True, "event": event.to_dict()})
+            return
+
+        # Object Storage Artifact Upload / Store
+        elif path == "/api/storage/artifacts/upload":
+            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            name = req_data.get("name", "artifact.bin")
+            content = req_data.get("content", "").encode("utf-8")
+            cat = req_data.get("category", "documents")
+            ttl = int(req_data.get("ttl_hours", 24))
+            ref = object_store.store_large_artifact(
+                name=name,
+                data=content,
+                category=cat,
+                tenant_id=tenant,
+                company_id=company,
+                metadata=req_data.get("metadata", {}),
+                ttl_hours=ttl
+            )
+            self._send_json({"success": True, "artifact": ref.to_dict()})
+            return
+
         self._send_json({"error": "Endpoint not found"}, status=404)
+
 
     def do_DELETE(self):
         parsed = urllib.parse.urlparse(self.path)

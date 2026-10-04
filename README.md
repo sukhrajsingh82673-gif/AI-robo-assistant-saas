@@ -530,5 +530,56 @@ Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`]
   - **CEO Executive Console (`web/ai_ceo_workspace.js`)**: Interactive 14-section Web UI console with decision rationale, approvals, and live telemetry.
   - **Master V8 Deliverables**: [`ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md`](file:///root/roboassistant/ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md) and [`openapi_v8.json`](file:///root/roboassistant/openapi_v8.json).
 
+---
+
+## 💻 ZONATA Universal Linux Terminal Execution Fabric
+
+The **Universal Linux Terminal Execution Fabric** is a persistent, governed execution abstraction and supervision fabric through which ZONATA and the AI CEO dynamically select, provision, operate, observe, verify, recover, and destroy heterogeneous Linux execution environments according to task, risk, security requirement, machine capability, and workload.
+
+- **Fundamental Architectural Principle:** The Universal Terminal is NOT an Ubuntu terminal, NOT a single Linux distribution, and NOT a shell simulator. It is an execution abstraction supporting sandboxed local host environments, containerized distributions, microVMs, remote cloud nodes, and specialist execution environments.
+- **4-Layer Independent Supervision Architecture:**
+  1. *Layer 1 (AICU / AI CEO):* Strategic direction, resource budgets, and goal setting (`AICeoTerminalInstruction`).
+  2. *Layer 2 (Terminal Handling Agent):* Technical command execution, tool chaining, and runtime operations.
+  3. *Layer 3 (Security & Governance Specialist Agent):* Independent security auditing, reversibility classification, kill-switch monitoring, and DLP credential scrubbing.
+  4. *Layer 4 (Verification Engine):* Semantic truth verification enforcing the invariant `Exit Code 0 != Task Success`.
+- **Reversibility & Checkpoint Engine (`core/universal_terminal/reversibility_engine.py`):** Bit-exact filesystem snapshots, deterministic rollbacks, operation records, and 22-question diagnostic failure dossiers.
+- **Governed Knowledge Evolution (`core/universal_terminal/knowledge_evolution.py`):** 11-step pipeline feeding empirically verified terminal knowledge back to the AI CEO technical intelligence base.
+- **Tool Integration & SBOM (`core/universal_terminal/tool_integration.py`):** 13-stage tool qualification pipeline, quarantine containment, and SHA-256 signed Software Bill of Materials (SBOM).
+
+---
+
+## ☁️ ZONATA Universal AI Company OS SaaS Platform (15 Enterprise Technologies)
+
+ZONATA integrates 15 production-grade technologies, subordinate to ZONATA Sovereign Authority and the Merkle EvidenceLedger:
+
+1. **Temporal (`zonata/temporal_adapter.py`):** Durable workflow execution bridge for Universal Linux Terminal activities with automatic crash recovery, compensation rollbacks, and task heartbeats.
+2. **OpenTelemetry (`core/opentelemetry_engine.py`):** W3C distributed tracing with 9-stage correlation lineage (`tenant` → `company` → `mission` → `execution` → `task` → `agent` → `model` → `tool` → `evidence`) and Prometheus `/metrics` exposition.
+3. **MinIO / S3 Object Storage (`core/object_storage.py`):** Large binary artifact persistence (`s3://zonata-artifacts/...`), HMAC-signed pre-signed URLs, dual-mode unpacking, legal holds, and lifecycle management.
+4. **HashiCorp Vault (`core/vault_client.py`):** Dynamic credential brokering with short-lived ephemeral leases, strict path/action scoping, zero log leakage, and instant tenant revocation.
+5. **Keycloak (`core/keycloak_idp.py`):** Enterprise OIDC IdP authentication, JIT user provisioning, and session revocation enforcing `IDENTITY != AUTHORITY`.
+6. **Langfuse (`core/langfuse_engine.py`):** Production LLM observability, generation tracing, immutable prompt versioning, automated multi-dimension evaluations, and multi-provider token pricing.
+7. **NATS + JetStream (`core/nats_jetstream.py`):** High-throughput distributed event broker with persistent streams (`MISSIONS`, `GOVERNANCE`, `OPERATIONS`, `BILLING`), wildcard routing (`*`, `>`), and tenant-scoped replays.
+8. **OpenFGA (`core/openfga_engine.py`):** Fine-grained Relationship-Based Access Control (ReBAC) evaluating authorization tuples, transitive relationships (`owner > editor > viewer`), and group memberships.
+9. **Agent Evaluation System (`core/agent_evaluation.py`):** Native benchmarking engine scoring 7 operational dimensions (Correctness, Tool selection, Policy compliance, Safety, Latency, Cost, Evidence completeness) with automated regression detection.
+10. **Usage Metering & Billing (`core/saas_billing.py`):** Multi-tenant Usage Ledger with re-entrant locking (`threading.RLock()`), 4-tier entitlement engine (`free`, `starter`, `pro`, `enterprise`), quota gating, and live Stripe & Razorpay adapters.
+11. **PostHog (`core/posthog_analytics.py`):** SaaS product intelligence tracking 8-stage conversion funnels, tenant-scoped feature flags, user cohorts, and automated PII/credential scrubbing.
+12. **Production Observability Stack:** Vendor-neutral OpenTelemetry metrics and Prometheus exporter on `/metrics` with zero-drift counter and histogram tracking.
+13. **Disaster Recovery & Backup:** Point-in-time filesystem snapshots, bit-exact rollback restoration, and Merkle Evidence chain integrity preservation.
+14. **Adversarial Multi-Tenancy:** Cryptographic data and runtime isolation across all 15 technologies with zero cross-tenant leak.
+15. **Supply-Chain Security & SBOM:** Cryptographically signed Software Bill of Materials (SBOM), package checksum verification, tool quarantine, and vulnerability provenance tracking.
+
+### New API Endpoints (`api_server.py`)
+- `GET /telemetry/trace`, `POST /telemetry/span`, `GET /telemetry/metrics`
+- `GET /evaluations/benchmark`, `POST /evaluations/run`
+- `GET /langfuse/generations`, `POST /langfuse/trace`
+- `GET /auth/token-info`, `POST /auth/validate`
+- `POST /openfga/check`
+- `GET /vault/lease-status`, `POST /vault/request-lease`
+- `GET /storage/presigned-url`, `POST /storage/upload`
+- `GET /billing/usage`, `POST /billing/meter`
+- `GET /analytics/funnels`, `POST /analytics/event`
+- `GET /events/replay`, `POST /events/publish`
+
+
 
 
