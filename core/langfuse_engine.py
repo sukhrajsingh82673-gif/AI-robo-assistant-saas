@@ -94,7 +94,12 @@ class LangfuseEngine:
         self.secret_key = secret_key or os.environ.get("LANGFUSE_SECRET_KEY", "sk-zonata-mock")
         self._generations: List[LangfuseGeneration] = []
         self._prompts: Dict[str, List[PromptVersion]] = {}
+        self._outage_active = False
         self._lock = threading.Lock()
+
+    def simulate_outage(self, enabled: bool):
+        """Simulates Langfuse service outage for failure injection."""
+        self._outage_active = enabled
 
     def calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """Calculates exact dollar cost using model token pricing matrix."""
@@ -135,6 +140,9 @@ class LangfuseEngine:
         completion_tokens: Optional[int] = None
     ) -> LangfuseGeneration:
         """Records an LLM generation trace with automatic token cost computation."""
+        if self._outage_active:
+            raise ConnectionError("Langfuse AI observability service unreachable (Connection refused)")
+
         resp_text = response if response is not None else (completion or "")
         inp_tok = input_tokens if input_tokens is not None else (prompt_tokens or 0)
         out_tok = output_tokens if output_tokens is not None else (completion_tokens or 0)

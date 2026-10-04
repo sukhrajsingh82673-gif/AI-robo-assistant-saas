@@ -117,6 +117,7 @@ class TerminalHealthService:
             "status": overall_status,
             "timestamp": time.time(),
             "tenant_id": tenant_id,
+            "host": metrics if "metrics" in locals() else {},
             "components": checks,
             "degraded_components": [k for k, v in checks.items() if v["status"] == "DEGRADED"],
             "failed_components": [k for k, v in checks.items() if v["status"] == "FAILED"]

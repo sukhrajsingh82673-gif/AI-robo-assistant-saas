@@ -152,6 +152,7 @@ class SaasBillingEngine:
 
     def __init__(self):
         self._tenants: Dict[str, TenantUsageSnapshot] = {}
+        self._processed_idempotency_keys: Set[str] = set()
         self.stripe = StripeBillingAdapter()
         self.razorpay = RazorpayBillingAdapter()
         self._lock = threading.RLock()
@@ -164,7 +165,7 @@ class SaasBillingEngine:
                     tenant_id=tenant_id,
                     tier=tier,
                     cycle_start=now,
-                    cycle_end=now + (86400 * 30)
+                    cycle_end=now + 86400 * 30
                 )
             return self._tenants[tenant_id]
 
@@ -211,10 +212,18 @@ class SaasBillingEngine:
         tenant_id: str,
         metric: str,
         amount: float,
-        cost_usd: float = 0.0
-    ):
-        """Records consumption event into the tenant's active usage ledger."""
+        cost_usd: float = 0.0,
+        idempotency_key: Optional[str] = None
+    ) -> bool:
+        """Records consumption event into the tenant's active usage ledger with idempotency defense."""
         with self._lock:
+            if idempotency_key:
+                full_key = f"{tenant_id}:{idempotency_key}"
+                if full_key in self._processed_idempotency_keys:
+                    logger.warning(f"DUPLICATE USAGE ATTEMPT SUPPRESSED: Key {full_key}")
+                    return False
+                self._processed_idempotency_keys.add(full_key)
+
             tenant = self.get_or_create_tenant(tenant_id)
             if metric == "tokens":
                 tenant.tokens_consumed += int(amount)
@@ -229,6 +238,7 @@ class SaasBillingEngine:
 
             tenant.total_cost_usd += cost_usd
             logger.info(f"USAGE RECORDED: [{tenant_id}] Metric: {metric} Amount: {amount} (Total Cost: ${tenant.total_cost_usd:.4f})")
+            return True
 
     def upgrade_plan(self, tenant_id: str, new_tier: SubscriptionTier) -> TenantUsageSnapshot:
         with self._lock:
@@ -236,6 +246,24 @@ class SaasBillingEngine:
             tenant.tier = new_tier
             logger.info(f"PLAN UPGRADED: Tenant {tenant_id} upgraded to {new_tier.value}")
             return tenant
+
+    def downgrade_plan(self, tenant_id: str, new_tier: SubscriptionTier) -> TenantUsageSnapshot:
+        with self._lock:
+            tenant = self.get_or_create_tenant(tenant_id)
+            tenant.tier = new_tier
+            logger.info(f"PLAN DOWNGRADED: Tenant {tenant_id} downgraded to {new_tier.value}")
+            return tenant
+
+    def charge_customer(self, tenant_id: str, amount_usd: float, idempotency_key: str) -> Dict[str, Any]:
+        """Executes a financial charge with strict idempotency defense against double-charging."""
+        with self._lock:
+            full_key = f"{tenant_id}:charge:{idempotency_key}"
+            if full_key in self._processed_idempotency_keys:
+                logger.warning(f"DUPLICATE FINANCIAL MUTATION SUPPRESSED: Key {full_key}")
+                return {"success": True, "duplicate": True, "message": "Duplicate mutation suppressed", "amount": amount_usd}
+            self._processed_idempotency_keys.add(full_key)
+            return {"success": True, "duplicate": False, "charge_id": f"ch_{uuid.uuid4().hex[:12]}", "amount": amount_usd}
+
 
 # Global singleton instance
 saas_billing_engine = SaasBillingEngine.get_instance()

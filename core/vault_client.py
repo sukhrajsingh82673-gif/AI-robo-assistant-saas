@@ -73,8 +73,14 @@ class HashiCorpVaultClient:
         self.vault_token = token or os.environ.get("VAULT_TOKEN", "root")
         self._master_secrets: Dict[str, Dict[str, Any]] = {}
         self._active_leases: Dict[str, ScopedCredentialLease] = {}
+        self._outage_active = False
         self._lock = threading.Lock()
         self._seed_default_master_secrets()
+
+    def simulate_outage(self, enabled: bool):
+        """Simulates Vault cluster connection failure for chaos & resilience qualification."""
+        self._outage_active = enabled
+        logger.warning(f"VAULT SIMULATE OUTAGE: enabled={enabled}")
 
     def _seed_default_master_secrets(self):
         """Seeds sovereign vault storage with sample master credentials."""
@@ -84,6 +90,8 @@ class HashiCorpVaultClient:
 
     def write_secret(self, path: str, secret_data: Dict[str, Any], tenant_id: str = "tnt_primary") -> bool:
         """Stores a master secret in the Vault KV v2 engine."""
+        if self._outage_active:
+            raise ConnectionError("HashiCorp Vault cluster unreachable (Connection refused)")
         full_key = f"{tenant_id}:{path}"
         with self._lock:
             self._master_secrets[full_key] = secret_data
@@ -92,6 +100,8 @@ class HashiCorpVaultClient:
 
     def read_secret(self, path: str, tenant_id: str = "tnt_primary") -> Optional[Dict[str, Any]]:
         """Reads a master secret (Restricted to internal ZONATA Authority Gateway only)."""
+        if self._outage_active:
+            raise ConnectionError("HashiCorp Vault cluster unreachable (Connection refused)")
         full_key = f"{tenant_id}:{path}"
         with self._lock:
             return self._master_secrets.get(full_key)
@@ -110,6 +120,8 @@ class HashiCorpVaultClient:
         Issues an ephemeral scoped credential lease to an AI agent.
         Never grants master keys; derives a restricted, time-bound scoped token.
         """
+        if self._outage_active:
+            raise ConnectionError("HashiCorp Vault cluster unreachable (Connection refused)")
         now = time.time()
         actions = required_actions or ["read"]
         lease_id = f"vault_lease_{uuid.uuid4().hex[:12]}"
@@ -153,20 +165,27 @@ class HashiCorpVaultClient:
         )
         return lease
 
-    def revoke_lease(self, lease_id: str, reason: str = "Explicit revocation") -> bool:
-        """Immediately revokes an agent credential lease."""
+    def revoke_lease(self, lease_id: str, reason: str = "Explicit revocation", requesting_tenant_id: Optional[str] = None) -> bool:
+        """Immediately revokes an agent credential lease with cross-tenant check."""
         with self._lock:
             lease = self._active_leases.get(lease_id)
-            if lease and not lease.revoked:
-                lease.revoked = True
-                lease.revocation_reason = reason
-                logger.warning(f"VAULT LEASE REVOKED: [{lease_id}] Reason: {reason}")
-                return True
+            if lease:
+                if requesting_tenant_id and lease.tenant_id != requesting_tenant_id:
+                    logger.warning(f"CROSS-TENANT VIOLATION BLOCKED: Tenant {requesting_tenant_id} tried revoking lease {lease_id} owned by {lease.tenant_id}")
+                    return False
+                if not lease.revoked:
+                    lease.revoked = True
+                    lease.revocation_reason = reason
+                    logger.warning(f"VAULT LEASE REVOKED: [{lease_id}] Reason: {reason}")
+                    return True
         return False
 
-    def get_lease(self, lease_id: str) -> Optional[ScopedCredentialLease]:
+    def get_lease(self, lease_id: str, requesting_tenant_id: Optional[str] = None) -> Optional[ScopedCredentialLease]:
         with self._lock:
-            return self._active_leases.get(lease_id)
+            lease = self._active_leases.get(lease_id)
+            if lease and requesting_tenant_id and lease.tenant_id != requesting_tenant_id:
+                return None
+            return lease
 
     def list_active_leases(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._lock:
@@ -174,6 +193,7 @@ class HashiCorpVaultClient:
                 l.to_dict() for l in self._active_leases.values()
                 if l.is_valid and (not tenant_id or l.tenant_id == tenant_id)
             ]
+
 
 # Global singleton instance
 vault_client = HashiCorpVaultClient.get_instance()

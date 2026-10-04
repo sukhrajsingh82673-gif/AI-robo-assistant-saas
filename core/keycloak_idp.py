@@ -82,8 +82,14 @@ class KeycloakIdPEngine:
         self.realm = realm
         self._user_directory: Dict[str, KeycloakUserProfile] = {}
         self._revoked_sessions: set = set()
+        self._outage_active = False
         self._lock = threading.Lock()
         self._seed_directory()
+
+    def simulate_outage(self, enabled: bool):
+        """Simulates Keycloak cluster outage for chaos injection."""
+        self._outage_active = enabled
+        logger.warning(f"KEYCLOAK SIMULATE OUTAGE: enabled={enabled}")
 
     def _seed_directory(self):
         """Seeds default enterprise user directory."""
@@ -105,18 +111,39 @@ class KeycloakIdPEngine:
         Validates an OIDC bearer token.
         Extracts claims and checks against revocation list.
         """
+        if self._outage_active:
+            return IdentityVerificationResult(
+                authenticated=False,
+                error_message="Keycloak IdP service unavailable (Connection refused)"
+            )
+
         try:
-            # Parse token payload (supports mock tokens or standard JWTs)
-            parts = token_string.split(".")
-            if len(parts) >= 2:
-                payload_str = base64.urlsafe_b64decode(parts[1] + "==").decode("utf-8")
-                claims = json.loads(payload_str)
+            # Parse token payload (supports direct JSON, standard JWTs, or raw identifier)
+            token_clean = token_string.strip()
+            if token_clean.startswith("{") and token_clean.endswith("}"):
+                claims = json.loads(token_clean)
+            elif "." in token_clean:
+                parts = token_clean.split(".")
+                if len(parts) >= 2:
+                    payload_str = base64.urlsafe_b64decode(parts[1] + "==").decode("utf-8")
+                    claims = json.loads(payload_str)
+                else:
+                    claims = {"sub": token_clean}
             else:
-                # Direct JSON token or identifier
-                claims = json.loads(token_string) if token_string.startswith("{") else {"sub": token_string}
+                claims = {"sub": token_clean}
+
+
+            # Check expiration
+            if "exp" in claims and float(claims["exp"]) < time.time():
+                return IdentityVerificationResult(
+                    authenticated=False,
+                    claims=claims,
+                    error_message="Token has expired"
+                )
 
             user_id = claims.get("sub", claims.get("user_id", "usr_unknown"))
             sess_id = claims.get("session_id", claims.get("sid", f"sess_{user_id}"))
+
 
             if sess_id in self._revoked_sessions:
                 return IdentityVerificationResult(

@@ -70,7 +70,12 @@ class ObjectStorageService:
         self.storage_root = storage_root or os.path.join(base_dir, "storage/object_store")
         os.makedirs(self.storage_root, exist_ok=True)
         self._registry_file = os.path.join(self.storage_root, "artifact_manifest.jsonl")
+        self._outage_active = False
         self._lock = threading.RLock()
+
+    def simulate_outage(self, enabled: bool):
+        """Simulates MinIO / S3 object storage cluster unreachable for failure injection."""
+        self._outage_active = enabled
 
     def store_artifact(
         self,
@@ -84,6 +89,9 @@ class ObjectStorageService:
         """
         Store binary artifact with cryptographic checksum, tenant isolation, and lifecycle tagging.
         """
+        if self._outage_active:
+            raise ConnectionError("MinIO / S3 storage cluster unreachable (Connection refused)")
+
         sha256_hash = hashlib.sha256(data).hexdigest()
         now = time.time()
         retention_until = now + (retention_days * 86400.0) if retention_days > 0 else None
@@ -124,6 +132,9 @@ class ObjectStorageService:
         tenant_id: Optional[str] = None
     ) -> Optional[RetrievedArtifact]:
         """Retrieve artifact bytes and verify cryptographic integrity, with tenant isolation."""
+        if self._outage_active:
+            raise ConnectionError("MinIO / S3 storage cluster unreachable (Connection refused)")
+
         # Handle positional tenant_id passed as second argument
         if expected_hash and len(expected_hash) != 64 and tenant_id is None:
             tenant_id = expected_hash

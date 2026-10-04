@@ -76,6 +76,7 @@ class JetStreamEngine:
         self._streams: Dict[str, StreamConfig] = {}
         self._messages: Dict[str, List[NatsMessage]] = {}
         self._subscribers: Dict[str, List[Callable[[NatsMessage], None]]] = {}
+        self._seen_dedup_keys: Dict[str, NatsMessage] = {}
         self._sequence_counter = 0
         self._lock = threading.Lock()
         self._init_default_streams()
@@ -115,21 +116,39 @@ class JetStreamEngine:
         tenant_id: str = "tnt_primary",
         company_id: str = "comp_primary"
     ) -> NatsMessage:
-        """Publishes an event message to JetStream with sequence numbering."""
+        """Publishes an event message to JetStream with sequence numbering and deduplication."""
         with self._lock:
-            self._sequence_counter += 1
             hdrs = dict(headers) if headers else {}
             if "tenant_id" not in hdrs:
                 hdrs["tenant_id"] = tenant_id
             if "company_id" not in hdrs:
                 hdrs["company_id"] = company_id
+
+            # Deduplication check
+            dedup_id = (
+                hdrs.get("Nats-Msg-Id") or
+                hdrs.get("idempotency_key") or
+                hdrs.get("message_id") or
+                (data.get("idempotency_key") if isinstance(data, dict) else None)
+            )
+            if dedup_id:
+                dedup_key = f"{tenant_id}:{dedup_id}"
+                if dedup_key in self._seen_dedup_keys:
+                    logger.info(f"NATS DEDUPLICATION: Suppressing duplicate message [{dedup_key}]")
+                    return self._seen_dedup_keys[dedup_key]
+
+            self._sequence_counter += 1
             msg = NatsMessage(
                 subject=subject,
                 data=data,
                 headers=hdrs,
                 sequence=self._sequence_counter,
-                timestamp=time.time()
+                timestamp=time.time(),
+                message_id=dedup_id if dedup_id else f"msg_{uuid.uuid4().hex[:12]}"
             )
+
+            if dedup_id:
+                self._seen_dedup_keys[f"{tenant_id}:{dedup_id}"] = msg
 
             # Store in matching streams
             matched_streams = []
@@ -150,7 +169,32 @@ class JetStreamEngine:
             logger.info(f"NATS EVENT PUBLISHED: {subject} (Seq: {msg.sequence}, Streams: {matched_streams})")
             return msg
 
+    def ack_message(self, message_id: str, stream_name: Optional[str] = None) -> bool:
+        """Acknowledges successful processing of a message."""
+        with self._lock:
+            streams_to_check = [stream_name] if stream_name and stream_name in self._messages else self._messages.keys()
+            found = False
+            for s in streams_to_check:
+                for m in self._messages.get(s, []):
+                    if m.message_id == message_id:
+                        m.acked = True
+                        found = True
+            return found
+
+    def get_unacked_messages(self, stream_name: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Returns pending unacknowledged messages for consumer crash recovery."""
+        with self._lock:
+            msgs = self._messages.get(stream_name, [])
+            res = []
+            for m in msgs:
+                if not m.acked:
+                    if tenant_id and m.headers.get("tenant_id") and m.headers.get("tenant_id") != tenant_id:
+                        continue
+                    res.append(m.to_dict())
+            return res
+
     def subscribe(self, subject_pattern: str, handler: Callable[[NatsMessage], None]):
+
         """Subscribes an event handler to a subject pattern."""
         with self._lock:
             if subject_pattern not in self._subscribers:
