@@ -138,7 +138,8 @@ class UniversalCoworkerEngine:
         self.background_dispatcher = BackgroundMissionDispatcher(
             subworker_coord=self.subworker_coordinator,
             runtime_router=self.runtime_router,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
+            db_path=db_path
         )
 
         # 15. Unified Observability Dashboard Service

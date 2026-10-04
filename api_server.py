@@ -15,6 +15,7 @@ import urllib.parse
 import platform
 import time
 import uuid
+import hashlib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
@@ -101,6 +102,11 @@ meeting_service = AiCeoMeetingService(tenant_id="tnt_primary")
 assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
 plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 from core.production_api import api_handler
+from core.coworker.engine import UniversalCoworkerEngine
+from core.coworker.runtimes.terminal_runtime import TerminalWorkerRuntime, TerminalCommandRisk, TerminalSecurityAnalyzer
+
+coworker_engine = UniversalCoworkerEngine.get_instance(tenant_id="tnt_primary")
+terminal_runtime = TerminalWorkerRuntime(tenant_id="tnt_primary")
 
 
 
@@ -1129,6 +1135,131 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(task)
             else:
                 self._send_json({"error": "Task not found"}, status=404)
+            return
+
+        # =====================================================================
+        # ZONATA AI Assistant & Universal Co-Worker Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/coworker/dashboard":
+            snap = coworker_engine.dashboard.get_dashboard_snapshot()
+            self._send_json(snap)
+            return
+
+        elif path == "/api/coworker/missions":
+            missions = coworker_engine.background_dispatcher.list_missions()
+            self._send_json({
+                "missions": [
+                    {
+                        "mission_id": m.mission_id,
+                        "prompt": m.prompt,
+                        "status": m.status,
+                        "progress_percent": m.progress_percent,
+                        "current_stage": m.current_stage,
+                        "subworkers": m.subworkers,
+                        "runtimes_used": m.runtimes_used,
+                        "deliverables": m.deliverables,
+                        "evidence_id": m.evidence_id,
+                        "notification_message": m.notification_message,
+                        "timeline": m.timeline,
+                        "human_control": m.human_control,
+                        "created_at": m.created_at,
+                        "updated_at": m.updated_at,
+                        "completed_at": m.completed_at
+                    }
+                    for m in missions
+                ],
+                "count": len(missions)
+            })
+            return
+
+        elif path.startswith("/api/coworker/missions/"):
+            mid = path.split("/")[4]
+            m = coworker_engine.background_dispatcher.get_mission(mid)
+            if m:
+                self._send_json({
+                    "mission_id": m.mission_id,
+                    "prompt": m.prompt,
+                    "status": m.status,
+                    "progress_percent": m.progress_percent,
+                    "current_stage": m.current_stage,
+                    "subworkers": m.subworkers,
+                    "runtimes_used": m.runtimes_used,
+                    "deliverables": m.deliverables,
+                    "evidence_id": m.evidence_id,
+                    "notification_message": m.notification_message,
+                    "timeline": m.timeline,
+                    "human_control": m.human_control,
+                    "created_at": m.created_at,
+                    "updated_at": m.updated_at,
+                    "completed_at": m.completed_at
+                })
+            else:
+                self._send_json({"error": f"Mission '{mid}' not found"}, status=404)
+            return
+
+        elif path == "/api/coworker/reality-matrix":
+            mat = coworker_engine.get_reality_matrix()
+            self._send_json({"reality_matrix": mat, "count": len(mat)})
+            return
+
+        elif path == "/api/coworker/terminal/diagnostics":
+            diag = terminal_runtime.observe("sess_diag")
+            self._send_json(diag)
+            return
+
+        elif path == "/api/coworker/approvals":
+            approvals = []
+            for m in coworker_engine.background_dispatcher.list_missions():
+                if m.status in ["AWAITING_APPROVAL", "WAITING"]:
+                    approvals.append({
+                        "approval_id": f"app_{m.mission_id}",
+                        "mission_id": m.mission_id,
+                        "what": f"Continue background mission: '{m.prompt}'",
+                        "why": "Governed execution gate checkpoint",
+                        "who": m.initiator,
+                        "worker": m.subworkers[0] if m.subworkers else "worker_coworker",
+                        "node": platform.node(),
+                        "data": "Company workspace files & network research",
+                        "credentials": "None (zero raw secret isolation)",
+                        "risk_level": "MEDIUM",
+                        "expected_result": "Verified deliverable synthesis with SHA-256 evidence",
+                        "status": "PENDING",
+                        "created_at": m.created_at
+                    })
+            self._send_json({"approvals": approvals, "count": len(approvals)})
+            return
+
+        elif path == "/api/coworker/artifacts":
+            artifacts = []
+            ws_dir = os.path.join(BASE_DIR, "storage", "workspaces")
+            if os.path.exists(ws_dir):
+                for f in os.listdir(ws_dir):
+                    fp = os.path.join(ws_dir, f)
+                    if os.path.isfile(fp):
+                        with open(fp, "rb") as af:
+                            sha = hashlib.sha256(af.read()).hexdigest()
+                        artifacts.append({
+                            "name": f,
+                            "path": fp,
+                            "size_bytes": os.path.getsize(fp),
+                            "sha256": sha,
+                            "type": "DELIVERABLE",
+                            "created_at": os.path.getmtime(fp)
+                        })
+            self._send_json({"artifacts": artifacts, "count": len(artifacts)})
+            return
+
+        elif path == "/api/coworker/self-extension":
+            self._send_json({
+                "extensions_enabled": True,
+                "supported_types": ["CLI_SCRIPT", "MCP_SERVER", "BROWSER_HOOK", "CUSTOM_TOOL"],
+                "qualification_pipeline": [
+                    "SECURITY_STATIC_ANALYSIS",
+                    "LICENSE_COMPLIANCE",
+                    "SANDBOX_VALIDATION",
+                    "TAMPER_EVIDENT_REGISTRATION"
+                ]
+            })
             return
 
         # =====================================================================
@@ -2913,6 +3044,111 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             approved = bool(req_data.get("approved", True))
             updated_task = assistant_service.approve_coworker_task(task_id, approved)
             self._send_json({"success": True, "task": updated_task})
+            return
+
+        # =====================================================================
+        # ZONATA AI Assistant & Universal Co-Worker POST Handlers
+        # =====================================================================
+        elif path == "/api/coworker/mission":
+            prompt = req_data.get("prompt", "")
+            initiator = req_data.get("initiator", "ZONATA AI Assistant")
+            auto_step = bool(req_data.get("auto_step", True))
+            m = coworker_engine.background_dispatcher.submit_background_prompt(prompt, initiator=initiator)
+            if auto_step:
+                coworker_engine.background_dispatcher.execute_compound_mission_step(m.mission_id)
+            self._send_json({
+                "success": True,
+                "mission_id": m.mission_id,
+                "status": m.status,
+                "progress_percent": m.progress_percent,
+                "current_stage": m.current_stage,
+                "subworkers": m.subworkers,
+                "runtimes_used": m.runtimes_used,
+                "deliverables": m.deliverables,
+                "evidence_id": m.evidence_id,
+                "timeline": m.timeline
+            })
+            return
+
+        elif path.startswith("/api/coworker/missions/") and path.endswith("/step"):
+            mid = path.split("/")[4]
+            m = coworker_engine.background_dispatcher.execute_compound_mission_step(mid)
+            if m:
+                self._send_json({"success": True, "mission_id": m.mission_id, "status": m.status, "progress": m.progress_percent, "stage": m.current_stage, "deliverables": m.deliverables, "evidence_id": m.evidence_id})
+            else:
+                self._send_json({"error": "Mission not found"}, status=404)
+            return
+
+        elif path.startswith("/api/coworker/missions/") and path.endswith("/control"):
+            mid = path.split("/")[4]
+            action = req_data.get("action", "").upper()
+            ok = False
+            msg = ""
+            if action == "PAUSE":
+                ok = coworker_engine.background_dispatcher.pause_mission(mid)
+                msg = "Mission paused"
+            elif action == "RESUME":
+                ok = coworker_engine.background_dispatcher.resume_mission(mid)
+                msg = "Mission resumed"
+            elif action in ["STOP", "CANCEL"]:
+                ok = coworker_engine.background_dispatcher.stop_mission(mid)
+                msg = "Mission stopped"
+            elif action == "TAKE_CONTROL":
+                ok = coworker_engine.background_dispatcher.take_control(mid)
+                msg = "Human operator took control"
+            elif action == "RETRY":
+                ret_m = coworker_engine.background_dispatcher.retry_mission(mid)
+                ok = ret_m is not None
+                msg = "Mission retried"
+            self._send_json({"success": ok, "action": action, "message": msg, "mission_id": mid})
+            return
+
+        elif path == "/api/coworker/terminal/execute":
+            params = req_data.get("parameters", {}) if isinstance(req_data.get("parameters"), dict) else {}
+            command = req_data.get("command") or params.get("command", "")
+            capability = req_data.get("capability") or params.get("capability", "terminal.shell_command")
+            cwd = req_data.get("cwd") or params.get("cwd", BASE_DIR)
+            human_approved = bool(req_data.get("human_approved", False) or params.get("human_approved", False))
+            session_id = f"term_api_{uuid.uuid4().hex[:6]}"
+            exec_payload = {
+                "capability": capability,
+                "command": command,
+                "cwd": cwd,
+                "parameters": {**params, "command": command, "cwd": cwd},
+                "human_approved": human_approved
+            }
+            for k in ["action", "file_path", "content"]:
+                if k in params:
+                    exec_payload[k] = params[k]
+                elif k in req_data:
+                    exec_payload[k] = req_data[k]
+            res = terminal_runtime.run_foreground(session_id, exec_payload)
+            self._send_json(res)
+            return
+
+        elif path == "/api/coworker/self-extension":
+            req_prompt = req_data.get("prompt", "")
+            ext_res = coworker_engine.self_extend(req_prompt)
+            self._send_json({
+                "success": ext_res.success,
+                "action_taken": ext_res.action_taken,
+                "capability_id": ext_res.capability_id,
+                "provider": ext_res.assigned_provider,
+                "qualification": ext_res.qualification_status.value,
+                "details": ext_res.details
+            })
+            return
+
+        elif path.startswith("/api/coworker/approvals/") and path.endswith("/decide"):
+            app_id = path.split("/")[4]
+            decision = req_data.get("decision", "APPROVE").upper()
+            mid = app_id.replace("app_", "")
+            if decision == "APPROVE":
+                coworker_engine.background_dispatcher.resume_mission(mid)
+                coworker_engine.background_dispatcher.execute_compound_mission_step(mid)
+            else:
+                coworker_engine.background_dispatcher.stop_mission(mid)
+            self._send_json({"success": True, "approval_id": app_id, "decision": decision})
             return
 
         # =====================================================================

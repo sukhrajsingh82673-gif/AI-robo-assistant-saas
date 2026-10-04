@@ -17,6 +17,7 @@ from .openhands_runtime import OpenHandsWorkerRuntime
 from .openclaw_runtime import OpenClawWorkerRuntime
 from .browser_runtime import BrowserWorkerRuntime
 from .computer_use_runtime import ComputerUseWorkerRuntime
+from .terminal_runtime import TerminalWorkerRuntime
 from ..contracts import RiskLevel
 
 @dataclass
@@ -41,6 +42,7 @@ class WorkerRuntimeRouter:
         self._history: List[RoutingDecision] = []
 
         # Register standard runtimes
+        self.register_runtime(TerminalWorkerRuntime(tenant_id))
         self.register_runtime(HermesWorkerRuntime(tenant_id))
         self.register_runtime(OpenHandsWorkerRuntime(tenant_id))
         self.register_runtime(OpenClawWorkerRuntime(tenant_id))
@@ -87,7 +89,10 @@ class WorkerRuntimeRouter:
             cap_prefix = capability_id.split(".")[0]
             rtype = r.runtime_type()
 
-            if cap_prefix == "engineering" and rtype == "OPENHANDS":
+            if cap_prefix in ["terminal", "shell", "bash", "system", "os"] and rtype == "TERMINAL":
+                score += 55.0
+                reasons.append("First-class Governed Terminal execution backbone")
+            elif cap_prefix == "engineering" and rtype == "OPENHANDS":
                 score += 40.0
                 reasons.append("Specialized software engineering runtime")
             elif cap_prefix in ["browser", "crawl"] and rtype in ["BROWSER", "OPENCLAW"]:

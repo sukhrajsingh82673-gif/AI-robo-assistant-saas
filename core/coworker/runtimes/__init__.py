@@ -14,6 +14,7 @@ from .openhands_runtime import OpenHandsWorkerRuntime
 from .openclaw_runtime import OpenClawWorkerRuntime, ClawHubPluginRegistry, ClawHubPlugin
 from .browser_runtime import BrowserWorkerRuntime, BrowserSessionState
 from .computer_use_runtime import ComputerUseWorkerRuntime, DesktopScreenState
+from .terminal_runtime import TerminalWorkerRuntime, TerminalCommandRisk, TerminalSecurityAnalyzer
 from .runtime_router import WorkerRuntimeRouter, RoutingDecision
 
 __all__ = [
@@ -36,6 +37,9 @@ __all__ = [
     "BrowserSessionState",
     "ComputerUseWorkerRuntime",
     "DesktopScreenState",
+    "TerminalWorkerRuntime",
+    "TerminalCommandRisk",
+    "TerminalSecurityAnalyzer",
     "WorkerRuntimeRouter",
     "RoutingDecision"
 ]

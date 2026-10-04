@@ -335,19 +335,26 @@ window.navigateTo = function(path) {
 
 function handleRoute(path) {
   let navKey = 'overview';
-  if (path.startsWith('/schedule')) navKey = 'schedule';
+  if (path.startsWith('/assistant')) navKey = 'assistant';
+  else if (path.startsWith('/coworker')) navKey = 'coworker';
+  else if (path.startsWith('/missions')) navKey = 'missions';
+  else if (path.startsWith('/approvals')) navKey = 'approvals';
+  else if (path.startsWith('/terminal')) navKey = 'terminal';
+  else if (path.startsWith('/activity')) navKey = 'activity';
+  else if (path.startsWith('/artifacts')) navKey = 'artifacts';
+  else if (path.startsWith('/schedule')) navKey = 'schedule';
   else if (path.startsWith('/ceo/meeting') || path.startsWith('/meeting')) navKey = 'meeting';
   else if (path.startsWith('/plugins') || path.startsWith('/connections')) navKey = 'plugins';
   else if (path.startsWith('/company') && path.includes('/organization')) navKey = 'organization';
   else if (path.startsWith('/company') && path.includes('/workforce')) navKey = 'workforce';
-  else if (path.startsWith('/company') && (path.includes('/tasks') || path.includes('/missions'))) navKey = 'tasks';
+  else if (path.startsWith('/company') && path.includes('/tasks')) navKey = 'tasks';
   else if (path.startsWith('/company') && path.includes('/processes')) navKey = 'processes';
   else if (path.startsWith('/company') && path.includes('/trustgraph')) navKey = 'trustgraph';
   else if (path.startsWith('/company')) navKey = 'company';
   else if (path.startsWith('/organization')) navKey = 'organization';
   else if (path.startsWith('/ceo') || path.startsWith('/ai-ceo')) navKey = 'ceo';
   else if (path.startsWith('/workforce')) navKey = 'workforce';
-  else if (path.startsWith('/tasks') || path.startsWith('/missions')) navKey = 'tasks';
+  else if (path.startsWith('/tasks')) navKey = 'tasks';
   else if (path.startsWith('/processes')) navKey = 'processes';
   else if (path.startsWith('/trustgraph')) navKey = 'trustgraph';
   else if (path.startsWith('/tools')) navKey = 'tools';
@@ -371,7 +378,21 @@ function handleRoute(path) {
 
   updateBreadcrumbs();
 
-  if (navKey === 'schedule' && window.ScheduleWorkspace) {
+  if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
+  } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
+  } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderMissions('view-missions');
+  } else if (navKey === 'approvals' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderApprovals('view-approvals');
+  } else if (navKey === 'terminal' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderTerminal('view-terminal');
+  } else if (navKey === 'activity' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderActivity('view-activity');
+  } else if (navKey === 'artifacts' && window.AssistantCoworkerWorkspace) {
+    window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
+  } else if (navKey === 'schedule' && window.ScheduleWorkspace) {
     window.ScheduleWorkspace.render('view-schedule');
   } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
     window.MeetingRoomWorkspace.render('view-meeting');
