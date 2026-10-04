@@ -23,9 +23,47 @@ class GovernedTerminalController:
     through the governed terminal runtime.
     """
 
-    def __init__(self, tenant_id: str = "tnt_primary"):
+    def __init__(self, tenant_id: str = "tnt_primary", company_id: str = "comp_primary", workspace_root: Optional[str] = None):
         self.tenant_id = tenant_id
-        self.runtime = TerminalWorkerRuntime(tenant_id=tenant_id)
+        self.company_id = company_id
+        self.runtime = TerminalWorkerRuntime(tenant_id=tenant_id, company_id=company_id, workspace_root=workspace_root)
+        from ...universal_terminal import UniversalTerminal, TerminalHandlingAgent
+        self.universal_terminal = UniversalTerminal(tenant_id=tenant_id, company_id=company_id, workspace_root=workspace_root)
+        self.agent = TerminalHandlingAgent(tenant_id=tenant_id, company_id=company_id, workspace_root=workspace_root)
+
+    def process_objective(
+        self,
+        objective: str,
+        mission_id: Optional[str] = None,
+        human_approved: bool = False,
+        force_gui: bool = False,
+        explicit_command: Optional[str] = None,
+        postconditions: Optional[List[Any]] = None
+    ) -> Dict[str, Any]:
+        """Processes high-level objective via the 16-step Terminal Handling Agent lifecycle."""
+        res = self.agent.process_objective(
+            objective=objective,
+            mission_id=mission_id,
+            human_approved=human_approved,
+            force_gui=force_gui,
+            explicit_command=explicit_command,
+            postconditions=postconditions
+        )
+        return {
+            "status": res.status,
+            "summary": res.summary,
+            "environment_used": res.environment_used,
+            "runtime_profile": res.runtime_profile,
+            "tools_used": res.tools_used,
+            "tools_installed": res.tools_installed,
+            "commands_executed": res.commands_executed,
+            "observations": res.observations,
+            "verification": res.verification,
+            "evidence_id": res.evidence_id,
+            "failures": res.failures,
+            "recovery_actions": res.recovery_actions,
+            "duration_ms": res.duration_ms
+        }
 
     def execute_command(
         self,
@@ -67,3 +105,4 @@ class GovernedTerminalController:
     def get_diagnostics(self) -> Dict[str, Any]:
         """Returns terminal sandbox diagnostics, sandbox directory, and snapshot count."""
         return self.runtime.get_diagnostics()
+

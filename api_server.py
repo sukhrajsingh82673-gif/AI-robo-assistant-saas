@@ -104,9 +104,16 @@ plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 from core.production_api import api_handler
 from core.coworker.engine import UniversalCoworkerEngine
 from core.coworker.runtimes.terminal_runtime import TerminalWorkerRuntime, TerminalCommandRisk, TerminalSecurityAnalyzer
+from core.universal_terminal import (
+    UniversalTerminal, TerminalHandlingAgent, TerminalHealthService,
+    ResourceInspector, UniversalRuntimeRouter, CommandPlan,
+    VerificationPostcondition, EnvironmentCapabilityRegistry
+)
 
 coworker_engine = UniversalCoworkerEngine.get_instance(tenant_id="tnt_primary")
 terminal_runtime = TerminalWorkerRuntime(tenant_id="tnt_primary")
+universal_terminal = UniversalTerminal(tenant_id="tnt_primary")
+terminal_agent = TerminalHandlingAgent(tenant_id="tnt_primary")
 
 
 
@@ -1202,10 +1209,40 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"reality_matrix": mat, "count": len(mat)})
             return
 
-        elif path == "/api/coworker/terminal/diagnostics":
-            diag = terminal_runtime.observe("sess_diag")
+        elif path == "/api/coworker/terminal/diagnostics" or path == "/api/terminal/diagnostics":
+            diag = TerminalHealthService.run_diagnostics(tenant_id=tenant_id)
             self._send_json(diag)
             return
+
+        elif path == "/api/terminal/profiles":
+            profiles = universal_terminal.registry.list_profiles()
+            res = [{
+                "profile_id": p.profile_id,
+                "distribution": p.distribution,
+                "version": p.version,
+                "architecture": p.architecture,
+                "desktop_environment": p.desktop_environment.value,
+                "execution_mode": p.execution_mode.value,
+                "isolation_level": p.isolation_level.value,
+                "network_mode": p.network_mode.value,
+                "min_ram_mb": p.min_ram_mb,
+                "capabilities": p.capabilities,
+                "preinstalled_tools": p.preinstalled_tools,
+                "description": p.metadata.get("description", "")
+            } for p in profiles]
+            self._send_json({"profiles": res, "count": len(res)})
+            return
+
+        elif path == "/api/terminal/host-inspection":
+            metrics = ResourceInspector.inspect_system()
+            self._send_json(metrics)
+            return
+
+        elif path == "/api/terminal/tools":
+            tools = universal_terminal.registry.list_tools()
+            self._send_json({"tools": tools, "count": len(tools)})
+            return
+
 
         elif path == "/api/coworker/approvals":
             approvals = []
@@ -3135,28 +3172,111 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"success": ok, "action": action, "message": msg, "mission_id": mid})
             return
 
-        elif path == "/api/coworker/terminal/execute":
+        elif path == "/api/coworker/terminal/execute" or path == "/api/terminal/execute":
             params = req_data.get("parameters", {}) if isinstance(req_data.get("parameters"), dict) else {}
             command = req_data.get("command") or params.get("command", "")
             capability = req_data.get("capability") or params.get("capability", "terminal.shell_command")
             cwd = req_data.get("cwd") or params.get("cwd", BASE_DIR)
             human_approved = bool(req_data.get("human_approved", False) or params.get("human_approved", False))
-            session_id = f"term_api_{uuid.uuid4().hex[:6]}"
-            exec_payload = {
-                "capability": capability,
-                "command": command,
-                "cwd": cwd,
-                "parameters": {**params, "command": command, "cwd": cwd},
-                "human_approved": human_approved
-            }
-            for k in ["action", "file_path", "content"]:
-                if k in params:
-                    exec_payload[k] = params[k]
-                elif k in req_data:
-                    exec_payload[k] = req_data[k]
-            res = terminal_runtime.run_foreground(session_id, exec_payload)
-            self._send_json(res)
+            session_id = req_data.get("session_id") or f"term_api_{uuid.uuid4().hex[:6]}"
+            profile_id = req_data.get("profile_id", "profile_linux_dev")
+
+            # Check if executing via UniversalTerminal or raw fallback
+            if req_data.get("use_fabric", True):
+                plan = CommandPlan(
+                    plan_id=f"plan_{uuid.uuid4().hex[:6]}",
+                    objective=req_data.get("objective", f"Execute shell command: {command}"),
+                    environment_profile_id=profile_id,
+                    working_directory=cwd,
+                    command=command,
+                    timeout_sec=float(req_data.get("timeout_sec", 30.0))
+                )
+                sess = universal_terminal._sessions.get(session_id)
+                if not sess:
+                    sess = universal_terminal.create_session(
+                        mission_id=req_data.get("mission_id", "msn_api"),
+                        task_id=req_data.get("task_id", "tsk_api"),
+                        environment_id=profile_id,
+                        workspace=cwd
+                    )
+                res = universal_terminal.execute(sess.session_id, plan)
+                self._send_json(res)
+                return
+            else:
+                exec_payload = {
+                    "capability": capability,
+                    "command": command,
+                    "cwd": cwd,
+                    "parameters": {**params, "command": command, "cwd": cwd},
+                    "human_approved": human_approved
+                }
+                for k in ["action", "file_path", "content"]:
+                    if k in params:
+                        exec_payload[k] = params[k]
+                    elif k in req_data:
+                        exec_payload[k] = req_data[k]
+                res = terminal_runtime.run_foreground(session_id, exec_payload)
+                self._send_json(res)
+                return
+
+        elif path == "/api/terminal/select-runtime":
+            objective = req_data.get("objective", "Linux development workload")
+            force_gui = bool(req_data.get("force_gui", False))
+            decision = universal_terminal.select_runtime(objective, force_gui=force_gui)
+            self._send_json({
+                "selected_profile_id": decision.selected_profile_id,
+                "selected_adapter_id": decision.selected_adapter_id,
+                "distribution": decision.distribution,
+                "version": decision.version,
+                "desktop_environment": decision.desktop_environment.value,
+                "execution_mode": decision.execution_mode.value,
+                "isolation_level": decision.isolation_level.value,
+                "network_mode": decision.network_mode.value,
+                "reason": decision.reason,
+                "score": decision.score,
+                "fallback_profiles": decision.fallback_profiles
+            })
             return
+
+        elif path == "/api/terminal/agent/objective":
+            objective = req_data.get("objective", "")
+            mission_id = req_data.get("mission_id")
+            human_approved = bool(req_data.get("human_approved", False))
+            force_gui = bool(req_data.get("force_gui", False))
+            explicit_cmd = req_data.get("command")
+            cwd = req_data.get("cwd")
+
+            result = terminal_agent.process_objective(
+                objective=objective,
+                mission_id=mission_id,
+                human_approved=human_approved,
+                force_gui=force_gui,
+                explicit_command=explicit_cmd,
+                custom_workspace=cwd
+            )
+            self._send_json({
+                "status": result.status,
+                "summary": result.summary,
+                "environment_used": result.environment_used,
+                "runtime_profile": result.runtime_profile,
+                "tools_used": result.tools_used,
+                "tools_installed": result.tools_installed,
+                "commands_executed": result.commands_executed,
+                "observations": result.observations,
+                "verification": result.verification,
+                "evidence_id": result.evidence_id,
+                "failures": result.failures,
+                "recovery_actions": result.recovery_actions,
+                "duration_ms": result.duration_ms
+            })
+            return
+
+        elif path == "/api/terminal/rollback":
+            snap_id = req_data.get("snapshot_id", "")
+            ok = universal_terminal.execution_gateway.rollback(snap_id)
+            self._send_json({"success": ok, "snapshot_id": snap_id})
+            return
+
 
         elif path == "/api/coworker/self-extension":
             req_prompt = req_data.get("prompt", "")
