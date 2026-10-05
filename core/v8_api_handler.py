@@ -23,6 +23,7 @@ logger = logging.getLogger("zonata.v8.api")
 
 class V8ApiHandler:
     _ceo_cache: Dict[Tuple[str, str], AICEOExecutiveOperatingLayer] = {}
+    _org_blueprints: Dict[Tuple[str, str], Any] = {}
 
     @classmethod
     def get_ceo(cls, tenant_id: str, company_id: str) -> AICEOExecutiveOperatingLayer:
@@ -30,6 +31,89 @@ class V8ApiHandler:
         if key not in cls._ceo_cache:
             cls._ceo_cache[key] = AICEOExecutiveOperatingLayer(tenant_id=tenant_id, company_id=company_id)
         return cls._ceo_cache[key]
+
+    @classmethod
+    def get_or_create_blueprint(cls, tenant_id: str, company_id: str, query_params: Optional[Dict[str, Any]] = None) -> Any:
+        key = (tenant_id, company_id)
+        if key not in cls._org_blueprints:
+            from core.aic_organization_constitution import (
+                CompanyProfile, DynamicOrganizationDesignEngine, CompanyScaleStage
+            )
+            params = query_params or {}
+            c_size_raw = params.get("company_size", ["SMALL_COMPANY"])
+            c_size_str = c_size_raw[0] if isinstance(c_size_raw, list) else c_size_raw
+            try:
+                scale_stage = CompanyScaleStage(c_size_str).value
+            except Exception:
+                scale_stage = "SMALL_COMPANY"
+
+            comp_name_raw = params.get("company_name", ["URA Enterprise"])
+            comp_name = comp_name_raw[0] if isinstance(comp_name_raw, list) else comp_name_raw
+
+            ind_raw = params.get("industry", ["SAAS_SOFTWARE"])
+            industry = ind_raw[0] if isinstance(ind_raw, list) else ind_raw
+
+            rev_raw = params.get("annual_revenue_usd", [5000000.0])
+            rev = float(rev_raw[0] if isinstance(rev_raw, list) else rev_raw)
+
+            hum_raw = params.get("human_employees", [18])
+            hum = int(hum_raw[0] if isinstance(hum_raw, list) else hum_raw)
+
+            agent_raw = params.get("active_agents", [12])
+            agents = int(agent_raw[0] if isinstance(agent_raw, list) else agent_raw)
+
+            profile = CompanyProfile(
+                company_id=company_id,
+                tenant_id=tenant_id,
+                company_name=comp_name,
+                industry=industry,
+                geography="GLOBAL",
+                company_size=scale_stage,
+                stage_maturity="SCALEUP",
+                revenue_model="SUBSCRIPTION_SAAS",
+                annual_revenue_usd=rev,
+                current_human_employees=hum,
+                current_active_agents=agents,
+                products_services=["Autonomous AI Company OS"],
+                customer_archetype="B2B",
+                regulatory_intensity="MEDIUM",
+                operational_complexity="MEDIUM",
+                capital_intensity="ASSET_LIGHT"
+            )
+            cls._org_blueprints[key] = DynamicOrganizationDesignEngine.synthesize_organization(profile)
+        return cls._org_blueprints[key]
+
+    @classmethod
+    def _build_company_profile(cls, tenant_id: str, company_id: str, data: Dict[str, Any]) -> Any:
+        from core.aic_organization_constitution import CompanyProfile, CompanyScaleStage
+        c_size_str = data.get("company_size", "SMALL_COMPANY")
+        try:
+            scale_stage = CompanyScaleStage(c_size_str).value
+        except Exception:
+            scale_stage = "SMALL_COMPANY"
+
+        prods = data.get("products_services", ["Autonomous AI Company OS"])
+        if isinstance(prods, str):
+            prods = [p.strip() for p in prods.split(",") if p.strip()]
+
+        return CompanyProfile(
+            company_id=data.get("company_id", company_id),
+            tenant_id=data.get("tenant_id", tenant_id),
+            company_name=data.get("company_name", "URA Enterprise"),
+            industry=data.get("industry", "SAAS_SOFTWARE"),
+            geography=data.get("geography", "GLOBAL"),
+            company_size=scale_stage,
+            stage_maturity=data.get("stage_maturity", "SCALEUP"),
+            revenue_model=data.get("revenue_model", "SUBSCRIPTION_SAAS"),
+            annual_revenue_usd=float(data.get("annual_revenue_usd", 5000000.0)),
+            current_human_employees=int(data.get("current_human_employees", data.get("human_employees", 18))),
+            current_active_agents=int(data.get("current_active_agents", data.get("active_agents", 12))),
+            products_services=prods,
+            customer_archetype=data.get("customer_archetype", "B2B"),
+            regulatory_intensity=data.get("regulatory_intensity", "MEDIUM"),
+            operational_complexity=data.get("operational_complexity", "MEDIUM"),
+            capital_intensity=data.get("capital_intensity", "ASSET_LIGHT")
+        )
 
     @classmethod
     def handle_get(cls, path: str, query_params: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
@@ -139,6 +223,112 @@ class V8ApiHandler:
             ind = query_params.get("industry", ["SAAS"])[0]
             prof = MultiIndustryEconomicAdapter.get_profile(ind)
             return {"success": True, "industry": ind, "profile": prof}, 200
+
+        # Universal AIC Organization Layer GET Endpoints
+        elif path == "/api/v8/organization":
+            from dataclasses import asdict
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "blueprint": asdict(blueprint),
+                "is_active": True,
+                "status": "OPERATIONAL",
+                "health": "HEALTHY"
+            }, 200
+
+        elif path == "/api/v8/organization/chart":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "reporting_tree": blueprint.reporting_tree,
+                "executives_count": len(blueprint.executives),
+                "departments_count": len(blueprint.departments),
+                "workforce_count": len(blueprint.workforce_agents),
+                "scale_stage": blueprint.scale_stage,
+                "industry": blueprint.industry
+            }, 200
+
+        elif path == "/api/v8/organization/roles":
+            from core.aic_organization_constitution import ExecutiveRoleRegistry
+            from dataclasses import asdict
+            roles = [asdict(r) for r in ExecutiveRoleRegistry.list_roles()]
+            return {"success": True, "roles": roles, "count": len(roles)}, 200
+
+        elif path == "/api/v8/organization/departments":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "departments": blueprint.departments,
+                "count": len(blueprint.departments)
+            }, 200
+
+        elif path == "/api/v8/organization/agents":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "workforce_agents": blueprint.workforce_agents,
+                "count": len(blueprint.workforce_agents)
+            }, 200
+
+        elif path == "/api/v8/organization/kras":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "kras": blueprint.kras,
+                "count": len(blueprint.kras)
+            }, 200
+
+        elif path == "/api/v8/organization/kpis":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "kpis": blueprint.kpis,
+                "count": len(blueprint.kpis)
+            }, 200
+
+        elif path == "/api/v8/organization/sops":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            return {
+                "success": True,
+                "sops": blueprint.sops,
+                "count": len(blueprint.sops)
+            }, 200
+
+        elif path == "/api/v8/organization/communications":
+            from core.aic_organization_constitution import ExecutiveCommunicationEngine, OperatingCadence
+            sender = query_params.get("sender_id", [None])[0]
+            msgs = ExecutiveCommunicationEngine.get_messages(sender)
+            return {
+                "success": True,
+                "messages": msgs,
+                "count": len(msgs),
+                "operating_cadences": [c.value for c in OperatingCadence]
+            }, 200
+
+        elif path == "/api/v8/organization/escalations":
+            from core.aic_organization_constitution import EscalationEngine
+            escs = EscalationEngine.list_escalations()
+            return {"success": True, "escalations": escs, "count": len(escs)}, 200
+
+        elif path == "/api/v8/organization/delegations":
+            from core.aic_organization_constitution import DelegationEngine
+            dlgs = DelegationEngine.list_delegations()
+            return {"success": True, "delegations": dlgs, "count": len(dlgs)}, 200
+
+        elif path == "/api/v8/organization/performance":
+            blueprint = cls.get_or_create_blueprint(tenant_id, company_id, query_params)
+            exec_count = len(blueprint.executives)
+            dept_count = max(1, len(blueprint.departments))
+            work_count = len(blueprint.workforce_agents)
+            return {
+                "success": True,
+                "span_of_control_analysis": blueprint.span_of_control_analysis,
+                "executive_span_ratio": round(exec_count / dept_count, 2),
+                "workforce_span_ratio": round(work_count / dept_count, 2),
+                "organizational_health_score": 92.5,
+                "efficiency_grade": "OPTIMAL",
+                "scale_stage": blueprint.scale_stage
+            }, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
 
@@ -676,6 +866,120 @@ class V8ApiHandler:
             params = body.get("params", {})
             res = ExecutiveStressTestSimulator.run_scenario(sc, params)
             return {"success": True, "scenario_result": res}, 200
+
+        # Universal AIC Organization Layer POST Endpoints
+        elif path == "/api/v8/organization/analyze":
+            from core.aic_organization_constitution import OrganizationGapAnalyzer
+            from dataclasses import asdict
+            prof_data = body.get("profile") or body
+            profile = cls._build_company_profile(tenant_id, company_id, prof_data)
+            existing_org = body.get("existing_org")
+            gap_res = OrganizationGapAnalyzer.analyze(profile, existing_org)
+            return {"success": True, "gap_analysis": asdict(gap_res)}, 200
+
+        elif path == "/api/v8/organization/design":
+            from core.aic_organization_constitution import DynamicOrganizationDesignEngine
+            from dataclasses import asdict
+            prof_data = body.get("profile") or body
+            profile = cls._build_company_profile(tenant_id, company_id, prof_data)
+            existing_org = body.get("existing_org")
+            blueprint = DynamicOrganizationDesignEngine.synthesize_organization(profile, existing_org)
+            cls._org_blueprints[(tenant_id, company_id)] = blueprint
+            return {"success": True, "blueprint": asdict(blueprint)}, 200
+
+        elif path == "/api/v8/organization/simulate":
+            from core.aic_organization_constitution import OrganizationRestructuringEngine, DynamicOrganizationDesignEngine
+            from dataclasses import asdict
+            current_bp = body.get("current_blueprint")
+            if not current_bp:
+                curr_obj = cls.get_or_create_blueprint(tenant_id, company_id)
+                current_bp = asdict(curr_obj)
+            proposed_bp = body.get("proposed_blueprint")
+            if not proposed_bp:
+                prop_prof_data = body.get("proposed_profile") or body
+                prop_prof = cls._build_company_profile(tenant_id, company_id, prop_prof_data)
+                prop_obj = DynamicOrganizationDesignEngine.synthesize_organization(prop_prof)
+                proposed_bp = asdict(prop_obj)
+            sim = OrganizationRestructuringEngine.simulate_restructuring(company_id, current_bp, proposed_bp)
+            return {"success": True, "simulation": asdict(sim)}, 200
+
+        elif path == "/api/v8/organization/activate":
+            b_id = body.get("blueprint_id", f"org_{company_id}_active")
+            approval = body.get("approval_authority", "AIC_CEO")
+            now = time.time()
+            return {
+                "success": True,
+                "status": "ACTIVE",
+                "blueprint_id": b_id,
+                "approved_by": approval,
+                "activation_timestamp": now,
+                "message": "Dynamic company organization formally activated under AIC CEO governance."
+            }, 200
+
+        elif path == "/api/v8/organization/communications/send":
+            from core.aic_organization_constitution import ExecutiveCommunicationEngine, MessagePriority
+            from dataclasses import asdict
+            sender = body.get("sender_id", "EXEC_CEO")
+            recipient = body.get("recipient_id", "EXEC_COO")
+            subject = body.get("subject", "Executive Operational Directive")
+            body_text = body.get("body", "Execute according to assigned SOP.")
+            priority_str = body.get("priority", "REQUEST")
+            try:
+                prio = MessagePriority(priority_str)
+            except Exception:
+                prio = MessagePriority.REQUEST
+            resp_deadline = body.get("response_required_by")
+            msg = ExecutiveCommunicationEngine.send_communication(
+                sender_id=sender,
+                recipient_id=recipient,
+                subject=subject,
+                body=body_text,
+                priority=prio,
+                response_required_by=resp_deadline
+            )
+            return {"success": True, "message": asdict(msg)}, 201
+
+        elif path == "/api/v8/organization/escalations/trigger":
+            from core.aic_organization_constitution import EscalationEngine
+            from dataclasses import asdict
+            orig = body.get("originator_id", "WORKER_AGENT_01")
+            target = body.get("target_executive_id", "EXEC_COO")
+            reason = body.get("trigger_reason", "Operational metric breach")
+            sev = body.get("severity", "HIGH")
+            details = body.get("details", {})
+            res = body.get("required_resolution", "Executive intervention required")
+            esc = EscalationEngine.trigger_escalation(
+                originator_id=orig,
+                target_executive_id=target,
+                trigger_reason=reason,
+                severity=sev,
+                details=details,
+                required_resolution=res
+            )
+            return {"success": True, "escalation": asdict(esc)}, 201
+
+        elif path == "/api/v8/organization/delegations/delegate":
+            from core.aic_organization_constitution import DelegationEngine
+            from dataclasses import asdict
+            d_by = body.get("delegator_id", "EXEC_CEO")
+            d_to = body.get("delegatee_id", "EXEC_COO")
+            mandate = body.get("mandate", "Manage operational delivery and resource capacity")
+            auth = body.get("authority_level", "EXECUTIVE_FUNCTION")
+            budget = float(body.get("budget_usd", 50000.0))
+            hours = float(body.get("time_hours", 168.0))
+            prohibitions = body.get("prohibited_actions", ["UNAUTHORIZED_DISCOUNTS", "LEGAL_COMMITMENTS", "SYSTEM_MUTATIONS"])
+            criteria = body.get("success_criteria", "Verified operational delivery")
+            dlg = DelegationEngine.create_delegation(
+                delegator_id=d_by,
+                delegatee_id=d_to,
+                mandate=mandate,
+                authority_level=auth,
+                budget_usd=budget,
+                time_hours=hours,
+                prohibitions=prohibitions,
+                success_criteria=criteria
+            )
+            return {"success": True, "delegation": asdict(dlg)}, 201
 
         ceo = cls.get_ceo(tenant_id, company_id)
 

@@ -320,7 +320,7 @@ function renderActiveNavView() {
     else renderCompanySection();
   }
   else if (navKey === 'organization') {
-    if (window.OrgWorkspace) window.OrgWorkspace.render('view-organization');
+    if (window.OrgWorkspace) window.OrgWorkspace.render('view-organization', currentRoute);
   }
   else if (navKey === 'ceo') {
     if (window.AiCeoWorkspace) window.AiCeoWorkspace.render('view-ceo', currentRoute);
@@ -468,7 +468,7 @@ function handleRoute(path) {
   } else if (navKey === 'company' && window.CompanyWorkspace) {
     window.CompanyWorkspace.render(cleanPath);
   } else if (navKey === 'organization' && window.OrgWorkspace) {
-    window.OrgWorkspace.render('view-organization');
+    window.OrgWorkspace.render('view-organization', cleanPath);
   } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
     window.AiCeoWorkspace.render('view-ceo', cleanPath);
   } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
