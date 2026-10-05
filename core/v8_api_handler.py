@@ -117,6 +117,21 @@ class V8ApiHandler:
 
     @classmethod
     def handle_get(cls, path: str, query_params: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        if not tenant_id or not company_id:
+            return {"error": "TENANT_COMPANY_ISOLATION: tenant_id and company_id are mandatory."}, 400
+
+        q_tnt = query_params.get("tenant_id")
+        if q_tnt:
+            val_tnt = q_tnt[0] if isinstance(q_tnt, list) else q_tnt
+            if val_tnt and val_tnt != tenant_id:
+                return {"error": "TENANT_ISOLATION_VIOLATION: Cross-tenant query rejected."}, 403
+
+        q_cmp = query_params.get("company_id")
+        if q_cmp:
+            val_cmp = q_cmp[0] if isinstance(q_cmp, list) else q_cmp
+            if val_cmp and val_cmp != company_id:
+                return {"error": "COMPANY_ISOLATION_VIOLATION: Cross-company query rejected."}, 403
+
         # 20. Production Infrastructure, Security & DR Endpoints (Do not require CEO instantiation)
         if path == "/api/v8/infra/orchestration/status":
             from core.production_orchestration import production_orchestrator
@@ -328,6 +343,23 @@ class V8ApiHandler:
                 "organizational_health_score": 92.5,
                 "efficiency_grade": "OPTIMAL",
                 "scale_stage": blueprint.scale_stage
+            }, 200
+
+        elif path == "/api/v8/organization/regulatory-profile":
+            from core.aic_organization_constitution import JurisdictionRegulatoryEngine
+            from dataclasses import asdict
+            jurisdiction = query_params.get("jurisdiction", query_params.get("country", ["GLOBAL"]))
+            jur_str = jurisdiction[0] if isinstance(jurisdiction, list) else jurisdiction
+            ind_raw = query_params.get("industry", ["UNKNOWN"])
+            ind_str = ind_raw[0] if isinstance(ind_raw, list) else ind_raw
+            act_raw = query_params.get("business_activity", [""])
+            act_str = act_raw[0] if isinstance(act_raw, list) else act_raw
+            profile = JurisdictionRegulatoryEngine.get_regulatory_profile(jur_str, ind_str, act_str)
+            return {
+                "success": True,
+                "regulatory_profile": asdict(profile),
+                "jurisdiction": jur_str,
+                "industry": ind_str
             }, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
@@ -596,6 +628,44 @@ class V8ApiHandler:
 
     @classmethod
     def handle_post(cls, path: str, body: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        if not tenant_id or not company_id:
+            return {"error": "TENANT_COMPANY_ISOLATION: tenant_id and company_id are mandatory."}, 400
+
+        req_tnt = body.get("tenant_id")
+        if req_tnt and req_tnt != tenant_id:
+            return {"error": "TENANT_ISOLATION_VIOLATION: Cross-tenant mutation rejected."}, 403
+
+        req_cmp = body.get("company_id")
+        if req_cmp and req_cmp != company_id:
+            return {"error": "COMPANY_ISOLATION_VIOLATION: Cross-company mutation rejected."}, 403
+
+        # Anti-Prompt-Injection Scanner
+        from core.aic_organization_constitution import AntiPromptInjectionScanner
+        def _scan_obj(val: Any) -> Optional[List[str]]:
+            if isinstance(val, str):
+                is_safe, v = AntiPromptInjectionScanner.scan_for_injection(val)
+                if not is_safe:
+                    return v
+            elif isinstance(val, dict):
+                for k, item in val.items():
+                    res = _scan_obj(item)
+                    if res:
+                        return res
+            elif isinstance(val, list):
+                for item in val:
+                    res = _scan_obj(item)
+                    if res:
+                        return res
+            return None
+
+        inj = _scan_obj(body)
+        if inj:
+            return {
+                "success": False,
+                "error": "PROMPT_INJECTION_DETECTED",
+                "details": f"Adversarial payload detected: {inj}"
+            }, 400
+
         # 20. Production Infrastructure, Security & DR POST Endpoints (Do not require CEO instantiation)
         if path == "/api/v8/infra/edge/inspect":
             from core.edge_security_gateway import edge_security_gateway
@@ -980,6 +1050,130 @@ class V8ApiHandler:
                 success_criteria=criteria
             )
             return {"success": True, "delegation": asdict(dlg)}, 201
+
+        elif path == "/api/v8/organization/discover":
+            from core.aic_organization_constitution import (
+                ExistingOrganizationData, ExistingOrganizationDiscoveryEngine
+            )
+            from dataclasses import asdict
+            raw_org = body.get("raw_org_data") or body.get("existing_org") or body
+            
+            data = ExistingOrganizationData(
+                company_id=company_id,
+                tenant_id=tenant_id,
+                company_name=raw_org.get("company_name", "Discovered Enterprise"),
+                industry=raw_org.get("industry", "UNKNOWN"),
+                geography=raw_org.get("geography", "UNKNOWN"),
+                jurisdictions=raw_org.get("jurisdictions", ["UNKNOWN"]),
+                company_stage=raw_org.get("company_stage", "UNKNOWN"),
+                employee_count=int(raw_org.get("employee_count", 0)),
+                AI_agent_count=int(raw_org.get("AI_agent_count", 0)),
+                contractor_count=int(raw_org.get("contractor_count", 0)),
+                business_units=raw_org.get("business_units", []),
+                departments=raw_org.get("departments", []),
+                teams=raw_org.get("teams", []),
+                managers=raw_org.get("managers", []),
+                executives=raw_org.get("executives", []),
+                reporting_lines=raw_org.get("reporting_lines", []),
+                current_roles=raw_org.get("current_roles", []),
+                current_KRAs=raw_org.get("current_KRAs", []),
+                current_KPIs=raw_org.get("current_KPIs", []),
+                current_SOPs=raw_org.get("current_SOPs", []),
+                current_tools=raw_org.get("current_tools", []),
+                current_systems=raw_org.get("current_systems", []),
+                current_revenue_model=raw_org.get("current_revenue_model", "UNKNOWN"),
+                current_customer_model=raw_org.get("current_customer_model", "UNKNOWN"),
+                current_operating_hours=raw_org.get("current_operating_hours", "UNKNOWN"),
+                current_risk_profile=raw_org.get("current_risk_profile", "UNKNOWN"),
+                current_regulatory_profile=raw_org.get("current_regulatory_profile", "UNKNOWN"),
+                current_budget=float(raw_org.get("current_budget", 0.0)),
+                current_cost_structure=raw_org.get("current_cost_structure", {}),
+                current_workload=raw_org.get("current_workload", "UNKNOWN"),
+                current_volume=float(raw_org.get("current_volume", 0.0)),
+                current_service_levels=raw_org.get("current_service_levels", {}),
+                current_quality_metrics=raw_org.get("current_quality_metrics", {}),
+                current_exception_rate=float(raw_org.get("current_exception_rate", 0.0)),
+                current_pain_points=raw_org.get("current_pain_points", []),
+                data_freshness=raw_org.get("data_freshness", "FRESH")
+            )
+            audit_report = ExistingOrganizationDiscoveryEngine.audit_existing_organization(data)
+            fingerprint = ExistingOrganizationDiscoveryEngine.generate_fingerprint(data)
+            return {
+                "success": True,
+                "audit_report": asdict(audit_report),
+                "fingerprint": asdict(fingerprint)
+            }, 200
+
+        elif path == "/api/v8/organization/diff":
+            from core.aic_organization_constitution import OrganizationDifferenceModel
+            from dataclasses import asdict
+            curr_org = body.get("current_org") or {}
+            target_bp = body.get("target_blueprint")
+            if not target_bp:
+                target_bp_obj = cls.get_or_create_blueprint(tenant_id, company_id)
+                target_bp = asdict(target_bp_obj)
+            diff = OrganizationDifferenceModel.calculate_diff(curr_org, target_bp)
+            return {"success": True, "diff": asdict(diff)}, 200
+
+        elif path == "/api/v8/organization/transition-plan":
+            from core.aic_organization_constitution import (
+                OrganizationDifferenceModel, OrganizationTransitionPlan
+            )
+            from dataclasses import asdict
+            curr_org = body.get("current_org") or {}
+            target_bp = body.get("target_blueprint")
+            if not target_bp:
+                target_bp_obj = cls.get_or_create_blueprint(tenant_id, company_id)
+                target_bp = asdict(target_bp_obj)
+            diff = OrganizationDifferenceModel.calculate_diff(curr_org, target_bp)
+            plan = OrganizationTransitionPlan.create_transition_plan(company_id, diff)
+            return {"success": True, "transition_plan": asdict(plan)}, 200
+
+        elif path == "/api/v8/organization/rollback":
+            from core.aic_organization_constitution import OrganizationRollbackEngine
+            target_ver = body.get("target_version", "")
+            curr_ver = body.get("current_version", "2.0.0-TARGET")
+            res = OrganizationRollbackEngine.rollback(company_id, target_ver, curr_ver)
+            code = 200 if res.get("success") else 400
+            return res, code
+
+        elif path == "/api/v8/organization/span/evaluate":
+            from core.aic_organization_constitution import AdaptiveSpanOfControlEngine
+            role_id = body.get("role_id", "EXEC_COO")
+            reports = int(body.get("current_reports_count", 5))
+            complexity = float(body.get("role_complexity", 5.0))
+            risk = body.get("risk_level", "MEDIUM")
+            reg = body.get("regulatory_intensity", "MEDIUM")
+            wf_type = body.get("workforce_type", "AI_AGENT")
+            exc_rate = float(body.get("exception_rate", 0.05))
+            span_eval = AdaptiveSpanOfControlEngine.evaluate_span(
+                role_id=role_id,
+                current_reports_count=reports,
+                role_complexity=complexity,
+                risk_level=risk,
+                regulatory_intensity=reg,
+                workforce_type=wf_type,
+                exception_rate=exc_rate
+            )
+            return {"success": True, "span_evaluation": span_eval}, 200
+
+        elif path == "/api/v8/organization/scaling/simulate":
+            from core.aic_organization_constitution import WorkloadWorkforceScalingSimulator
+            dept = body.get("department_name", "OPERATIONS")
+            base_count = int(body.get("base_agent_count", 10))
+            scenario = body.get("scenario", "NORMAL_VOLUME")
+            q_depth = int(body.get("queue_depth", 50))
+            sla = float(body.get("target_sla_sec", 30.0))
+            handle = float(body.get("avg_handle_time_sec", 15.0))
+            sim_res = WorkloadWorkforceScalingSimulator.simulate(
+                department_name=dept,
+                base_agent_count=base_count,
+                scenario=scenario,
+                queue_depth=q_depth,
+                target_sla_sec=sla,
+                avg_handle_time_sec=handle
+            )
+            return {"success": True, "simulation": sim_res, "simulation_only": True}, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
 

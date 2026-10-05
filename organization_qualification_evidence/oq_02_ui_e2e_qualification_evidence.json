@@ -1,0 +1,87 @@
+{
+  "audit_code": "OQ-02",
+  "title": "Complete 8-Tab UI / E2E Visual Qualification & Live API Grounding",
+  "timestamp": 1791201578.550372,
+  "status": "QUALIFIED",
+  "grounded_tabs": [
+    {
+      "tab_id": "overview",
+      "name": "1. Overview & Vitals",
+      "status": "PASS",
+      "data_freshness_badges": [
+        "FRESH",
+        "PARTIAL_DATA",
+        "STALE",
+        "UNVERIFIED"
+      ],
+      "dimensions_breakdown_count": 8
+    },
+    {
+      "tab_id": "chart",
+      "name": "2. Visual Org Chart",
+      "status": "PASS",
+      "interactive_hierarchy": true
+    },
+    {
+      "tab_id": "roles",
+      "name": "3. Executive Roles",
+      "status": "PASS",
+      "doa_ceilings_grounded": true
+    },
+    {
+      "tab_id": "kras",
+      "name": "4. KRA Cascade",
+      "status": "PASS",
+      "canonical_kra_count": 8
+    },
+    {
+      "tab_id": "kpis",
+      "name": "5. KPI & Anti-Gaming",
+      "status": "PASS",
+      "paired_counter_metrics": true,
+      "freshness_tags": true
+    },
+    {
+      "tab_id": "sops",
+      "name": "6. Executable SOPs",
+      "status": "PASS",
+      "kill_switch_bindings": true
+    },
+    {
+      "tab_id": "comms",
+      "name": "7. Comms & Escalations",
+      "status": "PASS",
+      "anti_storm_rate_limits": true
+    },
+    {
+      "tab_id": "simulator",
+      "name": "8. Discovery, Transition & Scaling",
+      "status": "PASS",
+      "simulation_only_badge": true,
+      "cutover_phases_count": 5
+    }
+  ],
+  "verified_api_endpoints": [
+    "GET /api/v8/organization",
+    "GET /api/v8/organization/chart",
+    "GET /api/v8/organization/roles",
+    "GET /api/v8/organization/departments",
+    "GET /api/v8/organization/agents",
+    "GET /api/v8/organization/kras",
+    "GET /api/v8/organization/kpis",
+    "GET /api/v8/organization/sops",
+    "GET /api/v8/organization/communications",
+    "GET /api/v8/organization/escalations",
+    "GET /api/v8/organization/delegations",
+    "GET /api/v8/organization/performance",
+    "GET /api/v8/organization/regulatory-profile",
+    "POST /api/v8/organization/discover",
+    "POST /api/v8/organization/diff",
+    "POST /api/v8/organization/transition-plan",
+    "POST /api/v8/organization/rollback",
+    "POST /api/v8/organization/span/evaluate",
+    "POST /api/v8/organization/scaling/simulate"
+  ],
+  "zero_mock_compliance": true,
+  "sha256_digest": "2bd69a370aa2443e2dbbe26112520daa1d8123071be362891ee69edd514dd8ab"
+}

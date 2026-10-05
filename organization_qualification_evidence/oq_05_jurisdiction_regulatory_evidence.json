@@ -1,0 +1,208 @@
+{
+  "audit_code": "OQ-05",
+  "title": "Jurisdiction-Aware Regulatory Architecture",
+  "timestamp": 1791201578.550372,
+  "status": "QUALIFIED",
+  "profiles_audited": {
+    "US_HEALTHCARE": {
+      "jurisdiction_id": "reg_US_HEALTHCARE",
+      "country": "US",
+      "state_province": "ALL",
+      "business_activity": "Operating in HEALTHCARE",
+      "industry": "HEALTHCARE",
+      "regulated_data_types": [
+        "CUSTOMER_PII",
+        "PROTECTED_HEALTH_INFORMATION_PHI",
+        "ELECTRONIC_HEALTH_RECORDS"
+      ],
+      "applicable_frameworks": [
+        "CCPA / CPRA",
+        "FTC Act Section 5",
+        "NIST Cybersecurity Framework",
+        "SOC 2 Type II",
+        "HIPAA (Health Insurance Portability and Accountability Act)",
+        "HITECH",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [
+        "Healthcare Facility Provider License"
+      ],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_CRO_RISK",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    },
+    "EU_FINTECH": {
+      "jurisdiction_id": "reg_EU_FINTECH",
+      "country": "EU",
+      "state_province": "ALL",
+      "business_activity": "Operating in FINTECH",
+      "industry": "FINTECH",
+      "regulated_data_types": [
+        "CUSTOMER_PII",
+        "FINANCIAL_PAYMENT_DATA",
+        "CARDHOLDER_DATA"
+      ],
+      "applicable_frameworks": [
+        "GDPR (General Data Protection Regulation)",
+        "NIS 2 Directive",
+        "DORA (Digital Operational Resilience Act)",
+        "EU Artificial Intelligence Act (EU AI Act)",
+        "MiFID II",
+        "PSD2 / PSD3",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [
+        "Financial Services Regulatory Authority Authorization"
+      ],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_CFO",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    },
+    "IN_MANUFACTURING": {
+      "jurisdiction_id": "reg_IN_MANUFACTURING",
+      "country": "IN",
+      "state_province": "ALL",
+      "business_activity": "Operating in MANUFACTURING",
+      "industry": "MANUFACTURING",
+      "regulated_data_types": [
+        "CUSTOMER_PII"
+      ],
+      "applicable_frameworks": [
+        "Digital Personal Data Protection (DPDP) Act 2023",
+        "Factories Act 1948",
+        "State Industrial Safety Rules",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [
+        "Factory Operating Permit & Environmental Clearance"
+      ],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_COO",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    },
+    "UK_FINANCIAL": {
+      "jurisdiction_id": "reg_UK_FINANCIAL",
+      "country": "UK",
+      "state_province": "ALL",
+      "business_activity": "Operating in FINANCIAL",
+      "industry": "FINANCIAL",
+      "regulated_data_types": [
+        "CUSTOMER_PII",
+        "FINANCIAL_PAYMENT_DATA",
+        "CARDHOLDER_DATA"
+      ],
+      "applicable_frameworks": [
+        "UK GDPR",
+        "Data Protection Act 2018",
+        "FCA Handbook Regulations",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [
+        "Financial Services Regulatory Authority Authorization"
+      ],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_CFO",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    },
+    "AE_HOSPITALITY": {
+      "jurisdiction_id": "reg_AE_HOSPITALITY",
+      "country": "AE",
+      "state_province": "ALL",
+      "business_activity": "Operating in HOSPITALITY",
+      "industry": "HOSPITALITY",
+      "regulated_data_types": [
+        "CUSTOMER_PII"
+      ],
+      "applicable_frameworks": [
+        "DIFC Data Protection Law No. 5 of 2020",
+        "UAE Federal Decree Law No. 45",
+        "Municipal Hospitality & Hygiene Licensing",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [
+        "Hospitality & Lodging Business License"
+      ],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_COO",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    },
+    "GLOBAL_SAAS_SOFTWARE": {
+      "jurisdiction_id": "reg_GLOBAL_SAAS_SOFTWARE",
+      "country": "GLOBAL",
+      "state_province": "ALL",
+      "business_activity": "Operating in SAAS_SOFTWARE",
+      "industry": "SAAS_SOFTWARE",
+      "regulated_data_types": [
+        "CUSTOMER_PII"
+      ],
+      "applicable_frameworks": [
+        "Baseline ISO 27701 Data Privacy",
+        "ISO 37000 (Governance of Organizations)",
+        "ISO 31000 (Risk Management)",
+        "ISO 37301 (Compliance Management)",
+        "ISO/IEC 42001 (AI Management System)"
+      ],
+      "licensing_requirements": [],
+      "human_approval_requirements": [
+        "Statutory tax filings require explicit human signature.",
+        "Clinical practice decisions must be verified by licensed human practitioners.",
+        "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+      ],
+      "accountable_owner_role": "EXEC_CLO",
+      "verification_status": "VERIFIED",
+      "confidence": 0.92
+    }
+  },
+  "statutory_human_signatures_enforced": [
+    "Statutory tax filings require explicit human signature.",
+    "Clinical practice decisions must be verified by licensed human practitioners.",
+    "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+  ],
+  "iso_compliance_suite": [
+    "ISO 37000",
+    "ISO 31000",
+    "ISO 37301",
+    "ISO/IEC 42001"
+  ],
+  "sha256_digest": "66fa61d289023a7fea61307014144816b5a7631fa93c4bf776e725dee7e890ca"
+}

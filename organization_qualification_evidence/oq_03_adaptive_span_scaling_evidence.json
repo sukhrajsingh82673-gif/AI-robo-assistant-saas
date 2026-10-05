@@ -1,0 +1,115 @@
+{
+  "audit_code": "OQ-03",
+  "title": "Adaptive Span-of-Control & Workload Workforce Scaling Simulator",
+  "timestamp": 1791201578.550372,
+  "status": "QUALIFIED",
+  "executive_span_evaluation": {
+    "role_id": "EXEC_CEO",
+    "current_span": 5,
+    "recommended_span": 4,
+    "min_reasonable_span": 3,
+    "max_reasonable_span": 5,
+    "status": "OPTIMAL",
+    "complexity_score": 7.17,
+    "rationale": "High regulatory/risk complexity requires narrower executive span for rigorous oversight.",
+    "assumptions": {
+      "workforce_type": "AI_AGENT",
+      "risk_level": "CRITICAL",
+      "regulatory_intensity": "HIGH",
+      "exception_rate": 0.05
+    }
+  },
+  "worker_ai_span_evaluation": {
+    "role_id": "MGR_OPS",
+    "current_span": 18,
+    "recommended_span": 18,
+    "min_reasonable_span": 10,
+    "max_reasonable_span": 25,
+    "status": "OPTIMAL",
+    "complexity_score": 4.05,
+    "rationale": "AI agents governed by telemetry and automated SOPs support expanded spans.",
+    "assumptions": {
+      "workforce_type": "AI_AGENT",
+      "risk_level": "MEDIUM",
+      "regulatory_intensity": "MEDIUM",
+      "exception_rate": 0.05
+    }
+  },
+  "workload_simulations": {
+    "LOW_VOLUME": {
+      "department_name": "OPERATIONS",
+      "scenario": "LOW_VOLUME",
+      "effective_queue_depth": 30,
+      "base_agent_count": 10,
+      "simulated_agent_count": 6,
+      "agent_delta": -4,
+      "sla_fulfillment_projected_pct": 84.5,
+      "estimated_cost_delta_usd": -480.0,
+      "simulation_only": true,
+      "mutates_production": false
+    },
+    "NORMAL_VOLUME": {
+      "department_name": "OPERATIONS",
+      "scenario": "NORMAL_VOLUME",
+      "effective_queue_depth": 60,
+      "base_agent_count": 10,
+      "simulated_agent_count": 12,
+      "agent_delta": 2,
+      "sla_fulfillment_projected_pct": 99.2,
+      "estimated_cost_delta_usd": 240.0,
+      "simulation_only": true,
+      "mutates_production": false
+    },
+    "HIGH_VOLUME": {
+      "department_name": "OPERATIONS",
+      "scenario": "HIGH_VOLUME",
+      "effective_queue_depth": 132,
+      "base_agent_count": 10,
+      "simulated_agent_count": 26,
+      "agent_delta": 16,
+      "sla_fulfillment_projected_pct": 99.2,
+      "estimated_cost_delta_usd": 1920.0,
+      "simulation_only": true,
+      "mutates_production": false
+    },
+    "SPIKE": {
+      "department_name": "OPERATIONS",
+      "scenario": "SPIKE",
+      "effective_queue_depth": 270,
+      "base_agent_count": 10,
+      "simulated_agent_count": 54,
+      "agent_delta": 44,
+      "sla_fulfillment_projected_pct": 99.2,
+      "estimated_cost_delta_usd": 5280.0,
+      "simulation_only": true,
+      "mutates_production": false
+    },
+    "CRISIS": {
+      "department_name": "OPERATIONS",
+      "scenario": "CRISIS",
+      "effective_queue_depth": 480,
+      "base_agent_count": 10,
+      "simulated_agent_count": 96,
+      "agent_delta": 86,
+      "sla_fulfillment_projected_pct": 99.2,
+      "estimated_cost_delta_usd": 10320.0,
+      "simulation_only": true,
+      "mutates_production": false
+    },
+    "RECOVERY": {
+      "department_name": "OPERATIONS",
+      "scenario": "RECOVERY",
+      "effective_queue_depth": 78,
+      "base_agent_count": 10,
+      "simulated_agent_count": 16,
+      "agent_delta": 6,
+      "sla_fulfillment_projected_pct": 99.2,
+      "estimated_cost_delta_usd": 720.0,
+      "simulation_only": true,
+      "mutates_production": false
+    }
+  },
+  "simulation_only_verified": true,
+  "mutates_production": false,
+  "sha256_digest": "7263d02a6a6c2e0c6e1e36283f2271ac602b4b0c6ff16da226d49ca29ebc2208"
+}

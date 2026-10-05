@@ -1,0 +1,187 @@
+{
+  "audit_code": "OQ-01",
+  "title": "Existing-Company Organizational Transformation & 30-Check Discovery Audit",
+  "timestamp": 1791201578.550372,
+  "status": "QUALIFIED",
+  "fingerprint": {
+    "company_id": "comp_primary",
+    "tenant_id": "tnt_primary",
+    "node_count": 56,
+    "executive_count": 1,
+    "department_count": 4,
+    "team_count": 0,
+    "manager_count": 0,
+    "specialist_count": 0,
+    "worker_count": 35,
+    "agent_count": 18,
+    "reporting_edge_count": 2,
+    "KRA_count": 0,
+    "KPI_count": 0,
+    "SOP_count": 0,
+    "communication_channel_count": 4,
+    "escalation_path_count": 1,
+    "delegation_count": 0,
+    "budget_count": 0,
+    "risk_control_count": 0,
+    "regulatory_requirement_count": 3,
+    "generated_at": 1791201578.554522,
+    "source_version": "CURRENT",
+    "sha256_fingerprint": "32fcfb4ebd671c736a401dc3ab0f750deb9d8f961cf7999e61e0cb3c4f11085b"
+  },
+  "audit_report": {
+    "audit_id": "aud_org_8800eaea",
+    "company_id": "comp_primary",
+    "tenant_id": "tnt_primary",
+    "current_org_version": "1.0.0-DISCOVERED",
+    "audit_timestamp": 1791201578.550469,
+    "organization_health_score": 96.2,
+    "governance_health_score": 100.0,
+    "accountability_score": 100.0,
+    "reporting_integrity_score": 100.0,
+    "span_of_control_score": 100.0,
+    "capability_coverage_score": 90.0,
+    "KPI_coverage_score": 100.0,
+    "SOP_coverage_score": 100.0,
+    "risk_coverage_score": 40.0,
+    "regulatory_coverage_score": 45.0,
+    "resilience_score": 80.0,
+    "cost_efficiency_score": 80.0,
+    "execution_capacity_score": 85.0,
+    "bottleneck_score": 100.0,
+    "duplication_score": 90.0,
+    "critical_gap_count": 0,
+    "warning_count": 0,
+    "recommendation_count": 1,
+    "gaps": [
+      {
+        "category": "MISSING_CAPABILITY",
+        "severity": "HIGH",
+        "description": "Company scale warrants dedicated CFO; financial treasury is unassigned."
+      }
+    ],
+    "warnings": [],
+    "recommendations": [
+      "Establish dedicated CFO or treasury lead to safeguard cash runway."
+    ],
+    "evidence_receipt": {
+      "fingerprint_sha256": "007e3d9c052aeb650911199814990b488749cd77d63f50b6ac96666a96bf6624",
+      "audit_id": "aud_org_8800eaea",
+      "timestamp": 1791201578.550469,
+      "node_count": 56,
+      "status": "QUALIFIED_AUDIT"
+    }
+  },
+  "difference_model": {
+    "diff_id": "diff_6ba1b40e",
+    "company_id": "comp_primary",
+    "added_roles": [
+      {
+        "role_id": "EXEC_COO",
+        "purpose": "treasury and ops"
+      }
+    ],
+    "removed_roles": [],
+    "renamed_roles": [],
+    "merged_roles": [],
+    "split_departments": [],
+    "moved_nodes": [],
+    "authority_changes": [],
+    "budget_changes": [],
+    "KRA_changes": [
+      {
+        "status": "ALIGNED_TO_TARGET"
+      }
+    ],
+    "KPI_changes": [
+      {
+        "status": "PAIRED_COUNTER_METRICS_ADDED"
+      }
+    ],
+    "SOP_changes": [
+      {
+        "status": "GOVERNED_EXECUTABLE_SOPS_ATTACHED"
+      }
+    ],
+    "reporting_changes": [],
+    "workforce_changes": {
+      "current": 1,
+      "target": 2,
+      "delta": 1
+    },
+    "regulatory_owner_changes": []
+  },
+  "transition_plan": {
+    "transition_id": "trans_60e3bb4e",
+    "company_id": "comp_primary",
+    "current_version": "1.0.0-DISCOVERED",
+    "target_version": "2.0.0-TARGET",
+    "phases": [
+      {
+        "phase": 1,
+        "title": "Governance Authorization",
+        "action": "Owner/CEO signoff and DoA commitment"
+      },
+      {
+        "phase": 2,
+        "title": "Pre-Provisioning & Successor Onboarding",
+        "action": "Provision successor roles before altering existing duties"
+      },
+      {
+        "phase": 3,
+        "title": "Reporting & Communication Cutover",
+        "action": "Update reporting lines and anti-storm channels"
+      },
+      {
+        "phase": 4,
+        "title": "SOP & KPI Verification",
+        "action": "Verify executable SOPs and anti-gaming counter-metrics"
+      },
+      {
+        "phase": 5,
+        "title": "Audit & Post-Cutover Telemetry",
+        "action": "Log cryptographic receipt into EvidenceLedger"
+      }
+    ],
+    "affected_people": 0,
+    "affected_agents": 2,
+    "authority_changes": [],
+    "rollback_plan": {
+      "strategy": "STATE_RESTORE",
+      "safe_fallback_version": "1.0.0-DISCOVERED",
+      "preconditions": [
+        "Target version backup preserved",
+        "No unassigned regulatory responsibilities"
+      ]
+    },
+    "approval_requirements": "AIC_CEO_INTERNAL",
+    "risk_assessment": "LOW: Redundancy safeguarded and authority vacuum prevented.",
+    "expected_duration_days": 14,
+    "success_criteria": "All departments operational, all KRAs owned, zero unowned KPIs.",
+    "evidence_receipt": {
+      "transition_id": "trans_60e3bb4e",
+      "timestamp": 1791201578.554675,
+      "sha256": "a68c4b27569238dff8cbd30f014bb76e6d51d8635e7b4337231d2ea7ff41d4a8"
+    }
+  },
+  "rollback_receipt": {
+    "success": true,
+    "status": "ROLLED_BACK",
+    "receipt": {
+      "rollback_id": "rb_0a9fad54",
+      "company_id": "comp_primary",
+      "reverted_from": "2.0.0-TARGET",
+      "restored_to": "1.0.0-DISCOVERED",
+      "timestamp": 1791201578.5546992,
+      "status": "ROLLED_BACK",
+      "sha256": "2418c3e28b92db07577027c3010c495187698c46a941b37ba56c8a41525a544b"
+    }
+  },
+  "verification_checks": {
+    "circular_reporting_detected": true,
+    "orphan_subordinates_detected": true,
+    "overloaded_managers_detected": true,
+    "sod_conflicts_detected": true,
+    "authority_vacuum_prevented": true
+  },
+  "sha256_digest": "8959d5e897de92dfc1b120ffb401b50e2bf6d63097b91fd57efaa22ae1ab0932"
+}

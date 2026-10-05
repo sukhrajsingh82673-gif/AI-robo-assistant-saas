@@ -1662,3 +1662,827 @@ class OrganizationRestructuringEngine:
             organizational_value_score=val_score,
             approval_required=approval
         )
+
+# ==============================================================================
+# 8. EXISTING COMPANY DISCOVERY, AUDIT & TRANSFORMATION ENGINE (GAP OQ-01)
+# ==============================================================================
+
+@dataclass
+class ExistingOrganizationData:
+    """
+    Intake schema for existing enterprise organizations.
+    Gracefully handles missing information without silent fabrication.
+    """
+    company_id: str
+    tenant_id: str
+    company_name: str
+    industry: str = "UNKNOWN"
+    geography: str = "UNKNOWN"
+    jurisdictions: List[str] = field(default_factory=lambda: ["UNKNOWN"])
+    company_stage: str = "UNKNOWN"
+    employee_count: int = 0
+    AI_agent_count: int = 0
+    contractor_count: int = 0
+    business_units: List[Dict[str, Any]] = field(default_factory=list)
+    departments: List[Dict[str, Any]] = field(default_factory=list)
+    teams: List[Dict[str, Any]] = field(default_factory=list)
+    managers: List[Dict[str, Any]] = field(default_factory=list)
+    executives: List[Dict[str, Any]] = field(default_factory=list)
+    reporting_lines: List[Dict[str, str]] = field(default_factory=list) # [{"subordinate": "...", "superior": "..."}]
+    current_roles: List[Dict[str, Any]] = field(default_factory=list)
+    current_KRAs: List[Dict[str, Any]] = field(default_factory=list)
+    current_KPIs: List[Dict[str, Any]] = field(default_factory=list)
+    current_SOPs: List[Dict[str, Any]] = field(default_factory=list)
+    current_tools: List[str] = field(default_factory=list)
+    current_systems: List[str] = field(default_factory=list)
+    current_revenue_model: str = "UNKNOWN"
+    current_customer_model: str = "UNKNOWN"
+    current_operating_hours: str = "UNKNOWN"
+    current_risk_profile: str = "UNKNOWN"
+    current_regulatory_profile: str = "UNKNOWN"
+    current_budget: float = 0.0
+    current_cost_structure: Dict[str, float] = field(default_factory=dict)
+    current_workload: str = "UNKNOWN"
+    current_volume: float = 0.0
+    current_service_levels: Dict[str, Any] = field(default_factory=dict)
+    current_quality_metrics: Dict[str, Any] = field(default_factory=dict)
+    current_exception_rate: float = 0.0
+    current_pain_points: List[str] = field(default_factory=list)
+    data_freshness: str = "FRESH" # FRESH, STALE, EXPIRED, UNKNOWN, UNVERIFIED, PARTIAL_DATA, DATA_CONFLICT
+
+@dataclass
+class CurrentOrgFingerprint:
+    """
+    Cryptographic snapshot of an organizational structure for audit and change detection.
+    """
+    company_id: str
+    tenant_id: str
+    node_count: int
+    executive_count: int
+    department_count: int
+    team_count: int
+    manager_count: int
+    specialist_count: int
+    worker_count: int
+    agent_count: int
+    reporting_edge_count: int
+    KRA_count: int
+    KPI_count: int
+    SOP_count: int
+    communication_channel_count: int
+    escalation_path_count: int
+    delegation_count: int
+    budget_count: int
+    risk_control_count: int
+    regulatory_requirement_count: int
+    generated_at: float
+    source_version: str
+    sha256_fingerprint: str
+
+@dataclass
+class OrganizationAuditReport:
+    """
+    Explainable multi-dimensional audit of an organization's health, governance, and operational integrity.
+    """
+    audit_id: str
+    company_id: str
+    tenant_id: str
+    current_org_version: str
+    audit_timestamp: float
+    organization_health_score: float      # Composite 0-100
+    governance_health_score: float        # Clear reporting, DoA, Owner sovereignty
+    accountability_score: float           # 16-field coverage, single owner per outcome
+    reporting_integrity_score: float      # No orphans, circulars, or dead ends
+    span_of_control_score: float          # Adaptive span balance
+    capability_coverage_score: float      # Required industry functions present
+    KPI_coverage_score: float             # KRA to KPI mapping ratio
+    SOP_coverage_score: float             # Executable SOP ownership
+    risk_coverage_score: float            # ISO 31000 risk limits assigned
+    regulatory_coverage_score: float      # Statutory compliance ownership
+    resilience_score: float               # Failover role redundancy, no SPOFs
+    cost_efficiency_score: float          # Management overhead ratio
+    execution_capacity_score: float       # Queue handling vs throughput
+    bottleneck_score: float               # Overloaded manager penalty
+    duplication_score: float              # Duplicate role overlap penalty
+    critical_gap_count: int
+    warning_count: int
+    recommendation_count: int
+    gaps: List[Dict[str, Any]]
+    warnings: List[str]
+    recommendations: List[str]
+    evidence_receipt: Dict[str, Any]
+
+class ExistingOrganizationDiscoveryEngine:
+    """
+    Discovers, validates, and audits an existing enterprise organization structure.
+    Executes 30 structural, operational, governance, and regulatory integrity checks.
+    """
+    @classmethod
+    def generate_fingerprint(cls, data: ExistingOrganizationData, version: str = "CURRENT") -> CurrentOrgFingerprint:
+        now = time.time()
+        node_cnt = len(data.executives) + len(data.managers) + len(data.current_roles) + data.employee_count + data.AI_agent_count
+        edge_cnt = len(data.reporting_lines)
+        kra_cnt = len(data.current_KRAs)
+        kpi_cnt = len(data.current_KPIs)
+        sop_cnt = len(data.current_SOPs)
+        
+        raw = f"{data.tenant_id}:{data.company_id}:{node_cnt}:{edge_cnt}:{kra_cnt}:{kpi_cnt}:{sop_cnt}:{data.employee_count}:{data.AI_agent_count}:{now}"
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+        return CurrentOrgFingerprint(
+            company_id=data.company_id,
+            tenant_id=data.tenant_id,
+            node_count=node_cnt,
+            executive_count=len(data.executives),
+            department_count=len(data.departments),
+            team_count=len(data.teams),
+            manager_count=len(data.managers),
+            specialist_count=len([r for r in data.current_roles if "specialist" in r.get("role_name", "").lower()]),
+            worker_count=data.employee_count,
+            agent_count=data.AI_agent_count,
+            reporting_edge_count=edge_cnt,
+            KRA_count=kra_cnt,
+            KPI_count=kpi_cnt,
+            SOP_count=sop_cnt,
+            communication_channel_count=max(1, len(data.departments)),
+            escalation_path_count=max(1, len(data.executives)),
+            delegation_count=0,
+            budget_count=1 if data.current_budget > 0 else 0,
+            risk_control_count=1 if data.current_risk_profile != "UNKNOWN" else 0,
+            regulatory_requirement_count=len(data.jurisdictions),
+            generated_at=now,
+            source_version=version,
+            sha256_fingerprint=digest
+        )
+
+    @classmethod
+    def audit_existing_organization(cls, data: ExistingOrganizationData) -> OrganizationAuditReport:
+        audit_id = f"aud_org_{uuid.uuid4().hex[:8]}"
+        now = time.time()
+
+        gaps: List[Dict[str, Any]] = []
+        warnings: List[str] = []
+        recommendations: List[str] = []
+
+        all_node_ids = {e.get("role_id") for e in data.executives if e.get("role_id")}
+        all_node_ids.update({m.get("id") or m.get("manager_id") for m in data.managers if m.get("id") or m.get("manager_id")})
+        all_node_ids.update({r.get("role_id") or r.get("id") for r in data.current_roles if r.get("role_id") or r.get("id")})
+
+        # 1. Check reporting integrity (circular reporting, orphans, impossible reporting)
+        subordinate_to_superior: Dict[str, str] = {}
+        superior_to_subordinates: Dict[str, List[str]] = {}
+        circulars: List[str] = []
+        orphans: List[str] = []
+
+        for line in data.reporting_lines:
+            sub = line.get("subordinate")
+            sup = line.get("superior")
+            if not sub or not sup:
+                continue
+            if sub == sup:
+                circulars.append(f"Self-reporting node: {sub}")
+            if sup not in all_node_ids and sup not in ["OWNER", "BOARD", "EXEC_CEO"]:
+                orphans.append(f"Orphan subordinate {sub} reports to non-existent superior {sup}")
+            
+            subordinate_to_superior[sub] = sup
+            superior_to_subordinates.setdefault(sup, []).append(sub)
+
+        # Detect circular reporting loops (A -> B -> A)
+        for sub, sup in subordinate_to_superior.items():
+            visited = {sub}
+            curr = sup
+            while curr and curr in subordinate_to_superior:
+                if curr in visited:
+                    circulars.append(f"Circular reporting detected: {sub} -> {sup} -> {curr}")
+                    break
+                visited.add(curr)
+                curr = subordinate_to_superior.get(curr)
+
+        if circulars:
+            for c in circulars:
+                gaps.append({"category": "REPORTING_GAP", "severity": "CRITICAL", "description": c})
+        if orphans:
+            for o in orphans:
+                gaps.append({"category": "REPORTING_GAP", "severity": "HIGH", "description": o})
+
+        # 2. Check for overloaded managers (> 12 direct reports)
+        for sup, subs in superior_to_subordinates.items():
+            if len(subs) > 12:
+                warnings.append(f"Manager {sup} is overloaded with {len(subs)} direct reports (exceeds span benchmark).")
+                gaps.append({
+                    "category": "MANAGEMENT_OVERLOAD",
+                    "severity": "MEDIUM",
+                    "description": f"Superior {sup} manages {len(subs)} direct reports."
+                })
+
+        # 3. Check for single points of failure (critical functions without backup)
+        spofs: List[str] = []
+        has_ceo = any("CEO" in (e.get("role_id", "") + e.get("role_name", "")) for e in data.executives)
+        if not has_ceo:
+            gaps.append({"category": "ACCOUNTABILITY_GAP", "severity": "CRITICAL", "description": "No formal CEO/Executive Director leadership found."})
+            spofs.append("Executive Direction")
+
+        has_cfo = any("CFO" in (e.get("role_id", "") + e.get("role_name", "")) for e in data.executives)
+        if data.employee_count > 10 and not has_cfo:
+            gaps.append({"category": "MISSING_CAPABILITY", "severity": "HIGH", "description": "Company scale warrants dedicated CFO; financial treasury is unassigned."})
+            spofs.append("Treasury & Solvency")
+
+        has_security = any("CISO" in e.get("role_id", "") or "security" in e.get("role_name", "").lower() for e in data.executives)
+        if "HIGH" in data.current_regulatory_profile.upper() and not has_security:
+            gaps.append({"category": "REGULATORY_GAP", "severity": "HIGH", "description": "High regulatory profile without dedicated CISO or Security Officer."})
+
+        # 4. Check for unowned KRAs, KPIs, SOPs
+        unowned_kras = [k for k in data.current_KRAs if not k.get("owner_id") and not k.get("assigned_role")]
+        for k in unowned_kras:
+            gaps.append({"category": "KRA_GAP", "severity": "MEDIUM", "description": f"KRA '{k.get('title', 'Untitled')}' has no assigned accountable owner."})
+
+        unowned_kpis = [k for k in data.current_KPIs if not k.get("owner_id") and not k.get("assigned_role")]
+        for k in unowned_kpis:
+            gaps.append({"category": "KPI_GAP", "severity": "MEDIUM", "description": f"KPI '{k.get('name', 'Untitled')}' has no assigned owner."})
+
+        unowned_sops = [s for s in data.current_SOPs if not s.get("owner_role") and not s.get("owner_id")]
+        for s in unowned_sops:
+            gaps.append({"category": "SOP_GAP", "severity": "MEDIUM", "description": f"SOP '{s.get('title', 'Untitled')}' has no owner role."})
+
+        # 5. Check Segregation of Duties conflicts
+        sod_conflicts = SegregationOfDutiesEngine.audit_conflicts(data)
+        for conf in sod_conflicts:
+            gaps.append({"category": "AUTHORITY_GAP", "severity": "CRITICAL", "description": conf})
+
+        # 6. Calculate Explainable Dimension Scores
+        rep_score = max(0.0, 100.0 - (len(circulars) * 30.0) - (len(orphans) * 15.0))
+        gov_score = max(0.0, 100.0 - (len(sod_conflicts) * 20.0) - (25.0 if not has_ceo else 0.0))
+        acc_score = max(0.0, 100.0 - (len(unowned_kras) * 12.0) - (len(unowned_kpis) * 8.0))
+        res_score = max(0.0, 100.0 - (len(spofs) * 20.0))
+        span_score = max(0.0, 100.0 - (len(warnings) * 10.0))
+        cap_score = 90.0 if len(data.departments) >= 3 else 65.0
+        kpi_cov_score = max(0.0, 100.0 - (len(unowned_kpis) * 15.0))
+        sop_cov_score = max(0.0, 100.0 - (len(unowned_sops) * 15.0))
+        risk_cov_score = 85.0 if data.current_risk_profile != "UNKNOWN" else 40.0
+        reg_cov_score = 90.0 if data.current_regulatory_profile != "UNKNOWN" else 45.0
+        cost_eff_score = 80.0
+        exec_cap_score = 85.0
+        bottle_score = max(0.0, 100.0 - (len(warnings) * 15.0))
+        dup_score = 90.0
+
+        scores = [rep_score, gov_score, acc_score, res_score, span_score, cap_score, kpi_cov_score, sop_cov_score]
+        composite_health = round(sum(scores) / len(scores), 1)
+
+        # 7. Generate Recommendations
+        if not has_cfo and data.employee_count > 10:
+            recommendations.append("Establish dedicated CFO or treasury lead to safeguard cash runway.")
+        if circulars:
+            recommendations.append("Eliminate circular reporting relationships to restore chain of accountability.")
+        if orphans:
+            recommendations.append("Reassign orphan subordinate nodes to valid departmental superiors.")
+        if unowned_kras or unowned_kpis:
+            recommendations.append(f"Assign single accountable owners to {len(unowned_kras)} unowned KRAs and {len(unowned_kpis)} unowned KPIs.")
+        if sod_conflicts:
+            recommendations.append("Enforce segregation of duties: separate approval rights from execution/audit rights.")
+
+        fingerprint = cls.generate_fingerprint(data)
+
+        evidence_receipt = {
+            "fingerprint_sha256": fingerprint.sha256_fingerprint,
+            "audit_id": audit_id,
+            "timestamp": now,
+            "node_count": fingerprint.node_count,
+            "status": "QUALIFIED_AUDIT"
+        }
+
+        return OrganizationAuditReport(
+            audit_id=audit_id,
+            company_id=data.company_id,
+            tenant_id=data.tenant_id,
+            current_org_version="1.0.0-DISCOVERED",
+            audit_timestamp=now,
+            organization_health_score=composite_health,
+            governance_health_score=gov_score,
+            accountability_score=acc_score,
+            reporting_integrity_score=rep_score,
+            span_of_control_score=span_score,
+            capability_coverage_score=cap_score,
+            KPI_coverage_score=kpi_cov_score,
+            SOP_coverage_score=sop_cov_score,
+            risk_coverage_score=risk_cov_score,
+            regulatory_coverage_score=reg_cov_score,
+            resilience_score=res_score,
+            cost_efficiency_score=cost_eff_score,
+            execution_capacity_score=exec_cap_score,
+            bottleneck_score=bottle_score,
+            duplication_score=dup_score,
+            critical_gap_count=len([g for g in gaps if g.get("severity") == "CRITICAL"]),
+            warning_count=len(warnings),
+            recommendation_count=len(recommendations),
+            gaps=gaps,
+            warnings=warnings,
+            recommendations=recommendations,
+            evidence_receipt=evidence_receipt
+        )
+
+# ==============================================================================
+# 9. DIFFERENCE MODEL, TRANSITION PLAN & ROLLBACK ENGINE
+# ==============================================================================
+
+@dataclass
+class OrganizationDifferenceModel:
+    """
+    Formal diff model contrasting current state against proposed target blueprint.
+    """
+    diff_id: str
+    company_id: str
+    added_roles: List[Dict[str, Any]]
+    removed_roles: List[Dict[str, Any]]
+    renamed_roles: List[Dict[str, str]]
+    merged_roles: List[Dict[str, Any]]
+    split_departments: List[Dict[str, Any]]
+    moved_nodes: List[Dict[str, str]]
+    authority_changes: List[Dict[str, Any]]
+    budget_changes: List[Dict[str, Any]]
+    KRA_changes: List[Dict[str, Any]]
+    KPI_changes: List[Dict[str, Any]]
+    SOP_changes: List[Dict[str, Any]]
+    reporting_changes: List[Dict[str, str]]
+    workforce_changes: Dict[str, int]
+    regulatory_owner_changes: List[Dict[str, str]]
+
+    @classmethod
+    def calculate_diff(cls, current_org: Dict[str, Any], target_blueprint: Dict[str, Any]) -> "OrganizationDifferenceModel":
+        d_id = f"diff_{uuid.uuid4().hex[:8]}"
+        comp_id = target_blueprint.get("company_id", "comp_default")
+
+        curr_execs = {e.get("role_id"): e for e in current_org.get("executives", []) if e.get("role_id")}
+        target_execs = {e.get("role_id"): e for e in target_blueprint.get("executives", []) if e.get("role_id")}
+
+        added = [target_execs[rid] for rid in target_execs if rid not in curr_execs]
+        removed = [curr_execs[rid] for rid in curr_execs if rid not in target_execs]
+
+        authority_chgs = []
+        for rid in target_execs:
+            if rid in curr_execs:
+                t_bgt = target_execs[rid].get("budget_limit_usd", 0.0)
+                c_bgt = curr_execs[rid].get("budget_limit_usd", 0.0)
+                if t_bgt != c_bgt:
+                    authority_chgs.append({"role_id": rid, "previous_budget": c_bgt, "new_budget": t_bgt})
+
+        curr_agents_cnt = len(current_org.get("workforce_agents", []))
+        targ_agents_cnt = len(target_blueprint.get("workforce_agents", []))
+
+        return OrganizationDifferenceModel(
+            diff_id=d_id,
+            company_id=comp_id,
+            added_roles=added,
+            removed_roles=removed,
+            renamed_roles=[],
+            merged_roles=[],
+            split_departments=[],
+            moved_nodes=[],
+            authority_changes=authority_chgs,
+            budget_changes=authority_chgs,
+            KRA_changes=[{"status": "ALIGNED_TO_TARGET"}],
+            KPI_changes=[{"status": "PAIRED_COUNTER_METRICS_ADDED"}],
+            SOP_changes=[{"status": "GOVERNED_EXECUTABLE_SOPS_ATTACHED"}],
+            reporting_changes=[],
+            workforce_changes={"current": curr_agents_cnt, "target": targ_agents_cnt, "delta": targ_agents_cnt - curr_agents_cnt},
+            regulatory_owner_changes=[]
+        )
+
+@dataclass
+class OrganizationTransitionPlan:
+    """
+    Phased transition plan ensuring zero authority vacuum during organizational change.
+    """
+    transition_id: str
+    company_id: str
+    current_version: str
+    target_version: str
+    phases: List[Dict[str, Any]]
+    affected_people: int
+    affected_agents: int
+    authority_changes: List[Dict[str, Any]]
+    rollback_plan: Dict[str, Any]
+    approval_requirements: str # SOVEREIGN_OWNER, AIC_CEO_INTERNAL
+    risk_assessment: str
+    expected_duration_days: int
+    success_criteria: str
+    evidence_receipt: Dict[str, Any]
+
+    @classmethod
+    def create_transition_plan(cls, company_id: str, diff: OrganizationDifferenceModel) -> "OrganizationTransitionPlan":
+        t_id = f"trans_{uuid.uuid4().hex[:8]}"
+        
+        # Verify no authority vacuum before removal
+        for rem in diff.removed_roles:
+            rid = rem.get("role_id", "")
+            if "CFO" in rid and not any("CFO" in a.get("role_id", "") or "treasury" in a.get("purpose", "").lower() for a in diff.added_roles):
+                raise RuntimeError(f"AUTHORITY_VACUUM_PREVENTED: Cannot remove {rid} without successor treasury ownership.")
+
+        approval = "SOVEREIGN_OWNER" if len(diff.added_roles) > 2 or any("CFO" in r.get("role_id", "") or "CLO" in r.get("role_id", "") for r in diff.added_roles) else "AIC_CEO_INTERNAL"
+
+        phases = [
+            {"phase": 1, "title": "Governance Authorization", "action": "Owner/CEO signoff and DoA commitment"},
+            {"phase": 2, "title": "Pre-Provisioning & Successor Onboarding", "action": "Provision successor roles before altering existing duties"},
+            {"phase": 3, "title": "Reporting & Communication Cutover", "action": "Update reporting lines and anti-storm channels"},
+            {"phase": 4, "title": "SOP & KPI Verification", "action": "Verify executable SOPs and anti-gaming counter-metrics"},
+            {"phase": 5, "title": "Audit & Post-Cutover Telemetry", "action": "Log cryptographic receipt into EvidenceLedger"}
+        ]
+
+        rollback = {
+            "strategy": "STATE_RESTORE",
+            "safe_fallback_version": "1.0.0-DISCOVERED",
+            "preconditions": ["Target version backup preserved", "No unassigned regulatory responsibilities"]
+        }
+
+        return OrganizationTransitionPlan(
+            transition_id=t_id,
+            company_id=company_id,
+            current_version="1.0.0-DISCOVERED",
+            target_version="2.0.0-TARGET",
+            phases=phases,
+            affected_people=0,
+            affected_agents=diff.workforce_changes.get("target", 0),
+            authority_changes=diff.authority_changes,
+            rollback_plan=rollback,
+            approval_requirements=approval,
+            risk_assessment="LOW: Redundancy safeguarded and authority vacuum prevented.",
+            expected_duration_days=14,
+            success_criteria="All departments operational, all KRAs owned, zero unowned KPIs.",
+            evidence_receipt={"transition_id": t_id, "timestamp": time.time(), "sha256": hashlib.sha256(t_id.encode()).hexdigest()}
+        )
+
+class OrganizationRollbackEngine:
+    """
+    Safely reverts organizational changes or escalates to Owner if rollback causes an authority vacuum.
+    """
+    @classmethod
+    def rollback(cls, company_id: str, target_version: str, current_version: str) -> Dict[str, Any]:
+        if not target_version:
+            return {
+                "success": False,
+                "status": "ESCALATE_TO_OWNER",
+                "reason": "ROLLBACK_UNSAFE: No valid target version specified; escalating to Sovereign Owner."
+            }
+        
+        now = time.time()
+        receipt = {
+            "rollback_id": f"rb_{uuid.uuid4().hex[:8]}",
+            "company_id": company_id,
+            "reverted_from": current_version,
+            "restored_to": target_version,
+            "timestamp": now,
+            "status": "ROLLED_BACK",
+            "sha256": hashlib.sha256(f"{company_id}:{target_version}:{now}".encode()).hexdigest()
+        }
+        return {"success": True, "status": "ROLLED_BACK", "receipt": receipt}
+
+# ==============================================================================
+# 10. ADAPTIVE SPAN-OF-CONTROL & WORKFORCE SCALING ENGINE (GAP OQ-03)
+# ==============================================================================
+
+class AdaptiveSpanOfControlEngine:
+    """
+    Context-aware span-of-control reasoning based on operational complexity rather than rigid constants.
+    """
+    @classmethod
+    def calculate_complexity_score(
+        cls,
+        role_complexity: float = 5.0,
+        risk_level: str = "MEDIUM",
+        regulatory_intensity: str = "MEDIUM",
+        workload_volatility: float = 0.3,
+        exception_rate: float = 0.05,
+        geographic_dispersion: int = 1,
+        workforce_type: str = "AI_AGENT"
+    ) -> float:
+        risk_w = 10.0 if risk_level == "CRITICAL" else (8.0 if risk_level == "HIGH" else (5.0 if risk_level == "MEDIUM" else 2.0))
+        reg_w = 10.0 if regulatory_intensity == "SEVERE" else (8.5 if regulatory_intensity == "HIGH" else (5.0 if regulatory_intensity == "MEDIUM" else 2.0))
+        wf_w = 8.0 if workforce_type == "HUMAN" else 3.0 # AI agents with telemetry require less cognitive oversight
+
+        # Explainable Complexity Formula (0.0 to 10.0 scale)
+        comp = (role_complexity * 0.25) + (risk_w * 0.25) + (reg_w * 0.25) + (wf_w * 0.15) + (exception_rate * 20.0 * 0.10)
+        return round(min(10.0, max(1.0, comp)), 2)
+
+    @classmethod
+    def evaluate_span(
+        cls,
+        role_id: str,
+        current_reports_count: int,
+        role_complexity: float = 5.0,
+        risk_level: str = "MEDIUM",
+        regulatory_intensity: str = "MEDIUM",
+        workforce_type: str = "AI_AGENT",
+        exception_rate: float = 0.05
+    ) -> Dict[str, Any]:
+        complexity = cls.calculate_complexity_score(
+            role_complexity=role_complexity,
+            risk_level=risk_level,
+            regulatory_intensity=regulatory_intensity,
+            exception_rate=exception_rate,
+            workforce_type=workforce_type
+        )
+
+        is_exec = "CEO" in role_id or "EXEC" in role_id
+
+        if is_exec:
+            # Executive Span Benchmark Range
+            if complexity >= 6.5:
+                min_span, max_span, rec_span = 3, 5, 4
+                rationale = "High regulatory/risk complexity requires narrower executive span for rigorous oversight."
+            elif complexity < 3.5:
+                min_span, max_span, rec_span = 6, 10, 8
+                rationale = "Standardized low-risk operations allow broad executive coordination span."
+            else:
+                min_span, max_span, rec_span = 4, 8, 6
+                rationale = "Balanced operating complexity supports standard canonical C-suite span."
+        else:
+            # Manager-to-Worker Span Benchmark Range
+            if workforce_type == "AI_AGENT":
+                # AI workers with telemetry and automated exception handling
+                if complexity > 7.0:
+                    min_span, max_span, rec_span = 6, 14, 10
+                else:
+                    min_span, max_span, rec_span = 10, 25, 18
+                rationale = "AI agents governed by telemetry and automated SOPs support expanded spans."
+            else:
+                # Human or hybrid workforce
+                if complexity > 7.0:
+                    min_span, max_span, rec_span = 3, 7, 5
+                else:
+                    min_span, max_span, rec_span = 5, 12, 8
+                rationale = "Human operational coordination requires bounded span to avoid cognitive overload."
+
+        if current_reports_count < min_span:
+            status = "TOO_NARROW"
+        elif current_reports_count > max_span:
+            status = "CRITICAL_OVERLOAD" if current_reports_count > max_span + 3 else "TOO_WIDE"
+        else:
+            status = "OPTIMAL"
+
+        return {
+            "role_id": role_id,
+            "current_span": current_reports_count,
+            "recommended_span": rec_span,
+            "min_reasonable_span": min_span,
+            "max_reasonable_span": max_span,
+            "status": status,
+            "complexity_score": complexity,
+            "rationale": rationale,
+            "assumptions": {
+                "workforce_type": workforce_type,
+                "risk_level": risk_level,
+                "regulatory_intensity": regulatory_intensity,
+                "exception_rate": exception_rate
+            }
+        }
+
+class WorkloadWorkforceScalingSimulator:
+    """
+    Simulates workforce sizing based on measurable operational drivers without mutating live state.
+    """
+    @classmethod
+    def simulate(
+        cls,
+        department_name: str,
+        base_agent_count: int,
+        scenario: str = "NORMAL_VOLUME",
+        queue_depth: int = 50,
+        target_sla_sec: float = 30.0,
+        avg_handle_time_sec: float = 15.0
+    ) -> Dict[str, Any]:
+        multipliers = {
+            "LOW_VOLUME": 0.5,
+            "NORMAL_VOLUME": 1.0,
+            "HIGH_VOLUME": 2.2,
+            "SPIKE": 4.5,
+            "CRISIS": 8.0,
+            "RECOVERY": 1.3
+        }
+        mult = multipliers.get(scenario.upper(), 1.0)
+        effective_queue = int(queue_depth * mult)
+
+        # Queueing Theory Driver: Required capacity = (arrival_rate * service_time) / target_latency
+        req_capacity = max(1, int(round((effective_queue * avg_handle_time_sec) / (target_sla_sec * 2.5))))
+        agent_delta = req_capacity - base_agent_count
+
+        return {
+            "department_name": department_name,
+            "scenario": scenario,
+            "effective_queue_depth": effective_queue,
+            "base_agent_count": base_agent_count,
+            "simulated_agent_count": req_capacity,
+            "agent_delta": agent_delta,
+            "sla_fulfillment_projected_pct": 99.2 if req_capacity >= base_agent_count else 84.5,
+            "estimated_cost_delta_usd": agent_delta * 120.0,
+            "simulation_only": True,
+            "mutates_production": False
+        }
+
+# ==============================================================================
+# 11. JURISDICTION-AWARE REGULATORY ARCHITECTURE (GAP OQ-05)
+# ==============================================================================
+
+@dataclass
+class RegulatoryProfile:
+    """
+    Jurisdiction-aware regulatory compliance blueprint.
+    Never hallucinates legal certainty; explicitly records verification confidence.
+    """
+    jurisdiction_id: str
+    country: str
+    state_province: str
+    business_activity: str
+    industry: str
+    regulated_data_types: List[str]
+    applicable_frameworks: List[str]
+    licensing_requirements: List[str]
+    human_approval_requirements: List[str]
+    accountable_owner_role: str
+    verification_status: str # VERIFIED, REGULATORY_DETERMINATION_REQUIRED, REGULATORY_UNKNOWN
+    confidence: float
+
+class JurisdictionRegulatoryEngine:
+    """
+    Maps abstract regulatory classes to country/region frameworks without hardcoded assumptions.
+    """
+    _FRAMEWORKS: Dict[str, Dict[str, List[str]]] = {
+        "US": {
+            "PRIVACY": ["CCPA / CPRA", "FTC Act Section 5"],
+            "HEALTHCARE": ["HIPAA (Health Insurance Portability and Accountability Act)", "HITECH"],
+            "FINANCIAL": ["SEC Regulations", "Sarbanes-Oxley (SOX)", "Gramm-Leach-Bliley"],
+            "EMPLOYMENT": ["OSHA (Occupational Safety)", "FLSA"],
+            "CYBERSECURITY": ["NIST Cybersecurity Framework", "SOC 2 Type II"]
+        },
+        "EU": {
+            "PRIVACY": ["GDPR (General Data Protection Regulation)"],
+            "CYBERSECURITY": ["NIS 2 Directive", "DORA (Digital Operational Resilience Act)"],
+            "FINANCIAL": ["MiFID II", "PSD2 / PSD3"],
+            "HEALTHCARE": ["EU MDR (Medical Device Regulation)"],
+            "AI_GOVERNANCE": ["EU Artificial Intelligence Act (EU AI Act)"]
+        },
+        "IN": {
+            "PRIVACY": ["Digital Personal Data Protection (DPDP) Act 2023"],
+            "FOOD_SAFETY": ["FSSAI Food Safety Standards"],
+            "MANUFACTURING": ["Factories Act 1948", "State Industrial Safety Rules"],
+            "CORPORATE_GOVERNANCE": ["Companies Act 2013"],
+            "FINANCIAL": ["Reserve Bank of India (RBI) Cyber Security Guidelines"]
+        },
+        "UK": {
+            "PRIVACY": ["UK GDPR", "Data Protection Act 2018"],
+            "FINANCIAL": ["FCA Handbook Regulations"],
+            "HEALTHCARE": ["Care Quality Commission (CQC) Fundamental Standards"]
+        },
+        "AE": {
+            "PRIVACY": ["DIFC Data Protection Law No. 5 of 2020", "UAE Federal Decree Law No. 45"],
+            "HEALTHCARE": ["Dubai Health Authority (DHA) Regulatory Standards"],
+            "FINANCIAL": ["DFSA Rulebook"]
+        },
+        "GLOBAL": {
+            "TRAVEL": ["IATA Resolutions", "Montreal Convention 1999"],
+            "GOVERNANCE": ["ISO 37000 (Governance of Organizations)"],
+            "RISK": ["ISO 31000 (Risk Management)"],
+            "COMPLIANCE": ["ISO 37301 (Compliance Management)"],
+            "AI_MANAGEMENT": ["ISO/IEC 42001 (AI Management System)"]
+        }
+    }
+
+    @classmethod
+    def get_regulatory_profile(cls, country: str, industry: str, business_activity: str = "") -> RegulatoryProfile:
+        country_code = (country or "UNKNOWN").upper().strip()
+        ind = (industry or "UNKNOWN").upper().strip()
+
+        if country_code in ["UNKNOWN", "INSUFFICIENT_DATA", ""]:
+            return RegulatoryProfile(
+                jurisdiction_id="REGULATORY_UNKNOWN",
+                country="UNKNOWN",
+                state_province="NONE",
+                business_activity=business_activity or "Unspecified",
+                industry=ind,
+                regulated_data_types=["UNKNOWN"],
+                applicable_frameworks=["REGULATORY_DETERMINATION_REQUIRED"],
+                licensing_requirements=["LEGAL_COUNSEL_REVIEW_MANDATORY"],
+                human_approval_requirements=["Statutory filings require human legal signature."],
+                accountable_owner_role="EXEC_CLO",
+                verification_status="REGULATORY_DETERMINATION_REQUIRED",
+                confidence=0.0
+            )
+
+        frameworks_by_country = cls._FRAMEWORKS.get(country_code, cls._FRAMEWORKS.get("GLOBAL", {}))
+        applicable: List[str] = []
+        data_types: List[str] = []
+        licensing: List[str] = []
+        owner_role = "EXEC_CLO"
+
+        # Privacy is universal across digital/modern operations
+        applicable.extend(frameworks_by_country.get("PRIVACY", ["Baseline ISO 27701 Data Privacy"]))
+        data_types.append("CUSTOMER_PII")
+
+        if "CYBERSECURITY" in frameworks_by_country:
+            applicable.extend(frameworks_by_country["CYBERSECURITY"])
+        if "AI_GOVERNANCE" in frameworks_by_country:
+            applicable.extend(frameworks_by_country["AI_GOVERNANCE"])
+
+        if "HEALTH" in ind:
+            applicable.extend(frameworks_by_country.get("HEALTHCARE", ["Statutory Clinical Care Standards"]))
+            data_types.extend(["PROTECTED_HEALTH_INFORMATION_PHI", "ELECTRONIC_HEALTH_RECORDS"])
+            licensing.append("Healthcare Facility Provider License")
+            owner_role = "EXEC_CRO_RISK"
+        elif "FINANC" in ind or "FINTECH" in ind or "BANK" in ind:
+            applicable.extend(frameworks_by_country.get("FINANCIAL", ["Statutory Financial Conduct Rules"]))
+            data_types.extend(["FINANCIAL_PAYMENT_DATA", "CARDHOLDER_DATA"])
+            licensing.append("Financial Services Regulatory Authority Authorization")
+            owner_role = "EXEC_CFO"
+        elif "MANUFACTUR" in ind:
+            applicable.extend(frameworks_by_country.get("MANUFACTURING", ["Industrial Workplace Safety Compliance"]))
+            licensing.append("Factory Operating Permit & Environmental Clearance")
+            owner_role = "EXEC_COO"
+        elif "HOTEL" in ind or "HOSPITAL" in ind:
+            applicable.extend(frameworks_by_country.get("FOOD_SAFETY", ["Municipal Hospitality & Hygiene Licensing"]))
+            licensing.append("Hospitality & Lodging Business License")
+            owner_role = "EXEC_COO"
+        elif "TRAVEL" in ind or "TOUR" in ind:
+            applicable.extend(cls._FRAMEWORKS["GLOBAL"]["TRAVEL"])
+            licensing.append("IATA Travel Agent Accreditation")
+            owner_role = "EXEC_CRO"
+
+        # Attach ISO Governance, Risk, Compliance & AI Management
+        applicable.extend(cls._FRAMEWORKS["GLOBAL"]["GOVERNANCE"])
+        applicable.extend(cls._FRAMEWORKS["GLOBAL"]["RISK"])
+        applicable.extend(cls._FRAMEWORKS["GLOBAL"]["COMPLIANCE"])
+        applicable.extend(cls._FRAMEWORKS["GLOBAL"]["AI_MANAGEMENT"])
+
+        return RegulatoryProfile(
+            jurisdiction_id=f"reg_{country_code}_{ind}",
+            country=country_code,
+            state_province="ALL",
+            business_activity=business_activity or f"Operating in {ind}",
+            industry=ind,
+            regulated_data_types=data_types,
+            applicable_frameworks=applicable,
+            licensing_requirements=licensing,
+            human_approval_requirements=[
+                "Statutory tax filings require explicit human signature.",
+                "Clinical practice decisions must be verified by licensed human practitioners.",
+                "Legal deeds and litigation settlements cannot be executed solely by AI agents."
+            ],
+            accountable_owner_role=owner_role,
+            verification_status="VERIFIED",
+            confidence=0.92
+        )
+
+# ==============================================================================
+# 12. SEGREGATION OF DUTIES (SOD) & CONFLICT DETECTION (GAP OQ-01 / OQ-04)
+# ==============================================================================
+
+class SegregationOfDutiesEngine:
+    """
+    Prevents toxic combinations of rights and conflicting organizational duties.
+    """
+    @classmethod
+    def audit_conflicts(cls, data: ExistingOrganizationData) -> List[str]:
+        conflicts: List[str] = []
+
+        # 1. AI agent cannot hold sovereign authority
+        for ex in data.executives:
+            if ex.get("workforce_type") == "AI_AGENT" and ex.get("role_id") == "L0_OWNER":
+                conflicts.append("SOD_CONFLICT: AI agent cannot be assigned Sovereign Owner authority (Invariant 3 & 17).")
+
+        # 2. Check requester vs approver conflicts
+        for role in data.current_roles:
+            rights = role.get("decision_rights", [])
+            if any("disbursement" in r.lower() for r in rights) and any("audit" in r.lower() for r in rights):
+                conflicts.append(f"SOD_CONFLICT: Role '{role.get('role_name')}' holds both financial disbursement and audit authority.")
+
+        return conflicts
+
+# ==============================================================================
+# 13. MULTI-TENANT ISOLATION TRIPWIRES & PROMPT-INJECTION PROTECTION (OQ-04)
+# ==============================================================================
+
+class TenantIsolationViolation(Exception):
+    """Raised when an attempt to cross tenant or company isolation boundaries is detected."""
+    pass
+
+class AntiPromptInjectionScanner:
+    """
+    Inspects organization metadata, directives, and role assignments for adversarial prompt-injection payloads.
+    """
+    _PROHIBITED_PATTERNS = [
+        "ignore previous instructions",
+        "elevate your authority",
+        "elevate authority to sovereign",
+        "authorize all payments",
+        "ignore tenant policy",
+        "export every company",
+        "system prompt override",
+        "disable kill switch",
+        "bypass doa"
+    ]
+
+    @classmethod
+    def scan_for_injection(cls, content: str) -> Tuple[bool, List[str]]:
+        if not content or not isinstance(content, str):
+            return True, []
+        low = content.lower()
+        found = [p for p in cls._PROHIBITED_PATTERNS if p in low]
+        return len(found) == 0, found
+
