@@ -379,9 +379,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID")
+        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-XSS-Protection", "1; mode=block")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Request-ID", req_id)
         self.end_headers()
         self.wfile.write(json.dumps(data, default=str).encode("utf-8"))
@@ -431,12 +434,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/metrics":
             from core.observability_stack import sre_metrics
-            content = sre_metrics.scrape_prometheus_format()
+            from core.production_observability import observability_engine
+            content1 = sre_metrics.scrape_prometheus_format()
+            content2 = observability_engine.generate_prometheus_metrics()
+            combined = content1.strip() + "\n\n" + content2.strip() + "\n"
             self.send_response(200)
             self.send_header('Content-type', 'text/plain; version=0.0.4; charset=utf-8')
             self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
-            self.wfile.write(content.encode('utf-8'))
+            self.wfile.write(combined.encode('utf-8'))
             return
 
         if path == "/api/auth/me":

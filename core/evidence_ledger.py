@@ -154,7 +154,10 @@ class EvidenceLedger:
 
     def get_merkle_root(self) -> str:
         self._load_existing()
-        hashes = [r["sha256_digest"] for r in self.chain]
+        hashes = [
+            r.get("sha256_digest") or r.get("hash") or r.get("evidence_hash") or hashlib.sha256(json.dumps(r).encode()).hexdigest()
+            for r in self.chain
+        ]
         return self.compute_merkle_root(hashes)
 
     def verify_ledger_integrity(self) -> bool:

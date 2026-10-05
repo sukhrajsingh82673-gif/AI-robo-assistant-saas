@@ -32,6 +32,39 @@ class V8ApiHandler:
 
     @classmethod
     def handle_get(cls, path: str, query_params: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        # 20. Production Infrastructure, Security & DR Endpoints (Do not require CEO instantiation)
+        if path == "/api/v8/infra/orchestration/status":
+            from core.production_orchestration import production_orchestrator
+            res = production_orchestrator.evaluate_cluster_readiness()
+            workers = [w.to_dict() for w in production_orchestrator.list_workers()]
+            services = [s.to_dict() for s in production_orchestrator.list_services()]
+            return {"success": True, "cluster_status": res, "workers": workers, "services": services}, 200
+
+        elif path == "/api/v8/infra/isolation/status":
+            from core.workload_isolation import workload_isolation
+            quota = workload_isolation.get_tenant_quota(tenant_id)
+            return {"success": True, "tenant_quota": quota.to_dict()}, 200
+
+        elif path == "/api/v8/infra/failsafe/status":
+            from core.failsafe_degradation_matrix import failsafe_matrix
+            matrix = failsafe_matrix.evaluate_entire_matrix()
+            return {"success": True, "failsafe_matrix": matrix}, 200
+
+        elif path == "/api/v8/infra/health/all":
+            from core.operational_health_system import operational_health_system
+            health = operational_health_system.get_overall_system_health()
+            return {"success": True, "health": health}, 200
+
+        elif path == "/api/v8/infra/capacity":
+            from core.resource_capacity_manager import capacity_manager
+            metrics = capacity_manager.get_current_metrics()
+            return {"success": True, "capacity": metrics}, 200
+
+        elif path == "/api/v8/infra/supply-chain/sbom":
+            from core.secure_supply_chain import supply_chain_controller
+            sbom = supply_chain_controller.generate_cyclonedx_sbom()
+            return {"success": True, "sbom": sbom}, 200
+
         ceo = cls.get_ceo(tenant_id, company_id)
 
         # 1. Executive State
@@ -294,12 +327,92 @@ class V8ApiHandler:
 
         elif path == "/api/v8/gemma/missions":
             msns = ceo.conversation_engine.mission_manager.list_missions()
-            return {"success": True, "missions": [m.to_dict() for m in msns]}, 200
-
         return None
 
     @classmethod
     def handle_post(cls, path: str, body: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        # 20. Production Infrastructure, Security & DR POST Endpoints (Do not require CEO instantiation)
+        if path == "/api/v8/infra/edge/inspect":
+            from core.edge_security_gateway import edge_security_gateway
+            req_path = body.get("path", "/api/v8/status")
+            req_method = body.get("method", "GET")
+            req_headers = body.get("headers", {})
+            raw_body = body.get("body", "").encode("utf-8")
+            client_ip = body.get("client_ip", "127.0.0.1")
+            insp = edge_security_gateway.inspect_inbound_request(
+                path=req_path,
+                method=req_method,
+                headers=req_headers,
+                body_bytes=raw_body,
+                client_ip=client_ip,
+                tenant_id=tenant_id
+            )
+            return {
+                "success": insp.is_allowed,
+                "is_allowed": insp.is_allowed,
+                "status_code": insp.status_code,
+                "blocking_reason": insp.blocking_reason,
+                "violation_category": insp.violation_category,
+                "rate_limit_remaining": insp.rate_limit_remaining,
+                "security_headers": insp.security_headers
+            }, 200
+
+        elif path == "/api/v8/infra/dr/backup":
+            from core.remote_disaster_recovery import remote_dr_manager
+            manifest = remote_dr_manager.execute_full_remote_backup()
+            return {"success": True, "manifest": manifest.to_dict()}, 201
+
+        elif path == "/api/v8/infra/dr/drill":
+            from core.remote_disaster_recovery import remote_dr_manager
+            manifest_id = body.get("manifest_id")
+            if not manifest_id:
+                manifest = remote_dr_manager.execute_full_remote_backup()
+                manifest_id = manifest.manifest_id
+            drill_result = remote_dr_manager.execute_complete_disaster_recovery_drill(manifest_id)
+            return {"success": True, "drill": drill_result}, 200
+
+        elif path == "/api/v8/infra/rollback/plan":
+            from core.deployment_rollback_controller import rollback_controller
+            target_version = body.get("target_version", "1.1.0-RC1")
+            previous_version = body.get("previous_version", "1.0.0-GA")
+            active_missions = int(body.get("active_missions_during_release", 3))
+            plan = rollback_controller.create_release_plan(
+                target_version=target_version,
+                previous_version=previous_version,
+                active_missions_count=active_missions
+            )
+            return {"success": True, "plan": plan.to_dict()}, 201
+
+        elif path == "/api/v8/infra/rollback/advance":
+            from core.deployment_rollback_controller import rollback_controller
+            plan_id = body.get("plan_id")
+            smoke_passed = bool(body.get("smoke_tests_passed", True))
+            error_rate = float(body.get("observed_error_rate_pct", 0.0))
+            ok, msg, plan = rollback_controller.advance_phase(
+                plan_id=plan_id,
+                smoke_tests_passed=smoke_passed,
+                observed_error_rate_pct=error_rate
+            )
+            return {"success": ok, "message": msg, "plan": plan.to_dict()}, 200
+
+        elif path == "/api/v8/infra/rollback/trigger":
+            from core.deployment_rollback_controller import rollback_controller
+            plan_id = body.get("plan_id")
+            reason = body.get("reason", "Manual or automated anomaly trigger")
+            res = rollback_controller.execute_automated_rollback(plan_id=plan_id, reason=reason)
+            return res, 200
+
+        elif path == "/api/v8/infra/migrations/apply":
+            from core.controlled_migration_engine import migration_engine
+            res = migration_engine.apply_pending_migrations()
+            return {"success": True, "migrations": res}, 200
+
+        elif path == "/api/v8/infra/capacity/evaluate":
+            from core.resource_capacity_manager import capacity_manager
+            cost = float(body.get("estimated_cost", 0.05))
+            allowed, reason = capacity_manager.evaluate_admission(tenant_id, estimated_cost=cost)
+            return {"success": allowed, "allowed": allowed, "reason": reason}, 200
+
         ceo = cls.get_ceo(tenant_id, company_id)
 
         # 1. Compile Objective

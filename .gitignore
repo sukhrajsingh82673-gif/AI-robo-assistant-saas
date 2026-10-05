@@ -48,5 +48,6 @@ storage/reports/
 storage/voice_output/
 storage/terminal_backups/
 storage/soak_telemetry.json
+storage/remote_dr_mirror/
 *.bundle
 supplier_evaluation_report.json

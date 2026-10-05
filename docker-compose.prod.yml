@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  zonata-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: zonata/api:1.0.0-GA
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENVIRONMENT=production
+      - DB_PATH=/app/storage/roboassistant.db
+      - NATS_URL=nats://nats:4222
+      - TEMPORAL_HOST=temporal:7233
+      - VAULT_ADDR=http://vault:8200
+      - KEYCLOAK_URL=http://keycloak:8080
+      - S3_ENDPOINT=http://minio:9000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    volumes:
+      - zonata-storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - nats
+      - temporal
+      - minio
+
+  zonata-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: zonata/worker:1.0.0-GA
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - NATS_URL=nats://nats:4222
+      - TEMPORAL_HOST=temporal:7233
+      - DB_PATH=/app/storage/roboassistant.db
+    volumes:
+      - zonata-storage:/app/storage
+    depends_on:
+      - nats
+      - temporal
+
+  nats:
+    image: nats:2.10-alpine
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data/jetstream", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats-data:/data/jetstream
+
+  temporal:
+    image: temporalio/auto-setup:1.24.0
+    restart: unless-stopped
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=sqlite
+      - SQLITE_STORAGE_DIR=/etc/temporal/data
+    volumes:
+      - temporal-data:/etc/temporal/data
+
+  minio:
+    image: minio/minio:RELEASE.2024-03-05T04-48-44Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=zonata_minio_admin
+      - MINIO_ROOT_PASSWORD=zonata_minio_secret_password_2026
+    volumes:
+      - minio-data:/data
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    restart: unless-stopped
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus metrics
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=zonata_admin_password_2026
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  zonata-storage:
+  nats-data:
+  temporal-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:
