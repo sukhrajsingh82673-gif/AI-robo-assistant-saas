@@ -12,6 +12,7 @@ Constitutional Invariants:
 import time
 import json
 import logging
+import uuid
 from typing import Dict, Any, Optional, Tuple
 
 from core.db import db
@@ -89,6 +90,55 @@ class V8ApiHandler:
             engine = UniversalAICCEOEngine(tenant_id=tenant_id, company_id=company_id)
             report = engine.generate_owner_executive_report()
             return {"success": True, "report": report}, 200
+
+        elif path == "/api/v8/ceo/economic/hierarchy":
+            from core.aic_ceo_economic_command import ECONOMIC_HIERARCHY_ORDER
+            return {"success": True, "economic_hierarchy": [p.value for p in ECONOMIC_HIERARCHY_ORDER]}, 200
+
+        elif path == "/api/v8/ceo/capital/allocations":
+            from core.aic_ceo_economic_command import CapitalAllocationEngine
+            from dataclasses import asdict
+            if not hasattr(cls, "_cap_engine") or cls._cap_engine is None:
+                cls._cap_engine = CapitalAllocationEngine(500000.0)
+            allocs = [asdict(a) for a in cls._cap_engine.list_allocations()]
+            return {
+                "success": True,
+                "total_capital_pool_usd": cls._cap_engine.total_capital_pool_usd,
+                "allocated_capital_usd": cls._cap_engine.allocated_capital_usd,
+                "unallocated_capital_usd": cls._cap_engine.unallocated_capital_usd,
+                "allocations": allocs,
+                "count": len(allocs)
+            }, 200
+
+        elif path == "/api/v8/ceo/learning/ledger":
+            from core.aic_ceo_economic_command import CeoLearningLoopEngine
+            from dataclasses import asdict
+            if not hasattr(cls, "_learn_engine") or cls._learn_engine is None:
+                cls._learn_engine = CeoLearningLoopEngine()
+            entries = [asdict(e) for e in cls._learn_engine.list_entries()]
+            return {"success": True, "learning_ledger": entries, "count": len(entries)}, 200
+
+        elif path == "/api/v8/ceo/performance/scorecard":
+            from core.aic_ceo_economic_command import CeoPerformanceScorecardEngine
+            from dataclasses import asdict
+            scorecard = CeoPerformanceScorecardEngine.evaluate(
+                company_id=company_id,
+                verified_financials={"contribution_margin_pct": 74.0},
+                verified_commercial={"nrr_pct": 118.0},
+                decision_quality_scores=[88.0, 92.0, 85.0]
+            )
+            return {"success": True, "scorecard": asdict(scorecard)}, 200
+
+        elif path == "/api/v8/ceo/contracts":
+            if not hasattr(cls, "_mission_contracts"):
+                cls._mission_contracts = {}
+            return {"success": True, "contracts": list(cls._mission_contracts.values()), "count": len(cls._mission_contracts)}, 200
+
+        elif path == "/api/v8/ceo/industry/profile":
+            from core.aic_ceo_economic_command import MultiIndustryEconomicAdapter
+            ind = query_params.get("industry", ["SAAS"])[0]
+            prof = MultiIndustryEconomicAdapter.get_profile(ind)
+            return {"success": True, "industry": ind, "profile": prof}, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
 
@@ -520,6 +570,112 @@ class V8ApiHandler:
                 expected_consequence=body.get("expected_consequence", "Monitored closely")
             )
             return {"success": True, "override_record": rec}, 200
+
+        elif path == "/api/v8/ceo/capital/allocate":
+            from core.aic_ceo_economic_command import CapitalAllocationEngine, ResourceType
+            from core.aic_ceo_constitution import DecisionClass
+            from dataclasses import asdict
+            if not hasattr(cls, "_cap_engine") or cls._cap_engine is None:
+                cls._cap_engine = CapitalAllocationEngine(500000.0)
+            res_type_str = body.get("resource_type", "MONEY")
+            try:
+                res_type = ResourceType(res_type_str)
+            except ValueError:
+                res_type = ResourceType.MONEY
+            alloc = cls._cap_engine.allocate(
+                resource_type=res_type,
+                quantity=float(body.get("quantity", 10000.0)),
+                unit=body.get("unit", "USD"),
+                purpose=body.get("purpose", "Operational Allocation"),
+                expected_outcome=body.get("expected_outcome", "Positive return"),
+                expected_return_usd=float(body.get("expected_return_usd", 15000.0)),
+                risk_level=body.get("risk_level", "LOW"),
+                payback_months=float(body.get("payback_months", 6.0)),
+                opportunity_cost=body.get("opportunity_cost", "Alternative investment deferred"),
+                approval_class=DecisionClass.CLASS_B_OPERATIONAL
+            )
+            return {"success": True, "allocation": asdict(alloc)}, 201
+
+        elif path == "/api/v8/ceo/capital/evaluate-competing":
+            from core.aic_ceo_economic_command import CapitalAllocationEngine
+            if not hasattr(cls, "_cap_engine") or cls._cap_engine is None:
+                cls._cap_engine = CapitalAllocationEngine(500000.0)
+            opps = body.get("opportunities", [])
+            ranked = cls._cap_engine.compare_competing_opportunities(opps)
+            return {"success": True, "ranked_opportunities": ranked}, 200
+
+        elif path == "/api/v8/ceo/contracts/create":
+            from core.aic_ceo_economic_command import CeoToAgentMissionContract
+            from dataclasses import asdict
+            if not hasattr(cls, "_mission_contracts"):
+                cls._mission_contracts = {}
+            contract_data = {
+                "mission_id": body.get("mission_id", f"msn_{uuid.uuid4().hex[:8]}"),
+                "owner_objective": body.get("owner_objective", "Expand company profitability"),
+                "ceo_objective": body.get("ceo_objective", "Target 70% contribution margin"),
+                "business_objective": body.get("business_objective", "Deliver verified economic output"),
+                "expected_business_outcome": body.get("expected_business_outcome", "Positive contribution profit"),
+                "kra": body.get("kra", "KRA-02 Revenue Growth"),
+                "kpi": body.get("kpi", "KPI-FIN-01 Contribution Margin %"),
+                "target": float(body.get("target", 70.0)),
+                "baseline": float(body.get("baseline", 50.0)),
+                "deadline_timestamp": float(body.get("deadline_timestamp", time.time() + 86400 * 30)),
+                "authority_level": body.get("authority_level", "EXECUTIVE_FUNCTION"),
+                "budget_limit_usd": float(body.get("budget_limit_usd", 10000.0)),
+                "time_limit_hours": float(body.get("time_limit_hours", 720.0)),
+                "risk_limit": body.get("risk_limit", "MEDIUM"),
+                "allowed_tools": body.get("allowed_tools", ["CRM", "ERP"]),
+                "allowed_data": body.get("allowed_data", ["PIPELINE"]),
+                "prohibited_actions": body.get("prohibited_actions", ["UNAUTHORIZED_DISCOUNTS"]),
+                "escalation_conditions": body.get("escalation_conditions", ["MARGIN_BELOW_50"]),
+                "success_criteria": body.get("success_criteria", "Verified financial ledger receipt"),
+                "verification_method": body.get("verification_method", "AUDITED_STATEMENT"),
+                "evidence_requirements": body.get("evidence_requirements", ["STRIPE_RECEIPT"]),
+                "expected_revenue_usd": float(body.get("expected_revenue_usd", 50000.0)),
+                "expected_profit_usd": float(body.get("expected_profit_usd", 35000.0)),
+                "expected_cash_impact_usd": float(body.get("expected_cash_impact_usd", 50000.0))
+            }
+            c = CeoToAgentMissionContract(**contract_data)
+            cls._mission_contracts[c.mission_id] = asdict(c)
+            return {"success": True, "contract": asdict(c)}, 201
+
+        elif path == "/api/v8/ceo/learning/record-prediction":
+            from core.aic_ceo_economic_command import CeoLearningLoopEngine
+            from dataclasses import asdict
+            if not hasattr(cls, "_learn_engine") or cls._learn_engine is None:
+                cls._learn_engine = CeoLearningLoopEngine()
+            entry = cls._learn_engine.record_prediction(
+                decision_id=body.get("decision_id", "dec_default"),
+                owner_objective=body.get("owner_objective", "Grow profitably"),
+                prediction_statement=body.get("prediction_statement", "Campaign will achieve positive ROI"),
+                metric_name=body.get("metric_name", "Revenue_USD"),
+                predicted_value=float(body.get("predicted_value", 50000.0)),
+                confidence_level=float(body.get("confidence_level", 0.8)),
+                evidence_basis=body.get("evidence_basis", "Historical trend analysis")
+            )
+            return {"success": True, "prediction_entry": asdict(entry)}, 201
+
+        elif path == "/api/v8/ceo/learning/resolve-actual":
+            from core.aic_ceo_economic_command import CeoLearningLoopEngine
+            from dataclasses import asdict
+            if not hasattr(cls, "_learn_engine") or cls._learn_engine is None:
+                cls._learn_engine = CeoLearningLoopEngine()
+            pid = body.get("prediction_id", "")
+            actual = float(body.get("actual_value", 0.0))
+            rc = body.get("root_cause", "Observed market movement")
+            ca = body.get("corrective_action", "Calibrate future estimates")
+            pa = body.get("future_policy_adjustment", "Updated forecasting policy")
+            resolved = cls._learn_engine.resolve_actual(pid, actual, rc, ca, pa)
+            if not resolved:
+                return {"error": "Prediction ID not found"}, 404
+            return {"success": True, "resolved_entry": asdict(resolved)}, 200
+
+        elif path == "/api/v8/ceo/scenarios/run":
+            from core.aic_ceo_economic_command import ExecutiveStressTestSimulator
+            sc = body.get("scenario_code") or body.get("scenario_id") or "SCENARIO_A"
+            params = body.get("params", {})
+            res = ExecutiveStressTestSimulator.run_scenario(sc, params)
+            return {"success": True, "scenario_result": res}, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
 

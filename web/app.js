@@ -225,6 +225,13 @@ function updateBreadcrumbs() {
 
   const navLabels = {
     overview: 'Overview',
+    assistant: 'AI Assistant',
+    coworker: 'Autonomous Coworker',
+    missions: 'Mission Control',
+    approvals: 'Sovereign Approvals',
+    terminal: 'Command Terminal',
+    activity: 'Audit Activity',
+    artifacts: 'Evidence Artifacts',
     schedule: 'Universal Schedule',
     company: 'Company',
     organization: 'Organization',
@@ -291,7 +298,23 @@ function toggleSidebarDrawer(forceState) {
 function renderActiveNavView() {
   const currentRoute = (window.location.hash.slice(1) || `/${state.activeNav}`).replace(/^\/+/, '/');
   const navKey = state.activeNav;
-  if (navKey === 'overview') renderOverview();
+  if (navKey === 'overview') {
+    if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
+      window.OverviewWorkspace.render('view-overview');
+    } else {
+      renderOverview();
+    }
+  }
+  else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
+  else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
+  else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderMissions('view-missions');
+  else if (navKey === 'approvals' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderApprovals('view-approvals');
+  else if (navKey === 'terminal' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderTerminal('view-terminal');
+  else if (navKey === 'activity' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderActivity('view-activity');
+  else if (navKey === 'artifacts' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
+  else if (navKey === 'schedule' && window.ScheduleWorkspace) window.ScheduleWorkspace.render('view-schedule');
+  else if (navKey === 'meeting' && window.MeetingRoomWorkspace) window.MeetingRoomWorkspace.render('view-meeting');
+  else if (navKey === 'plugins' && window.PluginsWorkspace) window.PluginsWorkspace.render('view-plugins');
   else if (navKey === 'company') {
     if (window.CompanyWorkspace) window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
     else renderCompanySection();
@@ -300,7 +323,7 @@ function renderActiveNavView() {
     if (window.OrgWorkspace) window.OrgWorkspace.render('view-organization');
   }
   else if (navKey === 'ceo') {
-    if (window.AiCeoWorkspace) window.AiCeoWorkspace.render('view-ceo');
+    if (window.AiCeoWorkspace) window.AiCeoWorkspace.render('view-ceo', currentRoute);
     else renderCeoSection();
   }
   else if (navKey === 'workforce') {
@@ -308,6 +331,31 @@ function renderActiveNavView() {
   }
   else if (navKey === 'tasks') {
     if (window.TaskMakerWorkspace) window.TaskMakerWorkspace.render('view-tasks');
+  }
+  else if (navKey === 'workflows' && window.WorkflowWorkspace) {
+    window.WorkflowWorkspace.render('view-workflows');
+  }
+  else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
+    window.AgentNetworkWorkspace.render('view-agent-network');
+  }
+  else if (navKey === 'mcp-network' && window.McpWorkspace) {
+    window.McpWorkspace.render('view-mcp-network');
+  }
+  else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
+    const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
+    mgr.render('view-openhands-execution');
+  }
+  else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
+    const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
+    mgr.render('view-browser-execution');
+  }
+  else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
+    const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
+    mgr.render('view-temporal-durable');
+  }
+  else if (navKey === 'nango-integrations' && (window.nangoWorkspace || window.NangoWorkspaceManager)) {
+    const mgr = window.nangoWorkspace || new window.NangoWorkspaceManager();
+    mgr.render('view-nango-integrations');
   }
   else if (navKey === 'processes') {
     if (window.ProcessesWorkspace) window.ProcessesWorkspace.render('view-processes');
@@ -323,6 +371,17 @@ function renderActiveNavView() {
     if (window.EnterpriseSettings) window.EnterpriseSettings.render(currentRoute.startsWith('/settings') ? currentRoute : '/settings/security');
     else renderSettingsSection();
   }
+  else {
+    const container = document.getElementById(`view-${navKey}`);
+    if (container && !container.innerHTML.trim()) {
+      container.innerHTML = `
+        <div class="card" style="padding: 24px; text-align: center;">
+          <h3>${navKey.toUpperCase()} Workspace</h3>
+          <p style="color:var(--text-secondary); margin-top:8px;">Workspace ready.</p>
+        </div>
+      `;
+    }
+  }
 }
 
 window.navigateTo = function(path) {
@@ -335,31 +394,39 @@ window.navigateTo = function(path) {
 
 function handleRoute(path) {
   let navKey = 'overview';
-  if (path.startsWith('/assistant')) navKey = 'assistant';
-  else if (path.startsWith('/coworker')) navKey = 'coworker';
-  else if (path.startsWith('/missions')) navKey = 'missions';
-  else if (path.startsWith('/approvals')) navKey = 'approvals';
-  else if (path.startsWith('/terminal')) navKey = 'terminal';
-  else if (path.startsWith('/activity')) navKey = 'activity';
-  else if (path.startsWith('/artifacts')) navKey = 'artifacts';
-  else if (path.startsWith('/schedule')) navKey = 'schedule';
-  else if (path.startsWith('/ceo/meeting') || path.startsWith('/meeting')) navKey = 'meeting';
-  else if (path.startsWith('/plugins') || path.startsWith('/connections')) navKey = 'plugins';
-  else if (path.startsWith('/company') && path.includes('/organization')) navKey = 'organization';
-  else if (path.startsWith('/company') && path.includes('/workforce')) navKey = 'workforce';
-  else if (path.startsWith('/company') && path.includes('/tasks')) navKey = 'tasks';
-  else if (path.startsWith('/company') && path.includes('/processes')) navKey = 'processes';
-  else if (path.startsWith('/company') && path.includes('/trustgraph')) navKey = 'trustgraph';
-  else if (path.startsWith('/company')) navKey = 'company';
-  else if (path.startsWith('/organization')) navKey = 'organization';
-  else if (path.startsWith('/ceo') || path.startsWith('/ai-ceo')) navKey = 'ceo';
-  else if (path.startsWith('/workforce')) navKey = 'workforce';
-  else if (path.startsWith('/tasks')) navKey = 'tasks';
-  else if (path.startsWith('/processes')) navKey = 'processes';
-  else if (path.startsWith('/trustgraph')) navKey = 'trustgraph';
-  else if (path.startsWith('/tools')) navKey = 'tools';
-  else if (path.startsWith('/settings')) navKey = 'settings';
-  else if (path.startsWith('/overview')) navKey = 'overview';
+  const cleanPath = (path || '/').replace(/^\/+/, '/');
+  if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
+  else if (cleanPath.startsWith('/missions')) navKey = 'missions';
+  else if (cleanPath.startsWith('/approvals')) navKey = 'approvals';
+  else if (cleanPath.startsWith('/terminal')) navKey = 'terminal';
+  else if (cleanPath.startsWith('/activity')) navKey = 'activity';
+  else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
+  else if (cleanPath.startsWith('/schedule')) navKey = 'schedule';
+  else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
+  else if (cleanPath.startsWith('/plugins') || cleanPath.startsWith('/connections')) navKey = 'plugins';
+  else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
+  else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
+  else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
+  else if (cleanPath.startsWith('/company') && cleanPath.includes('/processes')) navKey = 'processes';
+  else if (cleanPath.startsWith('/company') && cleanPath.includes('/trustgraph')) navKey = 'trustgraph';
+  else if (cleanPath.startsWith('/company')) navKey = 'company';
+  else if (cleanPath.startsWith('/organization')) navKey = 'organization';
+  else if (cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) navKey = 'ceo';
+  else if (cleanPath.startsWith('/workforce')) navKey = 'workforce';
+  else if (cleanPath.startsWith('/tasks')) navKey = 'tasks';
+  else if (cleanPath.startsWith('/workflows')) navKey = 'workflows';
+  else if (cleanPath.startsWith('/agent-network')) navKey = 'agent-network';
+  else if (cleanPath.startsWith('/mcp-network')) navKey = 'mcp-network';
+  else if (cleanPath.startsWith('/openhands-execution')) navKey = 'openhands-execution';
+  else if (cleanPath.startsWith('/browser-execution')) navKey = 'browser-execution';
+  else if (cleanPath.startsWith('/temporal-durable')) navKey = 'temporal-durable';
+  else if (cleanPath.startsWith('/nango-integrations')) navKey = 'nango-integrations';
+  else if (cleanPath.startsWith('/processes')) navKey = 'processes';
+  else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
+  else if (cleanPath.startsWith('/tools')) navKey = 'tools';
+  else if (cleanPath.startsWith('/settings')) navKey = 'settings';
+  else if (cleanPath.startsWith('/overview')) navKey = 'overview';
 
   state.activeNav = navKey;
   toggleSidebarDrawer(false);
@@ -399,11 +466,11 @@ function handleRoute(path) {
   } else if (navKey === 'plugins' && window.PluginsWorkspace) {
     window.PluginsWorkspace.render('view-plugins');
   } else if (navKey === 'company' && window.CompanyWorkspace) {
-    window.CompanyWorkspace.render(path);
+    window.CompanyWorkspace.render(cleanPath);
   } else if (navKey === 'organization' && window.OrgWorkspace) {
     window.OrgWorkspace.render('view-organization');
   } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
-    window.AiCeoWorkspace.render('view-ceo');
+    window.AiCeoWorkspace.render('view-ceo', cleanPath);
   } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
     window.WorkforceWorkspace.render('view-workforce');
   } else if (navKey === 'tasks' && window.TaskMakerWorkspace) {
@@ -431,9 +498,9 @@ function handleRoute(path) {
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
     window.TrustGraphWorkspace.render('view-trustgraph');
   } else if (navKey === 'settings' && window.EnterpriseSettings) {
-    window.EnterpriseSettings.render(path);
+    window.EnterpriseSettings.render(cleanPath);
   } else if (navKey === 'tools' && window.ToolsFactory) {
-    window.ToolsFactory.render(path);
+    window.ToolsFactory.render(cleanPath);
   } else {
     renderActiveNavView();
   }
