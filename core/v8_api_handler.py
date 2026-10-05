@@ -65,6 +65,31 @@ class V8ApiHandler:
             sbom = supply_chain_controller.generate_cyclonedx_sbom()
             return {"success": True, "sbom": sbom}, 200
 
+        # Universal AIC CEO Constitution & Governance Endpoints
+        elif path == "/api/v8/ceo/constitution":
+            from core.aic_ceo_constitution import CONSTITUTIONAL_PRINCIPLES, AuthorityLevel, DecisionClass
+            return {
+                "success": True,
+                "principles": CONSTITUTIONAL_PRINCIPLES,
+                "sovereign_hierarchy": [l.value for l in AuthorityLevel],
+                "decision_classes": [d.value for d in DecisionClass]
+            }, 200
+
+        elif path == "/api/v8/ceo/kras":
+            from core.aic_ceo_kra_kpi import CANONICAL_UNIVERSAL_KRAS
+            from dataclasses import asdict
+            return {
+                "success": True,
+                "kras": [asdict(k) for k in CANONICAL_UNIVERSAL_KRAS],
+                "count": len(CANONICAL_UNIVERSAL_KRAS)
+            }, 200
+
+        elif path == "/api/v8/ceo/report":
+            from core.aic_ceo_engine import UniversalAICCEOEngine
+            engine = UniversalAICCEOEngine(tenant_id=tenant_id, company_id=company_id)
+            report = engine.generate_owner_executive_report()
+            return {"success": True, "report": report}, 200
+
         ceo = cls.get_ceo(tenant_id, company_id)
 
         # 1. Executive State
@@ -412,6 +437,89 @@ class V8ApiHandler:
             cost = float(body.get("estimated_cost", 0.05))
             allowed, reason = capacity_manager.evaluate_admission(tenant_id, estimated_cost=cost)
             return {"success": allowed, "allowed": allowed, "reason": reason}, 200
+
+        # Universal AIC CEO POST Endpoints
+        elif path == "/api/v8/ceo/decision/evaluate":
+            from core.aic_ceo_engine import UniversalAICCEOEngine
+            engine = UniversalAICCEOEngine(tenant_id=tenant_id, company_id=company_id)
+            res = engine.evaluate_decision(
+                title=body.get("title", "Proposed Action"),
+                description=body.get("description", ""),
+                domain=body.get("domain", "OPERATIONS"),
+                financial_magnitude_usd=float(body.get("financial_magnitude_usd", 0.0)),
+                reversibility=body.get("reversibility", "FULLY_REVERSIBLE"),
+                safety_critical=bool(body.get("safety_critical", False)),
+                legal_exposure=body.get("legal_exposure", "NONE"),
+                customer_impact=body.get("customer_impact", "SINGLE_CUSTOMER"),
+                uncertainty=body.get("uncertainty", "LOW"),
+                is_constitutional_amendment=bool(body.get("is_constitutional_amendment", False))
+            )
+            return {"success": True, "evaluation": res}, 200
+
+        elif path == "/api/v8/ceo/kpi/anti-gaming/check":
+            from core.aic_ceo_kra_kpi import AntiGamingEngine
+            from dataclasses import asdict
+            engine = AntiGamingEngine()
+            p_name = body.get("primary_metric_name", "Revenue USD")
+            p_delta = float(body.get("primary_metric_change_pct", 0.0))
+            c_name = body.get("counter_metric_name", "Contribution Margin %")
+            c_delta = float(body.get("counter_metric_change_pct", 0.0))
+            eval_res = engine.evaluate_pair(p_name, p_delta, c_name, c_delta)
+            return {"success": True, "anti_gaming_evaluation": asdict(eval_res)}, 200
+
+        elif path == "/api/v8/ceo/benchmarks/calibrate":
+            from core.aic_ceo_kra_kpi import AdaptiveIndustryBenchmarkingEngine, IndustryArchetype, CompanyMaturity
+            from dataclasses import asdict
+            engine = AdaptiveIndustryBenchmarkingEngine()
+            ind_str = body.get("industry", "SAAS_SOFTWARE")
+            mat_str = body.get("maturity", "SCALEUP")
+            metric = body.get("metric_name", "NRR_PERCENT")
+            baseline = body.get("historical_baseline")
+            base_val = float(baseline) if baseline is not None else None
+
+            try:
+                ind = IndustryArchetype(ind_str)
+            except ValueError:
+                ind = IndustryArchetype.UNKNOWN
+            try:
+                mat = CompanyMaturity(mat_str)
+            except ValueError:
+                mat = CompanyMaturity.SCALEUP
+
+            cal = engine.calibrate(ind, mat, metric, base_val)
+            return {"success": True, "calibrated_benchmark": asdict(cal)}, 200
+
+        elif path == "/api/v8/ceo/mission/execute-governed":
+            from core.aic_ceo_engine import UniversalAICCEOEngine
+            from dataclasses import asdict
+            engine = UniversalAICCEOEngine(tenant_id=tenant_id, company_id=company_id)
+            plan = engine.initiate_mission(
+                owner_objective=body.get("owner_objective", "Grow recurring enterprise revenue"),
+                target_revenue_usd=float(body.get("target_revenue_usd", 50000.0))
+            )
+            evidence = body.get("evidence", [{"type": "ERP_REVENUE_LEDGER", "state": "VERIFIED"}])
+            actual_rev = float(body.get("actual_revenue_delta", 45000.0))
+            actual_prof = float(body.get("actual_profit_delta", 20000.0))
+            completed = engine.complete_and_verify_mission(
+                mission_id=plan.mission_id,
+                execution_done=True,
+                verified_evidence=evidence,
+                actual_revenue_delta=actual_rev,
+                actual_profit_delta=actual_prof
+            )
+            return {"success": True, "mission_result": asdict(completed)}, 200
+
+        elif path == "/api/v8/ceo/owner/override":
+            from core.aic_ceo_constitution import OwnerOverrideManager
+            mgr = OwnerOverrideManager()
+            rec = mgr.record_owner_override(
+                decision_id=body.get("decision_id", "dec_default"),
+                owner_instruction=body.get("owner_instruction", "Proceed"),
+                ceo_recommendation=body.get("ceo_recommendation", "Decline"),
+                difference_rationale=body.get("difference_rationale", "Strategic prioritization"),
+                expected_consequence=body.get("expected_consequence", "Monitored closely")
+            )
+            return {"success": True, "override_record": rec}, 200
 
         ceo = cls.get_ceo(tenant_id, company_id)
 
