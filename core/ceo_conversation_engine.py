@@ -522,7 +522,8 @@ class CEOConversationEngine:
 
         return {
             "success": True,
-            "scenario": "SECTION_37_REAL_WORLD_ACCEPTANCE_TEST",
+            "scenario": "SECTION_37_INTEGRATION_ACCEPTANCE_SCENARIO",
+            "execution_classification": "SIMULATION / INTEGRATION_ACCEPTANCE_SCENARIO",
             "goal": owner_directive,
             "cognitive_model": self.provider.active_model,
             "audit_trail": audit_steps,
@@ -530,5 +531,8 @@ class CEOConversationEngine:
             "missions_generated": [m.to_dict() for m in missions],
             "evidence_digest": f"sha256:{ev_digest}",
             "report_summary": report.summary,
+            "real_financial_effect_usd": 0.0,
+            "external_settlement_transactions": 0,
+            "simulation_note": "Governed closed-loop integration verification across simulated enterprise substrates; zero real external funds transacted.",
             "constitutional_compliance": "100% INVARIANTS PRESERVED"
         }

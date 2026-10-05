@@ -88,5 +88,20 @@ class ModelDataFirewall:
             blocking_reason=None
         )
 
+    def inspect_and_sanitize(
+        self,
+        raw_prompt: str,
+        tenant_id: str = "tnt_primary",
+        is_local: bool = False
+    ) -> FirewallInspectionResult:
+        """Convenience wrapper for inspecting and sanitizing prompt text."""
+        return self.inspect_and_filter(
+            raw_prompt=raw_prompt,
+            tenant_id=tenant_id,
+            provider_name="MODEL_FIREWALL",
+            is_sovereign_local_model=is_local,
+            allow_pii_redaction=True
+        )
+
 # Global singleton
 model_data_firewall = ModelDataFirewall()

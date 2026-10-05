@@ -250,7 +250,8 @@ class ExecutiveIntentClassifier:
             )
 
         # Ambiguous / Short Input Check
-        if len(inst_lower.split()) <= 2 and not any(w in inst_lower for w in ["help", "hi", "hello", "status"]):
+        words = inst_lower.split()
+        if len(words) <= 2 and not any(w in words for w in ["help", "hi", "hello", "status"]):
             return IntentClassificationResult(
                 intent=OwnerIntentType.UNKNOWN,
                 confidence=0.50,

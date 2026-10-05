@@ -148,3 +148,42 @@ class LayeredExecutiveMemory:
         """Returns Level 1 conversation records."""
         l1 = self._store.get(MemoryTierLevel.LEVEL_1_CONVERSATION, [])
         return [m.to_dict() for m in l1[-limit:]]
+
+    def prune_expired_memories(self, current_time: Optional[float] = None) -> int:
+        """Prunes memories that have exceeded their designated retention policy."""
+        now = current_time or time.time()
+        pruned_count = 0
+        ttl_map = {
+            "EPHEMERAL": 3600.0,       # 1 hour
+            "SESSION": 86400.0,        # 24 hours
+            "90_DAYS": 90 * 86400.0,   # 90 days
+            "IMMUTABLE": float("inf")  # never
+        }
+        for lvl in range(1, 9):
+            retained = []
+            for rec in self._store.get(lvl, []):
+                ttl = ttl_map.get(rec.retention_policy, 90 * 86400.0)
+                if (now - rec.created_at) <= ttl:
+                    retained.append(rec)
+                else:
+                    pruned_count += 1
+            self._store[lvl] = retained
+        return pruned_count
+
+    def resolve_conflicting_memory(
+        self,
+        memory_id: str,
+        superseding_content: str,
+        evidence_hash: str
+    ) -> Optional[LayeredMemoryRecord]:
+        """Resolves a conflicting memory record with verified physical evidence."""
+        for lvl in range(1, 9):
+            for rec in self._store.get(lvl, []):
+                if rec.memory_id == memory_id:
+                    rec.content = superseding_content
+                    rec.provenance = evidence_hash
+                    rec.confidence = 1.0
+                    rec.epistemic_category = "FACT"
+                    rec.source = "PHYSICAL_TRUTH_ENGINE"
+                    return rec
+        return None

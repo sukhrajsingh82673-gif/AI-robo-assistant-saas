@@ -355,7 +355,8 @@ class TestGemma4CognitiveCEOIntegration(unittest.TestCase):
         res = self.engine.execute_real_world_revenue_acceptance_scenario(owner_directive=directive)
 
         self.assertTrue(res["success"])
-        self.assertEqual(res["scenario"], "SECTION_37_REAL_WORLD_ACCEPTANCE_TEST")
+        self.assertEqual(res["scenario"], "SECTION_37_INTEGRATION_ACCEPTANCE_SCENARIO")
+        self.assertEqual(res["execution_classification"], "SIMULATION / INTEGRATION_ACCEPTANCE_SCENARIO")
         self.assertEqual(res["constitutional_compliance"], "100% INVARIANTS PRESERVED")
         self.assertTrue(len(res["audit_trail"]) >= 10)
         self.assertTrue(len(res["missions_generated"]) >= 1)

@@ -325,10 +325,19 @@ class Gemma4Provider(CognitiveModelProvider):
         if not text:
             return "", 0
         try:
-            res = model_data_firewall.inspect_and_sanitize(text, tenant_id)
-            return res.sanitized_prompt, len(res.redactions)
-        except Exception:
-            # Fallback if DB table not initialized
+            res = model_data_firewall.inspect_and_filter(
+                raw_prompt=text,
+                tenant_id=tenant_id,
+                provider_name=self.provider_name,
+                is_sovereign_local_model=(self._mode == "LOCAL"),
+                allow_pii_redaction=True
+            )
+            if not res.is_allowed:
+                logger.warning(f"DLP Firewall blocked prompt: {res.blocking_reason}")
+                return f"[DLP_BLOCKED: {res.blocking_reason}]", 0
+            return res.sanitized_prompt, res.redaction_count
+        except Exception as e:
+            logger.warning(f"DLP inspection error: {e}")
             return text, 0
 
     def chat(
