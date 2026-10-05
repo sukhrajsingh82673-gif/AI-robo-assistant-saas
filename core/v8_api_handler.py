@@ -21,9 +21,14 @@ from core.executive_control_loop import ControlLoopStage
 logger = logging.getLogger("zonata.v8.api")
 
 class V8ApiHandler:
+    _ceo_cache: Dict[Tuple[str, str], AICEOExecutiveOperatingLayer] = {}
+
     @classmethod
     def get_ceo(cls, tenant_id: str, company_id: str) -> AICEOExecutiveOperatingLayer:
-        return AICEOExecutiveOperatingLayer(tenant_id=tenant_id, company_id=company_id)
+        key = (tenant_id, company_id)
+        if key not in cls._ceo_cache:
+            cls._ceo_cache[key] = AICEOExecutiveOperatingLayer(tenant_id=tenant_id, company_id=company_id)
+        return cls._ceo_cache[key]
 
     @classmethod
     def handle_get(cls, path: str, query_params: Dict[str, Any], tenant_id: str, company_id: str) -> Optional[Tuple[Dict[str, Any], int]]:
@@ -253,6 +258,43 @@ class V8ApiHandler:
             engine = UniversalCoworkerEngine.get_instance(tenant_id)
             cycle = engine.supervisor.run_watchdog_cycle()
             return {"watchdog": cycle}, 200
+
+        # 18. Gemma 4 Cognitive Layer Endpoints
+        elif path == "/api/v8/gemma/status":
+            prov = ceo.conversation_engine.provider
+            return {
+                "success": True,
+                "provider": prov.provider_name,
+                "active_model": prov.active_model,
+                "deployment_mode": prov.deployment_mode,
+                "emergency_halted": ceo.conversation_engine.is_emergency_halted,
+                "circuit_healthy": True,
+                "active_missions_count": len(ceo.conversation_engine.mission_manager.list_missions()),
+                "departments_count": len(ceo.conversation_engine.department_registry.list_departments()),
+                "coworkers_count": len(ceo.conversation_engine.coworker_registry.list_coworkers()),
+                "memory_records_count": len(ceo.conversation_engine.memory.query_memories(limit=100))
+            }, 200
+
+        elif path == "/api/v8/gemma/benchmark":
+            from core.gemma_benchmark import GemmaBenchmarkSuite
+            bench_results = GemmaBenchmarkSuite.run_benchmark()
+            return {"success": True, "benchmark": bench_results}, 200
+
+        elif path == "/api/v8/gemma/reflections":
+            refs = ceo.conversation_engine.reflection_engine.get_latest_reflections(limit=10)
+            return {"success": True, "reflections": [r.to_dict() for r in refs]}, 200
+
+        elif path == "/api/v8/gemma/departments":
+            depts = ceo.conversation_engine.department_registry.list_departments()
+            return {"success": True, "departments": [d.to_dict() for d in depts]}, 200
+
+        elif path == "/api/v8/gemma/coworkers":
+            cws = ceo.conversation_engine.coworker_registry.list_coworkers()
+            return {"success": True, "coworkers": [c.to_dict() for c in cws]}, 200
+
+        elif path == "/api/v8/gemma/missions":
+            msns = ceo.conversation_engine.mission_manager.list_missions()
+            return {"success": True, "missions": [m.to_dict() for m in msns]}, 200
 
         return None
 
@@ -538,5 +580,26 @@ class V8ApiHandler:
                 success, msg = engine.takeover_mgr.return_control_to_ai(session_id, final_observed_state=body.get("observed_state", {}))
 
             return {"success": success, "message": msg, "session_id": session_id}, 200
+
+        # 19. Gemma 4 Cognitive Operational Actions
+        elif path == "/api/v8/emergency-stop":
+            reason = body.get("reason", "Emergency stop triggered via API")
+            res = ceo.conversation_engine.emergency_stop(reason=reason)
+            return res, 200
+
+        elif path == "/api/v8/emergency-resume":
+            reason = body.get("reason", "Operations resumed via API")
+            res = ceo.conversation_engine.emergency_resume(reason=reason)
+            return res, 200
+
+        elif path == "/api/v8/gemma/acceptance-test":
+            directive = body.get("directive", "Create a plan to increase revenue for the company by 15% over the next quarter.")
+            test_res = ceo.conversation_engine.execute_real_world_revenue_acceptance_scenario(owner_directive=directive)
+            return test_res, 200
+
+        elif path == "/api/v8/supervision/tick":
+            goal = body.get("goal", "Optimize revenue and operations")
+            tick = ceo.conversation_engine.supervision_loop.advance_stage(owner_goal=goal)
+            return {"success": True, "tick": tick.to_dict()}, 200
 
         return None

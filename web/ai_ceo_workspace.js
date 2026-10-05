@@ -43,6 +43,7 @@
       this.reports = [];
       this.loopStage = 'OBSERVE';
       this.chatHistory = [];
+      this.gemmaStatus = null;
       this.loading = false;
     }
 
@@ -73,7 +74,7 @@
         const [
           stateRes, perfRes, objRes, stratRes, prioRes,
           deptRes, msnRes, decRes, apprRes, resRes,
-          riskRes, oppRes, obsRes, loopRes, rptRes
+          riskRes, oppRes, obsRes, loopRes, rptRes, gemmaRes
         ] = await Promise.all([
           fetch('/api/v8/executive-state', { headers }).then(r => r.json()).catch(() => ({})),
           fetch('/api/v8/performance', { headers }).then(r => r.json()).catch(() => ({})),
@@ -89,7 +90,8 @@
           fetch('/api/v8/opportunities', { headers }).then(r => r.json()).catch(() => ({})),
           fetch('/api/v8/observations', { headers }).then(r => r.json()).catch(() => ({})),
           fetch('/api/v8/control-loop/state', { headers }).then(r => r.json()).catch(() => ({})),
-          fetch('/api/v8/reports', { headers }).then(r => r.json()).catch(() => ({}))
+          fetch('/api/v8/reports', { headers }).then(r => r.json()).catch(() => ({})),
+          fetch('/api/v8/gemma/status', { headers }).then(r => r.json()).catch(() => ({}))
         ]);
 
         this.executiveState = stateRes.state || null;
@@ -107,6 +109,7 @@
         this.observations = obsRes.observations || [];
         this.loopStage = loopRes.current_stage || 'OBSERVE';
         this.reports = rptRes.reports || [];
+        this.gemmaStatus = gemmaRes || null;
       } catch (err) {
         console.error('Failed to load V8 AI CEO Data:', err);
       } finally {
@@ -127,20 +130,27 @@
           <div class="card card-header-flexible" style="background:linear-gradient(135deg, rgba(20,24,35,0.95), rgba(15,30,50,0.95)); border-left:4px solid var(--primary, #3b82f6);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
               <div>
-                <div style="display:flex; align-items:center; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                   <span style="font-size:24px;">🏛️</span>
                   <h2 style="margin:0; font-size:1.5rem; font-weight:700;">AI CEO Executive Operating Console</h2>
                   <span class="status-indicator-pill" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid #10b981; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600;">
                     ${this.loopStage} ACTIVE
                   </span>
+                  <span class="status-indicator-pill" style="background:rgba(99,102,241,0.2); color:#818cf8; border:1px solid #6366f1; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600;">
+                    🧠 Cognitive: Google Gemma 4 (${this.gemmaStatus?.active_model || 'gemma-4-31b-it'}) [${this.gemmaStatus?.deployment_mode || 'HYBRID'}]
+                  </span>
+                  ${this.gemmaStatus?.emergency_halted ? `
+                  <span class="status-indicator-pill" style="background:rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; animation:pulse 1.5s infinite;">
+                    🛑 EMERGENCY CONTAINMENT ACTIVE
+                  </span>` : ''}
                 </div>
                 <p style="margin:6px 0 0 0; color:var(--text-secondary); font-size:0.9rem;">
-                  Operating Context: <strong>${companyName}</strong> | Mode: <strong>Closed-Loop Governed OS (V8.0-GA)</strong>
+                  Operating Context: <strong>${companyName}</strong> | Architecture: <strong>Gemma 4 Cognition + ZONATA Sovereign Authority</strong>
                 </p>
               </div>
 
-              <!-- Quick Status Vitals -->
-              <div style="display:flex; gap:16px; align-items:center;">
+              <!-- Quick Status Vitals & Sovereign Controls -->
+              <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                 <div style="text-align:center; padding:6px 12px; background:rgba(255,255,255,0.04); border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
                   <div style="font-size:0.75rem; color:var(--text-secondary);">OPERATIONAL RATING</div>
                   <div style="font-size:1.1rem; font-weight:700; color:#10b981;">${rating}</div>
@@ -150,28 +160,36 @@
                   <div style="font-size:1.1rem; font-weight:700; color:#3b82f6;">${decRate}%</div>
                 </div>
                 <div style="text-align:center; padding:6px 12px; background:rgba(255,255,255,0.04); border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
-                  <div style="font-size:0.75rem; color:var(--text-secondary);">MISSION SUCCESS</div>
-                  <div style="font-size:1.1rem; font-weight:700; color:#f59e0b;">${msnRate}%</div>
+                  <div style="font-size:0.75rem; color:var(--text-secondary);">ACTIVE MISSIONS</div>
+                  <div style="font-size:1.1rem; font-weight:700; color:#f59e0b;">${this.missions.length}</div>
                 </div>
-                <button class="btn btn-primary" id="btnRunClosedLoop" style="padding:10px 16px; display:flex; align-items:center; gap:8px;">
-                  <span>⚡ Run 22-Step Scenario</span>
+                <button class="btn" onclick="window.AiCeoWorkspace.triggerEmergencyStop()" style="background:#dc2626; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer;">
+                  🛑 Emergency STOP
+                </button>
+                <button class="btn" onclick="window.AiCeoWorkspace.triggerEmergencyResume()" style="background:#16a34a; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer;">
+                  ▶️ Resume
+                </button>
+                <button class="btn btn-primary" id="btnRunClosedLoop" style="padding:8px 14px; display:flex; align-items:center; gap:6px;">
+                  <span>⚡ 22-Step Scenario</span>
                 </button>
               </div>
             </div>
 
             <!-- Natural Language Command Bar -->
             <div style="margin-top:16px; display:flex; gap:10px;">
-              <input type="text" id="ceoCommandInput" class="ceo-command-input" style="flex:1; padding:10px 16px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:white;" placeholder="Command the AI CEO (e.g. 'How is the company performing?', 'Why is RevPAR below target?', 'Show me the evidence')..." />
+              <input type="text" id="ceoCommandInput" class="ceo-command-input" style="flex:1; padding:10px 16px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:white;" placeholder="Command the AI CEO (e.g. 'Increase hotel bookings by 20% this month', 'What is blocking marketing?', 'Show me the evidence')..." />
               <button class="btn btn-secondary" id="btnSendCeoCommand" style="padding:10px 20px;">Send Directive</button>
             </div>
 
             <!-- Fast Prompt Chips -->
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; font-size:0.8rem;">
-              <span style="color:var(--text-secondary); align-self:center;">Quick Directives:</span>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('How is the company performing?')">Health Status</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('What are our biggest KPI gaps?')">KPI Gaps</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Which department is overloaded?')">Workforce Capacity</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Show me the evidence')">Evidence Ledger</button>
+              <span style="color:var(--text-secondary); align-self:center;">Cognitive Directives:</span>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Increase hotel bookings by 20% this month')">🏨 +20% Bookings</button>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Create a plan to increase revenue for the company by 15% over the next quarter')">📈 +15% Revenue Plan</button>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('What is blocking marketing?')">🔍 Audit Marketing</button>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('How is the company performing?')">📊 Health Status</button>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Show me the evidence')">🔗 Evidence Ledger</button>
+              <button class="chip-btn" onclick="window.AiCeoWorkspace.runBenchmarkSuite()">🧪 Gemma 4 Benchmark</button>
               <button class="chip-btn" onclick="window.AiCeoWorkspace.advanceLoopTick()">Next Loop Tick (${this.loopStage})</button>
             </div>
 
@@ -608,7 +626,7 @@
       const feedback = document.getElementById('ceoChatFeedback');
       if (feedback) {
         feedback.style.display = 'block';
-        feedback.innerHTML = `<em>Consulting AI CEO Executive Cognition Layer...</em>`;
+        feedback.innerHTML = `<em>Consulting Google Gemma 4 Cognitive Executive Layer...</em>`;
       }
       try {
         const res = await fetch('/api/v8/chat', {
@@ -618,17 +636,102 @@
         }).then(r => r.json());
 
         if (res.success && feedback) {
-          const ans = res.reply?.answer || 'Directive acknowledged.';
+          const r = res.reply || {};
+          const ans = r.answer || 'Directive acknowledged.';
+          const modelBadge = r.model_used || 'gemma-4-31b-it';
+          const epistemic = r.epistemic_classification || 'INFERENCE';
+          const evLink = r.evidence_digest ? `<div style="margin-top:6px; font-size:0.8rem; color:#10b981;">🔗 <strong>Merkle Evidence Digest:</strong> <code>${r.evidence_digest}</code></div>` : '';
+          const metricsBadge = r.tokens_consumed ? `<span style="font-size:0.75rem; color:var(--text-secondary); margin-left:8px;">(${r.tokens_consumed} tokens, ${r.latency_ms}ms)</span>` : '';
+
           feedback.innerHTML = `
-            <div style="font-weight:600; color:#60a5fa; margin-bottom:4px;">Human Owner Directive: "${msg}"</div>
-            <div style="font-size:0.9rem; line-height:1.5;">${ans.replace(/\n/g, '<br>')}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
+              <div style="font-weight:600; color:#60a5fa;">Human Owner Directive: "${msg}"</div>
+              <div>
+                <span class="status-indicator-pill" style="background:rgba(99,102,241,0.2); color:#818cf8; font-size:0.75rem; padding:2px 6px; border-radius:6px;">${modelBadge}</span>
+                <span class="status-indicator-pill" style="background:rgba(16,185,129,0.2); color:#10b981; font-size:0.75rem; padding:2px 6px; border-radius:6px; margin-left:4px;">${epistemic}</span>
+                ${metricsBadge}
+              </div>
+            </div>
+            <div style="font-size:0.9rem; line-height:1.5; color:#f3f4f6;">${ans.replace(/\n/g, '<br>')}</div>
+            ${evLink}
           `;
-          if (res.reply?.scenario_result) {
-            await this.render();
+          if (r.resulting_mission || r.scenario_result) {
+            await this.loadAllData();
+            const sub = document.getElementById('ceoSectionContent');
+            if (sub) sub.innerHTML = this.renderActiveSection();
           }
         }
       } catch (e) {
         if (feedback) feedback.innerHTML = `Error executing directive: ${e}`;
+      }
+    }
+
+    async triggerEmergencyStop() {
+      if (!confirm("ENGAGE SOVEREIGN EMERGENCY STOP?\nThis will immediately pause all automated missions across all departments.")) return;
+      try {
+        const res = await fetch('/api/v8/emergency-stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': this.tenantId, 'X-Company-ID': this.companyId },
+          body: JSON.stringify({ reason: "Emergency Stop triggered from Executive Console" })
+        }).then(r => r.json());
+        if (window.showToast) window.showToast(`Emergency containment engaged. Paused ${res.paused_missions_count || 0} missions.`, 'error');
+        await this.render();
+      } catch (e) {
+        alert("Emergency stop failed: " + e);
+      }
+    }
+
+    async triggerEmergencyResume() {
+      try {
+        const res = await fetch('/api/v8/emergency-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': this.tenantId, 'X-Company-ID': this.companyId },
+          body: JSON.stringify({ reason: "Sovereign resume authorized by Owner" })
+        }).then(r => r.json());
+        if (window.showToast) window.showToast(`Sovereign operations resumed. ${res.resumed_missions_count || 0} missions active.`, 'success');
+        await this.render();
+      } catch (e) {
+        alert("Resume failed: " + e);
+      }
+    }
+
+    async runBenchmarkSuite() {
+      const feedback = document.getElementById('ceoChatFeedback');
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.innerHTML = `<em>Running empirical Gemma 4 benchmark (31B IT vs 26B MoE across 12 dimensions)...</em>`;
+      }
+      try {
+        const res = await fetch('/api/v8/gemma/benchmark', {
+          headers: { 'X-Tenant-ID': this.tenantId, 'X-Company-ID': this.companyId }
+        }).then(r => r.json());
+
+        if (res.success && feedback) {
+          const b = res.benchmark || {};
+          const r31 = b.results?.['gemma-4-31b-it'] || {};
+          const r26 = b.results?.['gemma-4-26b-a4b-it'] || {};
+          feedback.innerHTML = `
+            <div style="font-weight:700; color:#818cf8; margin-bottom:6px;">🧪 Google Gemma 4 Empirical Benchmark Matrix (12 Dimensions)</div>
+            <div style="font-size:0.85rem; line-height:1.5;">
+              <strong>Production Default:</strong> <code>${b.production_default}</code><br>
+              <strong>Rationale:</strong> ${b.recommendation_rationale}<br><br>
+              <table style="width:100%; border-collapse:collapse; margin-top:8px; font-size:0.8rem; text-align:left;">
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.2);">
+                  <th style="padding:4px;">Dimension</th>
+                  <th style="padding:4px;">Gemma 4 31B IT (Dense)</th>
+                  <th style="padding:4px;">Gemma 4 26B MoE (4B Active)</th>
+                </tr>
+                <tr><td style="padding:3px;">Reasoning Quality</td><td>${r31.reasoning_quality_score}/100</td><td>${r26.reasoning_quality_score}/100</td></tr>
+                <tr><td style="padding:3px;">Tool Selection Accuracy</td><td>${r31.tool_selection_accuracy_pct}%</td><td>${r26.tool_selection_accuracy_pct}%</td></tr>
+                <tr><td style="padding:3px;">Mean Latency</td><td>${r31.mean_latency_ms} ms</td><td style="color:#10b981; font-weight:600;">${r26.mean_latency_ms} ms (Fast)</td></tr>
+                <tr><td style="padding:3px;">Memory Footprint</td><td>${r31.memory_footprint_gb} GB</td><td style="color:#10b981; font-weight:600;">${r26.memory_footprint_gb} GB</td></tr>
+                <tr><td style="padding:3px;">Composite Score</td><td style="color:#3b82f6; font-weight:700;">${r31.composite_executive_score}/100 (Primary)</td><td>${r26.composite_executive_score}/100</td></tr>
+              </table>
+            </div>
+          `;
+        }
+      } catch (e) {
+        if (feedback) feedback.innerHTML = `Benchmark error: ${e}`;
       }
     }
 

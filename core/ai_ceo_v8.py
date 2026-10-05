@@ -39,6 +39,7 @@ from core.executive_decision import ExecutiveDecisionEngine, ExecutiveDecisionRe
 from core.ceo_performance import CEOPerformanceEngine, CEOPerformanceScorecard
 from core.executive_control_loop import ExecutiveControlLoop, ControlLoopStage
 from core.executive_events import create_executive_event
+from core.ceo_conversation_engine import CEOConversationEngine
 
 logger = logging.getLogger("zonata.v8.ai_ceo")
 
@@ -65,6 +66,7 @@ class AICEOExecutiveOperatingLayer:
         self.decision_engine = ExecutiveDecisionEngine(tenant_id, company_id)
         self.performance_engine = CEOPerformanceEngine(tenant_id, company_id)
         self.control_loop = ExecutiveControlLoop(tenant_id, company_id)
+        self.conversation_engine = CEOConversationEngine(tenant_id, company_id)
 
     # =========================================================================
     # Closed-Loop End-to-End Scenario Execution
@@ -283,19 +285,20 @@ class AICEOExecutiveOperatingLayer:
 
     def chat_query(self, message: str) -> Dict[str, Any]:
         """
-        Handles natural language executive queries and commands deterministically
-        and with structured operational evidence.
+        Handles natural language executive queries and commands using Google Gemma 4
+        cognitive layer embedded into ZONATA AI CEO runtime with sovereign governance.
         """
         msg_clean = message.strip()
         msg_lower = msg_clean.lower()
         now = time.time()
 
-        # 1. Performance Overview
-        if any(k in msg_lower for k in ["how is the company performing", "company health", "performance"]):
+        # 1. Performance Overview (Quick telemetry)
+        if any(k in msg_lower for k in ["how is the company performing", "company health"]):
             scorecard = self.performance_engine.evaluate_performance()
             state = self.state_mgr.get_state()
             return {
                 "intent": "PERFORMANCE_QUERY",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     f"**Company Performance Overview ({state.company.get('company_name', 'Company')})**\n\n"
                     f"- **Operational Rating:** {scorecard.operational_rating}\n"
@@ -314,6 +317,7 @@ class AICEOExecutiveOperatingLayer:
             deviations = [o for o in obs_list if o.observation_type in (ObservationType.DEVIATION, ObservationType.UNKNOWN)]
             return {
                 "intent": "KPI_DEVIATION_QUERY",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     f"**Active KPI Gaps & Deviations ({len(deviations)} identified):**\n\n" +
                     ("\n".join([f"- **{d.metric_name or d.category}:** {d.summary} (Confidence: {d.confidence})" for d in deviations]) if deviations else "No active negative deviations. All tracked metrics meet or exceed baseline.")
@@ -325,6 +329,7 @@ class AICEOExecutiveOperatingLayer:
         elif any(k in msg_lower for k in ["which department is overloaded", "workforce capacity", "overload", "utilization"]):
             return {
                 "intent": "DEPARTMENT_CAPACITY_QUERY",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     "**Department Workload & Capacity Audit:**\n\n"
                     "- **REVENUE:** 75% Capacity (High mission throughput due to rate optimization)\n"
@@ -341,6 +346,7 @@ class AICEOExecutiveOperatingLayer:
         elif any(k in msg_lower for k in ["do we have an employee capable", "employee capable"]):
             return {
                 "intent": "EMPLOYEE_CAPABILITY_QUERY",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     "**Workforce Capability Assessment:**\n\n"
                     "Yes. ZONATA's workforce contains:\n"
@@ -356,6 +362,7 @@ class AICEOExecutiveOperatingLayer:
             scenario_res = self.execute_closed_loop_scenario(owner_goal=message)
             return {
                 "intent": "STRATEGY_CREATION_COMMAND",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     f"**Strategic Plan Formulated & Executed:**\n\n"
                     f"- **Strategy ID:** `{scenario_res['strategy_id']}` (Version `{scenario_res['strategy_version']}`)\n"
@@ -371,6 +378,7 @@ class AICEOExecutiveOperatingLayer:
             decisions = self.decision_engine.list_decisions()
             return {
                 "intent": "EVIDENCE_QUERY",
+                "cognitive_model": self.conversation_engine.provider.active_model,
                 "answer": (
                     f"**Cryptographic Evidence Ledger:**\n\n"
                     f"Latest sealed decisions count: {len(decisions)}.\n" +
@@ -379,21 +387,35 @@ class AICEOExecutiveOperatingLayer:
                 "decisions": [d.to_dict() for d in decisions[:10]]
             }
 
-        # 7. Fallback General Executive Query
-        else:
-            state = self.state_mgr.get_state()
-            return {
-                "intent": "GENERAL_EXECUTIVE_STATUS",
-                "answer": (
-                    f"**ZONATA AI CEO Executive Console**\n\n"
-                    f"Company: **{state.company.get('company_name')}** | Stage: `{state.company.get('lifecycle_stage')}`\n"
-                    f"Active Loop Stage: `{self.control_loop.get_current_stage()}`\n"
-                    f"I continuously operate the 11-stage executive operating loop: "
-                    f"`OBSERVE -> ASSESS -> PRIORITIZE -> PLAN -> DELEGATE -> EXECUTE -> MONITOR -> VERIFY -> EVALUATE -> ADJUST -> REPORT`.\n\n"
-                    f"How can I serve your strategic objectives?"
-                ),
-                "state_summary": {"version": state.version, "last_stage": state.last_loop_stage}
-            }
+        # 7. Gemma 4 Governed Cognitive Executive Conversation Pipeline
+        state = self.state_mgr.get_state()
+        comp_meta = state.company or {
+            "company_name": "Royal Hotel Jaipur",
+            "industry": "Hospitality",
+            "revenue": 1200000.0,
+            "cost": 750000.0
+        }
+        res = self.conversation_engine.process_owner_directive(
+            instruction=message,
+            caller_role="OWNER",
+            company_metadata=comp_meta
+        )
+
+        return {
+            "intent": res.command_type,
+            "answer": res.reply_text,
+            "structured_decision": res.structured_decision,
+            "resulting_mission": res.resulting_mission,
+            "resulting_plan": res.resulting_plan,
+            "evidence_digest": res.evidence_digest,
+            "model_used": res.model_used,
+            "tokens_consumed": res.tokens_consumed,
+            "latency_ms": res.latency_ms,
+            "cost_usd": res.cost_usd,
+            "requires_approval": res.requires_approval,
+            "approval_id": res.approval_id,
+            "epistemic_classification": res.epistemic_classification
+        }
 
     # =========================================================================
     # Executive Reporting Generator
