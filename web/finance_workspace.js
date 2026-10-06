@@ -14,9 +14,21 @@
       this.loading = false;
     }
 
-    async render(containerId = 'view-finance') {
+    async render(containerId = 'view-finance', routePath = '/finance') {
       const container = document.getElementById(containerId);
       if (!container) return;
+
+      if (typeof routePath === 'string') {
+        if (routePath.includes('/revenue') || routePath.includes('/transactions')) {
+          this.activeTab = 'transactions';
+        } else if (routePath.includes('/expenses')) {
+          this.activeTab = 'expenses';
+        } else if (routePath.includes('/coa') || routePath.includes('/accounts')) {
+          this.activeTab = 'coa';
+        } else if (routePath === '/finance' || routePath.includes('/overview') || routePath.includes('/profitability')) {
+          this.activeTab = 'overview';
+        }
+      }
 
       container.innerHTML = `
         <div style="padding:40px; text-align:center;">

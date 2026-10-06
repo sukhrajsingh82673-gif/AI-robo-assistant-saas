@@ -395,6 +395,14 @@ function renderActiveNavView() {
   }
 }
 
+window.AppRouter = {
+  navigate: function(path) {
+    if (!path) return;
+    const clean = path.startsWith('/') ? path : '/' + path;
+    window.navigateTo(clean);
+  }
+};
+
 window.navigateTo = function(path) {
   if (!path.startsWith('/')) path = '/' + path;
   if (window.location.hash !== '#' + path) {
@@ -403,10 +411,89 @@ window.navigateTo = function(path) {
   handleRoute(path);
 };
 
+function renderNotFoundView(requestedPath) {
+  const container = document.getElementById('view-404');
+  if (!container) return;
+  container.innerHTML = `
+    <div style="max-width:880px; margin:40px auto; padding:32px; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; text-align:center;">
+      <div style="font-size:40px; margin-bottom:12px;">🧭</div>
+      <span class="badge badge-amber" style="font-size:12px; font-weight:700; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+        404 • Workspace Route Not Found
+      </span>
+      <h2 style="font-size:22px; font-weight:700; color:var(--text-primary); margin:10px 0 12px 0;">
+        Canonical Operational Workspace Not Found
+      </h2>
+      <p style="font-size:14px; color:var(--text-secondary); max-width:620px; margin:0 auto 16px auto; line-height:1.6;">
+        The requested path <code style="background:rgba(0,0,0,0.3); padding:3px 8px; border-radius:4px; color:var(--accent-blue); font-family:var(--font-mono); font-size:13px;">${escapeHtml(requestedPath)}</code> does not correspond to an authorized canonical workspace.
+      </p>
+      <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:24px;">
+        ZONATA enforces sovereign information architecture: navigation never silently defaults to Home. Select an authorized operational workspace below:
+      </p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; text-align:left; margin-bottom:28px;">
+        <button class="btn btn-outline" onclick="window.navigateTo('/overview')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">📊</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Executive Overview</div><div style="font-size:11px; color:var(--text-muted);">Command Surface</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/ceo')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">👑</span>
+          <div><div style="font-weight:600; font-size:12.5px;">AI CEO Strategy</div><div style="font-size:11px; color:var(--text-muted);">Autonomous Planning</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/missions')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">🎯</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Work & Missions</div><div style="font-size:11px; color:var(--text-muted);">Verified Outcomes</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/finance')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">💰</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Finance & GL</div><div style="font-size:11px; color:var(--text-muted);">Ledger & Cash Flow</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/customers')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">🤝</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Customers & CRM</div><div style="font-size:11px; color:var(--text-muted);">Customer 360 & Pipeline</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/governance')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">🛡️</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Governance & Risk</div><div style="font-size:11px; color:var(--text-muted);">Sovereign Boundaries</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/records')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">📜</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Enterprise Records</div><div style="font-size:11px; color:var(--text-muted);">Immutable Events</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/files')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">📁</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Files & Docs</div><div style="font-size:11px; color:var(--text-muted);">Artifacts & Evidence</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/reports')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">📈</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Reports & BI</div><div style="font-size:11px; color:var(--text-muted);">Audited Insights</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/agent-factory')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">⚡</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Dynamic Workforce</div><div style="font-size:11px; color:var(--text-muted);">AI CEO Agent Factory</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/integrations')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">🔌</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Integrations Hub</div><div style="font-size:11px; color:var(--text-muted);">External Connectors</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="window.navigateTo('/operations')" style="padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <span style="font-size:18px;">⚙️</span>
+          <div><div style="font-weight:600; font-size:12.5px;">Operations Center</div><div style="font-size:11px; color:var(--text-muted);">Host Nodes & Health</div></div>
+        </button>
+      </div>
+      <div>
+        <button class="btn-primary" onclick="window.history.length > 1 ? window.history.back() : window.navigateTo('/overview')">
+          ← Return to Previous Workspace
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function handleRoute(path) {
-  let navKey = 'overview';
   const cleanPath = (path || '/').replace(/^\/+/, '/');
-  if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  let navKey = null;
+
+  if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview')) navKey = 'overview';
+  else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
   else if (cleanPath.startsWith('/missions') || cleanPath.startsWith('/work')) navKey = 'missions';
   else if (cleanPath.startsWith('/operations')) navKey = 'operations';
@@ -447,7 +534,10 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
   else if (cleanPath.startsWith('/tools')) navKey = 'agent-factory';
   else if (cleanPath.startsWith('/settings')) navKey = 'settings';
-  else if (cleanPath.startsWith('/overview')) navKey = 'overview';
+  else {
+    // Unrecognized route: Do NOT fallback to Home. Explicitly render 404 Route Not Found
+    navKey = '404';
+  }
 
   state.activeNav = navKey;
   toggleSidebarDrawer(false);
@@ -466,83 +556,109 @@ function handleRoute(path) {
 
   updateBreadcrumbs();
 
-  if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
-  } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
-  } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderMissions('view-missions');
-  } else if (navKey === 'approvals' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderApprovals('view-approvals');
-  } else if (navKey === 'terminal' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderTerminal('view-terminal');
-  } else if (navKey === 'activity' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderActivity('view-activity');
-  } else if (navKey === 'artifacts' && window.AssistantCoworkerWorkspace) {
-    window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
-  } else if (navKey === 'schedule' && window.ScheduleWorkspace) {
-    window.ScheduleWorkspace.render('view-schedule');
-  } else if (navKey === 'operations' && window.OperationsWorkspace) {
-    window.OperationsWorkspace.render('view-operations');
-  } else if (navKey === 'customers' && window.CrmWorkspace) {
-    window.CrmWorkspace.render('view-customers');
-  } else if (navKey === 'finance' && window.FinanceWorkspace) {
-    window.FinanceWorkspace.render('view-finance');
-  } else if (navKey === 'people' && window.PeopleWorkspace) {
-    window.PeopleWorkspace.render('view-people');
-  } else if (navKey === 'records' && window.RecordsWorkspace) {
-    window.RecordsWorkspace.render('view-records');
-  } else if (navKey === 'files' && window.FilesWorkspace) {
-    window.FilesWorkspace.render('view-files');
-  } else if (navKey === 'reports' && window.ReportsWorkspace) {
-    window.ReportsWorkspace.render('view-reports');
-  } else if (navKey === 'agent-factory' && window.AgentFactoryWorkspace) {
-    window.AgentFactoryWorkspace.render('view-agent-factory');
-  } else if (navKey === 'integrations' && window.IntegrationsWorkspace) {
-    window.IntegrationsWorkspace.render('view-integrations');
-  } else if (navKey === 'governance' && window.GovernanceWorkspace) {
-    window.GovernanceWorkspace.render('view-governance');
-  } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
-    window.MeetingRoomWorkspace.render('view-meeting');
-  } else if (navKey === 'plugins' && window.IntegrationsWorkspace) {
-    window.IntegrationsWorkspace.render('view-integrations');
-  } else if (navKey === 'company' && window.CompanyWorkspace) {
-    window.CompanyWorkspace.render(cleanPath);
-  } else if (navKey === 'organization' && window.OrgWorkspace) {
-    window.OrgWorkspace.render('view-organization', cleanPath);
-  } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
-    window.AiCeoWorkspace.render('view-ceo', cleanPath);
-  } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
-    window.WorkforceWorkspace.render('view-workforce');
-  } else if (navKey === 'tasks' && window.TaskMakerWorkspace) {
-    window.TaskMakerWorkspace.render('view-tasks');
-  } else if (navKey === 'workflows' && window.WorkflowWorkspace) {
-    window.WorkflowWorkspace.render('view-workflows');
-  } else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
-    window.AgentNetworkWorkspace.render('view-agent-network');
-  } else if (navKey === 'mcp-network' && window.McpWorkspace) {
-    window.McpWorkspace.render('view-mcp-network');
-  } else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
-    const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
-    mgr.render('view-openhands-execution');
-  } else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
-    const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
-    mgr.render('view-browser-execution');
-  } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
-    const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
-    mgr.render('view-temporal-durable');
-  } else if (navKey === 'nango-integrations' && window.IntegrationsWorkspace) {
-    window.IntegrationsWorkspace.render('view-integrations');
-  } else if (navKey === 'processes' && window.ProcessesWorkspace) {
-    window.ProcessesWorkspace.render('view-processes');
-  } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
-    window.TrustGraphWorkspace.render('view-trustgraph');
-  } else if (navKey === 'settings' && window.EnterpriseSettings) {
-    window.EnterpriseSettings.render(cleanPath);
-  } else if (navKey === 'tools' && window.AgentFactoryWorkspace) {
-    window.AgentFactoryWorkspace.render('view-agent-factory');
-  } else {
-    renderActiveNavView();
+  if (navKey === '404') {
+    renderNotFoundView(cleanPath);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  try {
+    if (navKey === 'overview') {
+      if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
+        window.OverviewWorkspace.render('view-overview');
+      } else {
+        renderOverview();
+      }
+    } else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
+    } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
+    } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderMissions('view-missions');
+    } else if (navKey === 'approvals' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderApprovals('view-approvals');
+    } else if (navKey === 'terminal' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderTerminal('view-terminal');
+    } else if (navKey === 'activity' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderActivity('view-activity');
+    } else if (navKey === 'artifacts' && window.AssistantCoworkerWorkspace) {
+      window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
+    } else if (navKey === 'schedule' && window.ScheduleWorkspace) {
+      window.ScheduleWorkspace.render('view-schedule');
+    } else if (navKey === 'operations' && window.OperationsWorkspace) {
+      window.OperationsWorkspace.render('view-operations');
+    } else if (navKey === 'customers' && window.CrmWorkspace) {
+      window.CrmWorkspace.render('view-customers');
+    } else if (navKey === 'finance' && window.FinanceWorkspace) {
+      window.FinanceWorkspace.render('view-finance', cleanPath);
+    } else if (navKey === 'people' && window.PeopleWorkspace) {
+      window.PeopleWorkspace.render('view-people');
+    } else if (navKey === 'records' && window.RecordsWorkspace) {
+      window.RecordsWorkspace.render('view-records');
+    } else if (navKey === 'files' && window.FilesWorkspace) {
+      window.FilesWorkspace.render('view-files');
+    } else if (navKey === 'reports' && window.ReportsWorkspace) {
+      window.ReportsWorkspace.render('view-reports');
+    } else if (navKey === 'agent-factory' && window.AgentFactoryWorkspace) {
+      window.AgentFactoryWorkspace.render('view-agent-factory');
+    } else if (navKey === 'integrations' && window.IntegrationsWorkspace) {
+      window.IntegrationsWorkspace.render('view-integrations');
+    } else if (navKey === 'governance' && window.GovernanceWorkspace) {
+      window.GovernanceWorkspace.render('view-governance');
+    } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
+      window.MeetingRoomWorkspace.render('view-meeting');
+    } else if (navKey === 'plugins' && window.IntegrationsWorkspace) {
+      window.IntegrationsWorkspace.render('view-integrations');
+    } else if (navKey === 'company' && window.CompanyWorkspace) {
+      window.CompanyWorkspace.render(cleanPath);
+    } else if (navKey === 'organization' && window.OrgWorkspace) {
+      window.OrgWorkspace.render('view-organization', cleanPath);
+    } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
+      window.AiCeoWorkspace.render('view-ceo', cleanPath);
+    } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
+      window.WorkforceWorkspace.render('view-workforce');
+    } else if (navKey === 'tasks' && window.TaskMakerWorkspace) {
+      window.TaskMakerWorkspace.render('view-tasks');
+    } else if (navKey === 'workflows' && window.WorkflowWorkspace) {
+      window.WorkflowWorkspace.render('view-workflows');
+    } else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
+      window.AgentNetworkWorkspace.render('view-agent-network');
+    } else if (navKey === 'mcp-network' && window.McpWorkspace) {
+      window.McpWorkspace.render('view-mcp-network');
+    } else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
+      const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
+      mgr.render('view-openhands-execution');
+    } else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
+      const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
+      mgr.render('view-browser-execution');
+    } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
+      const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
+      mgr.render('view-temporal-durable');
+    } else if (navKey === 'nango-integrations' && window.IntegrationsWorkspace) {
+      window.IntegrationsWorkspace.render('view-integrations');
+    } else if (navKey === 'processes' && window.ProcessesWorkspace) {
+      window.ProcessesWorkspace.render('view-processes');
+    } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
+      window.TrustGraphWorkspace.render('view-trustgraph');
+    } else if (navKey === 'settings' && window.EnterpriseSettings) {
+      window.EnterpriseSettings.render(cleanPath);
+    } else if (navKey === 'tools' && window.AgentFactoryWorkspace) {
+      window.AgentFactoryWorkspace.render('view-agent-factory');
+    } else {
+      renderActiveNavView();
+    }
+  } catch (err) {
+    console.error(`Error rendering view-${navKey}:`, err);
+    if (activeSection) {
+      activeSection.innerHTML = `
+        <div class="card" style="padding:28px; max-width:800px; margin:24px auto; border-left:4px solid #ef4444;">
+          <h3 style="color:#ef4444; margin-bottom:8px;">Workspace Loading Exception</h3>
+          <p style="color:var(--text-secondary); margin-bottom:12px;">An unexpected error occurred while rendering the workspace.</p>
+          <pre style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; font-size:12px; overflow:auto;">${escapeHtml(err.message || String(err))}</pre>
+          <button class="btn btn-primary" style="margin-top:14px;" onclick="window.navigateTo('${cleanPath}')">Retry Loading</button>
+        </div>
+      `;
+    }
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });

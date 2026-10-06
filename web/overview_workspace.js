@@ -286,7 +286,7 @@
           meta: 'vs previous period',
           source: fin.source,
           updated: fin.last_updated,
-          action: 'window.OverviewWorkspace.openVarianceModal()'
+          action: 'window.navigateTo("/finance")'
         });
       } else {
         kpis.push({
@@ -297,7 +297,7 @@
           meta: 'Connect ERP/Accounting',
           source: 'Accounting Integration',
           updated: 'Pending',
-          action: 'showToast("Connect an accounting or ERP connector to track verified revenue.", "info")'
+          action: 'window.navigateTo("/finance")'
         });
       }
 
@@ -311,7 +311,7 @@
           meta: 'vs previous period',
           source: 'General Ledger',
           updated: fin.last_updated,
-          action: 'window.OverviewWorkspace.openVarianceModal()'
+          action: 'window.navigateTo("/finance")'
         });
       } else {
         kpis.push({
@@ -322,7 +322,7 @@
           meta: 'Connect ledger',
           source: 'General Ledger',
           updated: 'Pending',
-          action: 'showToast("Connect an accounting integration to view expense trends.", "info")'
+          action: 'window.navigateTo("/finance")'
         });
       }
 
@@ -336,7 +336,7 @@
           meta: 'Verified cashflow',
           source: 'Reconciled Profit',
           updated: fin.last_updated,
-          action: 'window.OverviewWorkspace.openMethodologyModal("Operating Margin")'
+          action: 'window.navigateTo("/finance")'
         });
       }
 
@@ -350,7 +350,7 @@
           meta: `${sales.conversion_rate_pct || 0}% Conversion`,
           source: sales.source,
           updated: sales.last_updated,
-          action: 'navigateTo("/tasks")'
+          action: 'window.navigateTo("/customers")'
         });
       } else {
         kpis.push({
@@ -361,7 +361,7 @@
           meta: 'Ingest CRM data',
           source: 'Sales AI Engine',
           updated: 'Pending',
-          action: 'showToast("Ingest sales leads to populate pipeline analytics.", "info")'
+          action: 'window.navigateTo("/customers")'
         });
       }
 
@@ -374,7 +374,7 @@
         meta: `${wf.workforce_utilization_pct || 80}% utilization`,
         source: wf.source,
         updated: wf.last_updated,
-        action: 'navigateTo("/workforce")'
+        action: 'window.navigateTo("/workforce")'
       });
 
       // 6. Active Missions
@@ -386,7 +386,7 @@
         meta: `${mis.success_rate_pct}% Success rate`,
         source: mis.source,
         updated: mis.last_updated,
-        action: 'navigateTo("/tasks")'
+        action: 'window.navigateTo("/missions")'
       });
 
       // 7. Operational Health
@@ -398,7 +398,7 @@
         meta: 'Physical Execution Index',
         source: ops.source,
         updated: ops.last_updated,
-        action: 'window.OverviewWorkspace.openMethodologyModal("Operational Health")'
+        action: 'window.navigateTo("/operations")'
       });
 
       // 8. Critical Risks / Attention
@@ -411,7 +411,7 @@
         meta: `${snap.attention ? snap.attention.important_count : 0} Reviews pending`,
         source: 'Executive Decision Center',
         updated: 'Live',
-        action: 'window.OverviewWorkspace.scrollToAttention()'
+        action: 'window.navigateTo("/approvals")'
       });
 
       // 9. Data Trust & Completeness
@@ -423,7 +423,7 @@
         meta: `Merkle: ${dq.merkle_integrity}`,
         source: 'Merkle Audit Ledger',
         updated: 'Continuous',
-        action: 'window.OverviewWorkspace.openDataQualityModal()'
+        action: 'window.navigateTo("/records")'
       });
 
       return `
@@ -629,29 +629,34 @@
               </h3>
               <p class="card-subtitle">Double-entry accounting reconciliations and budget utilization.</p>
             </div>
-            <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openVarianceModal()">
-              Why did this change?
-            </button>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openVarianceModal()">
+                Why did this change?
+              </button>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/finance')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Finance & GL →
+              </a>
+            </div>
           </div>
 
           <!-- Financial Snapshot Numbers -->
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Drill into Revenue in Finance & GL">
               <span class="fin-stat-lbl">Top-Line Run-Rate</span>
               <span class="fin-stat-val">${fin.currency}${formatCompactNumber(fin.revenue)}</span>
               <span class="fin-stat-meta text-emerald">+12.4% vs Baseline</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Drill into Operating Expenses in Finance & GL">
               <span class="fin-stat-lbl">Operating Overhead</span>
               <span class="fin-stat-val">${fin.currency}${formatCompactNumber(fin.expenses)}</span>
               <span class="fin-stat-meta text-secondary">${fin.budget_utilization_pct || 68}% Budget Used</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Drill into Operating Profit in Finance & GL">
               <span class="fin-stat-lbl">Operating Profit</span>
               <span class="fin-stat-val text-emerald">${fin.currency}${formatCompactNumber(fin.operating_profit)}</span>
               <span class="fin-stat-meta">${fin.operating_margin_pct}% Margin</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Drill into Cash & Banking in Finance & GL">
               <span class="fin-stat-lbl">Cash & Receivables</span>
               <span class="fin-stat-val">${fin.currency}${formatCompactNumber((fin.cash || 0) + (fin.receivables || 0))}</span>
               <span class="fin-stat-meta text-secondary">Payables: ${fin.currency}${formatCompactNumber(fin.payables || 0)}</span>
@@ -707,8 +712,8 @@
               <div class="empty-icon">💼</div>
               <h4>No Active Sales Pipeline</h4>
               <p>${escapeHtml(sales.empty_reason || 'Ingest leads or connect CRM to track conversion rates and pipeline velocity.')}</p>
-              <button class="btn-secondary" onclick="showToast('Lead ingestion available in TaskMaker & Sales Workforce', 'info')">
-                Ingest Sales Leads →
+              <button class="btn-secondary" onclick="window.navigateTo('/customers')">
+                Open CRM & Sales →
               </button>
             </div>
           </div>
@@ -725,21 +730,26 @@
               </h3>
               <p class="card-subtitle">Commercial velocity, lead scoring, and discount ceiling enforcement.</p>
             </div>
-            <span class="badge badge-emerald">Velocity: ${sales.sales_velocity_days || 14}d</span>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="badge badge-emerald">Velocity: ${sales.sales_velocity_days || 14}d</span>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/customers')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                CRM Pipeline →
+              </a>
+            </div>
           </div>
 
           <div class="sales-kpi-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Drill into Pipeline Deals in CRM">
               <span class="fin-stat-lbl">Pipeline Value</span>
               <span class="fin-stat-val">₹${formatCompactNumber(sales.pipeline_value)}</span>
               <span class="fin-stat-meta text-emerald">${sales.total_leads} Total Leads</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Drill into Revenue in Finance & GL">
               <span class="fin-stat-lbl">Won Revenue</span>
               <span class="fin-stat-val text-emerald">₹${formatCompactNumber(sales.won_revenue || 0)}</span>
               <span class="fin-stat-meta">Verified Bank Receipts</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Drill into Deals in CRM">
               <span class="fin-stat-lbl">Conversion Rate</span>
               <span class="fin-stat-val">${sales.conversion_rate_pct || 0}%</span>
               <span class="fin-stat-meta text-secondary">Avg Deal: ₹${formatCompactNumber(sales.average_deal_size || 0)}</span>
@@ -751,7 +761,7 @@
             <div class="section-subheading">Pipeline Conversion Stages</div>
             <div class="stage-bar-list">
               ${(sales.stages || []).map(st => `
-                <div class="stage-item">
+                <div class="stage-item" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Inspect Stage in CRM Pipeline">
                   <div class="stage-header">
                     <span class="stage-name">${escapeHtml(st.stage)}</span>
                     <span class="stage-count">${st.count} leads (${st.pct}%)</span>
@@ -784,6 +794,9 @@
               <div class="empty-icon">👥</div>
               <h4>No Customer Database Connected</h4>
               <p>${escapeHtml(cust.empty_reason || 'Connect CRM, PMS, or customer orders to track cohorts, retention and churn.')}</p>
+              <button class="btn-secondary" onclick="window.navigateTo('/customers')">
+                Open Customers Center →
+              </button>
             </div>
           </div>
         `;
@@ -801,13 +814,28 @@
               </h3>
               <p class="card-subtitle">Customer base expansion, retention rate, and support ticket posture.</p>
             </div>
+            <a href="javascript:void(0)" onclick="window.navigateTo('/customers')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+              Customer 360 →
+            </a>
           </div>
 
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Inspect Customer 360 Accounts">
               <span class="fin-stat-lbl">Total Customers</span>
               <span class="fin-stat-val">${cust.total_customers}</span>
               <span class="fin-stat-meta text-emerald">${cust.new_customers} New • ${cust.returning_customers} Returning</span>
+            </div>
+            <div class="fin-stat-box" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Inspect Customer Retention in CRM">
+              <span class="fin-stat-lbl">Retention Rate</span>
+              <span class="fin-stat-val text-emerald">${cust.retention_rate_pct}%</span>
+              <span class="fin-stat-meta text-secondary">Churn: ${cust.churn_rate_pct}%</span>
+            </div>
+            <div class="fin-stat-box" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Inspect Acquisition Cost in CRM">
+              <span class="fin-stat-lbl">Blended CAC</span>
+              <span class="fin-stat-val">₹${formatCompactNumber(cust.customer_acquisition_cost || 0)}</span>
+              <span class="fin-stat-meta">Escalations: ${cust.support_issues_count || 0}</span>
+            </div>
+          </div>
             </div>
             <div class="fin-stat-box">
               <span class="fin-stat-lbl">Retention Rate</span>
@@ -939,23 +967,28 @@
               </h3>
               <p class="card-subtitle">Host node telemetry, desktop robot execution, and process throughput.</p>
             </div>
-            <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openMethodologyModal('Operational Health')">
-              Methodology
-            </button>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openMethodologyModal('Operational Health')">
+                Methodology
+              </button>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/operations')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Operations Center →
+              </a>
+            </div>
           </div>
 
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/operations')" style="cursor:pointer;" title="Drill into Operational Health in Operations">
               <span class="fin-stat-lbl">Health Score</span>
               <span class="fin-stat-val text-emerald">${ops.operational_health_score}/100</span>
               <span class="fin-stat-meta text-emerald">${ops.sla_compliance_pct}% SLA</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/operations')" style="cursor:pointer;" title="Drill into Operations in Operations">
               <span class="fin-stat-lbl">Completed Ops</span>
               <span class="fin-stat-val">${ops.completed_operations}</span>
               <span class="fin-stat-meta text-secondary">Avg Latency: ${ops.average_completion_time}</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/operations')" style="cursor:pointer;" title="Drill into Execution Status in Operations">
               <span class="fin-stat-lbl">Execution Status</span>
               <span class="fin-stat-val">${ops.active_operations} Active</span>
               <span class="fin-stat-meta">${ops.failed_operations} Failed • ${ops.blocked_operations} Blocked</span>
@@ -966,7 +999,7 @@
             <div class="section-subheading">Process Bottlenecks & Execution Cadence</div>
             <div class="bottleneck-list">
               ${(ops.bottlenecks || []).map(b => `
-                <div class="bottleneck-item">
+                <div class="bottleneck-item" onclick="window.navigateTo('/operations')" style="cursor:pointer;" title="View Bottlenecks in Operations">
                   <div class="b-main">
                     <span class="b-name">${escapeHtml(b.process)}</span>
                     <span class="b-meta">Frequency: ${escapeHtml(b.frequency)}</span>
@@ -999,21 +1032,23 @@
               </h3>
               <p class="card-subtitle">Hybrid workforce allocation, utilization rate, and open capability gaps.</p>
             </div>
-            <a href="javascript:void(0)" onclick="navigateTo('/workforce')" style="font-size:12px; color:var(--accent-blue); text-decoration:none;">View Workforce →</a>
+            <a href="javascript:void(0)" onclick="window.navigateTo('/workforce')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+              AI Workforce →
+            </a>
           </div>
 
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Workforce Roster">
               <span class="fin-stat-lbl">Total Workforce</span>
               <span class="fin-stat-val">${wf.total_workforce}</span>
               <span class="fin-stat-meta text-emerald">${wf.ai_workforce} AI • ${wf.human_workforce} Human</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Workforce Utilization">
               <span class="fin-stat-lbl">Capacity Utilization</span>
               <span class="fin-stat-val text-emerald">${wf.workforce_utilization_pct || 80}%</span>
               <span class="fin-stat-meta text-secondary">${wf.active_workers} Active • ${wf.idle_workers} Idle</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Capability Gaps">
               <span class="fin-stat-lbl">Capability Coverage</span>
               <span class="fin-stat-val">${wf.capability_coverage ? wf.capability_coverage.coverage_pct : 75}%</span>
               <span class="fin-stat-meta">Open Gaps: ${wf.capability_coverage ? wf.capability_coverage.open_gaps.length : 0}</span>
@@ -1025,7 +1060,7 @@
             <div class="section-subheading">Synthesized Digital Employee Capability Gaps</div>
             <div class="gap-tags-list">
               ${(wf.capability_coverage && wf.capability_coverage.open_gaps ? wf.capability_coverage.open_gaps : []).map(gap => `
-                <span class="gap-tag">
+                <span class="gap-tag" onclick="window.navigateTo('/agent-factory')" style="cursor:pointer;" title="Synthesize Agent in Factory">
                   <span class="gap-dot"></span>
                   ${escapeHtml(gap)}
                 </span>
@@ -1052,21 +1087,23 @@
               </h3>
               <p class="card-subtitle">Constitutional Invariant: <code>TASK_SUCCESS != BUSINESS_OUTCOME</code></p>
             </div>
-            <a href="javascript:void(0)" onclick="navigateTo('/tasks')" style="font-size:12px; color:var(--accent-blue); text-decoration:none;">TaskMaker →</a>
+            <a href="javascript:void(0)" onclick="window.navigateTo('/missions')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+              Work & Missions →
+            </a>
           </div>
 
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/missions')" style="cursor:pointer;" title="Drill into Active Missions">
               <span class="fin-stat-lbl">Active Missions</span>
               <span class="fin-stat-val">${mis.active_missions}</span>
               <span class="fin-stat-meta text-emerald">${mis.completed_missions} Completed</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/missions')" style="cursor:pointer;" title="Drill into Verification Rate">
               <span class="fin-stat-lbl">Verification Rate</span>
               <span class="fin-stat-val text-emerald">${mis.success_rate_pct}%</span>
               <span class="fin-stat-meta text-secondary">Merkle SHA-256 Verified</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/approvals')" style="cursor:pointer;" title="Inspect Pending Approvals">
               <span class="fin-stat-lbl">Pending Approvals</span>
               <span class="fin-stat-val text-amber">${mis.awaiting_approval}</span>
               <span class="fin-stat-meta">${mis.blocked_missions} Blocked</span>
@@ -1111,23 +1148,28 @@
               </h3>
               <p class="card-subtitle">Active governance boundaries, unverified claims, and security posture.</p>
             </div>
-            <span class="badge ${risk.critical_risks > 0 ? 'badge-rose' : 'badge-emerald'}">
-              ${risk.critical_risks > 0 ? `${risk.critical_risks} Critical Risks` : 'Posture Normal'}
-            </span>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="badge ${risk.critical_risks > 0 ? 'badge-rose' : 'badge-emerald'}">
+                ${risk.critical_risks > 0 ? `${risk.critical_risks} Critical Risks` : 'Posture Normal'}
+              </span>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/governance')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Governance & Risk →
+              </a>
+            </div>
           </div>
 
           <div class="fin-snapshot-row">
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/governance')" style="cursor:pointer;" title="Drill into Sovereign Risk Exposure">
               <span class="fin-stat-lbl">Open Exposure</span>
               <span class="fin-stat-val text-amber">${risk.open_risks}</span>
               <span class="fin-stat-meta">${risk.critical_risks} Critical</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/governance')" style="cursor:pointer;" title="Drill into Security Posture">
               <span class="fin-stat-lbl">Security Incidents</span>
               <span class="fin-stat-val text-emerald">${risk.security_incidents}</span>
               <span class="fin-stat-meta text-emerald">Quarantine Enforced</span>
             </div>
-            <div class="fin-stat-box">
+            <div class="fin-stat-box" onclick="window.navigateTo('/governance')" style="cursor:pointer;" title="Drill into Compliance Gaps">
               <span class="fin-stat-lbl">Compliance Gaps</span>
               <span class="fin-stat-val">${risk.compliance_issues}</span>
               <span class="fin-stat-meta text-secondary">Zero credential leakage</span>
@@ -1137,16 +1179,16 @@
           <div class="risk-breakdown-wrapper">
             <div class="section-subheading">Risk Severity Distribution</div>
             <div class="risk-bar-grid">
-              <div class="risk-pill crit">
+              <div class="risk-pill crit" onclick="window.navigateTo('/governance')" style="cursor:pointer;">
                 <span>Critical: ${risk.severity_breakdown.critical}</span>
               </div>
-              <div class="risk-pill high">
+              <div class="risk-pill high" onclick="window.navigateTo('/governance')" style="cursor:pointer;">
                 <span>High: ${risk.severity_breakdown.high}</span>
               </div>
-              <div class="risk-pill med">
+              <div class="risk-pill med" onclick="window.navigateTo('/governance')" style="cursor:pointer;">
                 <span>Medium: ${risk.severity_breakdown.medium}</span>
               </div>
-              <div class="risk-pill low">
+              <div class="risk-pill low" onclick="window.navigateTo('/governance')" style="cursor:pointer;">
                 <span>Low: ${risk.severity_breakdown.low}</span>
               </div>
             </div>
@@ -1171,12 +1213,17 @@
               </h3>
               <p class="card-subtitle">Integration runtime status, host nodes, and connector sync freshness.</p>
             </div>
-            <span class="badge badge-emerald">${tech.healthy_count} Healthy</span>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="badge badge-emerald">${tech.healthy_count} Healthy</span>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/integrations')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Integrations Hub →
+              </a>
+            </div>
           </div>
 
           <div class="tech-systems-list">
             ${(tech.systems || []).map(sys => `
-              <div class="tech-system-row">
+              <div class="tech-system-row" onclick="window.navigateTo('/integrations')" style="cursor:pointer;" title="Inspect connector in Integrations Hub">
                 <div class="tech-main">
                   <span class="tech-name">${escapeHtml(sys.name)}</span>
                   <span class="tech-type">${escapeHtml(sys.type)}</span>
@@ -1207,12 +1254,17 @@
               </h3>
               <p class="card-subtitle">Epistemic validity, Merkle root verification, and missing data sources.</p>
             </div>
-            <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openDataQualityModal()">
-              View Details
-            </button>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn-secondary-sm" onclick="window.OverviewWorkspace.openDataQualityModal()">
+                View Details
+              </button>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/records')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Enterprise Records →
+              </a>
+            </div>
           </div>
 
-          <div class="dq-progress-overall">
+          <div class="dq-progress-overall" onclick="window.navigateTo('/records')" style="cursor:pointer;" title="Inspect Merkle Audit Ledger in Records">
             <div class="dq-lbl-row">
               <span>Overall Data Completeness</span>
               <span style="font-family:var(--font-mono); font-weight:700;">${dq.overall_completeness_pct}%</span>
@@ -1223,25 +1275,25 @@
           </div>
 
           <div class="dq-dimensions-grid">
-            <div class="dq-dim-item">
+            <div class="dq-dim-item" onclick="window.navigateTo('/finance')" style="cursor:pointer;" title="Inspect Financial Ledger">
               <span>Financial Data:</span>
               <span class="dq-dim-val">${dq.financial_pct}%</span>
             </div>
-            <div class="dq-dim-item">
+            <div class="dq-dim-item" onclick="window.navigateTo('/customers')" style="cursor:pointer;" title="Inspect Sales Pipeline & CRM">
               <span>Sales Pipeline:</span>
               <span class="dq-dim-val">${dq.sales_pct}%</span>
             </div>
-            <div class="dq-dim-item">
+            <div class="dq-dim-item" onclick="window.navigateTo('/operations')" style="cursor:pointer;" title="Inspect Operations Telemetry">
               <span>Operations Telemetry:</span>
               <span class="dq-dim-val">${dq.operations_pct}%</span>
             </div>
-            <div class="dq-dim-item">
+            <div class="dq-dim-item" onclick="window.navigateTo('/records')" style="cursor:pointer;" title="Inspect Records Attribution">
               <span>Marketing Attribution:</span>
               <span class="dq-dim-val">${dq.marketing_pct}%</span>
             </div>
           </div>
 
-          <div class="dq-footer-integrity">
+          <div class="dq-footer-integrity" onclick="window.navigateTo('/records')" style="cursor:pointer;" title="Open Records Merkle Chain">
             <span>Merkle Chain: <strong>${dq.merkle_integrity}</strong></span>
             <span>Verified Blocks: <strong>${dq.verified_records}</strong></span>
             <span>Conflicting: <strong>${dq.conflicting_records}</strong></span>
@@ -1286,7 +1338,7 @@
               <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">🔌</div>
               <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No MCP activity yet</div>
               <div style="font-size:13px; max-width:360px; margin:0 auto 16px auto;">Register an external MCP server or discover PMS/ERP tools to begin governed execution.</div>
-              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('mcp-network')" style="font-size:12px; padding:6px 14px;">Open MCP Network</button>
+              <button class="btn btn-outline" onclick="window.navigateTo('/mcp-network')" style="font-size:12px; padding:6px 14px;">Open MCP Network</button>
             </div>
           </div>
         `;
@@ -1342,7 +1394,7 @@
 
           <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px; font-size:12px; color:var(--text-secondary); flex-wrap:wrap; gap:8px;">
             <span>Stateless Protocol Core (2026-07-28) • Sovereign Governance Enforced</span>
-            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('mcp-network')" style="font-size:11px; padding:4px 10px;">Inspect MCP Network →</button>
+            <button class="btn btn-outline" onclick="window.navigateTo('/mcp-network')" style="font-size:11px; padding:4px 10px;">Inspect MCP Network →</button>
           </div>
         </div>
       `;
@@ -1384,7 +1436,7 @@
               <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">⚙️</div>
               <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No OpenHands execution activity yet</div>
               <div style="font-size:13px; max-width:380px; margin:0 auto 16px auto;">Dispatch an engineering mission or run a verification scenario to execute inside isolated sandboxes.</div>
-              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('openhands-execution')" style="font-size:12px; padding:6px 14px;">Open Execution Center</button>
+              <button class="btn btn-outline" onclick="window.navigateTo('/openhands-execution')" style="font-size:12px; padding:6px 14px;">Open Execution Center</button>
             </div>
           </div>
         `;
@@ -1428,7 +1480,7 @@
 
           <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary);">
             <span>${oh.status_text}</span>
-            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('openhands-execution')" style="font-size:11px; padding:4px 10px;">Inspect Execution Center →</button>
+            <button class="btn btn-outline" onclick="window.navigateTo('/openhands-execution')" style="font-size:11px; padding:4px 10px;">Inspect Execution Center →</button>
           </div>
         </div>
       `;
@@ -1471,7 +1523,7 @@
               <div style="font-size:32px; margin-bottom:8px; opacity:0.6;">🌐</div>
               <div style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:4px;">No browser execution activity yet</div>
               <div style="font-size:13px; max-width:380px; margin:0 auto 16px auto;">Dispatch a web navigation task or run canonical verification scenarios to inspect real browser actions.</div>
-              <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('browser-execution')" style="font-size:12px; padding:6px 14px;">Open Browser Cockpit</button>
+              <button class="btn btn-outline" onclick="window.navigateTo('/browser-execution')" style="font-size:12px; padding:6px 14px;">Open Browser Cockpit</button>
             </div>
           </div>
         `;
@@ -1515,7 +1567,7 @@
 
           <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary);">
             <span>${br.status_text}</span>
-            <button class="btn btn-outline" onclick="window.AppRouter && window.AppRouter.navigate('browser-execution')" style="font-size:11px; padding:4px 10px;">Inspect Browser Cockpit →</button>
+            <button class="btn btn-outline" onclick="window.navigateTo('/browser-execution')" style="font-size:11px; padding:4px 10px;">Inspect Browser Cockpit →</button>
           </div>
         </div>
       `;
@@ -1537,6 +1589,9 @@
               </h3>
               <p class="card-subtitle">Provenanced findings synthesized across company events and causality ledgers.</p>
             </div>
+            <a href="javascript:void(0)" onclick="window.navigateTo('/ceo')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+              AI CEO Strategy →
+            </a>
           </div>
 
           <div class="insights-list">
@@ -1577,16 +1632,21 @@
               </h3>
               <p class="card-subtitle">Automatically detected deviations against historical operating baselines.</p>
             </div>
-            <span class="badge ${anomalies.length > 0 ? 'badge-amber' : 'badge-emerald'}">
-              ${anomalies.length} Detected
-            </span>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="badge ${anomalies.length > 0 ? 'badge-amber' : 'badge-emerald'}">
+                ${anomalies.length} Detected
+              </span>
+              <a href="javascript:void(0)" onclick="window.navigateTo('/activity')" style="font-size:12px; color:var(--accent-blue); text-decoration:none; font-weight:600; padding:4px 8px; border-radius:4px; background:rgba(37,99,235,0.08);">
+                Audit Activity Log →
+              </a>
+            </div>
           </div>
 
           <div class="anomalies-list">
             ${anomalies.length === 0 ? `
               <div class="empty-state-notice">No statistical anomalies detected. All metrics within 2σ normal bounds.</div>
             ` : anomalies.map(anom => `
-              <div class="anomaly-item-box">
+              <div class="anomaly-item-box" onclick="window.navigateTo('/activity')" style="cursor:pointer;" title="Inspect in Audit Activity Log">
                 <div class="anom-header">
                   <span class="anom-metric">${escapeHtml(anom.metric)}</span>
                   <span class="anom-deviation badge ${anom.severity === 'CRITICAL' ? 'badge-rose' : 'badge-amber'}">

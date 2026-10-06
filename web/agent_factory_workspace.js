@@ -52,24 +52,27 @@
           <div class="plugins-header-card" style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:20px 24px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
             <div>
               <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
-                <span class="badge badge-purple" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:rgba(139,92,246,0.15); color:#c4b5fd;">Dynamic Agent Architecture</span>
+                <span class="badge badge-purple" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:rgba(139,92,246,0.15); color:#c4b5fd;">AI CEO Autonomous Workforce Engine</span>
                 <span style="font-size:12px; color:var(--accent-emerald); font-weight:600; display:inline-flex; align-items:center; gap:6px;">
                   <span class="status-pulse-dot" style="background:var(--accent-emerald);"></span>
-                  Sovereign Authority & Budget Clamping Active
+                  Autonomous Lifecycle & Budget Governance Active
                 </span>
               </div>
               <h1 style="font-size:24px; font-weight:700; color:var(--text-primary); margin:0 0 6px 0;">
-                True Agent Factory & Blueprint Studio
+                Dynamic Agent Factory & Workforce Synthesis
               </h1>
-              <p style="font-size:13px; color:var(--text-secondary); margin:0;">
-                Design, test, simulate, and deploy specialized autonomous AI agents with strict capability boundaries, tools, and spending limits.
+              <p style="font-size:13px; color:var(--text-secondary); margin:0; max-width:850px;">
+                The owner defines company goals, budgets, and sovereign constraints. The AI CEO continuously assesses departmental capability gaps, synthesizes specialized digital workers, binds verified tools, and supervises performance.
               </p>
             </div>
 
             <!-- Header Action -->
             <div style="display:flex; gap:10px; align-items:center;">
-              <button class="btn-primary" onclick="window.AgentFactoryWorkspace.openManualCreateModal()">
-                + Manual Blueprint Studio
+              <button class="btn btn-outline" onclick="window.navigateTo('/workforce')" style="font-size:13px;">
+                👥 Active Workforce Roster
+              </button>
+              <button class="btn btn-primary" onclick="window.AgentFactoryWorkspace.openManualCreateModal()">
+                + Executive Blueprint Request
               </button>
             </div>
           </div>
@@ -77,11 +80,11 @@
           <!-- Natural Language Agent Synthesizer Box (Hero) -->
           <div style="background:linear-gradient(135deg, rgba(30,27,75,0.4), rgba(15,23,42,0.6)); border:1px solid rgba(139,92,246,0.3); border-radius:12px; padding:20px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-              <span style="font-size:20px;">✨</span>
-              <h3 style="font-size:16px; font-weight:700; color:#f8fafc; margin:0;">Synthesize Autonomous Agent from Prompt</h3>
+              <span style="font-size:20px;">👑</span>
+              <h3 style="font-size:16px; font-weight:700; color:#f8fafc; margin:0;">Direct AI CEO to Synthesize New Capability</h3>
             </div>
             <p style="font-size:13px; color:var(--text-secondary); margin:0 0 12px 0;">
-              Describe your business requirements in plain English. The Agent Factory will discover required capabilities, assign tools, configure spending limits, and draft a verified operational blueprint.
+              Specify a strategic business objective or operational gap. The AI CEO will reason across the organization, assign tools, enforce spending clamping, and synthesize a production-certified digital worker.
             </p>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
               <input 
@@ -89,19 +92,19 @@
                 id="agentPromptInput" 
                 class="form-input" 
                 style="flex:1; min-width:280px;" 
-                placeholder="e.g. Create a procurement agent that monitors inventory, requests quotations, compares vendors, prepares purchase orders and escalates purchases above ₹50,000."
+                placeholder="e.g. Synthesize a procurement officer that audits supplier invoices against POs, flags discrepancies above ₹25,000, and prepares settlement batches."
               />
               <button 
                 class="btn-primary" 
                 id="btnSynthesizeAgent"
                 style="background:var(--accent-purple, #8b5cf6); padding:10px 20px;" 
                 onclick="window.AgentFactoryWorkspace.synthesizeFromPrompt()">
-                ⚡ Synthesize Blueprint
+                ⚡ Direct AI CEO to Synthesize
               </button>
             </div>
             <!-- Quick Suggestion Chips -->
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-              <span style="font-size:11.5px; color:var(--text-muted);">Quick Templates:</span>
+              <span style="font-size:11.5px; color:var(--text-muted);">Strategic Templates:</span>
               ${[
                 'Procurement & 3-Way Matching Agent with ₹50,000 limit',
                 'Hospitality Night Auditor & Room Charges Folio Balancer',

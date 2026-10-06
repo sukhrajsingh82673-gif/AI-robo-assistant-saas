@@ -2,5 +2,90 @@
   "account": {
     "host_name": "Sukhraj Singh (Enterprise)",
     "mfa_enabled": true
+  },
+  "security": {
+    "require_mfa": true,
+    "session_duration_hours": 12,
+    "quarantine_on_anomaly": true,
+    "login_notifications": true,
+    "device_trust": "ENFORCED",
+    "failed_login_lockout": 5
+  },
+  "workspace": {
+    "name": "ZONATA Primary Enterprise",
+    "slug": "zonata-primary",
+    "country": "India",
+    "timezone": "Asia/Kolkata (IST)",
+    "currency": "\u20b9",
+    "theme": "dark",
+    "density": "normal",
+    "language": "English (US)"
+  },
+  "ai": {
+    "ceo_model": "Gemini 3.8 Flash (High)",
+    "council_enabled": true,
+    "spending_stop_limit": 50000,
+    "human_in_the_loop_threshold": 10000,
+    "continuous_cognition_interval_mins": 15,
+    "max_autonomous_iterations": 12,
+    "reflection_frequency": "Every 4 Hours"
+  },
+  "workforce": {
+    "max_concurrent_agents": 16,
+    "allow_autonomous_spawning": true,
+    "require_role_certification": true,
+    "per_agent_daily_budget": 5000
+  },
+  "missions": {
+    "max_active_missions": 8,
+    "task_retry_limit": 3,
+    "require_formal_postcondition": true,
+    "escalate_on_stagnation_mins": 30
+  },
+  "models": {
+    "primary_provider": "Google Vertex AI / Gemini",
+    "fallback_chain": "Gemini 3.8 Flash \u2192 Claude 3.5 Sonnet \u2192 GPT-4o",
+    "private_endpoint_url": "https://inference.internal.zonata.ai/v1",
+    "context_window_limit": 128000
+  },
+  "tools": {
+    "sandboxed_execution": true,
+    "authority_ceiling": "ASK_ME",
+    "allow_browser_automation": true,
+    "allow_desktop_control": true,
+    "allow_package_install": false,
+    "discovery_path": "/usr/bin:/data/data/com.termux/files/usr/bin"
+  },
+  "computer": {
+    "screen_perception_fps": 2,
+    "mouse_throttling_ms": 150,
+    "allow_window_focus": true,
+    "capture_screenshot_on_action": true
+  },
+  "browser": {
+    "headless_mode": true,
+    "max_browser_contexts": 4,
+    "block_external_trackers": true,
+    "dom_sanitization": true
+  },
+  "governance": {
+    "audit_ledger_hashing": "SHA-256",
+    "immutability_mode": "STRICT",
+    "emergency_quarantine": false,
+    "two_person_financial_rule": true,
+    "require_evidence_receipt": true
+  },
+  "integrations": {
+    "opera_pms_status": "Connected",
+    "sap_erp_status": "Connected",
+    "salesforce_status": "Connected",
+    "stripe_status": "Active",
+    "slack_status": "Connected"
+  },
+  "data": {
+    "data_classification": "CONFIDENTIAL",
+    "tenant_isolation_mode": "STRICT_ROW_LEVEL",
+    "pii_masking": true,
+    "retention_days": 365
   }
 }
