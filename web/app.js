@@ -63,25 +63,60 @@ document.addEventListener('DOMContentLoaded', () => {
   renderApp();
 });
 
-// Session Management
-function loadStoredSession() {
+// Session Management — P0 Environment-Aware Authentication Boundary
+async function loadStoredSession() {
   const session = localStorage.getItem('zonata_host_session');
   if (session) {
     try {
       state.host = JSON.parse(session);
+      // Validate token expiration
+      if (state.host && state.host.exp && state.host.exp < Date.now() / 1000) {
+        console.warn('[Security] Sovereign host token expired. Session invalidated.');
+        clearSession();
+      }
     } catch (e) {
       state.host = null;
     }
   }
+
+  // Probe runtime environment
+  let appEnv = 'development';
+  try {
+    const res = await fetch('/api/auth/environment');
+    if (res.ok) {
+      const data = await res.json();
+      appEnv = (data.environment || 'development').toLowerCase();
+      state.environment = appEnv;
+      state.strictAuth = !!data.strict_auth;
+    }
+  } catch (err) {
+    // Local fallback
+  }
+
+  // P0 Constitutional Security Invariant:
+  // In PRODUCTION: NO default sovereign session, no implicit Host authentication!
+  // In STAGING: Real authentication or explicitly test-configured session required.
+  // In DEVELOPMENT: Local convenience authentication permitted for rapid local testing.
   if (!state.host) {
-    state.host = {
-      name: 'Sukhraj Singh',
-      email: 'host@zonata.internal',
-      role: 'SOVEREIGN_HOST',
-      phone: '+91 98888 00000',
-      status: 'AUTHENTICATED'
-    };
-    saveSession(state.host);
+    if (appEnv === 'production') {
+      console.warn('[Security] Production mode active: Host authentication required. Default auto-login blocked.');
+      state.host = null;
+    } else if (appEnv === 'staging') {
+      console.warn('[Security] Staging mode active: Valid credentials required.');
+      state.host = null;
+    } else {
+      // Development mode convenience bootstrap
+      state.host = {
+        name: 'Sukhraj Singh',
+        email: 'host@zonata.internal',
+        role: 'SOVEREIGN_HOST',
+        phone: '+91 98888 00000',
+        status: 'AUTHENTICATED',
+        auth_mode: 'DEV_BOOTSTRAP',
+        exp: Math.floor(Date.now() / 1000) + 86400 * 7
+      };
+      saveSession(state.host);
+    }
   }
 }
 
@@ -2144,7 +2179,7 @@ function renderSettingsSection() {
 
   if (window.EnterpriseSettings) {
     const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
-    window.EnterpriseSettings.render(route.startsWith('/settings') ? route : '/settings/security');
+    window.EnterpriseSettings.render(route.startsWith('/settings') ? route : '/settings');
     return;
   }
 

@@ -87,5 +87,10 @@
     "tenant_isolation_mode": "STRICT_ROW_LEVEL",
     "pii_masking": true,
     "retention_days": 365
-  }
+  },
+  "ceo_autonomy_level": "Level 2 \u2014 Execute With Approval",
+  "ceo_spending_limit": 75000,
+  "sec_session_duration_hours": 8,
+  "cost_global_budget_monthly": 50000,
+  "wf_max_concurrent_agents": 24
 }

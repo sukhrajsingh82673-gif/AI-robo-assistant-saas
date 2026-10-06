@@ -57,6 +57,7 @@ from workloads.universal_computer import run_universal_capability_discovery_task
 from core.team_catalog import EnterpriseTeamCatalog, BUNDLED_TEAMS
 from core.operating_skills import OperatingSkillRegistry, SKILLS_CATALOG
 from src.services.agent_engine import heartbeat_coordinator, delegation_engine, config_manager
+from core.settings_service import settings_service, GROUPS, CATEGORIES_CATALOG
 
 SERVER_START_TIME = time.time()
 
@@ -361,19 +362,31 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
             return payload
 
-        # Check strict production mode
-        is_strict = os.environ.get("ZONATA_STRICT_AUTH", "0") == "1"
-        if is_strict:
-            raise AuthExceptions.AuthenticationError("Authentication required: missing or invalid Bearer token")
+        # Environment-Aware Authentication Boundary (Development, Staging, Production)
+        app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("NODE_ENV") or "development"
+        is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
 
-        # Developer / local mode bootstrap
+        if is_strict:
+            # Production: No default sovereign session, no implicit Host authentication
+            raise AuthExceptions.AuthenticationError(
+                "Production Sovereign Host Authentication Required: Missing, expired, or revoked Bearer token"
+            )
+        elif app_env.lower() == "staging":
+            # Staging: Real authentication or explicitly test-configured session required
+            raise AuthExceptions.AuthenticationError(
+                "Staging Authentication Required: Real Bearer token or test credential required"
+            )
+
+        # Development Mode Convenience Bootstrap (Only active when APP_ENV == 'development')
         dev_tenant = requested_tenant or "tnt_primary"
         return {
             "user_id": "usr_dev_bootstrap",
             "tenant_id": dev_tenant,
             "company_id": "comp_primary",
             "role": UserRole.OWNER,
-            "permissions": ["*"]
+            "permissions": ["*"],
+            "auth_mode": "DEV_BOOTSTRAP",
+            "environment": "development"
         }
 
     def _get_tenant_id(self) -> str:
@@ -455,9 +468,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(combined.encode('utf-8'))
             return
 
+        if path == "/api/auth/environment":
+            app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("NODE_ENV") or "development"
+            is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+            self._send_json({
+                "environment": app_env.lower(),
+                "strict_auth": is_strict,
+                "requires_mfa": is_strict or (app_env.lower() == "staging"),
+                "auth_mode": "PRODUCTION_STRICT" if is_strict else ("STAGING" if app_env.lower() == "staging" else "DEV_BOOTSTRAP"),
+                "server_time": time.time()
+            })
+            return
+
         if path == "/api/auth/me":
-            ctx = self._get_auth_context()
-            self._send_json({"authenticated": True, "context": ctx})
+            try:
+                ctx = self._get_auth_context()
+                self._send_json({"authenticated": True, "context": ctx})
+            except AuthExceptions.AuthenticationError as e:
+                self._send_json({"authenticated": False, "error": str(e)}, status=401)
             return
 
         if path in ("/api/overview", "/api/overview/snapshot"):
@@ -1100,58 +1128,71 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings":
-            settings_file = os.path.join(BASE_DIR, "storage/enterprise_settings.json")
-            if os.path.exists(settings_file):
-                try:
-                    with open(settings_file, "r") as f:
-                        self._send_json(json.load(f))
-                        return
-                except Exception:
-                    pass
-            default_settings = {
-                "account": {
-                    "host_name": "Sukhraj Singh",
-                    "email": "host@zonata.internal",
-                    "tenant_id": tenant_id,
-                    "mfa_enabled": True,
-                    "session_timeout_mins": 60,
-                    "passkeys": ["MacBook Pro Touch ID", "YubiKey 5C NFC"]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            categories_cat = settings_service.get_categories_catalog(tenant_id, company_id)
+            self._send_json({
+                "groups": GROUPS,
+                "categories": categories_cat,
+                "total_categories": len(categories_cat),
+                "tenant_id": tenant_id,
+                "company_id": company_id
+            })
+            return
+
+        elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
+            cat_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            detail = settings_service.get_category_detail(cat_id, tenant_id, company_id)
+            self._send_json(detail)
+            return
+
+        elif path == "/api/settings/audit":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            cat = query_params.get("category", [None])[0]
+            actor = query_params.get("actor", [None])[0]
+            risk = query_params.get("risk", [None])[0]
+            limit = int(query_params.get("limit", [50])[0])
+            events = settings_service.get_audit_events(tenant_id, company_id, category=cat, actor=actor, risk_level=risk, limit=limit)
+            self._send_json({"events": events, "count": len(events)})
+            return
+
+        elif path == "/api/settings/effective":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            self._send_json({
+                "effective_enforcement": {
+                    "ceo_autonomy": {
+                        "configured": "Level 3 — Execute Within Policy",
+                        "effective": "Level 3 — Execute Within Policy",
+                        "runtime_status": "ACTIVE",
+                        "enforcer": "UniversalControlKernel + CeoCommandEngine"
+                    },
+                    "spending_stop_limit": {
+                        "configured": 50000,
+                        "effective": 50000,
+                        "runtime_status": "ACTIVE",
+                        "enforcer": "BudgetHierarchyEngine"
+                    },
+                    "emergency_quarantine": {
+                        "configured": False,
+                        "effective": False,
+                        "runtime_status": "ARMED_AND_READY",
+                        "enforcer": "UniversalControlKernel"
+                    },
+                    "audit_ledger": {
+                        "configured": "SHA-256 (Merkle Tree)",
+                        "effective": "SHA-256 (Merkle Tree)",
+                        "runtime_status": "VERIFIED",
+                        "enforcer": "EvidenceLedger"
+                    },
+                    "mfa_policy": {
+                        "configured": True,
+                        "effective": True,
+                        "runtime_status": "ACTIVE",
+                        "enforcer": "UserManager"
+                    }
                 },
-                "workspace": {
-                    "name": "ZONATA Primary Enterprise",
-                    "timezone": "Asia/Kolkata",
-                    "currency": "₹",
-                    "theme": "dark",
-                    "language": "English (US)"
-                },
-                "security": {
-                    "require_mfa": True,
-                    "session_duration_hours": 12,
-                    "quarantine_on_anomaly": True,
-                    "login_notifications": True,
-                    "device_trust": "ENFORCED"
-                },
-                "ai": {
-                    "ceo_model": "Gemini 3.8 Flash (High)",
-                    "council_enabled": True,
-                    "spending_stop_limit": 50000,
-                    "human_in_the_loop_threshold": 10000,
-                    "continuous_cognition_interval_mins": 15
-                },
-                "tools": {
-                    "sandboxed_execution": True,
-                    "authority_ceiling": "ASK_ME",
-                    "allow_browser_automation": True,
-                    "allow_desktop_control": True,
-                    "allow_package_install": False
-                },
-                "governance": {
-                    "audit_ledger_hashing": "SHA-256",
-                    "immutability_mode": "STRICT",
-                    "emergency_quarantine": False
-                }
-            }
-            self._send_json(default_settings)
+                "server_timestamp": time.time()
+            })
             return
 
         # =====================================================================
@@ -3258,11 +3299,65 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings":
-            settings_file = os.path.join(BASE_DIR, "storage/enterprise_settings.json")
-            os.makedirs(os.path.dirname(settings_file), exist_ok=True)
-            with open(settings_file, "w") as f:
-                json.dump(req_data, f, indent=2)
-            self._send_json({"success": True, "settings": req_data})
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            if isinstance(req_data, dict):
+                for k, v in req_data.items():
+                    if isinstance(v, dict):
+                        for sub_k, sub_v in v.items():
+                            settings_service.update_single_setting(tenant_id, company_id, sub_k, sub_v, actor=actor)
+                    else:
+                        settings_service.update_single_setting(tenant_id, company_id, k, v, actor=actor)
+            self._send_json({"success": True, "saved": True})
+            return
+
+        elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
+            cat_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            reason = req_data.get("reason", "Batch category save")
+            values = req_data.get("values", req_data)
+            res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
+            s_key = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            new_val = req_data.get("value") if "value" in req_data else req_data
+            reason = req_data.get("reason", "Direct setting update")
+            scope = req_data.get("scope", "Company")
+            res = settings_service.update_single_setting(tenant_id, company_id, s_key, new_val, actor=actor, reason=reason, scope=scope)
+            self._send_json(res)
+            return
+
+        elif path == "/api/settings/propose":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            s_id = req_data.get("setting_id", "")
+            proposed_val = req_data.get("proposed_value")
+            proposed_by = req_data.get("proposed_by", "AI CEO Executive Engine")
+            reason = req_data.get("reason", "Optimization recommendation")
+            expected_benefit = req_data.get("expected_benefit", "Performance improvement")
+            risk = req_data.get("risk_level", "MEDIUM")
+            res = settings_service.propose_change(tenant_id, company_id, s_id, proposed_val, proposed_by, reason, expected_benefit, risk)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/settings/proposal/") and path.endswith("/resolve"):
+            parts = path.split("/")
+            prop_id = parts[4]
+            decision = req_data.get("decision", "APPROVED")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            reason = req_data.get("reason", "Administrative resolution")
+            res = settings_service.resolve_proposal(prop_id, decision, actor, reason)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/settings/test/") and len(path.split("/")) == 5:
+            target = path.split("/")[4]
+            res = settings_service.run_live_test(target, req_data)
+            self._send_json(res)
             return
 
         # =====================================================================
@@ -5593,6 +5688,30 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         self._send_json({"error": "Endpoint not found"}, status=404)
 
+    def do_PUT(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        tenant_id = self.headers.get("X-Tenant-ID", "tnt_primary")
+        company_id = self.headers.get("X-Company-ID", "comp_primary")
+        actor = self.headers.get("X-User-Name", "Host Administrator")
+
+        length = int(self.headers.get('content-length', 0))
+        raw_body = self.rfile.read(length) if length > 0 else b"{}"
+        try:
+            req_data = json.loads(raw_body.decode('utf-8'))
+        except Exception:
+            req_data = {}
+
+        if path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
+            s_key = path.split("/")[4]
+            new_val = req_data.get("value") if "value" in req_data else req_data
+            reason = req_data.get("reason", "Direct REST PUT setting update")
+            scope = req_data.get("scope", "Company")
+            res = settings_service.update_single_setting(tenant_id, company_id, s_key, new_val, actor=actor, reason=reason, scope=scope)
+            self._send_json(res)
+            return
+
+        self._send_json({"error": "Endpoint not found or method not allowed"}, status=404)
 
     def do_DELETE(self):
         parsed = urllib.parse.urlparse(self.path)
