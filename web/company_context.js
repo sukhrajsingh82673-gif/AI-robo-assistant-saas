@@ -49,7 +49,12 @@
             localStorage.removeItem('zonata_active_company_id');
           }
 
-          this.activeCompany = this.companies.find(c => c.id === this.activeCompanyId) || null;
+          if (!this.activeCompanyId && this.companies.length > 0) {
+            this.activeCompanyId = this.companies[0].id;
+            localStorage.setItem('zonata_active_company_id', this.activeCompanyId);
+          }
+
+          this.activeCompany = this.companies.find(c => c.id === this.activeCompanyId) || (this.companies[0] || null);
           if (window.state) {
             window.state.activeCompanyId = this.activeCompanyId;
           }
@@ -63,11 +68,18 @@
     }
 
     getCompanyId() {
-      return this.activeCompanyId;
+      if (this.activeCompanyId) return this.activeCompanyId;
+      if (this.companies && this.companies.length > 0) return this.companies[0].id;
+      if (window.state && window.state.companies && window.state.companies.length > 0) {
+        return window.state.companies[0].id;
+      }
+      return 'comp_primary';
     }
 
     getCompany() {
-      return this.activeCompany;
+      if (this.activeCompany) return this.activeCompany;
+      if (this.companies && this.companies.length > 0) return this.companies[0];
+      return null;
     }
 
     getCompanies() {
@@ -75,13 +87,16 @@
     }
 
     hasCompany() {
-      return !!(this.activeCompanyId && this.companies.length > 0);
+      return (this.companies && this.companies.length > 0);
     }
 
     setCompanyId(id) {
-      const normalizedId = (id && id !== 'ALL') ? id : null;
+      const normalizedId = (id && id !== 'ALL') ? id : (this.companies[0] ? this.companies[0].id : null);
       if (normalizedId === this.activeCompanyId) return;
       this.activeCompanyId = normalizedId;
+      if (normalizedId) {
+        localStorage.setItem('zonata_active_company_id', normalizedId);
+      }
       this.activeCompany = this.companies.find(c => c.id === normalizedId) || null;
       if (normalizedId) {
         localStorage.setItem('zonata_active_company_id', normalizedId);

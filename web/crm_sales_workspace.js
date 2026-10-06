@@ -980,4 +980,5 @@
   }
 
   window.CrmWorkspace = new EnterpriseCrmWorkspace();
+  window.CrmSalesWorkspace = window.CrmWorkspace;
 })();

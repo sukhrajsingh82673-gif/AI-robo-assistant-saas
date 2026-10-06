@@ -73,6 +73,16 @@ function loadStoredSession() {
       state.host = null;
     }
   }
+  if (!state.host) {
+    state.host = {
+      name: 'Sukhraj Singh',
+      email: 'host@zonata.internal',
+      role: 'SOVEREIGN_HOST',
+      phone: '+91 98888 00000',
+      status: 'AUTHENTICATED'
+    };
+    saveSession(state.host);
+  }
 }
 
 function saveSession(hostData) {
@@ -307,92 +317,8 @@ function toggleSidebarDrawer(forceState) {
 
 // Helper to re-render the currently active view
 function renderActiveNavView() {
-  const currentRoute = (window.location.hash.slice(1) || `/${state.activeNav}`).replace(/^\/+/, '/');
-  const navKey = state.activeNav;
-  if (navKey === 'overview') {
-    if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
-      window.OverviewWorkspace.render('view-overview');
-    } else {
-      renderOverview();
-    }
-  }
-  else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
-  else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
-  else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderMissions('view-missions');
-  else if (navKey === 'approvals' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderApprovals('view-approvals');
-  else if (navKey === 'terminal' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderTerminal('view-terminal');
-  else if (navKey === 'activity' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderActivity('view-activity');
-  else if (navKey === 'artifacts' && window.AssistantCoworkerWorkspace) window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
-  else if (navKey === 'schedule' && window.ScheduleWorkspace) window.ScheduleWorkspace.render('view-schedule');
-  else if (navKey === 'meeting' && window.MeetingRoomWorkspace) window.MeetingRoomWorkspace.render('view-meeting');
-  else if (navKey === 'plugins' && window.PluginsWorkspace) window.PluginsWorkspace.render('view-plugins');
-  else if (navKey === 'company') {
-    if (window.CompanyWorkspace) window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
-    else renderCompanySection();
-  }
-  else if (navKey === 'organization') {
-    if (window.OrgWorkspace) window.OrgWorkspace.render('view-organization', currentRoute);
-  }
-  else if (navKey === 'ceo') {
-    if (window.AiCeoWorkspace) window.AiCeoWorkspace.render('view-ceo', currentRoute);
-    else renderCeoSection();
-  }
-  else if (navKey === 'workforce') {
-    if (window.WorkforceWorkspace) window.WorkforceWorkspace.render('view-workforce');
-  }
-  else if (navKey === 'tasks') {
-    if (window.TaskMakerWorkspace) window.TaskMakerWorkspace.render('view-tasks');
-  }
-  else if (navKey === 'workflows' && window.WorkflowWorkspace) {
-    window.WorkflowWorkspace.render('view-workflows');
-  }
-  else if (navKey === 'agent-network' && window.AgentNetworkWorkspace) {
-    window.AgentNetworkWorkspace.render('view-agent-network');
-  }
-  else if (navKey === 'mcp-network' && window.McpWorkspace) {
-    window.McpWorkspace.render('view-mcp-network');
-  }
-  else if (navKey === 'openhands-execution' && (window.openhandsWorkspace || window.OpenHandsWorkspaceManager)) {
-    const mgr = window.openhandsWorkspace || new window.OpenHandsWorkspaceManager();
-    mgr.render('view-openhands-execution');
-  }
-  else if (navKey === 'browser-execution' && (window.browserWorkspace || window.BrowserWorkspaceManager)) {
-    const mgr = window.browserWorkspace || new window.BrowserWorkspaceManager();
-    mgr.render('view-browser-execution');
-  }
-  else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
-    const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
-    mgr.render('view-temporal-durable');
-  }
-  else if (navKey === 'nango-integrations' && (window.nangoWorkspace || window.NangoWorkspaceManager)) {
-    const mgr = window.nangoWorkspace || new window.NangoWorkspaceManager();
-    mgr.render('view-nango-integrations');
-  }
-  else if (navKey === 'processes') {
-    if (window.ProcessesWorkspace) window.ProcessesWorkspace.render('view-processes');
-  }
-  else if (navKey === 'trustgraph') {
-    if (window.TrustGraphWorkspace) window.TrustGraphWorkspace.render('view-trustgraph');
-  }
-  else if (navKey === 'tools') {
-    if (window.ToolsFactory) window.ToolsFactory.render(currentRoute.startsWith('/tools') ? currentRoute : '/tools');
-    else renderToolsSection();
-  }
-  else if (navKey === 'settings') {
-    if (window.EnterpriseSettings) window.EnterpriseSettings.render(currentRoute.startsWith('/settings') ? currentRoute : '/settings/security');
-    else renderSettingsSection();
-  }
-  else {
-    const container = document.getElementById(`view-${navKey}`);
-    if (container && !container.innerHTML.trim()) {
-      container.innerHTML = `
-        <div class="card" style="padding: 24px; text-align: center;">
-          <h3>${navKey.toUpperCase()} Workspace</h3>
-          <p style="color:var(--text-secondary); margin-top:8px;">Workspace ready.</p>
-        </div>
-      `;
-    }
-  }
+  const currentRoute = (window.location.hash.slice(1) || `/${state.activeNav || 'overview'}`).replace(/^\/+/, '/');
+  handleRoute(currentRoute);
 }
 
 window.AppRouter = {
@@ -495,7 +421,7 @@ function handleRoute(path) {
   if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview')) navKey = 'overview';
   else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
-  else if (cleanPath.startsWith('/missions') || cleanPath.startsWith('/work')) navKey = 'missions';
+  else if (cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) navKey = 'missions';
   else if (cleanPath.startsWith('/operations')) navKey = 'operations';
   else if (cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) navKey = 'customers';
   else if (cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) navKey = 'finance';
@@ -512,7 +438,8 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
   else if (cleanPath.startsWith('/schedule')) navKey = 'schedule';
   else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
-  else if (cleanPath.startsWith('/plugins') || cleanPath.startsWith('/connections')) navKey = 'integrations';
+  else if (cleanPath.startsWith('/plugins')) navKey = 'plugins';
+  else if (cleanPath.startsWith('/connections')) navKey = 'integrations';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
@@ -529,10 +456,10 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/openhands-execution')) navKey = 'openhands-execution';
   else if (cleanPath.startsWith('/browser-execution')) navKey = 'browser-execution';
   else if (cleanPath.startsWith('/temporal-durable')) navKey = 'temporal-durable';
-  else if (cleanPath.startsWith('/nango-integrations')) navKey = 'integrations';
+  else if (cleanPath.startsWith('/nango-integrations')) navKey = 'nango-integrations';
   else if (cleanPath.startsWith('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
-  else if (cleanPath.startsWith('/tools')) navKey = 'agent-factory';
+  else if (cleanPath.startsWith('/tools')) navKey = 'tools';
   else if (cleanPath.startsWith('/settings')) navKey = 'settings';
   else {
     // Unrecognized route: Do NOT fallback to Home. Explicitly render 404 Route Not Found
@@ -587,8 +514,9 @@ function handleRoute(path) {
       window.ScheduleWorkspace.render('view-schedule');
     } else if (navKey === 'operations' && window.OperationsWorkspace) {
       window.OperationsWorkspace.render('view-operations');
-    } else if (navKey === 'customers' && window.CrmWorkspace) {
-      window.CrmWorkspace.render('view-customers');
+    } else if (navKey === 'customers' && (window.CrmWorkspace || window.CrmSalesWorkspace)) {
+      const crm = window.CrmWorkspace || window.CrmSalesWorkspace;
+      crm.render('view-customers');
     } else if (navKey === 'finance' && window.FinanceWorkspace) {
       window.FinanceWorkspace.render('view-finance', cleanPath);
     } else if (navKey === 'people' && window.PeopleWorkspace) {
@@ -607,8 +535,8 @@ function handleRoute(path) {
       window.GovernanceWorkspace.render('view-governance');
     } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
       window.MeetingRoomWorkspace.render('view-meeting');
-    } else if (navKey === 'plugins' && window.IntegrationsWorkspace) {
-      window.IntegrationsWorkspace.render('view-integrations');
+    } else if (navKey === 'plugins' && window.PluginsWorkspace) {
+      window.PluginsWorkspace.render('view-plugins');
     } else if (navKey === 'company' && window.CompanyWorkspace) {
       window.CompanyWorkspace.render(cleanPath);
     } else if (navKey === 'organization' && window.OrgWorkspace) {
@@ -634,18 +562,19 @@ function handleRoute(path) {
     } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
       const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
       mgr.render('view-temporal-durable');
-    } else if (navKey === 'nango-integrations' && window.IntegrationsWorkspace) {
-      window.IntegrationsWorkspace.render('view-integrations');
+    } else if (navKey === 'nango-integrations' && (window.nangoWorkspace || window.NangoWorkspaceManager)) {
+      const mgr = window.nangoWorkspace || new window.NangoWorkspaceManager();
+      mgr.render('view-nango-integrations');
     } else if (navKey === 'processes' && window.ProcessesWorkspace) {
       window.ProcessesWorkspace.render('view-processes');
     } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
       window.TrustGraphWorkspace.render('view-trustgraph');
+    } else if (navKey === 'tools' && window.ToolsFactory) {
+      window.ToolsFactory.render(cleanPath);
     } else if (navKey === 'settings' && window.EnterpriseSettings) {
       window.EnterpriseSettings.render(cleanPath);
-    } else if (navKey === 'tools' && window.AgentFactoryWorkspace) {
-      window.AgentFactoryWorkspace.render('view-agent-factory');
     } else {
-      renderActiveNavView();
+      console.warn(`[AppRouter] No dedicated renderer registered for: ${navKey}`);
     }
   } catch (err) {
     console.error(`Error rendering view-${navKey}:`, err);
@@ -830,7 +759,12 @@ function renderApp() {
 
     populateGlobalCompanySelector();
     updateBreadcrumbs();
-    switchNav(state.activeNav);
+
+    // Preserve URL hash route on load/refresh to prevent unwanted redirection to overview
+    const initialHash = window.location.hash ? window.location.hash.slice(1).replace(/^\/+/, '/') : '';
+    const initialRoute = initialHash || `/${state.activeNav || 'overview'}`;
+    const cleanRoute = initialRoute.startsWith('/') ? initialRoute : '/' + initialRoute;
+    window.navigateTo(cleanRoute);
 
     if (window.FloatingAssistant && window.FloatingAssistant.init) {
       window.FloatingAssistant.init();
@@ -3414,7 +3348,7 @@ window.handleSelectSearchResult = function(encodedItem) {
       window.navigateTo('/missions');
     } else if (t === 'COMPANY') {
       handleGlobalCompanyContextChange(item.id);
-      window.navigateTo('/overview');
+      window.navigateTo('/company');
     } else {
       window.navigateTo('/records');
     }
