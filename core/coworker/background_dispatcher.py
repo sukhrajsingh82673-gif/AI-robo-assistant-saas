@@ -197,6 +197,17 @@ class BackgroundMissionDispatcher:
         Main entry point for natural language background missions.
         Decomposes prompt into structured sub-workers and begins governed execution.
         """
+        # Idempotency check: prevent duplicate mission creation for identical prompt
+        norm_prompt = prompt.strip().lower()
+        now_ts = time.time()
+        for existing in self._missions.values():
+            if existing.tenant_id == self.tenant_id and existing.company_id == self.company_id:
+                if existing.prompt.strip().lower() == norm_prompt:
+                    if existing.status in [MissionState.PLANNED.value, MissionState.RUNNING.value, MissionState.WAITING.value, MissionState.AWAITING_APPROVAL.value]:
+                        return existing
+                    if (now_ts - existing.created_at) < 30.0:
+                        return existing
+
         mid = f"msn_{uuid.uuid4().hex[:8]}"
         pwid = parent_worker_id or f"cw_master_{uuid.uuid4().hex[:6]}"
 

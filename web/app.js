@@ -227,15 +227,26 @@ function updateBreadcrumbs() {
     overview: 'Overview',
     assistant: 'AI Assistant',
     coworker: 'Autonomous Coworker',
-    missions: 'Mission Control',
+    missions: 'Work & Missions',
+    work: 'Work & Missions',
     approvals: 'Sovereign Approvals',
     terminal: 'Command Terminal',
     activity: 'Audit Activity',
     artifacts: 'Evidence Artifacts',
     schedule: 'Universal Schedule',
-    company: 'Company',
-    organization: 'Organization',
-    ceo: 'AI CEO',
+    operations: 'Operations Center',
+    customers: 'Customers & CRM',
+    finance: 'Finance & General Ledger',
+    people: 'People & HR Operations',
+    records: 'Enterprise Records Ledger',
+    files: 'Files & Documents Center',
+    reports: 'Reports & Business Intelligence',
+    'agent-factory': 'True Dynamic Agent Factory',
+    integrations: 'Integrations & External SaaS Hub',
+    governance: 'Sovereign Governance & HOST Authority',
+    company: 'Company & Structure',
+    organization: 'Organization Matrix',
+    ceo: 'AI CEO Command',
     meeting: 'AI CEO Meeting Room',
     workforce: 'AI Workforce',
     tasks: 'TaskMaker',
@@ -248,9 +259,9 @@ function updateBreadcrumbs() {
     'nango-integrations': 'External Integrations (Nango Engine)',
     processes: 'Processes',
     trustgraph: 'TrustGraph',
-    tools: 'Tools & Factory',
-    plugins: 'Plugins & Connections',
-    settings: 'Settings'
+    tools: 'Agent Factory',
+    plugins: 'Integrations Hub',
+    settings: 'Settings & Administration'
   };
   const activeNavLabel = navLabels[state.activeNav] || 'Overview';
   
@@ -397,14 +408,24 @@ function handleRoute(path) {
   const cleanPath = (path || '/').replace(/^\/+/, '/');
   if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
-  else if (cleanPath.startsWith('/missions')) navKey = 'missions';
+  else if (cleanPath.startsWith('/missions') || cleanPath.startsWith('/work')) navKey = 'missions';
+  else if (cleanPath.startsWith('/operations')) navKey = 'operations';
+  else if (cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) navKey = 'customers';
+  else if (cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) navKey = 'finance';
+  else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
+  else if (cleanPath.startsWith('/records')) navKey = 'records';
+  else if (cleanPath.startsWith('/files')) navKey = 'files';
+  else if (cleanPath.startsWith('/reports') || cleanPath.startsWith('/bi')) navKey = 'reports';
+  else if (cleanPath.startsWith('/agent-factory')) navKey = 'agent-factory';
+  else if (cleanPath.startsWith('/integrations')) navKey = 'integrations';
+  else if (cleanPath.startsWith('/governance')) navKey = 'governance';
   else if (cleanPath.startsWith('/approvals')) navKey = 'approvals';
   else if (cleanPath.startsWith('/terminal')) navKey = 'terminal';
   else if (cleanPath.startsWith('/activity')) navKey = 'activity';
   else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
   else if (cleanPath.startsWith('/schedule')) navKey = 'schedule';
   else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
-  else if (cleanPath.startsWith('/plugins') || cleanPath.startsWith('/connections')) navKey = 'plugins';
+  else if (cleanPath.startsWith('/plugins') || cleanPath.startsWith('/connections')) navKey = 'integrations';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
@@ -421,10 +442,10 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/openhands-execution')) navKey = 'openhands-execution';
   else if (cleanPath.startsWith('/browser-execution')) navKey = 'browser-execution';
   else if (cleanPath.startsWith('/temporal-durable')) navKey = 'temporal-durable';
-  else if (cleanPath.startsWith('/nango-integrations')) navKey = 'nango-integrations';
+  else if (cleanPath.startsWith('/nango-integrations')) navKey = 'integrations';
   else if (cleanPath.startsWith('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
-  else if (cleanPath.startsWith('/tools')) navKey = 'tools';
+  else if (cleanPath.startsWith('/tools')) navKey = 'agent-factory';
   else if (cleanPath.startsWith('/settings')) navKey = 'settings';
   else if (cleanPath.startsWith('/overview')) navKey = 'overview';
 
@@ -461,10 +482,30 @@ function handleRoute(path) {
     window.AssistantCoworkerWorkspace.renderArtifacts('view-artifacts');
   } else if (navKey === 'schedule' && window.ScheduleWorkspace) {
     window.ScheduleWorkspace.render('view-schedule');
+  } else if (navKey === 'operations' && window.OperationsWorkspace) {
+    window.OperationsWorkspace.render('view-operations');
+  } else if (navKey === 'customers' && window.CrmWorkspace) {
+    window.CrmWorkspace.render('view-customers');
+  } else if (navKey === 'finance' && window.FinanceWorkspace) {
+    window.FinanceWorkspace.render('view-finance');
+  } else if (navKey === 'people' && window.PeopleWorkspace) {
+    window.PeopleWorkspace.render('view-people');
+  } else if (navKey === 'records' && window.RecordsWorkspace) {
+    window.RecordsWorkspace.render('view-records');
+  } else if (navKey === 'files' && window.FilesWorkspace) {
+    window.FilesWorkspace.render('view-files');
+  } else if (navKey === 'reports' && window.ReportsWorkspace) {
+    window.ReportsWorkspace.render('view-reports');
+  } else if (navKey === 'agent-factory' && window.AgentFactoryWorkspace) {
+    window.AgentFactoryWorkspace.render('view-agent-factory');
+  } else if (navKey === 'integrations' && window.IntegrationsWorkspace) {
+    window.IntegrationsWorkspace.render('view-integrations');
+  } else if (navKey === 'governance' && window.GovernanceWorkspace) {
+    window.GovernanceWorkspace.render('view-governance');
   } else if (navKey === 'meeting' && window.MeetingRoomWorkspace) {
     window.MeetingRoomWorkspace.render('view-meeting');
-  } else if (navKey === 'plugins' && window.PluginsWorkspace) {
-    window.PluginsWorkspace.render('view-plugins');
+  } else if (navKey === 'plugins' && window.IntegrationsWorkspace) {
+    window.IntegrationsWorkspace.render('view-integrations');
   } else if (navKey === 'company' && window.CompanyWorkspace) {
     window.CompanyWorkspace.render(cleanPath);
   } else if (navKey === 'organization' && window.OrgWorkspace) {
@@ -490,17 +531,16 @@ function handleRoute(path) {
   } else if (navKey === 'temporal-durable' && (window.temporalWorkspace || window.TemporalWorkspaceManager)) {
     const mgr = window.temporalWorkspace || new window.TemporalWorkspaceManager();
     mgr.render('view-temporal-durable');
-  } else if (navKey === 'nango-integrations' && (window.nangoWorkspace || window.NangoWorkspaceManager)) {
-    const mgr = window.nangoWorkspace || new window.NangoWorkspaceManager();
-    mgr.render('view-nango-integrations');
+  } else if (navKey === 'nango-integrations' && window.IntegrationsWorkspace) {
+    window.IntegrationsWorkspace.render('view-integrations');
   } else if (navKey === 'processes' && window.ProcessesWorkspace) {
     window.ProcessesWorkspace.render('view-processes');
   } else if (navKey === 'trustgraph' && window.TrustGraphWorkspace) {
     window.TrustGraphWorkspace.render('view-trustgraph');
   } else if (navKey === 'settings' && window.EnterpriseSettings) {
     window.EnterpriseSettings.render(cleanPath);
-  } else if (navKey === 'tools' && window.ToolsFactory) {
-    window.ToolsFactory.render(cleanPath);
+  } else if (navKey === 'tools' && window.AgentFactoryWorkspace) {
+    window.AgentFactoryWorkspace.render('view-agent-factory');
   } else {
     renderActiveNavView();
   }
@@ -524,11 +564,75 @@ function setupEventListeners() {
     handleRoute(raw);
   });
 
-  // Global search input
+  // Global search & Universal Command Palette dropdown
   const searchInput = document.getElementById('globalSearchInput');
+  const searchDropdown = document.getElementById('commandPaletteResults');
+  let searchDebounceTimer = null;
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
-      handleGlobalSearch(e.target.value);
+      const q = e.target.value.trim();
+      clearTimeout(searchDebounceTimer);
+      if (!q || q.length < 2) {
+        if (searchDropdown) {
+          searchDropdown.style.display = 'none';
+          searchDropdown.innerHTML = '';
+        }
+        return;
+      }
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const items = data.items || [];
+            if (!searchDropdown) return;
+            if (items.length === 0) {
+              searchDropdown.innerHTML = `
+                <div style="padding:12px 14px; color:var(--text-secondary); font-size:12.5px;">
+                  No matches found across Company OS for "<em>${q.replace(/</g, '&lt;')}</em>"
+                </div>
+              `;
+            } else {
+              searchDropdown.innerHTML = `
+                <div style="padding:6px 12px; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); letter-spacing:0.5px; border-bottom:1px solid var(--border-subtle);">
+                  Found ${items.length} Matches across Company OS
+                </div>
+                ${items.slice(0, 8).map(it => `
+                  <div class="search-result-item" style="padding:9px 12px; border-bottom:1px solid var(--border-subtle); cursor:pointer; display:flex; justify-content:space-between; align-items:center;"
+                       onclick="handleSelectSearchResult('${encodeURIComponent(JSON.stringify(it))}')">
+                    <div style="min-width:0; flex:1;">
+                      <div style="font-weight:600; font-size:13px; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+                        ${it.title || it.name || 'Entity'}
+                      </div>
+                      <div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+                        ${(it.snippet || it.type || '').slice(0, 65)}
+                      </div>
+                    </div>
+                    <span class="badge badge-blue" style="font-size:10px; margin-left:8px; text-transform:uppercase;">${it.type || 'Item'}</span>
+                  </div>
+                `).join('')}
+              `;
+            }
+            searchDropdown.style.display = 'block';
+          }
+        } catch (err) {
+          console.error("Command palette search failed:", err);
+        }
+      }, 200);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleGlobalSearch(e.target.value);
+        if (searchDropdown) searchDropdown.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (searchDropdown && !e.target.closest('.command-search-wrapper')) {
+        searchDropdown.style.display = 'none';
+      }
     });
   }
 
@@ -3156,6 +3260,51 @@ window.handleGlobalSearch = function(query) {
       ` : ''}
     </div>
   `);
+};
+
+window.handleSelectSearchResult = function(encodedItem) {
+  try {
+    const item = JSON.parse(decodeURIComponent(encodedItem));
+    const searchDropdown = document.getElementById('commandPaletteResults');
+    if (searchDropdown) searchDropdown.style.display = 'none';
+    const searchInput = document.getElementById('globalSearchInput');
+    if (searchInput) searchInput.value = '';
+
+    const t = (item.type || '').toUpperCase();
+    if (t === 'RECORD') {
+      window.navigateTo('/records');
+      setTimeout(() => {
+        if (window.RecordsWorkspace && window.RecordsWorkspace.openRecordDossier) {
+          window.RecordsWorkspace.openRecordDossier(item.id);
+        }
+      }, 200);
+    } else if (t === 'FILE') {
+      window.navigateTo('/files');
+      setTimeout(() => {
+        if (window.FilesWorkspace && window.FilesWorkspace.previewFile) {
+          window.FilesWorkspace.previewFile(item.id);
+        }
+      }, 200);
+    } else if (t === 'REPORT') {
+      window.navigateTo('/reports');
+      setTimeout(() => {
+        if (window.ReportsWorkspace && window.ReportsWorkspace.openReportDetail) {
+          window.ReportsWorkspace.openReportDetail(item.id);
+        }
+      }, 200);
+    } else if (t === 'AGENT' || t === 'BLUEPRINT') {
+      window.navigateTo('/agent-factory');
+    } else if (t === 'MISSION') {
+      window.navigateTo('/missions');
+    } else if (t === 'COMPANY') {
+      handleGlobalCompanyContextChange(item.id);
+      window.navigateTo('/overview');
+    } else {
+      window.navigateTo('/records');
+    }
+  } catch (err) {
+    console.error("Failed to select item", err);
+  }
 };
 
 window.openNewDirectiveModal = function() {

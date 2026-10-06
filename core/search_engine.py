@@ -51,8 +51,8 @@ class GlobalSearchEngine:
                     results["employees"].append(dict(r))
 
             # Search missions
-            for r in conn.execute("SELECT mission_id, title, department, status, target_outcome FROM missions WHERE tenant_id = ?", (tenant_id,)).fetchall():
-                if q in r["title"].lower() or q in (r["target_outcome"] or "").lower():
+            for r in conn.execute("SELECT mission_id, prompt, status, current_stage FROM coworker_background_missions WHERE tenant_id = ?", (tenant_id,)).fetchall():
+                if q in r["prompt"].lower():
                     results["missions"].append(dict(r))
 
             # Search approvals
@@ -60,15 +60,58 @@ class GlobalSearchEngine:
                 if q in r["action_desc"].lower() or q in r["reason"].lower():
                     results["approvals"].append(dict(r))
 
-            # Search knowledge facts
-            for r in conn.execute("SELECT fact_id, category, subject, predicate, object_val, truth_state FROM company_knowledge WHERE tenant_id = ?", (tenant_id,)).fetchall():
-                if q in r["predicate"].lower() or q in r["object_val"].lower():
-                    results["knowledge_facts"].append(dict(r))
+            # Search records
+            try:
+                for r in conn.execute("SELECT record_id, title, record_type, department, actor_name, amount, currency FROM enterprise_records WHERE tenant_id = ?", (tenant_id,)).fetchall():
+                    if q in r["title"].lower() or q in r["actor_name"].lower() or q in r["record_type"].lower():
+                        results.setdefault("records", []).append(dict(r))
+            except Exception:
+                pass
+
+            # Search files
+            try:
+                for r in conn.execute("SELECT file_id, name, department, category, document_type FROM enterprise_files WHERE tenant_id = ?", (tenant_id,)).fetchall():
+                    if q in r["name"].lower() or q in r["category"].lower() or q in r["department"].lower():
+                        results.setdefault("files", []).append(dict(r))
+            except Exception:
+                pass
+
+            # Search reports
+            try:
+                for r in conn.execute("SELECT report_id, title, report_category, verification_state FROM enterprise_reports WHERE tenant_id = ?", (tenant_id,)).fetchall():
+                    if q in r["title"].lower() or q in r["report_category"].lower():
+                        results.setdefault("reports", []).append(dict(r))
+            except Exception:
+                pass
+
+            # Search blueprints
+            try:
+                for r in conn.execute("SELECT blueprint_id, name, role, department, mission FROM agent_blueprints WHERE tenant_id = ?", (tenant_id,)).fetchall():
+                    if q in r["name"].lower() or q in r["role"].lower() or q in r["mission"].lower():
+                        results.setdefault("agent_blueprints", []).append(dict(r))
+            except Exception:
+                pass
+
+        # Build flat ranked items list for topbar Command Palette
+        items = []
+        for c in results["companies"]:
+            items.append({"category": "Companies", "title": c["name"], "subtitle": f"{c.get('industry', 'Operations')} • {c.get('status', 'ACTIVE')}", "route": "/company"})
+        for r in results.get("records", []):
+            items.append({"category": "Records", "title": r["title"], "subtitle": f"{r['department']} • {r['record_type']} • {r['actor_name']}", "route": "/records"})
+        for f in results.get("files", []):
+            items.append({"category": "Files", "title": f["name"], "subtitle": f"{f['department']} • {f['category']} • {f['document_type']}", "route": "/files"})
+        for rep in results.get("reports", []):
+            items.append({"category": "Reports", "title": rep["title"], "subtitle": f"{rep['report_category']} • {rep['verification_state']}", "route": "/reports"})
+        for bp in results.get("agent_blueprints", []):
+            items.append({"category": "Agents", "title": bp["name"], "subtitle": f"{bp['department']} • {bp['role']}", "route": "/agents"})
+        for m in results["missions"]:
+            items.append({"category": "Missions", "title": m.get("prompt", m.get("title", "")), "subtitle": f"{m.get('status', '')}", "route": "/missions"})
 
         total_matches = sum(len(v) for v in results.values())
         return {
             "query": query,
             "tenant_id": tenant_id,
             "total_matches": total_matches,
-            "results": results
+            "results": results,
+            "items": items[:20]
         }

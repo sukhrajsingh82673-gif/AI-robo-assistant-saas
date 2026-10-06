@@ -118,6 +118,14 @@ terminal_agent = TerminalHandlingAgent(tenant_id="tnt_primary")
 
 
 
+from core.enterprise_records import records_engine
+from core.enterprise_files import files_engine
+from core.enterprise_reports import reports_engine
+from core.enterprise_finance import finance_engine
+from core.enterprise_agent_factory import agent_factory
+from core.enterprise_integrations import integrations_registry
+from core.unified_search import unified_search
+
 # Zonata Universal AI CEO Subsystems
 from zonata.discovery import CompanyDiscoveryEngine
 from zonata.interview import CEODiscoveryInterview
@@ -1250,7 +1258,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/coworker/missions":
-            missions = coworker_engine.background_dispatcher.list_missions()
+            raw_missions = coworker_engine.background_dispatcher.list_missions()
+            seen_prompts = set()
+            missions = []
+            for m in raw_missions:
+                norm_p = m.prompt.strip().lower()
+                if norm_p in seen_prompts:
+                    continue
+                seen_prompts.add(norm_p)
+                missions.append(m)
             self._send_json({
                 "missions": [
                     {
@@ -1364,8 +1380,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/coworker/approvals":
             approvals = []
+            seen_prompts = set()
             for m in coworker_engine.background_dispatcher.list_missions():
                 if m.status in ["AWAITING_APPROVAL", "WAITING"]:
+                    norm_p = m.prompt.strip().lower()
+                    if norm_p in seen_prompts:
+                        continue
+                    seen_prompts.add(norm_p)
                     approvals.append({
                         "approval_id": f"app_{m.mission_id}",
                         "mission_id": m.mission_id,
@@ -1481,6 +1502,122 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "Connection not found"}, status=404)
             return
+
+        # =====================================================================
+        # Enterprise Records Center Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/records":
+            comp_id = query_params.get("company_id", [None])[0]
+            rtype = query_params.get("record_type", [None])[0]
+            dept = query_params.get("department", [None])[0]
+            drange = query_params.get("date_range", [None])[0]
+            sq = query_params.get("q", [None])[0]
+            lim = int(query_params.get("limit", [100])[0])
+            off = int(query_params.get("offset", [0])[0])
+            res = records_engine.list_records(company_id=comp_id, record_type=rtype, department=dept, date_range=drange, search_query=sq, limit=lim, offset=off)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/records/"):
+            rec_id = path.split("/")[3]
+            rec = records_engine.get_record(rec_id)
+            if rec:
+                self._send_json(rec)
+            else:
+                self._send_json({"error": "Record not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Enterprise Files & Documents Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/files":
+            comp_id = query_params.get("company_id", [None])[0]
+            dept = query_params.get("department", [None])[0]
+            cat = query_params.get("category", [None])[0]
+            sq = query_params.get("q", [None])[0]
+            res = files_engine.list_files(company_id=comp_id, department=dept, category=cat, search_query=sq)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/files/"):
+            fid = path.split("/")[3]
+            f = files_engine.get_file(fid)
+            if f:
+                self._send_json(f)
+            else:
+                self._send_json({"error": "File not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Enterprise Reports & BI Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/reports":
+            comp_id = query_params.get("company_id", [None])[0]
+            cat = query_params.get("category", [None])[0]
+            sq = query_params.get("q", [None])[0]
+            reps = reports_engine.list_reports(company_id=comp_id, category=cat, search_query=sq)
+            self._send_json({"reports": reps, "count": len(reps)})
+            return
+
+        elif path.startswith("/api/reports/") and path.endswith("/export"):
+            rid = path.split("/")[3]
+            fmt = query_params.get("format", ["csv"])[0].lower()
+            if fmt == "csv":
+                csv_data = reports_engine.export_report_csv(rid)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="report_{rid}.csv"')
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(csv_data.encode("utf-8"))
+                return
+            else:
+                rep = reports_engine.get_report(rid)
+                self._send_json(rep if rep else {"error": "Report not found"})
+                return
+
+        elif path.startswith("/api/reports/"):
+            rid = path.split("/")[3]
+            rep = reports_engine.get_report(rid)
+            if rep:
+                self._send_json(rep)
+            else:
+                self._send_json({"error": "Report not found"}, status=404)
+            return
+
+        # =====================================================================
+        # Enterprise Finance & Accounting Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/finance/summary":
+            comp_id = query_params.get("company_id", ["comp_primary"])[0]
+            summary = finance_engine.get_financial_summary(company_id=comp_id)
+            self._send_json(summary)
+            return
+
+        # =====================================================================
+        # True Agent Factory Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/agent-factory/blueprints":
+            comp_id = query_params.get("company_id", [None])[0]
+            dept = query_params.get("department", [None])[0]
+            bps = agent_factory.list_blueprints(company_id=comp_id, department=dept)
+            self._send_json({"blueprints": bps, "count": len(bps)})
+            return
+
+        # =====================================================================
+        # Enterprise Integration Center Endpoints (GET)
+        # =====================================================================
+        elif path == "/api/integrations/marketplace":
+            marketplace = integrations_registry.get_marketplace()
+            self._send_json({"marketplace": marketplace, "count": len(marketplace)})
+            return
+
+        elif path == "/api/integrations/connections":
+            comp_id = query_params.get("company_id", ["comp_primary"])[0]
+            conns = integrations_registry.list_connections(company_id=comp_id)
+            self._send_json({"connections": conns, "count": len(conns)})
+            return
+
 
         # =====================================================================
         # Governed Multi-Agent Workforce Orchestrator Endpoints (GET)
@@ -3595,6 +3732,43 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             conn_id = parts[3]
             res = plugins_service.sync_connection(conn_id)
+            self._send_json({"success": True, **res})
+            return
+
+        # =====================================================================
+        # Enterprise Records, Files, Reports, Finance & Agent Factory (POST)
+        # =====================================================================
+        elif path == "/api/records":
+            rec = records_engine.create_record(req_data)
+            self._send_json({"success": True, "record": rec})
+            return
+
+        elif path == "/api/files":
+            fil = files_engine.register_file(req_data)
+            self._send_json({"success": True, "file": fil})
+            return
+
+        elif path == "/api/reports":
+            rep = reports_engine.generate_report(req_data)
+            self._send_json({"success": True, "report": rep})
+            return
+
+        elif path == "/api/finance/expenses":
+            res = finance_engine.create_expense(req_data)
+            self._send_json(res)
+            return
+
+        elif path == "/api/agent-factory/synthesize":
+            prompt = req_data.get("prompt", "General business operations agent")
+            comp_id = req_data.get("company_id", "comp_primary")
+            bp = agent_factory.synthesize_blueprint_from_prompt(prompt, comp_id)
+            self._send_json({"success": True, "blueprint": bp})
+            return
+
+        elif path.startswith("/api/agent-factory/blueprints/") and path.endswith("/status"):
+            b_id = path.split("/")[4]
+            st = req_data.get("status", "ACTIVE")
+            res = agent_factory.update_blueprint_status(b_id, st)
             self._send_json({"success": True, **res})
             return
 
