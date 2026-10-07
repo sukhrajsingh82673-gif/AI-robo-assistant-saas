@@ -606,8 +606,13 @@ function handleRoute(path) {
       window.TrustGraphWorkspace.render('view-trustgraph');
     } else if (navKey === 'tools' && window.ToolsFactory) {
       window.ToolsFactory.render(cleanPath);
-    } else if (navKey === 'settings' && window.EnterpriseSettings) {
-      window.EnterpriseSettings.render(cleanPath);
+    } else if (navKey === 'settings') {
+      const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
+      if (es && es.render) {
+        es.render(cleanPath);
+      } else {
+        console.warn('[AppRouter] EnterpriseSettings not found');
+      }
     } else {
       console.warn(`[AppRouter] No dedicated renderer registered for: ${navKey}`);
     }

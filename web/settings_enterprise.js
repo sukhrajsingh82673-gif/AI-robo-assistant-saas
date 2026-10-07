@@ -290,6 +290,13 @@ const EnterpriseSettings = (function() {
     setupKeyboardShortcuts();
     await fetchEnvironment();
     await fetchEffectiveState();
+
+    // Auto-render if currently on settings route or hash
+    const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
+    if (hash.startsWith('#/settings') || hash.startsWith('#settings')) {
+      const clean = hash.replace(/^#/, '');
+      render(clean);
+    }
   }
 
   function setupKeyboardShortcuts() {
@@ -1849,6 +1856,14 @@ const EnterpriseSettings = (function() {
     focusSearchMobile
   };
 })();
+
+// Attach explicitly to window and globalThis for browser global availability
+if (typeof window !== 'undefined') {
+  window.EnterpriseSettings = EnterpriseSettings;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.EnterpriseSettings = EnterpriseSettings;
+}
 
 // Auto-initialize when document is ready
 if (typeof document !== 'undefined') {
