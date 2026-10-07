@@ -1139,6 +1139,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        elif path == "/api/settings/search":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            q = query_params.get("q", [""])[0]
+            results = settings_service.search_settings(q, tenant_id, company_id)
+            self._send_json({
+                "query": q,
+                "results": results,
+                "count": len(results),
+                "timestamp": time.time()
+            })
+            return
+
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", "comp_primary")

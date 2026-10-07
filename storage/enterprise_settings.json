@@ -92,5 +92,6 @@
   "ceo_spending_limit": 75000,
   "sec_session_duration_hours": 8,
   "cost_global_budget_monthly": 50000,
-  "wf_max_concurrent_agents": 24
+  "wf_max_concurrent_agents": 24,
+  "sec_require_mfa": true
 }

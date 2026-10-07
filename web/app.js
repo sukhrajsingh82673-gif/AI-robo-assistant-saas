@@ -2180,15 +2180,9 @@ function renderSettingsSection() {
   if (window.EnterpriseSettings) {
     const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
     window.EnterpriseSettings.render(route.startsWith('/settings') ? route : '/settings');
-    return;
-  }
-
-  if (state.settingsView === 'hub') {
-    renderSettingsHub(container);
-  } else {
-    renderSettingsDetail(container, state.settingsActiveCategory);
   }
 }
+
 
 // --------------------------------------------------------------------------
 // 1. Settings Hub View (Enterprise Control Center)
