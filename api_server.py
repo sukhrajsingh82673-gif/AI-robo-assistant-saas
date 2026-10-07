@@ -1170,41 +1170,19 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/effective":
             company_id = self.headers.get("X-Company-ID", "comp_primary")
+            enforcements = settings_service.get_all_effective_enforcements(tenant_id, company_id)
             self._send_json({
-                "effective_enforcement": {
-                    "ceo_autonomy": {
-                        "configured": "Level 3 — Execute Within Policy",
-                        "effective": "Level 3 — Execute Within Policy",
-                        "runtime_status": "ACTIVE",
-                        "enforcer": "UniversalControlKernel + CeoCommandEngine"
-                    },
-                    "spending_stop_limit": {
-                        "configured": 50000,
-                        "effective": 50000,
-                        "runtime_status": "ACTIVE",
-                        "enforcer": "BudgetHierarchyEngine"
-                    },
-                    "emergency_quarantine": {
-                        "configured": False,
-                        "effective": False,
-                        "runtime_status": "ARMED_AND_READY",
-                        "enforcer": "UniversalControlKernel"
-                    },
-                    "audit_ledger": {
-                        "configured": "SHA-256 (Merkle Tree)",
-                        "effective": "SHA-256 (Merkle Tree)",
-                        "runtime_status": "VERIFIED",
-                        "enforcer": "EvidenceLedger"
-                    },
-                    "mfa_policy": {
-                        "configured": True,
-                        "effective": True,
-                        "runtime_status": "ACTIVE",
-                        "enforcer": "UserManager"
-                    }
-                },
+                "tenant_id": tenant_id,
+                "company_id": company_id,
+                "effective_enforcement": enforcements,
                 "server_timestamp": time.time()
             })
+            return
+
+        elif path == "/api/settings/drift":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            drift = settings_service.check_runtime_drift(tenant_id, company_id)
+            self._send_json(drift)
             return
 
         # =====================================================================
@@ -3327,21 +3305,30 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             cat_id = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", "comp_primary")
             actor = self.headers.get("X-User-Name", "Host Administrator")
+            actor_role = self.headers.get("X-User-Role", "OWNER")
             reason = req_data.get("reason", "Batch category save")
             values = req_data.get("values", req_data)
-            res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason)
-            self._send_json(res)
+            res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason, actor_role=actor_role)
+            status_code = 200 if res.get("success") else 400
+            self._send_json(res, status=status_code)
             return
 
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", "comp_primary")
             actor = self.headers.get("X-User-Name", "Host Administrator")
+            actor_role = self.headers.get("X-User-Role", "OWNER")
+            expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data
             reason = req_data.get("reason", "Direct setting update")
             scope = req_data.get("scope", "Company")
-            res = settings_service.update_single_setting(tenant_id, company_id, s_key, new_val, actor=actor, reason=reason, scope=scope)
-            self._send_json(res)
+            res = settings_service.update_single_setting(
+                tenant_id, company_id, s_key, new_val,
+                actor=actor, reason=reason, scope=scope,
+                actor_role=actor_role, expected_version=expected_ver
+            )
+            status_code = res.get("status_code", (200 if res.get("success") else 400))
+            self._send_json(res, status=status_code)
             return
 
         elif path == "/api/settings/propose":
@@ -3535,6 +3522,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/coworker/terminal/execute" or path == "/api/terminal/execute":
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            
+            # Dynamic Runtime Enforcement (Gate G6, G2)
+            em_stop = settings_service.get_effective_setting(tenant_id, company_id, "host_emergency_stop", False)
+            if em_stop:
+                self._send_json({"error": "Host emergency stop active: terminal execution halted", "blocked": True}, status=403)
+                return
+
+            term_enabled = settings_service.get_effective_setting(tenant_id, company_id, "term_execution_enabled", True)
+            if not term_enabled:
+                self._send_json({"error": "Terminal command execution disabled by Enterprise Settings policy ('term_execution_enabled'=False)", "blocked": True}, status=403)
+                return
+
+            term_max_lease = float(settings_service.get_effective_setting(tenant_id, company_id, "term_max_lease_seconds", 60.0))
+
             params = req_data.get("parameters", {}) if isinstance(req_data.get("parameters"), dict) else {}
             command = req_data.get("command") or params.get("command", "")
             capability = req_data.get("capability") or params.get("capability", "terminal.shell_command")
@@ -3542,6 +3544,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             human_approved = bool(req_data.get("human_approved", False) or params.get("human_approved", False))
             session_id = req_data.get("session_id") or f"term_api_{uuid.uuid4().hex[:6]}"
             profile_id = req_data.get("profile_id", "profile_linux_dev")
+
+            raw_timeout = float(req_data.get("timeout_sec", 30.0))
+            effective_timeout = min(raw_timeout, term_max_lease)
 
             # Check if executing via UniversalTerminal or raw fallback
             if req_data.get("use_fabric", True):
@@ -3551,7 +3556,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     environment_profile_id=profile_id,
                     working_directory=cwd,
                     command=command,
-                    timeout_sec=float(req_data.get("timeout_sec", 30.0))
+                    timeout_sec=effective_timeout
                 )
                 sess = universal_terminal._sessions.get(session_id)
                 if not sess:
@@ -5716,11 +5721,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
+            actor_role = self.headers.get("X-User-Role", "OWNER")
+            expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data
             reason = req_data.get("reason", "Direct REST PUT setting update")
             scope = req_data.get("scope", "Company")
-            res = settings_service.update_single_setting(tenant_id, company_id, s_key, new_val, actor=actor, reason=reason, scope=scope)
-            self._send_json(res)
+            res = settings_service.update_single_setting(
+                tenant_id, company_id, s_key, new_val,
+                actor=actor, reason=reason, scope=scope,
+                actor_role=actor_role, expected_version=expected_ver
+            )
+            status_code = res.get("status_code", (200 if res.get("success") else 400))
+            self._send_json(res, status=status_code)
             return
 
         self._send_json({"error": "Endpoint not found or method not allowed"}, status=404)

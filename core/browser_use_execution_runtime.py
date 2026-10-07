@@ -215,6 +215,17 @@ class BrowserKillSwitch:
     ) -> Tuple[bool, str]:
         if cls._global_killed:
             return True, "Global Browser KillSwitch active"
+        # Check dynamic Enterprise Settings
+        try:
+            from core.settings_service import settings_service
+            t_id = tenant_id or "tnt_primary"
+            c_id = company_id or "comp_primary"
+            if settings_service.get_effective_setting(t_id, c_id, "host_emergency_stop", False):
+                return True, "Host emergency stop active via Enterprise Settings ('host_emergency_stop'=True)"
+            if settings_service.get_effective_setting(t_id, c_id, "gov_kill_switch_active", False):
+                return True, "Governance kill switch active via Enterprise Settings ('gov_kill_switch_active'=True)"
+        except Exception:
+            pass
         if tenant_id and tenant_id in cls._tenant_kills:
             return True, f"Tenant Browser KillSwitch active for '{tenant_id}'"
         if company_id and company_id in cls._company_kills:

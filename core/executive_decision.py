@@ -125,10 +125,23 @@ class ExecutiveDecisionEngine:
         sha256_digest = hashlib.sha256(ev_bytes).hexdigest()
         evidence_id = f"ev_dec_{uuid.uuid4().hex[:8]}"
 
-        # Step 7: Check approval boundary
+        # Step 7: Dynamic Enterprise Settings Governance Checks (Gate G1, G2, G12)
+        from core.settings_service import settings_service
+        em_stop = settings_service.get_effective_setting(self.tenant_id, self.company_id, "host_emergency_stop", False)
+        autonomy_level = settings_service.get_effective_setting(self.tenant_id, self.company_id, "ceo_autonomy_level", "Level 3 — Execute Within Policy")
+        ceo_spend_cap = float(settings_service.get_effective_setting(self.tenant_id, self.company_id, "ceo_spending_limit", 50000.0))
+        fin_high_approval = float(settings_service.get_effective_setting(self.tenant_id, self.company_id, "fin_high_expense_approval", 25000.0))
+
         if requires_human_approval is None:
-            # Automatic policy: financial commitments > 50,000 INR or destructive/high-risk actions require Owner
-            if financial_impact_inr > 50000.0 or any(k in decision_type.lower() for k in ["contract", "terminate", "major_budget", "destroy"]):
+            if em_stop:
+                # Emergency Stop: all automated actions blocked and require explicit owner intervention
+                requires_human_approval = True
+            elif "Level 0" in autonomy_level or "Level 1" in autonomy_level or "Level 2" in autonomy_level:
+                # Observe/Recommend/Approval required mode
+                requires_human_approval = True
+            elif financial_impact_inr > ceo_spend_cap or financial_impact_inr > fin_high_approval:
+                requires_human_approval = True
+            elif any(k in decision_type.lower() for k in ["contract", "terminate", "major_budget", "destroy"]):
                 requires_human_approval = True
             else:
                 requires_human_approval = False

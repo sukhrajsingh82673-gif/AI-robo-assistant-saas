@@ -112,12 +112,25 @@ class GovernedAgentFactory:
         quotas = cls.get_tenant_quotas(tenant_id)
         now = time.time()
 
+        # Dynamic Enterprise Settings Enforcement (Gate G3, G4)
+        from core.settings_service import settings_service
+        em_stop = settings_service.get_effective_setting(tenant_id, company_id, "host_emergency_stop", False)
+        if em_stop:
+            raise AgentFactoryQuotaException("Host emergency stop active: agent creation halted")
+
+        allow_spawning = settings_service.get_effective_setting(tenant_id, company_id, "wf_autonomous_spawning", True)
+        if not allow_spawning and parent_agent_id:
+            raise AgentFactoryQuotaException("Autonomous agent spawning disabled by Enterprise Settings policy ('wf_autonomous_spawning'=False)")
+
+        configured_max_agents = int(settings_service.get_effective_setting(tenant_id, company_id, "wf_max_concurrent_agents", quotas["max_agents"]))
+        effective_max_agents = min(quotas["max_agents"], configured_max_agents)
+
         # 1. Anti-Explosion Quota Check: Total Agents
         with db.get_connection() as conn:
             cnt = conn.execute("SELECT count(*) FROM governed_agents WHERE tenant_id = ? AND lifecycle_state NOT IN ('REVOKED', 'RETIRED')", (tenant_id,)).fetchone()[0]
-            if cnt >= quotas["max_agents"]:
+            if cnt >= effective_max_agents:
                 raise AgentFactoryQuotaException(
-                    f"Agent quota exceeded for tenant '{tenant_id}': active {cnt} >= max {quotas['max_agents']}"
+                    f"Agent quota exceeded for company '{company_id}': active {cnt} >= max {effective_max_agents}"
                 )
 
             # 2. Delegation Depth Check

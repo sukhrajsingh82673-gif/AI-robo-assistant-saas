@@ -86,6 +86,19 @@ class SpendGovernor:
         Check if an entity has budget capacity for an operation.
         Returns: (status: BudgetStatus, reason: str)
         """
+        # Dynamic Enterprise Settings Checks (Gate G10, G2)
+        try:
+            from core.settings_service import settings_service
+            if settings_service.get_effective_setting("tnt_primary", "comp_primary", "host_emergency_stop", False) or \
+               settings_service.get_effective_setting("tnt_primary", "comp_primary", "host_killswitch_finances", False):
+                return BudgetStatus.EMERGENCY_STOP, f"Financial operation halted by Host emergency stop / killswitch."
+
+            global_budget_cap = float(settings_service.get_effective_setting("tnt_primary", "comp_primary", "cost_global_budget_monthly", 100000.0))
+            if requested_spend_usd > global_budget_cap:
+                return BudgetStatus.HARD_LIMIT_EXCEEDED, f"Requested spend (${requested_spend_usd:.2f}) exceeds global monthly spending cap (${global_budget_cap:.2f})."
+        except Exception:
+            pass
+
         with engine.connection(workload=WorkloadType.READ) as conn:
             cursor = conn.execute("SELECT * FROM enterprise_budgets WHERE entity_id = ?", (entity_id,))
             row = cursor.fetchone()
