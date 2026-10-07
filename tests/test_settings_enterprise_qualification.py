@@ -109,7 +109,7 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
         res, status = self._api_get("/api/settings")
         self.assertEqual(status, 200)
         self.assertEqual(len(res["groups"]), 6)
-        self.assertEqual(res["total_categories"], 43)
+        self.assertEqual(res["total_categories"], len(CATEGORIES_CATALOG))
 
         for cat in CATEGORIES_CATALOG:
             cat_id = cat["id"]
@@ -454,6 +454,92 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
         self.assertEqual(st_drift, 200)
         self.assertEqual(res_drift.get("status"), "IN_SYNC")
         self.assertFalse(res_drift.get("drift_detected"))
+
+    # -------------------------------------------------------------------------
+    # Gate M: 32 Canonical Sequential Domains Resolution (01 to 32)
+    # -------------------------------------------------------------------------
+    def test_gate_m_all_32_canonical_sequential_domains_resolve(self):
+        """Verifies all 32 sequential numeric aliases (01 to 32) resolve cleanly via API with valid settings."""
+        for num in range(1, 33):
+            alias_padded = f"{num:02d}"
+            alias_unpadded = str(num)
+
+            # Test padded numeric alias (e.g., '01', '17', '23', '32')
+            res_pad, status_pad = self._api_get(f"/api/settings/category/{alias_padded}")
+            self.assertEqual(status_pad, 200, f"Padded alias '{alias_padded}' failed")
+            self.assertIn("category", res_pad)
+            self.assertIn("settings", res_pad)
+            self.assertGreater(len(res_pad["settings"]), 0, f"Domain {alias_padded} has empty settings")
+
+            # Test unpadded numeric alias (e.g., '1', '17', '23', '32')
+            res_unpad, status_unpad = self._api_get(f"/api/settings/category/{alias_unpadded}")
+            self.assertEqual(status_unpad, 200, f"Unpadded alias '{alias_unpadded}' failed")
+            self.assertEqual(res_unpad["category"]["id"], res_pad["category"]["id"])
+
+    # -------------------------------------------------------------------------
+    # Gate N: Decoupled Communication (Domain 17) & Notifications (Domain 23)
+    # -------------------------------------------------------------------------
+    def test_gate_n_decoupled_communication_and_notifications(self):
+        """Verifies Domain 17 (communication) and Domain 23 (notifications) are strictly decoupled."""
+        comm_res, comm_st = self._api_get("/api/settings/category/communication")
+        self.assertEqual(comm_st, 200)
+        comm_keys = {s["id"] for s in comm_res["settings"]}
+        self.assertIn("comm_smtp_server", comm_keys)
+        self.assertIn("comm_sender_identity", comm_keys)
+
+        notify_res, notify_st = self._api_get("/api/settings/category/notifications")
+        self.assertEqual(notify_st, 200)
+        notify_keys = {s["id"] for s in notify_res["settings"]}
+        self.assertIn("notify_critical_sms", notify_keys)
+        self.assertIn("notify_in_app_toast", notify_keys)
+
+        # Ensure settings sets are completely disjoint
+        intersection = comm_keys.intersection(notify_keys)
+        self.assertEqual(len(intersection), 0, f"Communication and Notifications share settings: {intersection}")
+
+    # -------------------------------------------------------------------------
+    # Gate O: Reset Category to Baseline Defaults & Cryptographic Proof
+    # -------------------------------------------------------------------------
+    def test_gate_o_reset_category_to_defaults(self):
+        """Verifies POST /api/settings/category/<cat>/reset reverts database records and generates SHA-256 receipt."""
+        # 1. Mutate a setting in communication
+        headers = {"X-User-Role": "OWNER"}
+        self._api_post("/api/settings/key/comm_smtp_port", {"value": 9999}, headers)
+        
+        detail_before, _ = self._api_get("/api/settings/category/communication")
+        smtp_port = next(s for s in detail_before["settings"] if s["id"] == "comm_smtp_port")
+        self.assertEqual(smtp_port["value"], 9999)
+
+        # 2. Reset communication category to defaults
+        reset_res, reset_st = self._api_post(
+            "/api/settings/category/communication/reset",
+            {"actor": "Qualification Auditor", "reason": "Gate O verification"},
+            headers
+        )
+        self.assertEqual(reset_st, 200)
+        self.assertTrue(reset_res.get("success"))
+        self.assertGreaterEqual(reset_res.get("reverted_count", 0), 1)
+        self.assertEqual(len(reset_res.get("evidence_hash", "")), 64)
+
+        # 3. Verify value reverted in SQLite
+        detail_after, _ = self._api_get("/api/settings/category/communication")
+        smtp_port_after = next(s for s in detail_after["settings"] if s["id"] == "comm_smtp_port")
+        self.assertEqual(smtp_port_after["value"], 587)
+
+    # -------------------------------------------------------------------------
+    # Gate P: Diagnostic Live Subsystem Probes
+    # -------------------------------------------------------------------------
+    def test_gate_p_live_diagnostic_probes(self):
+        """Verifies diagnostic test endpoint executes probes with valid latency and cryptographic evidence."""
+        probes = ["communication", "notifications", "backup", "terminal", "browser", "evidence", "database"]
+        sha_regex = re.compile(r"^[a-f0-9]{64}$")
+
+        for probe in probes:
+            res, status = self._api_post("/api/settings/test", {"target": probe})
+            self.assertEqual(status, 200, f"Diagnostic probe '{probe}' returned HTTP {status}")
+            self.assertEqual(res.get("status"), "PASSED")
+            self.assertGreater(res.get("latency_ms", 0), 0)
+            self.assertTrue(bool(sha_regex.match(res.get("evidence_hash", ""))), f"Probe '{probe}' has invalid hash")
 
 
 if __name__ == "__main__":

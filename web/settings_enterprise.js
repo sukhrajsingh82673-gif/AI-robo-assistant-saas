@@ -71,7 +71,7 @@ const EnterpriseSettings = (function() {
         { id: "account", num: "01", name: "Account Profile", icon: SVG_ICONS.user, desc: "Administrator profile, security credentials, sessions, and accessibility", scope: "User", risk: "LOW" },
         { id: "company", num: "02", name: "Company & Organization", icon: SVG_ICONS.building, desc: "Corporate legal entity, universal industry profile, KPIs, and hierarchy", scope: "Company", risk: "MEDIUM" },
         { id: "users", num: "03", name: "Users & Access Control", icon: SVG_ICONS.users, desc: "Granular RBAC roles, permission matrix, active sessions, and trusted devices", scope: "Company", risk: "HIGH" },
-        { id: "enterprise", num: "30", name: "Enterprise Administration", icon: SVG_ICONS.shield, desc: "Multi-tenant boundaries, SCIM provisioning, SAML 2.0, and data residency", scope: "Host", risk: "HIGH" }
+        { id: "enterprise", num: "04", name: "Enterprise Administration", icon: SVG_ICONS.shield, desc: "Multi-tenant boundaries, SCIM provisioning, SAML 2.0, and data residency", scope: "Host", risk: "HIGH" }
       ]
     },
     {
@@ -79,10 +79,10 @@ const EnterpriseSettings = (function() {
       title: "II. AI & Executive Intelligence",
       desc: "Autonomous cognitive engine, executive governance, workforce policies, and model routing",
       domains: [
-        { id: "ai_ceo", num: "04", name: "AI & AI CEO Governance", icon: SVG_ICONS.crown, desc: "Executive operating mode, 0-4 autonomy levels, spending limits, and cognition", scope: "Company", risk: "CRITICAL" },
-        { id: "workforce", num: "05", name: "AI Workforce Governance", icon: SVG_ICONS.bot, desc: "Dynamic agent spawning limits, department budgets, and performance gates", scope: "Company", risk: "HIGH" },
-        { id: "automation", num: "06", name: "Automation & Missions", icon: SVG_ICONS.repeat, desc: "Durable execution DAGs, mission triggers, retries, and outcome verification", scope: "Company", risk: "MEDIUM" },
-        { id: "ai_providers", num: "07", name: "Models & AI Providers", icon: SVG_ICONS.zap, desc: "Vertex AI, Gemini, Claude, OpenAI, local inference endpoints, and budget routing", scope: "Host", risk: "HIGH" }
+        { id: "ai_ceo", num: "05", name: "AI & AI CEO Governance", icon: SVG_ICONS.crown, desc: "Executive operating mode, 0-4 autonomy levels, spending limits, and cognition", scope: "Company", risk: "CRITICAL" },
+        { id: "workforce", num: "06", name: "AI Workforce Governance", icon: SVG_ICONS.bot, desc: "Dynamic agent spawning limits, department budgets, and performance gates", scope: "Company", risk: "HIGH" },
+        { id: "automation", num: "07", name: "Automation & Missions", icon: SVG_ICONS.repeat, desc: "Durable execution DAGs, mission triggers, retries, and outcome verification", scope: "Company", risk: "MEDIUM" },
+        { id: "ai_providers", num: "08", name: "Models & AI Providers", icon: SVG_ICONS.zap, desc: "Vertex AI, Gemini, Claude, OpenAI, local inference endpoints, and budget routing", scope: "Host", risk: "HIGH" }
       ]
     },
     {
@@ -90,12 +90,12 @@ const EnterpriseSettings = (function() {
       title: "III. Execution Fabric",
       desc: "Governed execution boundaries, tools fabric, sandboxes, MCP, and agent network",
       domains: [
-        { id: "tools", num: "08", name: "Tools & Execution Registry", icon: SVG_ICONS.tool, desc: "Capability fabric registry, risk classification, and sandboxed trust gates", scope: "Host", risk: "HIGH" },
-        { id: "desktop", num: "09", name: "Computer Control", icon: SVG_ICONS.monitor, desc: "Perception rates, mouse/keyboard throttling, application access, and evidence", scope: "Host", risk: "CRITICAL" },
-        { id: "browser", num: "10", name: "Browser Automation", icon: SVG_ICONS.globe, desc: "Headless Chromium contexts, domain allowlists, SSRF guard, and DOM audit", scope: "Host", risk: "HIGH" },
-        { id: "terminal", num: "11", name: "Governed Terminal", icon: SVG_ICONS.terminal, desc: "Sandboxed shell execution, TTL leases, egress allowlists, and execution ledger", scope: "Host", risk: "CRITICAL" },
-        { id: "mcp", num: "12", name: "MCP Protocol Servers", icon: SVG_ICONS.plug, desc: "Model Context Protocol connections, resource limits, and tool permissions", scope: "Company", risk: "MEDIUM" },
-        { id: "a2a", num: "13", name: "A2A / Agent Network", icon: SVG_ICONS.network, desc: "Agent-to-agent protocol, trust boundaries, message quotas, and broker topology", scope: "Company", risk: "HIGH" }
+        { id: "tools", num: "09", name: "Tools & Execution Registry", icon: SVG_ICONS.tool, desc: "Capability fabric registry, risk classification, and sandboxed trust gates", scope: "Host", risk: "HIGH" },
+        { id: "desktop", num: "10", name: "Computer Control", icon: SVG_ICONS.monitor, desc: "Perception rates, mouse/keyboard throttling, application access, and evidence", scope: "Host", risk: "CRITICAL" },
+        { id: "browser", num: "11", name: "Browser Automation", icon: SVG_ICONS.globe, desc: "Headless Chromium contexts, domain allowlists, SSRF guard, and DOM audit", scope: "Host", risk: "HIGH" },
+        { id: "terminal", num: "12", name: "Governed Terminal", icon: SVG_ICONS.terminal, desc: "Sandboxed shell execution, TTL leases, egress allowlists, and execution ledger", scope: "Host", risk: "CRITICAL" },
+        { id: "mcp", num: "13", name: "MCP Protocol Servers", icon: SVG_ICONS.plug, desc: "Model Context Protocol connections, resource limits, and tool permissions", scope: "Company", risk: "MEDIUM" },
+        { id: "a2a", num: "14", name: "A2A / Agent Network", icon: SVG_ICONS.network, desc: "Agent-to-agent protocol, trust boundaries, message quotas, and broker topology", scope: "Company", risk: "HIGH" }
       ]
     },
     {
@@ -103,11 +103,11 @@ const EnterpriseSettings = (function() {
       title: "IV. Business & Finance Systems",
       desc: "Third-party integrations, knowledge fabric, records, financial ledgers, and billing",
       domains: [
-        { id: "integrations", num: "14", name: "Integrations & Connectors", icon: SVG_ICONS.link, desc: "Connected business systems (PMS, ERP, CRM, Payments), sync cadence, and least privilege", scope: "Company", risk: "HIGH" },
-        { id: "data", num: "15", name: "Data & Knowledge Fabric", icon: SVG_ICONS.database, desc: "Semantic search index, retention lifecycles, and data classification tags", scope: "Company", risk: "MEDIUM" },
-        { id: "notifications", num: "16", name: "Communication & Dispatch", icon: SVG_ICONS.bell, desc: "Dispatch channels, priority SMS, digest intervals, and sending domains", scope: "Company", risk: "LOW" },
-        { id: "finance", num: "17", name: "Finance & Accounting", icon: SVG_ICONS.dollar, desc: "Chart of accounts, currencies, fiscal year close, and expenditure approval limits", scope: "Company", risk: "HIGH" },
-        { id: "billing", num: "18", name: "Billing & Compute Usage", icon: SVG_ICONS.card, desc: "Plan tier, token burn alerts (50/75/90/100%), spending caps, and invoices", scope: "Company", risk: "HIGH" }
+        { id: "integrations", num: "15", name: "Integrations & Connectors", icon: SVG_ICONS.link, desc: "Connected business systems (PMS, ERP, CRM, Payments), sync cadence, and least privilege", scope: "Company", risk: "HIGH" },
+        { id: "data", num: "16", name: "Data & Knowledge Fabric", icon: SVG_ICONS.database, desc: "Semantic search index, retention lifecycles, and data classification tags", scope: "Company", risk: "MEDIUM" },
+        { id: "communication", num: "17", name: "Communication & Dispatch", icon: SVG_ICONS.fileText, desc: "Corporate email dispatch, SMTP/SES gateways, dispatch schedules, and sender identity", scope: "Company", risk: "LOW" },
+        { id: "finance", num: "18", name: "Finance & Accounting", icon: SVG_ICONS.dollar, desc: "Chart of accounts, currencies, fiscal year close, and expenditure approval limits", scope: "Company", risk: "HIGH" },
+        { id: "billing", num: "19", name: "Billing & Compute Usage", icon: SVG_ICONS.card, desc: "Plan tier, token burn alerts (50/75/90/100%), spending caps, and invoices", scope: "Company", risk: "HIGH" }
       ]
     },
     {
@@ -115,11 +115,12 @@ const EnterpriseSettings = (function() {
       title: "V. Governance & Trust",
       desc: "Constitutional guardrails, approvals, privacy, cryptographic audit, and disaster recovery",
       domains: [
-        { id: "security", num: "19", name: "Security & Authentication", icon: SVG_ICONS.lock, desc: "MFA enforcement, WebAuthn passkeys, session lifetimes, and brute-force shields", scope: "Host", risk: "CRITICAL" },
-        { id: "governance", num: "20", name: "Governance & Approvals", icon: SVG_ICONS.scale, desc: "Sovereign authority hierarchy, approval pipelines, and instant kill switches", scope: "Host", risk: "CRITICAL" },
-        { id: "privacy", num: "21", name: "Privacy & Compliance", icon: SVG_ICONS.fileText, desc: "PII anonymization, ISO 37000/42001 profiles, statutory audits, and GDPR/DPDP", scope: "Company", risk: "HIGH" },
-        { id: "audit", num: "22", name: "Audit & Evidence Ledger", icon: SVG_ICONS.checkCircle, desc: "Cryptographic SHA-256 Merkle ledger, immutability mode, and export receipts", scope: "Host", risk: "MEDIUM" },
-        { id: "recovery", num: "27", name: "Backup & Disaster Recovery", icon: SVG_ICONS.hardDrive, desc: "Automated SQLite snapshots, cold backup sync, RPO/RTO goals, and restore drills", scope: "Host", risk: "HIGH" }
+        { id: "security", num: "20", name: "Security & Authentication", icon: SVG_ICONS.lock, desc: "MFA enforcement, WebAuthn passkeys, session lifetimes, and brute-force shields", scope: "Host", risk: "CRITICAL" },
+        { id: "governance", num: "21", name: "Governance & Approvals", icon: SVG_ICONS.scale, desc: "Sovereign authority hierarchy, approval pipelines, and instant kill switches", scope: "Host", risk: "CRITICAL" },
+        { id: "privacy", num: "22", name: "Privacy & Compliance", icon: SVG_ICONS.fileText, desc: "PII anonymization, ISO 37000/42001 profiles, statutory audits, and GDPR/DPDP", scope: "Company", risk: "HIGH" },
+        { id: "notifications", num: "23", name: "Notifications & Alert Routing", icon: SVG_ICONS.bell, desc: "Immediate SMS alerts, in-app notifications, priority paging, and digest cadence", scope: "Company", risk: "LOW" },
+        { id: "audit", num: "24", name: "Audit & Evidence Ledger", icon: SVG_ICONS.checkCircle, desc: "Cryptographic SHA-256 Merkle ledger, immutability mode, and export receipts", scope: "Host", risk: "MEDIUM" },
+        { id: "recovery", num: "25", name: "Backup & Disaster Recovery", icon: SVG_ICONS.hardDrive, desc: "Automated SQLite snapshots, cold backup sync, RPO/RTO goals, and restore drills", scope: "Host", risk: "HIGH" }
       ]
     },
     {
@@ -127,11 +128,11 @@ const EnterpriseSettings = (function() {
       title: "VI. Platform & Operations",
       desc: "Observability, developer APIs, webhooks, localization, UX appearance, and diagnostics",
       domains: [
-        { id: "monitoring", num: "24", name: "Observability & Telemetry", icon: SVG_ICONS.activity, desc: "Subsystem health monitors, circuit breakers, timeout thresholds, and liveness probes", scope: "Host", risk: "LOW" },
-        { id: "api", num: "25", name: "API & Developer Platform", icon: SVG_ICONS.code, desc: "Bearer token keys, OAuth scopes, rate limiting, and egress IP allowlists", scope: "Host", risk: "HIGH" },
-        { id: "webhooks", num: "26", name: "Webhooks & Event Signing", icon: SVG_ICONS.radio, desc: "HMAC-SHA256 signature verification, retry backoff, and event dispatch logs", scope: "Company", risk: "MEDIUM" },
-        { id: "localization", num: "28", name: "Localization & Formats", icon: SVG_ICONS.globe, desc: "Base reporting timezone, number formatting, currency symbols, and business days", scope: "Company", risk: "LOW" },
-        { id: "appearance", num: "29", name: "Appearance & Interface", icon: SVG_ICONS.sliders, desc: "Theme mode, high contrast, reduced motion, navigation density, and UI scale", scope: "User", risk: "LOW" },
+        { id: "monitoring", num: "26", name: "Observability & Telemetry", icon: SVG_ICONS.activity, desc: "Subsystem health monitors, circuit breakers, timeout thresholds, and liveness probes", scope: "Host", risk: "LOW" },
+        { id: "api", num: "27", name: "API & Developer Platform", icon: SVG_ICONS.code, desc: "Bearer token keys, OAuth scopes, rate limiting, and egress IP allowlists", scope: "Host", risk: "HIGH" },
+        { id: "webhooks", num: "28", name: "Webhooks & Event Signing", icon: SVG_ICONS.radio, desc: "HMAC-SHA256 signature verification, retry backoff, and event dispatch logs", scope: "Company", risk: "MEDIUM" },
+        { id: "localization", num: "29", name: "Localization & Formats", icon: SVG_ICONS.globe, desc: "Base reporting timezone, number formatting, currency symbols, and business days", scope: "Company", risk: "LOW" },
+        { id: "appearance", num: "30", name: "Appearance & Interface", icon: SVG_ICONS.sliders, desc: "Theme mode, high contrast, reduced motion, navigation density, and UI scale", scope: "User", risk: "LOW" },
         { id: "advanced", num: "31", name: "Advanced & Danger Zone", icon: SVG_ICONS.alertTriangle, desc: "Runtime engine tuning, cache invalidation, raw policy viewer, and emergency quarantine", scope: "Host", risk: "CRITICAL" },
         { id: "diagnostics", num: "32", name: "System Diagnostics", icon: SVG_ICONS.cpu, desc: "Live backend status, database WAL check, inference pings, and runtime telemetry", scope: "Host", risk: "LOW" }
       ]
@@ -143,83 +144,38 @@ const EnterpriseSettings = (function() {
 
   // URL route aliases for seamless direct navigation
   const ROUTE_ALIASES = {
-    "account": "account",
-    "profile": "account",
-    "company": "company",
-    "organization": "company",
-    "org": "company",
-    "users": "users",
-    "access": "users",
-    "enterprise": "enterprise",
-    "ai_ceo": "ai_ceo",
-    "ai": "ai_ceo",
-    "ceo": "ai_ceo",
-    "workforce": "workforce",
-    "agents": "workforce",
-    "agent_factory": "workforce",
-    "automation": "automation",
-    "missions": "automation",
-    "workflows": "automation",
-    "ai_providers": "ai_providers",
-    "models": "ai_providers",
-    "providers": "ai_providers",
-    "tools": "tools",
-    "desktop": "desktop",
-    "computer": "desktop",
-    "coworker": "desktop",
-    "browser": "browser",
-    "web": "browser",
-    "terminal": "terminal",
-    "shell": "terminal",
-    "mcp": "mcp",
-    "a2a": "a2a",
-    "network": "a2a",
-    "agent_network": "a2a",
-    "integrations": "integrations",
-    "connectors": "integrations",
-    "data": "data",
-    "knowledge": "data",
-    "files": "data",
-    "records": "data",
-    "notifications": "notifications",
-    "comms": "notifications",
-    "communication": "notifications",
-    "finance": "finance",
-    "accounting": "finance",
-    "billing": "billing",
-    "usage": "billing",
-    "costs": "billing",
-    "security": "security",
-    "mfa": "security",
-    "auth": "security",
-    "governance": "governance",
-    "approvals": "governance",
-    "constitution": "governance",
-    "privacy": "privacy",
-    "compliance": "privacy",
-    "gdpr": "privacy",
-    "audit": "audit",
-    "evidence": "audit",
-    "ledger": "audit",
-    "recovery": "recovery",
-    "backup": "recovery",
-    "dr": "recovery",
-    "monitoring": "monitoring",
-    "observability": "monitoring",
-    "telemetry": "monitoring",
-    "api": "api",
-    "developer": "api",
-    "keys": "api",
-    "webhooks": "webhooks",
-    "events": "webhooks",
-    "localization": "localization",
-    "locale": "localization",
-    "appearance": "appearance",
-    "theme": "appearance",
-    "advanced": "advanced",
-    "danger": "advanced",
-    "diagnostics": "diagnostics",
-    "system": "diagnostics"
+    "01": "account", "1": "account", "account": "account", "profile": "account",
+    "02": "company", "2": "company", "company": "company", "organization": "company", "org": "company",
+    "03": "users", "3": "users", "users": "users", "access": "users",
+    "04": "enterprise", "4": "enterprise", "enterprise": "enterprise",
+    "05": "ai_ceo", "5": "ai_ceo", "ai_ceo": "ai_ceo", "ai": "ai_ceo", "ceo": "ai_ceo",
+    "06": "workforce", "6": "workforce", "workforce": "workforce", "agents": "workforce", "agent_factory": "workforce",
+    "07": "automation", "7": "automation", "automation": "automation", "missions": "automation", "workflows": "automation",
+    "08": "ai_providers", "8": "ai_providers", "ai_providers": "ai_providers", "models": "ai_providers", "providers": "ai_providers",
+    "09": "tools", "9": "tools", "tools": "tools",
+    "10": "desktop", "desktop": "desktop", "computer": "desktop", "coworker": "desktop",
+    "11": "browser", "browser": "browser", "web": "browser",
+    "12": "terminal", "terminal": "terminal", "shell": "terminal",
+    "13": "mcp", "mcp": "mcp",
+    "14": "a2a", "a2a": "a2a", "network": "a2a", "agent_network": "a2a",
+    "15": "integrations", "integrations": "integrations", "connectors": "integrations",
+    "16": "data", "data": "data", "knowledge": "data", "files": "data", "records": "data",
+    "17": "communication", "communication": "communication", "comms": "communication", "email": "communication", "dispatch": "communication",
+    "18": "finance", "finance": "finance", "accounting": "finance",
+    "19": "billing", "billing": "billing", "usage": "billing", "costs": "billing",
+    "20": "security", "security": "security", "mfa": "security", "auth": "security",
+    "21": "governance", "governance": "governance", "approvals": "governance", "constitution": "governance",
+    "22": "privacy", "privacy": "privacy", "compliance": "privacy", "gdpr": "privacy",
+    "23": "notifications", "notifications": "notifications", "alerts": "notifications", "notify": "notifications",
+    "24": "audit", "audit": "audit", "evidence": "audit", "ledger": "audit",
+    "25": "recovery", "recovery": "recovery", "backup": "recovery", "dr": "recovery",
+    "26": "monitoring", "monitoring": "monitoring", "observability": "monitoring", "telemetry": "monitoring",
+    "27": "api", "api": "api", "developer": "api", "keys": "api",
+    "28": "webhooks", "webhooks": "webhooks", "events": "webhooks",
+    "29": "localization", "localization": "localization", "locale": "localization",
+    "30": "appearance", "appearance": "appearance", "theme": "appearance",
+    "31": "advanced", "advanced": "advanced", "danger": "advanced",
+    "32": "diagnostics", "diagnostics": "diagnostics", "system": "diagnostics"
   };
 
   // Section sub-tabs mapping
@@ -227,6 +183,7 @@ const EnterpriseSettings = (function() {
     account: [{ id: "all", name: "All Account" }, { id: "profile", name: "Host Identity" }, { id: "preferences", name: "Preferences" }],
     company: [{ id: "all", name: "All Corporate" }, { id: "profile", name: "Legal Entity" }, { id: "industry", name: "Industry KPIs" }, { id: "hierarchy", name: "Org Hierarchy" }],
     users: [{ id: "all", name: "All Access" }, { id: "rbac", name: "RBAC Roles" }, { id: "policy", name: "Access Policies" }],
+    enterprise: [{ id: "all", name: "All Enterprise" }, { id: "tenants", name: "Tenant Boundaries" }, { id: "scim", name: "SCIM Provisioning" }],
     ai_ceo: [{ id: "all", name: "All Executive" }, { id: "autonomy", name: "Autonomy Ceiling" }, { id: "spending", name: "Financial Limits" }, { id: "cognition", name: "Reasoning Mode" }],
     workforce: [{ id: "all", name: "All Workforce" }, { id: "spawning", name: "Spawning Policy" }, { id: "concurrency", name: "Concurrency Limits" }],
     automation: [{ id: "all", name: "All Automation" }, { id: "dags", name: "Workflow DAGs" }, { id: "verification", name: "Outcome Verification" }],
@@ -239,12 +196,13 @@ const EnterpriseSettings = (function() {
     a2a: [{ id: "all", name: "All A2A" }, { id: "broker", name: "Broker Security" }, { id: "tokens", name: "Agent Identities" }],
     integrations: [{ id: "all", name: "All Connectors" }, { id: "sync", name: "Sync Cadence" }, { id: "permissions", name: "Least Privilege" }],
     data: [{ id: "all", name: "All Knowledge" }, { id: "indexing", name: "Semantic Index" }, { id: "retention", name: "Retention Lifecycles" }],
-    notifications: [{ id: "all", name: "All Comms" }, { id: "channels", name: "Dispatch Channels" }, { id: "sms", name: "Emergency SMS" }],
+    communication: [{ id: "all", name: "All Dispatch" }, { id: "smtp", name: "SMTP Gateways" }, { id: "limits", name: "Rate Limits" }],
     finance: [{ id: "all", name: "All Finance" }, { id: "accounting", name: "Accounting Method" }, { id: "limits", name: "Expenditure Limits" }],
     billing: [{ id: "all", name: "All Billing" }, { id: "tier", name: "Plan Tier" }, { id: "caps", name: "Spend Stops" }],
     security: [{ id: "all", name: "All Security" }, { id: "mfa", name: "Authentication & MFA" }, { id: "session", name: "Session Lifetimes" }, { id: "device", name: "Device Trust" }],
     governance: [{ id: "all", name: "All Governance" }, { id: "sovereignty", name: "Authority Hierarchy" }, { id: "killswitch", name: "Emergency Stops" }],
     privacy: [{ id: "all", name: "All Privacy" }, { id: "anonymization", name: "PII Sanitization" }, { id: "compliance", name: "Regulatory Profiles" }],
+    notifications: [{ id: "all", name: "All Alerts" }, { id: "channels", name: "Delivery Channels" }, { id: "sms", name: "Emergency SMS" }, { id: "digest", name: "Cadence & Digests" }],
     audit: [{ id: "all", name: "All Audit" }, { id: "merkle", name: "Cryptographic Ledger" }, { id: "receipts", name: "Receipt Verifier" }],
     recovery: [{ id: "all", name: "All Recovery" }, { id: "snapshots", name: "SQLite Snapshots" }, { id: "drills", name: "Recovery Drills" }],
     monitoring: [{ id: "all", name: "All Telemetry" }, { id: "health", name: "Subsystem Health" }, { id: "circuit", name: "Circuit Breakers" }],
@@ -252,7 +210,6 @@ const EnterpriseSettings = (function() {
     webhooks: [{ id: "all", name: "All Webhooks" }, { id: "signatures", name: "HMAC Verification" }, { id: "dispatch", name: "Dispatch Logs" }],
     localization: [{ id: "all", name: "All Locale" }, { id: "timezone", name: "Timezone & Base" }, { id: "currency", name: "Currencies" }],
     appearance: [{ id: "all", name: "All Appearance" }, { id: "theme", name: "Theme Mode" }, { id: "density", name: "Interface Density" }],
-    enterprise: [{ id: "all", name: "All Enterprise" }, { id: "tenants", name: "Tenant Boundaries" }, { id: "scim", name: "SCIM Provisioning" }],
     advanced: [{ id: "all", name: "All Advanced" }, { id: "tuning", name: "Engine Tuning" }, { id: "danger", name: "Danger Zone" }],
     diagnostics: [{ id: "all", name: "All Diagnostics" }, { id: "live", name: "Live Subsystems" }, { id: "wal", name: "WAL Health" }]
   };
@@ -276,6 +233,7 @@ const EnterpriseSettings = (function() {
   let isSearchDropdownOpen = false;
   let isMobileDrawerOpen = false;
   let isAuditDrawerOpen = false;
+  let auditDrawerEvents = [];
 
   let authEnvironment = { environment: 'development', strict_auth: false, auth_mode: 'DEV_BOOTSTRAP' };
   let effectiveStateCache = {};
@@ -466,8 +424,13 @@ const EnterpriseSettings = (function() {
         ${renderMobileHeader("Settings & Administration")}
         ${renderMobileDrawer()}
 
-        <div class="settings-content-wrapper">
-          <!-- Top Master Header -->
+        <div class="settings-workspace-layout">
+          <!-- Left Dedicated Desktop Navigation Sidebar (260px) -->
+          ${renderDesktopSidebar('hub')}
+
+          <!-- Right Main Configuration Surface (100% Responsive) -->
+          <main class="settings-configuration-main">
+            <!-- Top Master Header -->
           <header class="settings-master-header">
             <div class="header-titles">
               <div class="sovereign-tag-pill">
@@ -651,6 +614,7 @@ const EnterpriseSettings = (function() {
               </div>
             </div>
           </footer>
+          </main>
         </div>
       </div>
 
@@ -819,7 +783,7 @@ const EnterpriseSettings = (function() {
   function renderDesktopSidebar(activeDomainId) {
     return `
       <aside class="settings-desktop-sidebar">
-        <div class="sidebar-overview-link" onclick="EnterpriseSettings.navigateTo('hub')">
+        <div class="sidebar-overview-link ${activeDomainId === 'hub' ? 'active' : ''}" onclick="EnterpriseSettings.navigateTo('hub')">
           <span class="link-arrow">←</span>
           <span class="link-text">Settings Overview</span>
         </div>
@@ -1054,6 +1018,15 @@ const EnterpriseSettings = (function() {
   // --------------------------------------------------------------------------
   function renderControlForSetting(s, curVal) {
     const isReadOnly = s.editable_by === 'READ_ONLY';
+
+    if (isReadOnly || s.type === 'status') {
+      return `
+        <div class="read-only-status-box">
+          <span class="status-box-val">${escapeHtml(String(curVal))}</span>
+          <span class="status-box-tag">READ ONLY // BASELINE</span>
+        </div>
+      `;
+    }
 
     if (s.type === 'toggle') {
       const isChecked = Boolean(curVal);
@@ -1399,7 +1372,9 @@ const EnterpriseSettings = (function() {
   // 17. FULL AUDIT TRAIL DRAWER (Section 20)
   // --------------------------------------------------------------------------
   function renderAuditDrawer() {
-    const audits = currentDomainData && currentDomainData.recent_audits ? currentDomainData.recent_audits : [];
+    const audits = (auditDrawerEvents && auditDrawerEvents.length > 0)
+      ? auditDrawerEvents
+      : (currentDomainData && currentDomainData.recent_audits ? currentDomainData.recent_audits : []);
 
     return `
       <div class="audit-drawer-overlay">
@@ -1493,9 +1468,35 @@ const EnterpriseSettings = (function() {
     renderRoute();
   }
 
-  function resetToInherited() {
-    if (confirm("Reset all settings in this domain to the Host Sovereign baseline?")) {
-      discardChanges();
+  async function resetToInherited() {
+    if (!confirm(`Reset all settings in domain '${activeView}' to the Host Sovereign baseline defaults? This will revert database records and generate an immutable cryptographic audit entry.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/settings/category/${encodeURIComponent(activeView)}/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actor: (window.state && window.state.host) ? window.state.host.name : 'Sovereign Host',
+          reason: `Administrative reset of domain ${activeView} to baseline defaults`
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        stagedValues = {};
+        originalValues = {};
+        if (typeof showToast === 'function') {
+          showToast(`Domain reset successfully. Reverted ${data.reverted_count} settings. Proof: ${(data.evidence_hash || '').substring(0, 10)}`, "success");
+        }
+        await loadDomain(activeView);
+        renderRoute();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Reset failed: ${err.error || 'Server error'}`);
+      }
+    } catch (e) {
+      console.error('[Settings] Domain reset error:', e);
+      alert(`Reset failed: ${e.message}`);
     }
   }
 
@@ -1518,8 +1519,20 @@ const EnterpriseSettings = (function() {
     }
   }
 
-  function toggleAuditDrawer() {
+  async function toggleAuditDrawer() {
     isAuditDrawerOpen = !isAuditDrawerOpen;
+    if (isAuditDrawerOpen) {
+      try {
+        const catParam = (activeView && activeView !== 'hub') ? `category=${encodeURIComponent(activeView)}&` : '';
+        const res = await fetch(`/api/settings/audit?${catParam}limit=30`);
+        if (res.ok) {
+          const data = await res.json();
+          auditDrawerEvents = data.audit_events || data.events || [];
+        }
+      } catch (e) {
+        console.warn('[Settings] Failed to fetch audit ledger:', e);
+      }
+    }
     renderRoute();
   }
 
@@ -1805,11 +1818,17 @@ const EnterpriseSettings = (function() {
     return [
       'ai_gemini_api_token', 'ai_primary_provider', 'browser_headless_mode',
       'term_execution_enabled', 'recovery_cold_sync_enabled', 'webhook_verify_signatures',
-      'mcp_allow_external_servers', 'a2a_inter_agent_auth', 'integ_least_privilege'
+      'mcp_allow_external_servers', 'a2a_inter_agent_auth', 'integ_least_privilege',
+      'comm_smtp_server', 'notify_critical_sms', 'notify_escalation_sms_number',
+      'sec_require_mfa', 'diag_wal_auto_checkpoint', 'data_retention_days', 'api_rate_limit_per_minute'
     ].includes(settingId);
   }
 
   function getTestTarget(settingId) {
+    if (settingId.includes('comm')) return 'communication';
+    if (settingId.includes('notify')) return 'notifications';
+    if (settingId.includes('diag')) return 'diagnostics';
+    if (settingId.includes('sec')) return 'security';
     if (settingId.includes('ai') || settingId.includes('gemini')) return 'ai_provider';
     if (settingId.includes('browser')) return 'browser';
     if (settingId.includes('term')) return 'terminal';

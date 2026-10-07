@@ -101,5 +101,18 @@
   "wf_autonomous_spawning": true,
   "host_killswitch_finances": false,
   "comp_industry": "Manufacturing & Supply Chain",
-  "ai_gemini_api_token": "AIzaSySecretToken1234567890abcdef"
+  "ai_gemini_api_token": "AIzaSySecretToken1234567890abcdef",
+  "comm_smtp_server": "smtp.sendgrid.net",
+  "comm_smtp_port": 587,
+  "comm_sender_identity": "dispatch@zonata.internal",
+  "comm_dispatch_rate_limit": 500,
+  "comm_tls_enforced": true,
+  "notify_critical_sms": true,
+  "notify_in_app_toast": true,
+  "notify_severity_threshold": "HIGH",
+  "notify_digest_interval": "Daily Summary",
+  "notify_escalation_sms_number": "+1-555-0199",
+  "diag_wal_auto_checkpoint": true,
+  "diag_verbose_kernel_traces": false,
+  "diag_collect_heap_metrics": true
 }

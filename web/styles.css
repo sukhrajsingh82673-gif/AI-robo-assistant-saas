@@ -10053,8 +10053,9 @@ mark {
 .link-text { font-size: 12px; font-weight: 600; }
 .prop-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .prop-desc { font-size: 12px; color: #94a3b8; }
-.prop-top { display: flex; align-items: center; justify-content: space-between; }
-.read-only-status-box { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #94a3b8; padding: 6px 10px; background: rgba(255, 255, 255, 0.03); border-radius: 6px; }
+.read-only-status-box { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #94a3b8; padding: 7px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; width: 100%; box-sizing: border-box; }
+.status-box-val { font-family: monospace; font-size: 12px; color: #f1f5f9; font-weight: 600; }
+.status-box-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; background: rgba(255, 255, 255, 0.05); padding: 2px 6px; border-radius: 4px; margin-left: auto; }
 .save-info-text { font-size: 13px; color: #f8fafc; }
 
 
@@ -10103,6 +10104,13 @@ mark {
 .sidebar-overview-link:hover {
   background: rgba(56, 189, 248, 0.1);
   color: #7dd3fc;
+}
+
+.sidebar-overview-link.active {
+  background: rgba(56, 189, 248, 0.14) !important;
+  color: #38bdf8 !important;
+  border-left: 3px solid #38bdf8;
+  font-weight: 700;
 }
 
 .sidebar-pillars-tree {

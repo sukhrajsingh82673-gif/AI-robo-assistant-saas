@@ -3313,6 +3313,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(res, status=status_code)
             return
 
+        elif path.startswith("/api/settings/category/") and path.endswith("/reset") and len(path.split("/")) == 6:
+            cat_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            res = settings_service.reset_category_to_defaults(cat_id, tenant_id, company_id, actor=actor)
+            status_code = 200 if res.get("success") else 400
+            self._send_json(res, status=status_code)
+            return
+
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", "comp_primary")
@@ -3350,6 +3359,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             actor = self.headers.get("X-User-Name", "Host Administrator")
             reason = req_data.get("reason", "Administrative resolution")
             res = settings_service.resolve_proposal(prop_id, decision, actor, reason)
+            self._send_json(res)
+            return
+
+        elif path == "/api/settings/test":
+            target = req_data.get("target", "database")
+            res = settings_service.run_live_test(target, req_data)
             self._send_json(res)
             return
 
