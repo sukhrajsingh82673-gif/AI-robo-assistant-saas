@@ -218,11 +218,12 @@ class ExecutionLease:
         secret_key: str,
         expected_tenant_id: Optional[str] = None,
         expected_workflow_version: Optional[int] = None,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
+        allowed_keys: Optional[List[str]] = None
     ) -> bool:
         """
         Constant-time integrity and context verification of execution lease.
-        Fails closed on any discrepancy or expiry.
+        Fails closed on any discrepancy or expiry. Supports key rotation via allowed_keys.
         """
         # 1. Expiry check
         if time.time() > self.expires_at:
@@ -242,7 +243,7 @@ class ExecutionLease:
             if not hmac.compare_digest(self.parameters_hash, computed_hash):
                 return False
 
-        # 5. Cryptographic HMAC comparison
+        # 5. Cryptographic HMAC comparison (active key + valid rotated keys)
         canonical = self.compute_canonical_payload(
             lease_id=self.lease_id,
             tenant_id=self.tenant_id,
@@ -257,8 +258,12 @@ class ExecutionLease:
             created_at=self.created_at,
             expires_at=self.expires_at
         )
-        expected_sig = hmac.new(secret_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(self.signature, expected_sig)
+        keys_to_test = [secret_key] + (allowed_keys or [])
+        for candidate_key in keys_to_test:
+            expected_sig = hmac.new(candidate_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+            if hmac.compare_digest(self.signature, expected_sig):
+                return True
+        return False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

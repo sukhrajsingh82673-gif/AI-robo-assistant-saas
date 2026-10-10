@@ -48,6 +48,8 @@ class AgentDelegationTask:
     permissions: List[str]
     parameters: Dict[str, Any]
     status: str = "PENDING"
+    delegation_chain: List[str] = field(default_factory=list)
+    delegator: str = "system"
     created_at: float = field(default_factory=time.time)
     completed_at: Optional[float] = None
     result: Optional[Dict[str, Any]] = None
@@ -368,16 +370,47 @@ class SpecializedAgentRegistry:
         ]
 
     def delegate_task(self, task: AgentDelegationTask) -> Dict[str, Any]:
+        # 1. Circular delegation & recursion depth check
+        if task.role in task.delegation_chain:
+            task.status = "REJECTED"
+            raise ValueError(
+                f"Circular delegation rejected: Agent role '{task.role}' already exists in delegation chain {task.delegation_chain}."
+            )
+        if len(task.delegation_chain) >= 5:
+            task.status = "REJECTED"
+            raise ValueError(
+                f"Delegation depth limit reached: chain depth {len(task.delegation_chain)} exceeds max allowed depth (5)."
+            )
+
         agent = self.get_agent(task.role)
         if not agent:
+            task.status = "REJECTED"
             raise KeyError(f"Specialist agent role '{task.role}' not recognized.")
-        
-        result = agent.execute_task(task)
-        task.status = "COMPLETED"
-        task.completed_at = time.time()
-        task.result = result
-        task.evidence_hash = hashlib.sha256(json.dumps(result, sort_keys=True).encode("utf-8")).hexdigest()
-        return result
+
+        # 2. Permission boundary verification
+        authorized_permissions = set(agent.default_permissions) | {"execute", "verify", "recovery:execute"}
+        for req_perm in task.permissions:
+            if req_perm not in authorized_permissions:
+                task.status = "DENIED"
+                raise PermissionError(
+                    f"Delegation permission violation: Agent '{task.role}' lacks permission '{req_perm}'."
+                )
+
+        # Record handoff into delegation chain
+        task.delegation_chain.append(task.role)
+
+        try:
+            result = agent.execute_task(task)
+            task.status = "COMPLETED"
+            task.completed_at = time.time()
+            task.result = result
+            task.evidence_hash = hashlib.sha256(json.dumps(result, sort_keys=True).encode("utf-8")).hexdigest()
+            return result
+        except Exception as e:
+            task.status = "FAILED"
+            task.completed_at = time.time()
+            task.result = {"error": str(e), "escalated": True, "escalation_target": "ExecutionRecoveryAgent"}
+            raise e
 
 
 # Singleton agent registry

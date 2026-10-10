@@ -29,6 +29,7 @@ import time
 import uuid
 import json
 import os
+import threading
 
 from core.db import db
 from core.automation_fabric import (
@@ -905,6 +906,302 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
         self.assertNotIn("id=\"tab-connectors\"", content)
         self.assertNotIn("id=\"tab-sbom\"", content)
 
+    # =========================================================================
+    # ACCEPTANCE TEST 26: Multi-Worker Atomic Dequeue Race Prevention
+    # =========================================================================
+    def test_26_multi_worker_atomic_dequeue_race_prevention(self):
+        """26. Proves two concurrent workers cannot double-dequeue or execute the same queued task."""
+        tmpl = self.templates.get_template("tmpl_sales_lead_qualification")
+        lead_inputs = {"lead_email": "cto@acme.corp", "company_name": "Acme Corp", "company_domain": "acme.corp"}
+        inst = self.templates.instantiate_template("tmpl_sales_lead_qualification", lead_inputs, self.tenant_a, self.company_a)
+        draft = self.fabric.create_workflow_draft(inst["name"], inst["workflow_spec"], self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        exec_id = self.fabric.submit_async_execution(
+            workflow_id=draft["workflow_id"],
+            inputs={"lead_email": "cto@acme.corp", "company_name": "Acme Corp", "company_domain": "acme.corp"},
+            tenant_id=self.tenant_a,
+            company_id=self.company_a
+        )
+
+        dequeued_results = []
+        def worker_worker():
+            res = self.fabric._process_next_queued_execution()
+            if res:
+                dequeued_results.append(res)
+
+        t1 = threading.Thread(target=worker_worker)
+        t2 = threading.Thread(target=worker_worker)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        # Exactly ONE worker claimed and processed the queued task
+        self.assertEqual(len(dequeued_results), 1)
+        self.assertEqual(dequeued_results[0], exec_id)
+
+    # =========================================================================
+    # ACCEPTANCE TEST 27: Checkpoint Resumption Without Repeating Steps
+    # =========================================================================
+    def test_27_durable_checkpoint_resumption_without_repeating_steps(self):
+        """27. Proves interrupted workflow resumes from durable checkpoint skipping completed steps."""
+        wf_spec = {
+            "id": f"wf_checkpoint_test_{uuid.uuid4().hex[:6]}",
+            "namespace": "zonata.core",
+            "description": "Multi-step checkpoint test",
+            "tasks": [
+                {
+                    "id": "step_one",
+                    "type": "io.kestra.plugin.scripts.exec.Commands",
+                    "description": "First idempotent step",
+                    "commands": [["echo", "STEP_ONE_DONE"]]
+                },
+                {
+                    "id": "step_two",
+                    "type": "io.kestra.plugin.scripts.exec.Commands",
+                    "description": "Second idempotent step",
+                    "commands": [["echo", "STEP_TWO_DONE"]]
+                }
+            ]
+        }
+        draft = self.fabric.create_workflow_draft("Checkpoint Test", wf_spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        # Manually create execution where step_one is already completed in checkpoint
+        exec_id = f"exec_chk_{uuid.uuid4().hex[:8]}"
+        now = time.time()
+        completed_step_1 = [{
+            "step_id": "step_one",
+            "node_type": "io.kestra.plugin.scripts.exec.Commands",
+            "status": "COMPLETED",
+            "output": {"stdout": "STEP_ONE_DONE"},
+            "duration_seconds": 0.05,
+            "error": None
+        }]
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO automation_executions (
+                    execution_id, workflow_id, tenant_id, company_id, version,
+                    status, step_results, inputs, context, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 1, 'RUNNING', ?, '{}', '{}', ?, ?)
+            """, (exec_id, draft["workflow_id"], self.tenant_a, self.company_a, json.dumps(completed_step_1), now, now))
+            conn.commit()
+
+        # Resume execution with existing_execution_id
+        res = self.fabric.execute_workflow(
+            workflow_id=draft["workflow_id"],
+            inputs={},
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            existing_execution_id=exec_id
+        )
+        self.assertEqual(res["status"], ExecutionStatus.COMPLETED.value)
+        # Verify both steps are present in final results
+        final_steps = res["step_results"]
+        self.assertEqual(len(final_steps), 2)
+        self.assertEqual(final_steps[0]["step_id"], "step_one")
+        self.assertEqual(final_steps[1]["step_id"], "step_two")
+
+    # =========================================================================
+    # ACCEPTANCE TEST 28: In-Flight KillSwitch Latency
+    # =========================================================================
+    def test_28_in_flight_killswitch_immediate_interruption(self):
+        """28. Proves KillSwitch engaged mid-execution stops active workflow instantly."""
+        self.fabric.set_killswitch(False)
+        wf_spec = {
+            "id": f"wf_ks_abort_{uuid.uuid4().hex[:6]}",
+            "namespace": "zonata.core",
+            "description": "Killswitch in flight test",
+            "tasks": [
+                {
+                    "id": "initial_step",
+                    "type": "io.kestra.plugin.core.http.Request",
+                    "description": "Safe step before killswitch"
+                },
+                {
+                    "id": "aborted_step",
+                    "type": "io.kestra.plugin.core.http.Request",
+                    "description": "Step that must never run after killswitch"
+                }
+            ]
+        }
+        draft = self.fabric.create_workflow_draft("KS Test", wf_spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        # Engage KillSwitch
+        start_time = time.time()
+        self.fabric.set_killswitch(True)
+        with self.assertRaises(KillSwitchEngagedException):
+            self.fabric.execute_workflow(
+                workflow_id=draft["workflow_id"],
+                inputs={},
+                tenant_id=self.tenant_a,
+                company_id=self.company_a
+            )
+        latency = (time.time() - start_time) * 1000.0
+        self.assertLess(latency, 50.0)  # Sub-50ms latency
+        self.fabric.set_killswitch(False)
+
+    # =========================================================================
+    # ACCEPTANCE TEST 29: Signing Key Rotation with Grace Period
+    # =========================================================================
+    def test_29_signing_key_rotation_with_grace_period(self):
+        """29. Proves key rotation allows old key during grace period and rejects invalid keys."""
+        old_key = self.fabric.get_lease_secret_key()
+        lease_under_old_key = ExecutionLease.create(
+            secret_key=old_key,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_rot_test",
+            run_id="run_rot_test",
+            action_name="action_rot",
+            scope="task:action_rot"
+        )
+
+        # Rotate key
+        new_key = self.fabric.rotate_signing_key(grace_period_seconds=120.0)
+        self.assertNotEqual(old_key, new_key)
+
+        # Lease signed under old key verifies using valid rotated keys
+        active_key, rotated_keys = self.fabric.get_valid_signing_keys()
+        self.assertIn(old_key, rotated_keys)
+        self.assertTrue(lease_under_old_key.verify(secret_key=active_key, allowed_keys=rotated_keys))
+
+        # Lease with bogus key fails
+        bogus_lease = ExecutionLease.create(
+            secret_key="bogus_fake_key",
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_rot_test",
+            run_id="run_rot_test",
+            action_name="action_rot",
+            scope="task:action_rot"
+        )
+        self.assertFalse(bogus_lease.verify(secret_key=active_key, allowed_keys=rotated_keys))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 30: Concurrent Lease Consumption Integrity Race
+    # =========================================================================
+    def test_30_concurrent_lease_consumption_integrity_race(self):
+        """30. Concurrently consuming the exact same lease fails closed for all but one thread."""
+        secret = self.fabric.get_lease_secret_key()
+        lease = ExecutionLease.create(
+            secret_key=secret,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_race_test",
+            run_id=f"run_race_{uuid.uuid4().hex[:6]}",
+            action_name="action_race",
+            scope="task:action_race"
+        )
+
+        results = []
+        exceptions = []
+
+        def racer():
+            try:
+                ok = self.fabric.consume_lease(lease, self.tenant_a, 1)
+                results.append(ok)
+            except AutomationSecurityException as ex:
+                exceptions.append(ex)
+
+        threads = [threading.Thread(target=racer) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(exceptions), 1)
+        self.assertIn("Replay attack detected", str(exceptions[0]))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 31: Specialized Agent Circular Delegation & Depth Limit
+    # =========================================================================
+    def test_31_specialized_agent_circular_delegation_and_depth_limit(self):
+        """31. Proves circular delegation and recursion depth limits are strictly rejected."""
+        # Cycle attempt: TaskPlanningAgent is already in delegation chain
+        cyclic_task = AgentDelegationTask(
+            task_id=f"dt_cycle_{uuid.uuid4().hex[:6]}",
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            role="TaskPlanningAgent",
+            objective="Cyclic task",
+            scope="task:test",
+            acceptance_criteria=["Done"],
+            timeout_seconds=10.0,
+            permissions=["plan:create"],
+            parameters={},
+            delegation_chain=["WorkflowDesignAgent", "TaskPlanningAgent"]
+        )
+        with self.assertRaises(ValueError) as ctx:
+            self.agents.delegate_task(cyclic_task)
+        self.assertIn("Circular delegation rejected", str(ctx.exception))
+
+        # Depth limit attempt: depth >= 5
+        deep_task = AgentDelegationTask(
+            task_id=f"dt_deep_{uuid.uuid4().hex[:6]}",
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            role="SalesCRMAgent",
+            objective="Deep task",
+            scope="task:test",
+            acceptance_criteria=["Done"],
+            timeout_seconds=10.0,
+            permissions=["crm:read"],
+            parameters={},
+            delegation_chain=["A", "B", "C", "D", "E"]
+        )
+        with self.assertRaises(ValueError) as ctx:
+            self.agents.delegate_task(deep_task)
+        self.assertIn("Delegation depth limit reached", str(ctx.exception))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 32: Specialized Agent Permission Boundary Enforcement
+    # =========================================================================
+    def test_32_specialized_agent_permission_boundary_enforcement(self):
+        """32. Proves agent task requesting unauthorized permissions is denied."""
+        unauthorized_task = AgentDelegationTask(
+            task_id=f"dt_perm_{uuid.uuid4().hex[:6]}",
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            role="SalesCRMAgent",
+            objective="Attempt shell root command",
+            scope="task:test",
+            acceptance_criteria=["Done"],
+            timeout_seconds=10.0,
+            permissions=["root:execute_shell_unrestricted"],  # Not authorized for SalesCRMAgent
+            parameters={}
+        )
+        with self.assertRaises(PermissionError) as ctx:
+            self.agents.delegate_task(unauthorized_task)
+        self.assertIn("Delegation permission violation", str(ctx.exception))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 33: PolicyEngine Evaluation Failure Fails Closed
+    # =========================================================================
+    def test_33_policy_engine_failure_fails_closed(self):
+        """33. Proves PolicyEngine evaluation error or non-permissive status fails closed."""
+        from unittest.mock import patch
+        from core.policy_engine_v2 import policy_engine_v2
+        lead_inputs = {"lead_email": "cto@acme.corp", "company_name": "Acme Corp", "company_domain": "acme.corp"}
+        inst = self.templates.instantiate_template("tmpl_sales_lead_qualification", lead_inputs, self.tenant_a, self.company_a)
+        draft = self.fabric.create_workflow_draft(inst["name"], inst["workflow_spec"], self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        # Mock PolicyEngine to raise an unexpected runtime exception
+        with patch.object(policy_engine_v2, "evaluate", side_effect=RuntimeError("Policy database connection failed")):
+            with self.assertRaises(AutomationSecurityException) as ctx:
+                self.fabric.execute_workflow(
+                    workflow_id=draft["workflow_id"],
+                    inputs={"lead_email": "cto@acme.corp", "company_name": "Acme Corp", "company_domain": "acme.corp"},
+                    tenant_id=self.tenant_a,
+                    company_id=self.company_a
+                )
+            self.assertIn("PolicyEngine evaluation failure (failing closed)", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
+

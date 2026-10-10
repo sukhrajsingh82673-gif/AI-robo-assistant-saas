@@ -60,6 +60,7 @@ class UniversalAutomationFabric:
     """
 
     _cached_secret_key: Optional[str] = None
+    _rotated_secret_keys: Dict[str, float] = {}
 
     @classmethod
     def get_lease_secret_key(cls) -> str:
@@ -73,6 +74,23 @@ class UniversalAutomationFabric:
         sec = hashlib.sha256(f"zonata_master_lease_salt_{os.getpid()}_{time.time()}".encode()).hexdigest()
         cls._cached_secret_key = sec
         return cls._cached_secret_key
+
+    @classmethod
+    def rotate_signing_key(cls, new_key: Optional[str] = None, grace_period_seconds: float = 300.0) -> str:
+        """Rotates the active HMAC lease signing key and retains previous key for grace period."""
+        current = cls.get_lease_secret_key()
+        now = time.time()
+        cls._rotated_secret_keys[current] = now + grace_period_seconds
+        cls._cached_secret_key = new_key or hashlib.sha256(f"zonata_rotated_{time.time()}_{uuid.uuid4().hex}".encode()).hexdigest()
+        return cls._cached_secret_key
+
+    @classmethod
+    def get_valid_signing_keys(cls) -> Tuple[str, List[str]]:
+        """Returns the active key and all valid rotated keys within their grace period."""
+        now = time.time()
+        active = cls.get_lease_secret_key()
+        cls._rotated_secret_keys = {k: exp for k, exp in cls._rotated_secret_keys.items() if exp > now}
+        return active, list(cls._rotated_secret_keys.keys())
 
     def __init__(self):
         self.evidence_ledger = EvidenceLedger()
@@ -200,17 +218,19 @@ class UniversalAutomationFabric:
         """
         Validates, consumes, and registers a single-use execution lease.
         Enforces:
-        - Cryptographic HMAC verification with constant-time check
+        - Cryptographic HMAC verification with constant-time check & key rotation support
         - Expiry deadline validation
         - Strict tenant isolation (rejects cross-tenant lease tampering)
         - Workflow version integrity (rejects leases from outdated versions)
         - Action parameters digest verification
-        - Replay prevention: fails closed if lease was previously used
+        - Replay prevention: fails closed if lease or nonce was previously used
         - Revocation registry check: fails closed if lease was revoked
+        - Concurrency race protection: fails closed on concurrent consumption attempts
         """
-        secret = self.get_lease_secret_key()
+        active_key, rotated_keys = self.get_valid_signing_keys()
         if not lease.verify(
-            secret_key=secret,
+            secret_key=active_key,
+            allowed_keys=rotated_keys,
             expected_tenant_id=expected_tenant_id,
             expected_workflow_version=expected_workflow_version,
             parameters=parameters
@@ -220,6 +240,7 @@ class UniversalAutomationFabric:
             )
 
         now = time.time()
+        import sqlite3
         with db.get_connection() as conn:
             # Check revocation
             rev = conn.execute(
@@ -231,23 +252,28 @@ class UniversalAutomationFabric:
                     f"Execution lease '{lease.lease_id}' was revoked: {rev['reason']}"
                 )
 
-            # Check replay
+            # Check replay by lease_id or nonce
             used = conn.execute(
-                "SELECT used_at FROM automation_used_leases WHERE lease_id = ?",
-                (lease.lease_id,)
+                "SELECT used_at FROM automation_used_leases WHERE lease_id = ? OR nonce = ?",
+                (lease.lease_id, lease.nonce)
             ).fetchone()
             if used:
                 raise AutomationSecurityException(
-                    f"Replay attack detected: execution lease '{lease.lease_id}' has already been consumed."
+                    f"Replay attack detected: execution lease '{lease.lease_id}' or nonce '{lease.nonce}' has already been consumed."
                 )
 
-            # Record single-use consumption atomically
-            conn.execute("""
-                INSERT INTO automation_used_leases (
-                    lease_id, nonce, run_id, tenant_id, action_name, used_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (lease.lease_id, lease.nonce, lease.run_id, lease.tenant_id, lease.action_name, now))
-            conn.commit()
+            # Record single-use consumption atomically with race prevention
+            try:
+                conn.execute("""
+                    INSERT INTO automation_used_leases (
+                        lease_id, nonce, run_id, tenant_id, action_name, used_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                """, (lease.lease_id, lease.nonce, lease.run_id, lease.tenant_id, lease.action_name, now))
+                conn.commit()
+            except sqlite3.IntegrityError:
+                raise AutomationSecurityException(
+                    f"Concurrent replay attack detected: lease '{lease.lease_id}' was simultaneously consumed by another worker."
+                )
 
         return True
 
@@ -492,9 +518,26 @@ class UniversalAutomationFabric:
         version = wf["version"]
 
         now = time.time()
+        step_results: List[StepResult] = []
         if existing_execution_id:
             execution_id = existing_execution_id
             with db.get_connection() as conn:
+                r_prev = conn.execute("SELECT step_results FROM automation_executions WHERE execution_id = ?", (execution_id,)).fetchone()
+                if r_prev and r_prev["step_results"]:
+                    try:
+                        raw_steps = json.loads(r_prev["step_results"])
+                        step_results = [
+                            StepResult(
+                                step_id=st["step_id"],
+                                node_type=st["node_type"],
+                                status=ExecutionStatus(st["status"]),
+                                output=st.get("output"),
+                                duration_seconds=st.get("duration_seconds", 0.0),
+                                error=st.get("error")
+                            ) for st in raw_steps if isinstance(st, dict) and "step_id" in st
+                        ]
+                    except Exception:
+                        step_results = []
                 conn.execute("""
                     UPDATE automation_executions
                     SET status = 'RUNNING', updated_at = ?
@@ -516,7 +559,6 @@ class UniversalAutomationFabric:
                 conn.commit()
 
         # Execute tasks sequentially
-        step_results: List[StepResult] = []
         is_blocked = False
         blocked_approval_id = None
         has_failed = False
@@ -530,6 +572,11 @@ class UniversalAutomationFabric:
                 return {"execution_id": execution_id, "status": ExecutionStatus.CANCELLED.value, "terminal_outcome": TerminalOutcome.CANCELLED.value}
 
             t_id = task.get("id")
+            # Skip previously completed idempotent steps when resuming from checkpoint
+            completed_step_ids = {s.step_id for s in step_results if s.status == ExecutionStatus.COMPLETED}
+            if t_id in completed_step_ids:
+                continue
+
             t_type = task.get("type")
             t_desc = task.get("description", t_id)
             step_start = time.time()
@@ -548,9 +595,15 @@ class UniversalAutomationFabric:
                 tool_id=t_id,
                 tool_risk_class=task.get("risk_class", "LOW_RISK")
             )
-            policy_res = policy_engine_v2.evaluate(policy_ctx)
+            try:
+                policy_res = policy_engine_v2.evaluate(policy_ctx)
+            except Exception as pe_err:
+                raise AutomationSecurityException(f"PolicyEngine evaluation failure (failing closed): {str(pe_err)}")
+
             if policy_res.decision == PolicyDecision.DENY:
                 raise AutomationSecurityException(f"PolicyEngine V2 DENIED task '{t_id}': {'; '.join(policy_res.reasons)}")
+            elif policy_res.decision not in (PolicyDecision.ALLOW, PolicyDecision.REQUIRE_APPROVAL):
+                raise AutomationSecurityException(f"PolicyEngine returned non-permissive decision '{policy_res.decision}'. Failing closed.")
 
             # Check if this task requires approval (Stage 4 or Policy Requirement)
             if "approval.Gate" in t_type or "flow.Pause" in t_type or policy_res.decision == PolicyDecision.REQUIRE_APPROVAL:
@@ -664,6 +717,15 @@ class UniversalAutomationFabric:
                 output=step_res,
                 duration_seconds=time.time() - step_start
             ))
+
+            # Persist durable intermediate checkpoint to SQLite immediately
+            with db.get_connection() as conn:
+                conn.execute("""
+                    UPDATE automation_executions
+                    SET step_results = ?, current_step_id = ?, updated_at = ?
+                    WHERE execution_id = ?
+                """, (json.dumps([s.to_dict() for s in step_results]), t_id, time.time(), execution_id))
+                conn.commit()
 
         # Check terminal state
         if is_blocked:
@@ -1254,14 +1316,14 @@ class UniversalAutomationFabric:
 
     def _recover_crashed_executions_on_startup(self) -> int:
         """
-        Detects executions left in RUNNING status from a prior crash or restart.
+        Detects executions left in RUNNING or CLAIMED status from a prior crash or restart.
         Safely transitions them to RECOVERING so they are not silently lost or blindly replayed.
         """
         now = time.time()
         with db.get_connection() as conn:
             rows = conn.execute("""
                 SELECT execution_id FROM automation_executions
-                WHERE status = 'RUNNING'
+                WHERE status IN ('RUNNING', 'CLAIMED')
             """).fetchall()
             for r in rows:
                 conn.execute("""
@@ -1312,15 +1374,18 @@ class UniversalAutomationFabric:
         return execution_id
 
     def _process_next_queued_execution(self) -> Optional[str]:
-        """Dequeues and executes the next pending background execution."""
+        """Dequeues and executes the next pending background execution with atomic race prevention."""
         with db.get_connection() as conn:
-            row = conn.execute("""
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE")
+            row = cursor.execute("""
                 SELECT execution_id, workflow_id, tenant_id, company_id, inputs, context
                 FROM automation_executions
                 WHERE status = 'QUEUED'
                 ORDER BY created_at ASC LIMIT 1
             """).fetchone()
             if not row:
+                conn.commit()
                 return None
             exec_id = row["execution_id"]
             wf_id = row["workflow_id"]
@@ -1328,6 +1393,16 @@ class UniversalAutomationFabric:
             company_id = row["company_id"]
             inputs = json.loads(row["inputs"] or "{}")
             context = json.loads(row["context"] or "{}")
+
+            cursor.execute("""
+                UPDATE automation_executions
+                SET status = 'RUNNING', updated_at = ?
+                WHERE execution_id = ? AND status = 'QUEUED'
+            """, (time.time(), exec_id))
+            if cursor.rowcount == 0:
+                conn.commit()
+                return None
+            conn.commit()
 
         try:
             self.execute_workflow(
