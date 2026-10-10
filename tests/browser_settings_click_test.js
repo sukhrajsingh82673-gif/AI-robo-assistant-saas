@@ -352,21 +352,22 @@ async function runSettingsClickTests() {
   assert(modelCard !== null, 'Found comp_business_model card');
 
   const shutterTrigger = modelCard.querySelector('#shutter-trigger-comp_business_model');
-  const shutterPanel = modelCard.querySelector('#shutter-panel-comp_business_model');
+  let shutterPanel = modelCard.querySelector('#shutter-panel-comp_business_model');
   assert(shutterTrigger && shutterPanel, 'Multi-select shutter trigger and expandable panel rendered');
 
   // Open shutter
   window.EnterpriseSettings.toggleShutter('comp_business_model');
-  assert(shutterPanel.style.display === 'block', 'Multi-select shutter opens on click');
+  shutterPanel = document.getElementById('shutter-panel-comp_business_model');
+  assert(shutterPanel && shutterPanel.style.display === 'block', 'Multi-select shutter opens on click');
 
   // Test "All" button
   window.EnterpriseSettings.selectAllMultiselect('comp_business_model');
-  let checkedBoxes = modelCard.querySelectorAll('.shutter-checkbox:checked');
+  let checkedBoxes = document.querySelectorAll('#card-comp_business_model .shutter-checkbox:checked');
   assert(checkedBoxes.length > 3, 'Select All selects all multi-select option checkboxes');
 
   // Test "Clear" button
   window.EnterpriseSettings.clearAllMultiselect('comp_business_model');
-  checkedBoxes = modelCard.querySelectorAll('.shutter-checkbox:checked');
+  checkedBoxes = document.querySelectorAll('#card-comp_business_model .shutter-checkbox:checked');
   assert(checkedBoxes.length === 0, 'Clear All clears all multi-select option checkboxes');
 
   // Select specific options: ['B2B', 'Subscription']
@@ -375,7 +376,8 @@ async function runSettingsClickTests() {
 
   // Close shutter
   window.EnterpriseSettings.toggleShutter('comp_business_model');
-  assert(shutterPanel.style.display === 'none', 'Shutter closes on Done/toggle');
+  shutterPanel = document.getElementById('shutter-panel-comp_business_model');
+  assert(shutterPanel && shutterPanel.style.display === 'none', 'Shutter closes on Done/toggle');
 
   // Save changes
   await window.EnterpriseSettings.saveChanges();
@@ -383,6 +385,15 @@ async function runSettingsClickTests() {
 
   const configuredModels = await getPersistedSettingValue('company', 'comp_business_model');
   assert(Array.isArray(configuredModels) && configuredModels.includes('B2B') && configuredModels.includes('Subscription'), 'Backend persistence verifies multiselect array persisted correctly');
+
+  // Test Multi-Company Entities Shutter
+  window.EnterpriseSettings.toggleShutter('comp_operating_entities');
+  window.EnterpriseSettings.toggleMultiselectOption('comp_operating_entities', 'ZONATA Global Holdings', true);
+  window.EnterpriseSettings.toggleShutter('comp_operating_entities');
+  await window.EnterpriseSettings.saveChanges();
+  await new Promise(r => setTimeout(r, 100));
+  const persistedEntities = await getPersistedSettingValue('company', 'comp_operating_entities');
+  assert(Array.isArray(persistedEntities) && persistedEntities.includes('ZONATA Global Holdings'), 'Backend persistence verifies multi-company entities shutter persisted correctly');
 
   console.log('\n--- 6. INTERACTION TEST: TOGGLES & EXPLICIT ENABLE / DISABLE BUTTONS ---');
   await window.EnterpriseSettings.navigateTo('security');
@@ -410,31 +421,58 @@ async function runSettingsClickTests() {
   persistedMfa = await getPersistedSettingValue('security', 'sec_require_mfa');
   assert(persistedMfa === true, 'Backend persistence verifies sec_require_mfa = true');
 
-  console.log('\n--- 7. INTERACTION TEST: DROPDOWN / SELECT CONTROLS ---');
+  console.log('\n--- 7. INTERACTION TEST: DROPDOWN BUTTONS & TIMEZONE / SELECT CONTROLS ---');
+  // 7.1 Test Custom Dropdown Button for CEO Autonomy
   await window.EnterpriseSettings.navigateTo('ai_ceo');
   await new Promise(r => setTimeout(r, 60));
 
   const autonomyCard = document.getElementById('card-ceo_autonomy_level');
   assert(autonomyCard !== null, 'Found ceo_autonomy_level card');
 
-  const autonomySelect = autonomyCard.querySelector('select.control-select');
-  assert(autonomySelect !== null, 'Found select dropdown for ceo_autonomy_level');
+  const dropdownTrigger = autonomyCard.querySelector('.custom-dropdown-trigger');
+  assert(dropdownTrigger !== null, 'Found custom dropdown button for ceo_autonomy_level');
 
-  // Change to Level 2
-  window.EnterpriseSettings.stageSettingChange('ceo_autonomy_level', 'Level 2 — Execute With Approval');
+  // Toggle dropdown menu open
+  window.EnterpriseSettings.toggleDropdown('ceo_autonomy_level');
+  let popover = document.getElementById('dropdown-popover-ceo_autonomy_level');
+  assert(popover !== null, 'Custom dropdown popover menu opens on button click');
+
+  // Select Option via custom dropdown
+  window.EnterpriseSettings.selectDropdownOption('ceo_autonomy_level', 'Level 2 — Execute With Approval');
+  assert(document.getElementById('dropdown-popover-ceo_autonomy_level') === null, 'Dropdown closes upon selection');
   await window.EnterpriseSettings.saveChanges();
   await new Promise(r => setTimeout(r, 100));
   effRes = await fetch(`${API_BASE}/api/settings/effective`);
   effData = await effRes.json();
   assert(effData.effective_enforcement.ceo_autonomy.configured.includes('Level 2'), 'Backend persistence verifies ceo_autonomy = Level 2');
 
-  // Restore to Level 3
-  window.EnterpriseSettings.stageSettingChange('ceo_autonomy_level', 'Level 3 — Execute Within Policy');
+  // Restore to Level 3 via dropdown
+  window.EnterpriseSettings.selectDropdownOption('ceo_autonomy_level', 'Level 3 — Execute Within Policy');
   await window.EnterpriseSettings.saveChanges();
   await new Promise(r => setTimeout(r, 100));
   effRes = await fetch(`${API_BASE}/api/settings/effective`);
   effData = await effRes.json();
   assert(effData.effective_enforcement.ceo_autonomy.configured.includes('Level 3'), 'Backend persistence restores ceo_autonomy = Level 3');
+
+  // 7.2 Test Timezone Dropdown Button in Localization
+  await window.EnterpriseSettings.navigateTo('localization');
+  await new Promise(r => setTimeout(r, 60));
+  const locTzCard = document.getElementById('card-loc_reporting_timezone');
+  assert(locTzCard !== null, 'Found loc_reporting_timezone timezone dropdown card');
+  window.EnterpriseSettings.selectDropdownOption('loc_reporting_timezone', 'UTC');
+  await window.EnterpriseSettings.saveChanges();
+  await new Promise(r => setTimeout(r, 100));
+  let persistedTz = await getPersistedSettingValue('localization', 'loc_reporting_timezone');
+  assert(persistedTz === 'UTC', 'Backend persistence verifies reporting timezone set to UTC');
+
+  // 7.3 Test Choose Multiple Operating Timezones Shutter
+  window.EnterpriseSettings.toggleShutter('loc_operating_timezones');
+  window.EnterpriseSettings.toggleMultiselectOption('loc_operating_timezones', 'Asia/Tokyo (JST)', true);
+  window.EnterpriseSettings.toggleShutter('loc_operating_timezones');
+  await window.EnterpriseSettings.saveChanges();
+  await new Promise(r => setTimeout(r, 100));
+  let persistedMultiTz = await getPersistedSettingValue('localization', 'loc_operating_timezones');
+  assert(Array.isArray(persistedMultiTz) && persistedMultiTz.includes('Asia/Tokyo (JST)'), 'Backend persistence verifies multi-timezone shutter persisted correctly');
 
   console.log('\n--- 8. INTERACTION TEST: TOKEN CONTROLS (REVEAL, COPY, ROTATE, REVOKE) ---');
   await window.EnterpriseSettings.navigateTo('api');

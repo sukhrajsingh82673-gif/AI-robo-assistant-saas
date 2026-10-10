@@ -3303,11 +3303,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            company_id = self.headers.get("X-Company-ID", req_data.get("company_id", "comp_primary"))
             actor = self.headers.get("X-User-Name", "Host Administrator")
             actor_role = self.headers.get("X-User-Role", "OWNER")
             reason = req_data.get("reason", "Batch category save")
-            values = req_data.get("values", req_data)
+            if "settings" in req_data and isinstance(req_data["settings"], dict):
+                values = req_data["settings"]
+            elif "values" in req_data and isinstance(req_data["values"], dict):
+                values = req_data["values"]
+            else:
+                values = {k: v for k, v in req_data.items() if k not in ("company_id", "reason", "tenant_id", "actor")}
             res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason, actor_role=actor_role)
             status_code = 200 if res.get("success") else 400
             self._send_json(res, status=status_code)
@@ -5783,6 +5788,23 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 actor_role=actor_role, expected_version=expected_ver
             )
             status_code = res.get("status_code", (200 if res.get("success") else 400))
+            self._send_json(res, status=status_code)
+            return
+
+        elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
+            cat_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", req_data.get("company_id", "comp_primary"))
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            actor_role = self.headers.get("X-User-Role", "OWNER")
+            reason = req_data.get("reason", "Batch category save via PUT")
+            if "settings" in req_data and isinstance(req_data["settings"], dict):
+                values = req_data["settings"]
+            elif "values" in req_data and isinstance(req_data["values"], dict):
+                values = req_data["values"]
+            else:
+                values = {k: v for k, v in req_data.items() if k not in ("company_id", "reason", "tenant_id", "actor")}
+            res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason, actor_role=actor_role)
+            status_code = 200 if res.get("success") else 400
             self._send_json(res, status=status_code)
             return
 

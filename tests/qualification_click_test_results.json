@@ -1,6 +1,6 @@
 {
   "totalDomainsCrawled": 32,
-  "totalControlsDiscovered": 189,
+  "totalControlsDiscovered": 195,
   "inventory": [
     {
       "id": "acc_display_name",
@@ -35,6 +35,22 @@
       "type": "select",
       "current_value": "Asia/Kolkata",
       "expected_action": "Interact with select and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_secondary_timezones",
+      "domain": "account",
+      "label": "Additional Monitored Timezones",
+      "type": "multiselect",
+      "current_value": [
+        "UTC",
+        "America/New_York"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/account",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/account",
       "persistence": "SQLite (core/settings_service.py)",
@@ -150,7 +166,7 @@
       "domain": "company",
       "label": "Legal Corporate Name",
       "type": "text",
-      "current_value": "ZONATA Primary Corp",
+      "current_value": "ZONATA Technologies Private Limited",
       "expected_action": "Interact with text and persist via /api/settings/category/company",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/company",
@@ -178,7 +194,8 @@
       "type": "multiselect",
       "current_value": [
         "B2B",
-        "Subscription"
+        "Subscription",
+        "Service"
       ],
       "expected_action": "Interact with multiselect and persist via /api/settings/category/company",
       "handler": "EnterpriseSettings handlers",
@@ -194,6 +211,38 @@
       "type": "select",
       "current_value": "INR (₹)",
       "expected_action": "Interact with select and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_operating_entities",
+      "domain": "company",
+      "label": "Subsidiaries & Operating Entities",
+      "type": "multiselect",
+      "current_value": [
+        "ZONATA Technologies Primary",
+        "ZONATA AI Labs"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_operating_timezones",
+      "domain": "company",
+      "label": "Corporate Operating Time Zones",
+      "type": "multiselect",
+      "current_value": [
+        "Asia/Kolkata",
+        "UTC"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/company",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/company",
       "persistence": "SQLite (core/settings_service.py)",
@@ -428,6 +477,23 @@
       "type": "select",
       "current_value": "IN-Central (Mumbai)",
       "expected_action": "Interact with select and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_authorized_companies",
+      "domain": "enterprise",
+      "label": "Authorized Multi-Company Tenants",
+      "type": "multiselect",
+      "current_value": [
+        "ZONATA Technologies Primary",
+        "ZONATA AI Labs",
+        "ZONATA Cloud Services"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/enterprise",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/enterprise",
       "persistence": "SQLite (core/settings_service.py)",
@@ -777,7 +843,7 @@
       "domain": "ai_providers",
       "label": "Single Inference Turn Maximum Spend ($)",
       "type": "currency",
-      "current_value": "2.5",
+      "current_value": "0.1",
       "expected_action": "Interact with currency and persist via /api/settings/category/ai_providers",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/ai_providers",
@@ -881,7 +947,7 @@
       "domain": "desktop",
       "label": "Perception Screen Sampling Rate (FPS)",
       "type": "slider",
-      "current_value": "2",
+      "current_value": "5",
       "expected_action": "Interact with slider and persist via /api/settings/category/desktop",
       "handler": "EnterpriseSettings handlers",
       "api": "/api/settings/category/desktop",
@@ -2190,6 +2256,37 @@
       "audit": "Cryptographic SHA-256 ledger receipt"
     },
     {
+      "id": "loc_reporting_timezone",
+      "domain": "localization",
+      "label": "Universal Enterprise Reporting Timezone",
+      "type": "select",
+      "current_value": "UTC",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_operating_timezones",
+      "domain": "localization",
+      "label": "Multi-Region Operating Timezones",
+      "type": "multiselect",
+      "current_value": [
+        "Asia/Kolkata (IST)",
+        "UTC",
+        "America/New_York (EST)",
+        "Asia/Tokyo (JST)"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
       "id": "loc_base_locale",
       "domain": "localization",
       "label": "Universal Enterprise Reporting Locale",
@@ -2467,12 +2564,12 @@
     {
       "testName": "Domain 'account' loaded and rendered setting cards",
       "status": "PASS",
-      "details": "Found 11 cards"
+      "details": "Found 12 cards"
     },
     {
       "testName": "Domain 'company' loaded and rendered setting cards",
       "status": "PASS",
-      "details": "Found 10 cards"
+      "details": "Found 12 cards"
     },
     {
       "testName": "Domain 'users' loaded and rendered setting cards",
@@ -2482,7 +2579,7 @@
     {
       "testName": "Domain 'enterprise' loaded and rendered setting cards",
       "status": "PASS",
-      "details": "Found 6 cards"
+      "details": "Found 7 cards"
     },
     {
       "testName": "Domain 'ceo' loaded and rendered setting cards",
@@ -2607,7 +2704,7 @@
     {
       "testName": "Domain 'localization' loaded and rendered setting cards",
       "status": "PASS",
-      "details": "Found 5 cards"
+      "details": "Found 7 cards"
     },
     {
       "testName": "Domain 'appearance' loaded and rendered setting cards",
@@ -2800,6 +2897,11 @@
       "details": ""
     },
     {
+      "testName": "Backend persistence verifies multi-company entities shutter persisted correctly",
+      "status": "PASS",
+      "details": ""
+    },
+    {
       "testName": "Found sec_require_mfa card",
       "status": "PASS",
       "details": ""
@@ -2830,7 +2932,17 @@
       "details": ""
     },
     {
-      "testName": "Found select dropdown for ceo_autonomy_level",
+      "testName": "Found custom dropdown button for ceo_autonomy_level",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Custom dropdown popover menu opens on button click",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Dropdown closes upon selection",
       "status": "PASS",
       "details": ""
     },
@@ -2841,6 +2953,21 @@
     },
     {
       "testName": "Backend persistence restores ceo_autonomy = Level 3",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found loc_reporting_timezone timezone dropdown card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies reporting timezone set to UTC",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies multi-timezone shutter persisted correctly",
       "status": "PASS",
       "details": ""
     },

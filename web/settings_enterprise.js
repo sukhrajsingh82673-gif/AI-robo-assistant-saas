@@ -241,6 +241,7 @@ const EnterpriseSettings = (function() {
   let collapsedPillars = new Set();
   let openShutters = new Set();
   let openCardDisclosures = new Set();
+  let openDropdowns = new Set();
 
   // --------------------------------------------------------------------------
   // 4. Lifecycle & Initialization
@@ -285,6 +286,10 @@ const EnterpriseSettings = (function() {
       const searchBox = document.querySelector('.settings-search-wrapper');
       if (searchBox && !searchBox.contains(e.target)) {
         closeSearchDropdown();
+      }
+      if (openDropdowns.size > 0 && !e.target.closest('.custom-dropdown-control-wrapper')) {
+        openDropdowns.clear();
+        renderRoute();
       }
     });
   }
@@ -1103,7 +1108,7 @@ const EnterpriseSettings = (function() {
             <div class="shutter-trigger-left">
               <span class="shutter-count-pill" id="shutter-count-${s.id}">${curArr.length} selected</span>
               <div class="shutter-tags-preview" id="shutter-tags-${s.id}">
-                ${curArr.length > 0 ? curArr.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') + (curArr.length > 3 ? `<span class="shutter-tag-more">+${curArr.length - 3}</span>` : '') : '<span class="shutter-tag-none">None selected</span>'}
+                ${curArr.length > 0 ? curArr.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') + (curArr.length > 3 ? `<span class="shutter-tag-more">+${curArr.length - 3}</span>` : '') : '<span class="shutter-tag-none">None selected (Click to choose options)</span>'}
               </div>
             </div>
             <span class="shutter-arrow-icon" id="shutter-arrow-${s.id}">${isOpen ? '▴' : '▾'}</span>
@@ -1111,7 +1116,7 @@ const EnterpriseSettings = (function() {
 
           <div class="shutter-dropdown-panel" id="shutter-panel-${s.id}" style="display:${isOpen ? 'block' : 'none'};">
             <div class="shutter-panel-header">
-              <span class="shutter-panel-title">Choose Applicable Options</span>
+              <span class="shutter-panel-title">Choose Applicable Options (${curArr.length}/${opts.length})</span>
               <div class="shutter-quick-btns">
                 <button type="button" class="btn-micro" onclick="EnterpriseSettings.selectAllMultiselect('${s.id}')">All</button>
                 <button type="button" class="btn-micro" onclick="EnterpriseSettings.clearAllMultiselect('${s.id}')">Clear</button>
@@ -1122,7 +1127,7 @@ const EnterpriseSettings = (function() {
               ${opts.map(opt => {
                 const isSelected = curArr.includes(opt);
                 return `
-                  <label class="shutter-option-item ${isSelected ? 'selected' : ''}">
+                  <div class="shutter-option-item ${isSelected ? 'selected' : ''}" onclick="EnterpriseSettings.toggleMultiselectOption('${s.id}', '${escapeHtml(opt)}', ${!isSelected})">
                     <input 
                       type="checkbox" 
                       id="multiselect-${s.id}-${escapeHtml(opt)}"
@@ -1131,10 +1136,11 @@ const EnterpriseSettings = (function() {
                       data-opt="${escapeHtml(opt)}"
                       ${isSelected ? 'checked' : ''}
                       ${isReadOnly ? 'disabled' : ''}
+                      onclick="event.stopPropagation();"
                       onchange="EnterpriseSettings.toggleMultiselectOption('${s.id}', '${escapeHtml(opt)}', this.checked)"
                     />
                     <span class="shutter-opt-label">${escapeHtml(opt)}</span>
-                  </label>
+                  </div>
                 `;
               }).join('')}
             </div>
@@ -1205,17 +1211,50 @@ const EnterpriseSettings = (function() {
 
     if (s.type === 'select') {
       const opts = s.options || [];
+      const isOpen = openDropdowns.has(s.id);
       return `
-        <div class="custom-select-control">
+        <div class="custom-dropdown-control-wrapper" id="dropdown-control-${s.id}">
+          <button 
+            type="button" 
+            class="custom-dropdown-trigger ${isOpen ? 'is-open' : ''}" 
+            id="dropdown-trigger-${s.id}"
+            onclick="EnterpriseSettings.toggleDropdown('${s.id}')"
+            ${isReadOnly ? 'disabled' : ''}
+          >
+            <span class="dropdown-trigger-text" id="dropdown-label-${s.id}">
+              ${escapeHtml(String(curVal))}${s.unit && !String(curVal).includes(s.unit) ? ' ' + s.unit : ''}
+            </span>
+            <span class="dropdown-trigger-icon" id="dropdown-chevron-${s.id}">${isOpen ? '▴' : '▾'}</span>
+          </button>
+
+          ${isOpen ? `
+            <div class="custom-dropdown-popover" id="dropdown-popover-${s.id}">
+              ${opts.map(opt => {
+                const isSelected = String(curVal) === String(opt);
+                return `
+                  <button 
+                    type="button" 
+                    class="custom-dropdown-choice ${isSelected ? 'is-selected' : ''}"
+                    onclick="EnterpriseSettings.selectDropdownOption('${s.id}', '${escapeHtml(String(opt))}')"
+                  >
+                    <span class="choice-check">${isSelected ? '✓' : ''}</span>
+                    <span class="choice-text">${escapeHtml(String(opt))}${s.unit && !String(opt).includes(s.unit) ? ' ' + s.unit : ''}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+
           <select 
             class="control-select" 
-            id="control-input-${s.id}"
+            id="control-input-${s.id}" 
+            style="display:none;"
             ${isReadOnly ? 'disabled' : ''}
             onchange="EnterpriseSettings.stageValue('${s.id}', this.value, false)"
           >
             ${opts.map(opt => `
               <option value="${escapeHtml(String(opt))}" ${String(curVal) === String(opt) ? 'selected' : ''}>
-                ${escapeHtml(String(opt))}${s.unit && !String(opt).includes(s.unit) ? ' ' + s.unit : ''}
+                ${escapeHtml(String(opt))}
               </option>
             `).join('')}
           </select>
@@ -1693,6 +1732,10 @@ const EnterpriseSettings = (function() {
       if (toggleText) {
         toggleText.textContent = Boolean(val) ? 'Enabled' : 'Disabled';
       }
+      const dropdownLabel = document.getElementById(`dropdown-label-${settingId}`);
+      if (dropdownLabel) {
+        dropdownLabel.textContent = String(val);
+      }
       updateCardDirtyState(settingId);
       updateSaveBar();
     }
@@ -1942,7 +1985,9 @@ const EnterpriseSettings = (function() {
           'X-User-Name': (window.state && window.state.host) ? window.state.host.name : 'Host Administrator'
         },
         body: JSON.stringify({
+          company_id: (window.state && window.state.activeCompanyId) || 'comp_primary',
           values: payload,
+          settings: payload,
           reason: `Batch administrative save in ${activeView}`
         })
       });
@@ -1952,10 +1997,14 @@ const EnterpriseSettings = (function() {
         dirtyKeys.forEach(k => {
           originalValues[k] = stagedValues[k];
         });
+        if (typeof showToast === 'function') {
+          showToast(`Saved ${dirtyKeys.length} setting(s) in ${activeView} successfully.`, 'success');
+        }
         await fetchEffectiveState();
         await loadDomain(activeView);
       } else {
-        alert("Failed to save configuration to backend SQLite. Review server logs.");
+        const errJson = await res.json().catch(() => ({}));
+        alert(`Failed to save configuration: ${errJson.error || (errJson.errors ? JSON.stringify(errJson.errors) : 'Check server logs')}`);
       }
     } catch (e) {
       console.error('[Settings] Save error:', e);
@@ -2076,19 +2125,37 @@ const EnterpriseSettings = (function() {
   // --------------------------------------------------------------------------
   // INTERACTIVE CONTROL ENHANCEMENT HANDLERS (Sliders, Shutters, Actions, Steppers)
   // --------------------------------------------------------------------------
+  function toggleDropdown(settingId) {
+    if (openDropdowns.has(settingId)) {
+      openDropdowns.delete(settingId);
+    } else {
+      openDropdowns.clear();
+      openDropdowns.add(settingId);
+    }
+    renderRoute();
+  }
+
+  function selectDropdownOption(settingId, optVal) {
+    openDropdowns.delete(settingId);
+    let finalVal = optVal;
+    if (currentDomainData && currentDomainData.settings) {
+      const s = currentDomainData.settings.find(item => item.id === settingId);
+      if (s && s.options) {
+        const matched = s.options.find(o => String(o) === String(optVal));
+        if (matched !== undefined) finalVal = matched;
+      }
+    }
+    stageValue(settingId, finalVal, false);
+    renderRoute();
+  }
+
   function toggleShutter(settingId) {
     if (openShutters.has(settingId)) {
       openShutters.delete(settingId);
     } else {
       openShutters.add(settingId);
     }
-    const panel = document.getElementById(`shutter-panel-${settingId}`);
-    const arrow = document.getElementById(`shutter-arrow-${settingId}`);
-    if (panel) {
-      const isOpen = openShutters.has(settingId);
-      panel.style.display = isOpen ? 'block' : 'none';
-      if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
-    }
+    renderRoute();
   }
 
   function toggleMultiselectOption(settingId, opt, isChecked) {
@@ -2103,53 +2170,19 @@ const EnterpriseSettings = (function() {
       nextList = nextList.filter(item => item !== opt);
     }
     stagedValues[settingId] = nextList;
-
-    const countBadge = document.getElementById(`shutter-count-${settingId}`);
-    if (countBadge) countBadge.textContent = `${nextList.length} selected`;
-
-    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
-    if (tagsBox) {
-      tagsBox.innerHTML = nextList.length > 0
-        ? nextList.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') + (nextList.length > 3 ? `<span class="shutter-tag-more">+${nextList.length - 3}</span>` : '')
-        : '<span class="shutter-tag-none">None selected</span>';
-    }
-
-    updateCardDirtyState(settingId);
-    updateSaveBar();
+    renderRoute();
   }
 
   function selectAllMultiselect(settingId) {
     const s = currentDomainData && currentDomainData.settings ? currentDomainData.settings.find(item => item.id === settingId) : null;
     const allOpts = (s && s.options) ? [...s.options] : [];
     stagedValues[settingId] = allOpts;
-
-    const panel = document.getElementById(`shutter-panel-${settingId}`);
-    if (panel) {
-      panel.querySelectorAll('input[type="checkbox"]').forEach(chk => { chk.checked = true; });
-    }
-    const countBadge = document.getElementById(`shutter-count-${settingId}`);
-    if (countBadge) countBadge.textContent = `${allOpts.length} selected`;
-    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
-    if (tagsBox) {
-      tagsBox.innerHTML = allOpts.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') +
-        (allOpts.length > 3 ? `<span class="shutter-tag-more">+${allOpts.length - 3}</span>` : '');
-    }
-    updateCardDirtyState(settingId);
-    updateSaveBar();
+    renderRoute();
   }
 
   function clearAllMultiselect(settingId) {
     stagedValues[settingId] = [];
-    const panel = document.getElementById(`shutter-panel-${settingId}`);
-    if (panel) {
-      panel.querySelectorAll('input[type="checkbox"]').forEach(chk => { chk.checked = false; });
-    }
-    const countBadge = document.getElementById(`shutter-count-${settingId}`);
-    if (countBadge) countBadge.textContent = '0 selected';
-    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
-    if (tagsBox) tagsBox.innerHTML = '<span class="shutter-tag-none">None selected</span>';
-    updateCardDirtyState(settingId);
-    updateSaveBar();
+    renderRoute();
   }
 
   function stageSliderValue(settingId, val) {
@@ -2483,6 +2516,8 @@ const EnterpriseSettings = (function() {
     rotateSecret,
     revokeSecret,
     resetSettingToDefault,
+    toggleDropdown,
+    selectDropdownOption,
     toggleShutter,
     toggleMultiselectOption,
     selectAllMultiselect,

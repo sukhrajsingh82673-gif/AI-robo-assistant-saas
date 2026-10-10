@@ -283,6 +283,12 @@ SETTINGS_DEFINITIONS = [
         "desc": "User interface timestamp projection timezone."
     },
     {
+        "id": "acc_secondary_timezones", "category": "account", "name": "Additional Monitored Timezones", "type": "multiselect",
+        "default": ["UTC", "America/New_York"], "scope": "User", "editable_by": "OWNER", "risk": "LOW",
+        "options": ["Asia/Kolkata", "UTC", "America/New_York", "Europe/London", "Asia/Dubai", "Asia/Singapore", "America/Los_Angeles", "Asia/Tokyo"],
+        "desc": "Personal secondary timezones projected on world clocks and executive briefings."
+    },
+    {
         "id": "acc_density", "category": "account", "name": "Interface Density", "type": "radio",
         "default": "comfortable", "scope": "User", "editable_by": "OWNER", "risk": "LOW",
         "options": ["compact", "comfortable"]
@@ -331,6 +337,18 @@ SETTINGS_DEFINITIONS = [
         "id": "comp_base_currency", "category": "company", "name": "Base Currency", "type": "select",
         "default": "INR (₹)", "scope": "Company", "editable_by": "OWNER", "risk": "HIGH",
         "options": ["INR (₹)", "USD ($)", "EUR (€)", "GBP (£)", "AED (د.إ)", "SGD (S$)"]
+    },
+    {
+        "id": "comp_operating_entities", "category": "company", "name": "Subsidiaries & Operating Entities", "type": "multiselect",
+        "default": ["ZONATA Technologies Primary", "ZONATA AI Labs"], "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "options": ["ZONATA Technologies Primary", "ZONATA AI Labs", "ZONATA Cloud Services", "ZONATA Robotics Private Limited", "ZONATA Global Holdings"],
+        "desc": "Operating subsidiary companies covered under this sovereign enterprise license."
+    },
+    {
+        "id": "comp_operating_timezones", "category": "company", "name": "Corporate Operating Time Zones", "type": "multiselect",
+        "default": ["Asia/Kolkata", "UTC"], "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "options": ["Asia/Kolkata", "UTC", "America/New_York", "Europe/London", "Asia/Dubai", "Asia/Singapore", "America/Los_Angeles", "Asia/Tokyo"],
+        "desc": "Global operating timezones governing inter-company operations, reporting, and dispatch."
     },
 
     # --- 4. Organization ---
@@ -697,6 +715,18 @@ SETTINGS_DEFINITIONS = [
         "default": "YYYY-MM-DD", "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
         "options": ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]
     },
+    {
+        "id": "loc_reporting_timezone", "category": "localization", "name": "Universal Enterprise Reporting Timezone", "type": "select",
+        "default": "Asia/Kolkata (IST)", "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "options": ["Asia/Kolkata (IST)", "UTC", "America/New_York (EST)", "Europe/London (GMT)", "Asia/Dubai (GST)", "Asia/Singapore (SGT)", "America/Los_Angeles (PST)", "Asia/Tokyo (JST)"],
+        "desc": "Primary enterprise base timezone for statutory reporting, ledger timestamps, and audit manifests."
+    },
+    {
+        "id": "loc_operating_timezones", "category": "localization", "name": "Multi-Region Operating Timezones", "type": "multiselect",
+        "default": ["Asia/Kolkata (IST)", "UTC", "America/New_York (EST)"], "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "options": ["Asia/Kolkata (IST)", "UTC", "America/New_York (EST)", "America/Los_Angeles (PST)", "Europe/London (GMT)", "Europe/Paris (CET)", "Asia/Dubai (GST)", "Asia/Singapore (SGT)", "Asia/Tokyo (JST)", "Australia/Sydney (AEST)"],
+        "desc": "Select multiple regional timezones for multi-office scheduling, calendar aggregation, and global shifts."
+    },
 
     # --- 37. Appearance ---
     {
@@ -860,6 +890,12 @@ SETTINGS_DEFINITIONS = [
         "default": "IN-Central (Mumbai)", "scope": "Host", "editable_by": "OWNER", "risk": "HIGH",
         "options": ["IN-Central (Mumbai)", "EU-West (Frankfurt)", "US-East (Virginia)", "SG-East (Singapore)"],
         "desc": "Geographical compute and database pinning zone for sovereignty compliance."
+    },
+    {
+        "id": "ent_authorized_companies", "category": "enterprise", "name": "Authorized Multi-Company Tenants", "type": "multiselect",
+        "default": ["ZONATA Technologies Primary", "ZONATA AI Labs", "ZONATA Cloud Services"], "scope": "Host", "editable_by": "OWNER", "risk": "HIGH",
+        "options": ["ZONATA Technologies Primary", "ZONATA AI Labs", "ZONATA Cloud Services", "ZONATA Robotics Private Limited", "ZONATA Global Holdings"],
+        "desc": "Authorized multi-entity portfolio companies permitted under cross-tenant federation."
     },
 
     # AI CEO
@@ -1844,6 +1880,44 @@ class EnterpriseSettingsService:
                     "error": f"Setting '{setting_key}' requires OWNER authority. Role '{actor_role}' is unauthorized.",
                     "status_code": 403
                 }
+
+        # Type coercion for browser form inputs and json submissions
+        stype = definition.get("type")
+        if stype in ("number", "slider") and isinstance(new_value, str):
+            try:
+                num = float(new_value)
+                default_val = definition.get("default")
+                if isinstance(default_val, int) and not isinstance(default_val, bool) and num.is_integer():
+                    new_value = int(num)
+                else:
+                    new_value = num
+            except (ValueError, TypeError):
+                pass
+        elif stype in ("select", "radio"):
+            opts = definition.get("options", [])
+            for o in opts:
+                if str(o) == str(new_value):
+                    new_value = o
+                    break
+        elif stype == "toggle" and isinstance(new_value, str):
+            new_value = new_value.lower() in ("true", "1", "yes", "on")
+        elif stype == "multiselect":
+            opts = definition.get("options", [])
+            if isinstance(new_value, str):
+                try:
+                    parsed = json.loads(new_value)
+                    if isinstance(parsed, list):
+                        new_value = parsed
+                    else:
+                        new_value = [s.strip() for s in new_value.split(",") if s.strip()]
+                except Exception:
+                    new_value = [s.strip() for s in new_value.split(",") if s.strip()]
+            if isinstance(new_value, (list, tuple, set)):
+                coerced = []
+                for item in new_value:
+                    matched = next((o for o in opts if str(o) == str(item)), item)
+                    coerced.append(matched)
+                new_value = coerced
 
         # 4. Authoritative Backend Validation
         valid, err = self._validate_value(definition, new_value)
