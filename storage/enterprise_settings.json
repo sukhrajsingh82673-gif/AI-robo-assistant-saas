@@ -90,7 +90,7 @@
   },
   "ceo_autonomy_level": "Level 3 \u2014 Execute Within Policy",
   "ceo_spending_limit": 75000,
-  "sec_session_duration_hours": 8,
+  "sec_session_duration_hours": "12",
   "cost_global_budget_monthly": 100000.0,
   "wf_max_concurrent_agents": 16,
   "sec_require_mfa": true,
@@ -115,5 +115,20 @@
   "diag_wal_auto_checkpoint": true,
   "diag_verbose_kernel_traces": false,
   "diag_collect_heap_metrics": true,
-  "term_max_lease_seconds": 5
+  "term_max_lease_seconds": 5,
+  "api_developer_key_vault": "REVOKED_BY_HOST",
+  "sec_max_login_attempts": 6,
+  "app_font_scale_pct": 100,
+  "comp_business_model": [
+    "B2B",
+    "Subscription",
+    "Service"
+  ],
+  "comp_base_currency": "INR (\u20b9)",
+  "org_hierarchy_enforcement": true,
+  "org_max_exec_span": 8,
+  "comp_subindustry": "Autonomous Enterprise Operations & Cognitive Governance",
+  "comp_fiscal_year_start": "April",
+  "comp_tax_id_number": "GSTIN-07AAACZ1234A1Z5",
+  "comp_business_calendar": "Monday - Friday (Standard)"
 }

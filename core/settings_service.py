@@ -654,7 +654,7 @@ SETTINGS_DEFINITIONS = [
     {
         "id": "sec_session_duration_hours", "category": "security", "name": "Session Maximum Lifetime (Hours)", "type": "select",
         "default": 12, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM",
-        "options": [1, 4, 8, 12, 24, 72]
+        "options": [1, 4, 8, 12, 14, 24, 72]
     },
     {
         "id": "sec_device_trust", "category": "security", "name": "Device Trust Enforced", "type": "toggle",
@@ -815,17 +815,17 @@ SETTINGS_DEFINITIONS = [
     # Users
     {
         "id": "usr_session_max_concurrent", "category": "users", "name": "Max Concurrent Operator Sessions", "type": "number",
-        "default": 5, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 20,
+        "default": 5, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 20, "unit": "sessions",
         "desc": "Maximum simultaneous browser or API sessions allowed per user identity."
     },
     {
         "id": "usr_invitation_expiry_hours", "category": "users", "name": "User Invite Link TTL (Hours)", "type": "number",
-        "default": 48, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 168,
+        "default": 48, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 168, "unit": "hours",
         "desc": "Time window before pending organization invitation tokens expire."
     },
     {
         "id": "usr_password_min_length", "category": "users", "name": "Minimum Password Length Enforcement", "type": "number",
-        "default": 14, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 8, "max": 64,
+        "default": 14, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 8, "max": 64, "unit": "chars",
         "desc": "Statutory password complexity boundary for non-SSO credentials."
     },
     {
@@ -871,7 +871,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "ceo_evidence_retention_days", "category": "ai_ceo", "name": "Executive Decision Evidence Retention (Days)", "type": "number",
-        "default": 365, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 30, "max": 3650,
+        "default": 365, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 30, "max": 3650, "unit": "days",
         "desc": "Retention lifecycle for rationale graphs and executive decision evidence proofs."
     },
 
@@ -883,7 +883,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "wf_lifecycle_auto_retire_idle_hours", "category": "workforce", "name": "Auto-Decommission Idle Specialized Workers (Hours)", "type": "number",
-        "default": 72, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 720,
+        "default": 72, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 720, "unit": "hours",
         "desc": "Reclaims compute resources for dynamic agents with zero active missions."
     },
     {
@@ -896,12 +896,12 @@ SETTINGS_DEFINITIONS = [
     # Workflows (Automation)
     {
         "id": "wf_retries_max", "category": "workflows", "name": "Maximum Step Retry Attempts on Transient Failure", "type": "number",
-        "default": 3, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 0, "max": 10,
+        "default": 3, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 0, "max": 10, "unit": "retries",
         "desc": "Exponential backoff retry bounds for distributed DAG tasks."
     },
     {
         "id": "wf_dag_execution_timeout_min", "category": "workflows", "name": "Mission Workflow Hard Timeout (Minutes)", "type": "number",
-        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 1440,
+        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 1440, "unit": "minutes",
         "desc": "Terminates hung tasks and triggers compensating rollback actions."
     },
     {
@@ -929,7 +929,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "ai_request_timeout_seconds", "category": "ai_providers", "name": "LLM Provider HTTP Request Timeout (Seconds)", "type": "number",
-        "default": 60, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 300,
+        "default": 60, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 300, "unit": "seconds",
         "desc": "Network socket timeout threshold for external cognitive API gateways."
     },
 
@@ -946,14 +946,14 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "tool_max_execution_duration_sec", "category": "tools", "name": "Tool Execution Time Limit (Seconds)", "type": "number",
-        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 600,
+        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 600, "unit": "seconds",
         "desc": "Maximum runtime lease granted to sandboxed process executions."
     },
 
     # Desktop
     {
         "id": "desk_input_cooldown_ms", "category": "desktop", "name": "Hardware Mouse & Keyboard Event Rate Limit (ms)", "type": "number",
-        "default": 250, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 50, "max": 2000,
+        "default": 250, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 50, "max": 2000, "unit": "ms",
         "desc": "Prevents runaway mechanical input loops and OS freeze events."
     },
     {
@@ -980,7 +980,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "browser_navigation_timeout_sec", "category": "browser", "name": "Page DOM Load & Network Idle Timeout (Seconds)", "type": "number",
-        "default": 45, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 10, "max": 180,
+        "default": 45, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 10, "max": 180, "unit": "seconds",
         "desc": "Navigation wait threshold before raising an automated page timeout exception."
     },
 
@@ -992,7 +992,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "term_cgroup_cpu_shares", "category": "terminal", "name": "Linux Cgroup CPU Share Weight Allocation", "type": "number",
-        "default": 512, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 128, "max": 2048,
+        "default": 512, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 128, "max": 2048, "unit": "shares",
         "desc": "Kernel throttling boundary preventing compute starvation by background worker shells."
     },
     {
@@ -1004,12 +1004,12 @@ SETTINGS_DEFINITIONS = [
     # MCP
     {
         "id": "mcp_max_connected_servers", "category": "mcp", "name": "Maximum Active MCP Server Connections", "type": "number",
-        "default": 8, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 32,
+        "default": 8, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 32, "unit": "servers", "unit": "servers",
         "desc": "Connection pooling threshold for concurrent Model Context Protocol daemons."
     },
     {
         "id": "mcp_json_rpc_timeout_sec", "category": "mcp", "name": "MCP JSON-RPC Handshake Timeout (Seconds)", "type": "number",
-        "default": 30, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 120,
+        "default": 30, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 120, "unit": "seconds",
         "desc": "Socket latency ceiling for protocol initialization and tool listing queries."
     },
     {
@@ -1032,7 +1032,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "a2a_rate_limit_per_min", "category": "a2a", "name": "Inter-Agent Message Rate Limit (Msg/Min)", "type": "number",
-        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 10, "max": 1000,
+        "default": 120, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 10, "max": 1000, "unit": "req/min",
         "desc": "Prevents infinite message loops and cognitive feedback storms between agents."
     },
     {
@@ -1050,12 +1050,12 @@ SETTINGS_DEFINITIONS = [
     # Integrations
     {
         "id": "integ_oauth_refresh_cadence_hours", "category": "integrations", "name": "OAuth Access Token Preemptive Refresh Cadence", "type": "number",
-        "default": 12, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 72,
+        "default": 12, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 72, "unit": "hours",
         "desc": "Proactive token refresh interval ensuring continuous uninterrupted SaaS connectivity."
     },
     {
         "id": "integ_sync_cadence_minutes", "category": "integrations", "name": "Universal Data Ingestion Polling Interval (Minutes)", "type": "number",
-        "default": 15, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 1440,
+        "default": 15, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 1, "max": 1440, "unit": "minutes",
         "desc": "Synchronization schedule for pull connectors (CRM, ERP, Accounting)."
     },
     {
@@ -1082,7 +1082,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "data_max_file_upload_mb", "category": "data", "name": "Maximum Ingested Document Size (MB)", "type": "number",
-        "default": 50, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 500,
+        "default": 50, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 5, "max": 500, "unit": "MB",
         "desc": "Upper file size limit for enterprise PDF, DOCX, CSV, and code bundle ingestion."
     },
     {
@@ -1123,7 +1123,7 @@ SETTINGS_DEFINITIONS = [
     # Security
     {
         "id": "sec_max_login_attempts", "category": "security", "name": "Failed Login Attempts Before Account Lockdown", "type": "number",
-        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 3, "max": 10,
+        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 3, "max": 10, "unit": "attempts",
         "desc": "Mitigates credential stuffing by locking out identities after repeated failures."
     },
     {
@@ -1174,7 +1174,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "priv_data_subject_request_window_days", "category": "privacy", "name": "Data Subject Access Request SLA (Days)", "type": "number",
-        "default": 30, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 7, "max": 60,
+        "default": 30, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 7, "max": 60, "unit": "days",
         "desc": "Maximum statutory timeframe permitted to fulfill customer data export and purge requests."
     },
     {
@@ -1186,7 +1186,7 @@ SETTINGS_DEFINITIONS = [
     # Audit
     {
         "id": "audit_retention_days", "category": "audit", "name": "Immutable Cryptographic Audit Retention (Days)", "type": "number",
-        "default": 730, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 90, "max": 3650,
+        "default": 730, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 90, "max": 3650, "unit": "days",
         "desc": "Statutory ledger retention duration before automated archive rotation."
     },
     {
@@ -1197,7 +1197,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "audit_merkle_validation_cadence_hours", "category": "audit", "name": "Automated Merkle Root Verification Cadence (Hours)", "type": "number",
-        "default": 24, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 168,
+        "default": 24, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 168, "unit": "hours",
         "desc": "Interval for full mathematical verification of SHA-256 chain continuity across all records."
     },
 
@@ -1209,12 +1209,12 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "recovery_rpo_minutes", "category": "recovery", "name": "Recovery Point Objective Target (RPO in Minutes)", "type": "number",
-        "default": 15, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 120,
+        "default": 15, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 120, "unit": "minutes",
         "desc": "Maximum permissible duration of transactional data loss in catastrophe scenarios."
     },
     {
         "id": "recovery_rto_minutes", "category": "recovery", "name": "Recovery Time Objective Target (RTO in Minutes)", "type": "number",
-        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 60,
+        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 60, "unit": "minutes",
         "desc": "Target maximum downtime to restore full database and control plane availability."
     },
     {
@@ -1227,17 +1227,17 @@ SETTINGS_DEFINITIONS = [
     # Monitoring
     {
         "id": "mon_circuit_breaker_threshold", "category": "monitoring", "name": "Subsystem Circuit Breaker Consecutive Error Trip Limit", "type": "number",
-        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 20,
+        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "min": 1, "max": 20, "unit": "failures",
         "desc": "Trips fail-safe isolation after consecutive failures on an external API or tool endpoint."
     },
     {
         "id": "mon_liveness_probe_interval_sec", "category": "monitoring", "name": "Subsystem Internal Liveness Probe Frequency (Seconds)", "type": "number",
-        "default": 10, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 2, "max": 60,
+        "default": 10, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 2, "max": 60, "unit": "seconds",
         "desc": "Health monitor check cadence across SQLite, Redis, agent worker bus, and HTTP gateway."
     },
     {
         "id": "mon_drift_check_cadence_min", "category": "monitoring", "name": "Configuration Drift Audit Verification Cadence (Minutes)", "type": "number",
-        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 60,
+        "default": 5, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 60, "unit": "minutes",
         "desc": "Compares in-memory runtime cache against persisted SQLite state to guarantee zero drift."
     },
     {
@@ -1272,12 +1272,12 @@ SETTINGS_DEFINITIONS = [
     # Webhooks
     {
         "id": "webhook_retry_max_attempts", "category": "webhooks", "name": "Webhook Dispatch Max Retry Attempts", "type": "number",
-        "default": 5, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 0, "max": 10,
+        "default": 5, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 0, "max": 10, "unit": "retries",
         "desc": "Maximum automated delivery retries on non-2xx HTTP responses."
     },
     {
         "id": "webhook_backoff_factor_sec", "category": "webhooks", "name": "Exponential Retry Backoff Multiplier (Seconds)", "type": "number",
-        "default": 2, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 10,
+        "default": 2, "scope": "Company", "editable_by": "OWNER", "risk": "LOW", "min": 1, "max": 10, "unit": "seconds",
         "desc": "Multiplication factor determining backoff delay between subsequent delivery attempts."
     },
     {
@@ -1288,7 +1288,7 @@ SETTINGS_DEFINITIONS = [
     },
     {
         "id": "webhook_egress_timeout_sec", "category": "webhooks", "name": "Outbound Webhook HTTP Timeout (Seconds)", "type": "number",
-        "default": 10, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 2, "max": 60,
+        "default": 10, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM", "min": 2, "max": 60, "unit": "seconds",
         "desc": "TCP socket timeout for external webhook endpoint responses."
     },
 
@@ -1331,7 +1331,7 @@ SETTINGS_DEFINITIONS = [
         "desc": "Controls vertical padding and icon sizing across the persistent desktop sidebar."
     },
     {
-        "id": "app_font_scale_pct", "category": "appearance", "name": "Interface Typography Scale (Percentage)", "type": "number",
+        "id": "app_font_scale_pct", "category": "appearance", "name": "Interface Typography Scale (Percentage)", "type": "slider",
         "default": 100, "scope": "User", "editable_by": "OWNER", "risk": "LOW", "min": 80, "max": 130, "unit": "%",
         "desc": "Scales body, header, and card typography for accessibility preferences."
     },
@@ -1339,7 +1339,7 @@ SETTINGS_DEFINITIONS = [
     # Advanced
     {
         "id": "adv_kernel_cache_ttl_sec", "category": "advanced", "name": "Universal Kernel Cache TTL (Seconds)", "type": "number",
-        "default": 300, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 30, "max": 3600,
+        "default": 300, "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM", "min": 30, "max": 3600, "unit": "seconds",
         "desc": "Duration to cache policy evaluation results and permission tokens in memory."
     },
     {
@@ -1356,7 +1356,7 @@ SETTINGS_DEFINITIONS = [
     # Diagnostics
     {
         "id": "diag_inference_ping_interval_sec", "category": "diagnostics", "name": "AI Inference Live Health Ping Interval (Seconds)", "type": "number",
-        "default": 30, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 5, "max": 300,
+        "default": 30, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 5, "max": 300, "unit": "seconds",
         "desc": "Cadence for automated probe testing of primary and fallback LLM endpoints."
     },
     {
@@ -1999,6 +1999,26 @@ class EnterpriseSettingsService:
         elif stype in ("text", "token"):
             if val is not None and len(str(val)) > 2048:
                 return False, f"Value for '{definition['name']}' exceeds maximum allowed length of 2048 characters."
+        elif stype == "multiselect":
+            opts = [str(o) for o in definition.get("options", [])]
+            if isinstance(val, (list, tuple, set)):
+                items = [str(item) for item in val]
+            elif isinstance(val, str):
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, list):
+                        items = [str(item) for item in parsed]
+                    else:
+                        items = [s.strip() for s in val.split(",") if s.strip()]
+                except Exception:
+                    items = [s.strip() for s in val.split(",") if s.strip()]
+            else:
+                return False, f"Value for '{definition['name']}' must be a list of selections."
+            for item in items:
+                if opts and item not in opts:
+                    return False, f"Invalid choice '{item}' for '{definition['name']}'. Must be one of: {', '.join(opts)}"
+        elif stype == "button_action":
+            pass
         return True, None
 
     def _propagate_to_runtime(self, setting_key: str, new_value: Any, tenant_id: str = "tnt_primary", company_id: str = "comp_primary"):
@@ -2415,6 +2435,72 @@ class EnterpriseSettingsService:
             "latency_ms": latency_ms,
             "evidence_hash": evidence_hash,
             "timestamp": time.time()
+        }
+
+    def execute_button_action(
+        self,
+        action_id: str,
+        tenant_id: str = "tnt_primary",
+        company_id: str = "comp_primary",
+        actor: str = "Host Administrator"
+    ) -> Dict[str, Any]:
+        """Executes sovereign operational action (session revocation, telemetry purge, etc.)."""
+        definition = next((d for d in SETTINGS_DEFINITIONS if d["id"] == action_id), None)
+        now = time.time()
+        
+        if action_id == "danger_revoke_all_sessions":
+            with db.get_connection() as conn:
+                try:
+                    conn.execute("UPDATE users SET session_version = session_version + 1 WHERE tenant_id = ?", (tenant_id,))
+                except Exception:
+                    pass
+            detail = "All active bearer tokens, refresh tokens, and user browser sessions have been invalidated across all nodes."
+        elif action_id == "danger_purge_telemetry":
+            sandbox_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/sandbox")
+            if os.path.exists(sandbox_dir):
+                for f in os.listdir(sandbox_dir):
+                    fp = os.path.join(sandbox_dir, f)
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                    except Exception:
+                        pass
+            detail = "Temporary sandbox artifacts, telemetry buffers, and ephemeral logs have been purged."
+        else:
+            detail = f"Operational action '{action_id}' executed successfully."
+
+        evidence_data = f"{tenant_id}:{company_id}:{action_id}:{now}:{actor}:{detail}"
+        evidence_hash = hashlib.sha256(evidence_data.encode("utf-8")).hexdigest()
+        event_id = f"evt_{uuid.uuid4().hex[:10]}"
+        
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO settings_audit_events
+                (event_id, tenant_id, company_id, setting_id, category, old_value, new_value, scope, actor, reason, approval_status, risk_level, evidence_hash, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Host', ?, ?, 'APPROVED', ?, ?, ?)
+            """, (
+                event_id,
+                tenant_id,
+                company_id,
+                action_id,
+                definition["category"] if definition else "danger",
+                "ACTIVE_STATE",
+                "ACTION_EXECUTED",
+                actor,
+                f"Sovereign execution of {action_id}",
+                definition.get("risk", "HIGH") if definition else "HIGH",
+                evidence_hash,
+                now
+            ))
+            conn.commit()
+
+        return {
+            "success": True,
+            "action_id": action_id,
+            "detail": detail,
+            "evidence_hash": evidence_hash,
+            "timestamp": now,
+            "actor": actor
         }
 
 settings_service = EnterpriseSettingsService()

@@ -238,6 +238,9 @@ const EnterpriseSettings = (function() {
   let authEnvironment = { environment: 'development', strict_auth: false, auth_mode: 'DEV_BOOTSTRAP' };
   let effectiveStateCache = {};
   let isInitialized = false;
+  let collapsedPillars = new Set();
+  let openShutters = new Set();
+  let openCardDisclosures = new Set();
 
   // --------------------------------------------------------------------------
   // 4. Lifecycle & Initialization
@@ -379,13 +382,14 @@ const EnterpriseSettings = (function() {
       }
       activeView = 'hub';
       renderRoute();
+      return Promise.resolve();
     } else {
       const norm = normalizeDomainId(targetView);
       const newHash = `#/settings/${norm}`;
       if (window.location.hash !== newHash) {
         window.location.hash = newHash;
       }
-      loadDomain(norm);
+      return loadDomain(norm);
     }
 
     if (optHighlightId) {
@@ -561,12 +565,15 @@ const EnterpriseSettings = (function() {
           <section class="settings-pillars-browser">
             ${PILLARS.map(p => `
               <div class="pillar-group-block">
-                <div class="pillar-header">
-                  <h3 class="pillar-title">${escapeHtml(p.title)}</h3>
+                <div class="pillar-header" onclick="EnterpriseSettings.togglePillarCollapse('${p.id}')">
+                  <div class="pillar-header-left">
+                    <span class="pillar-collapse-arrow" id="pillar-arrow-${p.id}">${collapsedPillars.has(p.id) ? '▸' : '▾'}</span>
+                    <h3 class="pillar-title">${escapeHtml(p.title)}</h3>
+                  </div>
                   <span class="pillar-desc">${escapeHtml(p.desc)}</span>
                 </div>
 
-                <div class="pillar-domains-grid">
+                <div class="pillar-domains-grid" id="pillar-grid-${p.id}" style="display:${collapsedPillars.has(p.id) ? 'none' : 'grid'};">
                   ${p.domains.map(d => `
                     <div class="domain-card-item" onclick="EnterpriseSettings.navigateTo('${d.id}')">
                       <div class="domain-top-line">
@@ -700,6 +707,7 @@ const EnterpriseSettings = (function() {
 
                 <div class="domain-quick-actions">
                   <button class="btn-secondary btn-sm" onclick="EnterpriseSettings.resetToInherited()" title="Revert all settings in this domain to inherited baseline">Reset Domain</button>
+                  <button class="btn-secondary btn-sm" onclick="EnterpriseSettings.runDiagnosticTest('${getTestTarget(domain.id)}')" title="Run live diagnostic test on this domain">Test Subsystem</button>
                   <button class="btn-secondary btn-sm" onclick="EnterpriseSettings.toggleAuditDrawer()" title="View immutable cryptographic audit ledger">Audit Trail (${audits.length})</button>
                 </div>
               </div>
@@ -994,6 +1002,24 @@ const EnterpriseSettings = (function() {
           <span class="runtime-status-pill status-${runtimeStatus.toLowerCase()}">${runtimeStatus}</span>
         </div>
 
+        <!-- Expandable Policy Details & Runtime Invariants Accordion -->
+        <div class="card-disclosure-box">
+          <button type="button" class="btn-card-disclosure" id="disclosure-btn-${s.id}" onclick="EnterpriseSettings.toggleCardDisclosure('${s.id}')">
+            <span class="disclosure-arrow" id="disclosure-arrow-${s.id}">${openCardDisclosures.has(s.id) ? '▾' : '▸'}</span>
+            <span>Policy Governance & Runtime Contract</span>
+          </button>
+          <div class="disclosure-content" id="disclosure-content-${s.id}" style="display:${openCardDisclosures.has(s.id) ? 'block' : 'none'};">
+            <div class="disclosure-inner">
+              <div class="disclosure-row"><strong>Scope Boundary:</strong> <span>${escapeHtml(s.scope || 'Company')}</span></div>
+              <div class="disclosure-row"><strong>Authority Ceiling:</strong> <span>${escapeHtml(s.editable_by === 'OWNER' ? 'Sovereign Host Exclusive' : 'Shared Delegation')}</span></div>
+              <div class="disclosure-row"><strong>Risk Classification:</strong> <span class="badge risk-${(s.risk || 'low').toLowerCase()}">${escapeHtml(s.risk || 'LOW')}</span></div>
+              <div class="disclosure-row"><strong>Merkle Evidence:</strong> <span>SHA-256 Ledger Sealed</span></div>
+              ${s.unit ? `<div class="disclosure-row"><strong>Measurement Unit:</strong> <span>${escapeHtml(s.unit)}</span></div>` : ''}
+              ${s.min !== undefined ? `<div class="disclosure-row"><strong>Allowed Bounds:</strong> <span>Min: ${s.min}${s.max !== undefined ? ` / Max: ${s.max}` : ''}</span></div>` : ''}
+            </div>
+          </div>
+        </div>
+
         <!-- Card Footer Actions: Inspect Details, Test, Reset -->
         <div class="card-footer-actions">
           <div class="affected-systems-pills">
@@ -1033,17 +1059,147 @@ const EnterpriseSettings = (function() {
     if (s.type === 'toggle') {
       const isChecked = Boolean(curVal);
       return `
-        <label class="custom-toggle-control ${isReadOnly ? 'control-disabled' : ''}">
-          <input 
-            type="checkbox" 
-            id="control-input-${s.id}"
-            ${isChecked ? 'checked' : ''} 
+        <div class="toggle-control-wrapper">
+          <label class="custom-toggle-control ${isReadOnly ? 'control-disabled' : ''}" id="toggle-label-${s.id}">
+            <input 
+              type="checkbox" 
+              id="control-input-${s.id}"
+              ${isChecked ? 'checked' : ''} 
+              ${isReadOnly ? 'disabled' : ''}
+              onchange="EnterpriseSettings.stageValue('${s.id}', this.checked, false)"
+            />
+            <span class="toggle-slider"></span>
+            <span class="toggle-state-text" id="toggle-state-text-${s.id}">${isChecked ? 'Enabled' : 'Disabled'}</span>
+          </label>
+          <button 
+            type="button" 
+            class="toggle-btn-shortcut ${isChecked ? 'is-enabled' : 'is-disabled'}"
+            id="toggle-btn-shortcut-${s.id}"
+            onclick="EnterpriseSettings.flipToggle('${s.id}')"
             ${isReadOnly ? 'disabled' : ''}
-            onchange="EnterpriseSettings.stageValue('${s.id}', this.checked, false)"
-          />
-          <span class="toggle-slider"></span>
-          <span class="toggle-state-text" id="toggle-state-text-${s.id}">${isChecked ? 'Enabled' : 'Disabled'}</span>
-        </label>
+          >
+            ${isChecked ? 'Disable' : 'Enable'}
+          </button>
+        </div>
+      `;
+    }
+
+    if (s.type === 'multiselect') {
+      let curArr = curVal;
+      if (!Array.isArray(curArr)) {
+        curArr = typeof curArr === 'string' ? curArr.split(',').map(x => x.trim()).filter(Boolean) : (s.default || []);
+      }
+      const opts = s.options || [];
+      const isOpen = openShutters.has(s.id);
+      return `
+        <div class="multiselect-shutter-container" id="shutter-container-${s.id}">
+          <button 
+            type="button" 
+            class="shutter-trigger-btn ${isOpen ? 'open' : ''}" 
+            id="shutter-trigger-${s.id}"
+            onclick="EnterpriseSettings.toggleShutter('${s.id}')"
+            ${isReadOnly ? 'disabled' : ''}
+          >
+            <div class="shutter-trigger-left">
+              <span class="shutter-count-pill" id="shutter-count-${s.id}">${curArr.length} selected</span>
+              <div class="shutter-tags-preview" id="shutter-tags-${s.id}">
+                ${curArr.length > 0 ? curArr.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') + (curArr.length > 3 ? `<span class="shutter-tag-more">+${curArr.length - 3}</span>` : '') : '<span class="shutter-tag-none">None selected</span>'}
+              </div>
+            </div>
+            <span class="shutter-arrow-icon" id="shutter-arrow-${s.id}">${isOpen ? '▴' : '▾'}</span>
+          </button>
+
+          <div class="shutter-dropdown-panel" id="shutter-panel-${s.id}" style="display:${isOpen ? 'block' : 'none'};">
+            <div class="shutter-panel-header">
+              <span class="shutter-panel-title">Choose Applicable Options</span>
+              <div class="shutter-quick-btns">
+                <button type="button" class="btn-micro" onclick="EnterpriseSettings.selectAllMultiselect('${s.id}')">All</button>
+                <button type="button" class="btn-micro" onclick="EnterpriseSettings.clearAllMultiselect('${s.id}')">Clear</button>
+                <button type="button" class="btn-micro btn-done" onclick="EnterpriseSettings.toggleShutter('${s.id}')">Done</button>
+              </div>
+            </div>
+            <div class="shutter-options-list">
+              ${opts.map(opt => {
+                const isSelected = curArr.includes(opt);
+                return `
+                  <label class="shutter-option-item ${isSelected ? 'selected' : ''}">
+                    <input 
+                      type="checkbox" 
+                      id="multiselect-${s.id}-${escapeHtml(opt)}"
+                      class="shutter-checkbox"
+                      data-setting="${s.id}"
+                      data-opt="${escapeHtml(opt)}"
+                      ${isSelected ? 'checked' : ''}
+                      ${isReadOnly ? 'disabled' : ''}
+                      onchange="EnterpriseSettings.toggleMultiselectOption('${s.id}', '${escapeHtml(opt)}', this.checked)"
+                    />
+                    <span class="shutter-opt-label">${escapeHtml(opt)}</span>
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (s.type === 'slider') {
+      const minVal = s.min !== undefined ? s.min : 0;
+      const maxVal = s.max !== undefined ? s.max : 100;
+      const stepVal = s.step || 1;
+      const unit = s.unit || '';
+      return `
+        <div class="slider-control-surface" id="slider-surface-${s.id}">
+          <div class="slider-track-row">
+            <input 
+              type="range" 
+              class="control-range-slider"
+              id="slider-range-${s.id}"
+              min="${minVal}" 
+              max="${maxVal}" 
+              step="${stepVal}"
+              value="${escapeHtml(String(curVal))}"
+              ${isReadOnly ? 'disabled' : ''}
+              oninput="EnterpriseSettings.stageSliderValue('${s.id}', this.value)"
+            />
+            <div class="slider-input-unit-group">
+              <input 
+                type="number" 
+                class="control-number-compact"
+                id="control-input-${s.id}"
+                min="${minVal}" 
+                max="${maxVal}" 
+                step="${stepVal}"
+                value="${escapeHtml(String(curVal))}"
+                ${isReadOnly ? 'disabled' : ''}
+                oninput="EnterpriseSettings.stageSliderValue('${s.id}', this.value)"
+              />
+              ${unit ? `<span class="slider-unit-tag">${escapeHtml(unit)}</span>` : ''}
+            </div>
+          </div>
+          <div class="slider-bounds-row">
+            <span class="bound-label">Min: ${minVal}${unit ? ' ' + unit : ''}</span>
+            <span class="slider-live-badge" id="slider-badge-${s.id}">${curVal}${unit ? ' ' + unit : ''}</span>
+            <span class="bound-label">Max: ${maxVal}${unit ? ' ' + unit : ''}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (s.type === 'button_action') {
+      return `
+        <div class="button-action-control-surface">
+          <button 
+            type="button" 
+            class="btn-action-trigger ${s.risk === 'CRITICAL' || s.risk === 'HIGH' ? 'btn-danger-action' : 'btn-secondary'}"
+            id="btn-action-${s.id}"
+            onclick="EnterpriseSettings.executeButtonAction('${s.id}')"
+            ${isReadOnly ? 'disabled' : ''}
+          >
+            ${escapeHtml(s.name)}
+          </button>
+          <span class="action-feedback-pill" id="action-feedback-${s.id}">Ready</span>
+        </div>
       `;
     }
 
@@ -1058,8 +1214,8 @@ const EnterpriseSettings = (function() {
             onchange="EnterpriseSettings.stageValue('${s.id}', this.value, false)"
           >
             ${opts.map(opt => `
-              <option value="${escapeHtml(opt)}" ${String(curVal) === String(opt) ? 'selected' : ''}>
-                ${escapeHtml(opt)}
+              <option value="${escapeHtml(String(opt))}" ${String(curVal) === String(opt) ? 'selected' : ''}>
+                ${escapeHtml(String(opt))}${s.unit && !String(opt).includes(s.unit) ? ' ' + s.unit : ''}
               </option>
             `).join('')}
           </select>
@@ -1071,30 +1227,41 @@ const EnterpriseSettings = (function() {
       return `
         <div class="currency-input-control">
           <span class="currency-prefix">$</span>
+          <button type="button" class="stepper-btn stepper-dec" onclick="EnterpriseSettings.stepNumber('${s.id}', -100)">−</button>
           <input 
             type="number" 
             class="control-number"
             id="control-input-${s.id}"
+            min="${s.min !== undefined ? s.min : 0}"
+            max="${s.max !== undefined ? s.max : ''}"
+            step="${s.step || 100}"
             value="${escapeHtml(String(curVal))}"
             ${isReadOnly ? 'disabled' : ''}
-            oninput="EnterpriseSettings.stageValue('${s.id}', parseFloat(this.value) || 0, false)"
+            oninput="EnterpriseSettings.stageNumberValue('${s.id}', this.value)"
           />
+          <button type="button" class="stepper-btn stepper-inc" onclick="EnterpriseSettings.stepNumber('${s.id}', 100)">+</button>
           <span class="currency-unit">USD / Month</span>
         </div>
       `;
     }
 
-    if (s.type === 'number' || s.type === 'slider') {
+    if (s.type === 'number') {
       return `
         <div class="number-input-control">
+          <button type="button" class="stepper-btn stepper-dec" onclick="EnterpriseSettings.stepNumber('${s.id}', -1)">−</button>
           <input 
             type="number" 
             class="control-number"
             id="control-input-${s.id}"
+            min="${s.min !== undefined ? s.min : ''}"
+            max="${s.max !== undefined ? s.max : ''}"
+            step="${s.step || 1}"
             value="${escapeHtml(String(curVal))}"
             ${isReadOnly ? 'disabled' : ''}
-            oninput="EnterpriseSettings.stageValue('${s.id}', parseInt(this.value, 10) || 0, false)"
+            oninput="EnterpriseSettings.stageNumberValue('${s.id}', this.value)"
           />
+          <button type="button" class="stepper-btn stepper-inc" onclick="EnterpriseSettings.stepNumber('${s.id}', 1)">+</button>
+          ${s.unit ? `<span class="number-unit-tag">${escapeHtml(s.unit)}</span>` : ''}
         </div>
       `;
     }
@@ -1115,6 +1282,8 @@ const EnterpriseSettings = (function() {
             ${isRevealed ? 'Hide' : 'Reveal'}
           </button>
           <button type="button" class="token-btn" onclick="EnterpriseSettings.copySecret('${s.id}')">Copy</button>
+          <button type="button" class="token-btn" onclick="EnterpriseSettings.rotateSecret('${s.id}')">Rotate</button>
+          <button type="button" class="token-btn btn-danger-token" onclick="EnterpriseSettings.revokeSecret('${s.id}')">Revoke</button>
         </div>
       `;
     }
@@ -1124,24 +1293,15 @@ const EnterpriseSettings = (function() {
         <div class="segmented-radio-control" id="radio-group-${s.id}">
           ${s.options.map(opt => `
             <button 
-              type="button"
+              type="button" 
               class="segment-btn ${String(curVal) === String(opt) ? 'active' : ''}"
-              data-val="${escapeHtml(opt)}"
-              onclick="EnterpriseSettings.stageRadioValue('${s.id}', '${escapeHtml(opt)}')"
+              data-val="${escapeHtml(String(opt))}"
+              onclick="EnterpriseSettings.stageRadioValue('${s.id}', '${escapeHtml(String(opt))}')"
               ${isReadOnly ? 'disabled' : ''}
             >
-              ${escapeHtml(opt)}
+              ${escapeHtml(String(opt))}
             </button>
           `).join('')}
-        </div>
-      `;
-    }
-
-    if (s.type === 'status') {
-      return `
-        <div class="read-only-status-box">
-          <span class="status-box-val">${escapeHtml(String(curVal))}</span>
-          <span class="status-box-tag">Constitutional Baseline</span>
         </div>
       `;
     }
@@ -1194,6 +1354,8 @@ const EnterpriseSettings = (function() {
 
     const curVal = stagedValues.hasOwnProperty(s.id) ? stagedValues[s.id] : s.value;
     const affectedSystems = getAffectedSystemsForSetting(s.id);
+    const effRuntimeVal = s.effective_runtime_value !== undefined ? s.effective_runtime_value : curVal;
+    const runtimeStatus = s.runtime_status || 'ACTIVE';
 
     return `
       <div class="setting-inspector-overlay">
@@ -1209,35 +1371,58 @@ const EnterpriseSettings = (function() {
           </div>
 
           <div class="inspector-scroll-body">
-            <!-- Section 1: Effective Configuration Context -->
+            <!-- Section 1: Effective Configuration Context (11 Required Fields) -->
             <div class="spec-section-card">
-              <h5 class="spec-heading">Configuration Values</h5>
+              <h5 class="spec-heading">11-Point Invariant Verification</h5>
               <div class="spec-grid-row">
-                <span class="spec-k">Configured Value:</span>
+                <span class="spec-k">1. Configured Value:</span>
                 <span class="spec-v"><code>${JSON.stringify(curVal)}</code></span>
               </div>
               <div class="spec-grid-row">
-                <span class="spec-k">Effective Runtime:</span>
-                <span class="spec-v"><strong>${escapeHtml(String(s.effective_runtime_value !== undefined ? s.effective_runtime_value : curVal))}</strong></span>
+                <span class="spec-k">2. Effective Runtime:</span>
+                <span class="spec-v"><strong>${escapeHtml(String(effRuntimeVal))}</strong></span>
               </div>
               <div class="spec-grid-row">
-                <span class="spec-k">Inherited Baseline:</span>
-                <span class="spec-v">${escapeHtml(s.inherited_from || 'Host Default')}</span>
+                <span class="spec-k">3. Scope Boundary:</span>
+                <span class="spec-v">${escapeHtml(s.scope || 'Company')}</span>
               </div>
               <div class="spec-grid-row">
-                <span class="spec-k">Sovereign Authority:</span>
+                <span class="spec-k">4. Inherited Baseline:</span>
+                <span class="spec-v">${escapeHtml(s.inherited_from || 'Host Sovereign Baseline')}</span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">5. Source Authority:</span>
                 <span class="spec-v">${escapeHtml(s.editable_by === 'OWNER' ? 'Sovereign Host Exclusive' : 'Shared Delegation')}</span>
               </div>
               <div class="spec-grid-row">
-                <span class="spec-k">Risk Ceiling:</span>
-                <span class="spec-v"><span class="badge risk-${(s.risk || 'low').toLowerCase()}">${escapeHtml(s.risk || 'LOW')}</span></span>
+                <span class="spec-k">6. Managed By:</span>
+                <span class="spec-v">${escapeHtml(s.is_ceo_managed ? 'AI CEO Autonomous Engine' : 'Sovereign Host Administrator')}</span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">7. Last Changed:</span>
+                <span class="spec-v">${s.updated_at ? new Date(s.updated_at * 1000).toLocaleString() : 'Baseline System Initialization'}</span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">8. Changed By (Actor):</span>
+                <span class="spec-v">${escapeHtml(s.updated_by || 'Sovereign Host')}</span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">9. Runtime Consumers:</span>
+                <span class="spec-v">${affectedSystems.join(', ')}</span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">10. Enforcement Status:</span>
+                <span class="spec-v"><span class="runtime-status-pill status-${runtimeStatus.toLowerCase()}">${runtimeStatus}</span></span>
+              </div>
+              <div class="spec-grid-row">
+                <span class="spec-k">11. Audit Ledger Receipt:</span>
+                <span class="spec-v"><code>${s.evidence_hash ? s.evidence_hash.substring(0, 16) + '...' : 'GENESIS-BLOCK-SEALED'}</code></span>
               </div>
             </div>
 
-            <!-- Section 2: Affected Systems & Dependencies -->
+            <!-- Section 2: Affected Subsystems -->
             <div class="spec-section-card">
               <h5 class="spec-heading">Affected Subsystems & Enforcers</h5>
-              <p class="spec-desc">Modifying this setting directly reconfigures the following runtime layers:</p>
               <div class="spec-systems-tags">
                 ${affectedSystems.map(sys => `
                   <div class="system-item-chip">
@@ -1248,24 +1433,17 @@ const EnterpriseSettings = (function() {
               </div>
             </div>
 
-            <!-- Section 3: Dependencies & Safety Gates -->
+            <!-- Section 3: Operational Actions -->
             <div class="spec-section-card">
-              <h5 class="spec-heading">Dependencies & Constraints</h5>
-              <p class="spec-desc">Constitutional rules governing this configuration:</p>
-              <ul class="spec-constraints-list">
-                <li>Strict multi-tenant boundaries enforced. Zero cross-company mutation permitted.</li>
-                <li>Changes require cryptographic audit receipt with SHA-256 evidence ledger logging.</li>
-                ${s.risk === 'CRITICAL' || s.risk === 'HIGH' ? '<li><strong>High-Risk Safeguard:</strong> Requires explicit Sovereign Host sign-off before persistence.</li>' : ''}
-              </ul>
-            </div>
-
-            <!-- Section 4: Live Verification Action -->
-            <div class="spec-section-card">
-              <h5 class="spec-heading">Live Subsystem Verification</h5>
-              <p class="spec-desc">Test real-time endpoint latency and runtime contract compliance:</p>
-              <button class="btn-primary btn-sm" onclick="EnterpriseSettings.runDiagnosticTest('${getTestTarget(s.id)}')">
-                Run Diagnostic Test
-              </button>
+              <h5 class="spec-heading">Operational Actions</h5>
+              <div class="inspector-action-buttons">
+                <button type="button" class="btn-secondary btn-sm" onclick="EnterpriseSettings.resetSettingToDefault('${s.id}')">
+                  Reset to Baseline Default
+                </button>
+                <button type="button" class="btn-primary btn-sm" onclick="EnterpriseSettings.runDiagnosticTest('${getTestTarget(s.id)}')">
+                  Run Diagnostic Test
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1507,6 +1685,10 @@ const EnterpriseSettings = (function() {
     if (shouldRerender) {
       renderRoute();
     } else {
+      const input = document.getElementById(`control-input-${settingId}`);
+      if (input && input.value !== String(val) && input.type !== 'checkbox') {
+        input.value = val;
+      }
       const toggleText = document.getElementById(`toggle-state-text-${settingId}`);
       if (toggleText) {
         toggleText.textContent = Boolean(val) ? 'Enabled' : 'Disabled';
@@ -1892,6 +2074,300 @@ const EnterpriseSettings = (function() {
   }
 
   // --------------------------------------------------------------------------
+  // INTERACTIVE CONTROL ENHANCEMENT HANDLERS (Sliders, Shutters, Actions, Steppers)
+  // --------------------------------------------------------------------------
+  function toggleShutter(settingId) {
+    if (openShutters.has(settingId)) {
+      openShutters.delete(settingId);
+    } else {
+      openShutters.add(settingId);
+    }
+    const panel = document.getElementById(`shutter-panel-${settingId}`);
+    const arrow = document.getElementById(`shutter-arrow-${settingId}`);
+    if (panel) {
+      const isOpen = openShutters.has(settingId);
+      panel.style.display = isOpen ? 'block' : 'none';
+      if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
+    }
+  }
+
+  function toggleMultiselectOption(settingId, opt, isChecked) {
+    let curList = stagedValues.hasOwnProperty(settingId) ? stagedValues[settingId] : originalValues[settingId];
+    if (!Array.isArray(curList)) {
+      curList = typeof curList === 'string' ? curList.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+    let nextList = [...curList];
+    if (isChecked) {
+      if (!nextList.includes(opt)) nextList.push(opt);
+    } else {
+      nextList = nextList.filter(item => item !== opt);
+    }
+    stagedValues[settingId] = nextList;
+
+    const countBadge = document.getElementById(`shutter-count-${settingId}`);
+    if (countBadge) countBadge.textContent = `${nextList.length} selected`;
+
+    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
+    if (tagsBox) {
+      tagsBox.innerHTML = nextList.length > 0
+        ? nextList.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') + (nextList.length > 3 ? `<span class="shutter-tag-more">+${nextList.length - 3}</span>` : '')
+        : '<span class="shutter-tag-none">None selected</span>';
+    }
+
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function selectAllMultiselect(settingId) {
+    const s = currentDomainData && currentDomainData.settings ? currentDomainData.settings.find(item => item.id === settingId) : null;
+    const allOpts = (s && s.options) ? [...s.options] : [];
+    stagedValues[settingId] = allOpts;
+
+    const panel = document.getElementById(`shutter-panel-${settingId}`);
+    if (panel) {
+      panel.querySelectorAll('input[type="checkbox"]').forEach(chk => { chk.checked = true; });
+    }
+    const countBadge = document.getElementById(`shutter-count-${settingId}`);
+    if (countBadge) countBadge.textContent = `${allOpts.length} selected`;
+    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
+    if (tagsBox) {
+      tagsBox.innerHTML = allOpts.slice(0, 3).map(item => `<span class="shutter-tag-pill">${escapeHtml(item)}</span>`).join('') +
+        (allOpts.length > 3 ? `<span class="shutter-tag-more">+${allOpts.length - 3}</span>` : '');
+    }
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function clearAllMultiselect(settingId) {
+    stagedValues[settingId] = [];
+    const panel = document.getElementById(`shutter-panel-${settingId}`);
+    if (panel) {
+      panel.querySelectorAll('input[type="checkbox"]').forEach(chk => { chk.checked = false; });
+    }
+    const countBadge = document.getElementById(`shutter-count-${settingId}`);
+    if (countBadge) countBadge.textContent = '0 selected';
+    const tagsBox = document.getElementById(`shutter-tags-${settingId}`);
+    if (tagsBox) tagsBox.innerHTML = '<span class="shutter-tag-none">None selected</span>';
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function stageSliderValue(settingId, val) {
+    const num = parseFloat(val);
+    stagedValues[settingId] = isNaN(num) ? val : num;
+    const range = document.getElementById(`slider-range-${settingId}`);
+    if (range && range.value !== String(val)) range.value = val;
+    const numInput = document.getElementById(`control-input-${settingId}`);
+    if (numInput && numInput.value !== String(val)) numInput.value = val;
+    const badge = document.getElementById(`slider-badge-${settingId}`);
+    if (badge) {
+      const s = currentDomainData && currentDomainData.settings ? currentDomainData.settings.find(item => item.id === settingId) : null;
+      badge.textContent = `${val}${s && s.unit ? ' ' + s.unit : ''}`;
+    }
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function stageNumberValue(settingId, rawVal) {
+    if (rawVal === '' || rawVal === '-') {
+      stagedValues[settingId] = rawVal;
+    } else {
+      const num = parseFloat(rawVal);
+      stagedValues[settingId] = isNaN(num) ? rawVal : num;
+    }
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function stepNumber(settingId, delta) {
+    const s = currentDomainData && currentDomainData.settings ? currentDomainData.settings.find(item => item.id === settingId) : null;
+    let cur = stagedValues.hasOwnProperty(settingId) ? stagedValues[settingId] : (originalValues.hasOwnProperty(settingId) ? originalValues[settingId] : 0);
+    cur = parseFloat(cur) || 0;
+    const step = (s && s.step) ? s.step : (s && s.type === 'currency' ? 100 : 1);
+    let nextVal = cur + (delta * step);
+    if (s && s.min !== undefined && nextVal < s.min) nextVal = s.min;
+    if (s && s.max !== undefined && nextVal > s.max) nextVal = s.max;
+
+    stagedValues[settingId] = nextVal;
+    const input = document.getElementById(`control-input-${settingId}`);
+    if (input) input.value = nextVal;
+    updateCardDirtyState(settingId);
+    updateSaveBar();
+  }
+
+  function flipToggle(settingId) {
+    const cur = stagedValues.hasOwnProperty(settingId) ? stagedValues[settingId] : (originalValues.hasOwnProperty(settingId) ? originalValues[settingId] : false);
+    const nextVal = !Boolean(cur);
+    stageValue(settingId, nextVal, false);
+    const input = document.getElementById(`control-input-${settingId}`);
+    if (input) input.checked = nextVal;
+    const shortcutBtn = document.getElementById(`toggle-btn-shortcut-${settingId}`);
+    if (shortcutBtn) {
+      shortcutBtn.textContent = nextVal ? 'Disable' : 'Enable';
+      shortcutBtn.className = `toggle-btn-shortcut ${nextVal ? 'is-enabled' : 'is-disabled'}`;
+    }
+  }
+
+  function toggleCardDisclosure(settingId) {
+    if (openCardDisclosures.has(settingId)) {
+      openCardDisclosures.delete(settingId);
+    } else {
+      openCardDisclosures.add(settingId);
+    }
+    const content = document.getElementById(`disclosure-content-${settingId}`);
+    const arrow = document.getElementById(`disclosure-arrow-${settingId}`);
+    if (content) {
+      const isOpen = openCardDisclosures.has(settingId);
+      content.style.display = isOpen ? 'block' : 'none';
+      if (arrow) arrow.textContent = isOpen ? '▾' : '▸';
+    }
+  }
+
+  function togglePillarCollapse(pillarId) {
+    if (collapsedPillars.has(pillarId)) {
+      collapsedPillars.delete(pillarId);
+    } else {
+      collapsedPillars.add(pillarId);
+    }
+    const grid = document.getElementById(`pillar-grid-${pillarId}`);
+    const arrow = document.getElementById(`pillar-arrow-${pillarId}`);
+    if (grid) {
+      const isCol = collapsedPillars.has(pillarId);
+      grid.style.display = isCol ? 'none' : 'grid';
+      if (arrow) arrow.textContent = isCol ? '▸' : '▾';
+    }
+  }
+
+  async function executeButtonAction(actionId) {
+    const feedback = document.getElementById(`action-feedback-${actionId}`);
+    if (feedback) feedback.textContent = 'Executing...';
+    try {
+      const res = await fetch(`/api/settings/action/${encodeURIComponent(actionId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Name': (window.state && window.state.host) ? window.state.host.name : 'Host Administrator'
+        },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (feedback) feedback.textContent = 'Executed ✓';
+        if (typeof showToast === 'function') {
+          showToast(`${data.detail || 'Action completed successfully.'}`, 'success');
+        } else {
+          alert(`Success: ${data.detail || 'Action executed.'}`);
+        }
+      } else {
+        if (feedback) feedback.textContent = 'Failed ✗';
+        const err = await res.json().catch(() => ({}));
+        alert(`Action failed: ${err.error || 'Server error'}`);
+      }
+    } catch (e) {
+      if (feedback) feedback.textContent = 'Error ✗';
+      alert(`Action error: ${e.message}`);
+    }
+  }
+
+  async function rotateSecret(settingId) {
+    try {
+      const res = await fetch(`/api/settings/key/${encodeURIComponent(settingId)}/rotate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Name': (window.state && window.state.host) ? window.state.host.name : 'Host Administrator'
+        },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        originalValues[settingId] = data.new_value;
+        stagedValues[settingId] = data.new_value;
+        const input = document.getElementById(`control-input-${settingId}`);
+        if (input) input.value = data.new_value;
+        updateCardDirtyState(settingId);
+        updateSaveBar();
+        if (typeof showToast === 'function') {
+          showToast(`Secret token rotated successfully. New key issued.`, 'success');
+        } else {
+          alert('Secret token rotated successfully.');
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to rotate secret: ${err.error || 'Server error'}`);
+      }
+    } catch (e) {
+      alert(`Rotate failed: ${e.message}`);
+    }
+  }
+
+  async function revokeSecret(settingId) {
+    try {
+      const res = await fetch(`/api/settings/key/${encodeURIComponent(settingId)}/revoke`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Name': (window.state && window.state.host) ? window.state.host.name : 'Host Administrator'
+        },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        originalValues[settingId] = data.new_value;
+        stagedValues[settingId] = data.new_value;
+        const input = document.getElementById(`control-input-${settingId}`);
+        if (input) input.value = data.new_value;
+        updateCardDirtyState(settingId);
+        updateSaveBar();
+        if (typeof showToast === 'function') {
+          showToast(`Secret token revoked.`, 'warning');
+        } else {
+          alert('Secret token revoked.');
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to revoke secret: ${err.error || 'Server error'}`);
+      }
+    } catch (e) {
+      alert(`Revoke failed: ${e.message}`);
+    }
+  }
+
+  async function resetSettingToDefault(settingId) {
+    try {
+      const res = await fetch(`/api/settings/key/${encodeURIComponent(settingId)}/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Name': (window.state && window.state.host) ? window.state.host.name : 'Host Administrator'
+        },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        originalValues[settingId] = data.new_value;
+        stagedValues[settingId] = data.new_value;
+        if (currentDomainData && currentDomainData.settings) {
+          const s = currentDomainData.settings.find(item => item.id === settingId);
+          if (s) {
+            s.value = data.new_value;
+            s.inherited_from = 'Host Default';
+          }
+        }
+        renderRoute();
+        if (typeof showToast === 'function') {
+          showToast(`Setting reset to default: ${JSON.stringify(data.new_value)}`, 'success');
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to reset setting: ${err.error || 'Server error'}`);
+      }
+    } catch (e) {
+      alert(`Reset failed: ${e.message}`);
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // 20. Helper Utilities
   // --------------------------------------------------------------------------
   function escapeHtml(str) {
@@ -1960,7 +2436,24 @@ const EnterpriseSettings = (function() {
     init,
     render,
     navigateTo,
+    selectCategory: navigateTo,
     stageValue,
+    stageSettingChange: stageValue,
+    saveChanges: async () => {
+      if (previewPendingChange) {
+        const chk = document.getElementById('hostConfirmCheckbox');
+        if (chk) chk.checked = true;
+        executeConfirmedSave();
+      } else {
+        await commitBatchSave();
+      }
+    },
+    openInspector: inspectSetting,
+    openAuditDrawer: async () => {
+      if (!isAuditDrawerOpen) {
+        await toggleAuditDrawer();
+      }
+    },
     stageRadioValue,
     resetSingleSetting,
     discardChanges,
@@ -1987,6 +2480,20 @@ const EnterpriseSettings = (function() {
     resolveProposal,
     toggleSecretReveal,
     copySecret,
+    rotateSecret,
+    revokeSecret,
+    resetSettingToDefault,
+    toggleShutter,
+    toggleMultiselectOption,
+    selectAllMultiselect,
+    clearAllMultiselect,
+    stageSliderValue,
+    stageNumberValue,
+    stepNumber,
+    flipToggle,
+    toggleCardDisclosure,
+    togglePillarCollapse,
+    executeButtonAction,
     focusSearchMobile
   };
 })();

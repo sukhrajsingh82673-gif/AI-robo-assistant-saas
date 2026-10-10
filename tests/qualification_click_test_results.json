@@ -1,0 +1,3034 @@
+{
+  "totalDomainsCrawled": 32,
+  "totalControlsDiscovered": 189,
+  "inventory": [
+    {
+      "id": "acc_display_name",
+      "domain": "account",
+      "label": "Display Name",
+      "type": "text",
+      "current_value": "Sukhraj Singh",
+      "expected_action": "Interact with text and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_email",
+      "domain": "account",
+      "label": "Host Email",
+      "type": "text",
+      "current_value": "host@zonata.internal",
+      "expected_action": "Interact with text and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_timezone",
+      "domain": "account",
+      "label": "Preferred Timezone",
+      "type": "select",
+      "current_value": "Asia/Kolkata",
+      "expected_action": "Interact with select and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_density",
+      "domain": "account",
+      "label": "Interface Density",
+      "type": "radio",
+      "current_value": "comfortable",
+      "expected_action": "Interact with radio and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "host_emergency_stop",
+      "domain": "account",
+      "label": "Global Emergency Stop",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "host_authority_scope",
+      "domain": "account",
+      "label": "Sovereign Authority Level",
+      "type": "unknown",
+      "current_value": null,
+      "expected_action": "Interact with unknown and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "host_killswitch_finances",
+      "domain": "account",
+      "label": "Halt Financial Execution",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "host_killswitch_desktop",
+      "domain": "account",
+      "label": "Halt Desktop / OS Control",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_session_timeout_min",
+      "domain": "account",
+      "label": "Host Session Inactivity Timeout (Minutes)",
+      "type": "number",
+      "current_value": "60",
+      "expected_action": "Interact with number and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_two_factor_method",
+      "domain": "account",
+      "label": "Primary 2FA Verification Method",
+      "type": "select",
+      "current_value": "TOTP Authenticator",
+      "expected_action": "Interact with select and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "acc_keyboard_shortcuts_enabled",
+      "domain": "account",
+      "label": "Global Command Palette Shortcuts (Cmd+K)",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/account",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/account",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_legal_name",
+      "domain": "company",
+      "label": "Legal Corporate Name",
+      "type": "text",
+      "current_value": "ZONATA Primary Corp",
+      "expected_action": "Interact with text and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_industry",
+      "domain": "company",
+      "label": "Industry Sector",
+      "type": "select",
+      "current_value": "Manufacturing & Supply Chain",
+      "expected_action": "Interact with select and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_business_model",
+      "domain": "company",
+      "label": "Business Model",
+      "type": "multiselect",
+      "current_value": [
+        "B2B",
+        "Subscription"
+      ],
+      "expected_action": "Interact with multiselect and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_base_currency",
+      "domain": "company",
+      "label": "Base Currency",
+      "type": "select",
+      "current_value": "INR (₹)",
+      "expected_action": "Interact with select and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "org_hierarchy_enforcement",
+      "domain": "company",
+      "label": "12-Level Hierarchy Enforcement",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "org_max_exec_span",
+      "domain": "company",
+      "label": "Executive Span of Control Limit",
+      "type": "number",
+      "current_value": "8",
+      "expected_action": "Interact with number and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_subindustry",
+      "domain": "company",
+      "label": "Sub-Industry Vertical Focus",
+      "type": "text",
+      "current_value": "Autonomous Enterprise Operations & Cognitive Governance",
+      "expected_action": "Interact with text and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_fiscal_year_start",
+      "domain": "company",
+      "label": "Fiscal Year Commencement Month",
+      "type": "select",
+      "current_value": "April",
+      "expected_action": "Interact with select and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_tax_id_number",
+      "domain": "company",
+      "label": "Statutory Tax Registration Number",
+      "type": "text",
+      "current_value": "GSTIN-07AAACZ1234A1Z5",
+      "expected_action": "Interact with text and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_business_calendar",
+      "domain": "company",
+      "label": "Operating Business Calendar Cadence",
+      "type": "select",
+      "current_value": "Monday - Friday (Standard)",
+      "expected_action": "Interact with select and persist via /api/settings/category/company",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/company",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "rbac_default_role",
+      "domain": "users",
+      "label": "Default Invited Role",
+      "type": "select",
+      "current_value": "OPERATOR",
+      "expected_action": "Interact with select and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "rbac_two_person_rule",
+      "domain": "users",
+      "label": "Enforce Two-Person Rule",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "usr_session_max_concurrent",
+      "domain": "users",
+      "label": "Max Concurrent Operator Sessions",
+      "type": "number",
+      "current_value": "5",
+      "expected_action": "Interact with number and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "usr_invitation_expiry_hours",
+      "domain": "users",
+      "label": "User Invite Link TTL (Hours)",
+      "type": "number",
+      "current_value": "48",
+      "expected_action": "Interact with number and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "usr_password_min_length",
+      "domain": "users",
+      "label": "Minimum Password Length Enforcement",
+      "type": "number",
+      "current_value": "14",
+      "expected_action": "Interact with number and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "usr_require_hardware_passkey",
+      "domain": "users",
+      "label": "Enforce FIDO2 Hardware Security Keys",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/users",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/users",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_scim_provisioning",
+      "domain": "enterprise",
+      "label": "SCIM Directory Sync",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_tenant_domain",
+      "domain": "enterprise",
+      "label": "Primary Enterprise Custom Domain",
+      "type": "text",
+      "current_value": "zonata.corp.internal",
+      "expected_action": "Interact with text and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_saml_sso_enforced",
+      "domain": "enterprise",
+      "label": "Enforce SAML 2.0 / OIDC Single Sign-On",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_tenant_storage_quota_gb",
+      "domain": "enterprise",
+      "label": "Tenant Storage Volume Quota (GB)",
+      "type": "number",
+      "current_value": "500",
+      "expected_action": "Interact with number and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_multi_workspace_isolation",
+      "domain": "enterprise",
+      "label": "Strict Workspace Boundary Isolation",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ent_data_residency_zone",
+      "domain": "enterprise",
+      "label": "Statutory Data Residency Region",
+      "type": "select",
+      "current_value": "IN-Central (Mumbai)",
+      "expected_action": "Interact with select and persist via /api/settings/category/enterprise",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/enterprise",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_master_enablement",
+      "domain": "ceo",
+      "label": "AI System Global Enablement",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_reasoning_depth",
+      "domain": "ceo",
+      "label": "Reasoning Depth Policy",
+      "type": "radio",
+      "current_value": "balanced",
+      "expected_action": "Interact with radio and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_prompt_injection_guard",
+      "domain": "ceo",
+      "label": "Prompt Injection Firewall",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_autonomy_level",
+      "domain": "ceo",
+      "label": "CEO Autonomy Level",
+      "type": "select",
+      "current_value": "Level 3 — Execute Within Policy",
+      "expected_action": "Interact with select and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_spending_limit",
+      "domain": "ceo",
+      "label": "CEO Autonomous Spending Cap",
+      "type": "currency",
+      "current_value": "50000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_council_enabled",
+      "domain": "ceo",
+      "label": "Executive Council Peer Review",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_continuous_cognition_mins",
+      "domain": "ceo",
+      "label": "Continuous Cognition Interval",
+      "type": "number",
+      "current_value": "15",
+      "expected_action": "Interact with number and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_escalation_protocol",
+      "domain": "ceo",
+      "label": "Autonomous Anomaly Escalation Protocol",
+      "type": "select",
+      "current_value": "Notify Host & Await Confirmation",
+      "expected_action": "Interact with select and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ceo_evidence_retention_days",
+      "domain": "ceo",
+      "label": "Executive Decision Evidence Retention (Days)",
+      "type": "number",
+      "current_value": "365",
+      "expected_action": "Interact with number and persist via /api/settings/category/ceo",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ceo",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_max_concurrent_agents",
+      "domain": "workforce",
+      "label": "Max Concurrent Active Agents",
+      "type": "number",
+      "current_value": "16",
+      "expected_action": "Interact with number and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_autonomous_spawning",
+      "domain": "workforce",
+      "label": "Allow Autonomous Agent Spawning",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "af_mandatory_simulation",
+      "domain": "workforce",
+      "label": "Mandatory Pre-Deployment Simulation",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_agent_budget_monthly",
+      "domain": "workforce",
+      "label": "Per-Worker Monthly Inference Budget Ceiling",
+      "type": "currency",
+      "current_value": "25000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_lifecycle_auto_retire_idle_hours",
+      "domain": "workforce",
+      "label": "Auto-Decommission Idle Specialized Workers (Hours)",
+      "type": "number",
+      "current_value": "72",
+      "expected_action": "Interact with number and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_memory_isolation_mode",
+      "domain": "workforce",
+      "label": "Cognitive Memory Partitioning Boundary",
+      "type": "select",
+      "current_value": "Tenant Strict Namespace",
+      "expected_action": "Interact with select and persist via /api/settings/category/workforce",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workforce",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mission_outcome_verification",
+      "domain": "workflows",
+      "label": "Mandatory Outcome Verification Gate",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mission_retry_limit",
+      "domain": "workflows",
+      "label": "Mission Max Retries",
+      "type": "number",
+      "current_value": "3",
+      "expected_action": "Interact with number and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_durable_checkpointing",
+      "domain": "workflows",
+      "label": "Durable Step Checkpointing",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_retries_max",
+      "domain": "workflows",
+      "label": "Maximum Step Retry Attempts on Transient Failure",
+      "type": "number",
+      "current_value": "3",
+      "expected_action": "Interact with number and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_dag_execution_timeout_min",
+      "domain": "workflows",
+      "label": "Mission Workflow Hard Timeout (Minutes)",
+      "type": "number",
+      "current_value": "120",
+      "expected_action": "Interact with number and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_auto_compensate_on_fail",
+      "domain": "workflows",
+      "label": "Execute Automatic Compensating Saga Actions",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "wf_cron_dispatch_enabled",
+      "domain": "workflows",
+      "label": "Enable Autonomous Cron & Heartbeat Schedulers",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/workflows",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/workflows",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_primary_provider",
+      "domain": "ai_providers",
+      "label": "Primary Inference Provider",
+      "type": "select",
+      "current_value": "Google Vertex AI / Gemini",
+      "expected_action": "Interact with select and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_gemini_api_token",
+      "domain": "ai_providers",
+      "label": "Gemini API Token",
+      "type": "token",
+      "current_value": "••••••••••••••••••••••••••••••••",
+      "expected_action": "Interact with token and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_circuit_breaker_retries",
+      "domain": "ai_providers",
+      "label": "Provider Max Retries",
+      "type": "number",
+      "current_value": "3",
+      "expected_action": "Interact with number and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_fallback_provider",
+      "domain": "ai_providers",
+      "label": "Failover Backup AI Model Provider",
+      "type": "select",
+      "current_value": "Anthropic Claude 3.5 Sonnet",
+      "expected_action": "Interact with select and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_cost_cap_per_turn_usd",
+      "domain": "ai_providers",
+      "label": "Single Inference Turn Maximum Spend ($)",
+      "type": "currency",
+      "current_value": "2.5",
+      "expected_action": "Interact with currency and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "ai_request_timeout_seconds",
+      "domain": "ai_providers",
+      "label": "LLM Provider HTTP Request Timeout (Seconds)",
+      "type": "number",
+      "current_value": "60",
+      "expected_action": "Interact with number and persist via /api/settings/category/ai_providers",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/ai_providers",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "tools_sandboxed_exec",
+      "domain": "tools",
+      "label": "Sandboxed Execution Mandatory",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/tools",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/tools",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "tools_authority_ceiling",
+      "domain": "tools",
+      "label": "Default Authority Ceiling",
+      "type": "select",
+      "current_value": "ASK_ME",
+      "expected_action": "Interact with select and persist via /api/settings/category/tools",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/tools",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "tool_allow_network_egress",
+      "domain": "tools",
+      "label": "Allow Outbound Internet Egress from Sandbox",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/tools",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/tools",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "tool_audit_payloads",
+      "domain": "tools",
+      "label": "Capture Complete Tool Invocation Arguments in Evidence",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/tools",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/tools",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "tool_max_execution_duration_sec",
+      "domain": "tools",
+      "label": "Tool Execution Time Limit (Seconds)",
+      "type": "number",
+      "current_value": "120",
+      "expected_action": "Interact with number and persist via /api/settings/category/tools",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/tools",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "desk_enable_control",
+      "domain": "desktop",
+      "label": "Enable Desktop Perception & Control",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/desktop",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/desktop",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "desk_fps_limit",
+      "domain": "desktop",
+      "label": "Perception Screen Sampling Rate (FPS)",
+      "type": "slider",
+      "current_value": "2",
+      "expected_action": "Interact with slider and persist via /api/settings/category/desktop",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/desktop",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "desk_input_cooldown_ms",
+      "domain": "desktop",
+      "label": "Hardware Mouse & Keyboard Event Rate Limit (ms)",
+      "type": "number",
+      "current_value": "250",
+      "expected_action": "Interact with number and persist via /api/settings/category/desktop",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/desktop",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "desk_screen_masking_enabled",
+      "domain": "desktop",
+      "label": "Mask Sensitive Passwords in Screen Captures",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/desktop",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/desktop",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "desk_kill_switch_hotkey",
+      "domain": "desktop",
+      "label": "Physical Emergency Halt Hotkey Binding",
+      "type": "text",
+      "current_value": "Ctrl+Alt+Escape",
+      "expected_action": "Interact with text and persist via /api/settings/category/desktop",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/desktop",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "browser_headless_mode",
+      "domain": "browser",
+      "label": "Headless Browser Automation",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/browser",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/browser",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "browser_ssrf_protection",
+      "domain": "browser",
+      "label": "Strict SSRF & Private Network Egress Filter",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/browser",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/browser",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "browser_download_allowed",
+      "domain": "browser",
+      "label": "Allow Automatic File Downloads in Browser",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/browser",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/browser",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "browser_session_isolation",
+      "domain": "browser",
+      "label": "Incognito Ephemeral Browser Context Per Task",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/browser",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/browser",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "browser_navigation_timeout_sec",
+      "domain": "browser",
+      "label": "Page DOM Load & Network Idle Timeout (Seconds)",
+      "type": "number",
+      "current_value": "45",
+      "expected_action": "Interact with number and persist via /api/settings/category/browser",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/browser",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "term_execution_enabled",
+      "domain": "terminal",
+      "label": "Terminal Command Execution Enabled",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "term_max_lease_seconds",
+      "domain": "terminal",
+      "label": "Command Execution Lease TTL (Seconds)",
+      "type": "number",
+      "current_value": "60",
+      "expected_action": "Interact with number and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "openhands_repo_sandbox",
+      "domain": "terminal",
+      "label": "Sandboxed Code Execution & Git Branch Isolation",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "term_network_isolated",
+      "domain": "terminal",
+      "label": "Enforce Network Namespace Isolation (Air-Gapped)",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "term_cgroup_cpu_shares",
+      "domain": "terminal",
+      "label": "Linux Cgroup CPU Share Weight Allocation",
+      "type": "number",
+      "current_value": "512",
+      "expected_action": "Interact with number and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "term_allowed_command_prefixes",
+      "domain": "terminal",
+      "label": "Authorized Shell Executable Allowlist",
+      "type": "text",
+      "current_value": "git,python3,node,ls,cat,grep,echo,find,tar,gzip",
+      "expected_action": "Interact with text and persist via /api/settings/category/terminal",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/terminal",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mcp_allow_external_servers",
+      "domain": "mcp",
+      "label": "Allow External MCP Servers",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/mcp",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/mcp",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mcp_max_connected_servers",
+      "domain": "mcp",
+      "label": "Maximum Active MCP Server Connections",
+      "type": "number",
+      "current_value": "8",
+      "expected_action": "Interact with number and persist via /api/settings/category/mcp",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/mcp",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mcp_json_rpc_timeout_sec",
+      "domain": "mcp",
+      "label": "MCP JSON-RPC Handshake Timeout (Seconds)",
+      "type": "number",
+      "current_value": "30",
+      "expected_action": "Interact with number and persist via /api/settings/category/mcp",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/mcp",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mcp_enforce_tls",
+      "domain": "mcp",
+      "label": "Mandate TLS Encryption on Remote MCP Transports",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/mcp",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/mcp",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mcp_auth_token",
+      "domain": "mcp",
+      "label": "MCP Gateway Bearer Authentication Secret",
+      "type": "token",
+      "current_value": "••••••••••••••••••••••••••••••••",
+      "expected_action": "Interact with token and persist via /api/settings/category/mcp",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/mcp",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "a2a_inter_agent_auth",
+      "domain": "a2a",
+      "label": "Cryptographic Agent Token Exchange",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/a2a",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/a2a",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "a2a_peer_discovery_mode",
+      "domain": "a2a",
+      "label": "Peer Agent Network Discovery Protocol",
+      "type": "select",
+      "current_value": "Gossip Mesh (Scoped)",
+      "expected_action": "Interact with select and persist via /api/settings/category/a2a",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/a2a",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "a2a_rate_limit_per_min",
+      "domain": "a2a",
+      "label": "Inter-Agent Message Rate Limit (Msg/Min)",
+      "type": "number",
+      "current_value": "120",
+      "expected_action": "Interact with number and persist via /api/settings/category/a2a",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/a2a",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "a2a_cross_company_allowed",
+      "domain": "a2a",
+      "label": "Allow Cross-Company Federation Communications",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/a2a",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/a2a",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "a2a_message_encryption_cipher",
+      "domain": "a2a",
+      "label": "Inter-Agent Transport Encryption Cipher",
+      "type": "select",
+      "current_value": "ChaCha20-Poly1305",
+      "expected_action": "Interact with select and persist via /api/settings/category/a2a",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/a2a",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "integ_least_privilege",
+      "domain": "integrations",
+      "label": "Enforce Least Privilege Sync Mappings",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/integrations",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/integrations",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "integ_oauth_refresh_cadence_hours",
+      "domain": "integrations",
+      "label": "OAuth Access Token Preemptive Refresh Cadence",
+      "type": "number",
+      "current_value": "12",
+      "expected_action": "Interact with number and persist via /api/settings/category/integrations",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/integrations",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "integ_sync_cadence_minutes",
+      "domain": "integrations",
+      "label": "Universal Data Ingestion Polling Interval (Minutes)",
+      "type": "number",
+      "current_value": "15",
+      "expected_action": "Interact with number and persist via /api/settings/category/integrations",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/integrations",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "integ_auto_revoke_on_anomaly",
+      "domain": "integrations",
+      "label": "Auto-Revoke Connector on Cryptographic Anomaly",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/integrations",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/integrations",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "integ_webhook_signature_secret",
+      "domain": "integrations",
+      "label": "Inbound Webhook Verification HMAC Secret",
+      "type": "token",
+      "current_value": "••••••••••••••••••••••••••••••••",
+      "expected_action": "Interact with token and persist via /api/settings/category/integrations",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/integrations",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "data_retention_days",
+      "domain": "data",
+      "label": "Operational Context Retention (Days)",
+      "type": "number",
+      "current_value": "365",
+      "expected_action": "Interact with number and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "files_max_upload_mb",
+      "domain": "data",
+      "label": "Max Upload Size (MB)",
+      "type": "number",
+      "current_value": "50",
+      "expected_action": "Interact with number and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "records_deduplication",
+      "domain": "data",
+      "label": "Automatic Deterministic Deduplication",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "data_semantic_indexing_enabled",
+      "domain": "data",
+      "label": "Continuous Semantic Vector Indexing (RAG)",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "data_pii_auto_redaction",
+      "domain": "data",
+      "label": "Pre-Ingestion PII / Sensitive Data Redaction",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "data_max_file_upload_mb",
+      "domain": "data",
+      "label": "Maximum Ingested Document Size (MB)",
+      "type": "number",
+      "current_value": "50",
+      "expected_action": "Interact with number and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "data_backup_checksum_verify",
+      "domain": "data",
+      "label": "Verify SHA-256 Checksum on Every Ingested Asset",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/data",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/data",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comm_smtp_server",
+      "domain": "comms",
+      "label": "Corporate SMTP Server",
+      "type": "text",
+      "current_value": "smtp.sendgrid.net",
+      "expected_action": "Interact with text and persist via /api/settings/category/comms",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/comms",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comm_smtp_port",
+      "domain": "comms",
+      "label": "SMTP Gateway Port",
+      "type": "number",
+      "current_value": "587",
+      "expected_action": "Interact with number and persist via /api/settings/category/comms",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/comms",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comm_sender_identity",
+      "domain": "comms",
+      "label": "Corporate Sender Identity",
+      "type": "text",
+      "current_value": "dispatch@zonata.internal",
+      "expected_action": "Interact with text and persist via /api/settings/category/comms",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/comms",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comm_dispatch_rate_limit",
+      "domain": "comms",
+      "label": "Outbound Dispatch Rate Limit (Per Hour)",
+      "type": "number",
+      "current_value": "500",
+      "expected_action": "Interact with number and persist via /api/settings/category/comms",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/comms",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comm_tls_enforced",
+      "domain": "comms",
+      "label": "Enforce TLS / STARTTLS Encryption",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/comms",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/comms",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "fin_accounting_method",
+      "domain": "finance",
+      "label": "Accounting Method",
+      "type": "select",
+      "current_value": "Accrual Basis (GAAP/IFRS)",
+      "expected_action": "Interact with select and persist via /api/settings/category/finance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/finance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "fin_high_expense_approval",
+      "domain": "finance",
+      "label": "Expense Threshold Requiring Owner Approval",
+      "type": "currency",
+      "current_value": "15000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/finance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/finance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "fin_strict_dual_signoff_threshold",
+      "domain": "finance",
+      "label": "Mandatory Dual Sign-Off Threshold Amount",
+      "type": "currency",
+      "current_value": "100000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/finance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/finance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "fin_fiscal_close_lock",
+      "domain": "finance",
+      "label": "Lock Historical Fiscal Period Records Against Edits",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/finance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/finance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "fin_auto_receipt_reconciliation",
+      "domain": "finance",
+      "label": "Autonomous OCR Receipt Reconciliation Engine",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/finance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/finance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "cost_global_budget_monthly",
+      "domain": "billing",
+      "label": "Global AI Compute Monthly Spending Cap",
+      "type": "currency",
+      "current_value": "100000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/billing",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/billing",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "cost_alert_threshold_pct",
+      "domain": "billing",
+      "label": "Budget Warning Alert Threshold",
+      "type": "select",
+      "current_value": "80%",
+      "expected_action": "Interact with select and persist via /api/settings/category/billing",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/billing",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "bill_plan_tier",
+      "domain": "billing",
+      "label": "Current Subscription Tier",
+      "type": "unknown",
+      "current_value": null,
+      "expected_action": "Interact with unknown and persist via /api/settings/category/billing",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/billing",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "cost_hard_stop_at_threshold",
+      "domain": "billing",
+      "label": "Enforce Immediate Hard Halt When Spend Exceeds Cap",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/billing",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/billing",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "cost_overage_charge_cap_usd",
+      "domain": "billing",
+      "label": "Maximum Authorized Monthly Overage Buffer ($)",
+      "type": "currency",
+      "current_value": "5000",
+      "expected_action": "Interact with currency and persist via /api/settings/category/billing",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/billing",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_require_mfa",
+      "domain": "security",
+      "label": "Require Multi-Factor Authentication (MFA)",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_session_duration_hours",
+      "domain": "security",
+      "label": "Session Maximum Lifetime (Hours)",
+      "type": "select",
+      "current_value": "12",
+      "expected_action": "Interact with select and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_device_trust",
+      "domain": "security",
+      "label": "Device Trust Enforced",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_max_login_attempts",
+      "domain": "security",
+      "label": "Failed Login Attempts Before Account Lockdown",
+      "type": "number",
+      "current_value": "6",
+      "expected_action": "Interact with number and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_enforce_ip_allowlist",
+      "domain": "security",
+      "label": "Enforce Administrative IP CIDR Whitelist",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "sec_passkey_enabled",
+      "domain": "security",
+      "label": "Enable WebAuthn / FIDO2 Passkey Passwordless Login",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/security",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/security",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "appr_auto_escalation_hours",
+      "domain": "governance",
+      "label": "Escalation Timeout (Hours)",
+      "type": "number",
+      "current_value": "24",
+      "expected_action": "Interact with number and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "gov_kill_switch_active",
+      "domain": "governance",
+      "label": "Emergency Quarantine Isolation Mode",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "comp_regulatory_profile",
+      "domain": "governance",
+      "label": "Statutory Governance Profile",
+      "type": "select",
+      "current_value": "ISO 37000 / ISO 42001 (Global)",
+      "expected_action": "Interact with select and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "gov_two_person_rule",
+      "domain": "governance",
+      "label": "Enforce Sovereign Two-Person Rule on System Policies",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "gov_risk_threshold_matrix",
+      "domain": "governance",
+      "label": "Constitutional Boundary Risk Assessment Matrix",
+      "type": "select",
+      "current_value": "Strict Constitutional Boundary",
+      "expected_action": "Interact with select and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "gov_emergency_escalation_tier",
+      "domain": "governance",
+      "label": "Emergency Escalation Notification Channel",
+      "type": "select",
+      "current_value": "Tier 1: Sovereign Host Real-Time Alert",
+      "expected_action": "Interact with select and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "gov_sovereign_override_pin_required",
+      "domain": "governance",
+      "label": "Require Hardware PIN for Emergency Overrides",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/governance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/governance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "priv_pii_masking",
+      "domain": "privacy",
+      "label": "Automated PII Sanitization & Masking",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/privacy",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/privacy",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "priv_gdpr_compliance_mode",
+      "domain": "privacy",
+      "label": "Enforce GDPR / DPDPA Statutory Privacy Controls",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/privacy",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/privacy",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "priv_ai_training_zero_retention",
+      "domain": "privacy",
+      "label": "Zero-Retention Guarantee on External AI Inference",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/privacy",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/privacy",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "priv_data_subject_request_window_days",
+      "domain": "privacy",
+      "label": "Data Subject Access Request SLA (Days)",
+      "type": "number",
+      "current_value": "30",
+      "expected_action": "Interact with number and persist via /api/settings/category/privacy",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/privacy",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "priv_anonymize_audit_exports",
+      "domain": "privacy",
+      "label": "Anonymize Operator PII in External Audit Exports",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/privacy",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/privacy",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "notify_critical_sms",
+      "domain": "notifications",
+      "label": "Immediate SMS Alerts on Kill Switch / Breach",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/notifications",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/notifications",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "notify_in_app_toast",
+      "domain": "notifications",
+      "label": "In-App Real-Time Toast Notifications",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/notifications",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/notifications",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "notify_severity_threshold",
+      "domain": "notifications",
+      "label": "Notification Severity Filter",
+      "type": "select",
+      "current_value": "HIGH",
+      "expected_action": "Interact with select and persist via /api/settings/category/notifications",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/notifications",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "notify_digest_interval",
+      "domain": "notifications",
+      "label": "Administrative Digest Interval",
+      "type": "select",
+      "current_value": "Daily Summary",
+      "expected_action": "Interact with select and persist via /api/settings/category/notifications",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/notifications",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "notify_escalation_sms_number",
+      "domain": "notifications",
+      "label": "Emergency Escalation SMS Number",
+      "type": "text",
+      "current_value": "+1-555-0199",
+      "expected_action": "Interact with text and persist via /api/settings/category/notifications",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/notifications",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "audit_ledger_hashing",
+      "domain": "audit",
+      "label": "Cryptographic Hash Algorithm",
+      "type": "unknown",
+      "current_value": null,
+      "expected_action": "Interact with unknown and persist via /api/settings/category/audit",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/audit",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "audit_immutability_mode",
+      "domain": "audit",
+      "label": "Immutability Enforcement",
+      "type": "unknown",
+      "current_value": null,
+      "expected_action": "Interact with unknown and persist via /api/settings/category/audit",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/audit",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "audit_retention_days",
+      "domain": "audit",
+      "label": "Immutable Cryptographic Audit Retention (Days)",
+      "type": "number",
+      "current_value": "730",
+      "expected_action": "Interact with number and persist via /api/settings/category/audit",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/audit",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "audit_tamper_alert_channel",
+      "domain": "audit",
+      "label": "Merkle Tree Tamper Detection Alert Destination",
+      "type": "select",
+      "current_value": "Immediate Host Pager + Syslog",
+      "expected_action": "Interact with select and persist via /api/settings/category/audit",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/audit",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "audit_merkle_validation_cadence_hours",
+      "domain": "audit",
+      "label": "Automated Merkle Root Verification Cadence (Hours)",
+      "type": "number",
+      "current_value": "24",
+      "expected_action": "Interact with number and persist via /api/settings/category/audit",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/audit",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "rec_auto_snapshot_frequency",
+      "domain": "recovery",
+      "label": "Automated SQLite Snapshot Interval",
+      "type": "select",
+      "current_value": "Every 6 Hours",
+      "expected_action": "Interact with select and persist via /api/settings/category/recovery",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/recovery",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "recovery_cold_sync_enabled",
+      "domain": "recovery",
+      "label": "Replicate Encrypted Snapshots to Cold Storage",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/recovery",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/recovery",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "recovery_rpo_minutes",
+      "domain": "recovery",
+      "label": "Recovery Point Objective Target (RPO in Minutes)",
+      "type": "number",
+      "current_value": "15",
+      "expected_action": "Interact with number and persist via /api/settings/category/recovery",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/recovery",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "recovery_rto_minutes",
+      "domain": "recovery",
+      "label": "Recovery Time Objective Target (RTO in Minutes)",
+      "type": "number",
+      "current_value": "5",
+      "expected_action": "Interact with number and persist via /api/settings/category/recovery",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/recovery",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "recovery_drill_auto_schedule",
+      "domain": "recovery",
+      "label": "Autonomous Disaster Recovery Drill Schedule",
+      "type": "select",
+      "current_value": "Weekly Autonomous Dry-Run",
+      "expected_action": "Interact with select and persist via /api/settings/category/recovery",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/recovery",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mon_health_probe_interval_s",
+      "domain": "monitoring",
+      "label": "Health Probe Frequency (Seconds)",
+      "type": "number",
+      "current_value": "30",
+      "expected_action": "Interact with number and persist via /api/settings/category/monitoring",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/monitoring",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mon_circuit_breaker_threshold",
+      "domain": "monitoring",
+      "label": "Subsystem Circuit Breaker Consecutive Error Trip Limit",
+      "type": "number",
+      "current_value": "5",
+      "expected_action": "Interact with number and persist via /api/settings/category/monitoring",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/monitoring",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mon_liveness_probe_interval_sec",
+      "domain": "monitoring",
+      "label": "Subsystem Internal Liveness Probe Frequency (Seconds)",
+      "type": "number",
+      "current_value": "10",
+      "expected_action": "Interact with number and persist via /api/settings/category/monitoring",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/monitoring",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mon_drift_check_cadence_min",
+      "domain": "monitoring",
+      "label": "Configuration Drift Audit Verification Cadence (Minutes)",
+      "type": "number",
+      "current_value": "5",
+      "expected_action": "Interact with number and persist via /api/settings/category/monitoring",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/monitoring",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "mon_telemetry_export_format",
+      "domain": "monitoring",
+      "label": "Telemetry Metric Protocol Format",
+      "type": "select",
+      "current_value": "OpenTelemetry OTLP",
+      "expected_action": "Interact with select and persist via /api/settings/category/monitoring",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/monitoring",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "api_rate_limit_rpm",
+      "domain": "api",
+      "label": "API Rate Limit (Requests / Min)",
+      "type": "number",
+      "current_value": "1200",
+      "expected_action": "Interact with number and persist via /api/settings/category/api",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/api",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "api_bearer_auth_enabled",
+      "domain": "api",
+      "label": "Mandate Bearer Token Authentication on REST API",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/api",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/api",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "api_developer_key_vault",
+      "domain": "api",
+      "label": "Primary Developer Bearer Key Token",
+      "type": "token",
+      "current_value": "••••••••••••••••••••••••••••••••",
+      "expected_action": "Interact with token and persist via /api/settings/category/api",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/api",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "api_cors_allowed_origins",
+      "domain": "api",
+      "label": "Permitted CORS Origin Hosts (Comma-Delimited)",
+      "type": "text",
+      "current_value": "https://zonata.internal,http://localhost:8080",
+      "expected_action": "Interact with text and persist via /api/settings/category/api",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/api",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "api_egress_ip_whitelist",
+      "domain": "api",
+      "label": "Authorized API Caller Egress CIDR Allowlist",
+      "type": "text",
+      "current_value": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32",
+      "expected_action": "Interact with text and persist via /api/settings/category/api",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/api",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "webhook_verify_signatures",
+      "domain": "webhooks",
+      "label": "HMAC-SHA256 Signature Verification",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/webhooks",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/webhooks",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "webhook_retry_max_attempts",
+      "domain": "webhooks",
+      "label": "Webhook Dispatch Max Retry Attempts",
+      "type": "number",
+      "current_value": "5",
+      "expected_action": "Interact with number and persist via /api/settings/category/webhooks",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/webhooks",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "webhook_backoff_factor_sec",
+      "domain": "webhooks",
+      "label": "Exponential Retry Backoff Multiplier (Seconds)",
+      "type": "number",
+      "current_value": "2",
+      "expected_action": "Interact with number and persist via /api/settings/category/webhooks",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/webhooks",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "webhook_signing_algorithm",
+      "domain": "webhooks",
+      "label": "Webhook Payload Signing Cryptographic Algorithm",
+      "type": "select",
+      "current_value": "HMAC-SHA256",
+      "expected_action": "Interact with select and persist via /api/settings/category/webhooks",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/webhooks",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "webhook_egress_timeout_sec",
+      "domain": "webhooks",
+      "label": "Outbound Webhook HTTP Timeout (Seconds)",
+      "type": "number",
+      "current_value": "10",
+      "expected_action": "Interact with number and persist via /api/settings/category/webhooks",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/webhooks",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_date_format",
+      "domain": "localization",
+      "label": "Date Presentation Format",
+      "type": "select",
+      "current_value": "YYYY-MM-DD",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_base_locale",
+      "domain": "localization",
+      "label": "Universal Enterprise Reporting Locale",
+      "type": "select",
+      "current_value": "en-IN",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_number_format",
+      "domain": "localization",
+      "label": "Financial Number & Comma Grouping Convention",
+      "type": "select",
+      "current_value": "1,00,000.00 (Indian Lakh/Crore)",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_first_day_of_week",
+      "domain": "localization",
+      "label": "First Day of the Business Week",
+      "type": "select",
+      "current_value": "Monday",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "loc_currency_display",
+      "domain": "localization",
+      "label": "Monetary Value Display Format",
+      "type": "select",
+      "current_value": "Symbol (₹)",
+      "expected_action": "Interact with select and persist via /api/settings/category/localization",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/localization",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "app_theme",
+      "domain": "appearance",
+      "label": "Color Scheme Theme",
+      "type": "select",
+      "current_value": "dark",
+      "expected_action": "Interact with select and persist via /api/settings/category/appearance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/appearance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "app_high_contrast",
+      "domain": "appearance",
+      "label": "High Contrast Mode",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/appearance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/appearance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "app_reduced_motion",
+      "domain": "appearance",
+      "label": "Reduced Motion Interface Mode",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/appearance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/appearance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "app_navigation_density",
+      "domain": "appearance",
+      "label": "Sidebar Navigation Density Layout",
+      "type": "select",
+      "current_value": "Compact Control Plane",
+      "expected_action": "Interact with select and persist via /api/settings/category/appearance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/appearance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "app_font_scale_pct",
+      "domain": "appearance",
+      "label": "Interface Typography Scale (Percentage)",
+      "type": "slider",
+      "current_value": "100",
+      "expected_action": "Interact with slider and persist via /api/settings/category/appearance",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/appearance",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "flag_hal_multimodal",
+      "domain": "advanced",
+      "label": "Enable HAL Multimodal Video Diagnostics",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "adv_debug_logging",
+      "domain": "advanced",
+      "label": "Extended Kernel Trace & Debug Logging",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "danger_revoke_all_sessions",
+      "domain": "advanced",
+      "label": "Revoke All Active Tokens Immediately",
+      "type": "button_action",
+      "current_value": "Ready to Execute",
+      "expected_action": "Interact with button_action and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "danger_purge_telemetry",
+      "domain": "advanced",
+      "label": "Purge Temporary Sandbox Logs",
+      "type": "button_action",
+      "current_value": "Ready to Execute",
+      "expected_action": "Interact with button_action and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "adv_kernel_cache_ttl_sec",
+      "domain": "advanced",
+      "label": "Universal Kernel Cache TTL (Seconds)",
+      "type": "number",
+      "current_value": "300",
+      "expected_action": "Interact with number and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "adv_isolate_quarantine_mode",
+      "domain": "advanced",
+      "label": "Instant Subsystem Isolation Quarantine Mode",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "adv_verbose_kernel_traces",
+      "domain": "advanced",
+      "label": "Emit Verbose Kernel Execution Traces to Syslog",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/advanced",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/advanced",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "diag_wal_auto_checkpoint",
+      "domain": "diagnostics",
+      "label": "Auto WAL Checkpoint on Startup",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/diagnostics",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/diagnostics",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "diag_verbose_kernel_traces",
+      "domain": "diagnostics",
+      "label": "Verbose Kernel Execution Traces",
+      "type": "toggle",
+      "current_value": false,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/diagnostics",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/diagnostics",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "diag_collect_heap_metrics",
+      "domain": "diagnostics",
+      "label": "Continuous Process Heap & Memory Metrics",
+      "type": "toggle",
+      "current_value": true,
+      "expected_action": "Interact with toggle and persist via /api/settings/category/diagnostics",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/diagnostics",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "diag_inference_ping_interval_sec",
+      "domain": "diagnostics",
+      "label": "AI Inference Live Health Ping Interval (Seconds)",
+      "type": "number",
+      "current_value": "30",
+      "expected_action": "Interact with number and persist via /api/settings/category/diagnostics",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/diagnostics",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    },
+    {
+      "id": "diag_active_subsystem_probe",
+      "domain": "diagnostics",
+      "label": "Subsystem Diagnostic Probe Execution Strategy",
+      "type": "select",
+      "current_value": "Continuous Adaptive Ping",
+      "expected_action": "Interact with select and persist via /api/settings/category/diagnostics",
+      "handler": "EnterpriseSettings handlers",
+      "api": "/api/settings/category/diagnostics",
+      "persistence": "SQLite (core/settings_service.py)",
+      "runtime_effect": "Effective enforcement resolution & runtime consumer propagation",
+      "audit": "Cryptographic SHA-256 ledger receipt"
+    }
+  ],
+  "testCases": [
+    {
+      "testName": "Domain 'account' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 11 cards"
+    },
+    {
+      "testName": "Domain 'company' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 10 cards"
+    },
+    {
+      "testName": "Domain 'users' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'enterprise' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'ceo' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 9 cards"
+    },
+    {
+      "testName": "Domain 'workforce' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'workflows' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 7 cards"
+    },
+    {
+      "testName": "Domain 'ai_providers' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'tools' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'desktop' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'browser' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'terminal' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'mcp' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'a2a' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'integrations' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'data' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 7 cards"
+    },
+    {
+      "testName": "Domain 'comms' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'finance' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'billing' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'security' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 6 cards"
+    },
+    {
+      "testName": "Domain 'governance' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 7 cards"
+    },
+    {
+      "testName": "Domain 'privacy' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'notifications' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'audit' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'recovery' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'monitoring' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'api' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'webhooks' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'localization' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'appearance' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Domain 'advanced' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 7 cards"
+    },
+    {
+      "testName": "Domain 'diagnostics' loaded and rendered setting cards",
+      "status": "PASS",
+      "details": "Found 5 cards"
+    },
+    {
+      "testName": "Full 180+ settings inventory discovered",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Vertical navigation to 'security' renders domain detail header",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Vertical navigation to 'ceo' renders domain detail header",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Vertical navigation to 'diagnostics' renders domain detail header",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Vertical navigation to 'account' renders domain detail header",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Vertical navigation to Hub overview renders Hub page title",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found sec_session_duration_hours duration card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found duration select control for sec_session_duration_hours",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Duration select displays 14 after change",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies sec_session_duration_hours = 14",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Duration select displays 24 after change",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies sec_session_duration_hours = 24",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Duration select displays 12 after change",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence restores sec_session_duration_hours = 12",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found sec_max_login_attempts numeric card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found numeric input for sec_max_login_attempts",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Explicit measurement unit \"attempts\" rendered",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Numeric stepper increment and decrement buttons rendered",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Numeric stepper changes value to 7",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies sec_max_login_attempts = 7",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Numeric stepper restores value to 6",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence restores sec_max_login_attempts = 6",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found app_font_scale_pct card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found range slider, linked number input, and value badge",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Range slider value synced to 115",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Linked number input synced to 115",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Slider value badge displays 115",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies app_font_scale_pct = 115",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found comp_business_model card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Multi-select shutter trigger and expandable panel rendered",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Multi-select shutter opens on click",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Select All selects all multi-select option checkboxes",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Clear All clears all multi-select option checkboxes",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Shutter closes on Done/toggle",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies multiselect array persisted correctly",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found sec_require_mfa card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found toggle checkbox input",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Flip toggle sets checkbox to false",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies sec_require_mfa = false",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies sec_require_mfa = true",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found ceo_autonomy_level card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found select dropdown for ceo_autonomy_level",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence verifies ceo_autonomy = Level 2",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Backend persistence restores ceo_autonomy = Level 3",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found api_developer_key_vault token card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token card renders Reveal, Copy, Rotate, and Revoke action buttons",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token Reveal changes input type from password to text",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token Hide restores input type to password",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token Copy writes secret to clipboard",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token Rotate executes via API and updates persistence",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Token Revoke executes via API and updates persistence",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found danger_revoke_all_sessions operational action card",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found operational action execute button",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Operational action execution completes and displays feedback",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Card disclosure accordion opens and reveals policy metadata",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Card disclosure accordion closes on subsequent click",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found pillar grid on Hub overview",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Pillar accordion collapses on header click",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Pillar accordion expands back to grid on subsequent click",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer overlay opens when Inspect button is clicked",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Configured Value'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Effective Runtime'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Scope Boundary'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Inherited Baseline'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Source Authority'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Managed By'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Last Changed'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Changed By'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Runtime Consumers'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Enforcement Status'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer renders required enterprise field: 'Audit Ledger Receipt'",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Inspector drawer closes properly",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Audit Trail drawer overlay opens and loads ledger events",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Audit Trail drawer closes properly",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Found comp_legal_name text input",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Input reflects staged dirty value",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Bottom dock save bar appears when changes are dirty",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Discard Changes restores original pristine value",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Dock save bar hides after Discard Changes",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Reset single setting API returns success with inherited baseline",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "testName": "Reset domain API returns success",
+      "status": "PASS",
+      "details": ""
+    }
+  ],
+  "errors": []
+}

@@ -3349,6 +3349,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(res, status=status_code)
             return
 
+        elif path.startswith("/api/settings/action/") and len(path.split("/")) == 5:
+            action_id = path.split("/")[4]
+            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            actor = self.headers.get("X-User-Name", "Host Administrator")
+            res = settings_service.execute_button_action(action_id, tenant_id, company_id, actor=actor)
+            status_code = res.get("status_code", (200 if res.get("success") else 400))
+            self._send_json(res, status=status_code)
+            return
+
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", "comp_primary")
