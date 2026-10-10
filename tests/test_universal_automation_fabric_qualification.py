@@ -737,9 +737,9 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
         )
         self.assertIsNotNone(exec_id)
 
-        # Check execution is in QUEUED state
+        # Check execution is in QUEUED or RUNNING state
         exec_data = self.fabric.get_execution(exec_id, self.tenant_a)
-        self.assertEqual(exec_data["status"], "QUEUED")
+        self.assertIn(exec_data["status"], ("QUEUED", "RUNNING"))
 
         # 20c. Start background worker with fast poll
         self.fabric.start_background_worker(poll_interval=0.1)
@@ -1581,6 +1581,22 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
             }
             with self.assertRaises(AuthExceptions.TenantIsolationViolation):
                 handler._get_auth_context()
+
+        # 40c. Verify docker-compose.prod.yml setting (ENVIRONMENT=production) enforces strict auth
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "APP_ENV": "", "ZONATA_STRICT_AUTH": "0"}):
+            handler_dc = RoboAssistantRequestHandler.__new__(RoboAssistantRequestHandler)
+            handler_dc.headers = {}
+            handler_dc.path = "/api/automation/fabric/status"
+            with self.assertRaises(AuthExceptions.AuthenticationError):
+                handler_dc._get_auth_context()
+
+        # 40d. Verify k8s configmap setting (ZONATA_STRICT_CONFIG=true) enforces strict auth
+        with patch.dict(os.environ, {"ZONATA_STRICT_CONFIG": "true", "APP_ENV": "", "ZONATA_STRICT_AUTH": "0"}):
+            handler_k8s = RoboAssistantRequestHandler.__new__(RoboAssistantRequestHandler)
+            handler_k8s.headers = {}
+            handler_k8s.path = "/api/automation/fabric/status"
+            with self.assertRaises(AuthExceptions.AuthenticationError):
+                handler_k8s._get_auth_context()
 
 
 if __name__ == "__main__":

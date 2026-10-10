@@ -371,8 +371,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return payload
 
         # Environment-Aware Authentication Boundary (Development, Staging, Production)
-        app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("NODE_ENV") or "development"
-        is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("ENVIRONMENT") or os.environ.get("NODE_ENV") or "development"
+        is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_STRICT_CONFIG", "").lower() == "true")
 
         if is_strict:
             # Production: No default sovereign session, no implicit Host authentication

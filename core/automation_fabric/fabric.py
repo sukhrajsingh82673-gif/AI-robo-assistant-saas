@@ -79,19 +79,21 @@ class UniversalAutomationFabric:
 
     @classmethod
     def get_lease_secret_key(cls) -> str:
-        """Resolves cryptographically isolated signing key from SQLite or environment."""
+        """Resolves cryptographically isolated signing key from SecretManager or SQLite."""
         cls._ensure_signing_keys_table()
         env_key = os.environ.get("URA_LEASE_SECRET")
         if env_key:
             cls._cached_secret_key = env_key
+            SecretManager.store_secret("sys_automation", "env_master", env_key)
             return env_key
 
         with db.get_connection() as conn:
             row = conn.execute(
-                "SELECT secret_key FROM automation_signing_keys WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
+                "SELECT key_id, secret_key FROM automation_signing_keys WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
             ).fetchone()
             if row and row["secret_key"]:
                 cls._cached_secret_key = row["secret_key"]
+                SecretManager.store_secret("sys_automation", row["key_id"], row["secret_key"])
                 return row["secret_key"]
 
             now = time.time()
@@ -102,6 +104,7 @@ class UniversalAutomationFabric:
                 VALUES (?, ?, 'ACTIVE', ?, NULL)
             """, (key_id, sec, now))
             conn.commit()
+            SecretManager.store_secret("sys_automation", key_id, sec)
             cls._cached_secret_key = sec
             return sec
 
@@ -127,6 +130,7 @@ class UniversalAutomationFabric:
             """, (new_id, new_secret, now))
             conn.commit()
 
+        SecretManager.store_secret("sys_automation", new_id, new_secret)
         cls._cached_secret_key = new_secret
         cls._rotated_secret_keys[current] = expires_at
         return new_secret
@@ -141,12 +145,13 @@ class UniversalAutomationFabric:
 
         with db.get_connection() as conn:
             rows = conn.execute("""
-                SELECT secret_key, expires_at FROM automation_signing_keys
+                SELECT key_id, secret_key, expires_at FROM automation_signing_keys
                 WHERE status = 'ROTATED' AND (expires_at IS NULL OR expires_at > ?)
             """, (now,)).fetchall()
             for r in rows:
                 if r["secret_key"] and r["secret_key"] != active:
                     rotated_keys.add(r["secret_key"])
+                    SecretManager.store_secret("sys_automation", r["key_id"], r["secret_key"])
 
         for k, exp in list(cls._rotated_secret_keys.items()):
             if exp > now and k != active:
