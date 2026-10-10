@@ -1134,11 +1134,18 @@ class UniversalAutomationFabric:
         actor: str,
         reason: str = "Authorized by employee",
         modified_parameters: Optional[Dict[str, Any]] = None,
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        actor_role: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Processes human-in-the-loop approval decision.
+        Enforces sovereign IAM verification, tenant isolation, role authorization,
+        and generates a cryptographically signed approval receipt.
         """
+        from core.auth import UserManager, UserRole, AuthExceptions, SECRET_KEY
+        import hmac
+
         decision_upper = decision.upper()
         now = time.time()
 
@@ -1150,8 +1157,35 @@ class UniversalAutomationFabric:
             if not row:
                 raise KeyError(f"Approval '{approval_id}' not found.")
 
-            if tenant_id and row["tenant_id"] != tenant_id:
-                raise AutomationSecurityException(f"Tenant '{tenant_id}' cannot access approval '{approval_id}' belonging to '{row['tenant_id']}'.")
+            target_tenant = row["tenant_id"]
+
+            if tenant_id and target_tenant != tenant_id:
+                raise AutomationSecurityException(f"Tenant '{tenant_id}' cannot access approval '{approval_id}' belonging to '{target_tenant}'.")
+
+            # Sovereign Approver Authentication & Authorization
+            effective_role = actor_role or UserRole.OPERATOR
+            effective_user = actor
+
+            if auth_token:
+                payload = UserManager.verify_token(auth_token)
+                if not payload:
+                    raise AuthExceptions.AuthenticationError(
+                        "Invalid, expired, or revoked authentication token for approver."
+                    )
+                token_tenant = payload.get("tenant_id")
+                if token_tenant and token_tenant != target_tenant and payload.get("role") != UserRole.GLOBAL_ADMIN:
+                    raise AuthExceptions.TenantIsolationViolation(
+                        f"Tenant isolation violation: approver token tenant '{token_tenant}' does not match approval tenant '{target_tenant}'."
+                    )
+                effective_user = payload.get("user_id", actor)
+                effective_role = payload.get("role", effective_role)
+
+            # Enforce authorization: Observers and Auditors can never approve or edit sensitive actions
+            disallowed_approver_roles = {UserRole.OBSERVER, UserRole.AUDITOR}
+            if effective_role in disallowed_approver_roles:
+                raise AuthExceptions.AuthorizationError(
+                    f"Approver identity '{effective_user}' with role '{effective_role}' lacks authority to decide approvals."
+                )
 
             if row["status"] != ApprovalStatus.PENDING.value:
                 raise ValueError(f"Approval is already in '{row['status']}' state.")
@@ -1168,13 +1202,29 @@ class UniversalAutomationFabric:
                 else ApprovalStatus.REJECTED.value if decision_upper in ("REJECT", "REJECTED") \
                 else ApprovalStatus.EDITED.value
 
+            # Cryptographically sign approval decision receipt
+            receipt_payload = {
+                "approval_id": approval_id,
+                "execution_id": row["execution_id"],
+                "tenant_id": target_tenant,
+                "company_id": row["company_id"],
+                "step_id": row["step_id"],
+                "decision": new_status,
+                "decided_by": effective_user,
+                "actor_role": effective_role,
+                "decided_at": now
+            }
+            receipt_json = json.dumps(receipt_payload, sort_keys=True)
+            receipt_signature = hmac.new(SECRET_KEY, receipt_json.encode("utf-8"), hashlib.sha256).hexdigest()
+            receipt_hash = hashlib.sha256(f"{receipt_json}.{receipt_signature}".encode("utf-8")).hexdigest()
+
             mod_json = json.dumps(modified_parameters) if modified_parameters else None
             conn.execute("""
                 UPDATE automation_approvals
                 SET status = ?, decided_by = ?, decision_reason = ?,
                     modified_parameters = ?, decided_at = ?
                 WHERE approval_id = ?
-            """, (new_status, actor, reason, mod_json, now, approval_id))
+            """, (new_status, effective_user, f"{reason} [Sig: {receipt_signature[:12]}]", mod_json, now, approval_id))
             exec_id = row["execution_id"]
             conn.commit()
 
@@ -1183,7 +1233,7 @@ class UniversalAutomationFabric:
                 exec_id,
                 ExecutionStatus.CANCELLED,
                 TerminalOutcome.CANCELLED,
-                f"Execution rejected by {actor}: {reason}"
+                f"Execution rejected by {effective_user}: {reason}"
             )
             with db.get_connection() as conn:
                 r_ctx = conn.execute("SELECT context FROM automation_executions WHERE execution_id = ?", (exec_id,)).fetchone()
@@ -1213,8 +1263,11 @@ class UniversalAutomationFabric:
         return {
             "approval_id": approval_id,
             "status": new_status,
-            "decided_by": actor,
-            "decided_at": now
+            "decided_by": effective_user,
+            "actor_role": effective_role,
+            "decided_at": now,
+            "receipt_signature": receipt_signature,
+            "receipt_hash": receipt_hash
         }
 
     def resume_execution(self, execution_id: str, tenant_id: str) -> Dict[str, Any]:

@@ -4624,16 +4624,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/automation/approvals/") and path.endswith("/decide"):
             appr_id = path.split("/")[4]
             decision = req_data.get("decision", "APPROVE")
-            actor = self.headers.get("X-User-Name", "HostEmployee")
             reason = req_data.get("reason", "Approved by employee")
             modified_params = req_data.get("modified_parameters")
+
+            try:
+                auth_ctx = self._get_auth_context()
+            except Exception as e:
+                self._send_json({"error": f"Authentication required: {str(e)}"}, status=401)
+                return
+
+            actor = auth_ctx.get("user_id") or self.headers.get("X-User-Name", "HostEmployee")
+            role = auth_ctx.get("role")
+            tenant_id = auth_ctx.get("tenant_id")
+
             try:
                 res = universal_automation_fabric.decide_approval(
                     approval_id=appr_id,
                     decision=decision,
                     actor=actor,
                     reason=reason,
-                    modified_parameters=modified_params
+                    modified_parameters=modified_params,
+                    tenant_id=tenant_id,
+                    actor_role=role
                 )
                 self._send_json(res)
             except Exception as e:

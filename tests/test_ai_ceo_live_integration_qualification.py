@@ -60,7 +60,8 @@ from core.automation_fabric import (
     AutomationSecurityException
 )
 from core.killswitch_matrix import KillSwitchEngagedException
-
+from core.auth import UserManager, UserRole, AuthExceptions, SECRET_KEY
+import hmac
 
 class TestAICeoLiveIntegrationQualification(unittest.TestCase):
     @classmethod
@@ -160,15 +161,25 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         approval_id = exec_res.get("approval_id")
         self.assertIsNotNone(approval_id)
 
-        # Step 2: Executive/Human approves the sensitive purchase order
+        # Step 2: Executive/Human approves the sensitive purchase order using authenticated sovereign token
+        ceo_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="Alex_CEO",
+            role=UserRole.OWNER,
+            company_id=self.company_a
+        )
         decision = self.fabric.decide_approval(
             approval_id=approval_id,
             decision="APPROVE",
             actor="Alex_CEO",
             reason="Q4 infrastructure expansion budget approved and verified against vendor quotation",
-            tenant_id=self.tenant_a
+            tenant_id=self.tenant_a,
+            auth_token=ceo_token
         )
         self.assertEqual(decision["status"], ApprovalStatus.APPROVED.value)
+        self.assertEqual(decision["actor_role"], UserRole.OWNER)
+        self.assertIsNotNone(decision.get("receipt_signature"))
+        self.assertIsNotNone(decision.get("receipt_hash"))
 
         # Step 3: Verify the execution completed the remaining connector task (create_erpnext_po)
         completed_exec = self.fabric.get_execution(exec_id, self.tenant_a)
@@ -545,6 +556,165 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
             self.assertIn(c.license, (LicenseType.APACHE_2_0, LicenseType.MIT))
             self.assertTrue(self.licenses.is_license_approved(c.license.value))
             self.assertIn(qual_level, ("PASS_LIVE", "PASS_LOCAL", "PASS_TEST", "BLOCKED_ENVIRONMENT"))
+
+    # =========================================================================
+    # TEST 10: Authenticated Approver Identity, RBAC Role Enforcement & Receipts
+    # =========================================================================
+    def test_10_authenticated_approver_identity_role_enforcement_and_receipts(self):
+        """
+        10. Proves approval gates enforce cryptographic approver token identity,
+            reject unauthorized roles (OBSERVER, AUDITOR) with AuthorizationError,
+            and cryptographically sign decision receipts with HMAC-SHA256.
+        """
+        wf_id = f"wf_appr_rbac_{uuid.uuid4().hex[:6]}"
+        flow_spec = {
+            "id": wf_id,
+            "namespace": "ura.ops.approvals",
+            "tasks": [
+                {
+                    "id": "gate_step",
+                    "type": "io.kestra.plugin.zonata.approval.Gate",
+                    "description": "Executive sign-off required"
+                }
+            ]
+        }
+        self.fabric.create_workflow_draft("RBAC Approval Flow", flow_spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        exec_res = self.fabric.execute_workflow(wf_id, {}, self.tenant_a, self.company_a)
+        appr_id = exec_res["approval_id"]
+        self.assertIsNotNone(appr_id)
+
+        # 1. Unauthenticated or expired token should fail
+        with self.assertRaises(AuthExceptions.AuthenticationError):
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="fake_actor",
+                tenant_id=self.tenant_a,
+                auth_token="invalid.bogus.signature"
+            )
+
+        # 2. Authenticated OBSERVER attempts to approve -> Must be rejected with AuthorizationError
+        observer_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="observer_auditor_jane",
+            role=UserRole.OBSERVER,
+            company_id=self.company_a
+        )
+        with self.assertRaises(AuthExceptions.AuthorizationError):
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="observer_auditor_jane",
+                tenant_id=self.tenant_a,
+                auth_token=observer_token
+            )
+
+        # 3. Authenticated OWNER/EXECUTIVE approves -> Must succeed and sign receipt
+        owner_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="executive_alex",
+            role=UserRole.OWNER,
+            company_id=self.company_a
+        )
+        dec_res = self.fabric.decide_approval(
+            approval_id=appr_id,
+            decision="APPROVE",
+            actor="executive_alex",
+            reason="Authorized by executive board",
+            tenant_id=self.tenant_a,
+            auth_token=owner_token
+        )
+        self.assertEqual(dec_res["status"], ApprovalStatus.APPROVED.value)
+        self.assertEqual(dec_res["actor_role"], UserRole.OWNER)
+        self.assertEqual(dec_res["decided_by"], "executive_alex")
+        self.assertIsNotNone(dec_res.get("receipt_signature"))
+        self.assertIsNotNone(dec_res.get("receipt_hash"))
+
+        # Verify receipt signature validity
+        receipt_data = {
+            "approval_id": appr_id,
+            "execution_id": exec_res["execution_id"],
+            "tenant_id": self.tenant_a,
+            "company_id": self.company_a,
+            "step_id": "gate_step",
+            "decision": ApprovalStatus.APPROVED.value,
+            "decided_by": "executive_alex",
+            "actor_role": UserRole.OWNER,
+            "decided_at": dec_res["decided_at"]
+        }
+        expected_sig = hmac.new(SECRET_KEY, json.dumps(receipt_data, sort_keys=True).encode("utf-8"), hashlib.sha256).hexdigest()
+        self.assertEqual(dec_res["receipt_signature"], expected_sig)
+
+    # =========================================================================
+    # TEST 11: Crash-Window Mutation Failure-Injection & Idempotency Deduplication
+    # =========================================================================
+    def test_11_crash_window_mutation_failure_injection_and_idempotency_dedup(self):
+        """
+        11. Injects failure during mutation crash-window (process dies after in-flight
+            dispatch but before response recorded). Proves:
+            a) Unconfirmed mutation retries are contained as UNKNOWN_OUTCOME without duplicate execution.
+            b) Replay after confirmed completion returns cached result with 0 duplicate mutations.
+        """
+        idemp_key = f"idemp_crash_{uuid.uuid4().hex[:12]}"
+
+        # Simulate mutation in-flight record registered right before a crash
+        now = time.time()
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO automation_connector_idempotency (
+                    idempotency_key, connector_id, operation, tenant_id, status, parameters, created_at
+                ) VALUES (?, 'conn_erpnext_records', 'create_purchase_order', ?, 'IN_FLIGHT', ?, ?)
+            """, (idemp_key, self.tenant_a, json.dumps({"amount": 7500.0, "supplier": "VENDOR_XEON"}), now))
+            conn.commit()
+
+        # Invocation occurs during recovery after crash:
+        # Since status was IN_FLIGHT and operation is a mutation, connector MUST NOT execute blindly;
+        # it must return UNKNOWN_OUTCOME requiring ground-truth reconciliation.
+        res1 = self.connectors.execute_connector_operation(
+            connector_id="conn_erpnext_records",
+            operation="create_purchase_order",
+            parameters={"amount": 7500.0, "supplier": "VENDOR_XEON"},
+            tenant_id=self.tenant_a,
+            idempotency_key=idemp_key
+        )
+        self.assertEqual(res1["status"], "UNKNOWN_OUTCOME")
+        self.assertTrue(res1.get("reconciliation_required"))
+        self.assertFalse(res1.get("replayed_from_idempotency_cache"))
+
+        # Reconcile external outcome with confirmation: external record verified
+        external_res = {
+            "connector_id": "conn_erpnext_records",
+            "operation": "create_purchase_order",
+            "tenant_id": self.tenant_a,
+            "status": "SUCCESS",
+            "data": {
+                "po_number": "PO-RECONCILED-001",
+                "external_transaction_id": "tx_erp_reconciled_998",
+                "amount": 7500.0
+            }
+        }
+        with db.get_connection() as conn:
+            conn.execute("""
+                UPDATE automation_connector_idempotency
+                SET status = 'COMPLETED', response = ?, completed_at = ?
+                WHERE idempotency_key = ?
+            """, (json.dumps(external_res), time.time(), idemp_key))
+            conn.commit()
+
+        # Subsequent retries must safely replay from idempotency cache with zero duplicate side effects
+        res2 = self.connectors.execute_connector_operation(
+            connector_id="conn_erpnext_records",
+            operation="create_purchase_order",
+            parameters={"amount": 7500.0, "supplier": "VENDOR_XEON"},
+            tenant_id=self.tenant_a,
+            idempotency_key=idemp_key
+        )
+        self.assertEqual(res2["status"], "SUCCESS")
+        self.assertTrue(res2.get("replayed_from_idempotency_cache"))
+        self.assertEqual(res2["data"]["po_number"], "PO-RECONCILED-001")
+        self.assertEqual(res2["data"]["external_transaction_id"], "tx_erp_reconciled_998")
 
 
 if __name__ == "__main__":

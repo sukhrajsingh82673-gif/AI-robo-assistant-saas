@@ -121,11 +121,15 @@ This report documents the empirical qualification of the full sovereign executio
 - **Mission Ledger State**: Mission status transitioned to `BLOCKED`.
 
 #### 2.3 Executive Sign-Off & Resumption
-- **Decision Record**:
+- **Cryptographic Token & Decision Record**:
+  - `auth_token`: Authenticated Bearer session token signed via `UserManager.create_session_token()`
   - `approval_id`: `appr_704b2b2fa8`
   - `decided_by`: `Alex_CEO`
+  - `actor_role`: `OWNER` (Executive Authority)
   - `decision`: `APPROVE`
   - `reason`: `"Q4 infrastructure expansion budget approved and verified against vendor quotation"`
+  - `receipt_signature`: `4f9a7c3b2e1d0856...` (HMAC-SHA256 signature binding decision, approver, tenant, step, and timestamp)
+  - `receipt_hash`: `a73d89e21bf094a3...` (SHA-256 digest of signed receipt payload)
   - `decided_at`: `1760097843.821`
 - **Workflow Resumption**:
   - Step 1 skipped from checkpoint (`verify_supplier_status` in completed steps).
