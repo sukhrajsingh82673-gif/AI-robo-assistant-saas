@@ -757,7 +757,9 @@ const EnterpriseSettings = (function() {
         </div>
 
         <!-- Docked Bottom Save Bar (CLEAN / DIRTY State, Section 16 & 79) -->
-        ${renderBottomSaveBar(hasDirty, dirtyCount, domain.name)}
+        <div id="settingsSaveBarContainer">
+          ${renderBottomSaveBar(hasDirty, dirtyCount, domain.name)}
+        </div>
 
         <!-- Slide-out Setting Detail Drawer / Inspector (Section 51) -->
         ${inspectingSettingId ? renderInspectorDrawer(inspectingSettingId) : ''}
@@ -1034,12 +1036,13 @@ const EnterpriseSettings = (function() {
         <label class="custom-toggle-control ${isReadOnly ? 'control-disabled' : ''}">
           <input 
             type="checkbox" 
+            id="control-input-${s.id}"
             ${isChecked ? 'checked' : ''} 
             ${isReadOnly ? 'disabled' : ''}
-            onchange="EnterpriseSettings.stageValue('${s.id}', this.checked)"
+            onchange="EnterpriseSettings.stageValue('${s.id}', this.checked, false)"
           />
           <span class="toggle-slider"></span>
-          <span class="toggle-state-text">${isChecked ? 'Enabled' : 'Disabled'}</span>
+          <span class="toggle-state-text" id="toggle-state-text-${s.id}">${isChecked ? 'Enabled' : 'Disabled'}</span>
         </label>
       `;
     }
@@ -1050,8 +1053,9 @@ const EnterpriseSettings = (function() {
         <div class="custom-select-control">
           <select 
             class="control-select" 
+            id="control-input-${s.id}"
             ${isReadOnly ? 'disabled' : ''}
-            onchange="EnterpriseSettings.stageValue('${s.id}', this.value)"
+            onchange="EnterpriseSettings.stageValue('${s.id}', this.value, false)"
           >
             ${opts.map(opt => `
               <option value="${escapeHtml(opt)}" ${String(curVal) === String(opt) ? 'selected' : ''}>
@@ -1070,9 +1074,10 @@ const EnterpriseSettings = (function() {
           <input 
             type="number" 
             class="control-number"
+            id="control-input-${s.id}"
             value="${escapeHtml(String(curVal))}"
             ${isReadOnly ? 'disabled' : ''}
-            oninput="EnterpriseSettings.stageValue('${s.id}', parseFloat(this.value) || 0)"
+            oninput="EnterpriseSettings.stageValue('${s.id}', parseFloat(this.value) || 0, false)"
           />
           <span class="currency-unit">USD / Month</span>
         </div>
@@ -1085,9 +1090,10 @@ const EnterpriseSettings = (function() {
           <input 
             type="number" 
             class="control-number"
+            id="control-input-${s.id}"
             value="${escapeHtml(String(curVal))}"
             ${isReadOnly ? 'disabled' : ''}
-            oninput="EnterpriseSettings.stageValue('${s.id}', parseInt(this.value, 10) || 0)"
+            oninput="EnterpriseSettings.stageValue('${s.id}', parseInt(this.value, 10) || 0, false)"
           />
         </div>
       `;
@@ -1100,25 +1106,28 @@ const EnterpriseSettings = (function() {
           <input 
             type="${isRevealed ? 'text' : 'password'}" 
             class="control-token"
+            id="control-input-${s.id}"
             value="${escapeHtml(String(curVal))}"
             ${isReadOnly ? 'disabled' : ''}
-            oninput="EnterpriseSettings.stageValue('${s.id}', this.value)"
+            oninput="EnterpriseSettings.stageValue('${s.id}', this.value, false)"
           />
-          <button class="token-btn" onclick="EnterpriseSettings.toggleSecretReveal('${s.id}')">
+          <button type="button" class="token-btn" id="token-reveal-btn-${s.id}" onclick="EnterpriseSettings.toggleSecretReveal('${s.id}')">
             ${isRevealed ? 'Hide' : 'Reveal'}
           </button>
-          <button class="token-btn" onclick="EnterpriseSettings.copySecret('${s.id}')">Copy</button>
+          <button type="button" class="token-btn" onclick="EnterpriseSettings.copySecret('${s.id}')">Copy</button>
         </div>
       `;
     }
 
     if (s.type === 'radio' && s.options) {
       return `
-        <div class="segmented-radio-control">
+        <div class="segmented-radio-control" id="radio-group-${s.id}">
           ${s.options.map(opt => `
             <button 
+              type="button"
               class="segment-btn ${String(curVal) === String(opt) ? 'active' : ''}"
-              onclick="EnterpriseSettings.stageValue('${s.id}', '${escapeHtml(opt)}')"
+              data-val="${escapeHtml(opt)}"
+              onclick="EnterpriseSettings.stageRadioValue('${s.id}', '${escapeHtml(opt)}')"
               ${isReadOnly ? 'disabled' : ''}
             >
               ${escapeHtml(opt)}
@@ -1143,9 +1152,10 @@ const EnterpriseSettings = (function() {
         <input 
           type="text" 
           class="control-text"
+          id="control-input-${s.id}"
           value="${escapeHtml(String(curVal))}"
           ${isReadOnly ? 'disabled' : ''}
-          oninput="EnterpriseSettings.stageValue('${s.id}', this.value)"
+          oninput="EnterpriseSettings.stageValue('${s.id}', this.value, false)"
         />
       </div>
     `;
@@ -1451,15 +1461,103 @@ const EnterpriseSettings = (function() {
   // --------------------------------------------------------------------------
   // 19. ACTION HANDLERS & PERSISTENCE ENGINE
   // --------------------------------------------------------------------------
-  function stageValue(settingId, val) {
+  function updateCardDirtyState(settingId) {
+    const card = document.getElementById(`card-${settingId}`);
+    if (!card) return;
+    const isDirty = stagedValues.hasOwnProperty(settingId) && stagedValues[settingId] !== originalValues[settingId];
+
+    if (isDirty) {
+      card.classList.add('card-is-dirty');
+      const titleGroup = card.querySelector('.card-title-group');
+      if (titleGroup && !titleGroup.querySelector('.badge-modified')) {
+        const badge = document.createElement('span');
+        badge.className = 'badge-modified';
+        badge.textContent = 'Modified';
+        titleGroup.appendChild(badge);
+      }
+      const btnsGroup = card.querySelector('.card-buttons-group');
+      if (btnsGroup && !btnsGroup.querySelector('.btn-card-reset')) {
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn-card-reset';
+        resetBtn.setAttribute('onclick', `EnterpriseSettings.resetSingleSetting('${settingId}')`);
+        resetBtn.textContent = 'Reset';
+        btnsGroup.insertBefore(resetBtn, btnsGroup.firstChild);
+      }
+    } else {
+      card.classList.remove('card-is-dirty');
+      const badge = card.querySelector('.badge-modified');
+      if (badge) badge.remove();
+      const resetBtn = card.querySelector('.btn-card-reset');
+      if (resetBtn) resetBtn.remove();
+    }
+  }
+
+  function updateSaveBar() {
+    const barContainer = document.getElementById('settingsSaveBarContainer');
+    if (!barContainer) return;
+    const dirtyKeys = Object.keys(stagedValues).filter(k => stagedValues[k] !== originalValues[k]);
+    const dirtyCount = dirtyKeys.length;
+    const hasDirty = dirtyCount > 0;
+    const domainName = (currentDomainData && currentDomainData.name) || activeView;
+    barContainer.innerHTML = renderBottomSaveBar(hasDirty, dirtyCount, domainName);
+  }
+
+  function stageValue(settingId, val, shouldRerender = false) {
     stagedValues[settingId] = val;
-    renderRoute();
+    if (shouldRerender) {
+      renderRoute();
+    } else {
+      const toggleText = document.getElementById(`toggle-state-text-${settingId}`);
+      if (toggleText) {
+        toggleText.textContent = Boolean(val) ? 'Enabled' : 'Disabled';
+      }
+      updateCardDirtyState(settingId);
+      updateSaveBar();
+    }
+  }
+
+  function stageRadioValue(settingId, val) {
+    stagedValues[settingId] = val;
+    const group = document.getElementById(`radio-group-${settingId}`);
+    if (group) {
+      group.querySelectorAll('.segment-btn').forEach(btn => {
+        if (btn.getAttribute('data-val') === String(val)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+    updateCardDirtyState(settingId);
+    updateSaveBar();
   }
 
   function resetSingleSetting(settingId) {
     if (originalValues.hasOwnProperty(settingId)) {
       stagedValues[settingId] = originalValues[settingId];
-      renderRoute();
+      const origVal = originalValues[settingId];
+      const input = document.getElementById(`control-input-${settingId}`);
+      if (input) {
+        if (input.type === 'checkbox') {
+          input.checked = Boolean(origVal);
+          const toggleText = document.getElementById(`toggle-state-text-${settingId}`);
+          if (toggleText) toggleText.textContent = input.checked ? 'Enabled' : 'Disabled';
+        } else {
+          input.value = origVal;
+        }
+      }
+      const radioGroup = document.getElementById(`radio-group-${settingId}`);
+      if (radioGroup) {
+        radioGroup.querySelectorAll('.segment-btn').forEach(btn => {
+          if (btn.getAttribute('data-val') === String(origVal)) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+      updateCardDirtyState(settingId);
+      updateSaveBar();
     }
   }
 
@@ -1761,20 +1859,35 @@ const EnterpriseSettings = (function() {
   }
 
   function toggleSecretReveal(settingId) {
+    const input = document.getElementById(`control-input-${settingId}`);
+    const btn = document.getElementById(`token-reveal-btn-${settingId}`);
+    if (input) {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      if (btn) {
+        btn.textContent = isPassword ? 'Hide' : 'Reveal';
+      }
+    }
     if (currentDomainData && currentDomainData.settings) {
       const s = currentDomainData.settings.find(item => item.id === settingId);
-      if (s) {
-        s._isRevealed = !s._isRevealed;
-        renderRoute();
-      }
+      if (s) s._isRevealed = !s._isRevealed;
     }
   }
 
   function copySecret(settingId) {
-    const val = stagedValues.hasOwnProperty(settingId) ? stagedValues[settingId] : originalValues[settingId];
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(String(val));
-      alert("Credential copied to clipboard.");
+    const val = stagedValues.hasOwnProperty(settingId) ? stagedValues[settingId] : (originalValues.hasOwnProperty(settingId) ? originalValues[settingId] : '');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(String(val)).then(() => {
+        if (typeof showToast === 'function') {
+          showToast("Credential copied to clipboard.", "info");
+        } else {
+          alert("Credential copied to clipboard.");
+        }
+      }).catch(() => {
+        prompt("Copy credential:", String(val));
+      });
+    } else {
+      prompt("Copy credential:", String(val));
     }
   }
 
@@ -1848,6 +1961,7 @@ const EnterpriseSettings = (function() {
     render,
     navigateTo,
     stageValue,
+    stageRadioValue,
     resetSingleSetting,
     discardChanges,
     resetToInherited,
@@ -1860,6 +1974,7 @@ const EnterpriseSettings = (function() {
     setSubTab,
     handleSearch,
     handleSearchFocus,
+    closeSearchDropdown,
     selectSearchResult,
     promptSaveCategory,
     cancelPreview,

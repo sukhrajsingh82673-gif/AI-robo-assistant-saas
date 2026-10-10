@@ -89,7 +89,7 @@
     "retention_days": 365
   },
   "ceo_autonomy_level": "Level 3 \u2014 Execute Within Policy",
-  "ceo_spending_limit": 50000.0,
+  "ceo_spending_limit": 75000,
   "sec_session_duration_hours": 8,
   "cost_global_budget_monthly": 100000.0,
   "wf_max_concurrent_agents": 16,
@@ -114,5 +114,6 @@
   "notify_escalation_sms_number": "+1-555-0199",
   "diag_wal_auto_checkpoint": true,
   "diag_verbose_kernel_traces": false,
-  "diag_collect_heap_metrics": true
+  "diag_collect_heap_metrics": true,
+  "term_max_lease_seconds": 5
 }

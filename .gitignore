@@ -51,3 +51,4 @@ storage/soak_telemetry.json
 storage/remote_dr_mirror/
 *.bundle
 supplier_evaluation_report.json
+node_modules/
