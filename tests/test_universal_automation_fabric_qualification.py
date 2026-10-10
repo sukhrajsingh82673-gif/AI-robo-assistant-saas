@@ -44,6 +44,7 @@ from core.automation_fabric import (
     ActionRiskLevel,
     ApprovalStatus,
     LicenseType,
+    ExecutionLease,
     AutomationSecurityException,
     LicenseValidationError
 )
@@ -623,6 +624,286 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
         self.assertEqual(metrics["tenant_id"], self.tenant_a)
         self.assertGreaterEqual(metrics["templates_available"], 8)
         self.assertEqual(metrics["specialized_agent_roles"], 11)
+
+    # =========================================================================
+    # ACCEPTANCE TEST 19: Negative Execution Lease Security Matrix
+    # =========================================================================
+    def test_19_negative_execution_lease_security_matrix(self):
+        """19. Proves forged, expired, replayed, revoked, cross-tenant, and tampered leases fail closed."""
+        secret = self.fabric.get_lease_secret_key()
+        run_id = f"test_run_{uuid.uuid4().hex[:8]}"
+
+        # 19a. Valid lease verifies correctly
+        valid_lease = ExecutionLease.create(
+            secret_key=secret,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_security_test",
+            workflow_version=1,
+            run_id=run_id,
+            action_name="test_action",
+            scope="task:test_action",
+            parameters={"param": "safe"}
+        )
+        self.assertTrue(valid_lease.verify(secret, expected_tenant_id=self.tenant_a, expected_workflow_version=1, parameters={"param": "safe"}))
+
+        # 19b. Forged signature is rejected
+        forged_lease = ExecutionLease.from_dict(valid_lease.to_dict())
+        forged_lease.signature = "0000000000000000000000000000000000000000000000000000000000000000"
+        self.assertFalse(forged_lease.verify(secret, expected_tenant_id=self.tenant_a))
+
+        # 19c. Expired lease is rejected
+        expired_lease = ExecutionLease.create(
+            secret_key=secret,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_security_test",
+            workflow_version=1,
+            run_id=run_id,
+            action_name="test_action",
+            scope="task:test_action",
+            ttl_seconds=-10.0
+        )
+        self.assertFalse(expired_lease.verify(secret, expected_tenant_id=self.tenant_a))
+
+        # 19d. Cross-tenant lease tampering is rejected
+        self.assertFalse(valid_lease.verify(secret, expected_tenant_id=self.tenant_b))
+
+        # 19e. Parameter mismatch (payload tampering) is rejected
+        self.assertFalse(valid_lease.verify(secret, expected_tenant_id=self.tenant_a, parameters={"param": "tampered_attack"}))
+
+        # 19f. Outdated workflow version is rejected
+        self.assertFalse(valid_lease.verify(secret, expected_tenant_id=self.tenant_a, expected_workflow_version=2))
+
+        # 19g. Replay attack: lease cannot be consumed more than once
+        consumable_lease = ExecutionLease.create(
+            secret_key=secret,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_security_test",
+            workflow_version=1,
+            run_id=run_id,
+            action_name="test_consume",
+            scope="task:test_consume"
+        )
+        # First consumption succeeds
+        consumed_ok = self.fabric.consume_lease(consumable_lease, expected_tenant_id=self.tenant_a, expected_workflow_version=1)
+        self.assertTrue(consumed_ok)
+
+        # Second consumption attempt raises replay detection exception
+        with self.assertRaises(AutomationSecurityException):
+            self.fabric.consume_lease(consumable_lease, expected_tenant_id=self.tenant_a, expected_workflow_version=1)
+
+        # 19h. Explicitly revoked lease is rejected
+        revocable_lease = ExecutionLease.create(
+            secret_key=secret,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_security_test",
+            workflow_version=1,
+            run_id=run_id,
+            action_name="test_revocation",
+            scope="task:test_revocation"
+        )
+        self.fabric.revoke_lease(revocable_lease.lease_id, self.tenant_a, reason="Security review flag")
+        with self.assertRaises(AutomationSecurityException):
+            self.fabric.consume_lease(revocable_lease, expected_tenant_id=self.tenant_a, expected_workflow_version=1)
+
+    # =========================================================================
+    # ACCEPTANCE TEST 20: Genuine Background Worker Lifecycle & Async Execution
+    # =========================================================================
+    def test_20_genuine_background_worker_lifecycle_and_async_execution(self):
+        """20. Validates background worker startup, asynchronous queue consumption, state persistence, and shutdown."""
+        # 20a. Create workflow
+        spec = {
+            "id": f"wf_async_{uuid.uuid4().hex[:6]}",
+            "namespace": "zonata.governed",
+            "name": "Async Background Workflow",
+            "tasks": [
+                {"id": "step_async", "type": "io.kestra.plugin.zonata.agent.Delegate", "role": "SoftwareEngineeringAgent"}
+            ]
+        }
+        draft = self.fabric.create_workflow_draft("Async Workflow", spec, self.tenant_a, self.company_a)
+        wf_id = draft["workflow_id"]
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        # 20b. Enqueue async execution
+        exec_id = self.fabric.submit_async_execution(
+            workflow_id=wf_id,
+            inputs={"job": "async_background"},
+            tenant_id=self.tenant_a,
+            company_id=self.company_a
+        )
+        self.assertIsNotNone(exec_id)
+
+        # Check execution is in QUEUED state
+        exec_data = self.fabric.get_execution(exec_id, self.tenant_a)
+        self.assertEqual(exec_data["status"], "QUEUED")
+
+        # 20c. Start background worker with fast poll
+        self.fabric.start_background_worker(poll_interval=0.1)
+
+        # Wait up to 3 seconds for worker to process queued task
+        completed = False
+        for _ in range(30):
+            time.sleep(0.1)
+            updated = self.fabric.get_execution(exec_id, self.tenant_a)
+            if updated and updated["status"] in ("COMPLETED", "FAILED"):
+                completed = True
+                break
+
+        self.fabric.stop_background_worker()
+        self.assertTrue(completed)
+        self.assertEqual(updated["status"], "COMPLETED")
+        self.assertIn(updated["terminal_outcome"], (TerminalOutcome.TASK_SUCCESS.value, TerminalOutcome.BUSINESS_OUTCOME_VERIFIED.value))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 21: AI CEO Executive Mission Planner Integration
+    # =========================================================================
+    def test_21_ai_ceo_executive_mission_planner_integration(self):
+        """21. Proves AI CEO executive mission delegates to automation fabric, captures evidence, and marks verified outcome."""
+        from core.executive_missions import ExecutiveMissionPlanner
+        planner = ExecutiveMissionPlanner(self.tenant_a, self.company_a)
+
+        mission = planner.create_mission(
+            objective_id="obj_growth_q4",
+            department="ENGINEERING",
+            manager="VP Engineering",
+            employee="SoftwareEngineeringAgent",
+            title="Automate Regression Triage Pipeline",
+            expected_output="Operational PR and verified regression check",
+            expected_business_outcome="Zero manual triage time for CI/CD",
+            kpi={"metric": "triage_latency_hours", "target": 0.1},
+            kra=["Continuous Deployment", "Autonomous Triage"],
+            acceptance_criteria=["Test suite verified green", "Audit record sealed"]
+        )
+        self.assertIsNotNone(mission.mission_id)
+        self.assertEqual(mission.status, "EXECUTE")
+
+        # Execute mission via Universal Automation Fabric using certified production template
+        res = planner.execute_with_automation_fabric(
+            mission_id=mission.mission_id,
+            workflow_or_template_id="tmpl_sales_lead_qualification",
+            inputs={"lead_email": "cto@acme.corp", "company_name": "Acme Corp", "company_domain": "acme.corp"}
+        )
+        self.assertIsNotNone(res.get("execution_id"))
+
+        # Re-fetch mission to verify evidence and outcome sealed in sovereign ledger
+        completed_mission = planner.get_mission(mission.mission_id)
+        self.assertEqual(completed_mission.status, "COMPLETED")
+        self.assertEqual(completed_mission.outcome_status, "VERIFIED_ACHIEVED")
+        self.assertIsNotNone(completed_mission.evidence_package_id)
+        self.assertTrue(completed_mission.verified_outcome.startswith("Verified:"))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 22: PolicyEngine V2 Governance Evaluation
+    # =========================================================================
+    def test_22_policy_engine_v2_governance_evaluation(self):
+        """22. Verifies that PolicyEngine V2 evaluates ABAC context and enforces approval on high risk."""
+        flow_spec = {
+            "id": f"wf_policy_{uuid.uuid4().hex[:6]}",
+            "namespace": "zonata.governed",
+            "name": "Policy Engine Governed Workflow",
+            "tasks": [
+                {
+                    "id": "step_sensitive",
+                    "type": "io.kestra.plugin.core.http.Request",
+                    "description": "High-risk resource mutation",
+                    "risk_class": "DESTRUCTIVE"  # Triggers PolicyEngine REQUIRE_APPROVAL
+                }
+            ]
+        }
+        draft = self.fabric.create_workflow_draft("Policy Governed Flow", flow_spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        res = self.fabric.execute_workflow(
+            workflow_id=draft["workflow_id"],
+            inputs={"target": "database_partition"},
+            tenant_id=self.tenant_a,
+            company_id=self.company_a
+        )
+        # PolicyEngine detects DESTRUCTIVE risk and halts at WAITING_FOR_APPROVAL
+        self.assertEqual(res["status"], ExecutionStatus.WAITING_FOR_APPROVAL.value)
+        self.assertEqual(res["terminal_outcome"], TerminalOutcome.BLOCKED.value)
+        self.assertIsNotNone(res["approval_id"])
+
+    # =========================================================================
+    # ACCEPTANCE TEST 23: UniversalControlKernel & EvidenceLedger Sealing
+    # =========================================================================
+    def test_23_uck_execution_and_evidence_ledger_sealing(self):
+        """23. Proves exec.Commands dispatches via UniversalControlKernel and seals evidence into EvidenceLedger."""
+        flow_spec = {
+            "id": f"wf_uck_{uuid.uuid4().hex[:6]}",
+            "namespace": "zonata.governed",
+            "name": "UCK Governed Execution",
+            "tasks": [
+                {
+                    "id": "uck_cmd_step",
+                    "type": "io.kestra.plugin.scripts.exec.Commands",
+                    "commands": ["echo", "ZONATA_UCK_VERIFIED_OUTPUT"]
+                }
+            ]
+        }
+        draft = self.fabric.create_workflow_draft("UCK Flow", flow_spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(draft["workflow_id"], self.tenant_a)
+
+        res = self.fabric.execute_workflow(
+            workflow_id=draft["workflow_id"],
+            inputs={"context": "uck_test"},
+            tenant_id=self.tenant_a,
+            company_id=self.company_a
+        )
+        self.assertEqual(res["status"], ExecutionStatus.COMPLETED.value)
+        self.assertIsNotNone(res.get("evidence_hash"))
+
+        # Verify step results contain UCK execution proof
+        step_res = res["step_results"][0]
+        self.assertEqual(step_res["step_id"], "uck_cmd_step")
+        self.assertIn("ZONATA_UCK_VERIFIED_OUTPUT", step_res["output"]["stdout"])
+
+    # =========================================================================
+    # ACCEPTANCE TEST 24: CycloneDX v1.5 Machine-Readable SBOM Verification
+    # =========================================================================
+    def test_24_cyclonedx_sbom_machine_readable_file(self):
+        """24. Proves valid CycloneDX v1.5 JSON SBOM file exists and satisfies schema requirements."""
+        sbom = self.licenses.generate_sbom(write_file=True)
+        self.assertEqual(sbom["bomFormat"], "CycloneDX")
+        self.assertEqual(sbom["specVersion"], "1.5")
+        self.assertIn("serialNumber", sbom)
+        self.assertGreaterEqual(len(sbom["components"]), 5)
+
+        # Verify standard CycloneDX component metadata
+        first_comp = sbom["components"][0]
+        self.assertIn("name", first_comp)
+        self.assertIn("version", first_comp)
+        self.assertIn("licenses", first_comp)
+        self.assertIn("purl", first_comp)
+
+        # Verify physical file on disk
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sbom_path = os.path.join(base_dir, "docs/cyclonedx_sbom.json")
+        self.assertTrue(os.path.exists(sbom_path))
+        with open(sbom_path, "r", encoding="utf-8") as f:
+            disk_sbom = json.load(f)
+        self.assertEqual(disk_sbom["bomFormat"], "CycloneDX")
+
+    # =========================================================================
+    # ACCEPTANCE TEST 25: Frontend Non-Regression (Zero Visual Intrusion)
+    # =========================================================================
+    def test_25_frontend_non_regression_zero_visual_intrusion(self):
+        """25. Proves frontend web/workflow_workspace.js contains zero new visual canvas or exposed internal tabs."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        frontend_path = os.path.join(base_dir, "web/workflow_workspace.js")
+        with open(frontend_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Proves existing sovereign LangGraph Governed Workflow Runtime UI is preserved
+        self.assertIn("Governed Workflow Runtime", content)
+        self.assertIn("LangGraph Core", content)
+        # Proves no unapproved visual canvas or internal controls were added
+        self.assertNotIn("id=\"tab-builder\"", content)
+        self.assertNotIn("id=\"tab-connectors\"", content)
+        self.assertNotIn("id=\"tab-sbom\"", content)
 
 
 if __name__ == "__main__":

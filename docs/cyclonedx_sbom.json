@@ -1,0 +1,205 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:zonata-automation-fabric-v1",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-10T06:35:04Z",
+    "component": {
+      "name": "URA Universal Automation Fabric",
+      "version": "1.0.0",
+      "type": "application",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/kestra-core@v0.18.2",
+      "name": "Kestra Open-Source Core",
+      "version": "v0.18.2",
+      "purl": "pkg:generic/kestra-core@v0.18.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/kestra-io/kestra/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/kestra-io/kestra"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "EMBEDDED_CORE_ADAPTER"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "LICENSE file verified in upstream commit e8f4a1c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/langgraph-core@v0.2.14",
+      "name": "LangGraph Core Engine",
+      "version": "v0.2.14",
+      "purl": "pkg:generic/langgraph-core@v0.2.14",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/langchain-ai/langgraph/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/langchain-ai/langgraph"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "EMBEDDED_RUNTIME"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "LICENSE file verified in upstream commit f5a91d2"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/mcp-python-sdk@v1.1.0",
+      "name": "Model Context Protocol Python SDK",
+      "version": "v1.1.0",
+      "purl": "pkg:generic/mcp-python-sdk@v1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/modelcontextprotocol/python-sdk/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/modelcontextprotocol/python-sdk"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Anthropic open-source specification release v1.1.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/playwright-python@v1.44.0",
+      "name": "Playwright Automation",
+      "version": "v1.44.0",
+      "purl": "pkg:generic/playwright-python@v1.44.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/microsoft/playwright-python/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/microsoft/playwright-python"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "REMOTE_WORKER"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Microsoft upstream Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/openhands@v0.9.1",
+      "name": "OpenHands Software Agent",
+      "version": "v0.9.1",
+      "purl": "pkg:generic/openhands@v0.9.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/All-Hands-AI/OpenHands/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/All-Hands-AI/OpenHands"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "SANDBOX_CONTAINER"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "All-Hands-AI upstream MIT license commit e2b8c5f"
+        }
+      ]
+    }
+  ],
+  "compliance_summary": {
+    "total_components": 5,
+    "osi_compliant_count": 5,
+    "unapproved_count": 0,
+    "overall_status": "FULLY_COMPLIANT"
+  }
+}

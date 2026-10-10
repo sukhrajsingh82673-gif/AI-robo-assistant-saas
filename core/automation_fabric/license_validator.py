@@ -127,33 +127,57 @@ class AutomationLicenseValidator:
             return False, f"License '{lic_str}' is not an approved OSI license"
         return True, "License compliant"
 
-    def generate_sbom(self) -> Dict[str, Any]:
-        """Produces Software Bill of Materials (SBOM) for the Automation Fabric."""
+    def generate_sbom(self, write_file: bool = True) -> Dict[str, Any]:
+        """Produces official CycloneDX v1.5 JSON Software Bill of Materials (SBOM)."""
+        import os
         components = []
         for key, info in self.PINNED_INVENTORY.items():
             components.append({
-                "component_id": key,
+                "type": "library",
+                "bom-ref": f"pkg:generic/{key}@{info['version']}",
                 "name": info["name"],
                 "version": info["version"],
-                "repository": info["repository"],
-                "license_spdx": info["spdx"],
-                "commercial_saas_rights": info["commercial_saas_compliant"],
-                "isolation": info["isolation_type"],
-                "verification_evidence": info["verified_evidence"]
+                "purl": f"pkg:generic/{key}@{info['version']}",
+                "licenses": [
+                    {
+                        "license": {
+                            "id": info["spdx"],
+                            "url": f"{info['repository']}/blob/main/LICENSE"
+                        }
+                    }
+                ],
+                "externalReferences": [
+                    {
+                        "type": "vcs",
+                        "url": info["repository"]
+                    }
+                ],
+                "properties": [
+                    {"name": "commercial_saas_rights", "value": str(info["commercial_saas_compliant"]).lower()},
+                    {"name": "isolation_type", "value": info["isolation_type"]},
+                    {"name": "verification_evidence", "value": info["verified_evidence"]}
+                ]
             })
 
-        return {
+        sbom = {
+            "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
             "bomFormat": "CycloneDX",
             "specVersion": "1.5",
             "serialNumber": "urn:uuid:zonata-automation-fabric-v1",
             "version": 1,
             "metadata": {
-                "timestamp": time.time(),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "component": {
                     "name": "URA Universal Automation Fabric",
                     "version": "1.0.0",
                     "type": "application",
-                    "license": "Apache-2.0"
+                    "licenses": [
+                        {
+                            "license": {
+                                "id": "Apache-2.0"
+                            }
+                        }
+                    ]
                 }
             },
             "components": components,
@@ -164,6 +188,19 @@ class AutomationLicenseValidator:
                 "overall_status": "FULLY_COMPLIANT"
             }
         }
+
+        if write_file:
+            try:
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                docs_dir = os.path.join(base_dir, "docs")
+                os.makedirs(docs_dir, exist_ok=True)
+                sbom_file = os.path.join(docs_dir, "cyclonedx_sbom.json")
+                with open(sbom_file, "w", encoding="utf-8") as f:
+                    json.dump(sbom, f, indent=2)
+            except Exception:
+                pass
+
+        return sbom
 
 
 # Singleton validator instance

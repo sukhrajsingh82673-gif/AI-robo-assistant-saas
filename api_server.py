@@ -181,7 +181,7 @@ from core.durable_workflow_runtime import (
 from zonata.langgraph_adapter import langgraph_adapter
 from core.automation_fabric import (
     universal_automation_fabric,
-    connector_registry,
+    connector_registry as automation_connector_registry,
     template_catalog,
     specialized_agent_registry,
     license_validator,
@@ -1909,7 +1909,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/automation/connectors":
-            conns = connector_registry.list_connectors()
+            conns = [c.to_dict() for c in automation_connector_registry.list_connectors(tenant_id)]
             self._send_json({"connectors": conns, "count": len(conns)})
             return
 
@@ -4592,7 +4592,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/automation/connectors/discover":
             candidate = req_data.get("candidate", {})
-            ok, msg, vetted = connector_registry.qualify_and_discover_connector(candidate)
+            ok, msg, vetted = automation_connector_registry.qualify_and_discover_connector(candidate)
             self._send_json({"success": ok, "message": msg, "connector": vetted.to_dict() if vetted else None}, status=200 if ok else 400)
             return
 
@@ -6108,9 +6108,14 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 def run_server(port=8080):
     ThreadedHTTPServer.allow_reuse_address = True
     print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} (Multi-Threaded Concurrent Engine)...")
-    with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
-        print(f"[*] Company OS 1.0 ready at http://localhost:{port} (Threaded Concurrency Enabled)")
-        httpd.serve_forever()
+    universal_automation_fabric.start_background_worker(poll_interval=0.5)
+    print("[*] Universal Automation Fabric Background Worker ACTIVE")
+    try:
+        with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
+            print(f"[*] Company OS 1.0 ready at http://localhost:{port} (Threaded Concurrency Enabled)")
+            httpd.serve_forever()
+    finally:
+        universal_automation_fabric.stop_background_worker()
 
 if __name__ == "__main__":
     p = int(sys.argv[1]) if len(sys.argv) > 1 else 8080

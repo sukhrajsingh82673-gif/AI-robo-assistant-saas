@@ -277,3 +277,23 @@ class ExecutiveMissionPlanner:
 
             rows = conn.execute(query, tuple(params)).fetchall()
             return [self.get_mission(r["mission_id"]) for r in rows if r["mission_id"]]
+
+    def execute_with_automation_fabric(
+        self,
+        mission_id: str,
+        workflow_or_template_id: str,
+        inputs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Bridges the executive mission to the Universal Automation Fabric.
+        Dispatches background workflow, captures cryptographic evidence,
+        and records completion directly in the sovereign mission ledger.
+        """
+        from core.automation_fabric import universal_automation_fabric
+        return universal_automation_fabric.execute_mission_via_fabric(
+            mission_id=mission_id,
+            workflow_or_template_id=workflow_or_template_id,
+            inputs=inputs,
+            tenant_id=self.tenant_id,
+            company_id=self.company_id
+        )

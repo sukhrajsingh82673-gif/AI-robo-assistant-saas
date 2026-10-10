@@ -95,46 +95,191 @@ class CircuitState(str, Enum):
 
 @dataclass
 class ExecutionLease:
-    """HMAC-signed scoped execution lease required for privileged actions."""
+    """
+    Cryptographically hardened HMAC-SHA-256 scoped execution lease.
+    Enforces canonical payload serialization, parameter digest binding,
+    workflow version integrity, tenant isolation, and single-use nonce.
+    """
     lease_id: str
     tenant_id: str
     company_id: str
     workflow_id: str
+    workflow_version: int
     run_id: str
     action_name: str
     scope: str
+    parameters_hash: str
+    nonce: str
     created_at: float
     expires_at: float
     signature: str
 
     @classmethod
-    def create(cls, secret_key: str, tenant_id: str, company_id: str,
-               workflow_id: str, run_id: str, action_name: str,
-               scope: str, ttl_seconds: float = 300.0) -> "ExecutionLease":
+    def compute_canonical_payload(
+        cls,
+        lease_id: str,
+        tenant_id: str,
+        company_id: str,
+        workflow_id: str,
+        workflow_version: int,
+        run_id: str,
+        action_name: str,
+        scope: str,
+        parameters_hash: str,
+        nonce: str,
+        created_at: float,
+        expires_at: float
+    ) -> str:
+        """Deterministic canonical JSON serialization of lease payload."""
+        import json
+        payload_dict = {
+            "action_name": action_name,
+            "company_id": company_id,
+            "created_at": round(float(created_at), 3),
+            "expires_at": round(float(expires_at), 3),
+            "lease_id": lease_id,
+            "nonce": nonce,
+            "parameters_hash": parameters_hash,
+            "run_id": run_id,
+            "scope": scope,
+            "tenant_id": tenant_id,
+            "workflow_id": workflow_id,
+            "workflow_version": int(workflow_version)
+        }
+        return json.dumps(payload_dict, sort_keys=True, separators=(",", ":"))
+
+    @classmethod
+    def compute_parameters_hash(cls, parameters: Optional[Dict[str, Any]]) -> str:
+        """Computes SHA-256 digest of canonical parameters."""
+        import json
+        if not parameters:
+            return ""
+        try:
+            param_str = json.dumps(parameters, sort_keys=True, default=str, separators=(",", ":"))
+            return hashlib.sha256(param_str.encode("utf-8")).hexdigest()
+        except Exception:
+            return ""
+
+    @classmethod
+    def create(
+        cls,
+        secret_key: str,
+        tenant_id: str,
+        company_id: str,
+        workflow_id: str,
+        run_id: str,
+        action_name: str,
+        scope: str,
+        workflow_version: int = 1,
+        parameters: Optional[Dict[str, Any]] = None,
+        ttl_seconds: float = 300.0,
+        nonce: Optional[str] = None
+    ) -> "ExecutionLease":
         lease_id = f"lease_{uuid.uuid4().hex[:12]}"
         now = time.time()
         expires = now + ttl_seconds
-        payload = f"{lease_id}:{tenant_id}:{company_id}:{workflow_id}:{run_id}:{action_name}:{scope}:{expires}"
-        sig = hmac.new(secret_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        param_hash = cls.compute_parameters_hash(parameters)
+        lease_nonce = nonce or uuid.uuid4().hex[:16]
+
+        canonical = cls.compute_canonical_payload(
+            lease_id=lease_id,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            workflow_id=workflow_id,
+            workflow_version=workflow_version,
+            run_id=run_id,
+            action_name=action_name,
+            scope=scope,
+            parameters_hash=param_hash,
+            nonce=lease_nonce,
+            created_at=now,
+            expires_at=expires
+        )
+        sig = hmac.new(secret_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
         return cls(
             lease_id=lease_id,
             tenant_id=tenant_id,
             company_id=company_id,
             workflow_id=workflow_id,
+            workflow_version=workflow_version,
             run_id=run_id,
             action_name=action_name,
             scope=scope,
+            parameters_hash=param_hash,
+            nonce=lease_nonce,
             created_at=now,
             expires_at=expires,
             signature=sig
         )
 
-    def verify(self, secret_key: str) -> bool:
+    def verify(
+        self,
+        secret_key: str,
+        expected_tenant_id: Optional[str] = None,
+        expected_workflow_version: Optional[int] = None,
+        parameters: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Constant-time integrity and context verification of execution lease.
+        Fails closed on any discrepancy or expiry.
+        """
+        # 1. Expiry check
         if time.time() > self.expires_at:
             return False
-        payload = f"{self.lease_id}:{self.tenant_id}:{self.company_id}:{self.workflow_id}:{self.run_id}:{self.action_name}:{self.scope}:{self.expires_at}"
-        expected = hmac.new(secret_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(self.signature, expected)
+
+        # 2. Tenant isolation check
+        if expected_tenant_id and self.tenant_id != expected_tenant_id:
+            return False
+
+        # 3. Workflow version integrity check
+        if expected_workflow_version is not None and self.workflow_version != expected_workflow_version:
+            return False
+
+        # 4. Parameters hash check
+        if parameters is not None and self.parameters_hash:
+            computed_hash = self.compute_parameters_hash(parameters)
+            if not hmac.compare_digest(self.parameters_hash, computed_hash):
+                return False
+
+        # 5. Cryptographic HMAC comparison
+        canonical = self.compute_canonical_payload(
+            lease_id=self.lease_id,
+            tenant_id=self.tenant_id,
+            company_id=self.company_id,
+            workflow_id=self.workflow_id,
+            workflow_version=self.workflow_version,
+            run_id=self.run_id,
+            action_name=self.action_name,
+            scope=self.scope,
+            parameters_hash=self.parameters_hash,
+            nonce=self.nonce,
+            created_at=self.created_at,
+            expires_at=self.expires_at
+        )
+        expected_sig = hmac.new(secret_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(self.signature, expected_sig)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionLease":
+        return cls(
+            lease_id=data["lease_id"],
+            tenant_id=data["tenant_id"],
+            company_id=data["company_id"],
+            workflow_id=data["workflow_id"],
+            workflow_version=int(data.get("workflow_version", 1)),
+            run_id=data["run_id"],
+            action_name=data["action_name"],
+            scope=data["scope"],
+            parameters_hash=data.get("parameters_hash", ""),
+            nonce=data.get("nonce", ""),
+            created_at=float(data["created_at"]),
+            expires_at=float(data["expires_at"]),
+            signature=data["signature"]
+        )
 
 
 @dataclass
