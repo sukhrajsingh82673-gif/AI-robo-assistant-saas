@@ -1,6 +1,6 @@
 """
 ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
-Phase 10 — Model Data Loss Prevention (DLP) Firewall
+Phase 10 — Model Data Loss Prevention (DLP) Firewall & Presidio Bridge
 Inspects, sanitizes, and evaluates outbound prompts before transmission to external AI providers.
 Prevents credential exfiltration, secret leakage, and unredacted PII exposure.
 
@@ -11,17 +11,21 @@ Constitutional Invariants:
 """
 
 import re
+import base64
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 from core.data_classification_engine import classification_engine, DataClassificationLevel, SensitivityCategory
+from core.presidio_dlp_engine import presidio_analyzer, presidio_anonymizer
 
 logger = logging.getLogger("zonata.model.firewall")
 
-# Comprehensive redaction patterns
+# Comprehensive legacy & fallback redaction patterns
 REDACTION_RULES = [
     (re.compile(r'\b\d{3}-\d{2}-\d{4}\b'), "[REDACTED_SSN]"),
+    (re.compile(r'\b\d{3}\s\d{2}\s\d{4}\b'), "[REDACTED_SSN]"),
     (re.compile(r'\b(?:\d{4}-){3}\d{4}\b'), "[REDACTED_CREDIT_CARD]"),
+    (re.compile(r'\b(?:\d{4}\s){3}\d{4}\b'), "[REDACTED_CREDIT_CARD]"),
     (re.compile(r'(?i)(?:api[_-]?key|secret[_-]?token|bearer\s+)[a-z0-9_\-\.]{16,}'), "[REDACTED_CREDENTIAL]"),
     (re.compile(r'(?i)-----BEGIN[A-Z\s]+PRIVATE KEY-----.*?-----END[A-Z\s]+PRIVATE KEY-----', re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     (re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'), "[REDACTED_EMAIL]")
@@ -39,9 +43,22 @@ class FirewallInspectionResult:
 class ModelDataFirewall:
     """
     Data Loss Prevention barrier sitting strictly between ZONATA AI Employees and LLM Providers.
+    Powered by local Presidio entity recognizers and ZONATA policy engine.
     """
-    # Strict cloud transmission policy: HIGHLY_RESTRICTED data is NEVER transmitted to external models
     PROHIBITED_CLOUD_LEVELS = {DataClassificationLevel.HIGHLY_RESTRICTED}
+
+    def _check_obfuscated_secrets(self, text: str) -> bool:
+        """Adversarial check: scans for base64 encoded private keys or tokens."""
+        # Find potential base64 strings of length >= 64
+        b64_candidates = re.findall(r'[A-Za-z0-9+/]{64,}={0,2}', text)
+        for cand in b64_candidates:
+            try:
+                decoded = base64.b64decode(cand).decode('utf-8', errors='ignore')
+                if "PRIVATE KEY" in decoded or "BEGIN RSA" in decoded:
+                    return True
+            except Exception:
+                continue
+        return False
 
     def inspect_and_filter(
         self,
@@ -54,10 +71,23 @@ class ModelDataFirewall:
         """
         Inspect prompt text, classify sensitivity, apply redaction, and enforce transmission boundaries.
         """
-        # 1. Classify content
+        # 1. Adversarial deobfuscation check (base64 private keys)
+        has_obfuscated_secret = self._check_obfuscated_secrets(raw_prompt)
+        if has_obfuscated_secret and not is_sovereign_local_model:
+            logger.error(f"[DLP BLOCKED] Prompt contains obfuscated (base64) private key; transmission to external provider '{provider_name}' forbidden.")
+            return FirewallInspectionResult(
+                is_allowed=False,
+                sanitized_prompt="",
+                detected_classification=DataClassificationLevel.HIGHLY_RESTRICTED,
+                detected_sensitivities=[SensitivityCategory.SECURITY_AUTH],
+                redaction_count=0,
+                blocking_reason=f"Obfuscated private key detected; strictly prohibited from external cloud provider '{provider_name}'."
+            )
+
+        # 2. Classify content
         eff_level, categories, reasons = classification_engine.classify_content(raw_prompt)
 
-        # 2. Enforce Sovereign Policy: If data is HIGHLY_RESTRICTED and model is 3rd-party cloud -> BLOCK
+        # 3. Enforce Sovereign Policy: If data is HIGHLY_RESTRICTED and model is 3rd-party cloud -> BLOCK
         if eff_level in self.PROHIBITED_CLOUD_LEVELS and not is_sovereign_local_model:
             logger.error(f"[DLP BLOCKED] Prompt contains {eff_level} data; transmission to external provider '{provider_name}' forbidden.")
             return FirewallInspectionResult(
@@ -69,15 +99,32 @@ class ModelDataFirewall:
                 blocking_reason=f"Classification '{eff_level}' strictly prohibited from external cloud provider '{provider_name}'."
             )
 
-        # 3. Apply DLP redaction if permitted
+        # 4. Apply Presidio & Pattern DLP redaction if permitted
         sanitized = raw_prompt
         redactions = 0
         if allow_pii_redaction:
+            # First pass: standard rules for strict backward-compatible tokens
             for pattern, replacement in REDACTION_RULES:
                 matches = pattern.findall(sanitized)
                 if matches:
                     redactions += len(matches)
                     sanitized = pattern.sub(replacement, sanitized)
+
+            # Second pass: Presidio entity recognition for company & extended entities
+            rec_results = presidio_analyzer.analyze(sanitized)
+            # Filter out spans already redacted
+            valid_recs = [r for r in rec_results if not sanitized[r.start:r.end].startswith("[REDACTED_")]
+            if valid_recs:
+                presidio_ops = {
+                    "ZONATA_EMPLOYEE_ID": {"type": "replace", "new_value": "[REDACTED_EMPLOYEE_ID]"},
+                    "ZONATA_CUSTOMER_ID": {"type": "replace", "new_value": "[REDACTED_CUSTOMER_ID]"},
+                    "CONFIDENTIAL_PROJECT_NAME": {"type": "replace", "new_value": "[REDACTED_PROJECT_CODENAME]"},
+                    "SECURITY_CANARY": {"type": "replace", "new_value": "[REDACTED_CANARY_SECRET]"},
+                    "DEFAULT": {"type": "replace"}
+                }
+                anon_res = presidio_anonymizer.anonymize(sanitized, valid_recs, operators=presidio_ops)
+                sanitized = anon_res.text
+                redactions += anon_res.items_count
 
         return FirewallInspectionResult(
             is_allowed=True,

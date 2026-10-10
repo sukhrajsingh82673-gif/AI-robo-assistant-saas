@@ -80,6 +80,16 @@ class GovernedMemoryManager:
         if tier == MemoryTier.BUSINESS_MEMORY and not is_sovereign_write:
             raise PermissionError("Worker memory cannot directly write to Authoritative BUSINESS_MEMORY without sovereign approval")
 
+        # Memory DLP Gate: scrub raw credentials, keys, or prohibited secrets before persistence
+        from core.ai_dlp_gateway import ai_dlp_gateway
+        _, sanitized_val, _ = ai_dlp_gateway.inspect_memory_persistence(
+            tier_name=tier.value,
+            key=key,
+            value=value,
+            tenant_id=self.tenant_id,
+            worker_id=worker_id
+        )
+
         mid = f"mem_{uuid.uuid4().hex[:8]}"
         record = MemoryRecord(
             memory_id=mid,
@@ -89,7 +99,7 @@ class GovernedMemoryManager:
             worker_id=worker_id,
             mission_id=mission_id,
             key=key,
-            value=value,
+            value=sanitized_val,
             source=source,
             confidence=confidence
         )

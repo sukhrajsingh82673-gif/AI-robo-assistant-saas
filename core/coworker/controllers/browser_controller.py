@@ -16,6 +16,14 @@ import ipaddress
 import time
 import uuid
 
+class SSRFSafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urllib.parse.urlparse(newurl)
+        if not parsed.hostname or GovernedBrowserController.is_private_ip(parsed.hostname):
+            raise urllib.error.HTTPError(newurl, 403, "SSRF Block: Redirect target is private or link-local", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class GovernedBrowserController:
     """
     Unified Browser Controller for the Universal Co-Worker.
@@ -36,8 +44,16 @@ class GovernedBrowserController:
         )
         self.reality_status = "QUALIFIED_NATIVE_EXTRACTOR" if not self.has_local_chromium else "QUALIFIED_GRAPHICAL_BROWSER"
 
-    def is_private_ip(self, hostname: str) -> bool:
+    @staticmethod
+    def is_private_ip(hostname: str) -> bool:
         """SSRF Guard: blocks access to private, loopback, or cloud-metadata IPs."""
+        if not hostname:
+            return True
+        h_lower = hostname.lower()
+        if h_lower in ("metadata.google.internal", "instance-data", "localhost", "127.0.0.1", "169.254.169.254", "::1"):
+            return True
+        if any(h_lower.startswith(p) for p in ("169.254.", "127.", "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")):
+            return True
         try:
             ip_str = socket.gethostbyname(hostname)
             ip = ipaddress.ip_address(ip_str)
@@ -48,7 +64,7 @@ class GovernedBrowserController:
                 ip_str.startswith("169.254.") # AWS / GCP metadata
             )
         except Exception:
-            return False
+            return True # Fail-closed on resolution failure
 
     def navigate_and_extract(
         self,
@@ -82,7 +98,15 @@ class GovernedBrowserController:
                 url,
                 headers={"User-Agent": "ZONATA-Enterprise-CoWorker/1.0 (Governed-Agent)"}
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            opener = urllib.request.build_opener(SSRFSafeRedirectHandler)
+            with opener.open(req, timeout=15) as resp:
+                final_parsed = urllib.parse.urlparse(resp.geturl())
+                if self.is_private_ip(final_parsed.hostname or ""):
+                    return {
+                        "success": False,
+                        "error": f"SSRF Block: Redirected to private target '{final_parsed.hostname}'.",
+                        "provider": "openclaw_native"
+                    }
                 raw_bytes = resp.read(max_bytes)
                 html_text = raw_bytes.decode("utf-8", errors="ignore")
 

@@ -88,7 +88,14 @@ class GovernedTerminalController:
         file_path: str,
         content: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Safely performs read/write/append with pre/post SHA-256 hashing."""
+        """Safely performs read/write/append with pre/post SHA-256 hashing and path confinement."""
+        clean_path = os.path.normpath(file_path)
+        if ".." in clean_path.split(os.sep) or any(clean_path.startswith(p) for p in ("/etc", "/root/.vault", "/proc", "/sys")):
+            return {
+                "success": False,
+                "error": f"Security Violation: Path traversal or restricted system path '{file_path}' blocked.",
+                "status": "FAILED_SECURITY_POLICY"
+            }
         session_id = f"file_ctl_{uuid.uuid4().hex[:6]}"
         return self.runtime.run_foreground(session_id, {
             "capability": "terminal.file_operation",

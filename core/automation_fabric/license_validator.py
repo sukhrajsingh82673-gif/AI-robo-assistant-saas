@@ -264,6 +264,16 @@ class AutomationLicenseValidator:
             "commercial_saas_compliant": True,
             "isolation_type": "EMBEDDED_RUNTIME",
             "verified_evidence": "CNCF OpenFeature Apache-2.0 license"
+        },
+        "presidio-core": {
+            "name": "Microsoft Presidio Data Protection Engine",
+            "version": "v2.2.364",
+            "repository": "https://github.com/microsoft/presidio",
+            "license": "MIT",
+            "spdx": "MIT",
+            "commercial_saas_compliant": True,
+            "isolation_type": "EMBEDDED_SOVEREIGN_ADAPTER",
+            "verified_evidence": "Microsoft Presidio MIT license"
         }
     }
 

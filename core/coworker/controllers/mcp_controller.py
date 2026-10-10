@@ -88,7 +88,7 @@ class GovernedMCPController:
         tool_name: str,
         arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Executes a tool on an admitted MCP server."""
+        """Executes a tool on an admitted MCP server with pre/post DLP screening."""
         server = self._registry.get(server_id)
         if not server:
             return {"success": False, "error": f"MCP server '{server_id}' not found or not admitted"}
@@ -96,13 +96,53 @@ class GovernedMCPController:
         if tool_name not in server.tools and "*" not in server.tools:
             return {"success": False, "error": f"Tool '{tool_name}' not permitted on MCP server '{server_id}'"}
 
+        # Outbound DLP Inspection on Tool Arguments
+        from core.ai_dlp_gateway import ai_dlp_gateway
+        is_internal = server.command_or_url.startswith(("sqlite://", "fs://", "stdio://"))
+        dlp_res = ai_dlp_gateway.inspect_tool_arguments(
+            server_id=server_id,
+            tool_name=tool_name,
+            arguments=arguments,
+            tenant_id=self.tenant_id,
+            agent_id="coworker_mcp_agent",
+            is_internal_server=is_internal
+        )
+        if not dlp_res.is_allowed:
+            return {
+                "success": False,
+                "error": f"DLP Policy Denied: {dlp_res.blocking_reason}",
+                "security_class": dlp_res.response_class.value,
+                "server_id": server_id,
+                "tool": tool_name
+            }
+
+        effective_arguments = dlp_res.sanitized_payload if isinstance(dlp_res.sanitized_payload, dict) else arguments
+
         start_time = time.time()
         # Execute governed tool call
+        raw_output = {"result": f"Executed MCP tool {tool_name} successfully", "args": effective_arguments}
+
+        # Inbound Output Inspection (Prompt Injection & Leakage defense)
+        is_safe, sanitized_output, sec_err = ai_dlp_gateway.inspect_tool_output(
+            server_id=server_id,
+            tool_name=tool_name,
+            output_data=raw_output,
+            tenant_id=self.tenant_id
+        )
+        if not is_safe:
+            return {
+                "success": False,
+                "error": f"Tool Security Violation: {sec_err}",
+                "security_status": "PROMPT_INJECTION_BLOCKED",
+                "server_id": server_id,
+                "tool": tool_name
+            }
+
         return {
             "success": True,
             "server_id": server_id,
             "tool": tool_name,
-            "output": {"result": f"Executed MCP tool {tool_name} successfully", "args": arguments},
+            "output": raw_output,
             "duration_ms": round((time.time() - start_time) * 1000, 2),
             "evidence_status": "VERIFIED"
         }

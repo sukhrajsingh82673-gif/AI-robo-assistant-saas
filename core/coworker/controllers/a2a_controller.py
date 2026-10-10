@@ -9,11 +9,12 @@ from typing import Dict, List, Optional, Any
 import time
 import uuid
 import hashlib
+import json
 
 class GovernedA2AController:
     """
     Safely dispatches communication to external agent networks (e.g., AutoGen, CrewAI, LangChain agents).
-    Enforces payload sanitization, signature validation, and prevents external agent authority escalation.
+    Enforces payload sanitization, signature validation, tenant isolation, and prevents external agent authority escalation.
     """
 
     def __init__(self, tenant_id: str = "tnt_primary"):
@@ -25,15 +26,37 @@ class GovernedA2AController:
         target_agent_id: str,
         message_type: str,
         content: Dict[str, Any],
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
+        target_tenant_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Sends an outbound message to an external agent through the governed gateway."""
+        """Sends an outbound message to an agent through the governed gateway with DLP verification."""
+        from core.ai_dlp_gateway import ai_dlp_gateway
+
+        # Enforce tenant isolation & outbound DLP
+        target_tenant = target_tenant_id or self.tenant_id
+        dlp_res = ai_dlp_gateway.inspect_a2a_message(
+            sender_agent_id=f"agent_{self.tenant_id}",
+            target_agent_id=target_agent_id,
+            message_payload=content,
+            sender_tenant_id=self.tenant_id,
+            target_tenant_id=target_tenant
+        )
+
+        if not dlp_res.is_allowed:
+            return {
+                "success": False,
+                "error": f"A2A Security Block: {dlp_res.blocking_reason}",
+                "security_class": dlp_res.response_class.value,
+                "target_agent": target_agent_id
+            }
+
         cid = conversation_id or f"a2a_conv_{uuid.uuid4().hex[:8]}"
         msg_id = f"a2a_msg_{uuid.uuid4().hex[:8]}"
         timestamp = time.time()
 
-        # Sanitize payload: strip any internal credentials, tokens, or private keys
-        sanitized_content = dict(content)
+        # Use DLP sanitized payload
+        effective_payload = dlp_res.sanitized_payload if isinstance(dlp_res.sanitized_payload, dict) else content
+        sanitized_content = dict(effective_payload)
         for sensitive_key in ["token", "secret", "auth", "password", "api_key"]:
             sanitized_content.pop(sensitive_key, None)
 
@@ -69,7 +92,25 @@ class GovernedA2AController:
         response_payload: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Receives and validates an incoming response from an external agent."""
-        # External responses are treated as UNTRUSTED DATA, never as executable code or sovereign policy
+        from core.ai_dlp_gateway import ai_dlp_gateway
+
+        # Inspect incoming payload for prompt injection or malicious instructions
+        is_safe, sanitized, err = ai_dlp_gateway.inspect_tool_output(
+            server_id="a2a_gateway",
+            tool_name=from_agent_id,
+            output_data=response_payload,
+            tenant_id=self.tenant_id
+        )
+
+        if not is_safe:
+            return {
+                "received": False,
+                "conversation_id": conversation_id,
+                "from_agent": from_agent_id,
+                "trust_level": "MALICIOUS_REJECTED",
+                "error": f"Adversarial payload rejected: {err}"
+            }
+
         return {
             "received": True,
             "conversation_id": conversation_id,
