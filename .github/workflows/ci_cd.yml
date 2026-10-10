@@ -134,6 +134,12 @@ jobs:
             python3 -m unittest -v tests/test_enterprise_capability_expansion_qualification.py
           fi
 
+      - name: Run AI CEO Live Integration Qualification Suite
+        run: |
+          if [ -f tests/test_ai_ceo_live_integration_qualification.py ]; then
+            python3 -m unittest -v tests/test_ai_ceo_live_integration_qualification.py
+          fi
+
       - name: Run Durable Workflow & Settings Regression Suites (77 Tests)
         run: |
           python3 -m unittest -v tests/test_durable_workflow.py tests/test_settings_enterprise_qualification.py

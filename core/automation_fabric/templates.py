@@ -372,9 +372,9 @@ class TemplateCatalog:
                 "id": "wf_erp_purchase_order",
                 "namespace": "ura.finance",
                 "tasks": [
-                    {"id": "verify_supplier_status", "type": "io.kestra.plugin.zonata.connector.Call", "description": "Check supplier tax and verification status"},
+                    {"id": "verify_supplier_status", "type": "io.kestra.plugin.zonata.connector.Call", "connector_id": "conn_erpnext_records", "action": "get_supplier", "description": "Check supplier tax and verification status"},
                     {"id": "executive_approval_gate", "type": "io.kestra.plugin.zonata.approval.Gate", "description": "Executive approval gate for PO > $1,000"},
-                    {"id": "create_erpnext_po", "type": "io.kestra.plugin.zonata.connector.Call", "description": "Submit purchase order to ERPNext"}
+                    {"id": "create_erpnext_po", "type": "io.kestra.plugin.zonata.connector.Call", "connector_id": "conn_erpnext_records", "action": "create_purchase_order", "description": "Submit purchase order to ERPNext"}
                 ]
             },
             permissions=["erp:read", "erp:write", "approval:executive"],

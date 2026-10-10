@@ -86,9 +86,14 @@ class TestEnterpriseCapabilityExpansionQualification(unittest.TestCase):
             conn.commit()
 
         cls.fabric.set_killswitch(False)
+        cls.registry.reset_circuit_breakers()
+
+    def setUp(self):
+        self.registry.reset_circuit_breakers()
 
     def tearDown(self):
         self.fabric.set_killswitch(False)
+        self.registry.reset_circuit_breakers()
 
     # =========================================================================
     # TEST 1: All 15 Enterprise Connectors Registered & Healthy

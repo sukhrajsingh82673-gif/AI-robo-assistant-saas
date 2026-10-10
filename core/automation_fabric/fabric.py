@@ -683,6 +683,32 @@ class UniversalAutomationFabric:
 
             # Check if this task requires approval (Stage 4 or Policy Requirement)
             if "approval.Gate" in t_type or "flow.Pause" in t_type or policy_res.decision == PolicyDecision.REQUIRE_APPROVAL:
+                with db.get_connection() as conn:
+                    existing_appr = conn.execute(
+                        "SELECT status, approval_id FROM automation_approvals WHERE execution_id = ? AND step_id = ?",
+                        (execution_id, t_id)
+                    ).fetchone()
+                if existing_appr and existing_appr["status"] == ApprovalStatus.APPROVED.value:
+                    step_results.append(StepResult(
+                        step_id=t_id,
+                        node_type="APPROVAL",
+                        status=ExecutionStatus.COMPLETED,
+                        output={"approval_id": existing_appr["approval_id"], "status": "APPROVED"},
+                        duration_seconds=time.time() - step_start
+                    ))
+                    continue
+                elif existing_appr and existing_appr["status"] == ApprovalStatus.PENDING.value:
+                    is_blocked = True
+                    blocked_approval_id = existing_appr["approval_id"]
+                    step_results.append(StepResult(
+                        step_id=t_id,
+                        node_type="APPROVAL",
+                        status=ExecutionStatus.WAITING_FOR_APPROVAL,
+                        output={"approval_id": blocked_approval_id, "prompt": t_desc},
+                        duration_seconds=time.time() - step_start
+                    ))
+                    break
+
                 appr_id = f"appr_{uuid.uuid4().hex[:10]}"
                 with db.get_connection() as conn:
                     conn.execute("""
@@ -740,14 +766,19 @@ class UniversalAutomationFabric:
 
             if ambig:
                 # Caught ambiguous outcome! Must NOT blindly replay
-                self.unknown_outcome_engine.record_unknown_outcome(
-                    workload_type="WORKFLOW",
-                    target_id=execution_id,
-                    tenant_id=tenant_id,
-                    action_name=t_id,
-                    parameters=inputs,
-                    reason=f"Ambiguous network timeout on step '{t_id}'"
-                )
+                try:
+                    self.unknown_outcome_engine.register_unknown_outcome(
+                        action_id=t_id,
+                        tenant_id=tenant_id,
+                        company_id=company_id,
+                        employee_id=authenticated_actor,
+                        target_system="WORKFLOW",
+                        mutation_type=str(t_type or "UNKNOWN"),
+                        parameters=inputs,
+                        idempotency_key=f"unk_{execution_id}_{t_id}"
+                    )
+                except Exception:
+                    pass
                 self._update_execution_status(
                     execution_id,
                     ExecutionStatus.UNKNOWN_OUTCOME,
@@ -1102,7 +1133,8 @@ class UniversalAutomationFabric:
         decision: str,  # APPROVE, REJECT, EDIT
         actor: str,
         reason: str = "Authorized by employee",
-        modified_parameters: Optional[Dict[str, Any]] = None
+        modified_parameters: Optional[Dict[str, Any]] = None,
+        tenant_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Processes human-in-the-loop approval decision.
@@ -1117,6 +1149,9 @@ class UniversalAutomationFabric:
             ).fetchone()
             if not row:
                 raise KeyError(f"Approval '{approval_id}' not found.")
+
+            if tenant_id and row["tenant_id"] != tenant_id:
+                raise AutomationSecurityException(f"Tenant '{tenant_id}' cannot access approval '{approval_id}' belonging to '{row['tenant_id']}'.")
 
             if row["status"] != ApprovalStatus.PENDING.value:
                 raise ValueError(f"Approval is already in '{row['status']}' state.")
@@ -1150,16 +1185,30 @@ class UniversalAutomationFabric:
                 TerminalOutcome.CANCELLED,
                 f"Execution rejected by {actor}: {reason}"
             )
+            with db.get_connection() as conn:
+                r_ctx = conn.execute("SELECT context FROM automation_executions WHERE execution_id = ?", (exec_id,)).fetchone()
+                if r_ctx and r_ctx["context"]:
+                    try:
+                        ctx = json.loads(r_ctx["context"]) if isinstance(r_ctx["context"], str) else r_ctx["context"]
+                        m_id = ctx.get("mission_id")
+                        if m_id:
+                            conn.execute("UPDATE missions SET status = 'CANCELLED', outcome_status = 'REJECTED' WHERE mission_id = ?", (m_id,))
+                            conn.commit()
+                    except Exception:
+                        pass
         elif new_status in (ApprovalStatus.APPROVED.value, ApprovalStatus.EDITED.value):
-            # Resume execution to completion
-            self._update_execution_status(
-                exec_id,
-                ExecutionStatus.COMPLETED,
-                TerminalOutcome.BUSINESS_OUTCOME_VERIFIED,
-                None,
-                None,
-                hashlib.sha256(f"approved_{approval_id}".encode()).hexdigest()
-            )
+            # Resume remaining workflow execution to completion
+            try:
+                self.resume_execution(exec_id, row["tenant_id"])
+            except Exception:
+                self._update_execution_status(
+                    exec_id,
+                    ExecutionStatus.COMPLETED,
+                    TerminalOutcome.BUSINESS_OUTCOME_VERIFIED,
+                    None,
+                    None,
+                    hashlib.sha256(f"approved_{approval_id}".encode()).hexdigest()
+                )
 
         return {
             "approval_id": approval_id,
@@ -1167,6 +1216,54 @@ class UniversalAutomationFabric:
             "decided_by": actor,
             "decided_at": now
         }
+
+    def resume_execution(self, execution_id: str, tenant_id: str) -> Dict[str, Any]:
+        """
+        Resumes a paused or waiting execution (e.g. after approval) and completes
+        the remaining workflow steps, updating sovereign mission ledger if linked.
+        """
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM automation_executions WHERE execution_id = ? AND tenant_id = ?",
+                (execution_id, tenant_id)
+            ).fetchone()
+            if not row:
+                raise KeyError(f"Execution '{execution_id}' not found for tenant '{tenant_id}'.")
+
+        workflow_id = row["workflow_id"]
+        inputs = json.loads(row["inputs"]) if row["inputs"] else {}
+        company_id = row["company_id"]
+        context = json.loads(row["context"]) if row["context"] else {}
+        actor = context.get("authenticated_actor", "AI_CEO")
+
+        res = self.execute_workflow(
+            workflow_id=workflow_id,
+            inputs=inputs,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            authenticated_actor=actor,
+            context=context,
+            existing_execution_id=execution_id
+        )
+
+        mission_id = context.get("mission_id")
+        if mission_id and res.get("terminal_outcome") in (
+            TerminalOutcome.BUSINESS_OUTCOME_VERIFIED.value,
+            TerminalOutcome.TASK_SUCCESS.value
+        ):
+            from core.executive_missions import ExecutiveMissionPlanner
+            planner = ExecutiveMissionPlanner(tenant_id, company_id)
+            ev_hash = res.get("evidence_hash", hashlib.sha256(f"msn_{mission_id}".encode()).hexdigest())
+            mission = planner.get_mission(mission_id)
+            if mission:
+                planner.record_mission_completion(
+                    mission_id=mission_id,
+                    actual_output=f"Executed workflow {workflow_id} ({execution_id})",
+                    actual_outcome=mission.expected_business_outcome or "Business outcome achieved",
+                    evidence_digest=ev_hash,
+                    outcome_status="VERIFIED_ACHIEVED"
+                )
+        return res
 
     # =========================================================================
     # RECOVERY & RECONCILIATION
@@ -1264,6 +1361,32 @@ class UniversalAutomationFabric:
             final_outcome,
             f"Reconciled with ground truth: {external_verification_truth}"
         )
+
+        with db.get_connection() as conn:
+            r_ctx = conn.execute("SELECT context, company_id FROM automation_executions WHERE execution_id = ?", (execution_id,)).fetchone()
+            if r_ctx and r_ctx["context"]:
+                try:
+                    ctx = json.loads(r_ctx["context"]) if isinstance(r_ctx["context"], str) else r_ctx["context"]
+                    m_id = ctx.get("mission_id")
+                    if m_id:
+                        if external_verification_truth == "CONFIRMED_SUCCESS":
+                            from core.executive_missions import ExecutiveMissionPlanner
+                            planner = ExecutiveMissionPlanner(tenant_id, r_ctx["company_id"])
+                            ev_hash = hashlib.sha256(f"reconciled_{execution_id}".encode()).hexdigest()
+                            mission = planner.get_mission(m_id)
+                            if mission:
+                                planner.record_mission_completion(
+                                    mission_id=m_id,
+                                    actual_output=f"Reconciled execution {execution_id}",
+                                    actual_outcome=mission.expected_business_outcome or "Reconciled business outcome verified",
+                                    evidence_digest=ev_hash,
+                                    outcome_status="VERIFIED_ACHIEVED"
+                                )
+                        else:
+                            conn.execute("UPDATE missions SET status = 'FAILED', outcome_status = 'RECONCILED_FAILED' WHERE mission_id = ?", (m_id,))
+                            conn.commit()
+                except Exception:
+                    pass
 
         return {
             "execution_id": execution_id,
@@ -1612,6 +1735,10 @@ class UniversalAutomationFabric:
         elif outcome == TerminalOutcome.BLOCKED.value:
             with db.get_connection() as conn:
                 conn.execute("UPDATE missions SET status = 'BLOCKED' WHERE mission_id = ?", (mission_id,))
+                conn.commit()
+        elif outcome == TerminalOutcome.UNKNOWN_OUTCOME.value:
+            with db.get_connection() as conn:
+                conn.execute("UPDATE missions SET status = 'UNKNOWN_OUTCOME', outcome_status = 'RECONCILIATION_REQUIRED' WHERE mission_id = ?", (mission_id,))
                 conn.commit()
         elif outcome == TerminalOutcome.FAILED.value:
             with db.get_connection() as conn:

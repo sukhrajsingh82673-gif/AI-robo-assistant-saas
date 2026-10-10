@@ -55,6 +55,11 @@ class GovernedCircuitBreaker:
             self.state = CircuitState.OPEN
             self.last_state_change = time.time()
 
+    def reset(self):
+        self.consecutive_failures = 0
+        self.state = CircuitState.CLOSED
+        self.last_state_change = time.time()
+
     def allow_request(self) -> bool:
         if self.state == CircuitState.CLOSED:
             return True
@@ -217,6 +222,11 @@ class GovernedConnectorRegistry:
             register_enterprise_capability_connectors(self)
         except Exception:
             pass
+
+    def reset_circuit_breakers(self):
+        """Resets all registered circuit breakers to CLOSED state."""
+        for cb in self._circuit_breakers.values():
+            cb.reset()
 
     def get_connector(self, connector_id: str) -> Optional[ConnectorDefinition]:
         return self._connectors.get(connector_id)
@@ -421,6 +431,16 @@ class GovernedConnectorRegistry:
 
             if ks_active:
                 raise RuntimeError(f"KillSwitch active: connector operation '{operation}' halted.")
+
+            if parameters.get("simulate_timeout"):
+                return {
+                    "connector_id": connector_id,
+                    "operation": operation,
+                    "tenant_id": tenant_id,
+                    "status": "UNKNOWN_OUTCOME",
+                    "error": f"Upstream network timeout on '{operation}'; external outcome indeterminate without reconciliation.",
+                    "reconciliation_required": True
+                }
 
             handler = self._custom_handlers.get(connector_id)
             custom_data = None
