@@ -63,34 +63,96 @@ class UniversalAutomationFabric:
     _rotated_secret_keys: Dict[str, float] = {}
 
     @classmethod
+    def _ensure_signing_keys_table(cls):
+        with db.get_connection() as conn:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS automation_signing_keys (
+                key_id TEXT PRIMARY KEY,
+                secret_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_autosign_status ON automation_signing_keys(status);")
+            conn.commit()
+
+    @classmethod
     def get_lease_secret_key(cls) -> str:
-        """Resolves cryptographically isolated signing key from secret store or environment."""
-        if cls._cached_secret_key:
-            return cls._cached_secret_key
+        """Resolves cryptographically isolated signing key from SQLite or environment."""
+        cls._ensure_signing_keys_table()
         env_key = os.environ.get("URA_LEASE_SECRET")
         if env_key:
             cls._cached_secret_key = env_key
-            return cls._cached_secret_key
-        sec = hashlib.sha256(f"zonata_master_lease_salt_{os.getpid()}_{time.time()}".encode()).hexdigest()
-        cls._cached_secret_key = sec
-        return cls._cached_secret_key
+            return env_key
+
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT secret_key FROM automation_signing_keys WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            if row and row["secret_key"]:
+                cls._cached_secret_key = row["secret_key"]
+                return row["secret_key"]
+
+            now = time.time()
+            sec = hashlib.sha256(f"zonata_master_lease_salt_{uuid.uuid4().hex}_{now}".encode()).hexdigest()
+            key_id = f"key_{uuid.uuid4().hex[:12]}"
+            conn.execute("""
+                INSERT INTO automation_signing_keys (key_id, secret_key, status, created_at, expires_at)
+                VALUES (?, ?, 'ACTIVE', ?, NULL)
+            """, (key_id, sec, now))
+            conn.commit()
+            cls._cached_secret_key = sec
+            return sec
 
     @classmethod
     def rotate_signing_key(cls, new_key: Optional[str] = None, grace_period_seconds: float = 300.0) -> str:
-        """Rotates the active HMAC lease signing key and retains previous key for grace period."""
-        current = cls.get_lease_secret_key()
+        """Rotates the active HMAC lease signing key and retains previous key in SQLite for grace period."""
+        cls._ensure_signing_keys_table()
         now = time.time()
-        cls._rotated_secret_keys[current] = now + grace_period_seconds
-        cls._cached_secret_key = new_key or hashlib.sha256(f"zonata_rotated_{time.time()}_{uuid.uuid4().hex}".encode()).hexdigest()
-        return cls._cached_secret_key
+        current = cls.get_lease_secret_key()
+        expires_at = now + grace_period_seconds
+        new_secret = new_key or hashlib.sha256(f"zonata_rotated_{now}_{uuid.uuid4().hex}".encode()).hexdigest()
+
+        with db.get_connection() as conn:
+            conn.execute("""
+                UPDATE automation_signing_keys
+                SET status = 'ROTATED', expires_at = ?
+                WHERE status = 'ACTIVE'
+            """, (expires_at,))
+            new_id = f"key_{uuid.uuid4().hex[:12]}"
+            conn.execute("""
+                INSERT INTO automation_signing_keys (key_id, secret_key, status, created_at, expires_at)
+                VALUES (?, ?, 'ACTIVE', ?, NULL)
+            """, (new_id, new_secret, now))
+            conn.commit()
+
+        cls._cached_secret_key = new_secret
+        cls._rotated_secret_keys[current] = expires_at
+        return new_secret
 
     @classmethod
     def get_valid_signing_keys(cls) -> Tuple[str, List[str]]:
-        """Returns the active key and all valid rotated keys within their grace period."""
+        """Returns the active key and all valid rotated keys within their grace period from SQLite."""
+        cls._ensure_signing_keys_table()
         now = time.time()
         active = cls.get_lease_secret_key()
-        cls._rotated_secret_keys = {k: exp for k, exp in cls._rotated_secret_keys.items() if exp > now}
-        return active, list(cls._rotated_secret_keys.keys())
+        rotated_keys = set()
+
+        with db.get_connection() as conn:
+            rows = conn.execute("""
+                SELECT secret_key, expires_at FROM automation_signing_keys
+                WHERE status = 'ROTATED' AND (expires_at IS NULL OR expires_at > ?)
+            """, (now,)).fetchall()
+            for r in rows:
+                if r["secret_key"] and r["secret_key"] != active:
+                    rotated_keys.add(r["secret_key"])
+
+        for k, exp in list(cls._rotated_secret_keys.items()):
+            if exp > now and k != active:
+                rotated_keys.add(k)
+
+        return active, list(rotated_keys)
 
     def __init__(self):
         self.evidence_ledger = EvidenceLedger()
@@ -201,6 +263,15 @@ class UniversalAutomationFabric:
                 revoked_at REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_autorev_tenant ON automation_revoked_leases(tenant_id);
+
+            CREATE TABLE IF NOT EXISTS automation_signing_keys (
+                key_id TEXT PRIMARY KEY,
+                secret_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_autosign_status ON automation_signing_keys(status);
             """)
             conn.commit()
 
@@ -694,6 +765,28 @@ class UniversalAutomationFabric:
                 }
 
             if err:
+                if self.is_killswitch_active() or "killswitch" in err.lower():
+                    self._update_execution_status(
+                        execution_id,
+                        ExecutionStatus.CANCELLED,
+                        TerminalOutcome.CANCELLED,
+                        err
+                    )
+                    step_results.append(StepResult(
+                        step_id=t_id,
+                        node_type=t_type,
+                        status=ExecutionStatus.CANCELLED,
+                        output=None,
+                        duration_seconds=time.time() - step_start,
+                        error=err
+                    ))
+                    return {
+                        "execution_id": execution_id,
+                        "status": ExecutionStatus.CANCELLED.value,
+                        "terminal_outcome": TerminalOutcome.CANCELLED.value,
+                        "error": err
+                    }
+
                 has_failed = True
                 failure_msg = err
                 step_results.append(StepResult(
@@ -801,6 +894,8 @@ class UniversalAutomationFabric:
         attempt = 0
 
         while attempt < max_attempts:
+            if self.is_killswitch_active():
+                return None, "Execution interrupted by KillSwitch engagement", False
             attempt += 1
             try:
                 # 1. API Call
@@ -812,7 +907,8 @@ class UniversalAutomationFabric:
                         operation=op,
                         parameters=inputs,
                         tenant_id=tenant_id,
-                        idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}"
+                        idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}",
+                        killswitch_check=self.is_killswitch_active
                     )
                     return res, None, False
 
@@ -822,7 +918,9 @@ class UniversalAutomationFabric:
                         connector_id="conn_zonata_mcp_local",
                         operation=task.get("operation", "query_knowledge"),
                         parameters=inputs,
-                        tenant_id=tenant_id
+                        tenant_id=tenant_id,
+                        idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}",
+                        killswitch_check=self.is_killswitch_active
                     )
                     return res, None, False
 
@@ -909,7 +1007,8 @@ class UniversalAutomationFabric:
                     uck_res = self.control_kernel.execute_action(
                         contract=contract,
                         agent_contract=agent_contract,
-                        command_payload=cmd_payload
+                        command_payload=cmd_payload,
+                        killswitch_check=self.is_killswitch_active
                     )
                     if not uck_res.get("success", False):
                         return None, uck_res.get("error", "UniversalControlKernel command execution failed"), False
@@ -924,6 +1023,9 @@ class UniversalAutomationFabric:
 
             except Exception as e:
                 err_str = str(e)
+                if self.is_killswitch_active() or "killswitch" in err_str.lower():
+                    return None, f"Execution halted by KillSwitch: {err_str}", False
+
                 # Check for ambiguous timeout
                 if "timeout" in err_str.lower() or "ambiguous" in err_str.lower():
                     # AMBIGUOUS: Do NOT blindly retry!

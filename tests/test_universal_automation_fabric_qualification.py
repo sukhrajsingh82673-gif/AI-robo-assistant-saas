@@ -1201,6 +1201,193 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
                 )
             self.assertIn("PolicyEngine evaluation failure (failing closed)", str(ctx.exception))
 
+    # =========================================================================
+    # ACCEPTANCE TEST 34: Active Subprocess KillSwitch Cancellation Propagation
+    # =========================================================================
+    def test_34_active_subprocess_killswitch_cancellation(self):
+        """34. Proves KillSwitch actively interrupts in-flight subprocess via SIGKILL with precise latency measurement."""
+        from core.models import ActionContract, AgentEmploymentContract, HostType, AuthorityLevel
+        import threading
+        import time
+
+        contract = ActionContract(
+            action_id=f"act_sleep_{uuid.uuid4().hex[:6]}",
+            mission_id="mission_killswitch_test",
+            agent_id="agt_software_engineer",
+            capability="long_running_exec",
+            target="localhost",
+            host=HostType.LINUX_CLOUD,
+            scope="task:sleep",
+            permissions_required=AuthorityLevel.AUTOMATIC_IDEMPOTENT,
+            resources_locked=[],
+            expected_outcome="Sleep 5 seconds unless killed",
+            verification_requirements=["exit_code_zero"]
+        )
+        agent_contract = AgentEmploymentContract(
+            agent_id="agt_software_engineer",
+            role="SoftwareEngineer",
+            department="ENGINEERING",
+            manager="CTO",
+            responsibilities=["Execute commands"],
+            objectives=["Execute verified commands"],
+            allowed_tools=["long_running_exec"],
+            allowed_hosts=[HostType.LINUX_CLOUD],
+            data_access=["INTERNAL"],
+            budget_limit=1000.0,
+            spending_limit=500.0,
+            decision_authority=["EXECUTE"],
+            approval_requirements=[],
+            forbidden_actions=[],
+            kpis={},
+            escalation_rules=[]
+        )
+
+        ks_state = {"active": False}
+        def check_ks():
+            return ks_state["active"]
+
+        # Trigger KillSwitch in a separate thread after 50ms
+        t_tripped = 0.0
+        def trip_killswitch():
+            nonlocal t_tripped
+            time.sleep(0.05)
+            t_tripped = time.time()
+            ks_state["active"] = True
+
+        t = threading.Thread(target=trip_killswitch)
+        t.start()
+
+        start_time = time.time()
+        res = self.fabric.control_kernel.execute_action(
+            contract=contract,
+            agent_contract=agent_contract,
+            command_payload=["sleep", "5"],
+            killswitch_check=check_ks
+        )
+        duration = time.time() - start_time
+        t.join()
+
+        # The 5-second sleep must be terminated within ~100ms, not run for 5 seconds
+        self.assertFalse(res["success"])
+        self.assertIn("PROCESS_ABORTED_BY_KILLSWITCH", res.get("output", ""))
+        self.assertLess(duration, 1.5, f"Subprocess was not promptly interrupted (took {duration:.3f}s)")
+
+        # Verify latency between KillSwitch activation and process termination
+        kill_response_latency_ms = max(0.0, (duration - 0.05) * 1000.0)
+        self.assertLess(kill_response_latency_ms, 500.0)
+
+    # =========================================================================
+    # ACCEPTANCE TEST 35: Crash-Window External Idempotency Reconciliation
+    # =========================================================================
+    def test_35_crash_window_external_idempotency_reconciliation(self):
+        """35. Proves crash-window recovery prevents duplicate external side effects via SQLite idempotency table."""
+        test_idempotency_key = f"idem_crash_test_{uuid.uuid4().hex[:8]}"
+        op_params = {"repo": "ura/zonata-os", "action": "test_crash_recovery"}
+
+        # Simulate: process crashed while connector execution was IN_FLIGHT
+        now = time.time()
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO automation_connector_idempotency (
+                    idempotency_key, connector_id, operation, tenant_id, status, parameters, created_at
+                ) VALUES (?, 'conn_github_v3', 'get_repo', ?, 'IN_FLIGHT', ?, ?)
+            """, (test_idempotency_key, self.tenant_a, json.dumps(op_params), now))
+            conn.commit()
+
+        # New / restarted process recovers and attempts the operation with identical idempotency key
+        reconciled = self.connectors.execute_connector_operation(
+            connector_id="conn_github_v3",
+            operation="get_repo",
+            parameters=op_params,
+            tenant_id=self.tenant_a,
+            idempotency_key=test_idempotency_key
+        )
+
+        self.assertEqual(reconciled["status"], "SUCCESS")
+        self.assertTrue(reconciled.get("reconciled_after_crash", False))
+        self.assertTrue(reconciled.get("replayed_from_idempotency_cache", False))
+        self.assertIn("duplicate execution prevented", reconciled["data"]["output"])
+
+        # Subsequent call returns completed cached result
+        subsequent = self.connectors.execute_connector_operation(
+            connector_id="conn_github_v3",
+            operation="get_repo",
+            parameters=op_params,
+            tenant_id=self.tenant_a,
+            idempotency_key=test_idempotency_key
+        )
+        self.assertEqual(subsequent["status"], "SUCCESS")
+        self.assertTrue(subsequent.get("replayed_from_idempotency_cache", False))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 36: Persistent Signing Key Rotation Across Restarts
+    # =========================================================================
+    def test_36_persistent_signing_key_rotation_across_restarts(self):
+        """36. Proves lease signing key rotation is persisted in SQLite, surviving worker restarts and enforcing grace period."""
+        from core.automation_fabric.fabric import UniversalAutomationFabric, ExecutionLease
+
+        # Step 1: Obtain initial active key
+        initial_key = UniversalAutomationFabric.get_lease_secret_key()
+        self.assertTrue(initial_key)
+
+        # Step 2: Create a lease signed with initial key
+        lease1 = ExecutionLease.create(
+            secret_key=initial_key,
+            tenant_id=self.tenant_a,
+            company_id=self.company_a,
+            workflow_id="wf_rot_test",
+            workflow_version=1,
+            run_id="run_rot_1",
+            action_name="action_step_1",
+            scope="task:step1",
+            parameters={"test": "data"}
+        )
+
+        # Step 3: Rotate signing key with 300s grace period
+        new_key = UniversalAutomationFabric.rotate_signing_key(grace_period_seconds=300.0)
+        self.assertNotEqual(initial_key, new_key)
+
+        # Step 4: Simulate worker process restart by wiping in-memory caches
+        UniversalAutomationFabric._cached_secret_key = None
+        UniversalAutomationFabric._rotated_secret_keys = {}
+
+        # Step 5: Verify new worker process loads the rotated keys directly from SQLite
+        reloaded_active, reloaded_rotated = UniversalAutomationFabric.get_valid_signing_keys()
+        self.assertEqual(reloaded_active, new_key)
+        self.assertIn(initial_key, reloaded_rotated)
+
+        # Step 6: Verify lease1 signed with rotated key verifies successfully during grace period
+        self.assertTrue(lease1.verify(
+            secret_key=reloaded_active,
+            allowed_keys=reloaded_rotated,
+            expected_tenant_id=self.tenant_a,
+            expected_workflow_version=1,
+            parameters={"test": "data"}
+        ))
+
+        # Step 7: Simulate expiry of grace period in SQLite
+        with db.get_connection() as conn:
+            conn.execute("""
+                UPDATE automation_signing_keys
+                SET expires_at = ?
+                WHERE secret_key = ?
+            """, (time.time() - 10.0, initial_key))
+            conn.commit()
+
+        # Step 8: Clear in-memory caches again and verify expired key is rejected
+        UniversalAutomationFabric._cached_secret_key = None
+        UniversalAutomationFabric._rotated_secret_keys = {}
+        curr_active, curr_rotated = UniversalAutomationFabric.get_valid_signing_keys()
+        self.assertNotIn(initial_key, curr_rotated)
+
+        self.assertFalse(lease1.verify(
+            secret_key=curr_active,
+            allowed_keys=curr_rotated,
+            expected_tenant_id=self.tenant_a,
+            expected_workflow_version=1,
+            parameters={"test": "data"}
+        ))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,10 +48,12 @@ class UniversalControlKernel:
         agent_contract: AgentEmploymentContract,
         command_payload: Optional[List[str]] = None,
         expected_output_file: Optional[str] = None,
-        expected_output_hash: Optional[str] = None
+        expected_output_hash: Optional[str] = None,
+        killswitch_check: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Executes a typed ActionContract under strict supervision.
+        Supports active cancellation propagation via killswitch_check.
         """
         # 1. Authority & Policy Validation
         if contract.capability in agent_contract.forbidden_actions:
@@ -84,23 +86,62 @@ class UniversalControlKernel:
             # 3. Execution on target host
             if contract.host == HostType.LINUX_CLOUD:
                 if command_payload:
-                    res = subprocess.run(
+                    proc = subprocess.Popen(
                         command_payload,
-                        capture_output=True,
-                        text=True,
-                        timeout=60
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
                     )
-                    exec_output = res.stdout + res.stderr
-                    proc_check = PhysicalVerification(
-                        check_type="exit_code_zero",
-                        target_path=" ".join(command_payload),
-                        expected_val="0",
-                        actual_val=str(res.returncode),
-                        verified=(res.returncode == 0),
-                        details=f"Exit code: {res.returncode}"
-                    )
-                    verifications.append(proc_check)
-                    success = (res.returncode == 0)
+                    timeout = 60.0
+                    start_t = time.time()
+                    aborted_by_ks = False
+
+                    while proc.poll() is None:
+                        if killswitch_check and killswitch_check():
+                            aborted_by_ks = True
+                            proc.kill()
+                            try:
+                                proc.wait(timeout=2.0)
+                            except Exception:
+                                pass
+                            break
+                        if time.time() - start_t > timeout:
+                            proc.kill()
+                            break
+                        time.sleep(0.005)  # 5ms slice for responsive interruption
+
+                    if aborted_by_ks:
+                        try:
+                            if proc.stdout:
+                                proc.stdout.close()
+                            if proc.stderr:
+                                proc.stderr.close()
+                        except Exception:
+                            pass
+                        exec_output = "PROCESS_ABORTED_BY_KILLSWITCH: Subprocess terminated via SIGKILL upon KillSwitch engagement."
+                        success = False
+                        verifications.append(PhysicalVerification(
+                            check_type="killswitch_abort",
+                            target_path=" ".join(command_payload),
+                            expected_val="ACTIVE",
+                            actual_val="ABORTED",
+                            verified=True,
+                            details="Subprocess killed immediately upon KillSwitch engagement"
+                        ))
+                    else:
+                        stdout_str, stderr_str = proc.communicate()
+                        exec_output = (stdout_str or "") + (stderr_str or "")
+                        retcode = proc.returncode
+                        proc_check = PhysicalVerification(
+                            check_type="exit_code_zero",
+                            target_path=" ".join(command_payload),
+                            expected_val="0",
+                            actual_val=str(retcode),
+                            verified=(retcode == 0),
+                            details=f"Exit code: {retcode}"
+                        )
+                        verifications.append(proc_check)
+                        success = (retcode == 0)
                 else:
                     success = True
             else:
