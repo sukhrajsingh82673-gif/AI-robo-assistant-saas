@@ -4,6 +4,7 @@ ExecutionSupervisor, Typed ActionContracts, Resource Locks, and Host Mediation.
 """
 
 import os
+import signal
 import subprocess
 import time
 import uuid
@@ -90,7 +91,8 @@ class UniversalControlKernel:
                         command_payload,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True
+                        text=True,
+                        start_new_session=True
                     )
                     timeout = 60.0
                     start_t = time.time()
@@ -99,14 +101,20 @@ class UniversalControlKernel:
                     while proc.poll() is None:
                         if killswitch_check and killswitch_check():
                             aborted_by_ks = True
-                            proc.kill()
+                            try:
+                                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                            except Exception:
+                                proc.kill()
                             try:
                                 proc.wait(timeout=2.0)
                             except Exception:
                                 pass
                             break
                         if time.time() - start_t > timeout:
-                            proc.kill()
+                            try:
+                                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                            except Exception:
+                                proc.kill()
                             break
                         time.sleep(0.005)  # 5ms slice for responsive interruption
 
@@ -118,7 +126,7 @@ class UniversalControlKernel:
                                 proc.stderr.close()
                         except Exception:
                             pass
-                        exec_output = "PROCESS_ABORTED_BY_KILLSWITCH: Subprocess terminated via SIGKILL upon KillSwitch engagement."
+                        exec_output = "PROCESS_ABORTED_BY_KILLSWITCH: Subprocess process tree terminated via SIGKILL upon KillSwitch engagement."
                         success = False
                         verifications.append(PhysicalVerification(
                             check_type="killswitch_abort",
@@ -126,7 +134,7 @@ class UniversalControlKernel:
                             expected_val="ACTIVE",
                             actual_val="ABORTED",
                             verified=True,
-                            details="Subprocess killed immediately upon KillSwitch engagement"
+                            details="Subprocess process tree killed immediately upon KillSwitch engagement"
                         ))
                     else:
                         stdout_str, stderr_str = proc.communicate()

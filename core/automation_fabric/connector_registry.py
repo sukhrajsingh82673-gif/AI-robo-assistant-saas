@@ -321,27 +321,51 @@ class GovernedConnectorRegistry:
                         return {**cached, "replayed_from_idempotency_cache": True}
                     elif row["status"] == "IN_FLIGHT":
                         # CRASH-WINDOW RECOVERY: previous process terminated after submitting or in-flight
-                        reconciled = {
-                            "connector_id": connector_id,
-                            "operation": operation,
-                            "tenant_id": tenant_id,
-                            "status": "SUCCESS",
-                            "data": {
-                                "executed_at": now,
-                                "op_echo": operation,
-                                "params_processed": list(parameters.keys()),
-                                "output": f"Reconciled in-flight operation {operation} via {conn.name} (duplicate execution prevented)"
-                            },
-                            "reconciled_after_crash": True,
-                            "replayed_from_idempotency_cache": True
-                        }
-                        conn_db.execute("""
-                            UPDATE automation_connector_idempotency
-                            SET status = 'COMPLETED', response = ?, completed_at = ?
-                            WHERE idempotency_key = ?
-                        """, (json.dumps(reconciled), now, idempotency_key))
-                        conn_db.commit()
-                        return reconciled
+                        is_safe_query = (
+                            operation.lower().startswith(("get", "list", "query", "describe", "read", "check", "verify", "head"))
+                            or parameters.get("external_confirmed") is True
+                        )
+                        if is_safe_query:
+                            reconciled = {
+                                "connector_id": connector_id,
+                                "operation": operation,
+                                "tenant_id": tenant_id,
+                                "status": "SUCCESS",
+                                "data": {
+                                    "executed_at": now,
+                                    "op_echo": operation,
+                                    "params_processed": list(parameters.keys()),
+                                    "output": f"Reconciled in-flight query operation {operation} via {conn.name} (duplicate execution prevented)"
+                                },
+                                "reconciled_after_crash": True,
+                                "replayed_from_idempotency_cache": True
+                            }
+                            conn_db.execute("""
+                                UPDATE automation_connector_idempotency
+                                SET status = 'COMPLETED', response = ?, completed_at = ?
+                                WHERE idempotency_key = ?
+                            """, (json.dumps(reconciled), now, idempotency_key))
+                            conn_db.commit()
+                            return reconciled
+                        else:
+                            # CRASH-WINDOW UNKNOWN MUTATION: Mutation cannot be confirmed without external reconciliation
+                            unknown_res = {
+                                "connector_id": connector_id,
+                                "operation": operation,
+                                "tenant_id": tenant_id,
+                                "status": "UNKNOWN_OUTCOME",
+                                "error": f"Crash detected while mutating operation '{operation}' was IN_FLIGHT. External outcome unconfirmed; blind retry prevented.",
+                                "reconciliation_required": True,
+                                "reconciled_after_crash": False,
+                                "replayed_from_idempotency_cache": False
+                            }
+                            conn_db.execute("""
+                                UPDATE automation_connector_idempotency
+                                SET status = 'UNKNOWN_OUTCOME', response = ?, completed_at = ?
+                                WHERE idempotency_key = ?
+                            """, (json.dumps(unknown_res), now, idempotency_key))
+                            conn_db.commit()
+                            return unknown_res
 
             # Register in-flight execution intent in SQLite
             with db.get_connection() as conn_db:

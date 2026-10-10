@@ -910,6 +910,8 @@ class UniversalAutomationFabric:
                         idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}",
                         killswitch_check=self.is_killswitch_active
                     )
+                    if res.get("status") == "UNKNOWN_OUTCOME":
+                        return None, res.get("error", "Unknown outcome requiring reconciliation"), True
                     return res, None, False
 
                 # 2. Governed MCP Tool Call
@@ -922,6 +924,8 @@ class UniversalAutomationFabric:
                         idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}",
                         killswitch_check=self.is_killswitch_active
                     )
+                    if res.get("status") == "UNKNOWN_OUTCOME":
+                        return None, res.get("error", "Unknown outcome requiring reconciliation"), True
                     return res, None, False
 
                 # 3. Specialized Agent Delegation

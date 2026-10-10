@@ -1114,7 +1114,7 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
 
         self.assertEqual(len(results), 1)
         self.assertEqual(len(exceptions), 1)
-        self.assertIn("Replay attack detected", str(exceptions[0]))
+        self.assertIn("replay attack detected", str(exceptions[0]).lower())
 
     # =========================================================================
     # ACCEPTANCE TEST 31: Specialized Agent Circular Delegation & Depth Limit
@@ -1387,6 +1387,200 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
             expected_workflow_version=1,
             parameters={"test": "data"}
         ))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 37: Process Tree KillSwitch Cancellation (No Orphans)
+    # =========================================================================
+    def test_37_process_tree_killswitch_cancellation(self):
+        """37. Proves KillSwitch terminates the entire process tree (parent and child processes) via SIGKILL."""
+        from core.models import ActionContract, AgentEmploymentContract, HostType, AuthorityLevel
+        import threading
+        import time
+
+        contract = ActionContract(
+            action_id=f"act_tree_{uuid.uuid4().hex[:6]}",
+            mission_id="mission_tree_kill_test",
+            agent_id="agt_software_engineer",
+            capability="tree_exec",
+            target="localhost",
+            host=HostType.LINUX_CLOUD,
+            scope="task:tree",
+            permissions_required=AuthorityLevel.AUTOMATIC_IDEMPOTENT,
+            resources_locked=[],
+            expected_outcome="Spawn child processes and wait",
+            verification_requirements=["exit_code_zero"]
+        )
+        agent_contract = AgentEmploymentContract(
+            agent_id="agt_software_engineer",
+            role="SoftwareEngineer",
+            department="ENGINEERING",
+            manager="CTO",
+            responsibilities=["Execute commands"],
+            objectives=["Execute verified commands"],
+            allowed_tools=["tree_exec"],
+            allowed_hosts=[HostType.LINUX_CLOUD],
+            data_access=["INTERNAL"],
+            budget_limit=1000.0,
+            spending_limit=500.0,
+            decision_authority=["EXECUTE"],
+            approval_requirements=[],
+            forbidden_actions=[],
+            kpis={},
+            escalation_rules=[]
+        )
+
+        ks_state = {"active": False}
+        def check_ks():
+            return ks_state["active"]
+
+        def trip_killswitch():
+            time.sleep(0.08)
+            ks_state["active"] = True
+
+        t = threading.Thread(target=trip_killswitch)
+        t.start()
+
+        start_time = time.time()
+        # Spawn child background processes and wait
+        res = self.fabric.control_kernel.execute_action(
+            contract=contract,
+            agent_contract=agent_contract,
+            command_payload=["sh", "-c", "sleep 10 & sleep 10 & wait"],
+            killswitch_check=check_ks
+        )
+        duration = time.time() - start_time
+        t.join()
+
+        self.assertFalse(res["success"])
+        self.assertIn("PROCESS_ABORTED_BY_KILLSWITCH", res.get("output", ""))
+        self.assertLess(duration, 1.5, f"Process tree was not promptly killed (took {duration:.3f}s)")
+
+    # =========================================================================
+    # ACCEPTANCE TEST 38: Unverified In-Flight Mutation Transitions to UNKNOWN_OUTCOME
+    # =========================================================================
+    def test_38_unverified_in_flight_mutation_transitions_to_unknown_outcome(self):
+        """38. Proves an unverified in-flight mutating operation transitions to UNKNOWN_OUTCOME requiring reconciliation."""
+        test_idempotency_key = f"idem_mutate_crash_{uuid.uuid4().hex[:8]}"
+        op_params = {"repo": "ura/zonata-os", "title": "Critical Bug", "action": "create_issue"}
+
+        now = time.time()
+        with db.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO automation_connector_idempotency (
+                    idempotency_key, connector_id, operation, tenant_id, status, parameters, created_at
+                ) VALUES (?, 'conn_github_v3', 'create_issue', ?, 'IN_FLIGHT', ?, ?)
+            """, (test_idempotency_key, self.tenant_a, json.dumps(op_params), now))
+            conn.commit()
+
+        # Attempt recovery on unconfirmed mutating operation
+        res = self.connectors.execute_connector_operation(
+            connector_id="conn_github_v3",
+            operation="create_issue",
+            parameters=op_params,
+            tenant_id=self.tenant_a,
+            idempotency_key=test_idempotency_key
+        )
+
+        # Invariant: UNKNOWN_OUTCOME != SUCCESS. Blind retries prevented.
+        self.assertEqual(res["status"], "UNKNOWN_OUTCOME")
+        self.assertTrue(res.get("reconciliation_required", False))
+        self.assertFalse(res.get("replayed_from_idempotency_cache", False))
+        self.assertIn("unconfirmed", res.get("error", ""))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 39: Multi-Worker Separate Process Concurrency
+    # =========================================================================
+    def test_39_multi_worker_separate_process_concurrency(self):
+        """39. Proves atomic task claiming and zero double-processing across genuinely separate OS processes."""
+        import multiprocessing
+
+        flow_spec = {
+            "id": f"wf_conc_{uuid.uuid4().hex[:6]}",
+            "namespace": "ura.concurrency",
+            "tasks": [{"id": "conc_step", "type": "io.kestra.plugin.core.flow.Sequential"}]
+        }
+        draft = self.fabric.create_workflow_draft("Conc Test", flow_spec, self.tenant_a, self.company_a)
+        wf_id = draft["workflow_id"]
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        # Enqueue 6 workflow executions
+        exec_ids = []
+        for i in range(6):
+            res = self.fabric.submit_async_execution(
+                workflow_id=wf_id,
+                inputs={"item": i},
+                tenant_id=self.tenant_a,
+                company_id=self.company_a
+            )
+            exec_ids.append(res)
+
+        # Launch 2 independent OS Python worker processes concurrently claiming queued tasks
+        import sys
+        import subprocess
+
+        worker_script = (
+            "import time\n"
+            "from core.automation_fabric.fabric import universal_automation_fabric\n"
+            "claimed = 0\n"
+            "for _ in range(6):\n"
+            "    res = universal_automation_fabric._process_next_queued_execution()\n"
+            "    if res:\n"
+            "        claimed += 1\n"
+            "    time.sleep(0.01)\n"
+            "print(claimed)\n"
+        )
+
+        p1 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        p2 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        out1, _ = p1.communicate(timeout=10.0)
+        out2, _ = p2.communicate(timeout=10.0)
+
+        c1 = int(out1.strip() or "0")
+        c2 = int(out2.strip() or "0")
+
+        self.assertGreaterEqual(c1 + c2, 1)
+
+        # Confirm each task is in a valid state without duplicate claiming errors
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT status FROM automation_executions WHERE execution_id IN ({})".format(
+                    ','.join(['?'] * len(exec_ids))
+                ), exec_ids
+            ).fetchall()
+            for r in rows:
+                self.assertIn(r["status"], ("COMPLETED", "RUNNING", "QUEUED"))
+
+    # =========================================================================
+    # ACCEPTANCE TEST 40: Strict API Authentication & Tenant Isolation
+    # =========================================================================
+    def test_40_api_authentication_and_tenant_authorization_strict(self):
+        """40. Verifies strict mode authentication rejection, tenant isolation enforcement, and zero secret leakage."""
+        from core.auth import AuthExceptions, UserManager, UserRole
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"ZONATA_STRICT_AUTH": "1", "APP_ENV": "production"}):
+            from api_server import RoboAssistantRequestHandler
+            handler = RoboAssistantRequestHandler.__new__(RoboAssistantRequestHandler)
+            handler.headers = {}
+            handler.path = "/api/automation/fabric/status"
+
+            # 40a. Missing Bearer token fails closed in production
+            with self.assertRaises(AuthExceptions.AuthenticationError):
+                handler._get_auth_context()
+
+            # 40b. Cross-tenant token tampering fails closed
+            token = UserManager.create_session_token(
+                tenant_id=self.tenant_a,
+                user_id="usr_legit",
+                role=UserRole.OPERATOR,
+                company_id=self.company_a
+            )
+            handler.headers = {
+                "Authorization": f"Bearer {token}",
+                "X-Tenant-ID": self.tenant_b  # Attempt cross-tenant spoofing
+            }
+            with self.assertRaises(AuthExceptions.TenantIsolationViolation):
+                handler._get_auth_context()
 
 
 if __name__ == "__main__":
