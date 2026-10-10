@@ -179,6 +179,14 @@ from core.durable_workflow_runtime import (
     EdgeType
 )
 from zonata.langgraph_adapter import langgraph_adapter
+from core.automation_fabric import (
+    universal_automation_fabric,
+    connector_registry,
+    template_catalog,
+    specialized_agent_registry,
+    license_validator,
+    AgentDelegationTask
+)
 from core.a2a_interoperability_runtime import (
     A2AGateway,
     A2AKillSwitch,
@@ -1842,6 +1850,87 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
             else:
                 self._send_json({"error": "Workflow not found"}, status=404)
+            return
+
+        # =====================================================================
+        # UNIVERSAL AUTOMATION FABRIC GET ENDPOINTS
+        # =====================================================================
+        elif path == "/api/automation/fabric/status":
+            self._send_json({
+                "status": "OPERATIONAL",
+                "killswitch_active": universal_automation_fabric.is_killswitch_active(),
+                "metrics": universal_automation_fabric.get_fabric_metrics(tenant_id)
+            })
+            return
+
+        elif path == "/api/automation/workflows":
+            cid = query_params.get("company_id", [None])[0]
+            wfs = universal_automation_fabric.list_workflows(tenant_id=tenant_id, company_id=cid)
+            self._send_json({"workflows": wfs, "count": len(wfs)})
+            return
+
+        elif path.startswith("/api/automation/workflows/") and len(path.split("/")) == 5:
+            wf_id = path.split("/")[4]
+            wf = universal_automation_fabric.get_workflow(wf_id, tenant_id=tenant_id)
+            if wf:
+                self._send_json({"workflow": wf})
+            else:
+                self._send_json({"error": "Workflow not found"}, status=404)
+            return
+
+        elif path == "/api/automation/executions":
+            wf_id = query_params.get("workflow_id", [None])[0]
+            execs = universal_automation_fabric.list_executions(tenant_id=tenant_id, workflow_id=wf_id)
+            self._send_json({"executions": execs, "count": len(execs)})
+            return
+
+        elif path.startswith("/api/automation/executions/") and len(path.split("/")) == 5:
+            exec_id = path.split("/")[4]
+            ex = universal_automation_fabric.get_execution(exec_id, tenant_id=tenant_id)
+            if ex:
+                self._send_json({"execution": ex})
+            else:
+                self._send_json({"error": "Execution not found"}, status=404)
+            return
+
+        elif path == "/api/automation/templates":
+            cat = query_params.get("category", [None])[0]
+            tmpls = template_catalog.list_templates(category=cat)
+            self._send_json({"templates": tmpls, "count": len(tmpls)})
+            return
+
+        elif path.startswith("/api/automation/templates/") and len(path.split("/")) == 5:
+            tmpl_id = path.split("/")[4]
+            tmpl = template_catalog.get_template(tmpl_id)
+            if tmpl:
+                self._send_json({"template": tmpl.to_dict()})
+            else:
+                self._send_json({"error": "Template not found"}, status=404)
+            return
+
+        elif path == "/api/automation/connectors":
+            conns = connector_registry.list_connectors()
+            self._send_json({"connectors": conns, "count": len(conns)})
+            return
+
+        elif path == "/api/automation/agents":
+            roles = specialized_agent_registry.list_roles()
+            self._send_json({"roles": roles, "count": len(roles)})
+            return
+
+        elif path == "/api/automation/approvals":
+            apprs = universal_automation_fabric.list_pending_approvals(tenant_id=tenant_id)
+            self._send_json({"approvals": apprs, "count": len(apprs)})
+            return
+
+        elif path == "/api/automation/metrics":
+            m = universal_automation_fabric.get_fabric_metrics(tenant_id=tenant_id)
+            self._send_json(m)
+            return
+
+        elif path == "/api/automation/sbom":
+            sbom = license_validator.generate_sbom()
+            self._send_json(sbom)
             return
 
         # =====================================================================
@@ -4409,6 +4498,174 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # =====================================================================
+        # UNIVERSAL AUTOMATION FABRIC POST ENDPOINTS
+        # =====================================================================
+        elif path == "/api/automation/workflows":
+            name = req_data.get("name", "New Workflow")
+            spec = req_data.get("spec", {})
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            author = self.headers.get("X-User-Name", "employee")
+            try:
+                draft = universal_automation_fabric.create_workflow_draft(name, spec, tenant_id, company_id, author=author)
+                self._send_json(draft, status=201)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/workflows/") and path.endswith("/publish"):
+            wf_id = path.split("/")[4]
+            try:
+                res = universal_automation_fabric.publish_workflow(wf_id, tenant_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/workflows/") and path.endswith("/rollback"):
+            wf_id = path.split("/")[4]
+            target_version = int(req_data.get("target_version", 1))
+            try:
+                res = universal_automation_fabric.rollback_workflow(wf_id, target_version, tenant_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/workflows/") and path.endswith("/execute"):
+            wf_id = path.split("/")[4]
+            inputs = req_data.get("inputs", {})
+            context = req_data.get("context", {})
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            actor = self.headers.get("X-User-Name", "HostEmployee")
+            try:
+                res = universal_automation_fabric.execute_workflow(
+                    workflow_id=wf_id,
+                    inputs=inputs,
+                    tenant_id=tenant_id,
+                    company_id=company_id,
+                    authenticated_actor=actor,
+                    context=context
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/templates/") and path.endswith("/instantiate"):
+            tmpl_id = path.split("/")[4]
+            inputs = req_data.get("inputs", {})
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            try:
+                instance = template_catalog.instantiate_template(tmpl_id, inputs, tenant_id, company_id)
+                draft = universal_automation_fabric.create_workflow_draft(
+                    name=instance["name"],
+                    spec=instance["workflow_spec"],
+                    tenant_id=tenant_id,
+                    company_id=company_id
+                )
+                self._send_json({"instance": instance, "draft": draft}, status=201)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/automation/agent/generate":
+            prompt = req_data.get("prompt", "Automate routine data sync")
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            task = AgentDelegationTask(
+                task_id=f"gen_{uuid.uuid4().hex[:8]}",
+                tenant_id=tenant_id,
+                company_id=company_id,
+                role="WorkflowDesignAgent",
+                objective=prompt,
+                scope="workflow:generate",
+                acceptance_criteria=["Valid draft generated"],
+                timeout_seconds=30.0,
+                permissions=["workflow:design"],
+                parameters={"prompt": prompt}
+            )
+            try:
+                gen_result = specialized_agent_registry.delegate_task(task)
+                self._send_json({"success": True, "generated_workflow": gen_result})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/automation/connectors/discover":
+            candidate = req_data.get("candidate", {})
+            ok, msg, vetted = connector_registry.qualify_and_discover_connector(candidate)
+            self._send_json({"success": ok, "message": msg, "connector": vetted.to_dict() if vetted else None}, status=200 if ok else 400)
+            return
+
+        elif path.startswith("/api/automation/agents/") and path.endswith("/delegate"):
+            role = path.split("/")[4]
+            objective = req_data.get("objective", "Execute task")
+            scope = req_data.get("scope", "general")
+            params = req_data.get("parameters", {})
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            task = AgentDelegationTask(
+                task_id=f"dt_{uuid.uuid4().hex[:8]}",
+                tenant_id=tenant_id,
+                company_id=company_id,
+                role=role,
+                objective=objective,
+                scope=scope,
+                acceptance_criteria=req_data.get("acceptance_criteria", []),
+                timeout_seconds=float(req_data.get("timeout_seconds", 30.0)),
+                permissions=req_data.get("permissions", ["execute"]),
+                parameters=params
+            )
+            try:
+                res = specialized_agent_registry.delegate_task(task)
+                self._send_json({"success": True, "result": res})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/approvals/") and path.endswith("/decide"):
+            appr_id = path.split("/")[4]
+            decision = req_data.get("decision", "APPROVE")
+            actor = self.headers.get("X-User-Name", "HostEmployee")
+            reason = req_data.get("reason", "Approved by employee")
+            modified_params = req_data.get("modified_parameters")
+            try:
+                res = universal_automation_fabric.decide_approval(
+                    approval_id=appr_id,
+                    decision=decision,
+                    actor=actor,
+                    reason=reason,
+                    modified_parameters=modified_params
+                )
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/executions/") and path.endswith("/recover"):
+            exec_id = path.split("/")[4]
+            try:
+                res = universal_automation_fabric.recover_crashed_execution(exec_id, tenant_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path.startswith("/api/automation/executions/") and path.endswith("/reconcile"):
+            exec_id = path.split("/")[4]
+            ground_truth = req_data.get("ground_truth", "CONFIRMED_SUCCESS")
+            try:
+                res = universal_automation_fabric.reconcile_unknown_outcome(exec_id, tenant_id, ground_truth)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
+            return
+
+        elif path == "/api/automation/killswitch":
+            active = bool(req_data.get("active", True))
+            universal_automation_fabric.set_killswitch(active)
+            self._send_json({"killswitch_active": active, "status": "KILLSWITCH_ENGAGED" if active else "KILLSWITCH_DISENGAGED"})
+            return
+
+        # =====================================================================
         # A2A (AGENT2AGENT PROTOCOL) POST ENDPOINTS
         # =====================================================================
         elif path in ("/a2a/message:send", "/message:send"):
@@ -5806,6 +6063,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             res = settings_service.bulk_save_category(tenant_id, company_id, cat_id, values, actor=actor, reason=reason, actor_role=actor_role)
             status_code = 200 if res.get("success") else 400
             self._send_json(res, status=status_code)
+            return
+
+        elif path.startswith("/api/automation/workflows/") and len(path.split("/")) == 5:
+            wf_id = path.split("/")[4]
+            new_spec = req_data.get("spec", req_data)
+            try:
+                res = universal_automation_fabric.update_and_bump_version(wf_id, new_spec, tenant_id)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=400)
             return
 
         self._send_json({"error": "Endpoint not found or method not allowed"}, status=404)
