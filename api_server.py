@@ -3791,7 +3791,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/terminal/ceo/directive":
             obj = req_data.get("objective", "")
-            tenant = req_data.get("tenant_id") or "tnt_primary"
+            tenant = tenant_id
             instruction = AICeoTerminalInstruction(
                 objective=obj,
                 constraints=req_data.get("constraints", []),
@@ -3918,7 +3918,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 priority=req_data.get("priority", "HIGH"),
                 authority=req_data.get("authority", "AUTOMATIC_IDEMPOTENT"),
                 budget=float(req_data.get("budget", 50.0)),
-                tenant_id=req_data.get("tenant_id", "tnt_primary"),
+                tenant_id=tenant_id,
                 company_id=req_data.get("company_id", "comp_primary")
             )
             ceo_resp = coworker_engine.execute_ceo_mission(req)
@@ -4627,6 +4627,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             reason = req_data.get("reason", "Approved by employee")
             modified_params = req_data.get("modified_parameters")
 
+            auth_header = self.headers.get("Authorization", "")
+            raw_token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else (auth_header.strip() if auth_header else None)
+
             try:
                 auth_ctx = self._get_auth_context()
             except Exception as e:
@@ -4645,6 +4648,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     reason=reason,
                     modified_parameters=modified_params,
                     tenant_id=tenant_id,
+                    auth_token=raw_token,
                     actor_role=role
                 )
                 self._send_json(res)
@@ -5823,7 +5827,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # ZONATA V8: AI CEO Executive Operating Layer Routes
         if path.startswith("/api/v8/"):
             from core.v8_api_handler import V8ApiHandler
-            t_id = self.headers.get("X-Tenant-ID", "tnt_primary")
+            t_id = tenant_id
             c_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             v8_res = V8ApiHandler.handle_post(path, req_data, t_id, c_id)
             if v8_res:
@@ -5834,7 +5838,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # OpenTelemetry Trace Span Endpoint
         elif path == "/api/telemetry/trace":
             name = req_data.get("name", "span_operation")
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             span = opentelemetry_engine.start_trace(
                 span_name=name,
@@ -5855,7 +5859,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Langfuse LLM Generation Endpoint
         elif path == "/api/langfuse/generations":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             gen = langfuse_engine.record_generation(
                 name=req_data.get("name", "llm_completion"),
@@ -5875,7 +5879,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # OpenFGA Relationship Authorization Endpoints
         elif path == "/api/openfga/check":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             user = req_data.get("user", "")
             relation = req_data.get("relation", "")
             obj = req_data.get("object", "")
@@ -5884,7 +5888,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/openfga/tuples":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             user = req_data.get("user", "")
             relation = req_data.get("relation", "")
             obj = req_data.get("object", "")
@@ -5898,7 +5902,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Vault Scoped Dynamic Credential Leases
         elif path == "/api/vault/lease":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             agent_id = req_data.get("agent_id", "agent_worker")
             target_system = req_data.get("target_system", "postgres_db")
             actions = req_data.get("required_actions", ["read"])
@@ -5922,7 +5926,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Keycloak Identity Authentication & Revocation
         elif path == "/api/keycloak/auth":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             token_str = req_data.get("token", "")
             res = keycloak_idp.authenticate_token(token_str)
             self._send_json(res.to_dict())
@@ -5936,7 +5940,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # NATS JetStream Event Publish
         elif path == "/api/events/publish":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             subject = req_data.get("subject", "zonata.events.general")
             data = req_data.get("data", {})
@@ -5972,7 +5976,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # SaaS Billing Plan Upgrade & Usage Record
         elif path == "/api/billing/upgrade":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             tier_str = req_data.get("tier", "pro").upper()
             try:
                 tier = SubscriptionTier[tier_str]
@@ -5983,7 +5987,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/billing/record":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             metric = req_data.get("metric", "api_call")
             amount = float(req_data.get("amount", 1.0))
             cost = float(req_data.get("cost_usd", 0.0))
@@ -5993,7 +5997,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # PostHog Product Analytics Capture
         elif path == "/api/analytics/posthog/capture":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             distinct_id = req_data.get("distinct_id", "usr_anon")
             event_name = req_data.get("event_name", "page_view")
@@ -6010,7 +6014,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Object Storage Artifact Upload / Store
         elif path == "/api/storage/artifacts/upload":
-            tenant = self.headers.get("X-Tenant-ID") or req_data.get("tenant_id", "tnt_primary")
+            tenant = tenant_id
             company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
             name = req_data.get("name", "artifact.bin")
             content = req_data.get("content", "").encode("utf-8")
@@ -6033,9 +6037,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_PUT(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        tenant_id = self.headers.get("X-Tenant-ID", "tnt_primary")
-        company_id = self.headers.get("X-Company-ID", "comp_primary")
-        actor = self.headers.get("X-User-Name", "Host Administrator")
+
+        try:
+            auth_ctx = self._get_auth_context()
+            tenant_id = auth_ctx.get("tenant_id", "tnt_primary")
+        except AuthExceptions.AuthenticationError as e:
+            self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
+            return
+        except AuthExceptions.TenantIsolationViolation as e:
+            self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
+            return
+
+        company_id = self.headers.get("X-Company-ID") or auth_ctx.get("company_id", "comp_primary")
+        actor = auth_ctx.get("user_id") or self.headers.get("X-User-Name", "Host Administrator")
+        actor_role = auth_ctx.get("role") or self.headers.get("X-User-Role", "OWNER")
 
         length = int(self.headers.get('content-length', 0))
         raw_body = self.rfile.read(length) if length > 0 else b"{}"
@@ -6046,7 +6061,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
-            actor_role = self.headers.get("X-User-Role", "OWNER")
             expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data
             reason = req_data.get("reason", "Direct REST PUT setting update")
@@ -6063,8 +6077,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
             company_id = self.headers.get("X-Company-ID", req_data.get("company_id", "comp_primary"))
-            actor = self.headers.get("X-User-Name", "Host Administrator")
-            actor_role = self.headers.get("X-User-Role", "OWNER")
             reason = req_data.get("reason", "Batch category save via PUT")
             if "settings" in req_data and isinstance(req_data["settings"], dict):
                 values = req_data["settings"]
@@ -6092,7 +6104,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_DELETE(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        tenant_id = self.headers.get("X-Tenant-ID", "tnt_primary")
+
+        try:
+            auth_ctx = self._get_auth_context()
+            tenant_id = auth_ctx.get("tenant_id", "tnt_primary")
+        except AuthExceptions.AuthenticationError as e:
+            self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
+            return
+        except AuthExceptions.TenantIsolationViolation as e:
+            self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
+            return
+
         if path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
             server_id = path.split("/")[4]
             ok = mcp_gateway.disconnect_server(server_id)
@@ -6105,7 +6127,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
         elif path.startswith("/api/nango/connections/") and len(path.split("/")) == 5:
             conn_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            company_id = self.headers.get("X-Company-ID") or auth_ctx.get("company_id", "comp_primary")
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             ok = gw.disconnect_connection(conn_id)
             self._send_json({"success": ok, "connection_id": conn_id})

@@ -716,6 +716,301 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         self.assertEqual(res2["data"]["po_number"], "PO-RECONCILED-001")
         self.assertEqual(res2["data"]["external_transaction_id"], "tx_erp_reconciled_998")
 
+    # =========================================================================
+    # TEST 12: Cryptographic Receipt Integrity & Tampered Decision Blocking
+    # =========================================================================
+    def test_12_tampered_approval_receipt_downstream_blocking(self):
+        """
+        12. Proves that HMAC-SHA256 decision receipts cannot be forged, replayed,
+            or tampered with. Any manipulation of the approval record or its signature
+            causes downstream resume_execution and execute_workflow to immediately halt.
+        """
+        wf_id = f"wf_tamper_test_{uuid.uuid4().hex[:6]}"
+        spec = {
+            "id": wf_id,
+            "namespace": "ura.security.tamper",
+            "tasks": [
+                {
+                    "id": "gate_step",
+                    "type": "io.kestra.plugin.zonata.approval.Gate",
+                    "risk": ActionRiskLevel.CRITICAL.value,
+                    "parameters": {"action": "release_funds", "amount": 10000.0}
+                },
+                {
+                    "id": "commit_step",
+                    "type": "io.kestra.plugin.core.flow.Sequential"
+                }
+            ]
+        }
+        self.fabric.create_workflow_draft("Tamper Detection Test", spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        exec_res = self.fabric.execute_workflow(wf_id, {}, self.tenant_a, self.company_a)
+        appr_id = exec_res["approval_id"]
+        exec_id = exec_res["execution_id"]
+
+        # Legitimate OWNER approves -> signs valid HMAC-SHA256 receipt
+        owner_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="legit_owner",
+            role=UserRole.OWNER,
+            company_id=self.company_a
+        )
+        dec_res = self.fabric.decide_approval(
+            approval_id=appr_id,
+            decision="APPROVE",
+            actor="legit_owner",
+            reason="Legitimate executive authorization",
+            tenant_id=self.tenant_a,
+            auth_token=owner_token
+        )
+        self.assertEqual(dec_res["status"], ApprovalStatus.APPROVED.value)
+
+        # Verify valid receipt passes verification
+        valid, err = self.fabric.verify_approval_receipt(appr_id, self.tenant_a)
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+        # Adversary tampers with the approval signature directly in SQLite
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE automation_approvals SET receipt_signature = ? WHERE approval_id = ?",
+                ("0" * 64, appr_id)
+            )
+            conn.commit()
+
+        # verify_approval_receipt must actively detect tampering
+        valid_tampered, err_tampered = self.fabric.verify_approval_receipt(appr_id, self.tenant_a)
+        self.assertFalse(valid_tampered)
+        self.assertIn("tampered with", err_tampered)
+
+        # Downstream workflow resumption must be blocked by AutomationSecurityException
+        with self.assertRaises(AutomationSecurityException) as ctx:
+            self.fabric.resume_execution(exec_id, self.tenant_a)
+        self.assertIn("Cryptographic verification failed", str(ctx.exception))
+
+    # =========================================================================
+    # TEST 13: Approver Impersonation & Role Spoofing Prevention
+    # =========================================================================
+    def test_13_approver_impersonation_and_role_spoofing_prevention(self):
+        """
+        13. Proves that an authenticated user cannot impersonate another actor
+            or claim a higher privilege level (e.g. MANAGER claiming OWNER).
+        """
+        wf_id = f"wf_spoof_test_{uuid.uuid4().hex[:6]}"
+        spec = {
+            "id": wf_id,
+            "namespace": "ura.security.spoof",
+            "tasks": [
+                {
+                    "id": "gate_step",
+                    "type": "io.kestra.plugin.zonata.approval.Gate",
+                    "risk": ActionRiskLevel.CRITICAL.value,
+                    "parameters": {"amount": 25000.0}
+                }
+            ]
+        }
+        self.fabric.create_workflow_draft("Spoof Prevention Test", spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        exec_res = self.fabric.execute_workflow(wf_id, {}, self.tenant_a, self.company_a)
+        appr_id = exec_res["approval_id"]
+
+        manager_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="manager_dave",
+            role=UserRole.MANAGER,
+            company_id=self.company_a
+        )
+
+        # Actor impersonation: token is for manager_dave, but client claims actor="board_chairman"
+        with self.assertRaises(AuthExceptions.AuthorizationError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="board_chairman",
+                tenant_id=self.tenant_a,
+                auth_token=manager_token
+            )
+        self.assertIn("impersonation prohibited", str(ctx.exception))
+
+        # Role spoofing: token is MANAGER, but client claims actor_role=OWNER
+        with self.assertRaises(AuthExceptions.AuthorizationError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="manager_dave",
+                actor_role=UserRole.OWNER,
+                tenant_id=self.tenant_a,
+                auth_token=manager_token
+            )
+        self.assertIn("role spoofing prohibited", str(ctx.exception))
+
+    # =========================================================================
+    # TEST 14: ₹50,000 INR Financial Ceiling Enforcement on Manager Sign-Off
+    # =========================================================================
+    def test_14_financial_ceiling_50k_enforcement(self):
+        """
+        14. Enforces statutory financial boundary:
+            - Orders > ₹50,000 INR CANNOT be approved by MANAGER role.
+            - Orders > ₹50,000 INR require OWNER or EXECUTIVE authorization.
+        """
+        wf_id = f"wf_financial_ceiling_{uuid.uuid4().hex[:6]}"
+        spec = {
+            "id": wf_id,
+            "namespace": "ura.finance.procurement",
+            "tasks": [
+                {
+                    "id": "po_approval",
+                    "type": "io.kestra.plugin.zonata.approval.Gate",
+                    "risk": ActionRiskLevel.CRITICAL.value,
+                    "parameters": {"amount": 75000.0, "vendor": "ACME Industrial"}
+                }
+            ]
+        }
+        self.fabric.create_workflow_draft("High Value PO Approval", spec, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_id, self.tenant_a)
+
+        exec_res = self.fabric.execute_workflow(wf_id, {}, self.tenant_a, self.company_a)
+        appr_id = exec_res["approval_id"]
+
+        manager_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="branch_manager",
+            role=UserRole.MANAGER,
+            company_id=self.company_a
+        )
+
+        # MANAGER attempts approval for ₹75,000 -> must be rejected with ceiling violation
+        with self.assertRaises(AuthExceptions.AuthorizationError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="branch_manager",
+                tenant_id=self.tenant_a,
+                auth_token=manager_token
+            )
+        self.assertIn("exceeds MANAGER financial ceiling of ₹50,000", str(ctx.exception))
+
+        # EXECUTIVE attempts approval for ₹75,000 -> must succeed
+        exec_token = UserManager.create_session_token(
+            tenant_id=self.tenant_a,
+            user_id="vp_finance",
+            role=UserRole.EXECUTIVE,
+            company_id=self.company_a
+        )
+        dec_res = self.fabric.decide_approval(
+            approval_id=appr_id,
+            decision="APPROVE",
+            actor="vp_finance",
+            reason="Capital expenditure approved by VP Finance",
+            tenant_id=self.tenant_a,
+            auth_token=exec_token
+        )
+        self.assertEqual(dec_res["status"], ApprovalStatus.APPROVED.value)
+        self.assertEqual(dec_res["actor_role"], UserRole.EXECUTIVE)
+        self.assertIsNotNone(dec_res.get("receipt_signature"))
+
+    # =========================================================================
+    # TEST 15: REST API PUT / DELETE Strict Authentication Enforcement
+    # =========================================================================
+    def test_15_api_put_delete_strict_authentication_enforcement(self):
+        """
+        15. Proves that HTTP PUT and DELETE routes enforce sovereign Bearer token
+            authentication in strict production mode, rejecting unauthenticated requests with 401.
+        """
+        import urllib.request
+        import urllib.error
+        import socketserver
+        import threading
+        from api_server import RoboAssistantRequestHandler
+
+        old_env = os.environ.get("APP_ENV")
+        old_strict = os.environ.get("ZONATA_STRICT_AUTH")
+        old_sec = os.environ.get("ZONATA_AUTH_SECRET")
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_STRICT_AUTH"] = "1"
+        os.environ["ZONATA_AUTH_SECRET"] = "qual_production_secret_key_32_bytes_long_12345"
+
+        server = socketserver.TCPServer(("127.0.0.1", 0), RoboAssistantRequestHandler)
+        port = server.server_address[1]
+        srv_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        srv_thread.start()
+
+        try:
+            # 1. PUT without token -> Expect 401
+            put_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/settings/key/company_name",
+                data=json.dumps({"value": "New Company Name"}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PUT"
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(put_req)
+            self.assertEqual(ctx.exception.code, 401)
+
+            # 2. DELETE without token -> Expect 401
+            del_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/browser/sessions/sess_qual_test",
+                headers={"Content-Type": "application/json"},
+                method="DELETE"
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(del_req)
+            self.assertEqual(ctx.exception.code, 401)
+
+            # 3. Authenticated PUT with valid token -> Succeeds (returns 200)
+            token = UserManager.create_session_token(
+                tenant_id=self.tenant_a,
+                user_id="admin_user",
+                role=UserRole.OWNER,
+                company_id=self.company_a
+            )
+            put_auth_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/settings/key/acc_display_name",
+                data=json.dumps({"value": "Verified AI Host", "scope": "User"}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                    "X-Company-ID": self.company_a
+                },
+                method="PUT"
+            )
+            with urllib.request.urlopen(put_auth_req) as resp:
+                self.assertEqual(resp.status, 200)
+                data = json.loads(resp.read().decode("utf-8"))
+                self.assertTrue(data.get("success"))
+
+            # 4. Authenticated DELETE with valid token -> Returns 200
+            del_auth_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/browser/sessions/sess_qual_test",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                    "X-Company-ID": self.company_a
+                },
+                method="DELETE"
+            )
+            with urllib.request.urlopen(del_auth_req) as resp:
+                self.assertEqual(resp.status, 200)
+                data = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(data.get("session_id"), "sess_qual_test")
+        finally:
+            server.shutdown()
+            server.server_close()
+            if old_env is not None:
+                os.environ["APP_ENV"] = old_env
+            else:
+                os.environ.pop("APP_ENV", None)
+            if old_strict is not None:
+                os.environ["ZONATA_STRICT_AUTH"] = old_strict
+            else:
+                os.environ.pop("ZONATA_STRICT_AUTH", None)
+            if old_sec is not None:
+                os.environ["ZONATA_AUTH_SECRET"] = old_sec
+            else:
+                os.environ.pop("ZONATA_AUTH_SECRET", None)
+
 
 if __name__ == "__main__":
     unittest.main()

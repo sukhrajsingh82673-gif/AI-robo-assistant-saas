@@ -13,8 +13,43 @@ import os
 from typing import Optional, Dict, Any, List, Set
 from .db import db
 
-# Secret key resolution: environment variable first, with production fallback
-SECRET_KEY = os.environ.get("ZONATA_AUTH_SECRET", "ROBOASSISTANT_INTERNAL_TENANT_HMAC_SECRET_2026").encode("utf-8")
+def get_auth_secret_key() -> bytes:
+    """
+    Resolves the sovereign HMAC signing key with strict production safety:
+    1. Checks environment variable ZONATA_AUTH_SECRET
+    2. Checks SecretManager for managed vault key
+    3. In production mode (APP_ENV=production or ZONATA_STRICT_AUTH=1), refuses hardcoded default and raises RuntimeError.
+    4. In development mode, falls back to internal dev secret.
+    """
+    from .secrets import SecretManager
+    secret = os.environ.get("ZONATA_AUTH_SECRET")
+    if secret:
+        return secret.encode("utf-8")
+    managed_key = SecretManager.get_secret("sec_sovereign_auth_key")
+    if managed_key:
+        return managed_key.encode("utf-8")
+    if os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1":
+        raise RuntimeError("Production Sovereign Security Violation: ZONATA_AUTH_SECRET environment variable is required in production mode. Hardcoded fallback prohibited.")
+    return b"ROBOASSISTANT_INTERNAL_TENANT_HMAC_SECRET_2026"
+
+def get_verification_keys() -> List[bytes]:
+    """
+    Returns the primary signing key and any previous rotated keys to support zero-downtime key rotation.
+    """
+    keys = [get_auth_secret_key()]
+    prev_secret = os.environ.get("ZONATA_PREVIOUS_AUTH_SECRET")
+    if prev_secret:
+        keys.append(prev_secret.encode("utf-8"))
+    from .secrets import SecretManager
+    prev_managed = SecretManager.get_secret("sec_sovereign_previous_auth_key")
+    if prev_managed:
+        keys.append(prev_managed.encode("utf-8"))
+    return keys
+
+def __getattr__(name: str):
+    if name == "SECRET_KEY":
+        return get_auth_secret_key()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 class UserRole:
     OWNER = "OWNER"
@@ -139,7 +174,8 @@ class UserManager:
             "exp": now + expires_in_seconds
         }
         payload_str = json.dumps(payload, sort_keys=True)
-        sig = hmac.new(SECRET_KEY, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        key = get_auth_secret_key()
+        sig = hmac.new(key, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
         return f"{payload_str}.{sig}"
 
     @staticmethod
@@ -149,8 +185,14 @@ class UserManager:
             if len(parts) != 2:
                 return None
             payload_str, sig = parts
-            expected_sig = hmac.new(SECRET_KEY, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(sig, expected_sig):
+            v_keys = get_verification_keys()
+            valid = False
+            for k in v_keys:
+                expected_sig = hmac.new(k, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(sig, expected_sig):
+                    valid = True
+                    break
+            if not valid:
                 return None
             payload = json.loads(payload_str)
 
