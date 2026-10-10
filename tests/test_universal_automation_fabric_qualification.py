@@ -1558,7 +1558,7 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
         from core.auth import AuthExceptions, UserManager, UserRole
         from unittest.mock import patch
 
-        with patch.dict(os.environ, {"ZONATA_STRICT_AUTH": "1", "APP_ENV": "production"}):
+        with patch.dict(os.environ, {"ZONATA_STRICT_AUTH": "1", "APP_ENV": "production", "ZONATA_AUTH_SECRET": "sec_prod_test_secret_key_32_bytes_long"}):
             from api_server import RoboAssistantRequestHandler
             handler = RoboAssistantRequestHandler.__new__(RoboAssistantRequestHandler)
             handler.headers = {}

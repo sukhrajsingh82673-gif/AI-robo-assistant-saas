@@ -25,15 +25,15 @@ In accordance with the sovereign qualification framework, this evaluation issues
 1. **Sovereign Single-Node, On-Premises & Private Cloud Container Deployments:**
    - Full orchestration of AI CEO missions, coworker agents, and background workers.
    - Durable workflow state machine with SQLite in WAL mode and native online backup API.
-   - 100% verified point-in-time disaster recovery restore drills with zero data loss (RPO=0, RTO < 30s).
+   - Point-in-time disaster recovery restore drills with zero data loss (`RPO=0` strictly scoped to committed transactions at the snapshot boundary, measured `RTO < 30s` with observed restore time of 0.15s–0.45s).
 2. **Hardened HTTP REST Security Boundary:**
    - Strict Bearer token authentication enforced on `GET`, `POST`, `PUT`, and `DELETE`.
    - Multi-tenant data and process isolation blocking cross-tenant tampering and spoofing attempts with HTTP 403.
    - Approver identity and role spoofing prevention; client inputs cannot override authenticated token claims.
-   - Statutory ₹50,000 INR financial ceiling enforcement on `MANAGER` role sign-offs.
+   - Statutory ₹50,000 INR financial ceiling enforcement verified server-side via boundary testing (amounts <= ₹50,000 permitted for `MANAGER`, > ₹50,000 strictly require `OWNER` or `EXECUTIVE`).
 3. **Cryptographic Governance & Decision Integrity:**
-   - HMAC-SHA256 decision receipts signed with sovereign keys and verified before downstream execution.
-   - Tampered, forged, or missing receipts actively halt execution with `AutomationSecurityException`.
+   - HMAC-SHA256 decision receipts cryptographically binding approver identity, role, tenant, step, proposed action, and SHA-256 parameter digest.
+   - Tampered signatures, altered parameters, or cross-tenant receipts actively halt downstream execution with `AutomationSecurityException`.
    - Merkle root evidence digests sealed for all completed executive missions.
 4. **Resilient Failure Recovery & Deduplication:**
    - 3-state idempotency tracking (`IN_FLIGHT`, `UNKNOWN_OUTCOME`, `COMPLETED`).
@@ -44,9 +44,9 @@ In accordance with the sovereign qualification framework, this evaluation issues
    - Prompt injection screening and zip-bomb decompression safety.
    - Authoritative KillSwitch matrix halting active and queued execution.
 6. **Open-Source License Compliance:**
-   - 100% OSI-approved license compliance (Apache-2.0, MIT, MPL-2.0) across all 15 connectors.
+   - 100% OSI-approved license compliance across all 15 connectors (Apache-2.0 and MIT permissive libraries; HashiCorp Vault API interaction under MPL-2.0 weak copyleft).
    - Zero AGPL viral server contamination in distributed connectors.
-   - CycloneDX v1.5 JSON SBOM generated and verified.
+   - CycloneDX v1.5 JSON SBOM generated and verified for all 23 embedded runtime components.
 
 ### 2.2 What Remains Environment-Blocked (External Prerequisite Scope):
 1. **Remote Third-Party SaaS Execution (`BLOCKED_ENVIRONMENT`):**

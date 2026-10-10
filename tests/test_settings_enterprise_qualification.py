@@ -30,12 +30,34 @@ BASE_URL = "http://localhost:8080"
 class TestSettingsEnterpriseQualification(unittest.TestCase):
     """Exhaustive Enterprise Qualification Suite for ZONATA / URA Settings."""
 
+    _server_proc = None
+
     @classmethod
     def setUpClass(cls):
-        # Ensure server is running
-        req = urllib.request.Request(f"{BASE_URL}/api/settings/effective")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            assert resp.status == 200
+        # Ensure server is running; start embedded instance if not present
+        try:
+            req = urllib.request.Request(f"{BASE_URL}/api/settings/effective")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                if resp.status == 200:
+                    return
+        except Exception:
+            pass
+
+        import threading
+        from api_server import ThreadedHTTPServer, RoboAssistantRequestHandler
+        cls._server_proc = ThreadedHTTPServer(("127.0.0.1", 8080), RoboAssistantRequestHandler)
+        srv_thread = threading.Thread(target=cls._server_proc.serve_forever, daemon=True)
+        srv_thread.start()
+        time.sleep(1.5)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._server_proc:
+            try:
+                cls._server_proc.shutdown()
+                cls._server_proc.server_close()
+            except Exception:
+                pass
 
     def setUp(self):
         self._reset_baseline()

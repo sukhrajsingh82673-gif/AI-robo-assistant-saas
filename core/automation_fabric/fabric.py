@@ -1237,7 +1237,10 @@ class UniversalAutomationFabric:
                 prop_params = json.loads(row["parameters"]) if isinstance(row["parameters"], str) else (row["parameters"] or {})
             except Exception:
                 prop_params = {}
-            amount_val = float(prop_params.get("amount", 0.0))
+            effective_params = dict(prop_params)
+            if modified_parameters and isinstance(modified_parameters, dict):
+                effective_params.update(modified_parameters)
+            amount_val = float(effective_params.get("amount", prop_params.get("amount", 0.0)))
             if amount_val > 50000.0 and effective_role == UserRole.MANAGER:
                 raise AuthExceptions.AuthorizationError(
                     f"Order amount ₹{amount_val:,.2f} exceeds MANAGER financial ceiling of ₹50,000. Executive or Owner sign-off required."
@@ -1258,31 +1261,42 @@ class UniversalAutomationFabric:
                 else ApprovalStatus.REJECTED.value if decision_upper in ("REJECT", "REJECTED") \
                 else ApprovalStatus.EDITED.value
 
+            mod_json = json.dumps(modified_parameters) if modified_parameters else None
+
+            # Canonical representation of action and parameters bound into receipt
+            eff_param_str = mod_json if mod_json else (
+                row["parameters"] if isinstance(row["parameters"], str) else json.dumps(row["parameters"], sort_keys=True)
+            )
+            param_hash = hashlib.sha256(eff_param_str.encode("utf-8")).hexdigest()
+
             # Cryptographically sign approval decision receipt
             from core.auth import get_auth_secret_key
             key = get_auth_secret_key()
             receipt_payload = {
-                "approval_id": approval_id,
-                "execution_id": row["execution_id"],
-                "tenant_id": target_tenant,
-                "company_id": row["company_id"],
-                "step_id": row["step_id"],
-                "decision": new_status,
-                "decided_by": effective_user,
+                "action": row["proposed_action"],
                 "actor_role": effective_role,
-                "decided_at": now
+                "approval_id": approval_id,
+                "company_id": row["company_id"],
+                "decided_at": now,
+                "decided_by": effective_user,
+                "decision": new_status,
+                "execution_id": row["execution_id"],
+                "parameters_hash": param_hash,
+                "step_id": row["step_id"],
+                "tenant_id": target_tenant
             }
             receipt_json = json.dumps(receipt_payload, sort_keys=True)
             receipt_signature = hmac.new(key, receipt_json.encode("utf-8"), hashlib.sha256).hexdigest()
             receipt_hash = hashlib.sha256(f"{receipt_json}.{receipt_signature}".encode("utf-8")).hexdigest()
 
-            mod_json = json.dumps(modified_parameters) if modified_parameters else None
-            conn.execute("""
+            cursor = conn.execute("""
                 UPDATE automation_approvals
                 SET status = ?, decided_by = ?, actor_role = ?, decision_reason = ?,
                     receipt_signature = ?, modified_parameters = ?, decided_at = ?
-                WHERE approval_id = ?
+                WHERE approval_id = ? AND status = 'PENDING'
             """, (new_status, effective_user, effective_role, f"{reason} [Sig: {receipt_signature[:12]}]", receipt_signature, mod_json, now, approval_id))
+            if cursor.rowcount == 0:
+                raise ValueError(f"Approval '{approval_id}' has already been decided or updated concurrently.")
             exec_id = row["execution_id"]
             conn.commit()
 
@@ -1352,11 +1366,41 @@ class UniversalAutomationFabric:
             if row["status"] != ApprovalStatus.APPROVED.value:
                 return False, f"Approval is not in APPROVED state (current state: '{row['status']}')."
 
+            if "expires_at" in row.keys() and row["expires_at"] and time.time() > row["expires_at"]:
+                return False, f"Approval '{approval_id}' has expired."
+
             stored_sig = row["receipt_signature"] if "receipt_signature" in row.keys() else None
             if not stored_sig:
                 return False, "Approval record lacks cryptographic receipt signature."
 
+            eff_param_str = row["modified_parameters"] if row["modified_parameters"] else (
+                row["parameters"] if isinstance(row["parameters"], str) else json.dumps(row["parameters"], sort_keys=True)
+            )
+            param_hash = hashlib.sha256(eff_param_str.encode("utf-8")).hexdigest()
+
+            # Canonical receipt payload binding action and parameters_hash
             receipt_payload = {
+                "action": row["proposed_action"],
+                "actor_role": row["actor_role"] or "OPERATOR",
+                "approval_id": approval_id,
+                "company_id": row["company_id"],
+                "decided_at": row["decided_at"],
+                "decided_by": row["decided_by"],
+                "decision": row["status"],
+                "execution_id": row["execution_id"],
+                "parameters_hash": param_hash,
+                "step_id": row["step_id"],
+                "tenant_id": row["tenant_id"]
+            }
+            receipt_json = json.dumps(receipt_payload, sort_keys=True)
+            v_keys = get_verification_keys()
+            for k in v_keys:
+                expected_sig = hmac.new(k, receipt_json.encode("utf-8"), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(stored_sig, expected_sig):
+                    return True, None
+
+            # Backward-compatibility fallback for legacy receipts lacking action/parameters_hash
+            legacy_payload = {
                 "approval_id": approval_id,
                 "execution_id": row["execution_id"],
                 "tenant_id": row["tenant_id"],
@@ -1367,11 +1411,10 @@ class UniversalAutomationFabric:
                 "actor_role": row["actor_role"] or "OPERATOR",
                 "decided_at": row["decided_at"]
             }
-            receipt_json = json.dumps(receipt_payload, sort_keys=True)
-            v_keys = get_verification_keys()
+            legacy_json = json.dumps(legacy_payload, sort_keys=True)
             for k in v_keys:
-                expected_sig = hmac.new(k, receipt_json.encode("utf-8"), hashlib.sha256).hexdigest()
-                if hmac.compare_digest(stored_sig, expected_sig):
+                expected_legacy = hmac.new(k, legacy_json.encode("utf-8"), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(stored_sig, expected_legacy):
                     return True, None
 
             return False, "HMAC-SHA256 signature verification failed. Approval decision payload has been tampered with."

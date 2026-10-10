@@ -359,8 +359,19 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
     def test_04_disaster_recovery_hot_backup_restore_and_continuity(self):
         """
         4. Proves online hot backup using SQLite backup API, computes SHA-256
-           checksum and Merkle root, performs restore drill, and validates database integrity.
+           checksum and Merkle root, performs restore drill, measures recovery time (RTO),
+           and validates database integrity and zero data loss (RPO=0) for committed transactions.
         """
+        # 1. Seed known committed transactions prior to snapshot boundary
+        committed_tx_keys = [f"idemp_dr_tx_{uuid.uuid4().hex[:8]}" for _ in range(5)]
+        with db.get_connection() as conn:
+            for k in committed_tx_keys:
+                conn.execute(
+                    "INSERT INTO automation_connector_idempotency (idempotency_key, connector_id, operation, tenant_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (k, "conn_erpnext_records", "test_dr_op", self.tenant_a, "COMPLETED", time.time())
+                )
+            conn.commit()
+
         dr = DisasterRecoveryManager(self.tenant_a, backup_dir="storage/backups_qualification_test")
         snapshot = dr.create_hot_snapshot(backup_type="LIVE_QUALIFICATION_HOT_BACKUP")
 
@@ -370,18 +381,27 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         self.assertIsNotNone(snapshot["sha256_checksum"])
         self.assertIsNotNone(snapshot["merkle_root"])
 
-        # Execute restore drill into an isolated restore location
+        # 2. Execute restore drill into an isolated restore location and measure RTO
         restore_target = f"storage/backups_qualification_test/restored_{uuid.uuid4().hex[:8]}.db"
+        t_start = time.perf_counter()
         restore_res = dr.verify_and_restore_snapshot(snapshot["manifest_id"], restore_target)
+        rto_seconds = time.perf_counter() - t_start
 
+        # Enforce RTO < 30 seconds requirement
+        self.assertLess(rto_seconds, 30.0, f"Measured RTO {rto_seconds:.3f}s exceeds statutory 30s threshold")
         self.assertTrue(restore_res["checksum_verified"])
         self.assertTrue(restore_res["sqlite_integrity_ok"])
         self.assertTrue(restore_res["record_counts_match"])
 
-        # Validate that restored database can be queried directly
+        # 3. Validate database integrity and record parity for all committed transactions (RPO=0)
         restored_conn = sqlite3.connect(restore_target)
         t_count = restored_conn.execute("SELECT count(*) FROM tenants WHERE tenant_id = ?", (self.tenant_a,)).fetchone()[0]
         self.assertEqual(t_count, 1)
+
+        # Confirm 100% of committed pre-snapshot transactions are intact (0 data loss)
+        for k in committed_tx_keys:
+            cnt = restored_conn.execute("SELECT count(*) FROM automation_connector_idempotency WHERE idempotency_key = ?", (k,)).fetchone()[0]
+            self.assertEqual(cnt, 1, f"Committed transaction '{k}' missing from restored snapshot (RPO violation)")
         restored_conn.close()
 
         # Clean up temporary restore files
@@ -633,16 +653,19 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         self.assertIsNotNone(dec_res.get("receipt_hash"))
 
         # Verify receipt signature validity
+        param_hash = hashlib.sha256(b"{}").hexdigest()
         receipt_data = {
-            "approval_id": appr_id,
-            "execution_id": exec_res["execution_id"],
-            "tenant_id": self.tenant_a,
-            "company_id": self.company_a,
-            "step_id": "gate_step",
-            "decision": ApprovalStatus.APPROVED.value,
-            "decided_by": "executive_alex",
+            "action": "Executive sign-off required",
             "actor_role": UserRole.OWNER,
-            "decided_at": dec_res["decided_at"]
+            "approval_id": appr_id,
+            "company_id": self.company_a,
+            "decided_at": dec_res["decided_at"],
+            "decided_by": "executive_alex",
+            "decision": ApprovalStatus.APPROVED.value,
+            "execution_id": exec_res["execution_id"],
+            "parameters_hash": param_hash,
+            "step_id": "gate_step",
+            "tenant_id": self.tenant_a
         }
         expected_sig = hmac.new(SECRET_KEY, json.dumps(receipt_data, sort_keys=True).encode("utf-8"), hashlib.sha256).hexdigest()
         self.assertEqual(dec_res["receipt_signature"], expected_sig)
@@ -779,7 +802,7 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
             )
             conn.commit()
 
-        # verify_approval_receipt must actively detect tampering
+        # verify_approval_receipt must actively detect signature tampering
         valid_tampered, err_tampered = self.fabric.verify_approval_receipt(appr_id, self.tenant_a)
         self.assertFalse(valid_tampered)
         self.assertIn("tampered with", err_tampered)
@@ -788,6 +811,41 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         with self.assertRaises(AutomationSecurityException) as ctx:
             self.fabric.resume_execution(exec_id, self.tenant_a)
         self.assertIn("Cryptographic verification failed", str(ctx.exception))
+
+        # Restore valid signature, then test parameter tampering in SQLite
+        orig_sig = dec_res["receipt_signature"]
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE automation_approvals SET receipt_signature = ?, parameters = ? WHERE approval_id = ?",
+                (orig_sig, json.dumps({"action": "release_funds", "amount": 99999999.0}), appr_id)
+            )
+            conn.commit()
+
+        # Parameter tampering MUST invalidate the cryptographic receipt
+        valid_param_tamper, err_param_tamper = self.fabric.verify_approval_receipt(appr_id, self.tenant_a)
+        self.assertFalse(valid_param_tamper)
+        self.assertIn("tampered with", err_param_tamper)
+
+        with self.assertRaises(AutomationSecurityException) as ctx:
+            self.fabric.resume_execution(exec_id, self.tenant_a)
+        self.assertIn("Cryptographic verification failed", str(ctx.exception))
+
+        # Cross-tenant receipt verification must fail with tenant mismatch
+        valid_xtenant, err_xtenant = self.fabric.verify_approval_receipt(appr_id, self.tenant_b)
+        self.assertFalse(valid_xtenant)
+        self.assertIn("Tenant mismatch", err_xtenant)
+
+        # Restore original parameters -> verification succeeds and workflow resumes cleanly
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE automation_approvals SET parameters = ? WHERE approval_id = ?",
+                (json.dumps({"action": "release_funds", "amount": 10000.0}), appr_id)
+            )
+            conn.commit()
+        valid_restored, err_restored = self.fabric.verify_approval_receipt(appr_id, self.tenant_a)
+        self.assertTrue(valid_restored)
+        res_resumed = self.fabric.resume_execution(exec_id, self.tenant_a)
+        self.assertEqual(res_resumed["status"], ExecutionStatus.COMPLETED.value)
 
     # =========================================================================
     # TEST 13: Approver Impersonation & Role Spoofing Prevention
@@ -911,6 +969,107 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         self.assertEqual(dec_res["actor_role"], UserRole.EXECUTIVE)
         self.assertIsNotNone(dec_res.get("receipt_signature"))
 
+        # Concurrent decision check: attempting to decide an already approved gate must fail
+        with self.assertRaises(ValueError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=appr_id,
+                decision="APPROVE",
+                actor="vp_finance",
+                tenant_id=self.tenant_a,
+                auth_token=exec_token
+            )
+        self.assertTrue("already" in str(ctx.exception).lower())
+
+        # Boundary Testing: Exactly ₹50,000, Below ₹50,000 (₹49,999), and Immediately Above (₹50,000.01 / ₹50,001)
+        # Boundary Case 1: Below ₹50,000 (₹49,999.00) -> MANAGER must SUCCEED
+        wf_b1 = f"wf_b1_{uuid.uuid4().hex[:6]}"
+        self.fabric.create_workflow_draft("PO 49999", {
+            "id": wf_b1, "namespace": "ura.finance",
+            "tasks": [{"id": "gate", "type": "io.kestra.plugin.zonata.approval.Gate", "parameters": {"amount": 49999.00}}]
+        }, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_b1, self.tenant_a)
+        res_b1 = self.fabric.execute_workflow(wf_b1, {}, self.tenant_a, self.company_a)
+        dec_b1 = self.fabric.decide_approval(
+            approval_id=res_b1["approval_id"], decision="APPROVE", actor="branch_manager",
+            tenant_id=self.tenant_a, auth_token=manager_token
+        )
+        self.assertEqual(dec_b1["status"], ApprovalStatus.APPROVED.value)
+
+        # Boundary Case 2: Exactly at ₹50,000.00 -> MANAGER must SUCCEED
+        wf_b2 = f"wf_b2_{uuid.uuid4().hex[:6]}"
+        self.fabric.create_workflow_draft("PO 50000", {
+            "id": wf_b2, "namespace": "ura.finance",
+            "tasks": [{"id": "gate", "type": "io.kestra.plugin.zonata.approval.Gate", "parameters": {"amount": 50000.00}}]
+        }, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_b2, self.tenant_a)
+        res_b2 = self.fabric.execute_workflow(wf_b2, {}, self.tenant_a, self.company_a)
+        dec_b2 = self.fabric.decide_approval(
+            approval_id=res_b2["approval_id"], decision="APPROVE", actor="branch_manager",
+            tenant_id=self.tenant_a, auth_token=manager_token
+        )
+        self.assertEqual(dec_b2["status"], ApprovalStatus.APPROVED.value)
+
+        # Boundary Case 3: Immediately above fractional boundary (₹50,000.01) -> MANAGER must FAIL
+        wf_b3 = f"wf_b3_{uuid.uuid4().hex[:6]}"
+        self.fabric.create_workflow_draft("PO 50000.01", {
+            "id": wf_b3, "namespace": "ura.finance",
+            "tasks": [{"id": "gate", "type": "io.kestra.plugin.zonata.approval.Gate", "parameters": {"amount": 50000.01}}]
+        }, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_b3, self.tenant_a)
+        res_b3 = self.fabric.execute_workflow(wf_b3, {}, self.tenant_a, self.company_a)
+        with self.assertRaises(AuthExceptions.AuthorizationError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=res_b3["approval_id"], decision="APPROVE", actor="branch_manager",
+                tenant_id=self.tenant_a, auth_token=manager_token
+            )
+        self.assertIn("exceeds MANAGER financial ceiling", str(ctx.exception))
+
+        # Boundary Case 4: Immediately above integer boundary (₹50,001.00) -> MANAGER must FAIL, OWNER must SUCCEED
+        wf_b4 = f"wf_b4_{uuid.uuid4().hex[:6]}"
+        self.fabric.create_workflow_draft("PO 50001", {
+            "id": wf_b4, "namespace": "ura.finance",
+            "tasks": [{"id": "gate", "type": "io.kestra.plugin.zonata.approval.Gate", "parameters": {"amount": 50001.00}}]
+        }, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_b4, self.tenant_a)
+        res_b4 = self.fabric.execute_workflow(wf_b4, {}, self.tenant_a, self.company_a)
+        with self.assertRaises(AuthExceptions.AuthorizationError):
+            self.fabric.decide_approval(
+                approval_id=res_b4["approval_id"], decision="APPROVE", actor="branch_manager",
+                tenant_id=self.tenant_a, auth_token=manager_token
+            )
+        owner_token = UserManager.create_session_token(self.tenant_a, "owner_sam", UserRole.OWNER, self.company_a)
+        dec_b4 = self.fabric.decide_approval(
+            approval_id=res_b4["approval_id"], decision="APPROVE", actor="owner_sam",
+            tenant_id=self.tenant_a, auth_token=owner_token
+        )
+        self.assertEqual(dec_b4["status"], ApprovalStatus.APPROVED.value)
+
+        # Boundary Case 5: Parameter tampering via modified_parameters:
+        # Initial amount ₹25,000, but MANAGER passes modified_parameters with ₹75,000 -> must FAIL
+        wf_b5 = f"wf_b5_{uuid.uuid4().hex[:6]}"
+        self.fabric.create_workflow_draft("PO 25000", {
+            "id": wf_b5, "namespace": "ura.finance",
+            "tasks": [{"id": "gate", "type": "io.kestra.plugin.zonata.approval.Gate", "parameters": {"amount": 25000.00}}]
+        }, self.tenant_a, self.company_a)
+        self.fabric.publish_workflow(wf_b5, self.tenant_a)
+        res_b5 = self.fabric.execute_workflow(wf_b5, {}, self.tenant_a, self.company_a)
+        with self.assertRaises(AuthExceptions.AuthorizationError) as ctx:
+            self.fabric.decide_approval(
+                approval_id=res_b5["approval_id"], decision="EDIT", actor="branch_manager",
+                modified_parameters={"amount": 75000.00},
+                tenant_id=self.tenant_a, auth_token=manager_token
+            )
+        self.assertIn("exceeds MANAGER financial ceiling", str(ctx.exception))
+
+        # Boundary Case 6: Unauthorized Role Matrix:
+        # OPERATOR role token attempting approval -> must FAIL
+        op_token = UserManager.create_session_token(self.tenant_a, "operator_op", UserRole.OPERATOR, self.company_a)
+        with self.assertRaises(AuthExceptions.AuthorizationError):
+            self.fabric.decide_approval(
+                approval_id=res_b5["approval_id"], decision="APPROVE", actor="operator_op",
+                tenant_id=self.tenant_a, auth_token=op_token
+            )
+
     # =========================================================================
     # TEST 15: REST API PUT / DELETE Strict Authentication Enforcement
     # =========================================================================
@@ -995,6 +1154,62 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
                 self.assertEqual(resp.status, 200)
                 data = json.loads(resp.read().decode("utf-8"))
                 self.assertEqual(data.get("session_id"), "sess_qual_test")
+
+            # 5. Protected GET without token in strict production mode -> Expect 401
+            get_unauth_req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/effective")
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(get_unauth_req)
+            self.assertEqual(ctx.exception.code, 401)
+
+            # 6. Protected POST without token in strict production mode -> Expect 401
+            post_unauth_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/automation/workflows",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(post_unauth_req)
+            self.assertEqual(ctx.exception.code, 401)
+
+            # 7. Intentionally Public Health Endpoint -> 200, NO sensitive credentials leaked
+            health_req = urllib.request.Request(f"http://127.0.0.1:{port}/health")
+            with urllib.request.urlopen(health_req) as resp:
+                self.assertEqual(resp.status, 200)
+                h_data = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(h_data.get("status"), "HEALTHY")
+                # Verify no sensitive auth secrets, keys, or passwords leaked in public health payload
+                h_str = json.dumps(h_data).lower()
+                self.assertNotIn("secret", h_str)
+                self.assertNotIn("token", h_str)
+                self.assertNotIn("password", h_str)
+
+            # 8. Cross-tenant spoofing attempt: Token for tenant_a, but X-Tenant-ID requests tenant_b -> Expect 403
+            spoof_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/settings/key/acc_display_name",
+                data=json.dumps({"value": "Hacked Value"}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                    "X-Tenant-ID": self.tenant_b,
+                    "X-Company-ID": self.company_b
+                },
+                method="PUT"
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(spoof_req)
+            self.assertEqual(ctx.exception.code, 403)
+
+            # 9. Missing production secret safety: In production mode without explicit secret, get_auth_secret_key fails closed
+            from core.auth import get_auth_secret_key
+            saved_sec = os.environ.pop("ZONATA_AUTH_SECRET", None)
+            try:
+                with self.assertRaises(RuntimeError) as r_ctx:
+                    get_auth_secret_key()
+                self.assertIn("Production Sovereign Security Violation", str(r_ctx.exception))
+            finally:
+                if saved_sec:
+                    os.environ["ZONATA_AUTH_SECRET"] = saved_sec
         finally:
             server.shutdown()
             server.server_close()

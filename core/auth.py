@@ -28,7 +28,9 @@ def get_auth_secret_key() -> bytes:
     managed_key = SecretManager.get_secret("sec_sovereign_auth_key")
     if managed_key:
         return managed_key.encode("utf-8")
-    if os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1":
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    is_strict = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1")
+    if is_strict:
         raise RuntimeError("Production Sovereign Security Violation: ZONATA_AUTH_SECRET environment variable is required in production mode. Hardcoded fallback prohibited.")
     return b"ROBOASSISTANT_INTERNAL_TENANT_HMAC_SECRET_2026"
 

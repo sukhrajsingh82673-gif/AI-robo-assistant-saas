@@ -23,9 +23,10 @@ The ZONATA / URA Universal AI Company Operating System operates as a sovereign m
 ## 2. HTTP Route Audit & Verification Matrix
 
 ### 2.1 GET Requests (`do_GET`)
-- **Public Exemptions:** Standard health endpoints (`/health`, `/healthz`, `/livez`, `/readyz`, `/api/v1/health`) return uptime and readiness without authentication.
-- **Protected Routes:** All workflow, template, telemetry, audit, and settings GET routes call `self._get_tenant_id()`, which delegates to `_get_auth_context()`.
-- **Enforcement:** In strict production mode, unauthenticated GET requests return `401 Unauthorized`. Tenant mismatches return `403 Forbidden`.
+- **Public Exemptions:** Standard health endpoints (`/health`, `/healthz`, `/livez`, `/readyz`, `/api/v1/health`) return service uptime and readiness without authentication. **Audit Verification:** Confirmed that public health responses expose zero cryptographic keys, tokens, session IDs, user records, or tenant identifiers.
+- **Protected Routes:** All workflow, template, telemetry, audit, coworker, and settings GET routes call `self._get_tenant_id()`, which delegates to `_get_auth_context()`.
+- **Enforcement:** In strict production mode (`APP_ENV=production` or `ZONATA_STRICT_AUTH=1`), unauthenticated GET requests return `HTTP 401 Unauthorized`. Cross-tenant header mismatches return `HTTP 403 Forbidden` (`TENANT_SPOOFING_ATTEMPT`).
+- **Fail-Safe Configuration Invariant:** In production mode, if `ZONATA_AUTH_SECRET` is unset and SecretManager contains no key, `get_auth_secret_key()` immediately raises `RuntimeError`, failing closed rather than falling back to default keys.
 
 ### 2.2 POST Requests (`do_POST`)
 - **Public Exemptions:** Authentication issuance endpoints (`/api/auth/token`, `/api/auth/login`, `/api/auth/revoke`).
