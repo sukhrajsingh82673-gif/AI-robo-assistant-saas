@@ -5,7 +5,7 @@
   "serialNumber": "urn:uuid:zonata-automation-fabric-v1",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-10T10:24:26Z",
+    "timestamp": "2026-10-10T11:22:49Z",
     "component": {
       "name": "URA Universal Automation Fabric",
       "version": "1.0.0",
@@ -194,11 +194,641 @@
           "value": "All-Hands-AI upstream MIT license commit e2b8c5f"
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/apache-camel@v4.8.0",
+      "name": "Apache Camel Integration Framework",
+      "version": "v4.8.0",
+      "purl": "pkg:generic/apache-camel@v4.8.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/apache/camel/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/apache/camel"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "ASF official repository Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/litellm@v1.48.0",
+      "name": "LiteLLM Model Gateway",
+      "version": "v1.48.0",
+      "purl": "pkg:generic/litellm@v1.48.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/BerriAI/litellm/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/BerriAI/litellm"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "BerriAI upstream MIT license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/vllm@v0.6.2",
+      "name": "vLLM High-Throughput Inference",
+      "version": "v0.6.2",
+      "purl": "pkg:generic/vllm@v0.6.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/vllm-project/vllm/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/vllm-project/vllm"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "REMOTE_WORKER"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "vLLM project official Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/apache-tika@v2.9.2",
+      "name": "Apache Tika Content Analysis Toolkit",
+      "version": "v2.9.2",
+      "purl": "pkg:generic/apache-tika@v2.9.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/apache/tika/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/apache/tika"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "ISOLATED_CONTAINER"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "ASF official repository Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/opensearch@v2.17.0",
+      "name": "OpenSearch Distributed Search Engine",
+      "version": "v2.17.0",
+      "purl": "pkg:generic/opensearch@v2.17.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/opensearch-project/OpenSearch/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/opensearch-project/OpenSearch"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "OpenSearch Project Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/qdrant@v1.12.0",
+      "name": "Qdrant Vector Database",
+      "version": "v1.12.0",
+      "purl": "pkg:generic/qdrant@v1.12.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/qdrant/qdrant/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/qdrant/qdrant"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Qdrant official Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/erpnext-client@v15.38.0",
+      "name": "Frappe ERPNext API Client",
+      "version": "v15.38.0",
+      "purl": "pkg:generic/erpnext-client@v15.38.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/frappe/erpnext/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/frappe/erpnext"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "API_GATEWAY_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Frappe client SDK MIT license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/suitecrm-client@v8.6.0",
+      "name": "SuiteCRM REST API Gateway",
+      "version": "v8.6.0",
+      "purl": "pkg:generic/suitecrm-client@v8.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/SuiteCRM/SuiteCRM/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/SuiteCRM/SuiteCRM"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "API_GATEWAY_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Client interface governed under Apache-2.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/zammad-client@v6.3.1",
+      "name": "Zammad REST API Client",
+      "version": "v6.3.1",
+      "purl": "pkg:generic/zammad-client@v6.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/zammad/zammad/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/zammad/zammad"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "API_GATEWAY_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Client interface governed under Apache-2.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/nextcloud-client@v29.0.4",
+      "name": "Nextcloud WebDAV/CalDAV Client",
+      "version": "v29.0.4",
+      "purl": "pkg:generic/nextcloud-client@v29.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/nextcloud/server/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/nextcloud/server"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "API_GATEWAY_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Client interface governed under Apache-2.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/apache-superset@v4.0.2",
+      "name": "Apache Superset BI & Data Exploration",
+      "version": "v4.0.2",
+      "purl": "pkg:generic/apache-superset@v4.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/apache/superset/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/apache/superset"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "ASF official repository Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/dbt-core@v1.8.5",
+      "name": "dbt Core Analytics Engineering",
+      "version": "v1.8.5",
+      "purl": "pkg:generic/dbt-core@v1.8.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/dbt-labs/dbt-core/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/dbt-labs/dbt-core"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "dbt Labs official Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/meltano@v3.5.0",
+      "name": "Meltano Data Integration Platform",
+      "version": "v3.5.0",
+      "purl": "pkg:generic/meltano@v3.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/meltano/meltano/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/meltano/meltano"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Meltano official MIT license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/falco@v0.38.1",
+      "name": "Falco Cloud-Native Runtime Security",
+      "version": "v0.38.1",
+      "purl": "pkg:generic/falco@v0.38.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/falcosecurity/falco/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/falcosecurity/falco"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "DAEMON_SECURITY_MONITOR"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "CNCF Falco project Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/argo-cd@v2.12.0",
+      "name": "Argo CD Declarative GitOps",
+      "version": "v2.12.0",
+      "purl": "pkg:generic/argo-cd@v2.12.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/argoproj/argo-cd/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/argoproj/argo-cd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "CNCF Argo project Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/promptfoo@v0.82.0",
+      "name": "promptfoo Adversarial AI Red-Teaming",
+      "version": "v0.82.0",
+      "purl": "pkg:generic/promptfoo@v0.82.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/promptfoo/promptfoo/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/promptfoo/promptfoo"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "promptfoo official MIT license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/matrix-synapse@v1.111.0",
+      "name": "Matrix Synapse Communications",
+      "version": "v1.111.0",
+      "purl": "pkg:generic/matrix-synapse@v1.111.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/element-hq/synapse/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/element-hq/synapse"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "STANDALONE_SERVICE"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Matrix.org Foundation Apache-2.0 license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/openfeature@v0.7.0",
+      "name": "OpenFeature Flagging Standard",
+      "version": "v0.7.0",
+      "purl": "pkg:generic/openfeature@v0.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/open-feature/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/open-feature"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "EMBEDDED_RUNTIME"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "CNCF OpenFeature Apache-2.0 license"
+        }
+      ]
     }
   ],
   "compliance_summary": {
-    "total_components": 5,
-    "osi_compliant_count": 5,
+    "total_components": 23,
+    "osi_compliant_count": 23,
     "unapproved_count": 0,
     "overall_status": "FULLY_COMPLIANT"
   }

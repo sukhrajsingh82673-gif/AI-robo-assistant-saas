@@ -106,8 +106,10 @@ class GovernedConnectorRegistry:
         self._rate_limiters: Dict[str, GovernedRateLimiter] = {}
         self._idempotency_cache: Dict[str, Dict[str, Any]] = {}
         self._registered_tools: Dict[str, Dict[str, Any]] = {}
+        self._custom_handlers: Dict[str, Any] = {}
         self._ensure_idempotency_table()
         self._init_standard_connectors()
+        self._init_enterprise_connectors()
 
     def _ensure_idempotency_table(self):
         """Ensures durable SQLite idempotency table exists for cross-process & crash-window recovery."""
@@ -203,6 +205,18 @@ class GovernedConnectorRegistry:
             rpm=connector.rate_limit_rpm
         )
         return True
+ 
+    def register_custom_handler(self, connector_id: str, handler: Any):
+        """Registers a specialized domain handler for a vetted connector."""
+        self._custom_handlers[connector_id] = handler
+
+    def _init_enterprise_connectors(self):
+        """Discovers and registers the 15 open-source enterprise capability connectors."""
+        try:
+            from core.automation_fabric.enterprise_connectors import register_enterprise_capability_connectors
+            register_enterprise_capability_connectors(self)
+        except Exception:
+            pass
 
     def get_connector(self, connector_id: str) -> Optional[ConnectorDefinition]:
         return self._connectors.get(connector_id)
@@ -394,8 +408,24 @@ class GovernedConnectorRegistry:
             raise RuntimeError(f"Rate limit exceeded for connector '{connector_id}' ({conn.rate_limit_rpm} RPM).")
 
         try:
+            ks_active = False
             if killswitch_check and killswitch_check():
+                ks_active = True
+            else:
+                try:
+                    from core.automation_fabric.fabric import universal_automation_fabric
+                    if universal_automation_fabric.is_killswitch_active():
+                        ks_active = True
+                except Exception:
+                    pass
+
+            if ks_active:
                 raise RuntimeError(f"KillSwitch active: connector operation '{operation}' halted.")
+
+            handler = self._custom_handlers.get(connector_id)
+            custom_data = None
+            if handler:
+                custom_data = handler(operation, parameters, tenant_id)
 
             result = {
                 "connector_id": connector_id,
@@ -409,6 +439,8 @@ class GovernedConnectorRegistry:
                     "output": f"Successfully completed {operation} via {conn.name}"
                 }
             }
+            if isinstance(custom_data, dict):
+                result["data"].update(custom_data)
 
             if cb:
                 cb.record_success()

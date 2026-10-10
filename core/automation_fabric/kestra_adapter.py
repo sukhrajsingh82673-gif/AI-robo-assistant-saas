@@ -49,6 +49,7 @@ class KestraFlowAdapter:
         "io.kestra.plugin.scripts.exec.Commands",
         # ZONATA Governed Sovereign Plugins
         "io.kestra.plugin.zonata.mcp.Call",
+        "io.kestra.plugin.zonata.connector.Call",
         "io.kestra.plugin.zonata.agent.Delegate",
         "io.kestra.plugin.zonata.verify.Postcondition",
         "io.kestra.plugin.zonata.approval.Gate"

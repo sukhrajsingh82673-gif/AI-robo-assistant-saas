@@ -933,6 +933,24 @@ class UniversalAutomationFabric:
                         return None, res.get("error", "Unknown outcome requiring reconciliation"), True
                     return res, None, False
 
+                # 2b. Governed Enterprise Connector Call
+                elif "connector.Call" in t_type:
+                    conn_id = task.get("connector_id") or "conn_erpnext_records"
+                    op = task.get("operation") or task.get("action") or "get_customer"
+                    if ":" in str(op):
+                        op = str(op).split(":")[-1]
+                    res = self.connector_registry.execute_connector_operation(
+                        connector_id=conn_id,
+                        operation=op,
+                        parameters=inputs,
+                        tenant_id=tenant_id,
+                        idempotency_key=f"idem_{lease.run_id}_{t_id}_{attempt}",
+                        killswitch_check=self.is_killswitch_active
+                    )
+                    if res.get("status") == "UNKNOWN_OUTCOME":
+                        return None, res.get("error", "Unknown outcome requiring reconciliation"), True
+                    return res, None, False
+
                 # 3. Specialized Agent Delegation
                 elif "agent.Delegate" in t_type:
                     role = task.get("role", "SoftwareEngineeringAgent")
