@@ -18,6 +18,7 @@ import re
 import time
 import uuid
 import hashlib
+import hmac
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
 
@@ -304,9 +305,9 @@ class SyntheticCanaryRecognizer(PatternRecognizer):
             name="SyntheticCanaryRecognizer",
             supported_entities=["SECURITY_CANARY"],
             patterns=[
-                Pattern("canary_standard", r"\bcanary_sec_[a-zA-Z0-9_]{8,}\b", 1.0),
-                Pattern("canary_zonata", r"\bZONATA_CANARY_[A-Za-z0-9_]{6,}\b", 1.0),
-                Pattern("canary_token", r"\bcanary_tok_[a-zA-Z0-9]{12,}\b", 1.0),
+                Pattern("canary_standard", r"(?i)\bcanary_sec_[a-zA-Z0-9_]{8,}\b", 1.0),
+                Pattern("canary_zonata", r"(?i)\bZONATA_CANARY_[A-Za-z0-9_]{6,}\b", 1.0),
+                Pattern("canary_token", r"(?i)\bcanary_tok_[a-zA-Z0-9]{12,}\b", 1.0),
             ],
             context_words=["canary", "honeytoken", "tripwire", "test"]
         )
@@ -521,13 +522,17 @@ class PresidioAnonymizerEngine:
                 token_salt = getattr(self, "_token_salt", None)
                 if not token_salt:
                     self._token_salt = uuid.uuid4().hex
-                token_hash = hashlib.sha256((self._token_salt + orig_span).encode("utf-8")).hexdigest()[:12]
+                token_hash = hmac.new(self._token_salt.encode("utf-8"), orig_span.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
                 surrogate = f"tok_dlp_{entity.lower()}_{token_hash}"
                 self._token_vault[surrogate] = orig_span
                 token_map[surrogate] = orig_span
                 new_val = surrogate
             elif op_type == "hash":
-                new_val = f"<HASH_{hashlib.sha256(orig_span.encode('utf-8')).hexdigest()[:16]}>"
+                token_salt = getattr(self, "_token_salt", None)
+                if not token_salt:
+                    self._token_salt = uuid.uuid4().hex
+                keyed_hash = hmac.new(self._token_salt.encode("utf-8"), orig_span.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+                new_val = f"<HMAC_{keyed_hash}>"
             elif op_type == "redact":
                 new_val = ""
             else:

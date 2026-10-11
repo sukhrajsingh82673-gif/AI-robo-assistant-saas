@@ -95,7 +95,9 @@ class TerminalSecurityAnalyzer:
         re.compile(r'(?i)(api[_-]?key|secret|token|password|auth[_-]?token)\s*[:=]\s*["\']?([^"\'\s]{8,})["\']?'),
         re.compile(r'ghp_[a-zA-Z0-9]{36}'),
         re.compile(r'sk-[a-zA-Z0-9]{32,}'),
-        re.compile(r'Bearer\s+[a-zA-Z0-9\-_\.]{20,}')
+        re.compile(r'Bearer\s+[a-zA-Z0-9\-_\.]{20,}'),
+        re.compile(r'CANARY_[A-Z0-9_]{10,}'),
+        re.compile(r'-----BEGIN\s+[A-Z\s]+PRIVATE\s+KEY-----.*?-----END\s+[A-Z\s]+PRIVATE\s+KEY-----', re.DOTALL)
     ]
 
     @classmethod

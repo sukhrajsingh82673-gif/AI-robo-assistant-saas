@@ -3,7 +3,7 @@
 **Executive Assessment & Architecture Specification**  
 **Document Classification:** RESTRICTED — INTERNAL GOVERNANCE  
 **Authority Reference:** ZONATA Company Kernel Authority Hierarchy  
-**Baseline Commit:** `53bd2ef` (Lineage verified from `45cf91f`)  
+**Baseline Commit:** `353238f` (Lineage verified from `53bd2ef` and `45cf91f`)  
 **Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
 ---
@@ -48,7 +48,7 @@ flowchart TD
 
 ## 3. The Ten Outbound Security Enforcement Routes
 
-Every outbound execution route in the operating system has been verified to ensure complete mediation:
+Every outbound execution route in the operating system has been verified to ensure complete pre-send mediation:
 
 ### 3.1 Route 1 — Central External & Local LLM Providers (`core/cognitive_model_provider.py` & `core/model_gateway_v4.py`)
 - **Inspection Scope**: Inspects all user prompts, system instructions, retrieved RAG context, and attached files before dispatch.
@@ -73,16 +73,18 @@ Every outbound execution route in the operating system has been verified to ensu
 
 ### 3.5 Route 5 — Persistent Memory Boundary (`core/coworker/memory_tier.py` & `core/memory_governance.py`)
 - **Pre-Storage Scrubbing**: Scans records before persistence in `OPERATIONAL_MEMORY`, `TASK_MEMORY`, or `EPISODIC_MEMORY`. Replaces raw tokens and API keys with `<REDACTED_MEMORY_SECRET>`.
-- **Keyed Session Salt Tokenization**: Prevents rainbow table brute-forcing of low-entropy customer IDs by salting tokenization hashes per session.
+- **Keyed HMAC Session Salt Tokenization**: Prevents rainbow table and dictionary brute-forcing of customer IDs by salting tokenization hashes per session using `hmac.new(self._token_salt, ...)`.
 - **Epistemic Segregation**: Non-sovereign worker agents cannot write to `BUSINESS_MEMORY` without explicit sovereign authority.
 
 ### 3.6 Route 6 — Browser & External Egress Boundary (`core/coworker/controllers/browser_controller.py`)
-- **SSRF Defense**: Validates destination hostnames and resolved IP addresses against IPv4/IPv6 private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), cloud metadata (`169.254.169.254`, `metadata.google.internal`), decimal integer IPs (`2130706433`), hex IPs (`0x7f000001`), and userinfo prefixes (`user@host`).
-- **Port Whitelisting**: Restricts browser egress to standard ports (80, 443, 8080, 8443).
-- **Redirect Chain Re-Validation**: Custom `SSRFSafeRedirectHandler` re-verifies target IP addresses on every 301/302 HTTP redirect, blocking attacks where a public URL redirects to cloud metadata.
+- **Connection-Time SSRF Defense**: `SSRFSafeHTTPConnection.connect()` and `SSRFSafeHTTPSConnection.connect()` perform socket resolution immediately prior to connection, verifying that every resolved IP address is public and non-restricted. The socket connects directly to the validated IP, eliminating DNS rebinding and TOCTOU flaws.
+- **Proxy Neutralization**: `urllib.request.ProxyHandler({})` explicitly disables environment proxy bypasses.
+- **Address & Port Coverage**: Defends against IPv4/IPv6 private ranges, loopback (`127.0.0.1`, `[::1]`), cloud metadata (`169.254.169.254`, `metadata.google.internal`), decimal integer IPs (`2130706433`), hex IPs (`0x7f000001`), and userinfo prefixes (`user@host`). Restricts browser egress to standard ports (80, 443, 8080, 8443).
+- **Redirect Chain Re-Validation**: `SSRFSafeRedirectHandler` re-verifies target IP addresses on every 301/302 HTTP redirect.
 - **Inbound DOM Scanning & Outbound Keystroke DLP**: Scans extracted DOM content for prompt injection and checks keyboard input typing actions against DLP rules.
 
 ### 3.7 Route 7 — Terminal & Workspace Boundary (`core/coworker/controllers/terminal_controller.py`)
+- **Pre-Execution Command DLP Screening**: Shell commands are pre-screened through `ai_dlp_gateway.inspect_and_enforce()` for `OutboundChannel.TERMINAL_COMMAND`. Commands attempting to dispatch canary tokens, API keys, or private keys via network utilities (`curl`, `wget`, `nc`, `ssh`) are denied on **Strike 1** (`exit_code: 126`, `status: "POLICY_DENIED"`).
 - **Path Traversal Confinement**: Rejects path traversal attempts (`../../etc/passwd`) and checks both raw and `os.path.realpath` canonical paths against restricted system directories (`/etc`, `/root/.vault`, `/proc`, `/sys`, `/root/.ssh`, `/root/.gnupg`, `/dev`).
 - **12-Tier Command Risk Matrix**: Analyzes shell commands before execution, blocking forbidden commands (`rm -rf /`, `curl ... | sh`, `mkfs`) and scrubbing credentials from terminal buffers.
 
@@ -115,7 +117,7 @@ Every outbound execution route in the operating system has been verified to ensu
 ## 5. Offline Operation & Scoped Fail-Closed Behavior
 
 When the human owner is unavailable for extended durations:
-1. **Pre-Authorized Local Rules**: All policy evaluations occur in-process within `< 1ms` without relying on cloud decision engines.
+1. **Pre-Authorized Local Rules**: All policy evaluations occur in-process within `< 2.5ms` without relying on cloud decision engines.
 2. **Automated Incident Mitigation**: Active attacks trigger agent-level or tool-level KillSwitches, stopping the attack vector while independent workforce members continue customer support and data processing.
 3. **Resilience & Checkpointing**: Blocked tasks enter durable queues with idempotency leases, preventing duplicate mutations upon owner review.
 

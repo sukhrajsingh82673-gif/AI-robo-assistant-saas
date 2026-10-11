@@ -3,7 +3,7 @@
 **Outbound Channel Governance & Data Classification Taxonomy**  
 **Document Classification:** RESTRICTED — INTERNAL GOVERNANCE  
 **Authority Reference:** `core/ai_dlp_gateway.py` & `core/data_classification_engine.py`  
-**Baseline Commit:** `53bd2ef` (Lineage verified from `45cf91f`)  
+**Baseline Commit:** `353238f` (Lineage verified from `53bd2ef` and `45cf91f`)  
 **Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
 ---
@@ -16,7 +16,7 @@
 | **INTERNAL** | 2 | Routine meeting notes, non-confidential task logs | Permitted to internal services and approved SaaS with TLS. |
 | **CONFIDENTIAL** | 3 | Customer records, employee HR data, financial forecasts, Indian tax identifiers (PAN, Aadhaar, GSTIN, IFSC) | Class 2 Transform (Redact/Tokenize) required before cloud egress. Egress to unapproved external endpoints strictly prohibited. |
 | **RESTRICTED** | 4 | Legal agreements, PII (SSNs, full credit card numbers), strategic plans | Strict tokenization/masking required. Cloud egress permitted only to explicitly approved destinations. |
-| **HIGHLY_RESTRICTED** | 5 | Private encryption keys, root passwords, live API tokens, canary secrets | **ZERO CLOUD EGRESS.** Local sovereign processing only (`LOCAL_SOVEREIGN` / `INTERNAL_SECURE`). |
+| **HIGHLY_RESTRICTED** | 5 | Private encryption keys, root passwords, live API tokens, synthetic canary secrets | **ZERO CLOUD EGRESS.** Local sovereign processing only (`LOCAL_SOVEREIGN` / `INTERNAL_SECURE`). |
 
 ---
 
@@ -46,10 +46,11 @@
 | **4** | Agent-to-Agent (A2A) | Agent Tenant A | Agent Tenant A | `INTERNAL_SECURE` | `CONFIDENTIAL` (Customer) | Redact sensitive PII; forward sanitized payload | **Class 2** | Deliver sanitized content only |
 | **5** | Persistent Memory | Agent Worker | Operational Memory | `LOCAL_SOVEREIGN` | `HIGHLY_RESTRICTED` (Key) | Scrub credentials; persist `<REDACTED_MEMORY_SECRET>` | **Class 2** | Memory stored without secret |
 | **5** | Persistent Memory | Non-Sovereign | Business Memory | `LOCAL_SOVEREIGN` | Any | Reject write; require sovereign authority | **Class 3** | Raise `PermissionError` |
-| **6** | Browser & Egress | Browser Agent | `169.254.169.254` or Decimal IP | `PUBLIC_INTERNET` | Navigation | Multi-format SSRF check: block metadata access | **Class 3** | Abort HTTP request immediately |
-| **6** | Browser & Egress | Browser Agent | Public Site $\to$ Localhost Redirect | `PUBLIC_INTERNET` | Navigation | Re-evaluate IP on redirect; block loopback target | **Class 3** | Abort HTTP request immediately |
+| **6** | Browser & Egress | Browser Agent | `169.254.169.254` or Decimal IP | `PUBLIC_INTERNET` | Navigation | Connection-time socket check (`SSRFSafeHTTPConnection`): block metadata | **Class 3** | Abort connection immediately |
+| **6** | Browser & Egress | Browser Agent | Public Site $\to$ Localhost Redirect | `PUBLIC_INTERNET` | Navigation | Re-evaluate IP on redirect and socket connect; block loopback | **Class 3** | Abort HTTP request immediately |
 | **6** | Browser & Egress (Typing) | Browser Agent | Web Form Input | `PUBLIC_INTERNET` | `HIGHLY_RESTRICTED` (Canary) | Intercept type action; redact credentials | **Class 2** | Keystrokes sanitized |
 | **7** | Terminal Sandbox | Terminal Agent | `../../etc/passwd` or `/root/.ssh` | `LOCAL_SOVEREIGN` | File Operation | Confinement check + `realpath`; reject traversal | **Class 3** | Return `FAILED_SECURITY_POLICY` |
+| **7** | Terminal Sandbox (Command) | Terminal Agent | Shell command with canary / key | `UNAPPROVED_EXTERNAL` | `HIGHLY_RESTRICTED` (Canary) | Pre-execution command DLP: Strike 1 denial before subprocess spawn | **Class 3** | Return `POLICY_DENIED`, exit 126 |
 | **8** | Enterprise Connectors | Workflow Engine | External Webhook / API | `UNAPPROVED_EXTERNAL` | `HIGHLY_RESTRICTED` (Canary) | Screen params; deny credential exfiltration | **Class 3** | Raise `ConnectorSecurityError` |
 | **8** | Enterprise Connectors | Workflow Engine | ERPNext / Financial Bank | `APPROVED_SAAS` | Mutation > ₹50,000 INR | Verify canonical HMAC approval receipt | **Class 5** | Require executive approval token |
 | **9** | Telemetry & Audit Logs | Telemetry Exporter | Observability Backend | `INTERNAL_SECURE` | Traces & Exceptions | Scrub raw credentials; output SHA-256 trace IDs | **Class 2** | Raw secrets omitted from logs |
@@ -70,7 +71,7 @@
     "CRYPTO_PRIVATE_KEY": { "type": "redact" },
     "API_KEY_OR_SECRET": { "type": "replace", "new_value": "<REDACTED_SECRET>" },
     "ZONATA_EMPLOYEE_ID": { "type": "replace", "new_value": "<REDACTED_ZONATA_EMPLOYEE_ID>" },
-    "ZONATA_CUSTOMER_ID": { "type": "tokenize", "session_salted": true },
+    "ZONATA_CUSTOMER_ID": { "type": "tokenize", "session_salted": true, "keyed_hmac": true },
     "CONFIDENTIAL_PROJECT_NAME": { "type": "replace", "new_value": "<REDACTED_CONFIDENTIAL_PROJECT_NAME>" },
     "SECURITY_CANARY": { "type": "replace", "new_value": "<REDACTED_CANARY_SECRET>" },
     "INDIA_PAN": { "type": "replace", "new_value": "<REDACTED_INDIA_PAN>" },

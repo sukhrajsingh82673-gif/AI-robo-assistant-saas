@@ -73,6 +73,30 @@ class GovernedTerminalController:
         timeout_sec: float = 30.0
     ) -> Dict[str, Any]:
         """Runs a command through the governed 12-tier security sandbox."""
+        # Pre-execution DLP check on outbound terminal command
+        from core.ai_dlp_gateway import ai_dlp_gateway, OutboundSecurityContext, OutboundChannel, DestinationTrustLevel
+        is_net = any(w in command.lower().split() for w in ["curl", "wget", "ssh", "scp", "nc", "netcat", "socat", "ftp"])
+        ctx = OutboundSecurityContext(
+            tenant_id=self.tenant_id,
+            principal_id="worker_terminal",
+            principal_role="COWORKER",
+            calling_agent_id="terminal_controller",
+            channel=OutboundChannel.TERMINAL_COMMAND,
+            destination_name="terminal_network_egress" if is_net else "terminal_local_shell",
+            destination_trust=DestinationTrustLevel.UNAPPROVED_EXTERNAL if is_net else DestinationTrustLevel.LOCAL_SOVEREIGN
+        )
+        dlp_res = ai_dlp_gateway.inspect_and_enforce(ctx, command)
+        if not dlp_res.is_allowed:
+            return {
+                "status": "POLICY_DENIED",
+                "risk_tier": "TERMINAL_DLP_DENIED",
+                "error": f"Security Violation: {dlp_res.blocking_reason}",
+                "exit_code": 126,
+                "verified": False,
+                "evidence_hash": None,
+                "duration_ms": 0.0
+            }
+
         session_id = f"term_ctl_{uuid.uuid4().hex[:6]}"
         return self.runtime.run_foreground(session_id, {
             "capability": "terminal.shell_command",

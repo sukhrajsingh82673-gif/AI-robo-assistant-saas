@@ -219,7 +219,7 @@ class AutonomousAIDLPGateway:
         )
 
         detected_entities = [r.entity_type for r in rec_results]
-        has_secrets = any(e in ("CRYPTO_PRIVATE_KEY", "API_KEY_OR_SECRET", "ZONATA_INTERNAL_TOKEN") for e in detected_entities)
+        has_secrets = any(e in ("CRYPTO_PRIVATE_KEY", "API_KEY_OR_SECRET", "ZONATA_INTERNAL_TOKEN", "SECURITY_CANARY") for e in detected_entities)
 
         # 4. Fail-Closed Security Policy Evaluation
 

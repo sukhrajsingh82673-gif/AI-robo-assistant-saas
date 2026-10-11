@@ -1,0 +1,50 @@
+{
+  "timestamp": 1791686864.7074673,
+  "workload_parameters": {
+    "samples": 200,
+    "warmup": 50,
+    "concurrency": 1,
+    "payload_sizes_bytes": {
+      "small": 102,
+      "medium": 1172,
+      "secret": 108
+    }
+  },
+  "memory_mb": {
+    "baseline_rss": 37.96,
+    "peak_rss": 42.13,
+    "delta_rss": 4.16
+  },
+  "presidio_analyzer": {
+    "p50_ms": 2.16,
+    "p95_ms": 2.291,
+    "avg_ms": 2.174,
+    "min_ms": 2.092,
+    "max_ms": 2.598,
+    "throughput_req_per_sec": 460.0
+  },
+  "presidio_anonymizer": {
+    "p50_ms": 0.061,
+    "p95_ms": 0.075,
+    "avg_ms": 0.063,
+    "min_ms": 0.06,
+    "max_ms": 0.158,
+    "throughput_req_per_sec": 15870.8
+  },
+  "class_1_allow": {
+    "p50_ms": 10.225,
+    "p95_ms": 19.502,
+    "avg_ms": 12.516,
+    "min_ms": 8.494,
+    "max_ms": 246.441,
+    "throughput_req_per_sec": 79.9
+  },
+  "class_3_restrict": {
+    "p50_ms": 10.411,
+    "p95_ms": 19.928,
+    "avg_ms": 14.216,
+    "min_ms": 8.371,
+    "max_ms": 265.792,
+    "throughput_req_per_sec": 70.3
+  }
+}

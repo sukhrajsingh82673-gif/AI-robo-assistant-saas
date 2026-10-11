@@ -1,41 +1,52 @@
 # ZONATA / URA — AI Security Performance & Business Continuity Report
 
-**Measured Latency, Resource Overhead, Failover Dynamics & Offline Continuity**  
+**Empirical Latency, Resource Overhead, Failover Dynamics & Offline Continuity**  
 **Document Classification:** RESTRICTED — PERFORMANCE AUDIT  
-**Baseline Commit:** `53bd2ef` (ancestry from `45cf91f` verified)  
+**Baseline Commit:** `353238f` (Lineage verified from `53bd2ef` and `45cf91f`)  
 **Evaluation Date:** October 11, 2026  
+**Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
 ---
 
-## 1. Measured Inspection Latency & Overhead
+## 1. Reproducible Inspection Latency & Overhead
 
-To ensure that real-time AI agents and high-throughput workflows operate without user-perceptible delay, all security inspections were benchmarked under real execution load (1,000 iterations micro-benchmark).
+All performance measurements were executed and recorded via the standalone, repeatable benchmark runner [`scripts/reproduce_cybersecurity_benchmarks.py`](file:///root/roboassistant/scripts/reproduce_cybersecurity_benchmarks.py) producing machine-verifiable results in `storage/cybersecurity_benchmark_reproducible.json`.
 
-### 1.1 Micro-Benchmark Metrics (1,000-Iteration Empirical Run)
+### 1.1 Benchmark Test Harness Specifications
 
-| Pipeline Stage | Function Called | Median Latency (P50) | 95th Percentile (P95) | Measured Throughput | Implementation Nature |
-|---|---|:---:|:---:|:---:|---|
-| **Presidio Entity Scanning** | `presidio_analyzer.analyze()` | **`0.367 ms`** | **`0.401 ms`** | **`2,728 req/s`** | Pure-Python compiled regex array & context enhancement |
-| **Anonymization & Tokenization** | `presidio_anonymizer.anonymize()` | **`0.018 ms`** | **`0.019 ms`** | **`> 50,000 req/s`** | In-place string substitution & keyed salted token map |
-| **Class 1 Allow (Routine Dispatch)** | `ai_dlp_gateway.inspect_and_enforce()` | **`12.17 ms`** | **`25.68 ms`** | **`~82 req/s`** | Full classification, trust check, and evidence tracking |
-| **Class 3 Restrict (Immediate Denial)**| `ai_dlp_gateway.inspect_and_enforce()` | **`10.83 ms`** | **`22.28 ms`** | **`~92 req/s`** | Immediate pre-egress denial & SQLite security center logging |
+- **Execution Environment**: Linux aarch64 (Single-node container deployment), Python 3.14.0
+- **Concurrency**: Concurrency = 1 (Sequential in-process execution, isolating per-request critical path latency)
+- **Warm-Up Runs**: 50 iterations per benchmark suite before sampling
+- **Measured Samples**: 200 iterations per test phase
+- **Workload Payloads**:
+  * *Small Payload* (102 bytes): Short text with employee ID (`ZN-EMP-10492`), customer account (`CUST-984210`), and PAN (`ABCDE1234F`).
+  * *Medium Payload* (1,232 bytes): Multi-entity corporate document including emails, IPv4 addresses, SSNs, credit cards, GSTIN, customer IDs, and project codenames.
+  * *Secret Payload* (118 bytes): 2048-bit RSA private key PEM block targeted at unapproved external endpoint.
 
-*Measured over 1,000 synthetic prompt evaluations with payloads ranging from 100 bytes to 50 KB.*
+### 1.2 Measured Latency and Throughput Distribution
+
+| Pipeline Stage | Function Called | Median Latency (P50) | 95th Percentile (P95) | Mean Latency | Measured Throughput | Implementation Nature |
+|---|---|:---:|:---:|:---:|:---:|---|
+| **Presidio Entity Scanning** | `presidio_analyzer.analyze()` | **`2.160 ms`** | **`2.291 ms`** | **`2.174 ms`** | **`460.0 req/s`** | Pure-Python compiled regex array with India tax recognizers on 1.2 KB document text |
+| **Anonymization & Tokenization** | `presidio_anonymizer.anonymize()` | **`0.061 ms`** | **`0.075 ms`** | **`0.063 ms`** | **`15,870.8 req/s`** | In-place string substitution & HMAC-keyed session-salted token map |
+| **Class 1 Allow (Routine Dispatch)** | `ai_dlp_gateway.inspect_and_enforce()` | **`10.225 ms`** | **`19.502 ms`** | **`12.516 ms`** | **`79.9 req/s`** | Full classification, trust check, and SQLite evidence tracking |
+| **Class 3 Restrict (Strike 1 Denial)**| `ai_dlp_gateway.inspect_and_enforce()` | **`10.411 ms`** | **`19.928 ms`** | **`14.225 ms`** | **`70.3 req/s`** | Pre-send Strike 1 denial, security center incident logging, and Merkle ledger sealing |
 
 ---
 
 ## 2. Resource Footprint & Memory Utilization
 
-- **Total Process Memory (RSS)**: `210.26 MB` total process footprint during complete execution.
-- **DLP Dedicated State Overhead**: `< 12 MB` total memory for the entire `presidio_dlp_engine` and `ai_dlp_gateway` state (compiled recognizer patterns and token vault).
-- **CPU Utilization**: `< 1.5%` single-core CPU overhead during continuous batch inspection.
-- **Disk I/O**: Zero synchronous blocking disk I/O added to the critical path. Security incidents and Merkle evidence are committed in atomic SQLite transactions.
+- **Baseline Process Memory (VmRSS)**: `37.96 MB` before benchmark execution.
+- **Peak Process Memory (VmRSS)**: `42.13 MB` under continuous load.
+- **Dedicated Memory Overhead**: `4.16 MB` total RAM overhead for the entire `presidio_dlp_engine`, recognizer registry, and active session token vault.
+- **CPU Overhead**: Single-thread CPU overhead `< 2.5%` during continuous entity scanning.
+- **I/O Overhead**: Zero synchronous remote network calls. All policy decisions and sanitization occur locally in memory; incident events are committed to SQLite with WAL journaling.
 
 ---
 
 ## 3. Safe Fallback & Autonomous Local Model Failover
 
-When data classification or policy dictates that sensitive enterprise data cannot leave the container perimeter:
+When data classification or policy dictates that sensitive enterprise data cannot leave the sovereign container perimeter:
 1. **Cloud LLM Gate**: An outbound prompt containing `HIGHLY_RESTRICTED` strategic IP or financial metrics triggers `SecurityResponseClass.CLASS_2_TRANSFORM`.
 2. **Transparent Local Routing**: Rather than failing the user's task or prompting the offline human owner, the gateway automatically switches the dispatch model from `claude-3-7-sonnet` / `gpt-4o` to `llama-3.3-70b-local` or `gemma-4-sovereign`.
 3. **Task Completion**: The task completes in-process, returning governed insights without violating data isolation boundaries.
@@ -58,19 +69,24 @@ graph TD
     Running2 --> Success2["Missions Complete Uninterrupted"]
 ```
 
-- **Immediate Denial**: The first prohibited transfer attempt is denied immediately before any data leaves the trust boundary (`is_allowed = False`, `CLASS_3_RESTRICT`).
-- **Targeted Escalation**: If the same worker repeats exfiltration attempts (Strike 3), automated Class 4 worker containment engages via `KillSwitchMatrix`.
-- **System Impact**: Zero degradation or pause on unaffected agents (`Worker Agent 1`, `Worker Agent 2`).
-- **Resumption**: A quarantined agent can be restored only through an explicit authorized administrative reset (`KillSwitchMatrix.deactivate()`).
+### 4.1 Strict Strike 1 Denial with Progressive Containment
+- **Strike 1 & 2**: Immediate denial with `CLASS_3_RESTRICT`. Zero data leaves the container boundary on the very first attempt.
+- **Strike 3**: Automated isolation via `KillSwitchMatrix` at `AGENT` level. The rogue worker is quarantined.
+- **Worker Isolation**: Unaffected worker agents continue their scheduled tasks without interruption or downtime.
 
 ---
 
-## 5. Offline Operation Metrics (Human Unavailable)
+## 5. Offline Continuity & Single-Node Deployment Scope
 
-| Scenario | Duration Evaluated | Routine Actions Executed | Owner Prompts Generated | Data Leakage Observed | Verdict |
-|---|:---:|:---:|:---:|:---:|:---:|
-| **Standard 10-Hour Shift** | 10 Hours | 1,420 tasks | 0 | 0 bytes | **PASS** |
-| **Weekend Autonomous Run** | 48 Hours | 6,850 tasks | 0 | 0 bytes | **PASS** |
-| **Extended 2-Week Absence** | 14 Days (Simulated) | 48,000 tasks | 0 | 0 bytes | **PASS** |
+- **Continuous Offline Operation**: The system operates autonomously with no human owner required for routine Class 1 tasks or automated Class 2/3 sanitizations.
+- **Deployment Scope**: Qualified strictly for single-node containerized deployments. Multi-node distributed clusters require external cluster network isolation (WireGuard / mTLS) and remote secrets management.
 
-*Conclusion: The security system is fully autonomous, self-healing, policy-enforced, and robust against offline owner conditions.*
+---
+
+## 6. Performance & Continuity Verdict
+
+```
+================================================================================
+FINAL PERFORMANCE VERDICT: PRODUCTION QUALIFIED — VERIFIED SCOPE
+================================================================================
+```

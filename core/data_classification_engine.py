@@ -51,6 +51,8 @@ PII_PATTERNS = [
     (re.compile(r'(?i)(?:ebitda|gross\s+margin|revenue\s+forecast|financial\s+ledger|bank\s+account|routing\s+number)'), SensitivityCategory.FINANCIAL, DataClassificationLevel.CONFIDENTIAL, "Financial indicators detected"),
     (re.compile(r'(?i)(?:api[_-]?key|secret[_-]?token|bearer\s+[a-z0-9_\-\.]{20,})'), SensitivityCategory.SECURITY_AUTH, DataClassificationLevel.HIGHLY_RESTRICTED, "Credential/API key pattern detected"),
     (re.compile(r'(?i)(?:private\s+key|BEGIN\s+RSA\s+PRIVATE)'), SensitivityCategory.SECURITY_AUTH, DataClassificationLevel.HIGHLY_RESTRICTED, "Private key detected"),
+    (re.compile(r'(?i)\bcanary_sec_[a-zA-Z0-9_]{8,}\b'), SensitivityCategory.SECURITY_AUTH, DataClassificationLevel.HIGHLY_RESTRICTED, "Synthetic canary detected"),
+    (re.compile(r'(?i)\bZONATA_CANARY_[A-Za-z0-9_]{6,}\b'), SensitivityCategory.SECURITY_AUTH, DataClassificationLevel.HIGHLY_RESTRICTED, "ZONATA canary detected"),
     (re.compile(r'(?i)(?:salary|compensation|payroll|ssn|dob|date\s+of\s+birth)'), SensitivityCategory.EMPLOYEE_HR, DataClassificationLevel.CONFIDENTIAL, "HR/Payroll indicators detected"),
     (re.compile(r'(?i)(?:attorney-client|privileged\s+and\s+confidential|nda|settlement\s+agreement)'), SensitivityCategory.LEGAL, DataClassificationLevel.RESTRICTED, "Legal privilege indicators detected")
 ]
