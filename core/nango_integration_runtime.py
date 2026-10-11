@@ -749,21 +749,41 @@ class ExternalIntegrationGateway:
         scopes = granted_scopes or ["default.read"]
 
         with db.get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO nango_connections (
-                    connection_id, tenant_id, company_id, provider_id, connection_key,
-                    status, auth_type, credential_ref, granted_scopes, metadata,
-                    health_status, last_health_check, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    conn_id, self.tenant_id, self.company_id, provider_id, key,
-                    ConnectionStatus.ACTIVE.value, auth_type, cred_ref,
-                    json.dumps(scopes), json.dumps(metadata or {}),
-                    HealthStatus.HEALTHY.value, now, now, now
+            existing = conn.execute(
+                "SELECT connection_id FROM nango_connections WHERE tenant_id = ? AND company_id = ? AND provider_id = ?",
+                (self.tenant_id, self.company_id, provider_id)
+            ).fetchone()
+            if existing:
+                conn_id = existing["connection_id"]
+                conn.execute(
+                    """
+                    UPDATE nango_connections SET
+                        connection_key = ?, status = ?, auth_type = ?, credential_ref = ?,
+                        granted_scopes = ?, metadata = ?, health_status = ?, last_health_check = ?, updated_at = ?
+                    WHERE connection_id = ?
+                    """,
+                    (
+                        key, ConnectionStatus.ACTIVE.value, auth_type, cred_ref,
+                        json.dumps(scopes), json.dumps(metadata or {}),
+                        HealthStatus.HEALTHY.value, now, now, conn_id
+                    )
                 )
-            )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO nango_connections (
+                        connection_id, tenant_id, company_id, provider_id, connection_key,
+                        status, auth_type, credential_ref, granted_scopes, metadata,
+                        health_status, last_health_check, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        conn_id, self.tenant_id, self.company_id, provider_id, key,
+                        ConnectionStatus.ACTIVE.value, auth_type, cred_ref,
+                        json.dumps(scopes), json.dumps(metadata or {}),
+                        HealthStatus.HEALTHY.value, now, now, now
+                    )
+                )
             conn.commit()
 
         # Record evidence in audit ledger

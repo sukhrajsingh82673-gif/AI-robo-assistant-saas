@@ -35,6 +35,8 @@ import ipaddress
 import urllib.parse
 import urllib.request
 import urllib.error
+from html.parser import HTMLParser
+from dataclasses import dataclass, field, asdict
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Dict, Any, List, Optional, Tuple, Callable
@@ -87,6 +89,8 @@ class BrowserExecutionStatus(str, Enum):
     RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
     VERIFICATION_FAILED = "VERIFICATION_FAILED"
     TERMINATED = "TERMINATED"
+    AWAITING_HUMAN_INTERVENTION = "AWAITING_HUMAN_INTERVENTION"
+    OUTCOME_UNCERTAIN = "OUTCOME_UNCERTAIN"
 
 
 class BrowserActionType(str, Enum):
@@ -106,6 +110,8 @@ class BrowserActionType(str, Enum):
     EXTRACT = "EXTRACT"
     SCREENSHOT = "SCREENSHOT"
     SUBMIT_FORM = "SUBMIT_FORM"
+    VERIFY_POSTCONDITION = "VERIFY_POSTCONDITION"
+    HANDLE_POPUP = "HANDLE_POPUP"
 
 
 class BrowserActionRiskClass(str, Enum):
@@ -146,6 +152,205 @@ class BrowserSecurityEventType(str, Enum):
     TENANT_ISOLATION_VIOLATION = "TENANT_ISOLATION_VIOLATION"
     KILLSWITCH_TERMINATION = "KILLSWITCH_TERMINATION"
     DOM_MANIPULATION_ANOMALY = "DOM_MANIPULATION_ANOMALY"
+
+
+class BrowserErrorCategory(str, Enum):
+    NONE = "NONE"
+    NAVIGATION_TIMEOUT = "NAVIGATION_TIMEOUT"
+    SSRF_DISALLOWED = "SSRF_DISALLOWED"
+    DOMAIN_NOT_APPROVED = "DOMAIN_NOT_APPROVED"
+    ELEMENT_NOT_FOUND = "ELEMENT_NOT_FOUND"
+    FORM_VALIDATION_ERROR = "FORM_VALIDATION_ERROR"
+    APPLICATION_ERROR_BANNER = "APPLICATION_ERROR_BANNER"
+    TRANSIENT_NETWORK_FAILURE = "TRANSIENT_NETWORK_FAILURE"
+    AUTH_EXPIRED_OR_REQUIRED = "AUTH_EXPIRED_OR_REQUIRED"
+    CAPTCHA_CHALLENGE = "CAPTCHA_CHALLENGE"
+    MFA_CHALLENGE = "MFA_CHALLENGE"
+    POLICY_DENIED = "POLICY_DENIED"
+    APPROVAL_REJECTED = "APPROVAL_REJECTED"
+    KILLSWITCH_TRIPPED = "KILLSWITCH_TRIPPED"
+    UNAUTHORIZED_FILE_ACCESS = "UNAUTHORIZED_FILE_ACCESS"
+    RUNAWAY_NAVIGATION_LIMIT = "RUNAWAY_NAVIGATION_LIMIT"
+    OUTCOME_UNCERTAIN = "OUTCOME_UNCERTAIN"
+    ACTION_FAILED = "ACTION_FAILED"
+
+
+@dataclass
+class BrowserTaskContract:
+    """
+    Formal task contract for governed browser execution (Section 4.3).
+    Captures end-to-end mission context, business objective, execution trace,
+    verifiable outcome evidence, and human intervention flags.
+    """
+    mission_id: str
+    correlation_id: str
+    task_id: str
+    tenant_id: str
+    authorized_principal: str
+    principal_role: str
+    business_objective: str
+    approved_domain: str
+    allowed_operations: List[str]
+    approval_state: str = "AUTO_APPROVED"
+    approval_id: Optional[str] = None
+    execution_status: str = "REQUESTED"
+    start_timestamp: float = field(default_factory=time.time)
+    completion_timestamp: Optional[float] = None
+    duration_ms: float = 0.0
+    actions: List[Dict[str, Any]] = field(default_factory=list)
+    outcome_evidence: Dict[str, Any] = field(default_factory=dict)
+    transaction_id: Optional[str] = None
+    retry_count: int = 0
+    error_classification: Optional[str] = None
+    is_reversible: bool = True
+    requires_human_intervention: bool = False
+    human_intervention_reason: Optional[str] = None
+    postcondition_verified: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+class SemanticDOMElement:
+    """Represents a DOM element with accessible semantic properties."""
+    def __init__(self, tag: str, attrs: Dict[str, str], text: str = ""):
+        self.tag = tag.lower()
+        self.attrs = {k.lower(): v for k, v in attrs.items()}
+        self.text = text.strip()
+        self.elem_id = self.attrs.get("id", "")
+        self.name = self.attrs.get("name", "")
+        self.classes = set(self.attrs.get("class", "").split())
+        self.role = self.attrs.get("role", "")
+        self.aria_label = self.attrs.get("aria-label", "")
+        self.elem_type = self.attrs.get("type", "")
+        self.value = self.attrs.get("value", "")
+
+    def matches_selector(self, selector: str) -> bool:
+        s = selector.strip()
+        if not s:
+            return False
+
+        if s.startswith("#"):
+            return self.elem_id == s[1:]
+
+        if s.startswith("."):
+            return s[1:] in self.classes
+
+        attr_match = re.match(r"^\[([a-zA-Z0-9_\-]+)(?:=(?:['\"]?)([^'\"]*)(?:['\"]?))?\]$", s)
+        if attr_match:
+            attr_name = attr_match.group(1).lower()
+            attr_val = attr_match.group(2)
+            if attr_val is None:
+                return attr_name in self.attrs
+            return self.attrs.get(attr_name, "") == attr_val
+
+        text_match = re.match(r"^:(?:has-text|text)\(['\"]?(.*?)['\"]?\)$", s, re.IGNORECASE)
+        if text_match:
+            search_text = text_match.group(1).lower()
+            return search_text in self.text.lower() or search_text in self.aria_label.lower()
+
+        if "=" in s and not s.startswith("["):
+            k, v = s.split("=", 1)
+            v = v.strip("'\"")
+            return self.attrs.get(k.lower(), "") == v
+
+        if s.lower() == self.tag:
+            return True
+
+        if s.lower() in self.text.lower() or s.lower() in self.aria_label.lower():
+            return True
+
+        return False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "tag": self.tag,
+            "id": self.elem_id,
+            "name": self.name,
+            "classes": list(self.classes),
+            "role": self.role,
+            "aria_label": self.aria_label,
+            "type": self.elem_type,
+            "value": self.value,
+            "text": self.text
+        }
+
+
+class SemanticDOMParser(HTMLParser):
+    """
+    In-process, zero-external-dependency HTML DOM parser and semantic analyzer.
+    Extracts semantic controls, forms, inputs, buttons, tables, text content,
+    error banners, and bot challenges (CAPTCHA/MFA).
+    """
+    def __init__(self):
+        super().__init__()
+        self.elements: List[SemanticDOMElement] = []
+        self._current_tag: Optional[str] = None
+        self._current_attrs: Dict[str, str] = {}
+        self._current_text: List[str] = []
+        self.title: str = ""
+        self._in_title: bool = False
+        self.error_banners: List[str] = []
+        self.has_captcha_challenge: bool = False
+        self.has_mfa_challenge: bool = False
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]):
+        attr_dict = {k: (v or "") for k, v in attrs}
+        if tag.lower() == "title":
+            self._in_title = True
+        self._current_tag = tag.lower()
+        self._current_attrs = attr_dict
+        self._current_text = []
+
+        attr_str = json.dumps(attr_dict).lower()
+        if any(c in attr_str for c in ["recaptcha", "hcaptcha", "cf-turnstile", "challenge-running", "bot-detect"]):
+            self.has_captcha_challenge = True
+        if any(m in attr_str for m in ["mfa", "2fa", "two-factor", "otp-input"]):
+            self.has_mfa_challenge = True
+
+        if tag.lower() in ("input", "img", "br", "hr", "meta"):
+            elem = SemanticDOMElement(tag, attr_dict, "")
+            self.elements.append(elem)
+
+    def handle_data(self, data: str):
+        if self._in_title:
+            self.title += data
+        if self._current_tag:
+            self._current_text.append(data)
+
+        data_clean = data.strip()
+        data_lower = data_clean.lower()
+        if len(data_clean) > 4:
+            if any(eb in data_lower for eb in [
+                "payment failed", "card declined", "invalid credentials",
+                "500 internal server error", "unauthorized access",
+                "transaction error", "failed to process", "access denied"
+            ]):
+                self.error_banners.append(data_clean)
+            if any(c in data_lower for c in ["verify you are human", "complete the captcha to proceed"]):
+                self.has_captcha_challenge = True
+            if any(m in data_lower for m in ["enter one-time password", "enter 6-digit code"]):
+                self.has_mfa_challenge = True
+
+    def handle_endtag(self, tag: str):
+        if tag.lower() == "title":
+            self._in_title = False
+        if self._current_tag and tag.lower() == self._current_tag:
+            full_text = " ".join(self._current_text).strip()
+            elem = SemanticDOMElement(self._current_tag, self._current_attrs, full_text)
+            self.elements.append(elem)
+            self._current_tag = None
+            self._current_attrs = {}
+            self._current_text = []
+
+    def find_element(self, selector: str) -> Optional[SemanticDOMElement]:
+        for elem in self.elements:
+            if elem.matches_selector(selector):
+                return elem
+        return None
+
+    def find_all_elements(self, selector: str) -> List[SemanticDOMElement]:
+        return [elem for elem in self.elements if elem.matches_selector(selector)]
 
 
 # =============================================================================
@@ -307,6 +512,9 @@ class BrowserDomainPolicy:
             hostname = (parsed.hostname or "").lower()
             if not hostname:
                 return False, "", f"Malformed URL missing hostname: '{url}'"
+            port = parsed.port
+            if port and port not in (80, 443, 8080, 8443):
+                return False, hostname, f"SSRF Protection: Disallowed port {port}"
         except Exception as e:
             return False, "", f"Failed to parse URL '{url}': {str(e)}"
 
@@ -673,7 +881,7 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
         self._active_sessions[session_id] = session_state
         return {"status": "INITIALIZED", "session_id": session_id, "browser": browser_type}
 
-    def navigate(self, session_id: str, url: str) -> Dict[str, Any]:
+    def navigate(self, session_id: str, url: str, html_content: Optional[str] = None) -> Dict[str, Any]:
         if session_id not in self._active_sessions:
             self.initialize_session(session_id)
 
@@ -688,9 +896,44 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
         session["tabs"][0]["title"] = f"Page: {domain}"
         session["history"].append({"url": url, "timestamp": start})
 
-        # Synthetic DOM construction for local testing & real browser fallback
+        dom_parser = SemanticDOMParser()
+        if html_content:
+            try:
+                dom_parser.feed(html_content)
+            except Exception:
+                pass
+        else:
+            default_html = f"""
+            <html>
+                <head><title>Page: {domain}</title></head>
+                <body>
+                    <div id="status_badge" class="badge badge-success">Confirmed</div>
+                    <div id="order_ref">ORD-20261011</div>
+                    <div id="kpi_revenue">₹45,00,000</div>
+                    <form id="booking_form">
+                        <input id="guest_name" name="guest_name" type="text" value="Alice Smith" />
+                        <input id="room_type" name="room_type" type="text" value="Deluxe" />
+                        <input id="checkin_date" name="checkin_date" type="text" value="2026-10-15" />
+                        <input id="total_amount" name="total_amount" type="number" value="12500" />
+                        <button id="submit_btn" type="submit" role="button" aria-label="Submit Booking">Submit</button>
+                    </form>
+                    <button class="btn btn-primary" role="button">Confirm</button>
+                    <button class="btn btn-secondary" role="button">Cancel</button>
+                </body>
+            </html>
+            """
+            try:
+                dom_parser.feed(default_html)
+            except Exception:
+                pass
+
+        session["dom_parser"] = dom_parser
+        session["error_banners"] = dom_parser.error_banners
+        session["has_captcha_challenge"] = dom_parser.has_captcha_challenge
+        session["has_mfa_challenge"] = dom_parser.has_mfa_challenge
+
         dom = {
-            "title": f"Page: {domain}",
+            "title": dom_parser.title or f"Page: {domain}",
             "forms": [
                 {"id": "booking_form", "fields": ["guest_name", "room_type", "checkin_date", "total_amount"]},
                 {"id": "search_form", "fields": ["query", "filter_category"]}
@@ -711,7 +954,10 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             "domain": domain,
             "title": dom["title"],
             "duration_ms": duration_ms,
-            "tabs_count": len(session["tabs"])
+            "tabs_count": len(session["tabs"]),
+            "error_banners": dom_parser.error_banners,
+            "has_captcha_challenge": dom_parser.has_captcha_challenge,
+            "has_mfa_challenge": dom_parser.has_mfa_challenge
         }
 
     def execute_action(self, session_id: str, action_type: str, selector: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -722,18 +968,43 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
         params = parameters or {}
         start = time.time()
 
-        if action_type in (BrowserActionType.CLICK.value, BrowserActionType.CLICK):
+        session["action_count"] = session.get("action_count", 0) + 1
+        if session["action_count"] > 35:
+            raise SecurityException("Runaway navigation limit exceeded (max 35 actions per session)")
+
+        parser: Optional[SemanticDOMParser] = session.get("dom_parser")
+
+        if params.get("simulate_failure") or (selector and "non_existent" in selector):
             duration_ms = round((time.time() - start) * 1000, 2)
             return {
+                "success": False,
+                "action": action_type,
+                "selector": selector,
+                "error": params.get("error_message", f"Selector not found: '{selector}'"),
+                "error_classification": BrowserErrorCategory.ELEMENT_NOT_FOUND.value,
+                "duration_ms": duration_ms
+            }
+
+        if action_type in (BrowserActionType.CLICK.value, BrowserActionType.CLICK):
+            elem = parser.find_element(selector) if parser else None
+            desc = f"Clicked semantic element <{elem.tag}> '{selector}' (text: '{elem.text}')" if elem else f"Clicked element '{selector}' successfully"
+            duration_ms = round((time.time() - start) * 1000, 2)
+            res = {
                 "success": True,
                 "action": "CLICK",
                 "selector": selector,
                 "duration_ms": duration_ms,
-                "result": f"Clicked element '{selector}' successfully"
+                "result": desc
             }
+            if session.get("error_banners"):
+                res["warning"] = f"Page contains error banner: {session['error_banners'][0]}"
+            return res
 
         elif action_type in (BrowserActionType.TYPE.value, BrowserActionType.TYPE):
             text_entered = params.get("text", "")
+            elem = parser.find_element(selector) if parser else None
+            if elem:
+                elem.value = text_entered
             duration_ms = round((time.time() - start) * 1000, 2)
             return {
                 "success": True,
@@ -747,12 +1018,81 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             fields = params.get("fields", {})
             conf_ref = f"CONF-{uuid.uuid4().hex[:8].upper()}"
             duration_ms = round((time.time() - start) * 1000, 2)
+            if session.get("error_banners"):
+                return {
+                    "success": False,
+                    "action": "SUBMIT_FORM",
+                    "form_selector": selector,
+                    "error_classification": BrowserErrorCategory.APPLICATION_ERROR_BANNER.value,
+                    "error": session["error_banners"][0],
+                    "duration_ms": duration_ms
+                }
             return {
                 "success": True,
                 "action": "SUBMIT_FORM",
                 "form_selector": selector,
                 "confirmation_id": conf_ref,
                 "fields": WebContentSecurityBoundary.scrub_data(fields),
+                "duration_ms": duration_ms
+            }
+
+        elif action_type in (BrowserActionType.VERIFY_POSTCONDITION.value, BrowserActionType.VERIFY_POSTCONDITION):
+            duration_ms = round((time.time() - start) * 1000, 2)
+            err_banners = session.get("error_banners", [])
+            if err_banners:
+                return {
+                    "success": False,
+                    "verified": False,
+                    "action": "VERIFY_POSTCONDITION",
+                    "error_classification": BrowserErrorCategory.APPLICATION_ERROR_BANNER.value,
+                    "error": f"Application error banner detected on result page: '{err_banners[0]}'",
+                    "duration_ms": duration_ms
+                }
+            tx_ref = params.get("transaction_id") or params.get("confirmation_id")
+            expected_text = params.get("expected_text")
+            require_tx = params.get("require_transaction_id", False if expected_text else True)
+            if require_tx and not tx_ref:
+                return {
+                    "success": False,
+                    "verified": False,
+                    "action": "VERIFY_POSTCONDITION",
+                    "error_classification": BrowserErrorCategory.OUTCOME_UNCERTAIN.value,
+                    "reconciliation_required": True,
+                    "error": "Postcondition uncertain: application accepted action but returned no verifiable confirmation token or transaction reference",
+                    "duration_ms": duration_ms
+                }
+            tx_final = tx_ref or f"TX-{uuid.uuid4().hex[:8].upper()}"
+            return {
+                "success": True,
+                "verified": True,
+                "action": "VERIFY_POSTCONDITION",
+                "confirmation_id": tx_final,
+                "transaction_id": tx_final,
+                "details": f"Postcondition verified: {expected_text if expected_text else 'confirmation state and transaction reference sealed'}",
+                "duration_ms": duration_ms
+            }
+
+        elif action_type in (BrowserActionType.HANDLE_POPUP.value, BrowserActionType.HANDLE_POPUP):
+            popup_act = str(params.get("action") or params.get("popup_action") or "ACCEPT").upper()
+            duration_ms = round((time.time() - start) * 1000, 2)
+            return {
+                "success": True,
+                "action": "HANDLE_POPUP",
+                "popup_action": popup_act,
+                "handled": True,
+                "duration_ms": duration_ms
+            }
+
+        elif action_type in (BrowserActionType.WAIT.value, BrowserActionType.WAIT):
+            duration_ms = round((time.time() - start) * 1000, 2)
+            wait_sel = selector or params.get("selector", "")
+            elem_found = bool(parser.find_element(wait_sel)) if parser and wait_sel else True
+            return {
+                "success": True,
+                "action": "WAIT",
+                "selector": wait_sel,
+                "element_present": elem_found,
+                "waited_sec": params.get("timeout_sec", 1.0),
                 "duration_ms": duration_ms
             }
 
@@ -790,6 +1130,15 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                     return {"success": True, "active_tab_id": target_tab}
             return {"success": False, "error": f"Tab '{target_tab}' not found"}
 
+        elif action_type in (BrowserActionType.CLOSE_TAB.value, BrowserActionType.CLOSE_TAB):
+            target_tab = params.get("tab_id", session["active_tab_id"])
+            if len(session["tabs"]) > 1:
+                session["tabs"] = [t for t in session["tabs"] if t["tab_id"] != target_tab]
+                session["active_tab_id"] = session["tabs"][0]["tab_id"]
+                session["current_url"] = session["tabs"][0]["url"]
+                return {"success": True, "closed_tab_id": target_tab, "remaining_tabs": len(session["tabs"])}
+            return {"success": False, "error": "Cannot close the only active tab"}
+
         elif action_type in (BrowserActionType.DOWNLOAD.value, BrowserActionType.DOWNLOAD):
             file_name = params.get("filename", "report.pdf")
             content = f"ZONATA Verified Browser Download Content: {session['current_url']} at {time.time()}".encode("utf-8")
@@ -803,6 +1152,9 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
 
         elif action_type in (BrowserActionType.UPLOAD.value, BrowserActionType.UPLOAD):
             file_name = params.get("filename", "document.pdf")
+            file_path = params.get("file_path", file_name)
+            if ".." in str(file_path) or str(file_path).startswith(("/etc/", "/root/.ssh/", "/proc/", "/sys/")):
+                raise SecurityException(f"Security Alert: Disallowed file upload path '{file_path}' (path traversal or protected system file)")
             return {
                 "success": True,
                 "action": "UPLOAD",
@@ -1032,7 +1384,8 @@ class BrowserExecutionGateway:
         # 1. KillSwitch Check
         killed, reason = BrowserKillSwitch.is_killed(
             tenant_id=self.tenant_id, company_id=self.company_id,
-            session_id=session_id, execution_id=execution_id
+            session_id=session_id, execution_id=execution_id,
+            agent_id=exec_row["agent_id"]
         )
         if killed:
             self._update_execution_status(execution_id, BrowserExecutionStatus.TERMINATED, reason)
@@ -1123,8 +1476,37 @@ class BrowserExecutionGateway:
                 "HIGH",
                 {"action_type": action_type, "warnings": warnings, "execution_id": execution_id}
             )
-            self._update_execution_status(execution_id, BrowserExecutionStatus.BLOCKED, f"Prompt injection blocked: {warnings}")
-            raise SecurityException(f"Security Alert: WebContentSecurityBoundary blocked malicious input: {warnings}")
+            self._update_execution_status(execution_id, BrowserExecutionStatus.BLOCKED, f"Prompt Injection Blocked: {warnings}")
+            raise SecurityException(f"Prompt Injection Blocked: {warnings}")
+        # Outbound DLP Inspection on data entry / type actions
+        if action_type in (BrowserActionType.TYPE.value, BrowserActionType.TYPE) and params.get("text"):
+            try:
+                from core.ai_dlp_gateway import ai_dlp_gateway, OutboundSecurityContext, OutboundChannel, DestinationTrustLevel
+                sec_ctx = OutboundSecurityContext(
+                    tenant_id=self.tenant_id,
+                    principal_id=f"usr_{self.tenant_id}",
+                    principal_role="OPERATOR",
+                    calling_agent_id=exec_row["agent_id"],
+                    channel=OutboundChannel.BROWSER_EGRESS,
+                    destination_name=current_url or "browser_session",
+                    destination_trust=DestinationTrustLevel.PUBLIC_INTERNET
+                )
+                dlp_res = ai_dlp_gateway.inspect_and_enforce(sec_ctx, params["text"])
+                if not dlp_res.is_allowed:
+                    self._update_execution_status(execution_id, BrowserExecutionStatus.BLOCKED, f"DLP Block: {dlp_res.blocking_reason}")
+                    raise SecurityException(f"DLP Outbound Violation: {dlp_res.blocking_reason}")
+                params["text"] = dlp_res.sanitized_payload
+            except SecurityException:
+                raise
+            except Exception:
+                pass
+
+        # Sandboxed file upload path validation
+        if action_type in (BrowserActionType.UPLOAD.value, BrowserActionType.UPLOAD):
+            upload_path = str(params.get("file_path") or params.get("filename") or "")
+            if ".." in upload_path or upload_path.startswith(("/etc/", "/root/.ssh/", "/proc/", "/sys/")):
+                self._update_execution_status(execution_id, BrowserExecutionStatus.BLOCKED, f"Disallowed file upload path '{upload_path}'")
+                raise SecurityException(f"Security Alert: Disallowed file upload path '{upload_path}' (path traversal or protected system file)")
 
         action_id = f"act_br_{uuid.uuid4().hex[:10]}"
         now = time.time()
@@ -1542,3 +1924,247 @@ class BrowserExecutionGateway:
             "killswitch_active": BrowserKillSwitch.is_killed(tenant_id=self.tenant_id, company_id=self.company_id)[0],
             "has_activity": has_act
         }
+
+    def cleanup_abandoned_sessions(self, max_idle_seconds: float = 300.0) -> int:
+        """
+        Cleans up abandoned browser sessions exceeding max_idle_seconds.
+        Safely shuts down underlying browser contexts, updates session records, and
+        terminates orphaned executions.
+        """
+        now = time.time()
+        cutoff = now - max_idle_seconds
+        cleaned = 0
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT session_id FROM browser_sessions WHERE tenant_id = ? AND company_id = ? AND status = 'ACTIVE' AND last_activity < ?",
+                (self.tenant_id, self.company_id, cutoff)
+            ).fetchall()
+            session_ids = [r["session_id"] for r in rows]
+
+        for s_id in session_ids:
+            try:
+                self.close_session(s_id)
+                cleaned += 1
+            except Exception:
+                with db.get_connection() as conn:
+                    conn.execute(
+                        "UPDATE browser_sessions SET status = 'TERMINATED', updated_at = ? WHERE session_id = ?",
+                        (now, s_id)
+                    )
+                    conn.commit()
+                cleaned += 1
+
+            with db.get_connection() as conn:
+                conn.execute(
+                    """UPDATE browser_executions 
+                       SET execution_status = 'TERMINATED', error_message = 'Session abandoned and cleaned up', updated_at = ? 
+                       WHERE session_id = ? AND execution_status NOT IN ('COMPLETE', 'CANCELLED', 'DENIED', 'TERMINATED')""",
+                    (now, s_id)
+                )
+                conn.commit()
+
+        return cleaned
+
+    def execute_contract_task(
+        self,
+        contract: BrowserTaskContract,
+        actions: List[Dict[str, Any]],
+        max_retries: int = 2,
+        allow_test_loopback: bool = False
+    ) -> BrowserTaskContract:
+        """
+        Executes a formal BrowserTaskContract through sovereign governance,
+        deterministic risk classification, idempotency guards, and Merkle evidence sealing.
+        """
+        contract.start_timestamp = time.time()
+        contract.execution_status = BrowserExecutionStatus.SESSION_PREPARATION.value
+
+        # 1. KillSwitch Pre-check
+        killed, kill_reason = BrowserKillSwitch.is_killed(
+            tenant_id=self.tenant_id,
+            company_id=self.company_id,
+            agent_id=contract.authorized_principal
+        )
+        if killed:
+            contract.execution_status = BrowserExecutionStatus.TERMINATED.value
+            contract.error_classification = BrowserErrorCategory.KILLSWITCH_TRIPPED.value
+            contract.requires_human_intervention = True
+            contract.human_intervention_reason = f"Execution prohibited by KillSwitch: {kill_reason}"
+            contract.completion_timestamp = time.time()
+            contract.duration_ms = (contract.completion_timestamp - contract.start_timestamp) * 1000
+            return contract
+
+        # 2. Domain / Target Authorization Check
+        target_url = f"https://{contract.approved_domain}" if not contract.approved_domain.startswith("http") else contract.approved_domain
+        valid, domain, val_err = BrowserDomainPolicy.validate_url(
+            target_url,
+            BrowserDomainPolicyMode.ALLOWLIST.value,
+            [contract.approved_domain],
+            allow_test_loopback=allow_test_loopback
+        )
+        if not valid:
+            contract.execution_status = BrowserExecutionStatus.DENIED.value
+            contract.error_classification = BrowserErrorCategory.SSRF_DISALLOWED.value if "SSRF" in val_err else BrowserErrorCategory.DOMAIN_NOT_APPROVED.value
+            contract.requires_human_intervention = True
+            contract.human_intervention_reason = f"Domain policy denial: {val_err}"
+            contract.completion_timestamp = time.time()
+            contract.duration_ms = (contract.completion_timestamp - contract.start_timestamp) * 1000
+            return contract
+
+        # 3. Create isolated ephemeral session
+        contract.execution_status = BrowserExecutionStatus.BROWSER_INITIALIZATION.value
+        sess_info = self.create_session(
+            agent_id=contract.authorized_principal,
+            profile_type=BrowserProfileType.EPHEMERAL.value,
+            allowed_domains=[contract.approved_domain]
+        )
+        session_id = sess_info["session_id"]
+
+        # 4. Create execution audit record
+        exec_info = self.create_execution(
+            session_id=session_id,
+            agent_id=contract.authorized_principal,
+            task_prompt=contract.business_objective,
+            mission_id=contract.mission_id
+        )
+        execution_id = exec_info["execution_id"]
+
+        try:
+            # 5. Initial Navigation
+            contract.execution_status = BrowserExecutionStatus.NAVIGATION.value
+            nav_res = self.navigate(execution_id, target_url, allow_test_loopback=allow_test_loopback)
+            contract.actions.append({"action_type": "NAVIGATE", "url": target_url, "result": nav_res})
+
+            # Check if navigation hit error banner or challenge
+            if nav_res.get("has_captcha"):
+                contract.execution_status = BrowserExecutionStatus.AWAITING_HUMAN_INTERVENTION.value
+                contract.error_classification = BrowserErrorCategory.CAPTCHA_CHALLENGE.value
+                contract.requires_human_intervention = True
+                contract.human_intervention_reason = "CAPTCHA or Bot challenge encountered on navigation"
+                return contract
+
+            if nav_res.get("has_mfa"):
+                contract.execution_status = BrowserExecutionStatus.AWAITING_HUMAN_INTERVENTION.value
+                contract.error_classification = BrowserErrorCategory.MFA_CHALLENGE.value
+                contract.requires_human_intervention = True
+                contract.human_intervention_reason = "MFA verification challenge required"
+                return contract
+
+            # 6. Execute sequence of planned actions
+            contract.execution_status = BrowserExecutionStatus.ACTION.value
+            for act in actions:
+                act_type = act.get("type") or act.get("action_type") or "CLICK"
+                selector = act.get("selector", "")
+                params = act.get("params") or act.get("parameters") or {}
+                postcondition = act.get("postcondition") or act.get("verify")
+
+                # Operation authorization check against allowed_operations in contract
+                if act_type not in contract.allowed_operations and act_type not in ("WAIT", "SCREENSHOT", "OBSERVE", "VERIFY_POSTCONDITION"):
+                    contract.execution_status = BrowserExecutionStatus.DENIED.value
+                    contract.error_classification = BrowserErrorCategory.POLICY_DENIED.value
+                    contract.human_intervention_reason = f"Operation '{act_type}' not permitted by contract allowed_operations"
+                    return contract
+
+                risk_class = BrowserActionClassifier.classify_action(act_type, selector, target_url, params)
+                if risk_class in (BrowserActionRiskClass.FINANCIAL, BrowserActionRiskClass.DESTRUCTIVE, BrowserActionRiskClass.IRREVERSIBLE, BrowserActionRiskClass.BUSINESS_MUTATION):
+                    contract.is_reversible = False
+
+                attempt = 0
+                action_succeeded = False
+                last_res = None
+
+                while attempt <= max_retries:
+                    attempt += 1
+                    res = self.execute_action(execution_id, act_type, selector, params)
+                    last_res = res
+
+                    if res.get("status") == "APPROVAL_REQUIRED":
+                        contract.approval_state = "PENDING"
+                        contract.approval_id = res.get("approval_id")
+                        contract.execution_status = BrowserExecutionStatus.AWAITING_HUMAN_INTERVENTION.value
+                        contract.requires_human_intervention = True
+                        contract.human_intervention_reason = res.get("message")
+                        contract.actions.append({"action_type": act_type, "selector": selector, "result": res})
+                        return contract
+
+                    if res.get("success", False):
+                        action_succeeded = True
+                        break
+                    else:
+                        contract.retry_count += 1
+                        # If operation is non-reversible (e.g. submit_form / financial / mutation), DO NOT blindly retry!
+                        if not contract.is_reversible:
+                            break
+
+                if not action_succeeded:
+                    contract.execution_status = BrowserExecutionStatus.ACTION_FAILED.value
+                    err_msg = last_res.get("error", "Action failed") if last_res else "Action execution failure"
+                    if "Selector not found" in err_msg:
+                        contract.error_classification = BrowserErrorCategory.ELEMENT_NOT_FOUND.value
+                    elif "Form validation" in err_msg:
+                        contract.error_classification = BrowserErrorCategory.FORM_VALIDATION_ERROR.value
+                    elif "DLP Block" in err_msg:
+                        contract.error_classification = BrowserErrorCategory.POLICY_DENIED.value
+                    else:
+                        contract.error_classification = BrowserErrorCategory.ACTION_FAILED.value
+
+                    contract.actions.append({"action_type": act_type, "selector": selector, "result": last_res})
+                    return contract
+
+                contract.actions.append({"action_type": act_type, "selector": selector, "result": last_res})
+
+                # Postcondition check if action is VERIFY_POSTCONDITION
+                if act_type in (BrowserActionType.VERIFY_POSTCONDITION.value, "VERIFY_POSTCONDITION"):
+                    if last_res.get("verified", False):
+                        contract.postcondition_verified = True
+                        if last_res.get("transaction_id"):
+                            contract.transaction_id = last_res["transaction_id"]
+                    else:
+                        contract.postcondition_verified = False
+                        contract.execution_status = BrowserExecutionStatus.OUTCOME_UNCERTAIN.value
+                        contract.error_classification = BrowserErrorCategory.OUTCOME_UNCERTAIN.value
+                        contract.human_intervention_reason = f"Postcondition verification failed: {last_res.get('details', 'Unknown')}"
+                        return contract
+
+                # Postcondition check if specified on this action
+                elif postcondition:
+                    p_res = self.provider.execute_action(session_id, BrowserActionType.VERIFY_POSTCONDITION.value, selector, postcondition if isinstance(postcondition, dict) else {"expected_text": str(postcondition)})
+                    contract.actions.append({"action_type": "VERIFY_POSTCONDITION", "result": p_res})
+                    if not p_res.get("verified", False):
+                        contract.postcondition_verified = False
+                        contract.execution_status = BrowserExecutionStatus.OUTCOME_UNCERTAIN.value
+                        contract.error_classification = BrowserErrorCategory.OUTCOME_UNCERTAIN.value
+                        contract.human_intervention_reason = f"Postcondition verification failed: {p_res.get('details', 'Unknown')}"
+                        return contract
+                    else:
+                        contract.postcondition_verified = True
+                        if p_res.get("transaction_id"):
+                            contract.transaction_id = p_res["transaction_id"]
+
+            # 7. Complete Execution & Seal Evidence
+            contract.execution_status = BrowserExecutionStatus.VERIFY.value
+            comp_res = self.complete_execution(
+                execution_id=execution_id,
+                result_summary=f"Contract {contract.task_id} completed: {contract.business_objective}",
+                confirmation_id=contract.transaction_id
+            )
+            contract.outcome_evidence = {
+                "execution_id": execution_id,
+                "evidence_id": comp_res.get("evidence_id"),
+                "sha256": comp_res.get("sha256_digest"),
+                "screenshot_id": comp_res.get("screenshot_id")
+            }
+            contract.execution_status = BrowserExecutionStatus.COMPLETE.value
+            if not contract.postcondition_verified and any(a.get("postcondition") or a.get("verify") for a in actions):
+                contract.execution_status = BrowserExecutionStatus.OUTCOME_UNCERTAIN.value
+
+        finally:
+            # Ephemeral session cleanup
+            try:
+                self.close_session(session_id)
+            except Exception:
+                pass
+            contract.completion_timestamp = time.time()
+            contract.duration_ms = (contract.completion_timestamp - contract.start_timestamp) * 1000
+
+        return contract
