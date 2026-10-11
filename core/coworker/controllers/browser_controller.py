@@ -46,23 +46,64 @@ class GovernedBrowserController:
 
     @staticmethod
     def is_private_ip(hostname: str) -> bool:
-        """SSRF Guard: blocks access to private, loopback, or cloud-metadata IPs."""
+        """SSRF Guard: blocks access to private, loopback, or cloud-metadata IPs across IPv4/IPv6 and alternate notations."""
         if not hostname:
             return True
-        h_lower = hostname.lower()
-        if h_lower in ("metadata.google.internal", "instance-data", "localhost", "127.0.0.1", "169.254.169.254", "::1"):
+        h_clean = hostname.strip().lower()
+        if "@" in h_clean:
+            h_clean = h_clean.split("@")[-1]
+        if h_clean.startswith("[") and h_clean.endswith("]"):
+            h_clean = h_clean[1:-1]
+        if ":" in h_clean and h_clean.count(":") == 1:
+            h_clean = h_clean.split(":")[0]
+
+        if h_clean in (
+            "metadata.google.internal", "metadata", "instance-data",
+            "localhost", "127.0.0.1", "169.254.169.254", "::1", "0.0.0.0", "::"
+        ):
             return True
-        if any(h_lower.startswith(p) for p in ("169.254.", "127.", "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")):
+
+        if any(h_clean.startswith(p) for p in (
+            "169.254.", "127.", "10.", "192.168.", "0."
+        )) or any(h_clean.startswith(f"172.{i}.") for i in range(16, 32)):
             return True
+
+        # Check integer or hexadecimal representations
         try:
-            ip_str = socket.gethostbyname(hostname)
-            ip = ipaddress.ip_address(ip_str)
-            return (
-                ip.is_private or
-                ip.is_loopback or
-                ip.is_link_local or
-                ip_str.startswith("169.254.") # AWS / GCP metadata
-            )
+            if h_clean.isdigit():
+                ip_obj = ipaddress.ip_address(int(h_clean))
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+                    return True
+            elif h_clean.startswith("0x"):
+                ip_obj = ipaddress.ip_address(int(h_clean, 16))
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+                    return True
+        except Exception:
+            pass
+
+        # Multi-family resolution (IPv4 & IPv6)
+        try:
+            addr_info = socket.getaddrinfo(h_clean, None)
+            if not addr_info:
+                return True
+            for family, socktype, proto, canonname, sockaddr in addr_info:
+                ip_str = sockaddr[0]
+                ip = ipaddress.ip_address(ip_str)
+                if (
+                    ip.is_private or
+                    ip.is_loopback or
+                    ip.is_link_local or
+                    ip.is_reserved or
+                    ip.is_multicast or
+                    ip.is_unspecified or
+                    ip_str.startswith("169.254.")
+                ):
+                    return True
+                if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+                    mapped = ip.ipv4_mapped
+                    if mapped.is_private or mapped.is_loopback or mapped.is_link_local:
+                        return True
+            return False
         except Exception:
             return True # Fail-closed on resolution failure
 
@@ -81,6 +122,14 @@ class GovernedBrowserController:
             return {
                 "success": False,
                 "error": f"Disallowed scheme: '{parsed.scheme}'. Only http and https permitted.",
+                "provider": "openclaw_native"
+            }
+
+        # Enforce port restriction
+        if parsed.port and parsed.port not in (80, 443, 8080, 8443):
+            return {
+                "success": False,
+                "error": f"SSRF Block: Disallowed port {parsed.port}. Only standard web ports (80, 443, 8080, 8443) permitted.",
                 "provider": "openclaw_native"
             }
 
@@ -119,6 +168,26 @@ class GovernedBrowserController:
             clean_text = re.sub(r"<style[^>]*>.*?</style>", "", clean_text, flags=re.DOTALL | re.IGNORECASE)
             clean_text = re.sub(r"<[^>]+>", " ", clean_text)
             clean_text = re.sub(r"\s+", " ", clean_text).strip()
+
+            # Inspect retrieved content for prompt injection attacks
+            try:
+                from core.ai_dlp_gateway import ai_dlp_gateway
+                is_safe, sanitized_content, sec_err = ai_dlp_gateway.inspect_tool_output(
+                    server_id="browser_extractor",
+                    tool_name="navigate_and_extract",
+                    output_data=clean_text,
+                    tenant_id=self.tenant_id
+                )
+                if not is_safe:
+                    return {
+                        "success": False,
+                        "url": url,
+                        "error": f"PROMPT_INJECTION_BLOCKED: {sec_err}",
+                        "provider": "openclaw_native"
+                    }
+                clean_text = sanitized_content
+            except Exception:
+                pass
 
             tables = []
             if extract_tables:
@@ -166,6 +235,30 @@ class GovernedBrowserController:
         Executes a graphical browser action (click, type, scroll, screenshot).
         If running headless without display, dispatches or marks as READY_FOR_NODE.
         """
+        if action == "type" and text:
+            try:
+                from core.ai_dlp_gateway import ai_dlp_gateway, OutboundSecurityContext, OutboundChannel, DestinationTrustLevel
+                sec_ctx = OutboundSecurityContext(
+                    tenant_id=self.tenant_id,
+                    principal_id=f"usr_{self.tenant_id}",
+                    principal_role="OPERATOR",
+                    calling_agent_id="browser_controller",
+                    channel=OutboundChannel.BROWSER_EGRESS,
+                    destination_name=url or "browser_session",
+                    destination_trust=DestinationTrustLevel.PUBLIC_INTERNET
+                )
+                dlp_res = ai_dlp_gateway.inspect_and_enforce(sec_ctx, text)
+                if not dlp_res.is_allowed:
+                    return {
+                        "success": False,
+                        "action": action,
+                        "error": f"DLP Block: {dlp_res.blocking_reason}",
+                        "provider": "browser_controller"
+                    }
+                text = dlp_res.sanitized_payload
+            except Exception:
+                pass
+
         if not self.has_local_chromium and not node_id:
             return {
                 "success": True,

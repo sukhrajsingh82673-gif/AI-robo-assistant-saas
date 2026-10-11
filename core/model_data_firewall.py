@@ -47,15 +47,23 @@ class ModelDataFirewall:
     """
     PROHIBITED_CLOUD_LEVELS = {DataClassificationLevel.HIGHLY_RESTRICTED}
 
-    def _check_obfuscated_secrets(self, text: str) -> bool:
-        """Adversarial check: scans for base64 encoded private keys or tokens."""
-        # Find potential base64 strings of length >= 64
-        b64_candidates = re.findall(r'[A-Za-z0-9+/]{64,}={0,2}', text)
-        for cand in b64_candidates:
+    def _check_obfuscated_secrets(self, text: str, max_depth: int = 2) -> bool:
+        """Adversarial check: scans for base64 encoded private keys or tokens with bounded memory and depth."""
+        if not text or max_depth < 1:
+            return False
+        # Limit candidate search to prevent regex denial of service on oversized inputs
+        bounded_text = text[:100000] if len(text) > 100000 else text
+        b64_candidates = re.findall(r'[A-Za-z0-9+/]{64,}={0,2}', bounded_text)
+        for cand in b64_candidates[:50]:
             try:
-                decoded = base64.b64decode(cand).decode('utf-8', errors='ignore')
-                if "PRIVATE KEY" in decoded or "BEGIN RSA" in decoded:
+                chunk = cand[:8192]
+                decoded = base64.b64decode(chunk).decode('utf-8', errors='ignore')
+                if "PRIVATE KEY" in decoded or "BEGIN RSA" in decoded or "BEGIN OPENSSH" in decoded:
                     return True
+                # Check nested base64 if within depth limit
+                if max_depth > 1 and len(decoded) >= 64:
+                    if self._check_obfuscated_secrets(decoded, max_depth=max_depth - 1):
+                        return True
             except Exception:
                 continue
         return False
@@ -120,6 +128,7 @@ class ModelDataFirewall:
                     "ZONATA_CUSTOMER_ID": {"type": "replace", "new_value": "[REDACTED_CUSTOMER_ID]"},
                     "CONFIDENTIAL_PROJECT_NAME": {"type": "replace", "new_value": "[REDACTED_PROJECT_CODENAME]"},
                     "SECURITY_CANARY": {"type": "replace", "new_value": "[REDACTED_CANARY_SECRET]"},
+                    "INDIA_IDENTITY_OR_TAX_ID": {"type": "replace", "new_value": "[REDACTED_INDIA_TAX_ID]"},
                     "DEFAULT": {"type": "replace"}
                 }
                 anon_res = presidio_anonymizer.anonymize(sanitized, valid_recs, operators=presidio_ops)

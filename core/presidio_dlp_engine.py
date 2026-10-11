@@ -370,6 +370,22 @@ class ZonataConfidentialProjectRecognizer(PatternRecognizer):
         )
 
 
+class IndiaIdentityRecognizer(PatternRecognizer):
+    """Detects Indian PII and financial tax identifiers (PAN, Aadhaar, GSTIN, IFSC)."""
+    def __init__(self):
+        super().__init__(
+            name="IndiaIdentityRecognizer",
+            supported_entities=["INDIA_IDENTITY_OR_TAX_ID"],
+            patterns=[
+                Pattern("in_pan", r"\b[A-Z]{5}[0-9]{4}[A-Z]\b", 0.95),
+                Pattern("in_aadhaar", r"\b[2-9]\d{3}\s\d{4}\s\d{4}\b", 0.90),
+                Pattern("in_gstin", r"\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b", 0.95),
+                Pattern("in_ifsc", r"\b[A-Z]{4}0[A-Z0-9]{6}\b", 0.90)
+            ],
+            context_words=["pan", "aadhaar", "uidai", "gstin", "gst", "ifsc", "tax", "income tax", "bank"]
+        )
+
+
 # =============================================================================
 # 5. PRESIDIO ANALYZER ENGINE
 # =============================================================================
@@ -399,6 +415,7 @@ class PresidioAnalyzerEngine:
         self.register_recognizer(ZonataInternalTokenRecognizer())
         self.register_recognizer(ZonataCustomerAccountRecognizer())
         self.register_recognizer(ZonataConfidentialProjectRecognizer())
+        self.register_recognizer(IndiaIdentityRecognizer())
 
     def register_recognizer(self, recognizer: BaseRecognizer):
         self.recognizers.append(recognizer)
@@ -501,7 +518,10 @@ class PresidioAnonymizerEngine:
                 preserved = orig_span[chars_to_mask:]
                 new_val = (masking_char * chars_to_mask) + preserved
             elif op_type == "tokenize":
-                token_hash = hashlib.sha256(orig_span.encode("utf-8")).hexdigest()[:12]
+                token_salt = getattr(self, "_token_salt", None)
+                if not token_salt:
+                    self._token_salt = uuid.uuid4().hex
+                token_hash = hashlib.sha256((self._token_salt + orig_span).encode("utf-8")).hexdigest()[:12]
                 surrogate = f"tok_dlp_{entity.lower()}_{token_hash}"
                 self._token_vault[surrogate] = orig_span
                 token_map[surrogate] = orig_span

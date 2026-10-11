@@ -90,7 +90,13 @@ class GovernedTerminalController:
     ) -> Dict[str, Any]:
         """Safely performs read/write/append with pre/post SHA-256 hashing and path confinement."""
         clean_path = os.path.normpath(file_path)
-        if ".." in clean_path.split(os.sep) or any(clean_path.startswith(p) for p in ("/etc", "/root/.vault", "/proc", "/sys")):
+        real_path = os.path.realpath(file_path) if os.path.exists(file_path) else clean_path
+        restricted_prefixes = ("/etc", "/root/.vault", "/proc", "/sys", "/root/.ssh", "/root/.gnupg", "/dev")
+        if (
+            ".." in clean_path.split(os.sep) or
+            any(clean_path.startswith(p) for p in restricted_prefixes) or
+            any(real_path.startswith(p) for p in restricted_prefixes)
+        ):
             return {
                 "success": False,
                 "error": f"Security Violation: Path traversal or restricted system path '{file_path}' blocked.",

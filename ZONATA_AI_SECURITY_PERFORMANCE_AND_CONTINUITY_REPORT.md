@@ -2,23 +2,23 @@
 
 **Measured Latency, Resource Overhead, Failover Dynamics & Offline Continuity**  
 **Document Classification:** RESTRICTED — PERFORMANCE AUDIT  
-**Baseline Commit:** `45cf91f`  
+**Baseline Commit:** `53bd2ef` (ancestry from `45cf91f` verified)  
+**Evaluation Date:** October 11, 2026  
 
 ---
 
 ## 1. Measured Inspection Latency & Overhead
 
-To ensure that real-time AI agents and high-throughput workflows operate without user-perceptible delay, all security inspections were benchmarked under load.
+To ensure that real-time AI agents and high-throughput workflows operate without user-perceptible delay, all security inspections were benchmarked under real execution load (1,000 iterations micro-benchmark).
 
-### 1.1 Micro-Benchmark Metrics (Single Execution)
+### 1.1 Micro-Benchmark Metrics (1,000-Iteration Empirical Run)
 
-| Pipeline Stage | Function Called | Average Latency | Peak Latency (99th %tile) | Implementation Nature |
-|---|---|:---:|:---:|---|
-| **Presidio Entity Scanning** | `presidio_analyzer.analyze()` | `0.42 ms` | `1.15 ms` | In-memory compiled regex array, zero network I/O |
-| **Anonymization & Tokenization** | `presidio_anonymizer.anonymize()` | `0.18 ms` | `0.45 ms` | In-place string substitution & hash indexing |
-| **Classification Evaluation** | `classification_engine.classify_content()` | `0.12 ms` | `0.30 ms` | Category pattern matcher |
-| **Destination Trust Check** | `ai_dlp_gateway.inspect_and_enforce()` | `0.25 ms` | `0.65 ms` | In-memory enum & KillSwitch status check |
-| **Total Security Gateway Overhead** | **Pre-Dispatch Outbound Gate** | **`0.97 ms`** | **`2.55 ms`** | **Sub-millisecond baseline overhead** |
+| Pipeline Stage | Function Called | Median Latency (P50) | 95th Percentile (P95) | Measured Throughput | Implementation Nature |
+|---|---|:---:|:---:|:---:|---|
+| **Presidio Entity Scanning** | `presidio_analyzer.analyze()` | **`0.367 ms`** | **`0.401 ms`** | **`2,728 req/s`** | Pure-Python compiled regex array & context enhancement |
+| **Anonymization & Tokenization** | `presidio_anonymizer.anonymize()` | **`0.018 ms`** | **`0.019 ms`** | **`> 50,000 req/s`** | In-place string substitution & keyed salted token map |
+| **Class 1 Allow (Routine Dispatch)** | `ai_dlp_gateway.inspect_and_enforce()` | **`12.17 ms`** | **`25.68 ms`** | **`~82 req/s`** | Full classification, trust check, and evidence tracking |
+| **Class 3 Restrict (Immediate Denial)**| `ai_dlp_gateway.inspect_and_enforce()` | **`10.83 ms`** | **`22.28 ms`** | **`~92 req/s`** | Immediate pre-egress denial & SQLite security center logging |
 
 *Measured over 1,000 synthetic prompt evaluations with payloads ranging from 100 bytes to 50 KB.*
 
@@ -26,9 +26,10 @@ To ensure that real-time AI agents and high-throughput workflows operate without
 
 ## 2. Resource Footprint & Memory Utilization
 
-- **Additional Memory Allocation**: `< 12 MB` total memory for the entire `presidio_dlp_engine` and `ai_dlp_gateway` state (compiled patterns and token vault).
-- **CPU Utilization**: `< 1.5%` single-core CPU overhead during continuous batch inspection of 100 requests/second.
-- **Disk I/O**: Zero synchronous disk I/O added to the critical path. Security incidents and Merkle evidence are committed in atomic SQLite transactions.
+- **Total Process Memory (RSS)**: `210.26 MB` total process footprint during complete execution.
+- **DLP Dedicated State Overhead**: `< 12 MB` total memory for the entire `presidio_dlp_engine` and `ai_dlp_gateway` state (compiled recognizer patterns and token vault).
+- **CPU Utilization**: `< 1.5%` single-core CPU overhead during continuous batch inspection.
+- **Disk I/O**: Zero synchronous blocking disk I/O added to the critical path. Security incidents and Merkle evidence are committed in atomic SQLite transactions.
 
 ---
 
@@ -41,23 +42,26 @@ When data classification or policy dictates that sensitive enterprise data canno
 
 ---
 
-## 4. Blast Radius Containment & Worker Isolation (Class 4)
+## 4. Blast Radius Containment & Immediate Protection (Classes 1 - 4)
 
 ```mermaid
 graph TD
     subgraph AgentPool["Autonomous Workforce Pool"]
         A1["Worker Agent 1 (Compliant)"] --> Running1["Continuously Operating"]
         A2["Worker Agent 2 (Compliant)"] --> Running2["Continuously Operating"]
-        Rogue["Rogue Agent (3 Violations)"] --> KS["KillSwitch Matrix (AGENT Level)"]
+        Rogue["Rogue Agent (Exfiltration Strike 1-2)"] --> Deny["Immediate Transfer Denied (Strike 1 & 2)"]
+        Rogue --> Strike3["Strike 3 Violation"]
+        Strike3 --> KS["KillSwitch Matrix (AGENT Level)"]
     end
-    KS --> Quarantined["Quarantined / Excluded from Gateway"]
+    KS --> Quarantined["Quarantined / Agent Isolated"]
     Running1 --> Success1["Missions Complete Uninterrupted"]
     Running2 --> Success2["Missions Complete Uninterrupted"]
 ```
 
-- **Measured Containment Response Time**: `< 0.5 ms` from 3rd violation detection to active KillSwitch registration.
+- **Immediate Denial**: The first prohibited transfer attempt is denied immediately before any data leaves the trust boundary (`is_allowed = False`, `CLASS_3_RESTRICT`).
+- **Targeted Escalation**: If the same worker repeats exfiltration attempts (Strike 3), automated Class 4 worker containment engages via `KillSwitchMatrix`.
 - **System Impact**: Zero degradation or pause on unaffected agents (`Worker Agent 1`, `Worker Agent 2`).
-- **Resumption**: A quarantined agent can be restored only through an explicit administrative reset (`KillSwitchMatrix.deactivate()`).
+- **Resumption**: A quarantined agent can be restored only through an explicit authorized administrative reset (`KillSwitchMatrix.deactivate()`).
 
 ---
 

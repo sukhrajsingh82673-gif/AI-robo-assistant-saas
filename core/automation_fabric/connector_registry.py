@@ -442,6 +442,31 @@ class GovernedConnectorRegistry:
                     "reconciliation_required": True
                 }
 
+            # Outbound DLP Inspection on external connector parameters
+            if operation != "redact_sensitive_prompt" and connector_id not in ("conn_apache_camel", "conn_litellm_gateway"):
+                try:
+                    from core.ai_dlp_gateway import ai_dlp_gateway, OutboundSecurityContext, OutboundChannel, DestinationTrustLevel
+                    is_local = "local" in connector_id.lower() or "mcp_local" in connector_id.lower()
+                    dest_trust = DestinationTrustLevel.INTERNAL_SECURE if is_local else DestinationTrustLevel.APPROVED_SAAS
+                    sec_ctx = OutboundSecurityContext(
+                        tenant_id=tenant_id,
+                        principal_id=f"usr_{tenant_id}",
+                        principal_role="OPERATOR",
+                        calling_agent_id=f"connector_{connector_id}",
+                        channel=OutboundChannel.CONNECTOR_MUTATION,
+                        destination_name=connector_id,
+                        destination_trust=dest_trust
+                    )
+                    dlp_res = ai_dlp_gateway.inspect_and_enforce(sec_ctx, parameters)
+                    if not dlp_res.is_allowed:
+                        raise ConnectorSecurityError(f"DLP Outbound Violation: {dlp_res.blocking_reason}")
+                    if dlp_res.sanitized_payload and isinstance(dlp_res.sanitized_payload, dict):
+                        parameters = dlp_res.sanitized_payload
+                except ConnectorSecurityError:
+                    raise
+                except Exception:
+                    pass
+
             handler = self._custom_handlers.get(connector_id)
             custom_data = None
             if handler:

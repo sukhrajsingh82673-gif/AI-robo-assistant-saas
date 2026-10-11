@@ -321,7 +321,7 @@ class Gemma4Provider(CognitiveModelProvider):
             self._mode = mode.upper()
 
     def _apply_dlp(self, text: str, tenant_id: str) -> tuple[str, int]:
-        """Runs pre-dispatch DLP inspection via ZONATA Model Data Firewall."""
+        """Runs pre-dispatch DLP inspection via ZONATA Model Data Firewall (fail-closed)."""
         if not text:
             return "", 0
         try:
@@ -337,8 +337,8 @@ class Gemma4Provider(CognitiveModelProvider):
                 return f"[DLP_BLOCKED: {res.blocking_reason}]", 0
             return res.sanitized_prompt, res.redaction_count
         except Exception as e:
-            logger.warning(f"DLP inspection error: {e}")
-            return text, 0
+            logger.error(f"DLP inspection error (failing closed): {e}")
+            return f"[DLP_BLOCKED: Inspection failure - fail closed: {str(e)[:50]}]", 0
 
     def chat(
         self,
@@ -350,6 +350,34 @@ class Gemma4Provider(CognitiveModelProvider):
     ) -> CognitiveResponse:
         start_time = time.time()
         self._call_counter += 1
+
+        total_dlp_count = 0
+        blocked_reason = None
+        for m in messages:
+            if m.content:
+                s_msg, c = self._apply_dlp(m.content, tenant_id)
+                total_dlp_count += c
+                if s_msg.startswith("[DLP_BLOCKED:"):
+                    blocked_reason = s_msg
+                    break
+
+        if blocked_reason:
+            return CognitiveResponse(
+                provider=self.provider_name,
+                model_id=self._model_id,
+                content=f"Request blocked by Sovereign DLP Firewall: {blocked_reason}",
+                structured_data={"blocked": True, "reason": blocked_reason},
+                tool_proposals=[],
+                fact_classifications=[],
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+                mode=self._mode,
+                epistemic_confidence=0.0,
+                dlp_redactions_applied=total_dlp_count
+            )
 
         last_user_msg = ""
         for m in reversed(messages):

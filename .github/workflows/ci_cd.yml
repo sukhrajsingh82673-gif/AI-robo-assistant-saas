@@ -70,7 +70,9 @@ jobs:
               re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'),
               re.compile(r'\bAKIA[0-9A-Z]{16}\b'),
               re.compile(r'\bxox[baprs]-[a-zA-Z0-9\-]{20,}\b'),
-              re.compile(r'Bearer\s+eyJ[a-zA-Z0-9_\-\.]{40,}')
+              re.compile(r'Bearer\s+eyJ[a-zA-Z0-9_\-\.]{40,}'),
+              re.compile(r'\bcanary_sec_[a-zA-Z0-9_]{8,}\b'),
+              re.compile(r'(?:postgres|mysql|mongodb):\/\/[^:\s]+:([^@\s]{6,})@')
           ]
           ignore_files = {'adversarial_suite.py', 'temporal_adapter.py', 'langgraph_adapter.py'}
           found = False
@@ -85,9 +87,10 @@ jobs:
                       with open(p, 'r', errors='ignore') as fh:
                           content = fh.read()
                           for pat in patterns:
-                              matches = [m for m in pat.findall(content) if 'mock' not in m.lower() and 'test' not in m.lower() and 'unauthorized' not in m.lower()]
+                              matches = [m for m in pat.findall(content) if 'mock' not in str(m).lower() and 'test' not in str(m).lower() and 'unauthorized' not in str(m).lower()]
                               if matches:
-                                  print(f'POTENTIAL SECRET DETECTED in {p}: {matches[:1]}')
+                                  # Never print the secret value into CI logs
+                                  print(f'POTENTIAL SECRET DETECTED in {p} (Pattern matched: {pat.pattern[:25]}...; secret scrubbed from CI output)')
                                   found = True
                                   break
                   except Exception:

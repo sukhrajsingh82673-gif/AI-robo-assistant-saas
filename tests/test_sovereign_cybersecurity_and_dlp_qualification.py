@@ -88,20 +88,23 @@ class TestSovereignCybersecurityAndDLPQualification(unittest.TestCase):
         self.assertIn("<REDACTED_CREDIT_CARD>", anon.text)
 
     def test_02_presidio_custom_company_recognizers(self):
-        """2. Verifies custom recognizers for ZONATA Employee IDs, customer accounts, internal tokens, and project codenames."""
-        text = "Staff ZN-EMP-10492 handling account CUST-984210 under confidential Project Falcon with token zn_live_abcdef123456789012345678."
+        """2. Verifies custom recognizers for ZONATA Employee IDs, customer accounts, internal tokens, Indian tax IDs, and project codenames."""
+        text = "Staff ZN-EMP-10492 handling account CUST-984210 under confidential Project Falcon with token zn_live_abcdef123456789012345678 and PAN ABCDE1234F."
         results = presidio_analyzer.analyze(text)
         detected_types = {r.entity_type for r in results}
         self.assertIn("ZONATA_EMPLOYEE_ID", detected_types)
         self.assertIn("ZONATA_CUSTOMER_ID", detected_types)
         self.assertIn("CONFIDENTIAL_PROJECT_NAME", detected_types)
         self.assertIn("ZONATA_INTERNAL_TOKEN", detected_types)
+        self.assertIn("INDIA_IDENTITY_OR_TAX_ID", detected_types)
 
         anon = presidio_anonymizer.anonymize(text, results)
         self.assertNotIn("ZN-EMP-10492", anon.text)
         self.assertNotIn("Project Falcon", anon.text)
+        self.assertNotIn("ABCDE1234F", anon.text)
         self.assertIn("<REDACTED_ZONATA_EMPLOYEE_ID>", anon.text)
         self.assertIn("<REDACTED_CONFIDENTIAL_PROJECT_NAME>", anon.text)
+        self.assertIn("<REDACTED_INDIA_IDENTITY_OR_TAX_ID>", anon.text)
 
     def test_03_presidio_tokenization_operator(self):
         """3. Verifies reversible tokenization operator preserves deterministic surrogates without disclosing PII."""
@@ -321,6 +324,21 @@ class TestSovereignCybersecurityAndDLPQualification(unittest.TestCase):
         self.assertFalse(res_loop["success"])
         self.assertIn("SSRF Block", res_loop["error"])
 
+        # Loopback IPv6
+        res_ipv6 = self.browser.navigate_and_extract("http://[::1]:8080/admin")
+        self.assertFalse(res_ipv6["success"])
+        self.assertIn("SSRF Block", res_ipv6["error"])
+
+        # Decimal IP encoding (2130706433 == 127.0.0.1)
+        res_dec = self.browser.navigate_and_extract("http://2130706433:8080/admin")
+        self.assertFalse(res_dec["success"])
+        self.assertIn("SSRF Block", res_dec["error"])
+
+        # Disallowed dangerous port (SSH port 22)
+        res_port = self.browser.navigate_and_extract("http://example.com:22/admin")
+        self.assertFalse(res_port["success"])
+        self.assertIn("SSRF Block", res_port["error"])
+
     def test_16_terminal_path_traversal_blocking(self):
         """16. Verifies terminal file operation blocks directory traversal and sensitive system file access."""
         res_traversal = self.terminal.file_operation(
@@ -418,6 +436,18 @@ class TestSovereignCybersecurityAndDLPQualification(unittest.TestCase):
         decision = ai_dlp_gateway.inspect_and_enforce(ctx, confidential_data)
         self.assertFalse(decision.is_allowed)
         self.assertEqual(decision.response_class, SecurityResponseClass.CLASS_3_RESTRICT)
+
+        # Connector mutation DLP enforcement check
+        from core.automation_fabric.connector_registry import GovernedConnectorRegistry, ConnectorSecurityError
+        registry = GovernedConnectorRegistry()
+        secret_mutation_params = {"repo": "enterprise/repo", "token": "sk-live-09876543210987654321"}
+        with self.assertRaises(ConnectorSecurityError):
+            registry.execute_connector_operation(
+                connector_id="conn_github_v3",
+                operation="create_issue",
+                parameters=secret_mutation_params,
+                tenant_id=self.tenant_id
+            )
 
     # =========================================================================
     # 8. AUDIT & TELEMETRY INTEGRITY
