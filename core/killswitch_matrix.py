@@ -74,6 +74,10 @@ class KillSwitchMatrix:
             logger.warning(f"KILLSWITCH ENGAGED: Level={level}, Target={target_id}, Reason={reason}")
             return switch_id
 
+    def engage(self, level: str, target_id: str, reason: str, engaged_by: str = "HUMAN_OWNER") -> str:
+        """Alias for activate."""
+        return self.activate(level=level, target_id=target_id, reason=reason, activated_by=engaged_by)
+
     def deactivate(
         self,
         switch_id_or_level: str,
@@ -97,6 +101,15 @@ class KillSwitchMatrix:
                 """, (now, deactivated_by, switch_id_or_level, switch_id_or_level))
             conn.commit()
             return res.rowcount > 0
+
+    def disengage(
+        self,
+        switch_id_or_level: str,
+        target_id: Optional[str] = None,
+        disengaged_by: str = "HUMAN_OWNER"
+    ) -> bool:
+        """Alias for deactivate."""
+        return self.deactivate(switch_id_or_level=switch_id_or_level, target_id=target_id, deactivated_by=disengaged_by)
 
     def is_activated(self, level: str, target_id: Optional[str] = None) -> bool:
         """Checks if a KillSwitch is currently active at level (and optional target)."""

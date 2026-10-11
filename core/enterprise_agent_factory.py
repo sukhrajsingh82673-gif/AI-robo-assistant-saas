@@ -172,7 +172,7 @@ class EnterpriseAgentFactory:
         bid = f"agt_bp_{uuid.uuid4().hex[:8]}"
 
         # Infer Department
-        if any(w in lower for w in ["procure", "purchase", "vendor", "supplier", "rfq", "po"]):
+        if any(w in lower for w in ["procure", "purchase", "vendor", "supplier", "rfq"]) or " po " in f" {lower} ":
             dept = "Procurement"
             name = "Autonomous Procurement & Sourcing Specialist"
             role = "Procurement Officer"
