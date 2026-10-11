@@ -5,7 +5,7 @@
   "serialNumber": "urn:uuid:zonata-automation-fabric-v1",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-11T03:04:45Z",
+    "timestamp": "2026-10-11T03:58:54Z",
     "component": {
       "name": "URA Universal Automation Fabric",
       "version": "1.0.0",
@@ -859,11 +859,81 @@
           "value": "Microsoft Presidio MIT license"
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/langfuse@v2.50.0",
+      "name": "Langfuse AI Observability & LLM Tracing",
+      "version": "v2.50.0",
+      "purl": "pkg:generic/langfuse@v2.50.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://github.com/langfuse/langfuse/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/langfuse/langfuse"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "INTERPROCESS_CLIENT"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Langfuse official MIT license"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/deepeval@v1.4.0",
+      "name": "DeepEval LLM Evaluation Framework",
+      "version": "v1.4.0",
+      "purl": "pkg:generic/deepeval@v1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/confident-ai/deepeval/blob/main/LICENSE"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/confident-ai/deepeval"
+        }
+      ],
+      "properties": [
+        {
+          "name": "commercial_saas_rights",
+          "value": "true"
+        },
+        {
+          "name": "isolation_type",
+          "value": "EMBEDDED_RUNTIME"
+        },
+        {
+          "name": "verification_evidence",
+          "value": "Confident AI DeepEval Apache-2.0 license"
+        }
+      ]
     }
   ],
   "compliance_summary": {
-    "total_components": 24,
-    "osi_compliant_count": 24,
+    "total_components": 26,
+    "osi_compliant_count": 26,
     "unapproved_count": 0,
     "overall_status": "FULLY_COMPLIANT"
   }

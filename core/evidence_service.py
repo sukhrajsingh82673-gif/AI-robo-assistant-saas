@@ -28,6 +28,12 @@ class EvidenceServiceV2:
     """
     GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
+    @staticmethod
+    def hash_payload(payload: Dict[str, Any]) -> str:
+        """Calculate canonical SHA-256 digest of payload dictionary."""
+        canonical_str = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+
     def __init__(self):
         self._init_db()
         self._local_ledger = EvidenceLedger()

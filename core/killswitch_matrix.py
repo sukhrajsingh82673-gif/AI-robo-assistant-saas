@@ -113,6 +113,10 @@ class KillSwitchMatrix:
                 """, (level,)).fetchone()
             return row is not None
 
+    def is_engaged(self, level: str, target_id: Optional[str] = None) -> bool:
+        """Alias for is_activated."""
+        return self.is_activated(level, target_id)
+
     def assert_can_execute(
         self,
         company_id: Optional[str] = None,

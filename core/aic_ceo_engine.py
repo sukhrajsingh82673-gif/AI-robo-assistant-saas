@@ -273,6 +273,19 @@ class UniversalAICCEOEngine:
             evidence_collected=[]
         )
         self._missions[mission_id] = plan
+
+        try:
+            from core.langfuse_adapter import governed_langfuse_adapter, ExecutionStage
+            governed_langfuse_adapter.start_stage_span(
+                stage=ExecutionStage.AI_CEO_PLANNING,
+                task_id=mission_id,
+                tenant_id=self.tenant_id,
+                agent_id="ai_ceo",
+                metadata={"objective": owner_objective, "target_revenue_usd": target_revenue_usd}
+            )
+        except Exception:
+            pass
+
         return plan
 
     def advance_mission_stage(self, mission_id: str, next_stage: OperatingLoopStage) -> Optional[ExecutiveMissionPlan]:
@@ -321,6 +334,23 @@ class UniversalAICCEOEngine:
             plan.lessons_learned.append(f"Strategy validated: Generated ${actual_revenue_delta} verified revenue with positive profit.")
         else:
             plan.lessons_learned.append("Execution complete, but economic criteria or verified evidence not fully satisfied.")
+
+        try:
+            from core.langfuse_adapter import governed_langfuse_adapter, ExecutionStage, StageStatus
+            span = governed_langfuse_adapter.start_stage_span(
+                stage=ExecutionStage.TASK_COMPLETION,
+                task_id=mission_id,
+                tenant_id=self.tenant_id,
+                agent_id="ai_ceo",
+                metadata={"financial_delta_usd": plan.financial_delta_usd, "is_successful": plan.is_successful}
+            )
+            governed_langfuse_adapter.finish_stage_span(
+                span_id=span.span_id,
+                status=StageStatus.SUCCESS if plan.is_successful else StageStatus.FAILED,
+                verification_status="VERIFIED" if plan.outcome_verified else "UNVERIFIED"
+            )
+        except Exception:
+            pass
 
         return plan
 

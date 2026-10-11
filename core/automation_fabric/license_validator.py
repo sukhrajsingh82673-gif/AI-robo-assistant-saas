@@ -274,6 +274,26 @@ class AutomationLicenseValidator:
             "commercial_saas_compliant": True,
             "isolation_type": "EMBEDDED_SOVEREIGN_ADAPTER",
             "verified_evidence": "Microsoft Presidio MIT license"
+        },
+        "langfuse": {
+            "name": "Langfuse AI Observability & LLM Tracing",
+            "version": "v2.50.0",
+            "repository": "https://github.com/langfuse/langfuse",
+            "license": "MIT",
+            "spdx": "MIT",
+            "commercial_saas_compliant": True,
+            "isolation_type": "INTERPROCESS_CLIENT",
+            "verified_evidence": "Langfuse official MIT license"
+        },
+        "deepeval": {
+            "name": "DeepEval LLM Evaluation Framework",
+            "version": "v1.4.0",
+            "repository": "https://github.com/confident-ai/deepeval",
+            "license": "Apache-2.0",
+            "spdx": "Apache-2.0",
+            "commercial_saas_compliant": True,
+            "isolation_type": "EMBEDDED_RUNTIME",
+            "verified_evidence": "Confident AI DeepEval Apache-2.0 license"
         }
     }
 

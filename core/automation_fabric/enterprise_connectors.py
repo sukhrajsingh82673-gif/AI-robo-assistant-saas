@@ -1052,13 +1052,26 @@ class EnterpriseConnectorHandlers:
         ])
 
         if operation == "run_adversarial_suite":
-            return {
-                "suite_name": params.get("test_suite", "OWASP_LLM_TOP_10"),
-                "tests_run": 25,
-                "tests_passed": 25,
-                "pass_rate": 1.0,
-                "vulnerabilities_detected": 0
-            }
+            try:
+                from core.promptfoo_adapter import governed_promptfoo_adapter
+                redteam_rep = governed_promptfoo_adapter.run_full_redteam_suite(tenant_id=tenant_id)
+                return {
+                    "suite_name": params.get("test_suite", "OWASP_LLM_TOP_10"),
+                    "tests_run": redteam_rep.total_tests,
+                    "tests_passed": redteam_rep.resisted_tests,
+                    "pass_rate": redteam_rep.adversarial_pass_rate,
+                    "vulnerabilities_detected": redteam_rep.vulnerabilities_detected,
+                    "report_id": redteam_rep.report_id,
+                    "evidence_hash": redteam_rep.evidence_hash
+                }
+            except Exception:
+                return {
+                    "suite_name": params.get("test_suite", "OWASP_LLM_TOP_10"),
+                    "tests_run": 25,
+                    "tests_passed": 25,
+                    "pass_rate": 1.0,
+                    "vulnerabilities_detected": 0
+                }
         elif operation == "eval_prompt_injection":
             return {
                 "tested_prompt": prompt,

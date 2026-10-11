@@ -309,6 +309,10 @@ class Gemma4Provider(CognitiveModelProvider):
         return self._model_id
 
     @property
+    def model_id(self) -> str:
+        return self._model_id
+
+    @property
     def deployment_mode(self) -> str:
         return self._mode
 
@@ -406,6 +410,24 @@ class Gemma4Provider(CognitiveModelProvider):
             (prompt_tokens / 1000.0) * spec["cost_per_1k_input_usd"] +
             (completion_tokens / 1000.0) * spec["cost_per_1k_output_usd"]
         )
+
+        # Governed Langfuse execution tracing (fails open)
+        try:
+            from core.langfuse_adapter import governed_langfuse_adapter
+            prompt_summary = " ".join([m.content for m in messages if m.content])
+            governed_langfuse_adapter.trace_model_call(
+                model=self._model_id,
+                prompt=prompt_summary[:500],
+                response=response_content[:500],
+                input_tokens=prompt_tokens,
+                output_tokens=completion_tokens,
+                latency_ms=latency,
+                tenant_id=tenant_id,
+                task_id=context.get("task_id", "task_cognitive") if context else "task_cognitive",
+                agent_id=context.get("agent_id", "ai_ceo") if context else "ai_ceo"
+            )
+        except Exception:
+            pass
 
         return CognitiveResponse(
             provider=self.provider_name,
