@@ -3,7 +3,7 @@
 **Executive Assessment & Architecture Specification**  
 **Document Classification:** RESTRICTED — INTERNAL GOVERNANCE  
 **Authority Reference:** ZONATA Company Kernel Authority Hierarchy  
-**Baseline Commit:** `353238f` (Lineage verified from `53bd2ef` and `45cf91f`)  
+**Baseline Commit:** `520e68d` (Lineage verified from `353238f`, `53bd2ef`, and `45cf91f`)  
 **Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
 ---
@@ -73,20 +73,23 @@ Every outbound execution route in the operating system has been verified to ensu
 
 ### 3.5 Route 5 — Persistent Memory Boundary (`core/coworker/memory_tier.py` & `core/memory_governance.py`)
 - **Pre-Storage Scrubbing**: Scans records before persistence in `OPERATIONAL_MEMORY`, `TASK_MEMORY`, or `EPISODIC_MEMORY`. Replaces raw tokens and API keys with `<REDACTED_MEMORY_SECRET>`.
-- **Keyed HMAC Session Salt Tokenization**: Prevents rainbow table and dictionary brute-forcing of customer IDs by salting tokenization hashes per session using `hmac.new(self._token_salt, ...)`.
+- **CSPRNG Keyed HMAC Salt Lifecycle**: Eliminates dictionary and rainbow table brute-forcing of customer IDs and tokens by initializing `_token_salt` with a 256-bit CSPRNG (`secrets.token_hex(32)`).
+- **Per-Mission Salt Rotation**: The `rotate_session_salt()` method allows rotating the cryptographic salt between independent missions, enforcing cross-mission token isolation while preserving deterministic tokenization within a session. Keyed HMAC-SHA256 is enforced across both tokenize and hash operators.
 - **Epistemic Segregation**: Non-sovereign worker agents cannot write to `BUSINESS_MEMORY` without explicit sovereign authority.
 
 ### 3.6 Route 6 — Browser & External Egress Boundary (`core/coworker/controllers/browser_controller.py`)
-- **Connection-Time SSRF Defense**: `SSRFSafeHTTPConnection.connect()` and `SSRFSafeHTTPSConnection.connect()` perform socket resolution immediately prior to connection, verifying that every resolved IP address is public and non-restricted. The socket connects directly to the validated IP, eliminating DNS rebinding and TOCTOU flaws.
-- **Proxy Neutralization**: `urllib.request.ProxyHandler({})` explicitly disables environment proxy bypasses.
+- **Connection-Time SSRF Defense & Direct Socket Binding**: `SSRFSafeHTTPConnection.connect()` and `SSRFSafeHTTPSConnection.connect()` resolve host addresses via `socket.getaddrinfo()`, validate every candidate against private, loopback, and metadata ranges, and directly bind/connect the socket to the validated socket address (`sa`). This eliminates DNS rebinding, TOCTOU, and race condition bypasses.
+- **Strict TLS Certificate Verification & Hostname Binding**: `SSRFSafeHTTPSConnection` strips any explicit port from `clean_host` to ensure the exact RFC 6066 SNI `server_hostname` is passed, while explicitly setting `context.check_hostname = True` and `context.verify_mode = ssl.CERT_REQUIRED`. Connections to IP addresses or hostnames with invalid or mismatched certificates fail closed immediately.
+- **Proxy Neutralization**: `urllib.request.ProxyHandler({})` is explicitly installed to neutralize environment proxy redirection (`HTTP_PROXY` / `HTTPS_PROXY` bypasses).
 - **Address & Port Coverage**: Defends against IPv4/IPv6 private ranges, loopback (`127.0.0.1`, `[::1]`), cloud metadata (`169.254.169.254`, `metadata.google.internal`), decimal integer IPs (`2130706433`), hex IPs (`0x7f000001`), and userinfo prefixes (`user@host`). Restricts browser egress to standard ports (80, 443, 8080, 8443).
-- **Redirect Chain Re-Validation**: `SSRFSafeRedirectHandler` re-verifies target IP addresses on every 301/302 HTTP redirect.
+- **Redirect Chain Re-Validation**: `SSRFSafeRedirectHandler` re-evaluates destination IP addresses on every 301/302 HTTP redirect.
 - **Inbound DOM Scanning & Outbound Keystroke DLP**: Scans extracted DOM content for prompt injection and checks keyboard input typing actions against DLP rules.
 
 ### 3.7 Route 7 — Terminal & Workspace Boundary (`core/coworker/controllers/terminal_controller.py`)
 - **Pre-Execution Command DLP Screening**: Shell commands are pre-screened through `ai_dlp_gateway.inspect_and_enforce()` for `OutboundChannel.TERMINAL_COMMAND`. Commands attempting to dispatch canary tokens, API keys, or private keys via network utilities (`curl`, `wget`, `nc`, `ssh`) are denied on **Strike 1** (`exit_code: 126`, `status: "POLICY_DENIED"`).
 - **Path Traversal Confinement**: Rejects path traversal attempts (`../../etc/passwd`) and checks both raw and `os.path.realpath` canonical paths against restricted system directories (`/etc`, `/root/.vault`, `/proc`, `/sys`, `/root/.ssh`, `/root/.gnupg`, `/dev`).
 - **12-Tier Command Risk Matrix**: Analyzes shell commands before execution, blocking forbidden commands (`rm -rf /`, `curl ... | sh`, `mkfs`) and scrubbing credentials from terminal buffers.
+- **Deployment Runtime Boundary Verification**: In the verified user-space PRoot / container deployment environment, kernel eBPF/iptables network namespace isolation is unavailable without host root permissions. Consequently, terminal exfiltration defense is proven at the **application-level command DLP inspection and filesystem realpath confinement layer**, while raw OS socket containment remains an explicit infrastructure prerequisite for untrusted multi-tenant host kernels.
 
 ### 3.8 Route 8 — Enterprise Connectors & Background Automation (`core/automation_fabric/connector_registry.py`)
 - **Pre-Execution Parameter Screening**: Outbound external connectors (REST, Webhooks, messaging) inspect execution parameters via DLP firewall prior to network dispatch.

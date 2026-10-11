@@ -2,7 +2,7 @@
 
 **Security Component Baseline, Integration Status & License Evidence**  
 **Document Classification:** RESTRICTED — AUDIT REPORT  
-**Baseline Commit:** `353238f` (Lineage from `53bd2ef` and `45cf91f` verified)  
+**Baseline Commit:** `520e68d` (Lineage from `353238f`, `53bd2ef`, and `45cf91f` verified)  
 **Evaluation Date:** October 11, 2026  
 **Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
@@ -36,9 +36,9 @@ All enterprise security capabilities in the repository are audited and classifie
 | **EdgeSecurityGateway** | `core/edge_security_gateway.py` | Ingress WAF & IP/tenant rate limiter | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Reused for outer perimeter protection. |
 | **GovernedMCPController** | `core/coworker/controllers/mcp_controller.py` | MCP tool invocation mediation | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with outbound argument DLP & inbound injection defense. |
 | **GovernedA2AController** | `core/coworker/controllers/a2a_controller.py` | Agent-to-Agent communication gateway | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with cross-tenant isolation and payload sanitization. |
-| **GovernedBrowserController** | `core/coworker/controllers/browser_controller.py` | SSRF-guarded browser runtime | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with connection-time socket validation (`SSRFSafeHTTPConnection`), IPv4/IPv6, integer IPs, port constraints, and redirect revalidation. |
-| **GovernedTerminalController** | `core/coworker/controllers/terminal_controller.py` | Sandbox shell & filesystem supervisor | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with realpath confinement, restricted prefix protection, and pre-execution Strike 1 DLP command screening. |
-| **GovernedMemoryManager** | `core/coworker/memory_tier.py` | Multi-tiered memory architecture | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with pre-persistence credential scrubbing and keyed HMAC tokenization. |
+| **GovernedBrowserController** | `core/coworker/controllers/browser_controller.py` | SSRF-guarded browser runtime | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with connection-time socket binding (`SSRFSafeHTTPConnection` / `SSRFSafeHTTPSConnection`), SNI port strip, strict TLS validation (`CERT_REQUIRED`), proxy bypass neutralization, and redirect revalidation. |
+| **GovernedTerminalController** | `core/coworker/controllers/terminal_controller.py` | Sandbox shell & filesystem supervisor | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with realpath confinement, restricted prefix protection, and pre-execution Strike 1 DLP command screening; PRoot user-space container boundary documented. |
+| **GovernedMemoryManager** | `core/coworker/memory_tier.py` | Multi-tiered memory architecture | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with pre-persistence credential scrubbing, 256-bit CSPRNG salt, and per-mission salt rotation. |
 | **GovernedConnectorRegistry** | `core/automation_fabric/connector_registry.py` | External connector mediation & discovery | Apache-2.0 | `IMPLEMENTED_AND_CONNECTED` | Hardened with outbound DLP parameter checks on external mutations. |
 | **SecretManager & VaultClient** | `core/secret_manager.py`, `core/vault_client.py` | Secrets mediation & JIT injection | Apache-2.0 / MPL-2.0 | `IMPLEMENTED_AND_CONNECTED` | In-memory fallback active locally; remote Vault is `BLOCKED_ENVIRONMENT`. |
 | **Presidio Compatible Engine** | `core/presidio_dlp_engine.py` | Sensitive entity detection & anonymization | MIT | `IMPLEMENTED_AND_CONNECTED` | Pure-Python sovereign local engine with India tax recognizers and HMAC-keyed tokenization. |

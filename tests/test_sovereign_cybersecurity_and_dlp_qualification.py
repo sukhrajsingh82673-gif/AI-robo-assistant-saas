@@ -107,7 +107,8 @@ class TestSovereignCybersecurityAndDLPQualification(unittest.TestCase):
         self.assertIn("<REDACTED_INDIA_IDENTITY_OR_TAX_ID>", anon.text)
 
     def test_03_presidio_tokenization_operator(self):
-        """3. Verifies reversible tokenization operator preserves deterministic surrogates without disclosing PII."""
+        """3. Verifies reversible tokenization operator preserves deterministic surrogates without disclosing PII and supports per-mission salt rotation."""
+        self.assertGreaterEqual(len(presidio_anonymizer._token_salt), 64)
         text = "Invoice for customer CUST-ABC12345."
         results = presidio_analyzer.analyze(text)
         operators = {"ZONATA_CUSTOMER_ID": {"type": "tokenize"}}
@@ -119,6 +120,22 @@ class TestSovereignCybersecurityAndDLPQualification(unittest.TestCase):
         token_key = list(anon.token_map.keys())[0]
         original_val = presidio_anonymizer.detokenize(token_key)
         self.assertEqual(original_val, "CUST-ABC12345")
+
+        # Verify within-session determinism
+        anon_repeat = presidio_anonymizer.anonymize(text, results, operators=operators)
+        token_key_repeat = list(anon_repeat.token_map.keys())[0]
+        self.assertEqual(token_key, token_key_repeat)
+
+        # Verify cross-mission salt rotation produces distinct surrogates
+        old_salt = presidio_anonymizer._token_salt
+        new_salt = presidio_anonymizer.rotate_session_salt()
+        self.assertNotEqual(old_salt, new_salt)
+        self.assertGreaterEqual(len(new_salt), 64)
+
+        anon_rotated = presidio_anonymizer.anonymize(text, results, operators=operators)
+        token_key_rotated = list(anon_rotated.token_map.keys())[0]
+        self.assertNotEqual(token_key, token_key_rotated)
+        self.assertEqual(presidio_anonymizer.detokenize(token_key_rotated), "CUST-ABC12345")
 
     def test_04_synthetic_canary_secret_detection(self):
         """4. Verifies synthetic security canary tokens are detected with confidence score 1.0."""

@@ -3,7 +3,7 @@
 **Outbound Channel Governance & Data Classification Taxonomy**  
 **Document Classification:** RESTRICTED — INTERNAL GOVERNANCE  
 **Authority Reference:** `core/ai_dlp_gateway.py` & `core/data_classification_engine.py`  
-**Baseline Commit:** `353238f` (Lineage verified from `53bd2ef` and `45cf91f`)  
+**Baseline Commit:** `520e68d` (Lineage verified from `353238f`, `53bd2ef`, and `45cf91f`)  
 **Status:** PRODUCTION QUALIFIED — VERIFIED SCOPE  
 
 ---
@@ -46,7 +46,7 @@
 | **4** | Agent-to-Agent (A2A) | Agent Tenant A | Agent Tenant A | `INTERNAL_SECURE` | `CONFIDENTIAL` (Customer) | Redact sensitive PII; forward sanitized payload | **Class 2** | Deliver sanitized content only |
 | **5** | Persistent Memory | Agent Worker | Operational Memory | `LOCAL_SOVEREIGN` | `HIGHLY_RESTRICTED` (Key) | Scrub credentials; persist `<REDACTED_MEMORY_SECRET>` | **Class 2** | Memory stored without secret |
 | **5** | Persistent Memory | Non-Sovereign | Business Memory | `LOCAL_SOVEREIGN` | Any | Reject write; require sovereign authority | **Class 3** | Raise `PermissionError` |
-| **6** | Browser & Egress | Browser Agent | `169.254.169.254` or Decimal IP | `PUBLIC_INTERNET` | Navigation | Connection-time socket check (`SSRFSafeHTTPConnection`): block metadata | **Class 3** | Abort connection immediately |
+| **6** | Browser & Egress | Browser Agent | `169.254.169.254` or Decimal IP | `PUBLIC_INTERNET` | Navigation | Connection-time socket check (`SSRFSafeHTTPConnection` / `SSRFSafeHTTPSConnection`), direct socket binding, strict TLS SNI & `CERT_REQUIRED`, proxy neutralization: block metadata | **Class 3** | Abort connection immediately |
 | **6** | Browser & Egress | Browser Agent | Public Site $\to$ Localhost Redirect | `PUBLIC_INTERNET` | Navigation | Re-evaluate IP on redirect and socket connect; block loopback | **Class 3** | Abort HTTP request immediately |
 | **6** | Browser & Egress (Typing) | Browser Agent | Web Form Input | `PUBLIC_INTERNET` | `HIGHLY_RESTRICTED` (Canary) | Intercept type action; redact credentials | **Class 2** | Keystrokes sanitized |
 | **7** | Terminal Sandbox | Terminal Agent | `../../etc/passwd` or `/root/.ssh` | `LOCAL_SOVEREIGN` | File Operation | Confinement check + `realpath`; reject traversal | **Class 3** | Return `FAILED_SECURITY_POLICY` |
@@ -71,7 +71,7 @@
     "CRYPTO_PRIVATE_KEY": { "type": "redact" },
     "API_KEY_OR_SECRET": { "type": "replace", "new_value": "<REDACTED_SECRET>" },
     "ZONATA_EMPLOYEE_ID": { "type": "replace", "new_value": "<REDACTED_ZONATA_EMPLOYEE_ID>" },
-    "ZONATA_CUSTOMER_ID": { "type": "tokenize", "session_salted": true, "keyed_hmac": true },
+    "ZONATA_CUSTOMER_ID": { "type": "tokenize", "session_salted": true, "csprng_256bit": true, "mission_rotatable": true, "keyed_hmac": true },
     "CONFIDENTIAL_PROJECT_NAME": { "type": "replace", "new_value": "<REDACTED_CONFIDENTIAL_PROJECT_NAME>" },
     "SECURITY_CANARY": { "type": "replace", "new_value": "<REDACTED_CANARY_SECRET>" },
     "INDIA_PAN": { "type": "replace", "new_value": "<REDACTED_INDIA_PAN>" },

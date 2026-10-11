@@ -42,15 +42,31 @@ class SSRFSafeHTTPConnection(http.client.HTTPConnection):
             if GovernedBrowserController.is_private_ip(target_ip):
                 raise urllib.error.HTTPError(f"http://{self.host}", 403, f"SSRF Block: Connection target IP '{target_ip}' is private or restricted", {}, None)
 
-        first_af, first_socktype, first_proto, _, first_sa = addr_info[0]
-        self.sock = socket.socket(first_af, first_socktype, first_proto)
-        if self.timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
-            self.sock.settimeout(self.timeout)
-        self.sock.connect(first_sa)
+        err = None
+        self.sock = None
+        for af, socktype, proto, canonname, sa in addr_info:
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                if self.timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(self.timeout)
+                if self.source_address:
+                    sock.bind(self.source_address)
+                sock.connect(sa)
+                self.sock = sock
+                break
+            except OSError as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if self.sock is None:
+            if err:
+                raise err
+            raise OSError("Could not connect to any validated target address")
 
 
 class SSRFSafeHTTPSConnection(http.client.HTTPSConnection):
-    """Enforces connection-time SSRF validation for HTTPS before TLS handshake."""
+    """Enforces connection-time SSRF validation for HTTPS before TLS handshake with strict certificate verification."""
     def connect(self):
         clean_host = self.host.strip("[]")
         if "@" in clean_host:
@@ -72,14 +88,33 @@ class SSRFSafeHTTPSConnection(http.client.HTTPSConnection):
             if GovernedBrowserController.is_private_ip(target_ip):
                 raise urllib.error.HTTPError(f"https://{self.host}", 403, f"SSRF Block: Connection target IP '{target_ip}' is private or restricted", {}, None)
 
-        first_af, first_socktype, first_proto, _, first_sa = addr_info[0]
-        raw_sock = socket.socket(first_af, first_socktype, first_proto)
-        if self.timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
-            raw_sock.settimeout(self.timeout)
-        raw_sock.connect(first_sa)
+        err = None
+        raw_sock = None
+        for af, socktype, proto, canonname, sa in addr_info:
+            try:
+                raw_sock = socket.socket(af, socktype, proto)
+                if self.timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                    raw_sock.settimeout(self.timeout)
+                if self.source_address:
+                    raw_sock.bind(self.source_address)
+                raw_sock.connect(sa)
+                break
+            except OSError as e:
+                err = e
+                if raw_sock is not None:
+                    raw_sock.close()
+                    raw_sock = None
+        if raw_sock is None:
+            if err:
+                raise err
+            raise OSError("Could not connect to any validated target address")
 
-        server_hostname = self.host if not self._tunnel_host else self._tunnel_host
+        # Strip any port from clean_host for TLS SNI and hostname check
+        clean_hostname = clean_host.split(":")[0] if (":" in clean_host and clean_host.count(":") == 1) else clean_host
+        server_hostname = self._tunnel_host if self._tunnel_host else clean_hostname
         context = self._context or ssl.create_default_context()
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
         self.sock = context.wrap_socket(raw_sock, server_hostname=server_hostname)
 
 

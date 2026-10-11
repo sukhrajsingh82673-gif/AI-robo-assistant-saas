@@ -19,6 +19,7 @@ import time
 import uuid
 import hashlib
 import hmac
+import secrets
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
 
@@ -476,8 +477,14 @@ class PresidioAnonymizerEngine:
       - hash: Replace with SHA-256 digest
       - redact: Strip content completely
     """
-    def __init__(self):
+    def __init__(self, token_salt: Optional[str] = None):
         self._token_vault: Dict[str, str] = {}
+        self._token_salt: str = token_salt or secrets.token_hex(32)
+
+    def rotate_session_salt(self) -> str:
+        """Rotates the session salt for new missions, enforcing cross-mission token isolation."""
+        self._token_salt = secrets.token_hex(32)
+        return self._token_salt
 
     def anonymize(
         self,
@@ -519,18 +526,12 @@ class PresidioAnonymizerEngine:
                 preserved = orig_span[chars_to_mask:]
                 new_val = (masking_char * chars_to_mask) + preserved
             elif op_type == "tokenize":
-                token_salt = getattr(self, "_token_salt", None)
-                if not token_salt:
-                    self._token_salt = uuid.uuid4().hex
                 token_hash = hmac.new(self._token_salt.encode("utf-8"), orig_span.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
                 surrogate = f"tok_dlp_{entity.lower()}_{token_hash}"
                 self._token_vault[surrogate] = orig_span
                 token_map[surrogate] = orig_span
                 new_val = surrogate
             elif op_type == "hash":
-                token_salt = getattr(self, "_token_salt", None)
-                if not token_salt:
-                    self._token_salt = uuid.uuid4().hex
                 keyed_hash = hmac.new(self._token_salt.encode("utf-8"), orig_span.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
                 new_val = f"<HMAC_{keyed_hash}>"
             elif op_type == "redact":

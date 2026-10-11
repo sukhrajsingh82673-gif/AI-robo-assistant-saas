@@ -2,7 +2,7 @@
 
 **Final Scoped Production Acceptance, Boundary Verification & Certification Closure**  
 **Official Release Verdict:** `PRODUCTION QUALIFIED — VERIFIED SCOPE`  
-**Starting Baseline Commit:** `353238f` (Lineage from `53bd2ef` and `45cf91f` verified)  
+**Starting Baseline Commit:** `520e68d` (Lineage from `353238f`, `53bd2ef`, and `45cf91f` verified)  
 **Evaluation Date:** October 11, 2026  
 **Auditor:** Anti-Gravity Autonomous DevSecOps & Security Release Auditor  
 
@@ -19,14 +19,15 @@ This certification is strictly and defensibly bounded to:
 1. **Sovereign Single-Node Containerized Deployment**: Full containerized runtime with local SQLite database engine in WAL mode, local process execution, and sovereign in-process authority controls.
 2. **Autonomous Outbound AI Data-Loss Prevention (DLP)**: End-to-end data mediation across LLMs, direct model SDKs, MCP tools, A2A communication, persistent memory, browser egress, terminal sandboxing, and enterprise connectors. Immediate Strike 1 denial on unauthorized exfiltration.
 3. **Microsoft Presidio Compatible Entity Engine**: Local pure-Python detection and anonymization of standard PII, synthetic canaries, Indian identifiers (PAN, Aadhaar, GSTIN, IFSC), and company-specific entities (`ZN-EMP`, `CUST-ID`).
-4. **Keyed HMAC Anonymization**: Session-salted HMAC tokenization preventing dictionary and rainbow table brute-forcing of low-entropy secrets.
-5. **Connection-Time Browser SSRF Defense**: Direct socket validation at connection time preventing DNS rebinding and TOCTOU exploits.
-6. **Progressive Response Governance**: Classes 1–5 autonomous response taxonomy enabling unattended continuous operations when the human owner is offline. Immediate denial on first prohibited transfer attempt.
-7. **Architectural Invariant Preservation**: `web/workflow_workspace.js` verified byte-for-byte identical to baseline commit `7c00938` (`198d57ec6bda875cd2a6825fe2ef8929b7ba30bd`).
+4. **Keyed HMAC Anonymization & Salt Lifecycle**: 256-bit CSPRNG session salt (`secrets.token_hex(32)`) and per-mission salt rotation (`rotate_session_salt()`) preventing dictionary and rainbow table brute-forcing while ensuring cross-mission token isolation and within-session determinism.
+5. **Connection-Time Browser SSRF & TLS Defense**: Direct socket address resolution and iteration connecting directly to validated `sa` (eliminating DNS rebinding & TOCTOU), host port stripping for SNI, strict certificate verification (`check_hostname = True`, `verify_mode = ssl.CERT_REQUIRED`), redirect revalidation, and proxy bypass neutralization (`ProxyHandler({})`).
+6. **Terminal Execution Sandbox & Strike 1 DLP**: Pre-execution shell command screening intercepting exfiltration attempts (`curl`, `wget`, `nc`, `ssh`) on Strike 1 (`status: "POLICY_DENIED"`, `exit_code: 126`), and realpath filesystem confinement against restricted system directories.
+7. **Progressive Response Governance**: Classes 1–5 autonomous response taxonomy enabling unattended continuous operations when the human owner is offline. Immediate denial on first prohibited transfer attempt.
+8. **Architectural Invariant Preservation**: `web/workflow_workspace.js` verified byte-for-byte identical to baseline commit `7c00938` (`198d57ec6bda875cd2a6825fe2ef8929b7ba30bd`).
 
 ### 1.2 Explicitly Excluded / External Prerequisites Scope
 - **Live Remote Cloud SaaS Execution**: External third-party ERPNext cloud servers, remote live HubSpot API, and external live Stripe production endpoints remain classified as `BLOCKED_ENVIRONMENT` due to the lack of live production tenant API keys. In-container local simulations are classified as `PASS_LOCAL`.
-- **Multi-Node Distributed Clustering**: Real-time cross-host replication (e.g., Litestream, Raft, multi-datacenter consensus) and remote HashiCorp Vault clusters require external networking and are outside the sovereign single-node scope.
+- **Multi-Node Distributed Clustering & Kernel-Level Network Namespaces**: Real-time cross-host replication (e.g., Litestream, Raft) and remote HashiCorp Vault clusters require external networking. In unprivileged PRoot/container environments, kernel eBPF/iptables network namespace socket blocking is an explicit infrastructure prerequisite; application-level command DLP and filesystem sandboxing are fully verified.
 
 ---
 
@@ -51,7 +52,7 @@ This certification is strictly and defensibly bounded to:
 
 | # | Master Acceptance Criterion | Implementation & Audit Evidence | Status |
 |:---:|---|---|:---:|
-| **1** | **Repository & Starting Baseline Identified** | Verified HEAD at `353238f`, ancestors `53bd2ef` & `45cf91f`, branch `main`, clean working tree. | **SATISFIED** |
+| **1** | **Repository & Starting Baseline Identified** | Verified HEAD at `520e68d`, ancestors `353238f`, `53bd2ef` & `45cf91f`, branch `main`, clean working tree. | **SATISFIED** |
 | **2** | **Existing Security Reused & Inventoried** | Reused `PolicyEngineV2`, `KillSwitchMatrix`, `EvidenceService`, `ModelDataFirewall`, `EdgeSecurityGateway`. | **SATISFIED** |
 | **3** | **All 10 Outbound Paths Governed** | Wired `AutonomousAIDLPGateway` across LLM, SDK, MCP, A2A, Memory, Browser, Terminal, Connectors, Logs, CI/CD. | **SATISFIED** |
 | **4** | **Autonomous Unattended Operation** | Routine work, safe redaction, and local failover execute without human prompts (Classes 1–4). | **SATISFIED** |
@@ -59,13 +60,13 @@ This certification is strictly and defensibly bounded to:
 | **6** | **Scoped Fail-Closed Enforcement** | Unresolved destinations or policy failures fail closed for that operation without system outage. | **SATISFIED** |
 | **7** | **Targeted Blast Radius Containment** | Repeated exfiltration attempts trigger Class 4 KillSwitch isolating rogue worker; other agents continue. | **SATISFIED** |
 | **8** | **Sovereign Authority Hierarchy Preserved** | Host $\to$ Kernel $\to$ AI CEO $\to$ Workforce hierarchy maintained. `MODEL != AUTHORITY`. | **SATISFIED** |
-| **9** | **Reproducible Test Evidence** | 177 tests executed across 6 suites: 177 Passed, 0 Failed, 0 Errors in 82.30s. | **SATISFIED** |
+| **9** | **Reproducible Test Evidence** | 177 tests executed across 6 suites: 177 Passed, 0 Failed, 0 Errors in 79.39s. | **SATISFIED** |
 | **10**| **Measured Performance & Overhead** | Benchmark: P50 scan `2.16ms`, P50 anon `0.061ms`, Class 1 `10.22ms`, Class 3 `10.41ms`, RAM overhead `4.16MB`. | **SATISFIED** |
 | **11**| **Accurate SBOM & License Compliance** | CycloneDX v1.5 SBOM Component 24 declared as pure-Python sovereign Presidio-compatible engine (MIT). | **SATISFIED** |
 | **12**| **Baseline Frontend Untouched** | `web/workflow_workspace.js` verified identical to Git blob `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd`. | **SATISFIED** |
-| **13**| **Explicit Residual Risks Stated** | Steganography limitations, single-node boundaries, and cloud retention documented. | **SATISFIED** |
+| **13**| **Explicit Residual Risks Stated** | PRoot container command DLP boundary vs kernel netns socket limitation and single-node boundary documented. | **SATISFIED** |
 | **14**| **Zero Raw Secrets in Logs/Incidents** | Audited telemetry and incident databases confirm only keyed HMACs, hashes, and opaque trace IDs. | **SATISFIED** |
-| **15**| **SSRF & Malicious Redirect Defense** | Connection-time socket evaluation (`SSRFSafeHTTPConnection`) blocking DNS rebinding and TOCTOU. | **SATISFIED** |
+| **15**| **SSRF & Malicious Redirect Defense** | Connection-time socket evaluation (`SSRFSafeHTTPConnection` / `SSRFSafeHTTPSConnection`), SNI port strip, and `CERT_REQUIRED`. | **SATISFIED** |
 | **16**| **Official Single Verdict Issued** | Official verdict strictly formatted as `PRODUCTION QUALIFIED — VERIFIED SCOPE`. | **SATISFIED** |
 
 ---
@@ -95,7 +96,7 @@ python3 -W ignore -m unittest \
 - **Failed**: **0**
 - **Errors**: **0**
 - **Pass Rate**: **100.0%**
-- **Duration**: **82.30s**
+- **Duration**: **79.39s**
 
 ---
 
