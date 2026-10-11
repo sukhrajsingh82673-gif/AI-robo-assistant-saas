@@ -270,7 +270,7 @@ All 7 platform qualification test suites were executed to verify zero regression
 | DeepEval Executive Evaluation | 12 canonical scenarios, 11 dimensions, assertions | Verified | SIGNED OFF |
 | Promptfoo Red-Teaming | 14 attack vectors, 0 critical vulns, incident logs | Verified | SIGNED OFF |
 | Governed Closed-Loop Cycle | 10-step lifecycle, staging sandbox, Merkle sealing | Verified | SIGNED OFF |
-| CycloneDX SBOM & Licenses | 26 components compliant (MIT / Apache-2.0 / BSD / MPL-2.0) | Verified | SIGNED OFF |
+| CycloneDX SBOM & Licenses | 26 components verified (17 Apache-2.0, 9 MIT; 0 copyleft contamination) | Verified | SIGNED OFF |
 | Master Regression Gate | 197 / 197 tests passing (0 failures, 0 errors) | Verified | SIGNED OFF |
 | Frontend Baseline Immutability | `web/workflow_workspace.js` blob hash `198d57ec...` | Unchanged | SIGNED OFF |
 | Live API Server | `http://localhost:8080/health` returning 200 OK | Verified | SIGNED OFF |
