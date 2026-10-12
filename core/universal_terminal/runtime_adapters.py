@@ -285,12 +285,13 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         # Check if container engine is missing on host
         if not engine:
             is_prod = _is_production_environment()
-            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
+            strict_isolation = exec_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]
+            allow_host = (exec_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod and not strict_isolation
             if not allow_host:
                 msg = (
                     "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
                     if is_prod else
-                    "Execution Rejected: Container sandbox unavailable on host (checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
+                    "Execution Rejected: Container engine unavailable on host (container sandbox unavailable; checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
                 )
                 return {
                     "exit_code": 126,

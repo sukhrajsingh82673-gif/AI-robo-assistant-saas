@@ -45,6 +45,7 @@ from core.universal_terminal.terminal_agent import TerminalHandlingAgent
 from core.universal_terminal.universal_terminal import UniversalTerminal
 from core.universal_terminal.health_service import TerminalHealthService
 from core.killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+from core.db import db, configure_isolated_test_db
 
 
 class TestUniversalTerminalOperationalQualification(unittest.TestCase):
@@ -55,11 +56,17 @@ class TestUniversalTerminalOperationalQualification(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.test_dir = tempfile.mkdtemp(prefix="zonata_op_qual_")
+        cls.orig_db_path = db.db_path
+        cls.isolated_db = os.path.join(cls.test_dir, "ut_op_qual.db")
+        configure_isolated_test_db(cls.isolated_db)
         cls.tenant_id = "tnt_qual_01"
         cls.company_id = "comp_qual_01"
 
     @classmethod
     def tearDownClass(cls):
+        if cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
         shutil.rmtree(cls.test_dir, ignore_errors=True)
 
     def setUp(self):
@@ -216,9 +223,10 @@ class TestUniversalTerminalOperationalQualification(unittest.TestCase):
             self.assertIn("Container engine unavailable", strict_res["stderr"])
             self.assertTrue(strict_res["degraded"])
 
-            # 2. Governed fallback to sandbox
+            # 2. Governed fallback to sandbox (requires explicit non-production permission)
             fallback_res = adapter.execute_command(
-                sess_id, "echo 'fallback execution'", self.workspace, timeout_sec=5.0
+                sess_id, "echo 'fallback execution'", self.workspace,
+                env={"ZONATA_ALLOW_HOST_SHELL": "1"}, timeout_sec=5.0
             )
             self.assertEqual(fallback_res["exit_code"], 0)
             self.assertTrue(fallback_res["degraded"])

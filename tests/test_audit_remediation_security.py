@@ -63,7 +63,7 @@ def tearDownModule():
     """Restores database path to original baseline."""
     global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
     if MODULE_ORIG_DB_PATH:
-        db.set_db_path(MODULE_ORIG_DB_PATH)
+        db.db_path = MODULE_ORIG_DB_PATH
         os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()

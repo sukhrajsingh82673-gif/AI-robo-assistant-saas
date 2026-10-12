@@ -10,11 +10,31 @@ import sys
 import unittest
 import time
 import uuid
+import tempfile
 
 sys.path.insert(0, "/roboassistant")
 
-from core.db import db
+from core.db import db, configure_isolated_test_db
 from core.auth import TenantManager, UserManager, AuthorizationEnforcer, UserRole
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "company_os_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
+
 from core.knowledge_graph import CompanyKnowledgeGraph, TruthState
 from core.departments import DepartmentControlUnit
 from core.approvals import ApprovalPipeline
@@ -291,7 +311,9 @@ class TestRoboAssistantCompanyOS(unittest.TestCase):
         self.assertTrue(pms.connected)
 
         records = pms.fetch_night_audit_records()
-        self.assertTrue(records["ledger_verified"])
+        self.assertFalse(records["ledger_verified"])
+        self.assertTrue(records.get("is_mock"))
+        self.assertEqual(records.get("execution_mode"), "SIMULATED")
         self.assertEqual(records["permission"], ConnectorPermission.READ_ONLY_VISIBILITY)
 
         acc = AccountingConnector()

@@ -16,7 +16,9 @@ import json
 import time
 import uuid
 
-from core.db import db
+import tempfile
+
+from core.db import db, configure_isolated_test_db
 from core.models import EvidenceStatus
 from core.evidence_ledger import EvidenceLedger
 from core.openhands_execution_runtime import (
@@ -43,6 +45,42 @@ from zonata.openhands_adapter import (
     OpenHandsCanonicalScenarios
 )
 from core.overview_service import OverviewDataService
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+MODULE_ORIG_LEDGER_PATH = None
+MODULE_ORIG_ALLOW_HOST = None
+
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR, MODULE_ORIG_LEDGER_PATH, MODULE_ORIG_ALLOW_HOST
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "openhands_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+
+    MODULE_ORIG_LEDGER_PATH = os.environ.get("ZONATA_EVIDENCE_PATH")
+    os.environ["ZONATA_EVIDENCE_PATH"] = os.path.join(MODULE_TEMP_DIR.name, "test_openhands_ledger.jsonl")
+
+    MODULE_ORIG_ALLOW_HOST = os.environ.get("ZONATA_ALLOW_HOST_SHELL")
+    os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR, MODULE_ORIG_LEDGER_PATH, MODULE_ORIG_ALLOW_HOST
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_ORIG_LEDGER_PATH is not None:
+        os.environ["ZONATA_EVIDENCE_PATH"] = MODULE_ORIG_LEDGER_PATH
+    elif "ZONATA_EVIDENCE_PATH" in os.environ:
+        del os.environ["ZONATA_EVIDENCE_PATH"]
+    if MODULE_ORIG_ALLOW_HOST is not None:
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = MODULE_ORIG_ALLOW_HOST
+    elif "ZONATA_ALLOW_HOST_SHELL" in os.environ:
+        del os.environ["ZONATA_ALLOW_HOST_SHELL"]
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 
 class TestOpenHandsExecution(unittest.TestCase):

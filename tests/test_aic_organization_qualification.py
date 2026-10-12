@@ -16,7 +16,15 @@ import json
 import urllib.request
 import urllib.error
 import hashlib
+import tempfile
+import shutil
+import socket
+import threading
+import os
 from typing import Dict, Any
+
+from core.db import db, configure_isolated_test_db
+from core.auth import UserManager, UserRole
 
 from core.aic_organization_constitution import (
     ExistingOrganizationData,
@@ -39,12 +47,70 @@ from core.aic_organization_constitution import (
     ExecutiveRoleRegistry
 )
 
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 class TestAICOrganizationQualification(unittest.TestCase):
+
+    _server = None
+    orig_db_path = None
+    test_dir = None
+    port = None
+    api_base = None
+    auth_token = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.orig_db_path = db.db_path
+        cls.test_dir = tempfile.mkdtemp(prefix="zonata_aic_org_qual_")
+        cls.isolated_db = os.path.join(cls.test_dir, "aic_org_qual.db")
+        configure_isolated_test_db(cls.isolated_db)
+
+        # Seed minimal tenant and company in isolated db
+        with db.get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES ('tnt_primary', 'Primary Tenant', 'ENTERPRISE', 'ACTIVE', ?)", (time.time(),))
+            conn.execute("INSERT OR IGNORE INTO companies (company_id, tenant_id, name, industry, company_type, status, revenue, cost, contribution, understanding_pct, created_at) VALUES ('comp_primary', 'tnt_primary', 'Primary Corp', 'Technology', 'NEW', 'OPERATIONAL', 0.0, 0.0, 0.0, 100.0, ?)", (time.time(),))
+            conn.commit()
+
+        # Generate valid auth token
+        user_data = {
+            "user_id": "usr_aic_admin",
+            "tenant_id": "tnt_primary",
+            "company_id": "comp_primary",
+            "email": "admin@primary.zonata",
+            "role": UserRole.OWNER,
+            "permissions": ["*"]
+        }
+        cls.auth_token = UserManager.generate_token(user_data, expires_in_seconds=3600)
+
+        from api_server import ThreadedHTTPServer, RoboAssistantRequestHandler
+        cls.port = get_free_port()
+        cls.api_base = f"http://127.0.0.1:{cls.port}"
+        cls._server = ThreadedHTTPServer(("127.0.0.1", cls.port), RoboAssistantRequestHandler)
+        srv_thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
+        srv_thread.start()
+        time.sleep(1.0)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._server:
+            try:
+                cls._server.shutdown()
+                cls._server.server_close()
+            except Exception:
+                pass
+        if cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
+        if cls.test_dir:
+            shutil.rmtree(cls.test_dir, ignore_errors=True)
 
     def setUp(self):
         self.tenant_id = "tnt_primary"
         self.company_id = "comp_primary"
-        self.api_base = "http://127.0.0.1:8080"
 
     # =========================================================================
     # OQ-01: EXISTING-COMPANY INTAKE, FINGERPRINT & 30-CHECK AUDIT
@@ -432,6 +498,7 @@ class TestAICOrganizationQualification(unittest.TestCase):
         data = json.dumps(body).encode("utf-8") if body is not None else None
         headers = {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
             "X-Tenant-ID": tenant,
             "X-Company-ID": company
         }
@@ -526,6 +593,7 @@ class TestAICOrganizationQualification(unittest.TestCase):
         data = json.dumps(body).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
             "X-Tenant-ID": "tnt_primary",
             "X-Company-ID": "comp_primary"
         }
@@ -544,6 +612,7 @@ class TestAICOrganizationQualification(unittest.TestCase):
         data = json.dumps(body).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
             "X-Tenant-ID": "tnt_primary",
             "X-Company-ID": "comp_primary"
         }
@@ -562,6 +631,7 @@ class TestAICOrganizationQualification(unittest.TestCase):
         data = json.dumps(body).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.auth_token}",
             "X-Tenant-ID": "tnt_primary",
             "X-Company-ID": "comp_primary"
         }
