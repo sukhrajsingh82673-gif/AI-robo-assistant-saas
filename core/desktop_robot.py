@@ -89,12 +89,13 @@ class UniversalDesktopRobot:
 
             # 4. Generate Evidence Package
             if result.get("success"):
+                is_simulated = bool(result.get("simulated") or cap in ["screen_capture", "capture_screen", "mouse_click", "keyboard_type", "window_inspect", "detect_window"])
                 pv = PhysicalVerification(
                     check_type=result.get("verification_type", "state_check"),
                     target_path=contract.target,
-                    expected_val="VERIFIED",
-                    actual_val="VERIFIED",
-                    verified=True,
+                    expected_val="VERIFIED" if not is_simulated else "SIMULATED",
+                    actual_val="VERIFIED" if not is_simulated else "SIMULATED",
+                    verified=not is_simulated,
                     details=result.get("details", "Execution verified")
                 )
                 pkg = self.ledger.seal_evidence(
@@ -102,10 +103,16 @@ class UniversalDesktopRobot:
                     mission_id=contract.mission_id,
                     agent_id=contract.agent_id,
                     verifications=[pv],
-                    metadata={"target": contract.target, "capability": contract.capability}
+                    metadata={
+                        "target": contract.target,
+                        "capability": contract.capability,
+                        "simulated": is_simulated,
+                        "execution_mode": "SIMULATED" if is_simulated else "LIVE"
+                    }
                 )
                 result["evidence_id"] = pkg.evidence_id
-                result["verified"] = True
+                result["verified"] = not is_simulated
+                result["execution_mode"] = "SIMULATED" if is_simulated else "LIVE"
 
             return result
 
@@ -233,25 +240,28 @@ class UniversalDesktopRobot:
 
         return {
             "success": True,
-            "verification_type": "screen_state_captured",
+            "simulated": True,
+            "verification_type": "simulated_screen_state",
             "capture_file": output_file,
             "visible_text": screen_data["visible_text"],
-            "details": "Screen state telemetrically captured and verified"
+            "details": "Screen state telemetrically captured (SIMULATED)"
         }
 
     def _handle_window_inspect(self, contract: ActionContract, params: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
-            "verification_type": "window_detected",
+            "simulated": True,
+            "verification_type": "simulated_window_detected",
             "focused_application": params.get("app_name", "RoboAssistant Core Server"),
-            "details": "Active window detected and confirmed"
+            "details": "Active window detected (SIMULATED)"
         }
 
     def _handle_input_event(self, contract: ActionContract, params: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
-            "verification_type": "input_event_dispatched",
+            "simulated": True,
+            "verification_type": "simulated_input_event_dispatched",
             "event_type": contract.capability,
             "target": contract.target,
-            "details": f"Dispatched {contract.capability} to {contract.target}"
+            "details": f"Dispatched {contract.capability} to {contract.target} (SIMULATED)"
         }

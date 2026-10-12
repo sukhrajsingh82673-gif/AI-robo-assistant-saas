@@ -8,9 +8,17 @@ import sqlite3
 import os
 import time
 import json
-from typing import Dict, List, Optional, Any, Tuple
+def get_default_db_path() -> str:
+    env_path = os.environ.get("ZONATA_DB_PATH") or os.environ.get("ROBOASSISTANT_DB_PATH")
+    if env_path:
+        return os.path.abspath(env_path)
+    storage_root = os.environ.get("ZONATA_STORAGE_DIR")
+    if storage_root:
+        return os.path.abspath(os.path.join(storage_root, "roboassistant.db"))
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    return os.path.join(base_dir, "storage", "roboassistant.db")
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/roboassistant.db")
+DB_PATH = get_default_db_path()
 
 SCHEMA_SQL = """
 -- 1. Tenants & Organizations
@@ -3176,9 +3184,22 @@ CREATE INDEX IF NOT EXISTS idx_dr_manifests ON disaster_recovery_manifests(tenan
 """
 
 class Database:
-    def __init__(self, db_path: str = DB_PATH):
-        self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            self.db_path = get_default_db_path()
+        elif db_path.startswith("/roboassistant/") and not os.path.exists("/roboassistant"):
+            rel = os.path.relpath(db_path, "/roboassistant")
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            self.db_path = os.path.join(base_dir, rel)
+        else:
+            self.db_path = os.path.abspath(db_path)
+
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
+        self._init_db()
+
+    def set_db_path(self, new_path: str):
+        self.db_path = os.path.abspath(new_path)
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
         self._init_db()
 
     def get_connection(self) -> sqlite3.Connection:
@@ -3197,3 +3218,14 @@ class Database:
 
 # Global Singleton Database Instance
 db = Database()
+
+def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
+    """Configures an isolated SQLite database for unit tests or simulations."""
+    if not custom_path:
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        custom_path = tmp.name
+        tmp.close()
+    db.set_db_path(custom_path)
+    os.environ["ZONATA_DB_PATH"] = custom_path
+    return custom_path

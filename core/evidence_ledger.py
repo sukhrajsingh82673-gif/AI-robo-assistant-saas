@@ -12,16 +12,50 @@ import hashlib
 import uuid
 import fcntl
 from typing import List, Dict, Any, Optional
-from .models import EvidencePackage, EvidenceStatus, PhysicalVerification
+from .models import EvidencePackage, EvidenceStatus, PhysicalVerification, ExecutionClassification
+
+def get_default_ledger_path() -> str:
+    env_path = os.environ.get("ZONATA_EVIDENCE_PATH")
+    if env_path:
+        return os.path.abspath(env_path)
+    storage_root = os.environ.get("ZONATA_STORAGE_DIR")
+    if storage_root:
+        return os.path.abspath(os.path.join(storage_root, "evidence", "audit_ledger.jsonl"))
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    return os.path.join(base_dir, "storage", "evidence", "audit_ledger.jsonl")
 
 class EvidenceLedger:
     GENESIS_HASH = "GENESIS_ROOT_ROBO_GA_1_0_0"
 
-    def __init__(self, ledger_file: str = "/roboassistant/storage/evidence/audit_ledger.jsonl"):
-        self.ledger_file = ledger_file
+    def __init__(self, ledger_file: Optional[str] = None):
+        self._is_explicit_file = (ledger_file is not None and ledger_file != "/roboassistant/storage/evidence/audit_ledger.jsonl")
+        if self._is_explicit_file:
+            if ledger_file.startswith("/roboassistant/") and not os.path.exists("/roboassistant"):
+                rel = os.path.relpath(ledger_file, "/roboassistant")
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                self._ledger_file = os.path.join(base_dir, rel)
+            else:
+                self._ledger_file = os.path.abspath(ledger_file)
+        else:
+            self._ledger_file = None
+
         self.chain: List[Dict[str, Any]] = []
-        os.makedirs(os.path.dirname(ledger_file), exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True, mode=0o750)
+        except OSError:
+            pass
         self._load_existing()
+
+    @property
+    def ledger_file(self) -> str:
+        if self._is_explicit_file and self._ledger_file:
+            return self._ledger_file
+        return get_default_ledger_path()
+
+    @ledger_file.setter
+    def ledger_file(self, val: str):
+        self._ledger_file = os.path.abspath(val)
+        self._is_explicit_file = True
 
     def _load_existing(self):
         self.chain = []
@@ -61,16 +95,37 @@ class EvidenceLedger:
         now = time.time()
         metadata = metadata or {}
 
-        # Determine Honest Evidence Status
-        if not verifications:
+        # Determine Honest Evidence Status and Provenance Classification
+        is_simulated = (
+            metadata.get("simulated") is True
+            or metadata.get("is_mock") is True
+            or metadata.get("execution_mode") == "SIMULATED"
+            or metadata.get("classification") == "SIMULATED"
+        )
+        is_test = (
+            metadata.get("test") is True
+            or metadata.get("execution_mode") == "TEST"
+            or metadata.get("classification") == "TEST"
+        )
+
+        if is_simulated:
+            classification = ExecutionClassification.SIMULATED.value
+            status = EvidenceStatus.SIMULATED
+        elif is_test:
+            classification = ExecutionClassification.TEST.value
+            status = EvidenceStatus.TEST
+        elif not verifications:
+            classification = ExecutionClassification.LIVE.value
             status = EvidenceStatus.PENDING_EVIDENCE
         elif all(v.verified for v in verifications):
             has_independent_physical = any(
                 v.check_type in ["file_exists", "sha256_match", "binary_header"]
                 for v in verifications
             )
+            classification = ExecutionClassification.LIVE.value
             status = EvidenceStatus.VERIFIED if has_independent_physical else EvidenceStatus.SELF_TESTED
         else:
+            classification = ExecutionClassification.LIVE.value
             status = EvidenceStatus.PENDING_EVIDENCE
 
         # Compute payload digest
@@ -123,6 +178,7 @@ class EvidenceLedger:
                     sha256_digest=sha256_digest,
                     signature=f"sig-ed25519-{signature[:24]}",
                     merkle_index=merkle_idx,
+                    execution_classification=classification,
                     metadata=metadata
                 )
 
@@ -133,6 +189,7 @@ class EvidenceLedger:
                     "agent_id": package.agent_id,
                     "timestamp": package.timestamp,
                     "status": package.status.value,
+                    "execution_classification": classification,
                     "sha256_digest": package.sha256_digest,
                     "signature": package.signature,
                     "merkle_index": package.merkle_index,

@@ -280,19 +280,16 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
 
         # Check if container engine is missing on host
         if not engine:
-            strict_requested = (
-                profile and profile.isolation_level in [IsolationLevel.LEVEL_2_CONTAINER, IsolationLevel.LEVEL_3_VM]
-                and profile.execution_mode == ExecutionMode.SECURITY_LAB
-                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
-            )
-            if strict_requested:
+            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            if not allow_host:
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Container engine unavailable on host (checked: docker, podman, bwrap). Strict container isolation cannot be satisfied on this substrate.",
+                    "stderr": "Execution Rejected: Container sandbox unavailable on host (checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited.",
                     "timed_out": False,
                     "degraded": True,
                     "engine": "NONE",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 
@@ -450,18 +447,16 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
 
         # If hardware virtualization is absent on this host
         if not has_virt:
-            strict_vm = (
-                profile and profile.isolation_level == IsolationLevel.LEVEL_3_VM
-                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
-            )
-            if strict_vm:
+            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            if not allow_host:
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Hardware-assisted virtualization (/dev/kvm) unavailable on host. Cannot boot microVM.",
+                    "stderr": "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited.",
                     "timed_out": False,
                     "degraded": True,
                     "isolation": "KVM_UNAVAILABLE",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 
@@ -721,15 +716,16 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
         endpoint = node_info.get("endpoint") or os.environ.get("REMOTE_LINUX_NODE_URL")
 
         if not endpoint:
-            # Report missing endpoint honestly
-            strict_remote = env and env.get("STRICT_REMOTE_REQUIRED") == "1"
-            if strict_remote:
+            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            if not allow_host:
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured in environment.",
+                    "stderr": "Execution Rejected: Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured. Unrestricted host fallback is prohibited.",
                     "timed_out": False,
                     "degraded": True,
+                    "fallback": "REJECTED_NO_REMOTE_ENDPOINT",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 

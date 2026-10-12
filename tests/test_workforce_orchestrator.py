@@ -12,9 +12,16 @@ Validates:
 9. Section 72 Governed Demonstration (Sales Pipeline Bottlenecks)
 """
 
+import os
+import sys
 import unittest
 import time
 import uuid
+import tempfile
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from core.workforce_runtime import (
     SwarmWorkforceRuntime,
@@ -32,18 +39,45 @@ from core.workforce_orchestrator import (
 )
 from zonata.agent_swarm_adapter import AgentWorkforceAdapter
 from core.evidence_ledger import EvidenceLedger
+from core.db import db, configure_isolated_test_db
 
-from core.db import db
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "workforce_orchestrator_test.db")
+    configure_isolated_test_db(isolated_db)
+    isolated_ledger = os.path.join(MODULE_TEMP_DIR.name, "workforce_orchestrator_ledger.jsonl")
+    os.environ["ZONATA_EVIDENCE_PATH"] = isolated_ledger
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if "ZONATA_EVIDENCE_PATH" in os.environ:
+        del os.environ["ZONATA_EVIDENCE_PATH"]
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 class TestWorkforceOrchestrator(unittest.TestCase):
     def setUp(self):
         self.tenant_id = "tnt_primary"
         self.company_id = "comp_primary"
         self.runtime = SwarmWorkforceRuntime()
-        self.ledger = EvidenceLedger(ledger_file="/root/roboassistant/storage/evidence/test_audit_ledger.jsonl")
+        import tempfile
+        self.test_ledger_file = os.path.join(tempfile.gettempdir(), f"test_audit_ledger_{uuid.uuid4().hex[:8]}.jsonl")
+        self.ledger = EvidenceLedger(ledger_file=self.test_ledger_file)
         self.planner = DynamicWorkforcePlanner(runtime=self.runtime, ledger=self.ledger)
 
         with db.get_connection() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES ('tnt_primary', 'Primary Tenant', 'ENTERPRISE', 'ACTIVE', ?)",
+                (time.time(),)
+            )
             conn.execute(
                 """
                 INSERT OR IGNORE INTO companies (

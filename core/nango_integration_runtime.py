@@ -331,6 +331,22 @@ class NangoAdapter(ExternalIntegrationProvider):
         params: Dict[str, Any],
         idempotency_key: Optional[str] = None
     ) -> Dict[str, Any]:
+        res = self._execute_action_dispatch(connection, action, params, idempotency_key)
+        if isinstance(res, dict):
+            provider_id = connection.get("provider_id", "unknown")
+            res.setdefault("is_mock", True)
+            res.setdefault("execution_mode", "SIMULATED")
+            res.setdefault("adapter_type", "MOCK_ADAPTER")
+            res.setdefault("provenance", f"SYNTHETIC_{provider_id.upper()}_FIXTURE")
+        return res
+
+    def _execute_action_dispatch(
+        self,
+        connection: Dict[str, Any],
+        action: str,
+        params: Dict[str, Any],
+        idempotency_key: Optional[str] = None
+    ) -> Dict[str, Any]:
         provider_id = connection["provider_id"]
         # Scrub incoming parameters
         scrubbed_params = IntegrationSecurityBoundary.scrub_dict(params)
@@ -534,8 +550,8 @@ class NangoAdapter(ExternalIntegrationProvider):
         # Standard HMAC SHA256 signature verification
         signature = headers.get("X-Nango-Signature") or headers.get("X-Hub-Signature-256") or headers.get("Stripe-Signature")
         if not signature:
-            # If no signature provided in test headers, compute expected
-            return True
+            # Fail closed: reject unauthenticated webhooks missing cryptographic signature header
+            return False
         computed = hmac.new(secret.encode(), raw_payload.encode(), hashlib.sha256).hexdigest()
         clean_sig = signature.replace("sha256=", "")
         return hmac.compare_digest(computed, clean_sig)
@@ -646,7 +662,7 @@ class ExternalIntegrationGateway:
         self.company_id = company_id
         self.adapter: ExternalIntegrationProvider = NangoAdapter()
         self.rate_governor = RateLimitGovernor(tenant_id, company_id)
-        self.evidence_ledger = EvidenceLedger(ledger_file="/root/roboassistant/storage/evidence/audit_ledger.jsonl")
+        self.evidence_ledger = EvidenceLedger()
         self.causality_engine = BusinessCausalityEngine(tenant_id, company_id)
         self._ensure_tenant_and_company()
         self._seed_default_providers_if_empty()

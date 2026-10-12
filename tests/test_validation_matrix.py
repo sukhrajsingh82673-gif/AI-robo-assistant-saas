@@ -6,8 +6,12 @@ Automated Cross-Domain Validation Matrix & Governance Regression Suite
 import os
 import sys
 import unittest
+import uuid
+import tempfile
 
-# Add root directory to path
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, "/roboassistant")
 
 from core.models import AuthorityLevel, MissionStatus, EvidenceStatus, HostType, ActionContract
@@ -22,14 +26,36 @@ from workloads.manufacturing import run_manufacturing_bottleneck_analysis
 from workloads.saas import run_saas_churn_analysis
 from workloads.personal import run_personal_file_hygiene
 from workloads.universal_computer import run_universal_capability_discovery_task
+from core.db import db, configure_isolated_test_db
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "validation_matrix_test.db")
+    configure_isolated_test_db(isolated_db)
+    isolated_ledger = os.path.join(MODULE_TEMP_DIR.name, "validation_matrix_ledger.jsonl")
+    os.environ["ZONATA_EVIDENCE_PATH"] = isolated_ledger
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if "ZONATA_EVIDENCE_PATH" in os.environ:
+        del os.environ["ZONATA_EVIDENCE_PATH"]
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 class TestRoboAssistantValidationMatrix(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.ledger_file = "/roboassistant/storage/evidence/test_audit_ledger.jsonl"
-        if os.path.exists(cls.ledger_file):
-            os.remove(cls.ledger_file)
+        import tempfile
+        cls.ledger_file = os.path.join(tempfile.gettempdir(), f"test_audit_ledger_{uuid.uuid4().hex[:8]}.jsonl")
         cls.ledger = EvidenceLedger(cls.ledger_file)
         cls.kernel = UniversalControlKernel(cls.ledger)
         cls.registry = CapabilityRegistry()

@@ -52,3 +52,4 @@ storage/remote_dr_mirror/
 *.bundle
 supplier_evaluation_report.json
 node_modules/
+storage/protected_baseline/

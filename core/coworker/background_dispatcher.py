@@ -357,10 +357,8 @@ class BackgroundMissionDispatcher:
                 )
 
                 # Record into audit_ledger.jsonl if accessible
-                audit_ledger_path = os.path.join(
-                    os.path.dirname(os.path.abspath(self.db_path)),
-                    "evidence", "audit_ledger.jsonl"
-                )
+                from core.evidence_ledger import get_default_ledger_path
+                audit_ledger_path = get_default_ledger_path()
                 try:
                     os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
                     audit_record = {

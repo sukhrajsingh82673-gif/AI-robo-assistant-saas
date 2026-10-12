@@ -62,7 +62,8 @@ from core.settings_service import settings_service, GROUPS, CATEGORIES_CATALOG
 SERVER_START_TIME = time.time()
 
 # Initialize Core Subsystems
-LEDGER_FILE = os.path.join(BASE_DIR, "storage/evidence/audit_ledger.jsonl")
+from core.evidence_ledger import get_default_ledger_path
+LEDGER_FILE = get_default_ledger_path()
 ledger = EvidenceLedger(LEDGER_FILE)
 kernel = UniversalControlKernel(ledger)
 registry = CapabilityRegistry()
@@ -337,15 +338,44 @@ def get_real_system_host():
         "latency_ms": 1
     }
 
+ALLOWED_ORIGINS = {
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://app.zonata.ai"
+}
+_env_origins = os.environ.get("ZONATA_ALLOWED_ORIGINS")
+if _env_origins:
+    for _o in _env_origins.split(","):
+        if _o.strip():
+            ALLOWED_ORIGINS.add(_o.strip())
+
 class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         self._request_id = f"req_{uuid.uuid4().hex[:10]}"
         super().__init__(*args, directory=WEB_DIR, **kwargs)
 
+    def _apply_cors_headers(self):
+        req_origin = self.headers.get("Origin")
+        if req_origin:
+            is_allowed = (
+                req_origin in ALLOWED_ORIGINS
+                or req_origin.startswith("http://localhost:")
+                or req_origin.startswith("http://127.0.0.1:")
+            )
+            if is_allowed:
+                self.send_header("Access-Control-Allow-Origin", req_origin)
+                self.send_header("Access-Control-Allow-Credentials", "true")
+                self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID, X-Correlation-ID")
+
     def _get_auth_context(self) -> Dict[str, Any]:
         """
         Constitutional Invariant: UNAUTHENTICATED REQUEST != TENANT IDENTITY.
         Extracts and cryptographically verifies Bearer token, enforcing tenant isolation.
+        Fails closed on missing or invalid tokens.
         """
         auth_header = self.headers.get("Authorization", "")
         token = ""
@@ -370,44 +400,23 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
             return payload
 
-        # Environment-Aware Authentication Boundary (Development, Staging, Production)
-        app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("ENVIRONMENT") or os.environ.get("NODE_ENV") or "development"
-        is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_STRICT_CONFIG", "").lower() == "true")
-
-        if is_strict:
-            # Production: No default sovereign session, no implicit Host authentication
-            raise AuthExceptions.AuthenticationError(
-                "Production Sovereign Host Authentication Required: Missing, expired, or revoked Bearer token"
-            )
-        elif app_env.lower() == "staging":
-            # Staging: Real authentication or explicitly test-configured session required
-            raise AuthExceptions.AuthenticationError(
-                "Staging Authentication Required: Real Bearer token or test credential required"
-            )
-
-        # Development Mode Convenience Bootstrap (Only active when APP_ENV == 'development')
-        dev_tenant = requested_tenant or "tnt_primary"
-        return {
-            "user_id": "usr_dev_bootstrap",
-            "tenant_id": dev_tenant,
-            "company_id": "comp_primary",
-            "role": UserRole.OWNER,
-            "permissions": ["*"],
-            "auth_mode": "DEV_BOOTSTRAP",
-            "environment": "development"
-        }
+        # Fail closed: No unauthenticated bootstrap permitted on network-accessible interface
+        raise AuthExceptions.AuthenticationError(
+            "Authentication Required: Missing, invalid, or expired Bearer token"
+        )
 
     def _get_tenant_id(self) -> str:
         ctx = self._get_auth_context()
-        return ctx.get("tenant_id", "tnt_primary")
+        tenant_id = ctx.get("tenant_id")
+        if not tenant_id:
+            raise AuthExceptions.AuthenticationError("Authenticated context has no valid tenant_id")
+        return tenant_id
 
     def _send_json(self, data, status=200):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID")
+        self._apply_cors_headers()
         self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
@@ -419,10 +428,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data, default=str).encode("utf-8"))
 
     def do_OPTIONS(self):
+        req_origin = self.headers.get("Origin")
+        if req_origin:
+            is_allowed = (
+                req_origin in ALLOWED_ORIGINS
+                or req_origin.startswith("http://localhost:")
+                or req_origin.startswith("http://127.0.0.1:")
+            )
+            if not is_allowed:
+                self.send_response(403)
+                self.end_headers()
+                return
+
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID")
+        self._apply_cors_headers()
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-XSS-Protection", "1; mode=block")
@@ -445,6 +464,30 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "timestamp": time.time()
             })
             return
+
+        # Public Auth Environment Endpoint
+        if path == "/api/auth/environment":
+            app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("NODE_ENV") or "development"
+            is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+            self._send_json({
+                "environment": app_env.lower(),
+                "strict_auth": is_strict,
+                "requires_mfa": is_strict or (app_env.lower() == "staging"),
+                "auth_mode": "PRODUCTION_STRICT" if is_strict else ("STAGING" if app_env.lower() == "staging" else "DEV_BOOTSTRAP"),
+                "server_time": time.time()
+            })
+            return
+
+        # Public Static Web Content (HTML, JS, CSS, images)
+        if not path.startswith("/api/") and path != "/metrics":
+            clean_path = path.lstrip('/')
+            if not clean_path:
+                clean_path = 'index.html'
+            file_path = os.path.join(WEB_DIR, clean_path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                return super().do_GET()
+            self.path = '/index.html'
+            return super().do_GET()
 
         if path.startswith("/api/v2/"):
             headers_dict = {k: v for k, v in self.headers.items()}
@@ -474,18 +517,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(combined.encode('utf-8'))
-            return
-
-        if path == "/api/auth/environment":
-            app_env = os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or os.environ.get("NODE_ENV") or "development"
-            is_strict = (app_env.lower() == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
-            self._send_json({
-                "environment": app_env.lower(),
-                "strict_auth": is_strict,
-                "requires_mfa": is_strict or (app_env.lower() == "staging"),
-                "auth_mode": "PRODUCTION_STRICT" if is_strict else ("STAGING" if app_env.lower() == "staging" else "DEV_BOOTSTRAP"),
-                "server_time": time.time()
-            })
             return
 
         if path == "/api/auth/me":
@@ -2551,17 +2582,54 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Public Authentication & Token Issuance Endpoints
         if path in ("/api/auth/token", "/api/auth/login"):
-            email = req_data.get("email", "admin@zonata.ai")
-            req_tenant = req_data.get("tenant_id", "tnt_primary")
-            req_company = req_data.get("company_id", "comp_primary")
-            role = req_data.get("role", UserRole.OWNER)
+            email = req_data.get("email", "").strip()
+            req_tenant = req_data.get("tenant_id")
+            client_secret = req_data.get("secret") or req_data.get("password") or req_data.get("bootstrap_key")
+
+            # Check if admin bootstrap secret is provided
+            from core.auth import get_auth_secret_key
+            auth_secret = get_auth_secret_key().decode("utf-8", errors="ignore")
+            is_valid_secret = bool(client_secret and (client_secret == auth_secret or client_secret == os.environ.get("ZONATA_BOOTSTRAP_SECRET")))
+
+            user_row = None
+            if req_tenant and email:
+                with db.get_connection() as conn:
+                    user_row = conn.execute(
+                        "SELECT * FROM users WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'",
+                        (email, req_tenant)
+                    ).fetchone()
+            elif email:
+                with db.get_connection() as conn:
+                    user_row = conn.execute(
+                        "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
+                        (email,)
+                    ).fetchone()
+
+            if user_row:
+                user_dict = dict(user_row)
+                target_tenant = user_dict["tenant_id"]
+                target_user = user_dict["user_id"]
+                target_role = user_dict["role"]
+                target_company = user_dict.get("company_id", "comp_primary")
+            elif is_valid_secret and req_tenant:
+                target_tenant = req_tenant
+                target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
+                target_role = req_data.get("role", UserRole.OWNER)
+                target_company = req_data.get("company_id", "comp_primary")
+            else:
+                self._send_json({
+                    "error": "Unauthorized",
+                    "detail": "Invalid credentials or user not enrolled in tenant"
+                }, status=401)
+                return
+
             user_data = {
-                "user_id": f"usr_{uuid.uuid4().hex[:8]}",
-                "tenant_id": req_tenant,
-                "company_id": req_company,
-                "email": email,
-                "role": role,
-                "permissions": ["*"]
+                "user_id": target_user,
+                "tenant_id": target_tenant,
+                "company_id": target_company,
+                "email": email or f"{target_user}@{target_tenant}.zonata",
+                "role": target_role,
+                "permissions": ["*"] if target_role == UserRole.OWNER else ["read", "execute"]
             }
             token = UserManager.generate_token(user_data, expires_in_seconds=86400 * 7)
             self._send_json({
@@ -6040,7 +6108,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
             auth_ctx = self._get_auth_context()
-            tenant_id = auth_ctx.get("tenant_id", "tnt_primary")
+            tenant_id = auth_ctx.get("tenant_id")
+            if not tenant_id:
+                self._send_json({"error": "Unauthorized", "detail": "Missing tenant identity in token"}, status=401)
+                return
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
@@ -6048,9 +6119,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
             return
 
-        company_id = self.headers.get("X-Company-ID") or auth_ctx.get("company_id", "comp_primary")
-        actor = auth_ctx.get("user_id") or self.headers.get("X-User-Name", "Host Administrator")
-        actor_role = auth_ctx.get("role") or self.headers.get("X-User-Role", "OWNER")
+        company_id = auth_ctx.get("company_id") or self.headers.get("X-Company-ID", "comp_primary")
+        actor = auth_ctx.get("user_id", "usr_unknown")
+        actor_role = auth_ctx.get("role", UserRole.OPERATOR)
 
         length = int(self.headers.get('content-length', 0))
         raw_body = self.rfile.read(length) if length > 0 else b"{}"
@@ -6107,7 +6178,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
             auth_ctx = self._get_auth_context()
-            tenant_id = auth_ctx.get("tenant_id", "tnt_primary")
+            tenant_id = auth_ctx.get("tenant_id")
+            if not tenant_id:
+                self._send_json({"error": "Unauthorized", "detail": "Missing tenant identity in token"}, status=401)
+                return
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return

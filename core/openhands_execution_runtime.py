@@ -677,6 +677,18 @@ class OpenHandsExecutionProvider(AgentExecutionProvider):
 
     def execute_command(self, workspace_path: str, command: str, timeout: int = 30) -> Dict[str, Any]:
         start = time.time()
+        # Enforce sandbox boundary: host execution requires explicit permission or verified isolation
+        allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+        is_isolated = bool(os.environ.get("ZONATA_CONTAINER_ISOLATION") or allow_host)
+        if not is_isolated:
+            return {
+                "success": False,
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": "Execution Rejected: Isolated container sandbox required for OpenHands agent command execution. Unrestricted host execution is prohibited.",
+                "latency_ms": 0.0
+            }
+
         try:
             res = subprocess.run(
                 command,

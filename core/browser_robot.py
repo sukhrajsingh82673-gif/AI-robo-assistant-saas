@@ -41,13 +41,16 @@ class BrowserExecutionFabric:
             "url": self.current_url,
             "title": self.tabs[self.active_tab_index]["title"],
             "load_time_ms": int((time.time() - start) * 1000),
-            "verified": True,
-            "details": f"Navigated successfully to {url}"
+            "verified": False,
+            "simulated": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_DOM_EMULATION",
+            "details": f"Navigated successfully to {url} (SIMULATED)"
         }
 
     def extract_structured_data(self, selector_type: str = "TEXT", query: str = "") -> Dict[str, Any]:
         """
-        Structured DOM extraction.
+        Structured DOM extraction (SIMULATED fixture data).
         """
         return {
             "success": True,
@@ -57,12 +60,15 @@ class BrowserExecutionFabric:
                 {"title": "Direct Booking Discount", "rate": "₹8,500/night", "status": "AVAILABLE"},
                 {"title": "Deluxe Heritage Suite", "rate": "₹14,200/night", "status": "AVAILABLE"}
             ],
-            "verified": True
+            "verified": False,
+            "simulated": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_DOM_FIXTURE"
         }
 
     def submit_form(self, form_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Submits structured form fields and verifies result state.
+        Submits structured form fields and verifies result state (SIMULATED).
         """
         # Invariant: Redact any password fields from the telemetry return
         safe_fields = {k: ("***REDACTED***" if "pass" in k.lower() or "secret" in k.lower() else v) for k, v in fields.items()}
@@ -70,8 +76,11 @@ class BrowserExecutionFabric:
             "success": True,
             "form_id": form_id,
             "fields_submitted": safe_fields,
-            "status": "SUBMITTED_AND_VERIFIED",
-            "verified": True
+            "status": "SUBMITTED_SIMULATED",
+            "verified": False,
+            "simulated": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_FORM_DISPATCH"
         }
 
     def capture_viewport(self) -> Dict[str, Any]:
@@ -80,5 +89,8 @@ class BrowserExecutionFabric:
             "current_url": self.current_url,
             "viewport": "1920x1080",
             "sha256": hashlib.sha256(f"screen_{self.current_url}_{time.time()}".encode()).hexdigest(),
-            "verified": True
+            "verified": False,
+            "simulated": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_VIEWPORT_TELEMETRY"
         }
