@@ -21,6 +21,7 @@ htmlcov/
 storage/*.db-journal
 storage/*.db-wal
 storage/*.db-shm
+storage/runtime*.db
 
 # Environments
 .env
