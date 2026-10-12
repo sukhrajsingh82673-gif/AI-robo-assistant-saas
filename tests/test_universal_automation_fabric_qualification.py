@@ -30,8 +30,9 @@ import uuid
 import json
 import os
 import threading
+import tempfile
 
-from core.db import db
+from core.db import db, configure_isolated_test_db
 from core.automation_fabric import (
     universal_automation_fabric,
     connector_registry,
@@ -50,6 +51,44 @@ from core.automation_fabric import (
     LicenseValidationError
 )
 from core.killswitch_matrix import KillSwitchEngagedException
+
+MODULE_ORIG_DB_PATH = None
+MODULE_ORIG_EV_PATH = None
+MODULE_TEMP_DIR = None
+
+
+def setUpModule():
+    """Configures a globally isolated database and evidence ledger for this suite."""
+    global MODULE_ORIG_DB_PATH, MODULE_ORIG_EV_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_ORIG_EV_PATH = os.environ.get("ZONATA_EVIDENCE_PATH")
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "fabric_test_isolated.db")
+    isolated_ev = os.path.join(MODULE_TEMP_DIR.name, "fabric_test_evidence.jsonl")
+
+    # Copy baseline database to disposable temporary location
+    base_db = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "roboassistant.db")
+    if os.path.exists(base_db):
+        import shutil
+        shutil.copyfile(base_db, isolated_db)
+
+    os.environ["ZONATA_EVIDENCE_PATH"] = isolated_ev
+    configure_isolated_test_db(isolated_db)
+    universal_automation_fabric._init_automation_tables()
+
+
+def tearDownModule():
+    """Restores original database and evidence ledger paths."""
+    global MODULE_ORIG_DB_PATH, MODULE_ORIG_EV_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_ORIG_EV_PATH is not None:
+        os.environ["ZONATA_EVIDENCE_PATH"] = MODULE_ORIG_EV_PATH
+    elif "ZONATA_EVIDENCE_PATH" in os.environ:
+        del os.environ["ZONATA_EVIDENCE_PATH"]
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 
 class TestUniversalAutomationFabricQualification(unittest.TestCase):

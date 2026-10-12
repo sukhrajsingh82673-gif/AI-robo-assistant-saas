@@ -6215,6 +6215,10 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def run_server(port=8080):
     ThreadedHTTPServer.allow_reuse_address = True
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    is_prod = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
+    if is_prod and os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1":
+        raise RuntimeError("Security Invariant Violation: ZONATA_ALLOW_HOST_SHELL=1 is strictly prohibited in production mode. Refusing server startup.")
     print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} (Multi-Threaded Concurrent Engine)...")
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
     print("[*] Universal Automation Fabric Background Worker ACTIVE")

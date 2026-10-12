@@ -85,13 +85,17 @@ class BackgroundMissionDispatcher:
         runtime_router: WorkerRuntimeRouter,
         tenant_id: str = "tnt_primary",
         company_id: str = "comp_primary",
-        db_path: str = "storage/roboassistant.db"
+        db_path: Optional[str] = None
     ):
         self.tenant_id = tenant_id
         self.company_id = company_id
         self.subworker_coord = subworker_coord
         self.runtime_router = runtime_router
-        self.db_path = db_path
+        if db_path is None:
+            from core.db import get_default_db_path
+            self.db_path = get_default_db_path()
+        else:
+            self.db_path = db_path
         self._missions: Dict[str, BackgroundMission] = {}
 
         self._init_db()

@@ -13,8 +13,12 @@ from .contracts import CoworkerProfile, ExecutionGraph, TaskNode, ExecutionState
 class CoworkerDBStore:
     """SQLite backing store for the Co-worker Fabric."""
 
-    def __init__(self, db_path: str = "storage/roboassistant.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            from core.db import get_default_db_path
+            self.db_path = get_default_db_path()
+        else:
+            self.db_path = db_path
         self._init_tables()
 
     def _get_connection(self):

@@ -216,9 +216,7 @@ class DatabaseEngine:
         else:
             self.dialect = DatabaseDialect.SQLITE
 
-        self.db_path = os.getenv("SQLITE_DB_PATH", os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/roboassistant.db"
-        ))
+        self._custom_db_path = None
 
         # Initialize workload-separated pools
         self.pools: Dict[str, DatabaseConnectionPool] = {
@@ -247,6 +245,20 @@ class DatabaseEngine:
                 pool_type=WorkloadType.READ
             )
         }
+
+    @property
+    def db_path(self) -> str:
+        if self._custom_db_path:
+            return self._custom_db_path
+        env_path = os.getenv("ZONATA_DB_PATH") or os.getenv("ROBOASSISTANT_DB_PATH") or os.getenv("SQLITE_DB_PATH")
+        if env_path:
+            return os.path.abspath(env_path)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, "storage", "roboassistant.db")
+
+    @db_path.setter
+    def db_path(self, val: str):
+        self._custom_db_path = os.path.abspath(val) if val else None
 
     def _create_raw_connection(self) -> Any:
         """Create dialect-specific raw database connection."""

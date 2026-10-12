@@ -20,6 +20,10 @@ from .models import (
     TerminalCommandRisk, ProcessInfo
 )
 
+def _is_production_environment() -> bool:
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    return (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
+
 class BaseRuntimeAdapter(ABC):
     """Abstract interface that all Linux execution substrates must implement."""
 
@@ -280,12 +284,18 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
 
         # Check if container engine is missing on host
         if not engine:
-            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            is_prod = _is_production_environment()
+            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
             if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Container sandbox unavailable on host (checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Execution Rejected: Container sandbox unavailable on host (checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
                     "engine": "NONE",
@@ -447,12 +457,18 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
 
         # If hardware virtualization is absent on this host
         if not has_virt:
-            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            is_prod = _is_production_environment()
+            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
             if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
                     "isolation": "KVM_UNAVAILABLE",
@@ -716,12 +732,18 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
         endpoint = node_info.get("endpoint") or os.environ.get("REMOTE_LINUX_NODE_URL")
 
         if not endpoint:
-            allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1"
+            is_prod = _is_production_environment()
+            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
             if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured. Unrestricted host fallback is prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Execution Rejected: Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured. Unrestricted host fallback is prohibited.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
                     "fallback": "REJECTED_NO_REMOTE_ENDPOINT",

@@ -31,7 +31,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from core.models import EvidencePackage, EvidenceStatus, ExecutionClassification, ActionContract, AuthorityLevel, HostType
+from core.models import EvidencePackage, EvidenceStatus, ExecutionClassification, ActionContract, AuthorityLevel, HostType, PhysicalVerification
 from core.evidence_ledger import EvidenceLedger, get_default_ledger_path
 from core.db import db, Database, get_default_db_path, configure_isolated_test_db
 from core.auth import UserManager, UserRole, AuthExceptions, get_auth_secret_key
@@ -250,15 +250,20 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     """Verifies that terminal and agent execution fail closed when sandbox runtimes are unavailable."""
 
     def setUp(self):
-        self.orig_allow_host = os.environ.get("ZONATA_ALLOW_HOST_SHELL")
-        if "ZONATA_ALLOW_HOST_SHELL" in os.environ:
-            del os.environ["ZONATA_ALLOW_HOST_SHELL"]
+        self.orig_env = {
+            k: os.environ.get(k)
+            for k in ["ZONATA_ALLOW_HOST_SHELL", "APP_ENV", "ZONATA_ENV", "ZONATA_STRICT_AUTH", "ZONATA_PRODUCTION"]
+        }
+        for k in self.orig_env:
+            if k in os.environ:
+                del os.environ[k]
 
     def tearDown(self):
-        if self.orig_allow_host is not None:
-            os.environ["ZONATA_ALLOW_HOST_SHELL"] = self.orig_allow_host
-        elif "ZONATA_ALLOW_HOST_SHELL" in os.environ:
-            del os.environ["ZONATA_ALLOW_HOST_SHELL"]
+        for k, v in self.orig_env.items():
+            if v is not None:
+                os.environ[k] = v
+            elif k in os.environ:
+                del os.environ[k]
 
     def test_01_container_runtime_fails_closed_without_sandbox(self):
         """Container adapter must fail closed with code 126 and sandbox_failure flag."""
@@ -294,7 +299,7 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
         self.assertIn("Isolated container sandbox required", result.get("stderr", ""))
 
     def test_04_explicit_host_shell_opt_in_override(self):
-        """When ZONATA_ALLOW_HOST_SHELL=1 is explicitly set, controlled host execution is permitted."""
+        """When ZONATA_ALLOW_HOST_SHELL=1 is explicitly set in non-production, controlled host execution is permitted."""
         os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
         adapter = ContainerRuntimeAdapter()
         res = adapter.execute_command(
@@ -304,6 +309,45 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
         )
         self.assertEqual(res.get("exit_code"), 0)
         self.assertIn("host_authorized", res.get("stdout", ""))
+
+    def test_05_production_mode_refuses_host_shell_override(self):
+        """In production mode (APP_ENV=production), host-shell override is unconditionally rejected."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+
+        container_adapter = ContainerRuntimeAdapter()
+        res_container = container_adapter.execute_command(
+            session_id="test_sess_prod_reject",
+            command="echo 'should_fail'",
+            cwd=tempfile.gettempdir()
+        )
+        self.assertEqual(res_container.get("exit_code"), 126)
+        self.assertIn("strictly prohibited in production mode", res_container.get("stderr", ""))
+
+        vm_adapter = VMRuntimeAdapter()
+        res_vm = vm_adapter.execute_command(
+            session_id="test_sess_prod_vm_reject",
+            command="echo 'should_fail'",
+            cwd=tempfile.gettempdir()
+        )
+        self.assertEqual(res_vm.get("exit_code"), 126)
+        self.assertIn("strictly prohibited in production mode", res_vm.get("stderr", ""))
+
+        res_oh = OpenHandsExecutionProvider(None).execute_command(
+            workspace_path=tempfile.gettempdir(),
+            command="echo 'should_fail'"
+        )
+        self.assertEqual(res_oh.get("exit_code"), 126)
+        self.assertIn("strictly prohibited in production mode", res_oh.get("stderr", ""))
+
+    def test_06_server_startup_refuses_host_shell_in_production(self):
+        """api_server.run_server raises RuntimeError if ZONATA_ALLOW_HOST_SHELL=1 is set in production."""
+        from api_server import run_server
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        with self.assertRaises(RuntimeError) as cm:
+            run_server(port=9999)
+        self.assertIn("strictly prohibited in production mode", str(cm.exception))
 
 
 class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
@@ -394,6 +438,74 @@ class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
         self.assertTrue(res.get("simulated"))
         self.assertFalse(res.get("verified"))
         self.assertEqual(res.get("execution_mode"), "SIMULATED")
+
+    def test_07_simulated_evidence_with_successful_verifications_cannot_promote_to_verified(self):
+        """Even with passing physical verifications, simulated metadata strictly forces SIMULATED status."""
+        verification = PhysicalVerification(
+            check_type="file_exists",
+            target_path="/tmp/fake_verified_file",
+            expected_val=True,
+            actual_val=True,
+            verified=True,
+            details={"note": "mock physical check"}
+        )
+        sealed = self.ledger.seal_evidence(
+            action_id="act_sim_spoof",
+            mission_id="msn_sim_spoof",
+            agent_id="agt_sim_spoof",
+            verifications=[verification],
+            metadata={"simulated": True, "execution_mode": "SIMULATED"}
+        )
+        self.assertEqual(sealed.status, EvidenceStatus.SIMULATED)
+        self.assertEqual(sealed.execution_classification, "SIMULATED")
+        self.assertNotEqual(sealed.status, EvidenceStatus.VERIFIED)
+
+        # Confirm persisted record in ledger preserves SIMULATED status
+        record = self.ledger.get_evidence(sealed.evidence_id)
+        self.assertEqual(record["status"], "SIMULATED")
+        self.assertEqual(record["execution_classification"], "SIMULATED")
+
+    def test_08_downstream_consumer_cannot_treat_simulated_as_verified(self):
+        """Downstream audit/reporting consumers must distinguish SIMULATED from VERIFIED records."""
+        # Record 1: Simulated record
+        pkg1 = self.ledger.seal_evidence(
+            action_id="act_sim_downstream",
+            mission_id="msn_downstream",
+            agent_id="agt_downstream",
+            verifications=[],
+            metadata={"simulated": True}
+        )
+        # Record 2: Real verification
+        real_verif = PhysicalVerification(
+            check_type="file_exists",
+            target_path="/bin/sh",
+            expected_val=True,
+            actual_val=True,
+            verified=True,
+            details={"note": "true physical check"}
+        )
+        pkg2 = self.ledger.seal_evidence(
+            action_id="act_real_downstream",
+            mission_id="msn_downstream",
+            agent_id="agt_downstream",
+            verifications=[real_verif],
+            metadata={"simulated": False}
+        )
+
+        rec1 = self.ledger.get_evidence(pkg1.evidence_id)
+        rec2 = self.ledger.get_evidence(pkg2.evidence_id)
+
+        # Verify downstream invariant: simulated cannot be counted as VERIFIED
+        self.assertEqual(rec1["status"], "SIMULATED")
+        self.assertEqual(rec1["execution_classification"], "SIMULATED")
+        self.assertEqual(rec2["status"], "VERIFIED")
+        self.assertEqual(rec2["execution_classification"], "LIVE")
+
+        verified_records = [r for r in self.ledger.chain if r.get("status") == "VERIFIED" and r.get("execution_classification") == "LIVE"]
+        simulated_records = [r for r in self.ledger.chain if r.get("status") == "SIMULATED" or r.get("execution_classification") == "SIMULATED"]
+        self.assertIn(rec2, verified_records)
+        self.assertNotIn(rec1, verified_records)
+        self.assertIn(rec1, simulated_records)
 
 
 class TestWebhookAndStoragePortability(unittest.TestCase):

@@ -110,10 +110,10 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         for d_id, d_name, mgr_agent in departments:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO departments (department_id, company_id, tenant_id, name, manager_agent_id)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO departments (department_id, company_id, tenant_id, name, manager_agent_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (d_id, SIM_COMPANY_ID, SIM_TENANT_ID, d_name, mgr_agent)
+                (d_id, SIM_COMPANY_ID, SIM_TENANT_ID, d_name, mgr_agent, now)
             )
 
         # 4. Users with Granular Roles
@@ -152,12 +152,12 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         # 5. Corporate Budgets
         conn.execute(
             """
-            INSERT OR REPLACE INTO budget_ledger (
-                budget_id, tenant_id, company_id, department_id, allocated_amount,
-                utilized_amount, currency, fiscal_period, created_at
-            ) VALUES (?, ?, ?, 'dept_exec', 10000000.0, 150000.0, '₹', 'FY26-Q4', ?)
+            INSERT OR REPLACE INTO enterprise_budgets (
+                entity_id, entity_type, tenant_id, company_id, allocated_usd,
+                spent_usd, soft_limit_pct, hard_limit_pct, is_frozen, created_at, updated_at
+            ) VALUES (?, 'COMPANY', ?, ?, 10000000.0, 150000.0, 80.0, 100.0, 0, ?, ?)
             """,
-            (f"bdg_master_{SIM_COMPANY_ID}", SIM_TENANT_ID, SIM_COMPANY_ID, now)
+            (f"bdg_master_{SIM_COMPANY_ID}", SIM_TENANT_ID, SIM_COMPANY_ID, now, now)
         )
 
         conn.commit()
