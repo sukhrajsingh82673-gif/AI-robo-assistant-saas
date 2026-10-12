@@ -18,8 +18,8 @@
       .replace(/'/g, '&#039;');
   }
 
-  // Canonical Enterprise Customer Directory
-  const CUSTOMERS_DATA = [
+  // Canonical Enterprise Customer Directory (Demo Fixture)
+  const DEMO_CUSTOMERS_DATA = [
     {
       id: 'comp_cust_taj',
       name: 'Taj Hospitality & Leisure Corporate Account',
@@ -197,8 +197,21 @@
         { timestamp: '2026-10-04 09:30', event: 'Risk Flag: P1 Ticket in Active Renewal Window', actor: 'AI CEO Risk Engine', sha: 'ee33...77a1' },
         { timestamp: '2026-10-03 14:15', event: 'Ticket TICK-908 Opened (Severity P1)', actor: 'Customer Contact', sha: '41ab...00de' }
       ]
-    }
   ];
+
+  function getCustomersData() {
+    const tenantId = (window.state && window.state.host && window.state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
+    const saved = localStorage.getItem('zonata_crm_customers_' + tenantId);
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    const appEnv = (window.state && window.state.environment) || 'development';
+    const isClean = appEnv === 'production' || localStorage.getItem('zonata_disable_demo_data') === 'true';
+    if (isClean) {
+      return [];
+    }
+    return DEMO_CUSTOMERS_DATA;
+  }
 
   class EnterpriseCrmWorkspace {
     constructor() {
@@ -260,8 +273,8 @@
             </div>
             <div class="metric-stat-card" onclick="window.CrmWorkspace.switchTab('customers')" style="cursor:pointer;" title="Inspect Accounts Roster">
               <div class="metric-stat-title">Customer Accounts</div>
-              <div class="metric-stat-value">${CUSTOMERS_DATA.length} Key Accounts</div>
-              <div class="metric-stat-sub">Avg Health Score: 87.8/100 →</div>
+              <div class="metric-stat-value">${getCustomersData().length} Accounts</div>
+              <div class="metric-stat-sub">Active CRM Directory →</div>
             </div>
             <div class="metric-stat-card">
               <div class="metric-stat-title">Autonomous SDR Velocity</div>
@@ -306,7 +319,8 @@
     }
 
     renderCustomersTabHtml() {
-      const filtered = CUSTOMERS_DATA.filter(c => {
+      const customersList = getCustomersData();
+      const filtered = customersList.filter(c => {
         if (this.filterStatus !== 'ALL' && c.status !== this.filterStatus) return false;
         if (this.filterTier !== 'ALL' && !c.tier.includes(this.filterTier)) return false;
         if (this.searchQuery) {
@@ -547,7 +561,12 @@
     // FULL CUSTOMER 360 MODAL (8 Mandatory Enterprise Dimensions)
     // =========================================================================
     openCustomer360(customerId) {
-      const cust = CUSTOMERS_DATA.find(c => c.id === customerId) || CUSTOMERS_DATA[0];
+      const customersList = getCustomersData();
+      const cust = customersList.find(c => c.id === customerId) || customersList[0];
+      if (!cust) {
+        showToast('No customer profile details available.', 'info');
+        return;
+      }
       this.active360CustomerId = cust.id;
       this.active360Tab = 'overview';
 
@@ -563,7 +582,9 @@
 
     switch360Tab(tabId) {
       this.active360Tab = tabId;
-      const cust = CUSTOMERS_DATA.find(c => c.id === this.active360CustomerId) || CUSTOMERS_DATA[0];
+      const customersList = getCustomersData();
+      const cust = customersList.find(c => c.id === this.active360CustomerId) || customersList[0];
+      if (!cust) return;
       const tabBody = document.getElementById('customer360TabBody');
       if (tabBody) {
         tabBody.innerHTML = this.buildCustomer360TabBody(cust, tabId);

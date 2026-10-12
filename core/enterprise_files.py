@@ -188,6 +188,11 @@ class EnterpriseFilesEngine:
             if cnt > 0:
                 return
 
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        clean_mode = (app_env in ("production", "prod")) or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) or (os.environ.get("ZONATA_CLEAN_STARTUP", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
+
         now = time.time()
         initial_files = [
             {

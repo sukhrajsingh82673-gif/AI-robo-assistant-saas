@@ -2640,6 +2640,75 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        elif path == "/api/auth/register":
+            email = req_data.get("email", "").strip()
+            name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
+            tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
+            plan = req_data.get("plan", "ENTERPRISE")
+
+            if not email:
+                self._send_json({"error": "Bad Request", "detail": "Email address is required for registration"}, status=400)
+                return
+
+            with db.get_connection() as conn:
+                existing_user = conn.execute(
+                    "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
+                    (email,)
+                ).fetchone()
+
+            if existing_user:
+                self._send_json({
+                    "error": "Conflict",
+                    "detail": "An active account with this email already exists. Please sign in instead."
+                }, status=409)
+                return
+
+            # Create tenant and owner user
+            from core.auth import TenantManager
+            tenant = TenantManager.create_tenant(name=tenant_name, plan=plan)
+            tenant_id = tenant["tenant_id"]
+            user = UserManager.create_user(
+                tenant_id=tenant_id,
+                email=email,
+                name=name,
+                role=UserRole.OWNER,
+                company_id="comp_primary"
+            )
+
+            # Create default primary company entity for the new tenant
+            now = time.time()
+            with db.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO companies (
+                        company_id, tenant_id, name, country, industry,
+                        company_type, status, currency, timezone, revenue,
+                        cost, contribution, created_at
+                    ) VALUES (?, ?, ?, 'US', 'Enterprise Cloud & SaaS', 'EXISTING', 'OPERATIONAL', '$', 'UTC', 0.0, 0.0, 0.0, ?)
+                    """,
+                    ("comp_primary", tenant_id, tenant_name, now)
+                )
+                conn.commit()
+
+            user_data = {
+                "user_id": user["user_id"],
+                "tenant_id": tenant_id,
+                "company_id": "comp_primary",
+                "email": email,
+                "name": name,
+                "role": UserRole.OWNER,
+                "permissions": ["*"]
+            }
+            token = UserManager.generate_token(user_data, expires_in_seconds=86400 * 7)
+            self._send_json({
+                "token": token,
+                "token_type": "Bearer",
+                "expires_in": 86400 * 7,
+                "user": user_data,
+                "tenant": tenant
+            }, status=201)
+            return
+
         elif path == "/api/auth/revoke":
             token_to_revoke = req_data.get("token") or req_data.get("token_id")
             if token_to_revoke:

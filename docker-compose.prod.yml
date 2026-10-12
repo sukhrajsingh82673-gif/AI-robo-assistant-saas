@@ -11,7 +11,12 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+      - APP_ENV=production
       - ENVIRONMENT=production
+      - ZONATA_STRICT_AUTH=1
+      - ZONATA_DISABLE_DEMO_SEED=1
+      - ZONATA_CLEAN_STARTUP=1
+      - DATABASE_URL=postgresql://zonata_admin:zonata_secure_prod_password_2026@postgres:5432/zonata_production
       - DB_PATH=/app/storage/roboassistant.db
       - NATS_URL=nats://nats:4222
       - TEMPORAL_HOST=temporal:7233
@@ -27,9 +32,14 @@ services:
       timeout: 5s
       retries: 3
     depends_on:
-      - nats
-      - temporal
-      - minio
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      temporal:
+        condition: service_started
+      minio:
+        condition: service_started
 
   zonata-worker:
     build:
@@ -38,15 +48,40 @@ services:
     image: zonata/worker:1.0.0-GA
     restart: unless-stopped
     environment:
+      - APP_ENV=production
       - ENVIRONMENT=production
+      - ZONATA_STRICT_AUTH=1
+      - ZONATA_DISABLE_DEMO_SEED=1
+      - DATABASE_URL=postgresql://zonata_admin:zonata_secure_prod_password_2026@postgres:5432/zonata_production
       - NATS_URL=nats://nats:4222
       - TEMPORAL_HOST=temporal:7233
       - DB_PATH=/app/storage/roboassistant.db
     volumes:
       - zonata-storage:/app/storage
     depends_on:
-      - nats
-      - temporal
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      temporal:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=zonata_admin
+      - POSTGRES_PASSWORD=zonata_secure_prod_password_2026
+      - POSTGRES_DB=zonata_production
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zonata_admin -d zonata_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   nats:
     image: nats:2.10-alpine
@@ -116,6 +151,7 @@ services:
 
 volumes:
   zonata-storage:
+  postgres-data:
   nats-data:
   temporal-data:
   minio-data:

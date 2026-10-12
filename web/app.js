@@ -4,6 +4,44 @@
  * Zero Mock Data Failure • Pure Dynamic State • Local & Live API Synced
  */
 
+// ============================================================================
+// Global Authenticated Fetch Interceptor
+// Injects Bearer token and X-Tenant-ID headers on all internal /api/ requests
+// ============================================================================
+(function() {
+  const _origFetch = window.fetch;
+  window.fetch = function(input, init) {
+    let url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+    if (typeof url === 'string' && url.startsWith('/api/')) {
+      const isPublicAuthRoute = url.startsWith('/api/auth/login') ||
+                                url.startsWith('/api/auth/token') ||
+                                url.startsWith('/api/auth/register') ||
+                                url.startsWith('/api/auth/environment') ||
+                                url.startsWith('/api/v1/health');
+      if (!isPublicAuthRoute) {
+        init = init || {};
+        let headers = {};
+        if (init.headers instanceof Headers) {
+          init.headers.forEach((v, k) => { headers[k] = v; });
+        } else if (typeof init.headers === 'object' && init.headers !== null) {
+          headers = { ...init.headers };
+        }
+
+        const token = localStorage.getItem('zonata_auth_token') || (typeof state !== 'undefined' && state.host && state.host.token);
+        if (token && !headers['Authorization'] && !headers['authorization']) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const tenantId = (typeof state !== 'undefined' && state.host && state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
+        if (tenantId && !headers['X-Tenant-ID'] && !headers['x-tenant-id']) {
+          headers['X-Tenant-ID'] = tenantId;
+        }
+        init.headers = headers;
+      }
+    }
+    return _origFetch.call(this, input, init);
+  };
+})();
+
 // Global Application State
 const state = {
   host: null,
@@ -55,8 +93,89 @@ function getCanonicalCompanies() {
 }
 window.getCanonicalCompanies = getCanonicalCompanies;
 
+// ============================================================================
+// Automatic Day/Night Theme System (Light-First Enterprise Architecture)
+// ============================================================================
+const ThemeManager = {
+  PREF_KEY: 'zonata_theme_preference',
+  
+  getPreference() {
+    return localStorage.getItem(this.PREF_KEY) || 'light';
+  },
+
+  setPreference(mode) {
+    localStorage.setItem(this.PREF_KEY, mode);
+    this.apply();
+  },
+
+  isDaytime() {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19;
+  },
+
+  getEffectiveTheme() {
+    const pref = this.getPreference();
+    if (pref === 'auto') {
+      return this.isDaytime() ? 'light' : 'dark';
+    }
+    return pref;
+  },
+
+  apply() {
+    const effective = this.getEffectiveTheme();
+    const pref = this.getPreference();
+    document.documentElement.setAttribute('data-theme', effective);
+    
+    const iconEl = document.getElementById('themeToggleIcon');
+    const btnEl = document.getElementById('themeToggleBtn');
+    if (btnEl) {
+      if (pref === 'auto') {
+        btnEl.title = `Theme: Auto Day/Night (${effective === 'light' ? '☀️ Daylight' : '🌙 Night'})`;
+      } else if (pref === 'light') {
+        btnEl.title = 'Theme: Light (Daylight Enterprise)';
+      } else {
+        btnEl.title = 'Theme: Dark (OLED High Contrast)';
+      }
+    }
+    if (iconEl) {
+      if (effective === 'light') {
+        iconEl.innerHTML = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+      } else {
+        iconEl.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+      }
+    }
+  },
+
+  cycle() {
+    const current = this.getPreference();
+    let next;
+    if (current === 'light') next = 'dark';
+    else if (current === 'dark') next = 'auto';
+    else next = 'light';
+    this.setPreference(next);
+    const effective = this.getEffectiveTheme();
+    if (typeof showToast === 'function') {
+      showToast(`Theme: ${next.toUpperCase()} mode active (${effective} display)`, 'info');
+    }
+  },
+
+  init() {
+    this.apply();
+    setInterval(() => {
+      if (this.getPreference() === 'auto') {
+        this.apply();
+      }
+    }, 300000);
+  }
+};
+window.ThemeManager = ThemeManager;
+
+// Initialize Theme immediately on script evaluation
+ThemeManager.apply();
+
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
+  ThemeManager.init();
   loadStoredSession();
   loadData();
   setupEventListeners();
@@ -66,12 +185,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // Session Management — P0 Environment-Aware Authentication Boundary
 async function loadStoredSession() {
   const session = localStorage.getItem('zonata_host_session');
+  const storedToken = localStorage.getItem('zonata_auth_token');
   if (session) {
     try {
       state.host = JSON.parse(session);
+      if (storedToken && !state.host.token) {
+        state.host.token = storedToken;
+      }
       // Validate token expiration
       if (state.host && state.host.exp && state.host.exp < Date.now() / 1000) {
-        console.warn('[Security] Sovereign host token expired. Session invalidated.');
+        console.warn('[Security] Host token expired. Session invalidated.');
         clearSession();
       }
     } catch (e) {
@@ -93,41 +216,45 @@ async function loadStoredSession() {
     // Local fallback
   }
 
-  // P0 Constitutional Security Invariant:
-  // In PRODUCTION: NO default sovereign session, no implicit Host authentication!
-  // In STAGING: Real authentication or explicitly test-configured session required.
-  // In DEVELOPMENT: Local convenience authentication permitted for rapid local testing.
+  // Production-grade security invariant:
+  // If no valid session, require explicit user authentication (Sign In / Sign Up)
+  // Dev convenience auto-login is only permitted if explicitly opted-in via localStorage flag
   if (!state.host) {
-    if (appEnv === 'production') {
-      console.warn('[Security] Production mode active: Host authentication required. Default auto-login blocked.');
-      state.host = null;
-    } else if (appEnv === 'staging') {
-      console.warn('[Security] Staging mode active: Valid credentials required.');
-      state.host = null;
-    } else {
-      // Development mode convenience bootstrap
+    const devAutoOptIn = localStorage.getItem('zonata_dev_autologin') === 'true';
+    if (appEnv === 'development' && devAutoOptIn) {
       state.host = {
         name: 'Sukhraj Singh',
         email: 'host@zonata.internal',
         role: 'SOVEREIGN_HOST',
-        phone: '+91 98888 00000',
+        tenant_id: 'tnt_primary',
         status: 'AUTHENTICATED',
         auth_mode: 'DEV_BOOTSTRAP',
         exp: Math.floor(Date.now() / 1000) + 86400 * 7
       };
       saveSession(state.host);
+    } else {
+      state.host = null;
     }
   }
 }
 
-function saveSession(hostData) {
+function saveSession(hostData, token) {
   state.host = hostData;
+  if (token) {
+    state.host.token = token;
+    localStorage.setItem('zonata_auth_token', token);
+  }
+  if (hostData && hostData.tenant_id) {
+    localStorage.setItem('zonata_active_tenant_id', hostData.tenant_id);
+  }
   localStorage.setItem('zonata_host_session', JSON.stringify(hostData));
 }
 
 function clearSession() {
   state.host = null;
   localStorage.removeItem('zonata_host_session');
+  localStorage.removeItem('zonata_auth_token');
+  localStorage.removeItem('zonata_active_tenant_id');
 }
 
 // Strict Company Entity Deduplication Engine
@@ -724,7 +851,9 @@ function setupEventListeners() {
   // Theme toggle
   const themeToggle = document.getElementById('themeToggleBtn');
   if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.addEventListener('click', () => {
+      ThemeManager.cycle();
+    });
   }
 
   // Sign out button
@@ -753,12 +882,7 @@ function setupEventListeners() {
 
 // Theme Management
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'dark';
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  state.settings.theme = next;
-  saveData();
-  showToast(`Switched to ${next} theme`, 'info');
+  ThemeManager.cycle();
 }
 
 // Main View Router
@@ -935,41 +1059,73 @@ window.switchAuthTab = function(tab) {
 };
 
 window.handleSocialAuth = function(provider) {
-  const host = {
-    name: provider === 'Google' ? 'Sukhraj Singh' : (provider + ' Enterprise Host'),
-    email: provider.toLowerCase() + '.host@zonata.internal',
-    provider: provider,
-    authenticatedAt: new Date().toISOString()
-  };
-  saveSession(host);
-  showToast(`Successfully authenticated via ${provider}`, 'success');
-  renderApp();
+  openModal(`${provider} Single Sign-On (SSO)`, `
+    <div style="font-size:13.5px; line-height:1.6; color:var(--text-secondary); padding:8px 0;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <span style="font-size:20px;">🔒</span>
+        <strong style="color:var(--text-primary); font-size:14px;">Enterprise Identity Provider Not Configured</strong>
+      </div>
+      <p style="margin-bottom:12px;">OAuth 2.0 / SAML single sign-on integration for <strong>${provider}</strong> is not configured on this host instance.</p>
+      <p style="margin-bottom:16px;">To enable corporate federated identity, configure client credentials in <code>.env.production</code> (e.g. <code>${provider.toUpperCase()}_CLIENT_ID</code> and <code>${provider.toUpperCase()}_CLIENT_SECRET</code>) or sign in using enterprise password credentials.</p>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn btn-primary" onclick="closeModal()">Return to Sign In</button>
+      </div>
+    </div>
+  `);
 };
 
-window.handleAuthSubmit = function(e, type) {
+window.handleAuthSubmit = async function(e, type) {
   e.preventDefault();
-  let host;
-  if (type === 'signin') {
-    const email = document.getElementById('authEmail').value;
-    host = {
-      name: email.split('@')[0].toUpperCase(),
-      email: email,
-      provider: 'Password',
-      authenticatedAt: new Date().toISOString()
-    };
-  } else {
-    const name = document.getElementById('newHostName').value;
-    const email = document.getElementById('newHostEmail').value;
-    host = {
-      name: name,
-      email: email,
-      provider: 'Password',
-      authenticatedAt: new Date().toISOString()
-    };
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Connecting...</span>`;
   }
-  saveSession(host);
-  showToast(`Welcome back, Host ${host.name}!`, 'success');
-  renderApp();
+
+  try {
+    if (type === 'signin') {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail || data.error || 'Authentication failed. Please verify credentials.', 'error');
+        return;
+      }
+      saveSession(data.user, data.token);
+      showToast(`Welcome back, ${data.user.name || data.user.email}!`, 'success');
+      renderApp();
+    } else {
+      const name = document.getElementById('newHostName').value.trim();
+      const email = document.getElementById('newHostEmail').value.trim();
+      const password = document.getElementById('newHostPassword').value;
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail || data.error || 'Registration failed.', 'error');
+        return;
+      }
+      saveSession(data.user, data.token);
+      showToast(`Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
+      renderApp();
+    }
+  } catch (err) {
+    showToast(`Network or server connection error: ${err.message}`, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
+    }
+  }
 };
 
 window.showSecurityQuestionsModal = function() {
