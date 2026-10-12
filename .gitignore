@@ -35,6 +35,7 @@ ENV/
 
 # Sandboxed runtime files
 storage/sandbox/
+storage/simulation/
 storage/workspaces/
 storage/browser_artifacts/
 storage/object_store/
