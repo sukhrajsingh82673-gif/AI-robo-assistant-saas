@@ -80,23 +80,23 @@ flowchart TD
 
 ---
 
-## 3. Pre-Run & Post-Run Protected Asset Invariant Hashes
+## 3. Pre-Run & Post-Run Protected Asset Invariant Identifiers
 
 A critical mandate of this qualification was demonstrating that executing the synthetic company simulation leaves all baseline database, ledger, and frontend assets 100% byte-for-byte identical.
 
-### Cryptographic Invariant Hash Verification
+### Cryptographic Invariant Identifier Verification
 
-| Protected Asset Path | Invariant Standard Hash | Pre-Simulation Measured Hash | Post-Simulation Measured Hash | Hash Delta / Mutation Status |
+| Protected Asset Path | Identifier Type & Canonical Invariant Value | Pre-Simulation Measured Value | Post-Simulation Measured Value | Mutation Status |
 | :--- | :--- | :--- | :--- | :--- |
-| `storage/roboassistant.db` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | **IDENTICAL (0 bytes mutated)** |
-| `storage/evidence/audit_ledger.jsonl` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | **IDENTICAL (0 bytes mutated)** |
-| `web/workflow_workspace.js` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **IDENTICAL (0 bytes mutated)** |
+| `storage/roboassistant.db` | **SHA-256 Digest:** `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | **IDENTICAL (0 bytes mutated)** |
+| `storage/evidence/audit_ledger.jsonl` | **SHA-256 Digest:** `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | **IDENTICAL (0 bytes mutated)** |
+| `web/workflow_workspace.js` | **Git Object Blob SHA-1 (`git hash-object`):** `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd`<br>*(SHA-256: `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b`)* | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **IDENTICAL (0 bytes mutated)** |
 
 ---
 
 ## 4. End-to-End Workflow Inventory
 
-All 10 required synthetic enterprise workflows were executed sequentially.
+All 10 required synthetic enterprise workflows were executed sequentially. Operational categories are explicitly distinguished (Initialization, Auth, Graph Planning, Durable Execution, Synthetic Connectors, Evidence Sealing, Analytics, Human Gating, Idempotency, Emergency KillSwitch).
 
 ### Execution Summary
 - **Total Workflows Planned:** 10
@@ -109,18 +109,18 @@ All 10 required synthetic enterprise workflows were executed sequentially.
 
 ### Workflow Inventory Table
 
-| ID | Workflow Title | Objective | Execution Latency | Status | Key Verified Outputs |
+| ID | Workflow Title & Operational Category | Objective & Operational Scope | Execution Latency | Status | Key Verified Outputs |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **WF-01** | Company & Tenant Initialization | Bootstrap Nova Dynamics Simulation Corp with deterministic corporate entities and capital | 151.05 ms | **PASSED** | 5 departments created, 5 role-tiered users provisioned, ₹10,000,000 master budget assigned |
-| **WF-02** | Authentication & Tenant Boundary Enforcement | Validate RBAC tokens across 5 roles and assert fail-closed rejection of tampered/expired tokens | 66.94 ms | **PASSED** | OWNER, EXECUTIVE, MANAGER, OPERATOR, AUDITOR claims verified; signature tamper & expiration strictly rejected |
-| **WF-03** | Business Request Intake & Planning | Parse CEO directive into structured ExecutionGraph with deterministic task assignment | 0.19 ms | **PASSED** | Formulated mission `msn_cw_eae0b9ed` with 2 interdependent task nodes |
-| **WF-04** | Durable Workflow Execution & Crash Recovery | Acquire lease, detect simulated worker crash, recover checkpoint, and advance to completion | 246.50 ms | **PASSED** | 3 state checkpoints persisted; expired lease swept; restored state from step 2; completed workflow |
-| **WF-05** | Synthetic Connector Provenance | Query Hospitality PMS, Accounting, and Payment connectors against synthetic fixtures | 6.35 ms | **PASSED** | 42 folios & 18 accounts ingested; all tagged `is_mock=True` and `execution_mode=SIMULATED` |
-| **WF-06** | Evidence Sealing & Merkle Ledger Integrity | Seal synthetic and physical evidence packages and verify Merkle chain cryptographic integrity | 15.36 ms | **PASSED** | Sealed 1 `SIMULATED` package and 1 `VERIFIED` package; Merkle chain integrity verified `UNBROKEN` |
-| **WF-07** | Reporting & Executive Overview Analytics | Compute executive overview snapshot adhering to epistemic provenance rules | 216.59 ms | **PASSED** | Verified exactly 1 verified record and 1 unverified record; data completeness reported at 57% |
-| **WF-08** | Human Approval Gates | Verify high-impact actions halt execution until approved by sovereign host/owner | 341.42 ms | **PASSED** | High-risk financial transfer held in `PENDING` state; execution unblocked upon human owner authorization |
-| **WF-09** | Idempotency & Duplicate Handling | Verify repeated requests with duplicate idempotency key return cached result without mutation | 1,819.55 ms | **PASSED** | Duplicate request intercepted; returned cached response with `replayed_from_idempotency_cache=True` |
-| **WF-10** | Controlled Recovery & KillSwitch Interruption | Engage multi-level KillSwitch barrier, verify instant execution halt, and resume cleanly | 330.97 ms | **PASSED** | Tenant-level killswitch halted execution immediately; disengagement restored operational status |
+| **WF-01** | Company & Tenant Initialization<br>*(Bootstrap / Setup)* | Bootstrap Nova Dynamics Simulation Corp with deterministic corporate entities and capital | 151.05 ms | **PASSED** | 5 departments created, 5 role-tiered users provisioned, ₹10,000,000 master budget assigned |
+| **WF-02** | Authentication & Tenant Boundary Enforcement<br>*(Auth & RBAC)* | Validate RBAC tokens across 5 roles and assert fail-closed rejection of tampered/expired tokens | 66.94 ms | **PASSED** | OWNER, EXECUTIVE, MANAGER, OPERATOR, AUDITOR claims verified; signature tamper & expiration strictly rejected |
+| **WF-03** | Business Request Intake & DAG Planning<br>*(In-Memory Graph Formulation)* | Parse CEO directive into structured ExecutionGraph; verifies DAG formulation and dependencies *(planning phase only; not full business execution)* | 0.19 ms | **PASSED** | Formulated mission `msn_cw_eae0b9ed` with 2 interdependent task nodes |
+| **WF-04** | Durable Workflow Execution & Crash Recovery<br>*(Durable Execution Lifecycle)* | Acquire lease, detect simulated worker crash, sweep expired lease, recover checkpoint, advance to completion | 246.50 ms | **PASSED** | 3 state checkpoints persisted; expired lease swept; restored state from step 2; completed workflow |
+| **WF-05** | Synthetic Connector Provenance<br>*(Simulated Provider Ingestion)* | Query Hospitality PMS, Accounting, and Payment connectors against synthetic fixtures | 6.35 ms | **PASSED** | 42 folios & 18 accounts ingested; all tagged `is_mock=True` and `execution_mode=SIMULATED` |
+| **WF-06** | Evidence Sealing & Merkle Ledger Integrity<br>*(Evidence Sealing & Hashing)* | Seal synthetic and physical evidence packages and verify Merkle chain cryptographic integrity | 15.36 ms | **PASSED** | Sealed 1 `SIMULATED` package and 1 `VERIFIED` package; Merkle chain integrity verified `UNBROKEN` |
+| **WF-07** | Reporting & Executive Overview Analytics<br>*(Reporting & Data Quality)* | Compute executive overview snapshot adhering to epistemic provenance rules | 216.59 ms | **PASSED** | Verified exactly 1 verified record and 1 unverified record; data completeness reported at 57% |
+| **WF-08** | Human Approval Gates<br>*(Governance & Authorization)* | Verify high-impact actions halt execution until approved by sovereign host/owner | 341.42 ms | **PASSED** | High-risk financial transfer held in `PENDING` state; execution unblocked upon human owner authorization |
+| **WF-09** | Idempotency & Duplicate Handling<br>*(Deduplication Engine)* | Verify repeated requests with duplicate idempotency key return cached result without mutation | 1,819.55 ms | **PASSED** | Duplicate request intercepted; returned cached response with `replayed_from_idempotency_cache=True` |
+| **WF-10** | Controlled Recovery & KillSwitch Interruption<br>*(Resilience & Emergency Barrier)* | Engage multi-level KillSwitch barrier, verify instant execution halt, and resume cleanly | 330.97 ms | **PASSED** | Tenant-level killswitch halted execution immediately; disengagement restored operational status |
 
 ---
 
@@ -204,6 +204,9 @@ The simulation strictly verified the integrity of the evidence ledger and adhere
 | **7** | Simulation ledger isolated from baseline | File path comparison between simulation and baseline | Simulation wrote strictly to ephemeral path | **PASSED** |
 | **8** | Zero live third-party operations represented as verified | Inspection of PMS, Accounting, and Payment results | All connectors returned `verified: False` | **PASSED** |
 
+> **Epistemic Integrity Note on Physical Verification:**  
+> The physical verification check (`pkg_phys`) validates that the on-disk report artifact (`audit_reconciliation_report.txt`) exists at the specified workspace path and matches its cryptographic SHA-256 digest byte-for-byte. This proves **local file integrity and physical disk artifact verification** within the disposable simulation environment; it does **not** assert that a genuine commercial bank settlement or live external financial audit occurred in the real world.
+
 ---
 
 ## 8. Database, Connector & External-Side-Effect Observations
@@ -251,6 +254,8 @@ While the synthetic company simulation executed without error, the following arc
    - In environments without rootless Docker or KVM hypervisors, terminal execution correctly fails closed (exit code 126). However, production deployment requires physical hardware virtualization (`/dev/kvm` microVMs or Kata Containers) to provide multi-tenant workload isolation.
 4. **Disaster Recovery Validation:**
    - Backup and point-in-time recovery mechanisms have been validated locally, but live multi-region hot failover has not yet been exercised against geo-distributed clusters.
+5. **Kernel-Level Egress Enforcement:**
+   - The simulation confirmed zero external mutations because connectors were wired to synthetic mock adapters. However, operating-system-level packet filtering (`iptables`, `nftables`, network namespaces, eBPF) was not configured in the host process; live network isolation is a mandatory infrastructure gate for bare-metal production deployment.
 
 ---
 
