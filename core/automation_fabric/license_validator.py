@@ -404,7 +404,7 @@ class AutomationLicenseValidator:
                 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 docs_dir = os.path.join(base_dir, "docs")
                 os.makedirs(docs_dir, exist_ok=True)
-                sbom_file = os.path.join(docs_dir, "cyclonedx_sbom.json")
+                sbom_file = os.environ.get("ZONATA_SBOM_PATH") or os.path.join(docs_dir, "cyclonedx_sbom.json")
                 with open(sbom_file, "w", encoding="utf-8") as f:
                     json.dump(sbom, f, indent=2)
             except Exception:

@@ -680,9 +680,10 @@ class OpenHandsExecutionProvider(AgentExecutionProvider):
         # Enforce sandbox boundary: host execution requires explicit permission or verified isolation
         app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
         is_prod = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
-        allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
+        strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+        allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod and not strict_isolation
         is_isolated = bool(os.environ.get("ZONATA_CONTAINER_ISOLATION") or allow_host)
-        if not is_isolated:
+        if not is_isolated or strict_isolation:
             msg = (
                 "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
                 if is_prod else

@@ -43,6 +43,8 @@ def init_simulation_environment(
     # Set environment variables for child processes/threads
     os.environ["ZONATA_DB_PATH"] = os.path.abspath(target_db)
     os.environ["ZONATA_EVIDENCE_PATH"] = os.path.abspath(target_ev)
+    os.environ["STRICT_ISOLATION_REQUIRED"] = "1"
+    os.environ["ZONATA_ALLOW_HOST_SHELL"] = "0"
 
     # Point global singleton database to the isolated simulation path
     db.set_db_path(target_db)
@@ -56,6 +58,8 @@ def init_simulation_environment(
         "simulation_evidence": target_ev,
         "tenant_id": SIM_TENANT_ID,
         "company_id": SIM_COMPANY_ID,
+        "strict_isolation": True,
+        "allow_host_shell": False,
         "fixtures": fixtures_summary
     }
 

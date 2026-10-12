@@ -19,7 +19,7 @@ import re
 import secrets
 from typing import Dict, Any, List, Optional, Tuple, Set
 
-from core.db import db
+from core.db import db, get_default_db_path
 from core.models import AuthorityLevel
 
 # Group Constants
@@ -2107,7 +2107,7 @@ class EnterpriseSettingsService:
                 self._effective_cache[(tenant_id, company_id, setting_key)] = new_value
 
             # Sync to storage/enterprise_settings.json for legacy subsystems
-            json_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/enterprise_settings.json")
+            json_file = os.environ.get("ZONATA_SETTINGS_PATH") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/enterprise_settings.json")
             data = {}
             if os.path.exists(json_file):
                 try:
@@ -2468,7 +2468,7 @@ class EnterpriseSettingsService:
             else:
                 detail = "Governed execution lease policy verified: command execution currently quarantined per host security policy."
         elif target_lower in ["backup", "disaster_recovery"]:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage/roboassistant.db")
+            db_path = get_default_db_path()
             if os.path.exists(db_path):
                 sz_mb = round(os.path.getsize(db_path) / (1024 * 1024), 2)
                 detail = f"SQLite WAL check and hot snapshot drill completed successfully ({sz_mb} MB). Integrity check: OK."

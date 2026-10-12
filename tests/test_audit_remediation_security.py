@@ -252,7 +252,7 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def setUp(self):
         self.orig_env = {
             k: os.environ.get(k)
-            for k in ["ZONATA_ALLOW_HOST_SHELL", "APP_ENV", "ZONATA_ENV", "ZONATA_STRICT_AUTH", "ZONATA_PRODUCTION"]
+            for k in ["ZONATA_ALLOW_HOST_SHELL", "STRICT_ISOLATION_REQUIRED", "APP_ENV", "ZONATA_ENV", "ZONATA_STRICT_AUTH", "ZONATA_PRODUCTION"]
         }
         for k in self.orig_env:
             if k in os.environ:
@@ -348,6 +348,60 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             run_server(port=9999)
         self.assertIn("strictly prohibited in production mode", str(cm.exception))
+
+    def test_07_strict_isolation_required_blocks_host_shell_override(self):
+        """When STRICT_ISOLATION_REQUIRED=1, host shell fallback is forbidden even if ZONATA_ALLOW_HOST_SHELL=1."""
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        os.environ["STRICT_ISOLATION_REQUIRED"] = "1"
+
+        container_adapter = ContainerRuntimeAdapter()
+        res_container = container_adapter.execute_command(
+            session_id="test_sess_strict_container",
+            command="echo 'should_fail'",
+            cwd=tempfile.gettempdir()
+        )
+        self.assertEqual(res_container.get("exit_code"), 126)
+        self.assertTrue(res_container.get("sandbox_failure"))
+
+        vm_adapter = VMRuntimeAdapter()
+        res_vm = vm_adapter.execute_command(
+            session_id="test_sess_strict_vm",
+            command="echo 'should_fail'",
+            cwd=tempfile.gettempdir()
+        )
+        self.assertEqual(res_vm.get("exit_code"), 126)
+        self.assertTrue(res_vm.get("sandbox_failure"))
+
+        res_oh = OpenHandsExecutionProvider(None).execute_command(
+            workspace_path=tempfile.gettempdir(),
+            command="echo 'should_fail'"
+        )
+        self.assertEqual(res_oh.get("exit_code"), 126)
+
+    def test_08_strict_isolation_rejects_caller_env_host_shell_override(self):
+        """Caller-supplied env dictionary cannot bypass STRICT_ISOLATION_REQUIRED restriction."""
+        os.environ["STRICT_ISOLATION_REQUIRED"] = "1"
+
+        container_adapter = ContainerRuntimeAdapter()
+        res = container_adapter.execute_command(
+            session_id="test_sess_injected_env",
+            command="echo 'should_fail'",
+            cwd=tempfile.gettempdir(),
+            env={"ZONATA_ALLOW_HOST_SHELL": "1"}
+        )
+        self.assertEqual(res.get("exit_code"), 126)
+        self.assertTrue(res.get("sandbox_failure"))
+
+    def test_09_simulation_fixtures_enforce_strict_isolation(self):
+        """init_simulation_environment configures STRICT_ISOLATION_REQUIRED=1 and ZONATA_ALLOW_HOST_SHELL=0."""
+        from core.simulation_fixtures import init_simulation_environment
+        with tempfile.TemporaryDirectory() as td:
+            fixture_db = os.path.join(td, "sim_test.db")
+            cfg = init_simulation_environment(fixture_db)
+            self.assertEqual(os.environ.get("STRICT_ISOLATION_REQUIRED"), "1")
+            self.assertEqual(os.environ.get("ZONATA_ALLOW_HOST_SHELL"), "0")
+            self.assertTrue(cfg.get("strict_isolation"))
+            self.assertFalse(cfg.get("allow_host_shell"))
 
 
 class TestEvidenceIntegrityAndConnectors(unittest.TestCase):

@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from .db import db
 from .decision_center import OwnerDecisionCenter
 from .evidence_ledger import EvidenceLedger
+from .models import EvidenceStatus
 
 
 class OverviewDataService:
@@ -682,7 +683,9 @@ class OverviewDataService:
             # 12. Data Quality / Trust Indicator
             # -------------------------------------------------------------
             el = EvidenceLedger()
-            verified_count = len(el.chain)
+            verified_count = sum(1 for r in el.chain if r.get("status") in ("VERIFIED", EvidenceStatus.VERIFIED.value))
+            simulated_or_test_count = sum(1 for r in el.chain if r.get("status") in ("SIMULATED", "TEST", "PENDING_EVIDENCE", EvidenceStatus.SIMULATED.value, EvidenceStatus.TEST.value))
+            unverified_count = simulated_or_test_count if el.chain else (3 if not has_financial_data else 1)
             integrity_ok = el.verify_ledger_integrity()
 
             fin_score = 94 if has_financial_data else 0
@@ -699,7 +702,7 @@ class OverviewDataService:
                 "operations_pct": ops_score,
                 "marketing_pct": mkt_score,
                 "verified_records": verified_count,
-                "unverified_records": 3 if not has_financial_data else 1,
+                "unverified_records": unverified_count,
                 "conflicting_records": 0,
                 "merkle_integrity": "UNBROKEN" if integrity_ok else "DEGRADED",
                 "missing_sources": [

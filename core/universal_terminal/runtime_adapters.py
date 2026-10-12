@@ -277,16 +277,17 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         engine = container_meta.get("engine") or self._detect_engine()
         profile = container_meta.get("profile")
 
+        # Check caller-supplied environment overrides
+        caller_env = (env or {}).copy()
         exec_env = os.environ.copy()
-        if env:
-            exec_env.update(env)
+        exec_env.update(caller_env)
         exec_env["ZONATA_CONTAINER_ISOLATION"] = "LEVEL_2"
 
         # Check if container engine is missing on host
         if not engine:
             is_prod = _is_production_environment()
-            strict_isolation = exec_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]
-            allow_host = (exec_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod and not strict_isolation
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
             if not allow_host:
                 msg = (
                     "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
@@ -457,9 +458,11 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
         profile = vm_info.get("profile")
 
         # If hardware virtualization is absent on this host
+        caller_env = (env or {}).copy()
         if not has_virt:
             is_prod = _is_production_environment()
-            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
             if not allow_host:
                 msg = (
                     "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
@@ -479,8 +482,7 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
 
             # Governed disposable sandbox fallback
             exec_env = os.environ.copy()
-            if env:
-                exec_env.update(env)
+            exec_env.update(caller_env)
             exec_env["ZONATA_VM_DEGRADED_FALLBACK"] = "1"
             try:
                 proc = subprocess.run(
@@ -732,9 +734,11 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
         node_info = self._nodes.get(session_id, {})
         endpoint = node_info.get("endpoint") or os.environ.get("REMOTE_LINUX_NODE_URL")
 
+        caller_env = (env or {}).copy()
         if not endpoint:
             is_prod = _is_production_environment()
-            allow_host = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") and not is_prod
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
             if not allow_host:
                 msg = (
                     "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
@@ -754,8 +758,7 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
 
             # Governed fallback with honest warning
             exec_env = os.environ.copy()
-            if env:
-                exec_env.update(env)
+            exec_env.update(caller_env)
             exec_env["ZONATA_REMOTE_NODE_FALLBACK"] = "1"
             try:
                 proc = subprocess.run(
