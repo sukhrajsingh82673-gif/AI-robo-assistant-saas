@@ -16,6 +16,7 @@ import sys
 import time
 import json
 import subprocess
+import unittest
 from typing import Dict, Any, List
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -102,46 +103,157 @@ BLOCKED_SUITES = [
 ]
 
 
+class GranularTestResult(unittest.TestResult):
+    """
+    Subclass of TestResult to record granular metadata for every test execution:
+    test_id, method_name, docstring description, status (PASS/FAIL/ERROR), duration, and security classification.
+    """
+    def __init__(self, suite_file: str, suite_name: str, suite_category: str):
+        super().__init__()
+        self.suite_file = suite_file
+        self.suite_name = suite_name
+        self.suite_category = suite_category
+        self.recorded_tests: List[Dict[str, Any]] = []
+        self._starts: Dict[str, float] = {}
+
+    def startTest(self, test: unittest.TestCase):
+        super().startTest(test)
+        self._starts[test.id()] = time.time()
+
+    def addSuccess(self, test: unittest.TestCase):
+        super().addSuccess(test)
+        dur = round(time.time() - self._starts.get(test.id(), time.time()), 4)
+        doc = test.shortDescription() or (test._testMethodDoc.strip().split("\n")[0] if getattr(test, "_testMethodDoc", None) else "")
+        is_sec = "Security" in self.suite_category
+        self.recorded_tests.append({
+            "test_id": test.id(),
+            "method_name": test._testMethodName,
+            "suite_file": self.suite_file,
+            "suite_name": self.suite_name,
+            "category": self.suite_category,
+            "description": doc.strip() if doc else "",
+            "status": "PASS",
+            "duration_seconds": dur,
+            "is_security_negative": is_sec,
+            "error_detail": None
+        })
+
+    def addFailure(self, test: unittest.TestCase, err):
+        super().addFailure(test, err)
+        dur = round(time.time() - self._starts.get(test.id(), time.time()), 4)
+        doc = test.shortDescription() or ""
+        is_sec = "Security" in self.suite_category
+        self.recorded_tests.append({
+            "test_id": test.id(),
+            "method_name": test._testMethodName,
+            "suite_file": self.suite_file,
+            "suite_name": self.suite_name,
+            "category": self.suite_category,
+            "description": doc.strip() if doc else "",
+            "status": "FAIL",
+            "duration_seconds": dur,
+            "is_security_negative": is_sec,
+            "error_detail": self._exc_info_to_string(err, test)
+        })
+
+    def addError(self, test: unittest.TestCase, err):
+        super().addError(test, err)
+        dur = round(time.time() - self._starts.get(test.id(), time.time()), 4)
+        doc = test.shortDescription() or ""
+        is_sec = "Security" in self.suite_category
+        self.recorded_tests.append({
+            "test_id": test.id(),
+            "method_name": test._testMethodName,
+            "suite_file": self.suite_file,
+            "suite_name": self.suite_name,
+            "category": self.suite_category,
+            "description": doc.strip() if doc else "",
+            "status": "ERROR",
+            "duration_seconds": dur,
+            "is_security_negative": is_sec,
+            "error_detail": self._exc_info_to_string(err, test)
+        })
+
+
+def run_suite_in_process(file_rel: str, name: str, category: str):
+    """Worker process entrypoint: loads suite, executes via GranularTestResult, and outputs JSON."""
+    module_name = file_rel.replace("/", ".").replace(".py", "")
+    if BASE_DIR not in sys.path:
+        sys.path.insert(0, BASE_DIR)
+
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromName(module_name)
+    result = GranularTestResult(file_rel, name, category)
+    t0 = time.time()
+    suite.run(result)
+    duration = time.time() - t0
+
+    payload = {
+        "file": file_rel,
+        "name": name,
+        "category": category,
+        "test_count": len(result.recorded_tests),
+        "passed_count": len([t for t in result.recorded_tests if t["status"] == "PASS"]),
+        "failures": len(result.failures),
+        "errors": len(result.errors),
+        "duration_seconds": round(duration, 3),
+        "status": "PASS" if (len(result.failures) == 0 and len(result.errors) == 0) else "FAIL",
+        "tests": result.recorded_tests
+    }
+    print("---JSON_OUTPUT_START---")
+    print(json.dumps(payload))
+    print("---JSON_OUTPUT_END---")
+
+
 def run_single_suite(suite_info: Dict[str, Any]) -> Dict[str, Any]:
     file_rel = suite_info["file"]
-    file_abs = os.path.join(BASE_DIR, file_rel)
-    cmd = [sys.executable, "-m", "unittest", file_rel]
+    cmd = [
+        sys.executable,
+        "-W", "ignore",
+        os.path.abspath(__file__),
+        "--run-suite-json",
+        file_rel,
+        suite_info["name"],
+        suite_info["category"]
+    ]
     t0 = time.time()
     proc = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True)
     duration = time.time() - t0
 
-    output = proc.stderr + "\n" + proc.stdout
-    passed = proc.returncode == 0
+    output = proc.stdout
+    if "---JSON_OUTPUT_START---" in output and "---JSON_OUTPUT_END---" in output:
+        json_part = output.split("---JSON_OUTPUT_START---")[1].split("---JSON_OUTPUT_END---")[0].strip()
+        data = json.loads(json_part)
+        return data
 
-    # Parse test count from unittest output: "Ran X tests in Ys"
-    import re
-    match = re.search(r"Ran (\d+) tests? in", output)
-    test_count = int(match.group(1)) if match else 0
-
-    fail_match = re.search(r"FAILED \((?:failures=(\d+))?(?:, )?(?:errors=(\d+))?\)", output)
-    failures = int(fail_match.group(1)) if fail_match and fail_match.group(1) else 0
-    errors = int(fail_match.group(2)) if fail_match and fail_match.group(2) else 0
-
+    # Fallback if execution failed unexpectedly
     return {
         "file": file_rel,
         "name": suite_info["name"],
         "category": suite_info["category"],
-        "test_count": test_count,
-        "passed_count": test_count - failures - errors,
-        "failures": failures,
-        "errors": errors,
+        "test_count": 0,
+        "passed_count": 0,
+        "failures": 1,
+        "errors": 1,
         "duration_seconds": round(duration, 3),
-        "status": "PASS" if passed else "FAIL"
+        "status": "FAIL",
+        "tests": [],
+        "raw_error": proc.stderr
     }
 
 
 def main():
+    if len(sys.argv) >= 5 and sys.argv[1] == "--run-suite-json":
+        run_suite_in_process(sys.argv[2], sys.argv[3], sys.argv[4])
+        return
+
     print("=" * 80)
     print("ZONATA SaaS — Automated Test Accounting Auditor")
     print(f"Executing {len(SUITES_CONFIG)} standalone test suites...")
     print("=" * 80)
 
     results = []
+    all_executed_tests: List[Dict[str, Any]] = []
     total_tests = 0
     total_passed = 0
     total_failed = 0
@@ -151,6 +263,8 @@ def main():
     for suite in SUITES_CONFIG:
         print(f"Running {suite['file']}...", end="", flush=True)
         res = run_single_suite(suite)
+        suite_tests = res.pop("tests", [])
+        all_executed_tests.extend(suite_tests)
         results.append(res)
         total_tests += res["test_count"]
         total_passed += res["passed_count"]
@@ -159,7 +273,7 @@ def main():
         total_duration += res["duration_seconds"]
         print(f" -> {res['status']} ({res['test_count']} tests, {res['duration_seconds']}s)")
 
-    security_count = sum(r["test_count"] for r in results if "Security" in r["category"])
+    security_count = sum(1 for t in all_executed_tests if t.get("is_security_negative"))
 
     try:
         git_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, text=True).strip()
@@ -184,6 +298,7 @@ def main():
             "security_negative_test_count": security_count
         },
         "executed_suites": results,
+        "executed_tests": all_executed_tests,
         "blocked_infrastructure_suites": BLOCKED_SUITES
     }
 

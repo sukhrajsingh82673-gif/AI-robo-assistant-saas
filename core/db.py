@@ -9,13 +9,65 @@ import os
 import time
 import json
 import re
+import urllib.parse
 from typing import Optional, Any, Dict, List
 
-def sanitize_db_url(url: str) -> str:
-    """Masks password credentials in database connection URLs (e.g., postgresql://user:pass@host/db -> postgresql://user:***@host/db)."""
-    if not url:
+def sanitize_db_url(raw_input: str) -> str:
+    """Safely sanitizes database connection strings and diagnostic error strings.
+    Parses connection URLs via urllib.parse to redact userinfo passwords and query secrets,
+    with defensive multi-layer fallbacks for irregular strings, punctuation, URL-encoded
+    characters, and exception traces.
+    """
+    if not raw_input:
         return ""
-    return re.sub(r':([^:@/\s]+)@', r':***@', str(url))
+    text = str(raw_input).strip()
+
+    def _sanitize_single_url(url: str) -> str:
+        try:
+            parsed = urllib.parse.urlsplit(url)
+            netloc = parsed.netloc
+            if "@" in netloc:
+                userinfo, hostinfo = netloc.rsplit("@", 1)
+                if ":" in userinfo:
+                    username, _ = userinfo.split(":", 1)
+                    new_userinfo = f"{username}:***"
+                else:
+                    new_userinfo = userinfo
+                netloc = f"{new_userinfo}@{hostinfo}"
+
+            query = parsed.query
+            if query:
+                q_pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
+                new_pairs = []
+                for k, v in q_pairs:
+                    if k.lower() in ("password", "pwd", "secret", "token", "auth", "key"):
+                        new_pairs.append((k, "***"))
+                    else:
+                        new_pairs.append((k, v))
+                query = urllib.parse.urlencode(new_pairs)
+            return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path, query, parsed.fragment))
+        except Exception:
+            return url
+
+    # 1. If raw input is directly a URL:
+    if re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://', text):
+        cleaned = _sanitize_single_url(text)
+    else:
+        cleaned = text
+
+    # 2. Secondary defense: sanitize any embedded URLs in error messages
+    def _sub_embedded(m):
+        return _sanitize_single_url(m.group(0))
+
+    cleaned = re.sub(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\'"`,;)]+', _sub_embedded, cleaned)
+
+    # 3. Tertiary defense: sanitize any remaining :<password>@ patterns
+    cleaned = re.sub(r':([^:@/\s\'"`,;)]+)@', r':***@', cleaned)
+
+    # 4. Quaternary defense: query parameters in strings
+    cleaned = re.sub(r'([?&](?:password|pwd|secret|token|auth)=)[^&\s\'"`,;)]+', r'\g<1>***', cleaned, flags=re.IGNORECASE)
+
+    return cleaned
 
 def get_default_db_path() -> str:
     env_path = os.environ.get("ZONATA_DB_PATH") or os.environ.get("ROBOASSISTANT_DB_PATH")

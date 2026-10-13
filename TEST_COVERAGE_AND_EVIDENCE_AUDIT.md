@@ -75,6 +75,8 @@ The following suites represent real-world infrastructure tests that require live
 ## 4. Assertion Meaningfulness and Integrity Audit
 
 1. **No Suppressed Assertions**: All test suites assert concrete state changes, return codes, and cryptographic outputs (e.g., `self.assertEqual`, `self.assertTrue`, `self.assertRaises`).
-2. **Negative Boundary Validation**: All 50 security tests verify that invalid or malicious inputs strictly fail closed (returning HTTP 400, 401, 403, 404, or 429).
+2. **Negative Boundary Validation**: All 51 security tests verify that invalid or malicious inputs strictly fail closed (returning HTTP 400, 401, 403, 404, or 429).
 3. **Database State Isolation**: Every test run creates a temporary SQLite file, executes migrations, executes test assertions, and unlinks the temporary file upon completion, while rigorously restoring `db.db_path` and `ZONATA_DB_PATH`.
 4. **Constitutional Reference Assets Untouched**: The three constitutional reference files (`storage/roboassistant.db`, `storage/evidence/audit_ledger.jsonl`, `web/workflow_workspace.js`) were never modified or used as disposable test fixtures.
+5. **Granular Test IDs & Metadata Accounting**: The machine-readable summary [`storage/evidence/test_accounting_summary.json`](file:///root/roboassistant/storage/evidence/test_accounting_summary.json) captures an exact entry for every one of the 109 executed tests, including `test_id` (fully qualified module, class, and method), `method_name`, `suite_file`, `suite_name`, `category`, `description` (docstring), `status` (PASS/FAIL), `duration_seconds`, and `is_security_negative` flag.
+

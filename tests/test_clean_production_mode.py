@@ -236,15 +236,28 @@ class TestCleanProductionMode(unittest.TestCase):
         from unittest.mock import patch, MagicMock
         from core.db import sanitize_db_url
 
-        # 1. Direct test of sanitize_db_url helper
-        raw_url = "postgresql://zonata_admin:super_secret_password_123@pgcluster.internal:5432/zonata_db"
-        sanitized = sanitize_db_url(raw_url)
-        self.assertNotIn("super_secret_password_123", sanitized)
-        self.assertIn("postgresql://zonata_admin:***@pgcluster.internal:5432/zonata_db", sanitized)
+        # 1. Direct test of sanitize_db_url helper across adversarial formats
+        adversarial_cases = [
+            ("postgresql://zonata_admin:super_secret_password_123@pgcluster.internal:5432/zonata_db", "super_secret_password_123"),
+            ("postgresql://app_user:p%40ss%3Aword%21123@[::1]:5432/mydb?sslmode=require", "p%40ss%3Aword%21123"),
+            ("postgresql://admin:mypass@[2001:db8::1]:5432/prod_db", "mypass"),
+            ("postgres://user:p$w&o*r-d_!@[::1]:5432/db", "p$w&o*r-d_!"),
+            ("postgresql://host:5432/db?user=admin&password=secret_in_query&sslmode=verify-full", "secret_in_query"),
+            ('psycopg2.OperationalError: failed for user "zonata_admin" in postgresql://zonata_admin:ultra_secret_pw@[10.0.0.1]:5432/zonata_prod', "ultra_secret_pw")
+        ]
+        for raw_str, secret in adversarial_cases:
+            sanitized = sanitize_db_url(raw_str)
+            self.assertNotIn(secret, sanitized, f"Secret leaked for case: {raw_str}")
+            self.assertIn("***", sanitized, f"Mask indicator missing for case: {raw_str}")
+
+        # Non-credential URL preservation
+        plain_url = "postgresql://admin@host:5432/db"
+        self.assertEqual(sanitize_db_url(plain_url), plain_url)
 
         # 2. Test exception propagation redacting credentials
         old_url = os.environ.get("DATABASE_URL")
         try:
+            raw_url = "postgresql://zonata_admin:super_secret_password_123@pgcluster.internal:5432/zonata_db"
             os.environ["DATABASE_URL"] = raw_url
             pg_db = Database()
             mock_psycopg2 = MagicMock()

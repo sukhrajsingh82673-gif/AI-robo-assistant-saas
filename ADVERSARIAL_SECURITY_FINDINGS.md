@@ -24,6 +24,7 @@ An adversarial source-level inspection and negative test review was conducted ac
 | **SEC-06** | Ephemeral SQLite Production Fallback & DB Credential Leakage | `core/db.py:Database.__init__` | **HIGH** | Resolved | `test_clean_production_mode.py:test_11`, `test_12` |
 | **SEC-07** | HTTP 501 Unsupported Method on RESTful Deal Mutations | `do_PATCH` in `api_server.py` | **LOW** | Resolved | `api_server.py:do_PATCH` |
 | **SEC-08** | Tampering with Immutable CRM Identity & Audit Fields | `core/enterprise_crm.py:update_customer/deal` | **HIGH** | Resolved | `test_direct_object_access_and_tenant_security.py:test_14` |
+| **SEC-09** | Robust Parser-Based Database URL Sanitization & Credential Exposure | `core/db.py:sanitize_db_url` | **HIGH** | Resolved | `test_clean_production_mode.py:test_12` |
 
 ---
 
@@ -106,4 +107,15 @@ An adversarial source-level inspection and negative test review was conducted ac
 - **Severity**: **HIGH (CWE-284: Improper Access Control / CWE-693: Protection Mechanism Failure)**.
 - **Fix**: Enforced strict validation in `update_customer()` and `update_deal()` in [`core/enterprise_crm.py`](file:///root/roboassistant/core/enterprise_crm.py), throwing `ValueError` if immutable fields differ from existing record state. Caught and returned as HTTP 400 Bad Request in `api_server.py`.
 - **Regression Proof**: [`tests/test_direct_object_access_and_tenant_security.py:test_14_immutable_identity_fields_in_crm`](file:///root/roboassistant/tests/test_direct_object_access_and_tenant_security.py).
+
+---
+
+### SEC-09: Robust Parser-Based Database URL Sanitization & Credential Exposure
+- **Attack Scenario**: 1) Standard regex replacement failed on complex or URL-encoded database passwords (e.g., `p%40ss%3Aword%21123`), IPv6 bracketed hosts (`[::1]:5432`), or special punctuation (`p$w&o*r-d_!`), leaving raw or partially revealed passwords in error messages and log outputs. 2) Sensitive query string tokens (e.g., `?password=...&sslmode=require`) passed through unredacted. 3) Database driver exception messages could disclose credentials when dumping failed connection configurations.
+- **Affected Route**: `core/db.py:sanitize_db_url`, `Database._get_postgresql_connection`, `Database.verify_schema`.
+- **Root Cause**: Reliance on simple single-pass regex replacement rather than RFC-compliant URL parsing combined with multi-layer defensive redaction.
+- **Severity**: **HIGH (CWE-532: Insertion of Sensitive Information into Log File / CWE-209: Generation of Error Message Containing Sensitive Information)**.
+- **Fix**: Upgraded `sanitize_db_url()` in [`core/db.py`](file:///root/roboassistant/core/db.py) to parse database connection URLs via `urllib.parse.urlsplit()`. Reconstructed the authority segment with `quote(username):***@host[:port]`, strictly scrubbing query parameters containing `password`, `pwd`, `secret`, `token`, and `auth`. Applied multi-layer fallback scrubbing across embedded error strings, ensuring that even if raw exception traces contain embedded database URLs or keyword arguments, secrets are unconditionally redacted.
+- **Regression Proof**: [`tests/test_clean_production_mode.py:test_12_postgresql_connection_error_redacts_credentials`](file:///root/roboassistant/tests/test_clean_production_mode.py) testing URL-encoded passwords, IPv6 bracketed addresses, punctuation, query secret parameters, and driver error strings.
+
 
