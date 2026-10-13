@@ -3,7 +3,8 @@
 **Document Version**: 1.0.0-GA  
 **Target Environment**: Production Cloud Infrastructure (Docker Swarm / Kubernetes / Docker Compose)  
 **Security Classification**: Confidential Enterprise Operations  
-**Date**: 12 October 2026
+**Date**: 13 October 2026  
+**Audited Branch**: `engineering/production-readiness-gap-closure`
 
 ---
 
@@ -53,7 +54,7 @@ ZONATA_DISABLE_DEMO_SEED=1
 ZONATA_CLEAN_STARTUP=1
 ZONATA_REQUIRE_EXPLICIT_SECRET=1
 
-# Sovereign Cryptographic Secret (MUST BE 64 HEX CHARACTERS)
+# Sovereign Cryptographic Secret (MUST BE 64 HEX CHARACTERS OR >= 32 BYTES)
 # Generate via: openssl rand -hex 32
 ZONATA_AUTH_SECRET=9f8c2e71b4a035d8e1694f27ca3b51908271e6205738ab4c19ef01678234abcd
 ZONATA_BOOTSTRAP_SECRET=admin_bootstrap_key_prod_2026_x89f
@@ -81,9 +82,9 @@ ANTHROPIC_API_KEY=
 
 ### Step 4.1: Clone and Checkout Validated Baseline Release
 ```bash
-git clone https://github.com/organization/zonata-saas.git /opt/zonata
+git clone https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git /opt/zonata
 cd /opt/zonata
-git checkout remediation/audit-hardening-simulation-gate
+git checkout engineering/production-readiness-gap-closure
 ```
 
 ### Step 4.2: Verify Cryptographic Invariant Baseline Hashes
@@ -121,8 +122,8 @@ docker compose -f docker-compose.prod.yml ps postgres
 Execute the schema migration script against PostgreSQL:
 ```bash
 docker compose -f docker-compose.prod.yml run --rm zonata-api python3 -c "
-from core.database_engine import db_engine
-db_engine.initialize()
+from core.db import db
+db.initialize()
 print('PostgreSQL production schema initialized successfully.')
 "
 ```
@@ -219,10 +220,11 @@ curl -s -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "host@zonata.internal",
+    "password": "StrongMasterPassword2026!",
     "name": "Sovereign Host",
     "tenant_name": "Sovereign Enterprise"
   }' | jq .
-# Expected: HTTP 201 with Bearer token and tenant_id
+# Expected: HTTP 201 with Bearer token, tenant_id, and user_id
 ```
 
 ---
@@ -243,7 +245,7 @@ find "$BACKUP_DIR" -type f -mtime +30 -delete
 ```
 
 ### 7.2 Database Restore Drill
-To restore a snapshot into a new database:
+To restore a snapshot into a disposable database for disaster recovery drills:
 ```bash
 docker compose -f docker-compose.prod.yml exec -T postgres createdb -U zonata_admin zonata_restore_test
 docker compose -f docker-compose.prod.yml exec -T postgres pg_restore -U zonata_admin -d zonata_restore_test < backup.dump

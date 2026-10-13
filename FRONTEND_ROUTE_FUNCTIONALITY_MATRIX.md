@@ -1,7 +1,7 @@
 # URA / ZONATA SaaS — Frontend Route Functionality Matrix
 
-**Audit Date**: 12 October 2026  
-**Baseline Commit**: `198bd6734b93f15182c3e3e95ae2c7d307470814`  
+**Audit Date**: 13 October 2026  
+**Audited Branch**: `engineering/production-readiness-gap-closure`  
 **Application Architecture**: Client-Side Single Page Application (SPA) with Hash & Path History Router  
 **Theme System**: Light-First Automatic Day/Night Theme (`light` default, `dark`, `auto` scheduler)  
 **Security Model**: Bearer Token Auth Interceptor (`Authorization: Bearer <token>`, `X-Tenant-ID`)
@@ -14,7 +14,7 @@ The URA / ZONATA frontend registers **37 distinct functional workspace routes** 
 
 | Total Routes Audited | Fully Connected | Partially Connected / Opt-in | Unconfigured Infrastructure Disclosures | 404 Fallback |
 |---|---|---|---|---|
-| **38** (37 + 404) | 26 | 7 | 4 | 1 |
+| **38** (37 + 404) | 27 | 6 | 4 | 1 |
 
 ---
 
@@ -25,9 +25,9 @@ The URA / ZONATA frontend registers **37 distinct functional workspace routes** 
 | **01** | `/` or `/overview` | `OverviewWorkspace` (`overview_workspace.js`) | `GET /api/overview`, `GET /api/overview/snapshot` | **Fully Connected** | Displays zeroed aggregates with "Create First Company" CTA | 100% Light/Dark responsive | Time period filter, Company context switcher (Persisted in state) |
 | **02** | `/assistant` | `AssistantCoworkerWorkspace.renderAssistant` | `POST /api/chat`, `/api/auth/me` | **Fully Connected** | Displays starter prompts: "Analyze Q3 burn", "Draft SOP" | 100% Light/Dark responsive | Send message, copy response, view ledger citations (Persisted in mission memory) |
 | **03** | `/coworker` | `AssistantCoworkerWorkspace.renderCoworker` | `GET /api/coworker/nodes`, `GET /api/coworker/state` | **Fully Connected** | Displays "No remote host nodes enrolled. Install agent daemon." | 100% Light/Dark responsive | Enroll node, trigger health check (Persisted to SQLite/PostgreSQL) |
-| **04** | `/missions` (`/work`) | `AssistantCoworkerWorkspace.renderMissions` | `GET /api/missions`, `POST /api/missions` | **Fully Connected** | Displays "No active missions. Launch autonomous work stream." | 100% Light/Dark responsive | Dispatch mission, cancel mission, review plan (Persisted to database) |
+| **04** | `/missions` (`/work`) | `AssistantCoworkerWorkspace.renderMissions` | `GET /api/missions`, `POST /api/missions`, `POST /api/missions/simulate` | **Fully Connected** | Displays "No active missions. Launch autonomous work stream." | 100% Light/Dark responsive | Dispatch mission, cancel mission, review plan, run digital twin simulation (Persisted to database) |
 | **05** | `/operations` | `OperationsWorkspace` (`operations_workspace.js`) | `GET /api/operations/nodes`, `GET /api/v1/health` | **Fully Connected** | Displays node topology diagram with host status | 100% Light/Dark responsive | Restart service, ping node, toggle maintenance mode (Persisted to node store) |
-| **06** | `/customers` (`/sales`, `/crm`) | `EnterpriseCrmWorkspace` (`crm_sales_workspace.js`) | `getCustomersData()` / `localStorage` / `/api/crm` | **Partially Connected** | Displays "No customer accounts found" with `+ Add Customer Account` | 100% Light/Dark responsive | Search, filter by status/tier, open 360° modal, add customer (Persisted to tenant store) |
+| **06** | `/customers` (`/sales`, `/crm`) | `EnterpriseCrmWorkspace` (`crm_sales_workspace.js`) | `GET /api/crm/customers`, `POST /api/crm/customers`, `GET /api/crm/deals`, `POST /api/crm/deals`, `PATCH /api/crm/deals/:id` | **Fully Connected** | Displays "No customer accounts found" with `+ Add Customer Account` | 100% Light/Dark responsive | Search, filter by status/tier, open 360° Customer modal, create deal, advance deal stage Kanban (Persisted to `crm_customers` & `crm_deals` relational tables) |
 | **07** | `/finance` (`/accounting`) | `FinanceWorkspace` (`finance_workspace.js`) | `GET /api/finance/accounts`, `GET /api/finance/transactions` | **Fully Connected** | Displays zero-balance Chart of Accounts (COA) with ₹0.00 balances | 100% Light/Dark responsive | Create journal entry, record expense, trigger GL reconciliation (Persisted to DB) |
 | **08** | `/people` (`/hr`) | `PeopleWorkspace` (`people_workspace.js`) | `GET /api/employees`, `POST /api/employees` | **Fully Connected** | Displays "No workforce members enrolled. Add employee." | 100% Light/Dark responsive | Add employee, change department, update permissions (Persisted to DB) |
 | **09** | `/records` | `RecordsWorkspace` (`records_workspace.js`) | `GET /api/records`, `POST /api/records` | **Fully Connected** | Displays "No enterprise records. Ingest invoices or contracts." | 100% Light/Dark responsive | Ingest record, verify three-way match, download PDF (Persisted to DB) |
@@ -67,5 +67,6 @@ The URA / ZONATA frontend registers **37 distinct functional workspace routes** 
 
 - **Auth Requirement**: In production mode (`APP_ENV=production`), every route except the public Authentication entry point requires an authenticated session. Unauthenticated attempts display the Sign In / Sign Up modal.
 - **Bearer Token Interception**: All `fetch()` calls to `/api/` endpoints automatically inject `Authorization: Bearer <token>` and `X-Tenant-ID: <tenant_id>`.
+- **Server-Derived Identity**: The backend derives tenant identity strictly from the authenticated cryptographically signed Bearer token, rejecting any mismatching client `X-Tenant-ID` with HTTP 403.
 - **Theme Consistency**: The root `<html data-theme="...">` token is obeyed across all 38 views using CSS variables (`--bg-surface`, `--text-primary`, `--border-color`, `--accent-blue`).
 - **Protected Workspace Asset**: `web/workflow_workspace.js` has not been altered; its cryptographic git blob SHA remains `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd`.
