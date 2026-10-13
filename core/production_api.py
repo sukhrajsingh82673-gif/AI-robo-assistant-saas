@@ -82,15 +82,38 @@ class ProductionAPIHandler:
         token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
 
         if not token:
-            # Allow token generation endpoint
+            # Allow token generation endpoint with verified user enrollment or bootstrap secret
             if path == "/api/auth/token" and method == "POST":
                 try:
                     data = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
                     tenant_id = data.get("tenant_id")
-                    user_id = data.get("user_id", "admin")
-                    role = data.get("role", "OWNER")
+                    user_id = data.get("user_id")
+                    email = data.get("email")
+                    client_secret = data.get("secret") or data.get("password") or data.get("bootstrap_key")
                     if not tenant_id:
                         return (400, resp_headers, {"error": "tenant_id required"})
+
+                    from core.db import db
+                    from core.auth import get_auth_secret_key
+                    auth_secret = get_auth_secret_key().decode("utf-8", errors="ignore")
+                    is_valid_secret = bool(client_secret and (client_secret == auth_secret or client_secret == os.environ.get("ZONATA_BOOTSTRAP_SECRET")))
+
+                    user_row = None
+                    with db.get_connection() as conn:
+                        if user_id:
+                            user_row = conn.execute("SELECT * FROM users WHERE user_id = ? AND tenant_id = ? AND status = 'ACTIVE'", (user_id, tenant_id)).fetchone()
+                        elif email:
+                            user_row = conn.execute("SELECT * FROM users WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'", (email, tenant_id)).fetchone()
+
+                    if user_row:
+                        role = user_row["role"]
+                        user_id = user_row["user_id"]
+                    elif is_valid_secret:
+                        role = data.get("role", "OWNER")
+                        user_id = user_id or f"usr_{uuid.uuid4().hex[:8]}"
+                    else:
+                        return (401, resp_headers, {"error": "UNAUTHORIZED", "detail": "User not enrolled in tenant and no valid bootstrap credential provided."})
+
                     new_token = self.token_manager.create_session_token(tenant_id, user_id, role)
                     return (201, resp_headers, {"token": new_token, "tenant_id": tenant_id, "user_id": user_id, "role": role})
                 except Exception as e:

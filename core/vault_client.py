@@ -83,7 +83,14 @@ class HashiCorpVaultClient:
         logger.warning(f"VAULT SIMULATE OUTAGE: enabled={enabled}")
 
     def _seed_default_master_secrets(self):
-        """Seeds sovereign vault storage with sample master credentials."""
+        """Seeds sovereign vault storage with sample master credentials only when demo mode is enabled."""
+        import os
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
         self.write_secret("crm/salesforce", {"client_id": "sf_master_client_99", "client_secret": "sf_super_secret_master_key_123456"})
         self.write_secret("payments/stripe", {"api_key": "sk_live_master_stripe_key_abcdef123456"})
         self.write_secret("cloud/aws", {"access_key_id": "AKIA_MASTER_CORP_KEY", "secret_access_key": "aws_master_secret_corp_key_xyz"})

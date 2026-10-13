@@ -24,7 +24,11 @@ import hashlib
 import uuid
 import urllib.request
 import urllib.parse
+import socket
+import threading
 
+from core.db import db, configure_isolated_test_db
+from core.auth import UserManager, UserRole
 from core.universal_terminal.models import (
     RuntimeProfile, ExecutionMode, IsolationLevel, DesktopEnvironment,
     NetworkMode, TerminalCommandRisk, CommandPlan, TerminalSession,
@@ -59,11 +63,30 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
     Production Master Qualification Test Suite for Universal Linux Terminal Execution Fabric.
     """
 
+    orig_db_path = None
+    orig_evidence_path = None
+    _server = None
+    base_url = None
+
     @classmethod
     def setUpClass(cls):
         cls.test_dir = tempfile.mkdtemp(prefix="zonata_master_qual_")
         cls.tenant_id = "tnt_master_qual_01"
         cls.company_id = "comp_master_qual_01"
+
+        cls.orig_db_path = db.db_path
+        cls.orig_evidence_path = os.environ.get("ZONATA_EVIDENCE_PATH")
+        cls.isolated_db = os.path.join(cls.test_dir, "ut_master_qual.db")
+        cls.isolated_evidence = os.path.join(cls.test_dir, "ut_master_evidence.jsonl")
+        os.environ["ZONATA_EVIDENCE_PATH"] = cls.isolated_evidence
+        configure_isolated_test_db(cls.isolated_db)
+
+        # Seed minimal tenant and company
+        with db.get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES (?, 'Master Qual Tenant', 'ENTERPRISE', 'ACTIVE', ?)", (cls.tenant_id, time.time()))
+            conn.execute("INSERT OR IGNORE INTO companies (company_id, tenant_id, name, industry, company_type, status, revenue, cost, contribution, understanding_pct, created_at) VALUES (?, ?, 'Master Qual Corp', 'Tech', 'NEW', 'OPERATIONAL', 0.0, 0.0, 0.0, 100.0, ?)", (cls.company_id, cls.tenant_id, time.time()))
+            conn.commit()
+
         cls.terminal = UniversalTerminal(tenant_id=cls.tenant_id, company_id=cls.company_id)
         cls.agent = cls.terminal.agent
         cls.security_agent = cls.terminal.security_agent
@@ -71,10 +94,34 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
         cls.evolution_engine = cls.terminal.evolution_engine
         cls.tool_engine = cls.terminal.tool_engine
 
+        from api_server import ThreadedHTTPServer, RoboAssistantRequestHandler
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            cls.port = s.getsockname()[1]
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        cls._server = ThreadedHTTPServer(("127.0.0.1", cls.port), RoboAssistantRequestHandler)
+        cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
+        cls._thread.start()
+        time.sleep(1.0)
+
     @classmethod
     def tearDownClass(cls):
+        if hasattr(cls, "_server") and cls._server:
+            try:
+                cls._server.shutdown()
+                cls._server.server_close()
+            except Exception:
+                pass
+        if cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
+        if cls.orig_evidence_path:
+            os.environ["ZONATA_EVIDENCE_PATH"] = cls.orig_evidence_path
+        elif "ZONATA_EVIDENCE_PATH" in os.environ:
+            del os.environ["ZONATA_EVIDENCE_PATH"]
         if os.path.exists(cls.test_dir):
             shutil.rmtree(cls.test_dir, ignore_errors=True)
+
 
     def setUp(self):
         self.sub_ws = os.path.join(self.test_dir, f"ws_{uuid.uuid4().hex[:8]}")
@@ -580,7 +627,19 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
     # Production HTTP API Endpoints
     # -------------------------------------------------------------------------
     def test_http_api_endpoints_master_qualification(self):
-        base_url = "http://localhost:8080"
+        base_url = self.base_url or "http://localhost:8080"
+        token = UserManager.generate_token({
+            "user_id": "usr_master_qual",
+            "tenant_id": self.tenant_id,
+            "company_id": self.company_id,
+            "role": UserRole.OWNER,
+            "permissions": ["*"]
+        })
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Tenant-ID": self.tenant_id,
+            "X-Company-ID": self.company_id
+        }
 
         # 1. Health check
         req = urllib.request.Request(f"{base_url}/health")
@@ -593,12 +652,13 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
         directive_payload = json.dumps({
             "objective": "echo 'HTTP_CEO_DIRECTIVE_QUALIFIED'",
             "tenant_id": self.tenant_id,
+            "company_id": self.company_id,
             "constraints": ["sandbox_strict"]
         }).encode("utf-8")
         req2 = urllib.request.Request(
             f"{base_url}/api/terminal/ceo/directive",
             data=directive_payload,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", **headers}
         )
         with urllib.request.urlopen(req2, timeout=10) as response2:
             self.assertEqual(response2.status, 200)
@@ -607,7 +667,7 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
             self.assertGreater(len(data2["evidence_refs"]), 0)
 
         # 3. GET /api/terminal/knowledge/evolution
-        req3 = urllib.request.Request(f"{base_url}/api/terminal/knowledge/evolution")
+        req3 = urllib.request.Request(f"{base_url}/api/terminal/knowledge/evolution", headers=headers)
         with urllib.request.urlopen(req3, timeout=5) as response3:
             self.assertEqual(response3.status, 200)
             data3 = json.loads(response3.read().decode())
@@ -615,11 +675,12 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
             self.assertGreaterEqual(data3["count"], 1)
 
         # 4. GET /api/terminal/tools/sbom
-        req4 = urllib.request.Request(f"{base_url}/api/terminal/tools/sbom")
+        req4 = urllib.request.Request(f"{base_url}/api/terminal/tools/sbom", headers=headers)
         with urllib.request.urlopen(req4, timeout=5) as response4:
             self.assertEqual(response4.status, 200)
             data4 = json.loads(response4.read().decode())
             self.assertIn("sbom", data4)
+
 
 
 if __name__ == "__main__":

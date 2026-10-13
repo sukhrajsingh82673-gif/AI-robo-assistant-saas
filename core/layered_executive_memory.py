@@ -73,10 +73,17 @@ class LayeredExecutiveMemory:
         self._seed_baseline_memory()
 
     def _seed_baseline_memory(self):
+        import os
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
         # Level 5: Organizational Memory
         self.store_memory(
             level=MemoryTierLevel.LEVEL_5_ORGANIZATIONAL,
-            content="Corporate Charter: Royal Hotel Jaipur operates under luxury hospitality standards with bounded dynamic yield management.",
+            content="Corporate Charter: Operations run under sovereign governance standards with bounded dynamic yield management.",
             epistemic_category="FACT",
             source="CORPORATE_CHARTER",
             provenance="charter_v1.0"

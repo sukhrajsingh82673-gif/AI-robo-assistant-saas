@@ -85,13 +85,17 @@ class BackgroundMissionDispatcher:
         runtime_router: WorkerRuntimeRouter,
         tenant_id: str = "tnt_primary",
         company_id: str = "comp_primary",
-        db_path: str = "storage/roboassistant.db"
+        db_path: Optional[str] = None
     ):
         self.tenant_id = tenant_id
         self.company_id = company_id
         self.subworker_coord = subworker_coord
         self.runtime_router = runtime_router
-        self.db_path = db_path
+        if db_path is None:
+            from core.db import get_default_db_path
+            self.db_path = get_default_db_path()
+        else:
+            self.db_path = db_path
         self._missions: Dict[str, BackgroundMission] = {}
 
         self._init_db()
@@ -357,10 +361,8 @@ class BackgroundMissionDispatcher:
                 )
 
                 # Record into audit_ledger.jsonl if accessible
-                audit_ledger_path = os.path.join(
-                    os.path.dirname(os.path.abspath(self.db_path)),
-                    "evidence", "audit_ledger.jsonl"
-                )
+                from core.evidence_ledger import get_default_ledger_path
+                audit_ledger_path = get_default_ledger_path()
                 try:
                     os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
                     audit_record = {

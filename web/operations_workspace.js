@@ -17,8 +17,8 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      const company = (window.state && window.state.companies && window.state.companies[0]) || { name: 'Taj Heritage', industry: 'Hospitality & Leisure' };
-      this.industry = company.industry || 'Hospitality';
+      const company = (window.state && window.state.companies && window.state.companies[0]) || { name: 'Primary Enterprise', industry: 'Operations & SaaS' };
+      this.industry = company.industry || 'General Operations';
 
       container.innerHTML = `
         <div class="operations-workspace-layout" style="display:flex; flex-direction:column; gap:20px; max-width:1440px; margin:0 auto; padding-bottom:60px;">

@@ -10,6 +10,11 @@ import urllib.error
 import time
 import re
 import sqlite3
+import os
+import tempfile
+import shutil
+import socket
+import threading
 
 from core.settings_service import (
     settings_service,
@@ -22,33 +27,48 @@ from core.executive_decision import ExecutiveDecisionEngine, DecisionApprovalSta
 from core.agent_factory_runtime import GovernedAgentFactory, AgentFactoryQuotaException
 from core.spend_governor import SpendGovernor, BudgetStatus
 from core.browser_use_execution_runtime import BrowserDomainPolicy, BrowserKillSwitch
-from core.db import db
+from core.db import db, configure_isolated_test_db
+from core.auth import UserManager, UserRole
 
-BASE_URL = "http://localhost:8080"
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 class TestSettingsEnterpriseQualification(unittest.TestCase):
     """Exhaustive Enterprise Qualification Suite for ZONATA / URA Settings."""
 
     _server_proc = None
+    orig_db_path = None
+    test_dir = None
+    port = None
+    base_url = None
 
     @classmethod
     def setUpClass(cls):
-        # Ensure server is running; start embedded instance if not present
-        try:
-            req = urllib.request.Request(f"{BASE_URL}/api/settings/effective")
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                if resp.status == 200:
-                    return
-        except Exception:
-            pass
+        cls.orig_db_path = db.db_path
+        cls.test_dir = tempfile.mkdtemp(prefix="zonata_settings_qual_")
+        cls.isolated_db = os.path.join(cls.test_dir, "settings_qual.db")
+        configure_isolated_test_db(cls.isolated_db)
 
-        import threading
+        # Seed minimal tenant and company in isolated db
+        with db.get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES ('tnt_primary', 'Primary Tenant', 'ENTERPRISE', 'ACTIVE', ?)", (time.time(),))
+            conn.execute("INSERT OR IGNORE INTO companies (company_id, tenant_id, name, industry, company_type, status, revenue, cost, contribution, understanding_pct, created_at) VALUES ('comp_primary', 'tnt_primary', 'Primary Corp', 'Technology', 'NEW', 'OPERATIONAL', 0.0, 0.0, 0.0, 100.0, ?)", (time.time(),))
+            conn.commit()
+
+        # Initialize enterprise settings schema and seeds in the isolated db
+        settings_service._ensure_schema()
+        settings_service._seed_default_settings()
+
         from api_server import ThreadedHTTPServer, RoboAssistantRequestHandler
-        cls._server_proc = ThreadedHTTPServer(("127.0.0.1", 8080), RoboAssistantRequestHandler)
+        cls.port = get_free_port()
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        cls._server_proc = ThreadedHTTPServer(("127.0.0.1", cls.port), RoboAssistantRequestHandler)
         srv_thread = threading.Thread(target=cls._server_proc.serve_forever, daemon=True)
         srv_thread.start()
-        time.sleep(1.5)
+        time.sleep(1.0)
 
     @classmethod
     def tearDownClass(cls):
@@ -58,6 +78,11 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
                 cls._server_proc.server_close()
             except Exception:
                 pass
+        if cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
+        if cls.test_dir:
+            shutil.rmtree(cls.test_dir, ignore_errors=True)
 
     def setUp(self):
         self._reset_baseline()
@@ -78,22 +103,47 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
         except Exception:
             pass
 
+    def _make_headers(self, headers=None):
+        hdrs = dict(headers or {})
+        if "Authorization" not in hdrs and "authorization" not in hdrs:
+            role = hdrs.get("X-User-Role", UserRole.OWNER)
+            company = hdrs.get("X-Company-ID", "comp_primary")
+            tenant = hdrs.get("X-Tenant-ID", "tnt_primary")
+            token = UserManager.generate_token({
+                "user_id": f"usr_test_{role.lower()}",
+                "tenant_id": tenant,
+                "company_id": company,
+                "role": role,
+                "permissions": ["*"]
+            })
+            hdrs["Authorization"] = f"Bearer {token}"
+        return hdrs
+
     def _api_get(self, path, headers=None):
-        req = urllib.request.Request(f"{BASE_URL}{path}")
-        if headers:
-            for k, v in headers.items():
-                req.add_header(k, v)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = resp.read().decode("utf-8")
-            return json.loads(data), resp.status
+        base = self.base_url or "http://localhost:8080"
+        req = urllib.request.Request(f"{base}{path}")
+        hdrs = self._make_headers(headers)
+        for k, v in hdrs.items():
+            req.add_header(k, v)
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = resp.read().decode("utf-8")
+                return json.loads(data), resp.status
+        except urllib.error.HTTPError as e:
+            data = e.read().decode("utf-8")
+            try:
+                return json.loads(data), e.code
+            except Exception:
+                return {"error": data}, e.code
 
     def _api_post(self, path, payload, headers=None):
+        base = self.base_url or "http://localhost:8080"
         body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(f"{BASE_URL}{path}", data=body, method="POST")
+        req = urllib.request.Request(f"{base}{path}", data=body, method="POST")
         req.add_header("Content-Type", "application/json")
-        if headers:
-            for k, v in headers.items():
-                req.add_header(k, v)
+        hdrs = self._make_headers(headers)
+        for k, v in hdrs.items():
+            req.add_header(k, v)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = resp.read().decode("utf-8")
@@ -106,12 +156,13 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
                 return {"error": data}, e.code
 
     def _api_put(self, path, payload, headers=None):
+        base = self.base_url or "http://localhost:8080"
         body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(f"{BASE_URL}{path}", data=body, method="PUT")
+        req = urllib.request.Request(f"{base}{path}", data=body, method="PUT")
         req.add_header("Content-Type", "application/json")
-        if headers:
-            for k, v in headers.items():
-                req.add_header(k, v)
+        hdrs = self._make_headers(headers)
+        for k, v in hdrs.items():
+            req.add_header(k, v)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = resp.read().decode("utf-8")
@@ -122,6 +173,7 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
                 return json.loads(data), e.code
             except Exception:
                 return {"error": data}, e.code
+
 
     # -------------------------------------------------------------------------
     # Gate A: Page & Route Integrity

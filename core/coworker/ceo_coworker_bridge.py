@@ -232,10 +232,8 @@ class AICeoCoworkerBridge:
         evidence_token = f"ev_merkle_{hashlib.sha256(evidence_content.encode()).hexdigest()[:16]}"
 
         # Write to audit ledger
-        audit_ledger_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "storage", "evidence", "audit_ledger.jsonl"
-        )
+        from core.evidence_ledger import get_default_ledger_path
+        audit_ledger_path = get_default_ledger_path()
         try:
             os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
             with open(audit_ledger_path, "a", encoding="utf-8") as af:

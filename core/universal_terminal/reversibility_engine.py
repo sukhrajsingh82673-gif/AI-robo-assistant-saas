@@ -95,7 +95,11 @@ class ReversibilityAndCheckpointEngine:
 
     def __init__(self, tenant_id: str = "tnt_primary", db_path: Optional[str] = None):
         self.tenant_id = tenant_id
-        self.db_path = db_path or os.path.join(os.getcwd(), "storage", "roboassistant.db")
+        if db_path is None:
+            from core.db import get_default_db_path
+            self.db_path = get_default_db_path()
+        else:
+            self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.backup_dir = os.path.join(os.path.dirname(self.db_path), "terminal_backups")
         os.makedirs(self.backup_dir, exist_ok=True)

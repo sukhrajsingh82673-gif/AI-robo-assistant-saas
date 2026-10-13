@@ -41,6 +41,7 @@ from .tool_discovery import ToolDiscoveryEngine
 from .self_extension import SelfExtensionEngine
 from .qualification_harness import ProviderQualificationHarness
 from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+from ..db import get_default_db_path
 from .db_store import CoworkerDBStore
 from .fleet import (
     GovernedNodeRegistry, GovernedFleetRouter, RemoteNodeWorkerAgent,
@@ -80,9 +81,9 @@ class UniversalCoworkerEngine:
             cls._instances[tenant_id] = cls(tenant_id=tenant_id)
         return cls._instances[tenant_id]
 
-    def __init__(self, tenant_id: str = "tnt_primary", db_path: str = "storage/roboassistant.db"):
+    def __init__(self, tenant_id: str = "tnt_primary", db_path: Optional[str] = None):
         self.tenant_id = tenant_id
-        self.db_path = db_path
+        self.db_path = db_path or get_default_db_path()
 
         # 1. Registries & Providers
         self.capability_reg = CapabilityRegistry()

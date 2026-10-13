@@ -58,6 +58,14 @@ class GovernedCoworkerRegistry:
         self._seed_default_coworkers()
 
     def _seed_default_coworkers(self):
+        import os
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
+
         defaults = [
             ("Yield Optimization Specialist", "Revenue Management", ["pms_rate_read", "pms_rate_update"], ["tool_pms_yield_optimizer"]),
             ("Guest Operations Coordinator", "Hospitality", ["pms_booking_read", "dispatch_housekeeping"], ["tool_guest_checkin_flow"]),

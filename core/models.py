@@ -19,6 +19,13 @@ class EvidenceStatus(str, Enum):
     VERIFIED = "VERIFIED"
     SELF_TESTED = "SELF_TESTED"
     PENDING_EVIDENCE = "PENDING_EVIDENCE"
+    SIMULATED = "SIMULATED"
+    TEST = "TEST"
+
+class ExecutionClassification(str, Enum):
+    SIMULATED = "SIMULATED"
+    TEST = "TEST"
+    LIVE = "LIVE"
 
 class HostType(str, Enum):
     LINUX_CLOUD = "LINUX_CLOUD"
@@ -98,6 +105,7 @@ class EvidencePackage:
     sha256_digest: str
     signature: str
     merkle_index: int
+    execution_classification: str = "LIVE"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass

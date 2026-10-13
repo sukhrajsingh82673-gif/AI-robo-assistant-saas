@@ -20,6 +20,10 @@ from .models import (
     TerminalCommandRisk, ProcessInfo
 )
 
+def _is_production_environment() -> bool:
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    return (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
+
 class BaseRuntimeAdapter(ABC):
     """Abstract interface that all Linux execution substrates must implement."""
 
@@ -273,26 +277,31 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         engine = container_meta.get("engine") or self._detect_engine()
         profile = container_meta.get("profile")
 
+        # Check caller-supplied environment overrides
+        caller_env = (env or {}).copy()
         exec_env = os.environ.copy()
-        if env:
-            exec_env.update(env)
+        exec_env.update(caller_env)
         exec_env["ZONATA_CONTAINER_ISOLATION"] = "LEVEL_2"
 
         # Check if container engine is missing on host
         if not engine:
-            strict_requested = (
-                profile and profile.isolation_level in [IsolationLevel.LEVEL_2_CONTAINER, IsolationLevel.LEVEL_3_VM]
-                and profile.execution_mode == ExecutionMode.SECURITY_LAB
-                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
-            )
-            if strict_requested:
+            is_prod = _is_production_environment()
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
+            if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Container engine unavailable on host (container sandbox unavailable; checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Container engine unavailable on host (checked: docker, podman, bwrap). Strict container isolation cannot be satisfied on this substrate.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
                     "engine": "NONE",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 
@@ -449,26 +458,31 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
         profile = vm_info.get("profile")
 
         # If hardware virtualization is absent on this host
+        caller_env = (env or {}).copy()
         if not has_virt:
-            strict_vm = (
-                profile and profile.isolation_level == IsolationLevel.LEVEL_3_VM
-                and env and env.get("STRICT_ISOLATION_REQUIRED") == "1"
-            )
-            if strict_vm:
+            is_prod = _is_production_environment()
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
+            if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Hardware-assisted virtualization (/dev/kvm) unavailable on host. Cannot boot microVM.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
                     "isolation": "KVM_UNAVAILABLE",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 
             # Governed disposable sandbox fallback
             exec_env = os.environ.copy()
-            if env:
-                exec_env.update(env)
+            exec_env.update(caller_env)
             exec_env["ZONATA_VM_DEGRADED_FALLBACK"] = "1"
             try:
                 proc = subprocess.run(
@@ -720,23 +734,31 @@ class RemoteLinuxRuntimeAdapter(BaseRuntimeAdapter):
         node_info = self._nodes.get(session_id, {})
         endpoint = node_info.get("endpoint") or os.environ.get("REMOTE_LINUX_NODE_URL")
 
+        caller_env = (env or {}).copy()
         if not endpoint:
-            # Report missing endpoint honestly
-            strict_remote = env and env.get("STRICT_REMOTE_REQUIRED") == "1"
-            if strict_remote:
+            is_prod = _is_production_environment()
+            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
+            if not allow_host:
+                msg = (
+                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                    if is_prod else
+                    "Execution Rejected: Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured. Unrestricted host fallback is prohibited."
+                )
                 return {
                     "exit_code": 126,
                     "stdout": "",
-                    "stderr": "Remote Linux node requested but REMOTE_LINUX_NODE_URL endpoint is not configured in environment.",
+                    "stderr": msg,
                     "timed_out": False,
                     "degraded": True,
+                    "fallback": "REJECTED_NO_REMOTE_ENDPOINT",
+                    "sandbox_failure": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
 
             # Governed fallback with honest warning
             exec_env = os.environ.copy()
-            if env:
-                exec_env.update(env)
+            exec_env.update(caller_env)
             exec_env["ZONATA_REMOTE_NODE_FALLBACK"] = "1"
             try:
                 proc = subprocess.run(

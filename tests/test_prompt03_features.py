@@ -8,11 +8,31 @@ Unit tests for ZONATA Prompt 03 Capabilities:
 
 import unittest
 import time
-from core.db import db
+import os
+import tempfile
+from core.db import db, configure_isolated_test_db
 from core.schedule_service import UniversalScheduleService
 from core.meeting_service import AiCeoMeetingService
 from core.assistant_service import FloatingAssistantService
 from core.plugins_service import PluginsAndConnectionsService
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "prompt03_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 class TestPrompt03Features(unittest.TestCase):
     def setUp(self):
@@ -21,9 +41,14 @@ class TestPrompt03Features(unittest.TestCase):
         self.assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
         self.plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 
-        # Ensure comp_primary exists and clean test schedule state
+        # Ensure tnt_primary and comp_primary exist and clean test state
         with db.get_connection() as conn:
             conn.execute("DELETE FROM universal_schedules WHERE tenant_id = 'tnt_primary'")
+            conn.execute("DELETE FROM external_connections WHERE tenant_id = 'tnt_primary'")
+            conn.execute(
+                "INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES ('tnt_primary', 'Primary Tenant', 'ENTERPRISE', 'ACTIVE', ?)",
+                (time.time(),)
+            )
             conn.execute(
                 """
                 INSERT OR IGNORE INTO companies (
@@ -35,6 +60,8 @@ class TestPrompt03Features(unittest.TestCase):
                 (time.time(),)
             )
             conn.commit()
+
+
 
     # =========================================================================
     # 1. Universal Schedule Tests

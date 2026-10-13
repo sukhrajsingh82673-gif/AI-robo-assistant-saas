@@ -25,7 +25,7 @@ class ConnectorPermission:
     FULL_ADMIN = "FULL_ADMIN"
 
 class BaseConnector:
-    def __init__(self, connector_id: str, name: str, connector_type: str, endpoint: str):
+    def __init__(self, connector_id: str, name: str, connector_type: str, endpoint: str, is_mock: bool = True):
         self.connector_id = connector_id
         self.name = name
         self.connector_type = connector_type
@@ -34,6 +34,8 @@ class BaseConnector:
         self.trust_score = 0.5  # Neutral trust upon initial connection
         self.connected = False
         self.last_sync = None
+        self.is_mock = is_mock
+        self.execution_mode = "SIMULATED" if is_mock else "LIVE"
 
     def connect(self, credentials_meta: Dict[str, str]) -> bool:
         """Establishes authenticated handshake without exposing secrets to LLM context."""
@@ -54,12 +56,15 @@ class BaseConnector:
             "permission_enforced": self.permission_level,
             "records_count": 0,
             "synced_at": time.time(),
-            "trust_score": self.trust_score
+            "trust_score": self.trust_score,
+            "execution_mode": self.execution_mode,
+            "is_mock": self.is_mock,
+            "provenance": "SYNTHETIC_CONNECTOR" if self.is_mock else "LIVE_PROVIDER"
         }
 
 class HospitalityPMSConnector(BaseConnector):
-    def __init__(self, name: str = "Oracle Hospitality Opera PMS"):
-        super().__init__(f"conn_pms_{uuid.uuid4().hex[:6]}", name, ConnectorType.PMS_HOSPITALITY, "https://api.pms.enterprise/v1")
+    def __init__(self, name: str = "Oracle Hospitality Opera PMS (Mock/Simulated)"):
+        super().__init__(f"conn_pms_{uuid.uuid4().hex[:6]}", name, ConnectorType.PMS_HOSPITALITY, "https://api.pms.enterprise/v1", is_mock=True)
 
     def fetch_night_audit_records(self) -> Dict[str, Any]:
         if not self.connected:
@@ -68,13 +73,17 @@ class HospitalityPMSConnector(BaseConnector):
             "source": self.name,
             "permission": self.permission_level,
             "folios_audited": 42,
-            "ledger_verified": True,
+            "ledger_verified": False,
+            "verified": False,
+            "is_mock": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_PMS_FIXTURE",
             "timestamp": time.time()
         }
 
 class AccountingConnector(BaseConnector):
-    def __init__(self, name: str = "Tally ERP / QuickBooks Online"):
-        super().__init__(f"conn_acc_{uuid.uuid4().hex[:6]}", name, ConnectorType.ACCOUNTING, "https://api.accounting.enterprise/v2")
+    def __init__(self, name: str = "Tally ERP / QuickBooks Online (Mock/Simulated)"):
+        super().__init__(f"conn_acc_{uuid.uuid4().hex[:6]}", name, ConnectorType.ACCOUNTING, "https://api.accounting.enterprise/v2", is_mock=True)
 
     def fetch_general_ledger(self) -> Dict[str, Any]:
         if not self.connected:
@@ -84,12 +93,16 @@ class AccountingConnector(BaseConnector):
             "permission": self.permission_level,
             "accounts_reconciled": 18,
             "unbalanced_credits": 0.0,
+            "verified": False,
+            "is_mock": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_ACCOUNTING_FIXTURE",
             "timestamp": time.time()
         }
 
 class PaymentGatewayConnector(BaseConnector):
-    def __init__(self, name: str = "Razorpay / Stripe Payments"):
-        super().__init__(f"conn_pay_{uuid.uuid4().hex[:6]}", name, ConnectorType.PAYMENTS, "https://api.payments.enterprise/v1")
+    def __init__(self, name: str = "Razorpay / Stripe Payments (Mock/Simulated)"):
+        super().__init__(f"conn_pay_{uuid.uuid4().hex[:6]}", name, ConnectorType.PAYMENTS, "https://api.payments.enterprise/v1", is_mock=True)
 
     def fetch_settlement_batch(self) -> Dict[str, Any]:
         if not self.connected:
@@ -97,8 +110,12 @@ class PaymentGatewayConnector(BaseConnector):
         return {
             "source": self.name,
             "permission": self.permission_level,
-            "settlement_status": "CAPTURED",
-            "payout_verified": True,
+            "settlement_status": "SIMULATED_CAPTURED",
+            "payout_verified": False,
+            "verified": False,
+            "is_mock": True,
+            "execution_mode": "SIMULATED",
+            "provenance": "SYNTHETIC_PAYMENTS_FIXTURE",
             "timestamp": time.time()
         }
 

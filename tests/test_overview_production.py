@@ -117,15 +117,123 @@ class TestOverviewProductionRebuild(unittest.TestCase):
             self.assertEqual(out["verified_outcome"], "VERIFIED_SUCCESS")
 
     def test_07_data_quality_and_trust(self):
-        """Verify data quality calculation reflects actual presence/absence of sources."""
+        """Verify data quality calculation reflects baseline ledger and empty-state contracts."""
+        # 1. Baseline ledger test: exactly 25 verified records from baseline ledger
         snap = OverviewDataService.get_snapshot(self.tenant_id, company_id=None, period="30d")
         dq = snap["data_quality"]
         self.assertGreaterEqual(dq["overall_completeness_pct"], 0)
         self.assertLessEqual(dq["overall_completeness_pct"], 100)
         self.assertIn(dq["merkle_integrity"], ["UNBROKEN", "DEGRADED"])
-        self.assertGreater(dq["verified_records"], 0)
+        self.assertEqual(dq["verified_records"], 25, "Baseline ledger contains exactly 25 verified records")
+        self.assertGreater(dq["unverified_records"], 0)
 
-    def test_08_frontend_assets_wiring(self):
+        # 2. Empty ledger fixture contract: exactly 0 verified records
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            empty_ledger = os.path.join(td, "empty_ledger.jsonl")
+            with open(empty_ledger, "w") as f:
+                pass
+            orig_env = os.environ.get("ZONATA_EVIDENCE_PATH")
+            os.environ["ZONATA_EVIDENCE_PATH"] = empty_ledger
+            try:
+                snap_empty = OverviewDataService.get_snapshot(self.tenant_id, company_id=None, period="30d")
+                dq_empty = snap_empty["data_quality"]
+                self.assertEqual(dq_empty["verified_records"], 0, "Empty ledger fixture must yield exactly 0 verified records")
+                self.assertGreater(dq_empty["unverified_records"], 0, "Empty state must report unverified records pending ingestion")
+            finally:
+                if orig_env is not None:
+                    os.environ["ZONATA_EVIDENCE_PATH"] = orig_env
+                elif "ZONATA_EVIDENCE_PATH" in os.environ:
+                    del os.environ["ZONATA_EVIDENCE_PATH"]
+
+    def test_08_evidence_provenance_simulated_cannot_promote_to_verified(self):
+        """Verify synthetic evidence is sealed as SIMULATED and never counted as verified_records."""
+        import tempfile
+        from core.evidence_ledger import EvidenceLedger
+        from core.models import EvidenceStatus, PhysicalVerification
+
+        with tempfile.TemporaryDirectory() as td:
+            test_ledger = os.path.join(td, "test_sim_ledger.jsonl")
+            orig_env = os.environ.get("ZONATA_EVIDENCE_PATH")
+            os.environ["ZONATA_EVIDENCE_PATH"] = test_ledger
+            try:
+                el = EvidenceLedger()
+                pkg = el.seal_evidence(
+                    action_id="act_sim_test",
+                    mission_id="mis_sim_test",
+                    agent_id="agt_sim_test",
+                    verifications=[PhysicalVerification(check_type="simulated_run", target_path="/tmp", expected_val="1", actual_val="1", verified=True, details="simulated run check")],
+                    metadata={"simulated": True, "is_mock": True}
+                )
+                self.assertEqual(pkg.status, EvidenceStatus.SIMULATED)
+
+                # Snapshot must still report verified_records == 0 and unverified_records == 1
+                snap = OverviewDataService.get_snapshot(self.tenant_id, company_id=None, period="30d")
+                dq = snap["data_quality"]
+                self.assertEqual(dq["verified_records"], 0, "Simulated evidence must not increment verified_records")
+                self.assertEqual(dq["unverified_records"], 1, "Simulated evidence must count as unverified_records")
+            finally:
+                if orig_env is not None:
+                    os.environ["ZONATA_EVIDENCE_PATH"] = orig_env
+                elif "ZONATA_EVIDENCE_PATH" in os.environ:
+                    del os.environ["ZONATA_EVIDENCE_PATH"]
+
+    def test_09_qualifying_physical_verification_increments_verified_records(self):
+        """Verify qualifying physical evidence is sealed as VERIFIED and increments verified_records."""
+        import tempfile
+        import hashlib
+        from core.evidence_ledger import EvidenceLedger
+        from core.models import EvidenceStatus, PhysicalVerification
+
+        with tempfile.TemporaryDirectory() as td:
+            test_ledger = os.path.join(td, "test_ver_ledger.jsonl")
+            test_target = os.path.join(td, "real_artifact.txt")
+            with open(test_target, "w") as f:
+                f.write("confirmed real payload")
+            digest = hashlib.sha256(b"confirmed real payload").hexdigest()
+
+            orig_env = os.environ.get("ZONATA_EVIDENCE_PATH")
+            os.environ["ZONATA_EVIDENCE_PATH"] = test_ledger
+            try:
+                el = EvidenceLedger()
+                pkg = el.seal_evidence(
+                    action_id="act_phys_test",
+                    mission_id="mis_phys_test",
+                    agent_id="agt_phys_test",
+                    verifications=[
+                        PhysicalVerification(
+                            check_type="file_exists",
+                            target_path=test_target,
+                            expected_val="EXISTS",
+                            actual_val="EXISTS",
+                            verified=True,
+                            details="file existence verified"
+                        ),
+                        PhysicalVerification(
+                            check_type="sha256_match",
+                            target_path=test_target,
+                            expected_val=digest,
+                            actual_val=digest,
+                            verified=True,
+                            details="sha256 digest match verified"
+                        )
+                    ],
+                    metadata={"simulated": False, "is_mock": False}
+                )
+                self.assertEqual(pkg.status, EvidenceStatus.VERIFIED)
+
+                # Snapshot must report verified_records == 1
+                snap = OverviewDataService.get_snapshot(self.tenant_id, company_id=None, period="30d")
+                dq = snap["data_quality"]
+                self.assertEqual(dq["verified_records"], 1, "Qualifying physical verification must increment verified_records")
+                self.assertEqual(dq["unverified_records"], 0, "No unverified records when all are verified")
+            finally:
+                if orig_env is not None:
+                    os.environ["ZONATA_EVIDENCE_PATH"] = orig_env
+                elif "ZONATA_EVIDENCE_PATH" in os.environ:
+                    del os.environ["ZONATA_EVIDENCE_PATH"]
+
+    def test_10_frontend_assets_wiring(self):
         """Verify all frontend files exist and are properly linked."""
         web_dir = os.path.join(BASE_DIR, "web")
         overview_js = os.path.join(web_dir, "overview_workspace.js")

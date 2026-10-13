@@ -22,9 +22,14 @@ import tempfile
 import urllib.request
 import urllib.parse
 
+import socket
+import threading
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
+from core.db import db, configure_isolated_test_db
+from core.auth import UserManager, UserRole
 from core.coworker.engine import UniversalCoworkerEngine
 from core.coworker.background_dispatcher import (
     BackgroundMissionDispatcher, BackgroundMission, MissionState
@@ -36,8 +41,62 @@ from core.coworker.memory_tier import GovernedMemoryManager, MemoryTier
 from core.coworker.contracts import RiskLevel, ExecutionState, VerificationStatus
 from core.killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
 
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
 class TestAssistantCoworkerCompoundMission(unittest.TestCase):
+    orig_db_path = None
+    cls_temp_dir = None
+    _server = None
+    base_url = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.orig_db_path = db.db_path
+        cls.orig_evidence_path = os.environ.get("ZONATA_EVIDENCE_PATH")
+        cls.cls_temp_dir = tempfile.mkdtemp(prefix="zonata_coworker_cls_")
+        cls.isolated_db = os.path.join(cls.cls_temp_dir, "coworker_qual.db")
+        cls.isolated_evidence = os.path.join(cls.cls_temp_dir, "coworker_evidence.jsonl")
+        os.environ["ZONATA_EVIDENCE_PATH"] = cls.isolated_evidence
+        configure_isolated_test_db(cls.isolated_db)
+
+        # Seed minimal tenant and company
+        with db.get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES ('tnt_test', 'Test Tenant', 'ENTERPRISE', 'ACTIVE', ?)", (time.time(),))
+            conn.execute("INSERT OR IGNORE INTO companies (company_id, tenant_id, name, industry, company_type, status, revenue, cost, contribution, understanding_pct, created_at) VALUES ('comp_test', 'tnt_test', 'Test Corp', 'Tech', 'NEW', 'OPERATIONAL', 0.0, 0.0, 0.0, 100.0, ?)", (time.time(),))
+            conn.commit()
+
+        from api_server import ThreadedHTTPServer, RoboAssistantRequestHandler
+        cls.port = get_free_port()
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        cls._server = ThreadedHTTPServer(("127.0.0.1", cls.port), RoboAssistantRequestHandler)
+        cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
+        cls._thread.start()
+        time.sleep(1.0)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_server") and cls._server:
+            try:
+                cls._server.shutdown()
+                cls._server.server_close()
+            except Exception:
+                pass
+        if cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
+        if cls.orig_evidence_path:
+            os.environ["ZONATA_EVIDENCE_PATH"] = cls.orig_evidence_path
+        elif "ZONATA_EVIDENCE_PATH" in os.environ:
+            del os.environ["ZONATA_EVIDENCE_PATH"]
+        if hasattr(cls, "cls_temp_dir") and os.path.exists(cls.cls_temp_dir):
+            shutil.rmtree(cls.cls_temp_dir, ignore_errors=True)
+
+
     def setUp(self):
+
         self.test_dir = tempfile.mkdtemp(prefix="zonata_compound_test_")
         self.db_path = os.path.join(self.test_dir, "test_robo.db")
         self.subworker_coord = SubWorkerCoordinator(tenant_id="tnt_test")
@@ -211,8 +270,21 @@ class TestAssistantCoworkerCompoundMission(unittest.TestCase):
 
     # 6. REST API Server Live Integration
     def test_live_api_server_endpoints(self):
+        token = UserManager.generate_token({
+            "user_id": "usr_test_coworker",
+            "tenant_id": "tnt_test",
+            "company_id": "comp_test",
+            "role": UserRole.OWNER,
+            "permissions": ["*"]
+        })
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Tenant-ID": "tnt_test",
+            "X-Company-ID": "comp_test"
+        }
+
         # Test dashboard endpoint
-        req = urllib.request.Request("http://localhost:8080/api/coworker/dashboard")
+        req = urllib.request.Request(f"{self.base_url}/api/coworker/dashboard", headers=headers)
         with urllib.request.urlopen(req, timeout=5) as resp:
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.read().decode())
@@ -220,18 +292,19 @@ class TestAssistantCoworkerCompoundMission(unittest.TestCase):
             self.assertIn("specialized_runtimes", data)
 
         # Test reality matrix endpoint
-        req_mat = urllib.request.Request("http://localhost:8080/api/coworker/reality-matrix")
+        req_mat = urllib.request.Request(f"{self.base_url}/api/coworker/reality-matrix", headers=headers)
         with urllib.request.urlopen(req_mat, timeout=5) as resp:
             self.assertEqual(resp.status, 200)
             data_mat = json.loads(resp.read().decode())
             self.assertGreater(data_mat["count"], 0)
 
         # Test terminal diagnostics endpoint
-        req_diag = urllib.request.Request("http://localhost:8080/api/coworker/terminal/diagnostics")
+        req_diag = urllib.request.Request(f"{self.base_url}/api/coworker/terminal/diagnostics", headers=headers)
         with urllib.request.urlopen(req_diag, timeout=5) as resp:
             self.assertEqual(resp.status, 200)
             data_diag = json.loads(resp.read().decode())
             self.assertIn("host", data_diag)
+
 
 if __name__ == "__main__":
     unittest.main()

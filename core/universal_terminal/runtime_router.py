@@ -7,7 +7,9 @@ isolation level, network mode, and company policies.
 
 from typing import Dict, List, Optional, Any, Tuple
 import time
+import re
 from dataclasses import dataclass, field
+
 
 from .models import (
     RuntimeProfile, ExecutionMode, IsolationLevel, DesktopEnvironment,
@@ -79,24 +81,35 @@ class UniversalRuntimeRouter:
         ram_total_mb = host_sys["ram"]["total_mb"]
         ram_avail_mb = host_sys["ram"]["available_mb"]
 
+        def _matches_any(text: str, keywords: List[str]) -> bool:
+            for kw in keywords:
+                if " " in kw or "-" in kw:
+                    if kw in text:
+                        return True
+                else:
+                    if re.search(r'\b' + re.escape(kw) + r'\b', text):
+                        return True
+            return False
+
         # 1. Determine GUI vs Headless requirement
         gui_keywords = ["gui", "desktop", "browser", "display", "visual", "ui", "chromium", "firefox", "window", "screenshot"]
-        needs_gui = force_gui or any(kw in obj_lower for kw in gui_keywords) or "gui_automation" in req_caps
+        needs_gui = force_gui or _matches_any(obj_lower, gui_keywords) or "gui_automation" in req_caps
 
         # 2. Determine Security Testing / Defensive Lab requirement
         sec_keywords = ["security test", "vulnerability", "audit security", "nmap", "packet capture", "forensic", "incident analysis", "malware analysis", "wireshark", "cve"]
-        is_security_lab = any(kw in obj_lower for kw in sec_keywords) or "security_testing" in req_caps
+        is_security_lab = _matches_any(obj_lower, sec_keywords) or "security_testing" in req_caps
 
         # 3. Determine Privacy-Sensitive / Amnesic requirement
         privacy_keywords = ["privacy", "anonymize", "amnesic", "zero-retention", "ephemeral ram", "tor", "tails"]
-        is_privacy = any(kw in obj_lower for kw in privacy_keywords) or "zero_persistence" in req_caps
+        is_privacy = _matches_any(obj_lower, privacy_keywords) or "zero_persistence" in req_caps
 
         # 4. Determine Build / Compilation requirement
         build_keywords = ["compile", "build", "cargo build", "rustc", "gcc", "gradle", "make", "docker build", "clang"]
-        is_heavy_build = any(kw in obj_lower for kw in build_keywords) and ram_avail_mb > 4096
+        is_heavy_build = _matches_any(obj_lower, build_keywords) and ram_avail_mb > 4096
 
         # 5. Determine Production requirement
-        is_production = risk_level == TerminalCommandRisk.PRODUCTION_MUTATION or "production" in obj_lower
+        is_production = risk_level == TerminalCommandRisk.PRODUCTION_MUTATION or _matches_any(obj_lower, ["production"])
+
 
         # Selection logic based on capabilities and policy (NOT distro branding)
         selected_profile_id = "profile_linux_dev"
