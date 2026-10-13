@@ -5,6 +5,7 @@ and schema transformation connectors with health scoring and scoped permissions.
 """
 
 from typing import Dict, List, Optional, Any
+import os
 import time
 import uuid
 import json
@@ -121,6 +122,12 @@ class PluginsAndConnectionsService:
             rows = conn.execute(query, params).fetchall()
 
         if not rows:
+            app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+            is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+            enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+            clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+            if clean_mode:
+                return []
             self._seed_canonical_connections(company_id or "comp_primary")
             with db.get_connection() as conn:
                 params = [self.tenant_id]
@@ -431,6 +438,13 @@ class PluginsAndConnectionsService:
             conn.commit()
 
     def _seed_canonical_connections(self, company_id: str):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
+
         now = time.time()
         connections = [
             {

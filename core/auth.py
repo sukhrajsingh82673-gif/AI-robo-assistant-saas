@@ -10,7 +10,8 @@ import time
 import uuid
 import json
 import os
-from typing import Optional, Dict, Any, List, Set
+import threading
+from typing import Optional, Dict, Any, List, Set, Tuple
 from .db import db
 
 def get_auth_secret_key() -> bytes:
@@ -23,13 +24,15 @@ def get_auth_secret_key() -> bytes:
     """
     from .secrets import SecretManager
     secret = os.environ.get("ZONATA_AUTH_SECRET")
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    is_strict = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1")
     if secret:
+        if is_strict and len(secret.strip()) < 32:
+            raise RuntimeError("Production Sovereign Security Violation: ZONATA_AUTH_SECRET must be at least 32 characters with high entropy in production mode.")
         return secret.encode("utf-8")
     managed_key = SecretManager.get_secret("sec_sovereign_auth_key")
     if managed_key:
         return managed_key.encode("utf-8")
-    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
-    is_strict = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1")
     if is_strict:
         raise RuntimeError("Production Sovereign Security Violation: ZONATA_AUTH_SECRET environment variable is required in production mode. Hardcoded fallback prohibited.")
     return b"ROBOASSISTANT_INTERNAL_TENANT_HMAC_SECRET_2026"
@@ -133,6 +136,41 @@ class TenantManager:
             rows = conn.execute("SELECT * FROM tenants ORDER BY created_at DESC").fetchall()
             return [dict(r) for r in rows]
 
+class RateLimiter:
+    """Sliding-window rate limiter for sensitive authentication endpoints."""
+    _records: Dict[str, List[float]] = {}
+    _lock = threading.Lock()
+
+    @classmethod
+    def is_allowed(cls, key: str, max_requests: int = 5, window_seconds: float = 60.0) -> Tuple[bool, int]:
+        now = time.time()
+        with cls._lock:
+            timestamps = cls._records.get(key, [])
+            valid_timestamps = [t for t in timestamps if now - t < window_seconds]
+            if len(valid_timestamps) >= max_requests:
+                cls._records[key] = valid_timestamps
+                retry_after = int(window_seconds - (now - valid_timestamps[0])) + 1
+                return False, max(1, retry_after)
+            valid_timestamps.append(now)
+            cls._records[key] = valid_timestamps
+            return True, 0
+
+
+def hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
+    """Computes PBKDF2-HMAC-SHA256 hash with unique cryptographic salt."""
+    import secrets
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+    return hashed, salt
+
+
+def verify_password(password: str, salt: str, expected_hash: str) -> bool:
+    """Constant-time verification of supplied password against PBKDF2 digest."""
+    actual_hash, _ = hash_password(password, salt=salt)
+    return hmac.compare_digest(actual_hash, expected_hash)
+
+
 class UserManager:
     @staticmethod
     def create_user(tenant_id: str, email: str, name: str, role: str = UserRole.OWNER, company_id: Optional[str] = None) -> Dict[str, Any]:
@@ -152,6 +190,94 @@ class UserManager:
             "name": name,
             "role": role
         }
+
+    @staticmethod
+    def create_user_with_credentials(
+        tenant_id: str,
+        email: str,
+        name: str,
+        password: str,
+        role: str = UserRole.OWNER,
+        company_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        user_id = f"usr_{uuid.uuid4().hex[:8]}"
+        now = time.time()
+        pw_hash, salt = hash_password(password)
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO users (user_id, tenant_id, email, name, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (user_id, tenant_id, email, name, role, "ACTIVE", now)
+            )
+            conn.execute(
+                "INSERT INTO auth_credentials (user_id, password_hash, salt, failed_attempts, locked_until, created_at, updated_at) VALUES (?, ?, ?, 0, 0, ?, ?)",
+                (user_id, pw_hash, salt, now, now)
+            )
+            conn.commit()
+        return {
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "company_id": company_id or "comp_primary",
+            "email": email,
+            "name": name,
+            "role": role
+        }
+
+    @staticmethod
+    def authenticate_user(
+        email: str,
+        password: str,
+        tenant_id: Optional[str] = None
+    ) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+        now = time.time()
+        with db.get_connection() as conn:
+            if tenant_id:
+                user_row = conn.execute(
+                    "SELECT * FROM users WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'",
+                    (email, tenant_id)
+                ).fetchone()
+            else:
+                user_row = conn.execute(
+                    "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
+                    (email,)
+                ).fetchone()
+
+            if not user_row:
+                return False, None, "Invalid email or password"
+
+            user_dict = dict(user_row)
+            uid = user_dict["user_id"]
+
+            cred_row = conn.execute(
+                "SELECT * FROM auth_credentials WHERE user_id = ?",
+                (uid,)
+            ).fetchone()
+
+            if not cred_row:
+                # No credential record in auth_credentials
+                return False, None, "Credentials not enrolled for this account"
+
+            cred = dict(cred_row)
+            if cred.get("locked_until", 0) > now:
+                remaining = int(cred["locked_until"] - now)
+                return False, None, f"Account temporarily locked due to failed attempts. Try again in {remaining}s."
+
+            is_valid = verify_password(password, cred["salt"], cred["password_hash"])
+            if is_valid:
+                conn.execute(
+                    "UPDATE auth_credentials SET failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ?",
+                    (now, uid)
+                )
+                conn.commit()
+                return True, user_dict, "OK"
+            else:
+                fails = cred.get("failed_attempts", 0) + 1
+                locked_until = now + 600 if fails >= 5 else 0
+                conn.execute(
+                    "UPDATE auth_credentials SET failed_attempts = ?, locked_until = ?, updated_at = ? WHERE user_id = ?",
+                    (fails, locked_until, now, uid)
+                )
+                conn.commit()
+                return False, None, "Invalid email or password"
 
     @staticmethod
     def get_user(user_id: str) -> Optional[Dict[str, Any]]:
@@ -272,3 +398,10 @@ class AuthorizationEnforcer:
     @staticmethod
     def can_execute_missions(role: str) -> bool:
         return role in [UserRole.OWNER, UserRole.EXECUTIVE, UserRole.MANAGER, UserRole.OPERATOR, UserRole.SYSTEM_AGENT, UserRole.GLOBAL_ADMIN]
+
+    @staticmethod
+    def enforce_tenant_boundary(token_payload: Optional[Dict[str, Any]], requested_tenant_id: str):
+        if not AuthorizationEnforcer.require_tenant(token_payload, requested_tenant_id):
+            raise AuthExceptions.TenantIsolationViolation(f"Cross-tenant access prohibited for tenant '{requested_tenant_id}'")
+
+TenantContext = AuthorizationEnforcer

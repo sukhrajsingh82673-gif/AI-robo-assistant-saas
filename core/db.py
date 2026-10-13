@@ -46,6 +46,26 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
+-- 2b. Authentication Credentials & Password Hashes
+CREATE TABLE IF NOT EXISTS auth_credentials (
+    user_id TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until REAL NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_auth_credentials_user ON auth_credentials(user_id);
+
+-- 2c. Authentication Revoked Tokens
+CREATE TABLE IF NOT EXISTS auth_revoked_tokens (
+    token_id TEXT PRIMARY KEY,
+    revoked_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_revoked_tokens ON auth_revoked_tokens(token_id);
+
 -- 3. Companies & Operating Contexts
 CREATE TABLE IF NOT EXISTS companies (
     company_id TEXT PRIMARY KEY,
@@ -3181,10 +3201,100 @@ CREATE TABLE IF NOT EXISTS disaster_recovery_manifests (
     created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_dr_manifests ON disaster_recovery_manifests(tenant_id, created_at);
+
+-- 20. CRM & Commercial Pipeline
+CREATE TABLE IF NOT EXISTS crm_customers (
+    customer_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    legal_name TEXT,
+    tier TEXT NOT NULL DEFAULT 'STANDARD',
+    industry TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    health_score REAL NOT NULL DEFAULT 100.0,
+    arr REAL NOT NULL DEFAULT 0.0,
+    ltv REAL NOT NULL DEFAULT 0.0,
+    gstin TEXT,
+    address TEXT,
+    sla_level TEXT NOT NULL DEFAULT 'Standard 99.9%',
+    renewal_date TEXT,
+    assigned_agent TEXT,
+    contacts JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_crm_customers ON crm_customers(tenant_id, company_id);
+
+CREATE TABLE IF NOT EXISTS crm_deals (
+    deal_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    customer_id TEXT,
+    title TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'discovery',
+    value REAL NOT NULL DEFAULT 0.0,
+    probability REAL NOT NULL DEFAULT 0.5,
+    closing_date TEXT,
+    owner TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_crm_deals ON crm_deals(tenant_id, company_id);
 """
+
+class DatabaseDialect:
+    SQLITE = "sqlite"
+    POSTGRESQL = "postgresql"
+
+
+class PostgresConnectionWrapper:
+    """Wraps raw PostgreSQL connection with sqlite3-compatible Row and transaction semantics."""
+    def __init__(self, raw_conn):
+        self.raw_conn = raw_conn
+
+    def execute(self, sql: str, params: Any = ()):
+        # Normalize parameter placeholders: convert SQLite ? to PostgreSQL %s
+        normalized_sql = sql.replace("?", "%s")
+        cursor = self.raw_conn.cursor()
+        cursor.execute(normalized_sql, params)
+        return cursor
+
+    def executescript(self, sql_script: str):
+        cursor = self.raw_conn.cursor()
+        cursor.execute(sql_script)
+        return cursor
+
+    def commit(self):
+        self.raw_conn.commit()
+
+    def rollback(self):
+        self.raw_conn.rollback()
+
+    def close(self):
+        self.raw_conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
+        self.database_url = os.environ.get("DATABASE_URL", "").strip()
+        dialect_env = os.environ.get("ZONATA_DB_DIALECT", "").lower()
+        if self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
+            self.dialect = DatabaseDialect.POSTGRESQL
+        else:
+            self.dialect = DatabaseDialect.SQLITE
+
         if db_path is None:
             self.db_path = get_default_db_path()
         elif db_path.startswith("/roboassistant/") and not os.path.exists("/roboassistant"):
@@ -3194,15 +3304,39 @@ class Database:
         else:
             self.db_path = os.path.abspath(db_path)
 
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
-        self._init_db()
+        if self.dialect == DatabaseDialect.SQLITE:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+            if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
+                # Protected baseline database — never mutate or execute schema scripts automatically
+                pass
+            else:
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
+                self._init_db()
 
     def set_db_path(self, new_path: str):
         self.db_path = os.path.abspath(new_path)
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
-        self._init_db()
+        self.dialect = DatabaseDialect.SQLITE
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+        if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
+            pass
+        else:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
+            self._init_db()
 
-    def get_connection(self) -> sqlite3.Connection:
+    def initialize(self):
+        return self._init_db()
+
+    def get_dialect(self) -> str:
+        return self.dialect
+
+    def is_postgresql(self) -> bool:
+        return self.dialect == DatabaseDialect.POSTGRESQL
+
+    def get_connection(self):
+        if self.dialect == DatabaseDialect.POSTGRESQL:
+            return self._get_postgresql_connection()
         conn = sqlite3.connect(self.db_path, timeout=60.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -3211,7 +3345,29 @@ class Database:
         conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
+    def _get_postgresql_connection(self):
+        try:
+            import psycopg2
+            import psycopg2.extras
+            raw_conn = psycopg2.connect(self.database_url, connect_timeout=10)
+            raw_conn.autocommit = False
+            return PostgresConnectionWrapper(raw_conn)
+        except ImportError:
+            raise RuntimeError(
+                "PostgreSQL driver (psycopg2) is not installed in the runtime environment. "
+                "Install psycopg2-binary or configure SQLITE dialect."
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to connect to PostgreSQL database at '{self.database_url}': {e}"
+            )
+
     def _init_db(self):
+        if self.dialect == DatabaseDialect.SQLITE:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+            if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
+                return
         with self.get_connection() as conn:
             conn.executescript(SCHEMA_SQL)
             conn.commit()

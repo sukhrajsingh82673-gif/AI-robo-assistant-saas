@@ -984,12 +984,12 @@ function renderAuth() {
       <form id="signInForm" onsubmit="handleAuthSubmit(event, 'signin')">
         <div class="form-group">
           <label class="form-label">Host Email or Username</label>
-          <input type="text" class="form-input" id="authEmail" placeholder="sukhraj@zonata.internal" value="sukhraj@zonata.internal" required />
+          <input type="text" class="form-input" id="authEmail" placeholder="founder@company.com" required />
         </div>
         <div class="form-group">
           <label class="form-label">Secret Password</label>
           <div class="form-input-wrapper">
-            <input type="password" class="form-input" id="authPassword" placeholder="••••••••••••" value="UniversalRobo2026!" required />
+            <input type="password" class="form-input" id="authPassword" placeholder="••••••••••••" required />
           </div>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; font-size:12.5px;">
@@ -2552,20 +2552,41 @@ window.openSimulateMissionModal = function() {
   `);
 };
 
-window.runSimulationTest = function() {
+window.runSimulationTest = async function() {
   const box = document.getElementById('simResultBox');
   if (!box) return;
   box.style.display = 'block';
-  box.innerHTML = `
-    <div>[SIMULATION_STATE]: COMPLETE</div>
-    <div>[PREDICTED_REVENUE]: ₹58,000 (+287% ROI)</div>
-    <div>[PROJECTED_COST]: ₹14,200</div>
-    <div>[ESTIMATED_CONTRIBUTION]: ₹43,800</div>
-    <div>[RISK_SCORE]: 0.12 (LOW_RISK)</div>
-    <div>[CAN_ROLLBACK]: TRUE (Idempotent DB Transactions)</div>
-    <div>[VERIFICATION_CRITERIA]: Stripe webhook payment confirmation</div>
-  `;
-  showToast('Simulation passed pre-flight checks.', 'success');
+  box.innerHTML = '<div>[SIMULATING]: Running pre-flight digital twin simulation...</div>';
+  try {
+    const res = await fetch('/api/missions/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'Execute automated strategic workload',
+        department: 'Operations',
+        budget: 5000.0,
+        authority: 'ASK_ME'
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      box.innerHTML = `
+        <div>[SIMULATION_STATE]: ${data.status || 'COMPLETE'}</div>
+        <div>[PREDICTED_REVENUE]: ₹${Number(data.projected_revenue || 0).toLocaleString()}</div>
+        <div>[PROJECTED_COST]: ₹${Number(data.projected_cost || 0).toLocaleString()}</div>
+        <div>[ESTIMATED_CONTRIBUTION]: ₹${Number(data.projected_margin || 0).toLocaleString()}</div>
+        <div>[RISK_SCORE]: ${data.risk_score || 0.05} (${data.risk_tier || 'LOW_RISK'})</div>
+        <div>[CAN_ROLLBACK]: ${data.can_rollback !== false ? 'TRUE' : 'FALSE'} (Idempotent DB Transactions)</div>
+        <div>[CONFIDENCE]: ${((data.confidence_score || 0.95) * 100).toFixed(0)}% (${data.simulation_engine || 'DigitalTwinCore'})</div>
+      `;
+      showToast('Simulation passed pre-flight checks.', 'success');
+    } else {
+      const err = await res.json();
+      box.innerHTML = `<div style="color:var(--accent-rose);">[SIMULATION_ERROR]: ${err.detail || err.error || 'Simulation failed'}</div>`;
+    }
+  } catch (err) {
+    box.innerHTML = `<div style="color:var(--accent-rose);">[NETWORK_ERROR]: ${err.message}</div>`;
+  }
 };
 
 window.openAssignMissionModal = function(agentId) {

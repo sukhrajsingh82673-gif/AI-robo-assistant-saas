@@ -526,6 +526,36 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             except AuthExceptions.AuthenticationError as e:
                 self._send_json({"authenticated": False, "error": str(e)}, status=401)
             return
+        if path == "/api/crm/customers":
+            from core.enterprise_crm import EnterpriseCrmService
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", [None])[0]
+            search = query_params.get("search", [None])[0]
+            status = query_params.get("status", [None])[0]
+            tier = query_params.get("tier", [None])[0]
+            svc = EnterpriseCrmService(tenant_id)
+            customers = svc.list_customers(company_id=company_id, search=search, status=status, tier=tier)
+            self._send_json({"customers": customers, "total": len(customers)})
+            return
+
+        elif path.startswith("/api/crm/customers/"):
+            cust_id = path.split("/api/crm/customers/")[1].split("?")[0].strip()
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            c = svc.get_customer(cust_id)
+            if c:
+                self._send_json(c)
+            else:
+                self._send_json({"error": "Customer not found"}, status=404)
+            return
+
+        elif path == "/api/crm/deals":
+            from core.enterprise_crm import EnterpriseCrmService
+            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", [None])[0]
+            stage = query_params.get("stage", [None])[0]
+            svc = EnterpriseCrmService(tenant_id)
+            deals = svc.list_deals(company_id=company_id, stage=stage)
+            self._send_json({"deals": deals, "total": len(deals)})
+            return
 
         if path in ("/api/overview", "/api/overview/snapshot"):
             cid = query_params.get("company_id", [None])[0]
@@ -2582,41 +2612,47 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Public Authentication & Token Issuance Endpoints
         if path in ("/api/auth/token", "/api/auth/login"):
+            client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+            from core.auth import RateLimiter
+            allowed, retry_after = RateLimiter.is_allowed(f"login:{client_ip}", max_requests=25, window_seconds=60.0)
+            if not allowed:
+                self._send_json({"error": "Too Many Requests", "detail": f"Rate limit exceeded. Try again in {retry_after}s."}, status=429)
+                return
+
             email = req_data.get("email", "").strip()
             req_tenant = req_data.get("tenant_id")
-            client_secret = req_data.get("secret") or req_data.get("password") or req_data.get("bootstrap_key")
+            password = req_data.get("password") or req_data.get("secret")
+            bootstrap_key = req_data.get("bootstrap_key") or req_data.get("secret")
 
-            # Check if admin bootstrap secret is provided
             from core.auth import get_auth_secret_key
             auth_secret = get_auth_secret_key().decode("utf-8", errors="ignore")
-            is_valid_secret = bool(client_secret and (client_secret == auth_secret or client_secret == os.environ.get("ZONATA_BOOTSTRAP_SECRET")))
+            is_valid_secret = bool(bootstrap_key and (bootstrap_key == auth_secret or bootstrap_key == os.environ.get("ZONATA_BOOTSTRAP_SECRET")))
 
-            user_row = None
-            if req_tenant and email:
-                with db.get_connection() as conn:
-                    user_row = conn.execute(
-                        "SELECT * FROM users WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'",
-                        (email, req_tenant)
-                    ).fetchone()
-            elif email:
-                with db.get_connection() as conn:
-                    user_row = conn.execute(
-                        "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
-                        (email,)
-                    ).fetchone()
+            target_user = None
+            target_tenant = None
+            target_role = None
+            target_company = "comp_primary"
 
-            if user_row:
-                user_dict = dict(user_row)
-                target_tenant = user_dict["tenant_id"]
-                target_user = user_dict["user_id"]
-                target_role = user_dict["role"]
-                target_company = user_dict.get("company_id", "comp_primary")
-            elif is_valid_secret and req_tenant:
+            # 1. Try real credential-based authentication
+            if email and password:
+                ok, user_dict, msg = UserManager.authenticate_user(email, password, tenant_id=req_tenant)
+                if ok and user_dict:
+                    target_user = user_dict["user_id"]
+                    target_tenant = user_dict["tenant_id"]
+                    target_role = user_dict["role"]
+                    target_company = user_dict.get("company_id", "comp_primary")
+                elif not is_valid_secret:
+                    self._send_json({"error": "Unauthorized", "detail": msg}, status=401)
+                    return
+
+            # 2. Administrative bootstrap path with verified secret
+            if not target_user and is_valid_secret and req_tenant:
                 target_tenant = req_tenant
                 target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
                 target_role = req_data.get("role", UserRole.OWNER)
                 target_company = req_data.get("company_id", "comp_primary")
-            else:
+
+            if not target_user:
                 self._send_json({
                     "error": "Unauthorized",
                     "detail": "Invalid credentials or user not enrolled in tenant"
@@ -2641,13 +2677,27 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/auth/register":
-            email = req_data.get("email", "").strip()
+            client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+            from core.auth import RateLimiter
+            allowed, retry_after = RateLimiter.is_allowed(f"register:{client_ip}", max_requests=10, window_seconds=60.0)
+            if not allowed:
+                self._send_json({"error": "Too Many Requests", "detail": f"Rate limit exceeded. Try again in {retry_after}s."}, status=429)
+                return
+
+            email = req_data.get("email", "").strip().lower()
             name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
+            password = req_data.get("password", "")
             tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
             plan = req_data.get("plan", "ENTERPRISE")
 
-            if not email:
-                self._send_json({"error": "Bad Request", "detail": "Email address is required for registration"}, status=400)
+            import re
+            email_pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+            if not email or not re.match(email_pattern, email):
+                self._send_json({"error": "Bad Request", "detail": "A valid email address is required for registration"}, status=400)
+                return
+
+            if not password or len(password) < 8:
+                self._send_json({"error": "Bad Request", "detail": "Password must be at least 8 characters in length"}, status=400)
                 return
 
             with db.get_connection() as conn:
@@ -2663,14 +2713,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 }, status=409)
                 return
 
-            # Create tenant and owner user
+            # Atomic tenant and credential provisioning
             from core.auth import TenantManager
             tenant = TenantManager.create_tenant(name=tenant_name, plan=plan)
             tenant_id = tenant["tenant_id"]
-            user = UserManager.create_user(
+            user = UserManager.create_user_with_credentials(
                 tenant_id=tenant_id,
                 email=email,
                 name=name,
+                password=password,
                 role=UserRole.OWNER,
                 company_id="comp_primary"
             )
@@ -2710,6 +2761,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/auth/revoke":
+            try:
+                auth_ctx = self._get_auth_context()
+            except Exception as e:
+                self._send_json({"error": "Unauthorized", "detail": "Authentication required to revoke tokens"}, status=401)
+                return
+
             token_to_revoke = req_data.get("token") or req_data.get("token_id")
             if token_to_revoke:
                 if "." in token_to_revoke:
@@ -2733,6 +2790,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
         except AuthExceptions.TenantIsolationViolation as e:
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
+            return
+
+        if path == "/api/crm/customers":
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            try:
+                cust = svc.create_customer(company_id, req_data)
+                self._send_json(cust, status=201)
+            except ValueError as e:
+                self._send_json({"error": "Bad Request", "detail": str(e)}, status=400)
+            return
+
+        elif path == "/api/crm/deals":
+            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            try:
+                deal = svc.create_deal(company_id, req_data)
+                self._send_json(deal, status=201)
+            except ValueError as e:
+                self._send_json({"error": "Bad Request", "detail": str(e)}, status=400)
             return
 
         if path == "/api/overview/explain-variance":
@@ -6199,7 +6278,19 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             req_data = {}
 
-        if path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
+        if path.startswith("/api/crm/deals/") and len(path.split("/")) == 5:
+            deal_id = path.split("/")[4]
+            stage = req_data.get("stage")
+            if not stage:
+                self._send_json({"error": "stage required"}, status=400)
+                return
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            res = svc.update_deal_stage(deal_id, stage)
+            self._send_json(res)
+            return
+
+        elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
             expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data

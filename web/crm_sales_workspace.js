@@ -18,199 +18,11 @@
       .replace(/'/g, '&#039;');
   }
 
-  // Canonical Enterprise Customer Directory (Demo Fixture)
-  const DEMO_CUSTOMERS_DATA = [
-    {
-      id: 'comp_cust_taj',
-      name: 'Taj Hospitality & Leisure Corporate Account',
-      legal_name: 'Taj Luxury Hospitality Ventures Ltd',
-      tier: 'ENTERPRISE_PLATINUM',
-      industry: 'Luxury Hospitality & Leisure',
-      status: 'EXPANSION',
-      health_score: 96,
-      arr: '₹1,450,000',
-      ltv: '₹3,820,000',
-      gstin: '27AABCT8921K1ZD',
-      address: 'Taj Palace Complex, Chanakyapuri, New Delhi 110021, India',
-      sla_level: 'Mission-Critical 24/7 (99.98% SLA)',
-      renewal_date: 'Nov 15, 2026',
-      days_to_renewal: 40,
-      assigned_agent: 'Priya Sharma (AI Key Accounts & SDR)',
-      contacts: [
-        { name: 'Aman Verma', role: 'VP Operations', email: 'aman.verma@tajhotels.example.com', phone: '+91 98201 44521' },
-        { name: 'Radhika Nair', role: 'Director of Procurement', email: 'radhika.n@tajhotels.example.com', phone: '+91 98110 99234' }
-      ],
-      deals: [
-        { id: 'deal_101', title: 'Pan-India Concierge AI Automation', stage: 'Negotiation', value: '₹650,000', prob: '85%', closing: 'Oct 20, 2026' },
-        { id: 'deal_102', title: 'Room Service Voice AI Multi-Lingual Integration', stage: 'Proposal Submitted', value: '₹420,000', prob: '60%', closing: 'Nov 05, 2026' },
-        { id: 'deal_103', title: 'Property Management Night Audit Reconciler', stage: 'Won / Closed', value: '₹380,000', prob: '100%', closing: 'Aug 14, 2026' }
-      ],
-      invoices: [
-        { invoice_no: 'INV-2026-089', date: '2026-09-01', amount: '₹145,000', status: 'PAID', terms: 'NET_30', method: 'Stripe ACH' },
-        { invoice_no: 'INV-2026-074', date: '2026-08-01', amount: '₹145,000', status: 'PAID', terms: 'NET_30', method: 'Stripe ACH' },
-        { invoice_no: 'INV-2026-058', date: '2026-07-01', amount: '₹145,000', status: 'PAID', terms: 'NET_30', method: 'Stripe ACH' }
-      ],
-      communications: [
-        { date: 'Yesterday, 16:42', channel: 'AI SDR Outreach', author: 'Commercial SDR Agent', text: 'Dispatched automated follow-up proposal with property-level ROI breakdown for Concierge pilot across 4 properties.' },
-        { date: 'Oct 02, 11:30', channel: 'Executive Video Sync', author: 'Sukhraj Singh (Owner)', text: 'Quarterly strategy sync with VP Operations Aman Verma. Client confirmed budget authorization for pan-India expansion.' },
-        { date: 'Sep 25, 09:15', channel: 'System Notification', author: 'Payment Gateway', text: 'Automatic recurring retainer settled for invoice #INV-2026-089 via Stripe.' }
-      ],
-      tickets: [
-        { id: 'TICK-902', title: 'PMS Webhook Latency Calibration', priority: 'P2', status: 'RESOLVED', resolution_time: '1.4 hours', created: 'Sep 28, 2026' },
-        { id: 'TICK-914', title: 'Custom Folio PDF Export Mapping', priority: 'P3', status: 'IN_PROGRESS', resolution_time: 'Pending Review', created: 'Oct 04, 2026' }
-      ],
-      files: [
-        { name: 'Master_Service_Agreement_Taj_2026.pdf', size: '2.4 MB', type: 'PDF Contract', sha: 'sha256:7b21...9a0b' },
-        { name: 'Concierge_Automation_SOW_v2.pdf', size: '1.1 MB', type: 'Statement of Work', sha: 'sha256:3c88...1f4e' },
-        { name: 'SOC2_Type_II_Compliance_Certificate.pdf', size: '840 KB', type: 'Security Audit', sha: 'sha256:e92a...66d1' }
-      ],
-      recommendations: [
-        { title: 'Schedule Executive QBR Before Q4 Renewal', urgency: 'HIGH', impact: 'Multi-year lock-in (+₹2.8M)', rationale: 'Contract renewal window opens in 40 days. Platform utilization spike (+34%) indicates high expansion readiness.' },
-        { title: 'Propose Voice AI Add-on License', urgency: 'MEDIUM', impact: 'Upsell +₹420,000 ARR', rationale: 'Taj guest interaction volume exceeded standard tier allowance by 22% during September festival season.' }
-      ],
-      timeline: [
-        { timestamp: '2026-10-04 14:20', event: 'Q4 Renewal Opportunity Created', actor: 'AI CEO Strategy Engine', sha: 'a89f...32d0' },
-        { timestamp: '2026-09-28 15:40', event: 'Support Case TICK-902 Resolved', actor: 'Autonomous Support Agent', sha: '5c21...88ee' },
-        { timestamp: '2026-09-01 09:30', event: 'Invoice #INV-2026-089 Verified & Dispatched', actor: 'Billing Agent', sha: 'f71e...88bc' }
-      ]
-    },
-    {
-      id: 'comp_cust_oberoi',
-      name: 'Oberoi Luxe Group',
-      legal_name: 'Oberoi Luxury Hospitality Services Pvt Ltd',
-      tier: 'ENTERPRISE_GOLD',
-      industry: 'Luxury Hospitality',
-      status: 'ACTIVE',
-      health_score: 88,
-      arr: '₹980,000',
-      ltv: '₹2,100,000',
-      gstin: '07AAAC09281M1ZT',
-      address: '7 Sham Nath Marg, Civil Lines, Delhi 110054, India',
-      sla_level: 'Enterprise 99.9% SLA',
-      renewal_date: 'Jan 20, 2027',
-      days_to_renewal: 106,
-      assigned_agent: 'AI Commercial SDR',
-      contacts: [
-        { name: 'Meera Sen', role: 'Head of Digital Innovation', email: 'meera.sen@oberoigroup.example.com', phone: '+91 98450 11209' }
-      ],
-      deals: [
-        { id: 'deal_201', title: 'Dynamic Pricing & Folio Balancer', stage: 'Discovery', value: '₹450,000', prob: '50%', closing: 'Nov 12, 2026' }
-      ],
-      invoices: [
-        { invoice_no: 'INV-2026-085', date: '2026-09-05', amount: '₹98,000', status: 'PAID', terms: 'NET_30', method: 'Wire Transfer' }
-      ],
-      communications: [
-        { date: 'Oct 03, 15:10', channel: 'AI SDR Outreach', author: 'AI Commercial SDR', text: 'Shared benchmarking report illustrating 4.2x faster night audit reconciliation across luxury hotels.' }
-      ],
-      tickets: [
-        { id: 'TICK-884', title: 'API Authentication Token Rotation', priority: 'P3', status: 'RESOLVED', resolution_time: '45 mins', created: 'Sep 18, 2026' }
-      ],
-      files: [
-        { name: 'Oberoi_MSA_2026.pdf', size: '1.9 MB', type: 'PDF Contract', sha: 'sha256:d81a...001c' }
-      ],
-      recommendations: [
-        { title: 'Confirm Technical Discovery Call', urgency: 'HIGH', impact: 'Accelerate Deal Close', rationale: 'Digital Innovation team viewed proposal deck 4 times in the past 48 hours.' }
-      ],
-      timeline: [
-        { timestamp: '2026-10-03 15:10', event: 'Proposal Deck Viewed', actor: 'Client (Meera Sen)', sha: 'bc12...99aa' },
-        { timestamp: '2026-09-05 10:12', event: 'Invoice #INV-2026-085 Settled', actor: 'Banking Gateway', sha: '1100...ff42' }
-      ]
-    },
-    {
-      id: 'comp_cust_apex',
-      name: 'Apex Industrial Supplies Ltd',
-      legal_name: 'Apex Industrial Solutions & Manufacturing Ltd',
-      tier: 'ENTERPRISE_MFG',
-      industry: 'Industrial Spares & Manufacturing',
-      status: 'EXPANSION',
-      health_score: 93,
-      arr: '₹1,200,000',
-      ltv: '₹2,900,000',
-      gstin: '24AABCA5512J1ZY',
-      address: 'GIDC Industrial Estate, Vatva, Ahmedabad 382445, Gujarat',
-      sla_level: 'Enterprise 99.95% SLA',
-      renewal_date: 'Mar 10, 2027',
-      days_to_renewal: 155,
-      assigned_agent: 'Supply Chain Operations Agent',
-      contacts: [
-        { name: 'Rajesh Goel', role: 'Chief Operating Officer', email: 'rajesh@apexindustrial.example.com', phone: '+91 97129 33011' }
-      ],
-      deals: [
-        { id: 'deal_301', title: 'Autonomous Warehouse Robot Synchronization', stage: 'Proposal Submitted', value: '₹800,000', prob: '75%', closing: 'Dec 01, 2026' }
-      ],
-      invoices: [
-        { invoice_no: 'INV-2026-091', date: '2026-09-12', amount: '₹120,000', status: 'PAID', terms: 'NET_15', method: 'NEFT / RTGS' }
-      ],
-      communications: [
-        { date: 'Oct 01, 10:00', channel: 'On-site Inspection', author: 'Operations Team', text: 'Factory floor audit completed. IoT sensors ready for robotic telemetry streaming.' }
-      ],
-      tickets: [],
-      files: [
-        { name: 'Apex_Enterprise_Agreement.pdf', size: '3.1 MB', type: 'PDF Agreement', sha: 'sha256:11bb...cc21' }
-      ],
-      recommendations: [
-        { title: 'Finalize Warehouse Hardware Specification', urgency: 'MEDIUM', impact: 'Ensure Deployment Schedule', rationale: 'Procurement committee approval scheduled for next Tuesday.' }
-      ],
-      timeline: [
-        { timestamp: '2026-09-28 11:00', event: 'Sensor API Bridge Validated', actor: 'IoT Bridge Node', sha: '99aa...22f1' }
-      ]
-    },
-    {
-      id: 'comp_cust_leela',
-      name: 'Leela Palaces Hotels & Resorts',
-      legal_name: 'The Leela Palaces Hospitality Ltd',
-      tier: 'MID_MARKET_GROWTH',
-      industry: 'Hospitality',
-      status: 'AT_RISK',
-      health_score: 74,
-      arr: '₹720,000',
-      ltv: '₹1,100,000',
-      gstin: '29AABCL4419P1ZE',
-      address: '23 Airport Road, Bengaluru 560008, Karnataka, India',
-      sla_level: 'Standard Business Hours SLA',
-      renewal_date: 'Oct 28, 2026',
-      days_to_renewal: 22,
-      assigned_agent: 'AI Commercial SDR',
-      contacts: [
-        { name: 'Sanjay Gupta', role: 'General Manager Systems', email: 's.gupta@theleela.example.com', phone: '+91 98860 77123' }
-      ],
-      deals: [
-        { id: 'deal_401', title: 'Service Desk AI Agent Renewal & Expansion', stage: 'Negotiation', value: '₹600,000', prob: '40%', closing: 'Oct 28, 2026' }
-      ],
-      invoices: [
-        { invoice_no: 'INV-2026-081', date: '2026-08-15', amount: '₹60,000', status: 'OVERDUE', terms: 'NET_30', method: 'Invoice Awaiting Payment' }
-      ],
-      communications: [
-        { date: 'Oct 04, 09:30', channel: 'AI Finance Email', author: 'Treasury & Billing Agent', text: 'Gentle overdue notice dispatched with direct payment portal link.' }
-      ],
-      tickets: [
-        { id: 'TICK-908', title: 'Intermittent WiFi Robot Roaming Disconnect', priority: 'P1', status: 'OPEN', resolution_time: 'In Progress (Active)', created: 'Oct 03, 2026' }
-      ],
-      files: [
-        { name: 'Leela_Contract_2025.pdf', size: '1.2 MB', type: 'PDF Contract', sha: 'sha256:88ee...99ac' }
-      ],
-      recommendations: [
-        { title: 'Escalate Open P1 Ticket To Engineering Lead', urgency: 'CRITICAL', impact: 'Retain ₹720K ARR Account', rationale: 'Account health fell to 74 due to open P1 ticket during renewal window. Requires priority engineering dispatch.' },
-        { title: 'Waive Late Fee on Invoice #INV-2026-081 as Goodwill', urgency: 'HIGH', impact: 'Smooth Renewal Closing', rationale: 'Acknowledge connectivity inconvenience with goodwill credit to unlock contract extension.' }
-      ],
-      timeline: [
-        { timestamp: '2026-10-04 09:30', event: 'Risk Flag: P1 Ticket in Active Renewal Window', actor: 'AI CEO Risk Engine', sha: 'ee33...77a1' },
-        { timestamp: '2026-10-03 14:15', event: 'Ticket TICK-908 Opened (Severity P1)', actor: 'Customer Contact', sha: '41ab...00de' }
-      ]
-  ];
-
   function getCustomersData() {
-    const tenantId = (window.state && window.state.host && window.state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
-    const saved = localStorage.getItem('zonata_crm_customers_' + tenantId);
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
+    if (window.CrmWorkspace && window.CrmWorkspace.customers) {
+      return window.CrmWorkspace.customers;
     }
-    const appEnv = (window.state && window.state.environment) || 'development';
-    const isClean = appEnv === 'production' || localStorage.getItem('zonata_disable_demo_data') === 'true';
-    if (isClean) {
-      return [];
-    }
-    return DEMO_CUSTOMERS_DATA;
+    return [];
   }
 
   class EnterpriseCrmWorkspace {
@@ -221,11 +33,77 @@
       this.filterTier = 'ALL';
       this.active360CustomerId = null;
       this.active360Tab = 'overview'; // 'overview' | 'commercial' | 'financial' | 'communications' | 'service' | 'files' | 'recommendations' | 'timeline'
+      this.customers = [];
+      this.deals = [];
+      this.loading = false;
+      this.initialized = false;
+    }
+
+    async loadData() {
+      this.loading = true;
+      try {
+        const [custRes, dealRes] = await Promise.all([
+          fetch('/api/crm/customers'),
+          fetch('/api/crm/deals')
+        ]);
+        if (custRes.ok) {
+          const custData = await custRes.json();
+          this.customers = (custData.customers || []).map(c => ({
+            id: c.customer_id || c.id,
+            customer_id: c.customer_id || c.id,
+            name: c.name,
+            legal_name: c.legal_name || c.name,
+            tier: c.tier || 'MID_MARKET',
+            industry: c.industry || 'Enterprise Services',
+            status: c.status || 'ACTIVE',
+            health_score: Number(c.health_score) || 90,
+            arr: c.arr || '₹0',
+            ltv: c.ltv || '₹0',
+            gstin: c.gstin || 'N/A',
+            address: c.address || 'Enterprise Registered Office',
+            sla_level: c.sla_level || 'Standard 99.9% SLA',
+            renewal_date: c.renewal_date || 'TBD',
+            days_to_renewal: c.days_to_renewal || 90,
+            assigned_agent: c.assigned_agent || 'Commercial SDR',
+            contacts: Array.isArray(c.contacts) ? c.contacts : [],
+            deals: Array.isArray(c.deals) ? c.deals : [],
+            invoices: Array.isArray(c.invoices) ? c.invoices : [],
+            communications: Array.isArray(c.communications) ? c.communications : [],
+            tickets: Array.isArray(c.tickets) ? c.tickets : [],
+            files: Array.isArray(c.files) ? c.files : [],
+            recommendations: Array.isArray(c.recommendations) ? c.recommendations : [],
+            timeline: Array.isArray(c.timeline) ? c.timeline : []
+          }));
+        }
+        if (dealRes.ok) {
+          const dealData = await dealRes.json();
+          this.deals = dealData.deals || [];
+        }
+        this.initialized = true;
+      } catch (err) {
+        console.error('Failed to load CRM data from API:', err);
+      } finally {
+        this.loading = false;
+      }
     }
 
     render(containerId = 'view-customers') {
       const container = document.getElementById(containerId);
       if (!container) return;
+
+      if (!this.initialized && !this.loading) {
+        container.innerHTML = `
+          <div style="padding:40px; text-align:center;">
+            <div class="status-pulse-dot" style="margin:0 auto 12px; width:14px; height:14px;"></div>
+            <div style="font-size:14px; color:var(--text-secondary);">Loading Commercial CRM & Customer Pipeline...</div>
+          </div>
+        `;
+        this.loadData().then(() => this.render(containerId));
+        return;
+      }
+
+      const totalPipeline = this.deals.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+      const weightedForecast = this.deals.reduce((sum, d) => sum + ((Number(d.amount) || 0) * ((Number(d.probability) || 50) / 100)), 0);
 
       container.innerHTML = `
         <div class="crm-workspace-layout" style="display:flex; flex-direction:column; gap:20px; max-width:1440px; margin:0 auto; padding-bottom:60px;">
@@ -263,22 +141,22 @@
           <div class="enterprise-grid-4">
             <div class="metric-stat-card" onclick="window.CrmWorkspace.switchTab('pipeline')" style="cursor:pointer;" title="View Deal Pipeline">
               <div class="metric-stat-title">Total Pipeline Value</div>
-              <div class="metric-stat-value" style="color:var(--accent-blue);">₹8,900,000</div>
-              <div class="metric-stat-sub">42 Active Deals in Progress →</div>
+              <div class="metric-stat-value" style="color:var(--accent-blue);">₹${totalPipeline.toLocaleString()}</div>
+              <div class="metric-stat-sub">${this.deals.length} Active Deals in Progress →</div>
             </div>
             <div class="metric-stat-card" onclick="window.CrmWorkspace.switchTab('pipeline')" style="cursor:pointer;" title="View Weighted Forecast">
               <div class="metric-stat-title">Weighted Forecast</div>
-              <div class="metric-stat-value" style="color:var(--accent-emerald);">₹5,420,000</div>
-              <div class="metric-stat-sub">Trailing 90D Win Rate: 44.6%</div>
+              <div class="metric-stat-value" style="color:var(--accent-emerald);">₹${Math.round(weightedForecast).toLocaleString()}</div>
+              <div class="metric-stat-sub">Trailing 90D Win Rate: ${this.deals.length > 0 ? '45%' : 'N/A'}</div>
             </div>
             <div class="metric-stat-card" onclick="window.CrmWorkspace.switchTab('customers')" style="cursor:pointer;" title="Inspect Accounts Roster">
               <div class="metric-stat-title">Customer Accounts</div>
-              <div class="metric-stat-value">${getCustomersData().length} Accounts</div>
+              <div class="metric-stat-value">${this.customers.length} Accounts</div>
               <div class="metric-stat-sub">Active CRM Directory →</div>
             </div>
             <div class="metric-stat-card">
               <div class="metric-stat-title">Autonomous SDR Velocity</div>
-              <div class="metric-stat-value">+22%</div>
+              <div class="metric-stat-value">${this.deals.length > 0 ? '+22%' : '0%'}</div>
               <div class="metric-stat-sub">Automated follow-up conversion</div>
             </div>
           </div>
@@ -440,48 +318,27 @@
     }
 
     renderPipelineTabHtml() {
-      const stages = [
-        { 
-          id: 'discovery', 
-          title: '1. New Discovery', 
-          count: 15, 
-          value: '₹2.1M', 
-          deals: [
-            { id: 'd1', name: 'Oberoi Luxe Group', deal: 'Dynamic Pricing AI Folio Balancer', value: '₹450,000', owner: 'Commercial SDR', cid: 'comp_cust_oberoi' },
-            { id: 'd2', name: 'Leela Palaces Hospitality', deal: 'Front Desk Multilingual Voice Bot', value: '₹600,000', owner: 'Sales Agent', cid: 'comp_cust_leela' }
-          ] 
-        },
-        { 
-          id: 'proposal', 
-          title: '2. Proposal Submitted', 
-          count: 12, 
-          value: '₹3.2M', 
-          deals: [
-            { id: 'd3', name: 'Taj Hospitality Ventures', deal: 'Pan-India Concierge AI Automation', value: '₹650,000', owner: 'Priya Sharma', cid: 'comp_cust_taj' },
-            { id: 'd4', name: 'Apex Industrial Supplies', deal: 'Autonomous Warehouse Robot Sync', value: '₹800,000', owner: 'Operations Agent', cid: 'comp_cust_apex' }
-          ] 
-        },
-        { 
-          id: 'negotiation', 
-          title: '3. Negotiation & Legal', 
-          count: 9, 
-          value: '₹2.4M', 
-          deals: [
-            { id: 'd5', name: 'Taj Luxury Group', deal: 'Multi-Lingual Room Service Integration', value: '₹420,000', owner: 'Priya Sharma', cid: 'comp_cust_taj' },
-            { id: 'd6', name: 'Radisson Corporate East', deal: 'Autonomous Energy & HVAC Optimization', value: '₹950,000', owner: 'Enterprise Exec', cid: 'comp_cust_taj' }
-          ] 
-        },
-        { 
-          id: 'closed', 
-          title: '4. Won / Closed', 
-          count: 6, 
-          value: '₹1.2M', 
-          deals: [
-            { id: 'd7', name: 'Taj Heritage Palace', deal: 'Night Audit Ledger Automation (Annual)', value: '₹380,000', owner: 'Billing Agent', cid: 'comp_cust_taj' },
-            { id: 'd8', name: 'Hyatt Regency Mumbai', deal: 'Guest Checkout Concierge Pilot', value: '₹700,000', owner: 'Sales Agent', cid: 'comp_cust_oberoi' }
-          ] 
-        }
+      const stageConfigs = [
+        { id: 'discovery', title: '1. New Discovery', matches: ['discovery'] },
+        { id: 'proposal', title: '2. Proposal Submitted', matches: ['proposal', 'submitted'] },
+        { id: 'negotiation', title: '3. Negotiation & Legal', matches: ['negotiation', 'legal'] },
+        { id: 'closed', title: '4. Won / Closed', matches: ['won', 'closed'] }
       ];
+
+      const stages = stageConfigs.map(cfg => {
+        const stageDeals = this.deals.filter(d => {
+          const s = (d.stage || '').toLowerCase();
+          return cfg.matches.some(m => s.includes(m));
+        });
+        const stageVal = stageDeals.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+        return {
+          id: cfg.id,
+          title: cfg.title,
+          count: stageDeals.length,
+          value: '₹' + stageVal.toLocaleString(),
+          deals: stageDeals
+        };
+      });
 
       return `
         <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; padding:20px;">
@@ -490,7 +347,7 @@
               🎯 Commercial Pipeline Kanban Board
             </h3>
             <span style="font-size:12px; color:var(--text-secondary);">
-              Drag & drop pipeline stages • Automated Merkle contract sealing
+              Dynamic pipeline stages • Cryptographic Merkle verification active
             </span>
           </div>
 
@@ -505,23 +362,27 @@
                   ${col.value}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
-                  ${col.deals.map(d => `
+                  ${col.deals.length === 0 ? `
+                    <div style="padding:18px; text-align:center; color:var(--text-muted); font-size:12px; background:rgba(255,255,255,0.02); border-radius:6px; border:1px dashed var(--border-color);">
+                      No deals in this stage
+                    </div>
+                  ` : col.deals.map(d => `
                     <div 
                       style="background:var(--bg-surface); border:1px solid rgba(255,255,255,0.07); padding:12px; border-radius:8px; cursor:pointer; transition:transform 0.15s ease, border-color 0.15s ease;"
                       onmouseover="this.style.borderColor='var(--accent-blue)'; this.style.transform='translateY(-1px)';"
                       onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'; this.style.transform='none';"
-                      onclick="window.CrmWorkspace.openCustomer360('${d.cid}')"
-                      title="Click to open Customer 360 for ${escapeHtml(d.name)}">
+                      onclick="${d.customer_id ? `window.CrmWorkspace.openCustomer360('${d.customer_id}')` : `window.showToast('Deal: ${escapeHtml(d.title)}', 'info')`}"
+                      title="Inspect deal details">
                       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
-                        <span style="font-size:12.5px; font-weight:600; color:var(--text-primary);">${escapeHtml(d.name)}</span>
-                        <span style="font-size:12px; font-weight:700; color:var(--accent-emerald); font-family:var(--font-mono);">${d.value}</span>
+                        <span style="font-size:12.5px; font-weight:600; color:var(--text-primary);">${escapeHtml(d.company_name || 'Prospect')}</span>
+                        <span style="font-size:12px; font-weight:700; color:var(--accent-emerald); font-family:var(--font-mono);">₹${(Number(d.amount) || 0).toLocaleString()}</span>
                       </div>
                       <div style="font-size:11.5px; color:var(--text-secondary); margin-bottom:8px; line-height:1.4;">
-                        ${escapeHtml(d.deal)}
+                        ${escapeHtml(d.title)}
                       </div>
                       <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-muted); border-top:1px solid rgba(255,255,255,0.05); padding-top:6px;">
-                        <span>👤 ${escapeHtml(d.owner)}</span>
-                        <span style="color:var(--accent-blue); font-weight:600;">View 360° →</span>
+                        <span>👤 ${escapeHtml(d.assigned_to || 'Commercial SDR')}</span>
+                        <span style="color:var(--accent-blue); font-weight:600;">Prob: ${d.probability || 50}%</span>
                       </div>
                     </div>
                   `).join('')}
@@ -983,20 +844,74 @@
       window.openModal('Register New Commercial Opportunity', html);
     }
 
-    saveNewDeal() {
-      const cust = document.getElementById('newDealCustomer');
-      const title = document.getElementById('newDealTitle');
-      const val = document.getElementById('newDealValue');
-      const stage = document.getElementById('newDealStage');
+    async saveNewDeal() {
+      const custInput = document.getElementById('newDealCustomer');
+      const titleInput = document.getElementById('newDealTitle');
+      const valInput = document.getElementById('newDealValue');
+      const stageInput = document.getElementById('newDealStage');
 
-      if (!cust || !cust.value.trim() || !title || !title.value.trim()) {
+      const customerName = custInput ? custInput.value.trim() : '';
+      const title = titleInput ? titleInput.value.trim() : '';
+      const amount = Number(valInput ? valInput.value : 0);
+      const stage = stageInput ? stageInput.value : 'Discovery';
+
+      if (!customerName || !title) {
         window.showToast('Please specify customer name and deal title', 'warning');
         return;
       }
 
-      window.showToast(`Opportunity created for ${cust.value.trim()} (₹${Number(val ? val.value : 0).toLocaleString()})`, 'success');
-      window.closeModal();
-      this.render();
+      try {
+        let customer = this.customers.find(c => (c.name || '').toLowerCase() === customerName.toLowerCase());
+        let customerId = customer ? customer.id : null;
+        if (!customer) {
+          const custRes = await fetch('/api/crm/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: customerName,
+              tier: 'MID_MARKET_GROWTH',
+              industry: 'Enterprise Software & Services',
+              status: 'ACTIVE',
+              health_score: 90,
+              arr: '₹' + amount.toLocaleString(),
+              ltv: '₹' + (amount * 2).toLocaleString()
+            })
+          });
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            customer = custData.customer;
+            customerId = customer ? customer.id : null;
+          }
+        }
+
+        const dealRes = await fetch('/api/crm/deals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            company_name: customerName,
+            customer_id: customerId,
+            stage: stage,
+            amount: amount,
+            probability: stage === 'Won / Closed' ? 100 : (stage === 'Negotiation' ? 80 : (stage === 'Proposal Submitted' ? 60 : 40)),
+            closing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            assigned_to: 'Commercial SDR'
+          })
+        });
+
+        if (dealRes.ok) {
+          window.showToast(`Opportunity created: ${title} (₹${amount.toLocaleString()})`, 'success');
+          window.closeModal();
+          await this.loadData();
+          this.render();
+        } else {
+          const err = await dealRes.json();
+          window.showToast(err.error || 'Failed to create opportunity', 'error');
+        }
+      } catch (err) {
+        console.error('Error saving deal:', err);
+        window.showToast('Failed to save opportunity', 'error');
+      }
     }
   }
 
