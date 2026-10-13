@@ -210,7 +210,7 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET", None)
 
     def test_06_transparent_password_hash_upgrade(self):
-        """Verify legacy hex hash is transparently upgraded to pbkdf2_sha256 format on authentication."""
+        """Verify legacy hex hash is transparently upgraded to pbkdf2_sha256 format with 600000 iterations on authentication."""
         # 1. Register user with legacy format (raw hex hash in database)
         import hashlib
         salt = "testsalt12345678"
@@ -232,11 +232,26 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(msg, "OK")
 
-        # 3. Check database record -> Must be upgraded to pbkdf2_sha256$100000$... format
+        # 3. Check database record -> Must be upgraded to pbkdf2_sha256$600000$... format
         with self.db.get_connection() as conn:
             row = conn.execute("SELECT password_hash FROM auth_credentials WHERE user_id = 'usr_upg_01'").fetchone()
             upgraded_hash = row["password_hash"]
-            self.assertTrue(upgraded_hash.startswith("pbkdf2_sha256$100000$"), f"Hash was not upgraded: {upgraded_hash}")
+            self.assertTrue(upgraded_hash.startswith("pbkdf2_sha256$600000$"), f"Hash was not upgraded: {upgraded_hash}")
+
+        # 4. User with 100000 iterations format also gets upgraded to 600000 iterations
+        iter100k_hash = f"pbkdf2_sha256$100000${salt}${legacy_raw_hash}"
+        with self.db.get_connection() as conn:
+            conn.execute(
+                "UPDATE auth_credentials SET password_hash = ? WHERE user_id = 'usr_upg_01'",
+                (iter100k_hash,)
+            )
+            conn.commit()
+
+        ok, u_dict, msg = UserManager.authenticate_user("upgrade@corp.com", "OldPass2026!", tenant_id="tnt_idor_alpha")
+        self.assertTrue(ok)
+        with self.db.get_connection() as conn:
+            row = conn.execute("SELECT password_hash FROM auth_credentials WHERE user_id = 'usr_upg_01'").fetchone()
+            self.assertTrue(row["password_hash"].startswith("pbkdf2_sha256$600000$"))
 
     def test_07_deal_update_idor_and_cross_tenant_association(self):
         """Verify deal updates enforce tenant boundary and prevent cross-tenant customer association."""
@@ -334,11 +349,15 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         # 3. Emergency Retirement: immediately revoke compromised key
         emergency_retire_previous_secret(key_compromised)
         self.assertIsNone(UserManager.verify_token(token_under_prev), "Emergency retirement failed to reject token")
+        from core.auth import compute_key_fingerprint
+        compromised_fp = compute_key_fingerprint(key_compromised.encode("utf-8"))
+        self.assertIn(compromised_fp, os.environ.get("ZONATA_REVOKED_KEY_FINGERPRINTS", ""))
 
         # Cleanup
         os.environ.pop("ZONATA_AUTH_SECRET", None)
         os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET", None)
         os.environ.pop("ZONATA_REVOKED_AUTH_SECRETS", None)
+        os.environ.pop("ZONATA_REVOKED_KEY_FINGERPRINTS", None)
         os.environ.pop("ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY", None)
 
     def test_10_cryptographic_secret_generation(self):
@@ -355,6 +374,51 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         self.assertEqual(verify_password_with_upgrade("Pass", "salt", "invalid_string"), (False, False))
         self.assertEqual(verify_password_with_upgrade("Pass", "salt", "pbkdf2_sha256$notanumber$salt$hash"), (False, False))
         self.assertEqual(verify_password_with_upgrade("Pass", "salt", "pbkdf2_sha256$-100$salt$hash"), (False, False))
+
+    def test_12_password_max_length_and_unicode_normalization(self):
+        """Verify Unicode normalization matches across forms and excessive password length is rejected."""
+        import unicodedata
+        from core.auth import hash_password, verify_password
+
+        # Unicode equivalence test: composed vs decomposed forms
+        pass_nfc = unicodedata.normalize("NFC", "SchöneStraße2026!€")
+        pass_nfd = unicodedata.normalize("NFD", "SchöneStraße2026!€")
+        p_hash, salt = hash_password(pass_nfc)
+        self.assertTrue(verify_password(pass_nfd, salt, p_hash), "Unicode normalization failed across NFC/NFD representations")
+
+        # Massive input size rejection to prevent algorithmic DoS
+        massive_pw = "A" * 5000
+        with self.assertRaises(ValueError):
+            hash_password(massive_pw)
+        self.assertFalse(verify_password(massive_pw, salt, p_hash))
+
+    def test_13_dual_axis_rate_limit_and_scoped_pruning(self):
+        """Verify dual-axis rate limiting throttles IP and account independently with scoped pruning."""
+        # 1. Account throttling independently of IP
+        ip_rotating_prefix = "192.168.1."
+        target_account = "targeted_cfo@enterprise.com"
+
+        for i in range(5):
+            ok, retry, axis = RateLimiter.rate_limit_ip_and_account(
+                f"{ip_rotating_prefix}{i+1}",
+                target_account,
+                max_ip_requests=20,
+                max_account_requests=5,
+                window_seconds=60.0
+            )
+            self.assertTrue(ok, f"Attempt {i+1} unexpectedly blocked")
+
+        # 6th attempt from a fresh IP against the same account must fail on ACCOUNT axis
+        ok, retry, axis = RateLimiter.rate_limit_ip_and_account(
+            "192.168.1.99",
+            target_account,
+            max_ip_requests=20,
+            max_account_requests=5,
+            window_seconds=60.0
+        )
+        self.assertFalse(ok)
+        self.assertEqual(axis, "ACCOUNT_RATE_LIMIT_EXCEEDED")
+        self.assertGreater(retry, 0)
 
 
 if __name__ == "__main__":

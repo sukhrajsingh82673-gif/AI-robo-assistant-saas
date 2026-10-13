@@ -1,26 +1,28 @@
 {
-  "timestamp": 1791870663.809683,
-  "timestamp_iso": "2026-10-13T05:51:03Z",
+  "timestamp": 1791877562.933303,
+  "timestamp_iso": "2026-10-13T07:46:02Z",
+  "git_commit": "ddbd9da2a83bf8f3c40534447bd63becc5ac7250",
+  "git_branch": "engineering/production-readiness-gap-closure",
   "summary": {
     "total_suites_executed": 9,
-    "total_tests_executed": 105,
-    "total_passed": 105,
+    "total_tests_executed": 107,
+    "total_passed": 107,
     "total_failed": 0,
     "total_errors": 0,
-    "total_duration_seconds": 106.51,
+    "total_duration_seconds": 121.0,
     "pass_rate_pct": 100.0,
-    "security_negative_test_count": 48
+    "security_negative_test_count": 50
   },
   "executed_suites": [
     {
       "file": "tests/test_direct_object_access_and_tenant_security.py",
       "name": "Direct Object Access, IDOR & Multi-Tenant IAM Security",
       "category": "Security-Negative / Unit",
-      "test_count": 11,
-      "passed_count": 11,
+      "test_count": 13,
+      "passed_count": 13,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 11.197,
+      "duration_seconds": 17.126,
       "status": "PASS"
     },
     {
@@ -31,7 +33,7 @@
       "passed_count": 8,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 10.031,
+      "duration_seconds": 10.54,
       "status": "PASS"
     },
     {
@@ -42,7 +44,7 @@
       "passed_count": 29,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 10.339,
+      "duration_seconds": 11.0,
       "status": "PASS"
     },
     {
@@ -53,7 +55,7 @@
       "passed_count": 11,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 11.223,
+      "duration_seconds": 12.541,
       "status": "PASS"
     },
     {
@@ -64,7 +66,7 @@
       "passed_count": 4,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 5.356,
+      "duration_seconds": 5.107,
       "status": "PASS"
     },
     {
@@ -75,7 +77,7 @@
       "passed_count": 3,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 7.752,
+      "duration_seconds": 9.122,
       "status": "PASS"
     },
     {
@@ -86,7 +88,7 @@
       "passed_count": 10,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 4.673,
+      "duration_seconds": 4.873,
       "status": "PASS"
     },
     {
@@ -97,7 +99,7 @@
       "passed_count": 22,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 44.833,
+      "duration_seconds": 49.58,
       "status": "PASS"
     },
     {
@@ -108,7 +110,7 @@
       "passed_count": 7,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 1.104,
+      "duration_seconds": 1.116,
       "status": "PASS"
     }
   ],

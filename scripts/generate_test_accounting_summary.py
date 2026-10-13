@@ -161,9 +161,18 @@ def main():
 
     security_count = sum(r["test_count"] for r in results if "Security" in r["category"])
 
+    try:
+        git_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, text=True).strip()
+        git_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=BASE_DIR, text=True).strip()
+    except Exception:
+        git_commit = "unknown"
+        git_branch = "unknown"
+
     report_payload = {
         "timestamp": time.time(),
         "timestamp_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "git_commit": git_commit,
+        "git_branch": git_branch,
         "summary": {
             "total_suites_executed": len(results),
             "total_tests_executed": total_tests,

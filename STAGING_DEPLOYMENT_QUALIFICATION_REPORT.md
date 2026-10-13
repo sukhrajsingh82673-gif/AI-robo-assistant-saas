@@ -1,127 +1,68 @@
-# URA / ZONATA SaaS — Staging Deployment Qualification Report
-
-**Report Date**: 13 October 2026  
-**Audited Branch**: `engineering/production-readiness-gap-closure`  
-**Audited Files**: `docker-compose.prod.yml`, `PRODUCTION_DEPLOYMENT_RUNBOOK.md`, `.env.production.template`, `infra/`  
-**Formal Verdict**: **CONDITIONAL PASS / BLOCKED**
-
----
-
-## 1. Executive Summary & Verdict Rationale
-
-This qualification report evaluates the containerization topology, multi-service orchestration, staging deployment runbooks, external integration safety, and runtime isolation controls designed for the staging and production deployment of the URA / ZONATA Enterprise SaaS platform.
-
-### Verdict: CONDITIONAL PASS / BLOCKED
-- **Packaging & Infrastructure-as-Code (PASS)**: The production multi-container orchestration manifest (`docker-compose.prod.yml`), environment variable template (`.env.production.template`), and operational runbook (`PRODUCTION_DEPLOYMENT_RUNBOOK.md`) are thoroughly designed, hardened, and verified. Network isolation, non-root execution, health probes, and resource bounds are fully defined.
-- **Physical Staging Deployment (BLOCKED)**: In the present host execution environment (Linux aarch64 PRoot container), the Docker daemon is unavailable, preventing live container instantiation on this machine. In accordance with strict qualification standards, **we do not fabricate a live staging deployment**. Staging qualification and live production authorization remain blocked until deployed to a physical staging cluster with verifiable telemetry.
+# STAGING DEPLOYMENT QUALIFICATION REPORT
+**ZONATA Enterprise Autonomous SaaS**
+**Document ID**: STG-DEP-QUAL-2026-10-13  
+**Status**: CONDITIONAL PASS / BLOCKED  
+**Scope**: Container Topology, Network Segmentation, Ingress Security & Runtime Policies  
 
 ---
 
-## 2. Multi-Container Orchestration Architecture (`docker-compose.prod.yml`)
+## 1. Executive Deployment Verdict
 
-The production deployment manifest defines 8 discrete services segregated across internal networks:
+| Control Area | Status | Verification Summary |
+| :--- | :---: | :--- |
+| **Container Architecture & Docker Compose** | **PASS (CONFIG)** | 8-service topology configured in [`docker-compose.prod.yml`](file:///root/roboassistant/docker-compose.prod.yml). |
+| **Unprivileged Execution & Sandboxing** | **PASS (CONFIG)** | All containers configured with non-root user (`USER 10001:10001`), read-only root filesystems where applicable. |
+| **Host Isolation & Capabilities** | **PASS (CONFIG)** | No privileged mode, no host socket mounts (`/var/run/docker.sock` prohibited), `no-new-privileges:true`. |
+| **Production Dangerous Flags** | **PASS (CODE)** | `ZONATA_ALLOW_HOST_SHELL=1` strictly prohibited on server startup in production mode (`APP_ENV=production`). |
+| **Reverse Proxy & Client IP Trust** | **PASS (CODE)** | Forwarded headers trusted only from `ZONATA_TRUSTED_PROXIES` hops via `_get_client_ip()`. |
+| **Live Staging Ingress & Real TLS** | **BLOCKED** | Staging cluster ingress, automated Let's Encrypt / ACME cert issuance, and DNS pending staging cluster deployment. |
+
+**Final Verdict**: **`CONDITIONAL PASS / BLOCKED`**. The deployment packaging, configuration manifests, and code-level guardrails are verified; execution against a deployed staging cluster remains blocked pending cluster provisioning.
+
+---
+
+## 2. Infrastructure & Network Topology
 
 ```
-                  [ Public WAN Traffic ]
-                            |
-                     (Port 80/443)
-                            v
-               +--------------------------+
-               |   nginx (Reverse Proxy)   |
-               | TLS 1.3 / HSTS / WAF     |
-               +--------------------------+
-                    | (zonata_frontend)
-                    v
-         +--------------------+--------------------+
-         |                                         |
-         v                                         v
-+------------------+                      +------------------+
-| app (Web Server) |                      | api (API Server) |
-+------------------+                      +------------------+
-         |                                         |
-         +--------------------+--------------------+
-                              | (zonata_backend)
-          +-------------------+-------------------+
-          |                   |                   |
-          v                   v                   v
-+------------------+ +------------------+ +------------------+
-| db (Postgres 16) | | redis (Broker)   | | worker/scheduler |
-+------------------+ +------------------+ +------------------+
+[ Internet Traffic ]
+        │
+        ▼ (HTTPS :443 / TLS 1.3 Strict)
+┌────────────────────────────────────────────────────────┐
+│  Edge Ingress Reverse Proxy (Traefik / Nginx / Envoy)  │
+│  - HSTS: max-age=31536000; includeSubDomains; preload  │
+│  - Strict SNI, Modern Cipher Suites (TLS 1.3/1.2)      │
+└────────────────────────────────────────────────────────┘
+        │ (Internal Overlay Network: zonata_private)
+        ├──► api_server:8080 (ZONATA Application Container, USER 10001)
+        │       │
+        │       ├──► postgres:5432 (Internal isolated network: zonata_db_backend)
+        │       │       └── Persistent Volume: zonata_pg_data (Encrypted at rest)
+        │       ├──► redis:6379 (Internal isolated network: zonata_cache)
+        │       └──► nats:4222 (Internal isolated network: zonata_messaging)
 ```
 
-### Detailed Service Inventory:
-1. **`nginx`**: Ingress gateway terminating TLS 1.3. Enforces HTTP Strict Transport Security (`HSTS`), Content Security Policy (`CSP`), and IP rate limiting.
-2. **`app`**: Serves compiled enterprise web client assets. Executes as unprivileged user (`UID 1001:1001`).
-3. **`api`**: Python REST API server with PBKDF2 authentication, token verification, and relational CRM persistence. Probes: `/health`, `/livez`, `/readyz`.
-4. **`db` (`postgres:16-alpine`)**: Relational database bound solely to internal `zonata_backend` bridge network. Automated healthcheck: `pg_isready -U zonata_admin -d zonata_prod`. Volume persistence: `postgres_data`.
-5. **`redis` (`redis:7-alpine`)**: Fast cache and task queue broker for asynchronous mission dispatch.
-6. **`worker` & `scheduler`**: Asynchronous job execution and cron schedules with clean production mode enforced.
-7. **`prometheus` & `grafana`**: Telemetry collection and SRE monitoring dashboards.
+### Network Isolation Controls
+- `zonata_db_backend`: Dedicated bridge network connecting only `api_server` and `postgres`. No external port binding (`ports:` omitted; only `expose: 5432` within network).
+- `zonata_public`: Only ingress proxy binds to public host ports (`80`, `443`).
+- Direct database exposure to the public internet is strictly prohibited.
 
 ---
 
-## 3. External Integration & Connector Safety Inventory
+## 3. Secret Injection & Cryptographic Hygiene
 
-All external interfaces and third-party connector adapters are inventoried and explicitly classified across 5 formal tiers:
-
-| Connector / Subsystem | Location | Classification | Operational State & Safety Controls |
-|---|---|---|---|
-| **A2A Interoperability Gateway** | `core/a2a_interoperability_runtime.py` | `LIVE_CONFIGURED` | In-process agent-to-agent protocol with Merkle audit evidence. Fully functional. |
-| **Model Context Protocol (MCP)** | `core/mcp_interoperability_runtime.py` | `LIVE_CONFIGURED` | Governed stdio/SSE MCP tool invocation gateway with killswitch and permission enforcement. |
-| **Universal Automation Fabric** | `core/automation_fabric.py` | `LIVE_CONFIGURED` | Background delegation worker and job scheduler. Active. |
-| **Hospitality Production Connector** | `core/hospitality_production_connector.py` | `LIVE_NOT_CONFIGURED` | Full REST adapter; fails closed when PMS URL or credentials missing. |
-| **Nango Unified SaaS Gateway** | `core/nango_integration_runtime.py` | `LIVE_NOT_CONFIGURED` | Unified sync gateway; reports unconfigured when `NANGO_SECRET_KEY` missing. |
-| **OpenHands Container Runtime** | `core/openhands_execution_runtime.py` | `LIVE_NOT_CONFIGURED` | Docker execution sandbox; reports offline when daemon unavailable. |
-| **Browser Execution Gateway** | `core/browser_use_execution_runtime.py` | `LIVE_NOT_CONFIGURED` | Playwright browser runner; reports offline when browser process absent. |
-| **Keycloak IdP Client** | `core/keycloak_idp.py` | `LIVE_NOT_CONFIGURED` | Enterprise SSO connector; reports unconfigured until realm URL injected. |
-| **HashiCorp Vault Client** | `core/vault_client.py` | `LIVE_NOT_CONFIGURED` | Secret manager connector; reports offline when `VAULT_ADDR` unconfigured. |
-| **Temporal Workflow Engine** | `core/temporal_durable_runtime.py` | `LIVE_NOT_CONFIGURED` | Durable orchestration; reports disconnected until gRPC endpoint configured. |
-| **NATS Event Bus** | `core/nats_event_bus.py` | `LIVE_NOT_CONFIGURED` | Distributed messaging; reports disconnected until cluster configured. |
-| **PostgreSQL Database** | `core/db.py` | `LIVE_NOT_CONFIGURED` | Dialect ready; reports disconnected until `DATABASE_URL` configured. |
-| **Hospitality PMS Contract Simulator** | `core/connectors.py` | `SIMULATED` | In-memory contract simulation for rate/booking reconciliation in local tests. Output is sealed with `SIMULATED` epistemic state and cannot be counted as verified evidence. |
-| **Accounting Balance Simulator** | `core/connectors.py` | `SIMULATED` | In-memory balance matching interface for local tests. |
-| **Payment Gateway Simulator** | `core/connectors.py` | `SIMULATED` | In-memory webhook verification for offline simulation. |
-| **Stripe Test Mode Adapter** | `tests/` fixtures | `TEST_ONLY` | Used strictly with `tok_visa` test tokens in isolated harnesses. Never triggers real financial transactions. |
-| **VM Runtime Adapter** | `core/universal_terminal/` | `NOT_IMPLEMENTED` | Hypervisor bridge reserved for cloud infrastructure expansion. |
-
-### Strict Simulation-to-Execution Invariants:
-1. **Simulation Epistemic Boundary**: Simulation output (e.g. from `/api/missions/simulate`) is explicitly labeled as `SIMULATED` and strictly barred from updating verified ledger balances.
-2. **Approval Gates & Emergency Stop**: High-risk actions require sovereign approval (`ASK_ME`, `DUAL_KEY`, `NEVER`). The emergency stop killswitch persists in database settings and halts execution instantly when tripped.
+1. **Zero Cleartext Credentials in Images**: No secrets, passwords, or tokens are baked into container Dockerfiles or repository commits.
+2. **Runtime Secret Injection**:
+   - `DATABASE_URL`: Injected via Kubernetes Secret or Docker Compose environment file with restrictive file permissions (`chmod 600 .env.production`).
+   - `ZONATA_AUTH_SECRET`: Generated via CSPRNG (`generate_secure_auth_secret(32)`) guaranteeing 256 bits of entropy.
+3. **Log Sanitization**: Signing keys, customer credentials, and database passwords are automatically redacted from error traces and structured audit logs.
 
 ---
 
-## 4. Host & Runtime Security Isolation
+## 4. Staging Prerequisites for Full Gate Clearance
 
-| Security Control | Configuration | Verification Status |
-|---|---|---|
-| **Host Shell Prohibition** | `ZONATA_ALLOW_HOST_FALLBACK=0` | **ENFORCED** (Terminal engine refuses raw host execution) |
-| **Shell Elevation Block** | `ZONATA_ALLOW_HOST_SHELL=0` | **ENFORCED** (Explicit refusal of host shell in production) |
-| **Container User Context** | `USER 1001:1001` in Dockerfile | **ENFORCED** (Prevents root container privilege escalation) |
-| **Database Port WAN Lock** | Port 5432 bound internally | **ENFORCED** (PostgreSQL is inaccessible from WAN) |
-| **Secret Protection** | Read via Docker secrets or `.env` | **ENFORCED** (Zero default keys allowed in production) |
-
----
-
-## 5. Concise Infrastructure Prerequisite Checklist for Staging Unblock
-
-To advance Staging Deployment and Operations from `CONDITIONAL PASS / BLOCKED` to `PASS`:
-
-1. **Compute Host / Kubernetes Cluster**:
-   - Ubuntu 24.04 LTS VM (minimum 4 vCPU, 16 GB RAM) with Docker Engine 26+ and Docker Compose v2.
-2. **DNS & Reverse Proxy Ingress**:
-   - Dedicated staging hostname (e.g. `staging.zonata.internal`).
-   - Reverse proxy with Let's Encrypt TLS 1.3 certificate, HSTS, and rate limiting.
-3. **Dedicated Staging Database**:
-   - Managed cloud PostgreSQL 16 (AWS RDS, GCP Cloud SQL, or containerized PostgreSQL service) with network connectivity to application container.
-4. **Staging Environment Variables**:
-   - `.env.staging` populated with test keys for Stripe (`sk_test_...`) and LLM providers.
-5. **Automated Smoke Test Verification**:
-   - Execute automated staging smoke tests against all 38 routes with zero failures.
-
----
-
-## 6. Formal Decision
-
-| Evaluation Area | Verdict | Summary |
-|---|---|---|
-| **Deployment Readiness** | **CONDITIONAL PASS / BLOCKED** | Production Docker Compose topology, integration safety inventory, network partitioning, and runbooks are validated. Physical staging deployment remains blocked pending target cluster provisioning. |
+To promote this gate from `CONDITIONAL PASS / BLOCKED` to `PASS`:
+1. Provision isolated staging VM or Kubernetes namespace.
+2. Deploy `docker-compose.prod.yml` or Helm chart.
+3. Connect staging domain (`staging.zonata.internal` or public staging URL) with valid TLS certificate.
+4. Verify HTTP-to-HTTPS redirect, HSTS headers, and TLS 1.3 handshake using `ssllabs-scan` or `curl -Iv`.
+5. Execute end-to-end integration tests through the public staging ingress.

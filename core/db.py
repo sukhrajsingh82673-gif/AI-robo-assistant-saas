@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
     attempt_timestamp REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_key ON auth_rate_limits(rate_key, attempt_timestamp);
+CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_ts ON auth_rate_limits(attempt_timestamp);
 
 -- 3. Companies & Operating Contexts
 CREATE TABLE IF NOT EXISTS companies (

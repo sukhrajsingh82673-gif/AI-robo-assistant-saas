@@ -11,6 +11,8 @@ import uuid
 import json
 import os
 import threading
+import random
+import unicodedata
 from typing import Optional, Dict, Any, List, Set, Tuple
 from .db import db
 
@@ -37,17 +39,33 @@ def get_auth_secret_key() -> bytes:
         raise RuntimeError("Production Sovereign Security Violation: ZONATA_AUTH_SECRET environment variable is required in production mode. Hardcoded fallback prohibited.")
     return b"ROBOASSISTANT_INTERNAL_TENANT_HMAC_SECRET_2026"
 
+def compute_key_fingerprint(key: bytes) -> str:
+    """
+    Computes a deterministic, non-reversible SHA-256 cryptographic fingerprint of a signing key.
+    Enables safe revocation auditing and key tracking without ever exposing raw secret material in logs or revocation lists.
+    """
+    if isinstance(key, str):
+        key = key.encode("utf-8")
+    return hashlib.sha256(key).hexdigest()
+
 def get_verification_keys() -> List[bytes]:
     """
     Returns the primary signing key and any active previous rotated keys to support zero-downtime key rotation.
-    Enforces expiration window and emergency revocation list.
+    Enforces expiration window and emergency key fingerprint revocation list.
     """
     primary = get_auth_secret_key()
     keys = [primary]
 
-    # Check emergency revocation list
-    revoked_str = os.environ.get("ZONATA_REVOKED_AUTH_SECRETS", "")
-    revoked_secrets = {s.strip().encode("utf-8") for s in revoked_str.split(",") if s.strip()}
+    # Collect revoked key fingerprints (never raw secrets)
+    revoked_fps = set()
+    for env_var in ("ZONATA_REVOKED_KEY_FINGERPRINTS", "ZONATA_REVOKED_AUTH_SECRETS"):
+        val = os.environ.get(env_var, "")
+        for item in val.split(","):
+            item = item.strip()
+            if item:
+                revoked_fps.add(item)
+                # If an operator passed a raw secret string, fingerprint it so it matches safely
+                revoked_fps.add(compute_key_fingerprint(item.encode("utf-8")))
 
     # Check rotation window expiry for previous key
     now = time.time()
@@ -65,26 +83,36 @@ def get_verification_keys() -> List[bytes]:
         prev_secret = os.environ.get("ZONATA_PREVIOUS_AUTH_SECRET")
         if prev_secret:
             prev_bytes = prev_secret.encode("utf-8")
-            if prev_bytes not in revoked_secrets and prev_bytes != primary:
+            prev_fp = compute_key_fingerprint(prev_bytes)
+            if prev_fp not in revoked_fps and prev_bytes != primary:
                 keys.append(prev_bytes)
         from .secrets import SecretManager
         prev_managed = SecretManager.get_secret("sec_sovereign_previous_auth_key")
         if prev_managed:
             prev_m_bytes = prev_managed.encode("utf-8")
-            if prev_m_bytes not in revoked_secrets and prev_m_bytes != primary and prev_m_bytes not in keys:
+            prev_m_fp = compute_key_fingerprint(prev_m_bytes)
+            if prev_m_fp not in revoked_fps and prev_m_bytes != primary and prev_m_bytes not in keys:
                 keys.append(prev_m_bytes)
     return keys
 
-def emergency_retire_previous_secret(secret_to_revoke: Optional[str] = None):
+def emergency_retire_previous_secret(secret_or_fingerprint: Optional[str] = None):
     """
     Emergency procedure: Immediately retires and revokes previous signing secret,
-    causing all sessions signed with that key to fail verification immediately.
+    causing all sessions signed with that key to fail verification immediately across all nodes.
+    Stores the cryptographic fingerprint rather than raw secret material.
     """
     os.environ["ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY"] = "1"
-    if secret_to_revoke:
-        existing = os.environ.get("ZONATA_REVOKED_AUTH_SECRETS", "")
-        updated = f"{existing},{secret_to_revoke}".strip(",")
-        os.environ["ZONATA_REVOKED_AUTH_SECRETS"] = updated
+    if secret_or_fingerprint:
+        # Determine fingerprint
+        fp = secret_or_fingerprint
+        if len(secret_or_fingerprint) != 64 or not all(c in "0123456789abcdefABCDEF" for c in secret_or_fingerprint):
+            fp = compute_key_fingerprint(secret_or_fingerprint.encode("utf-8"))
+        existing = os.environ.get("ZONATA_REVOKED_KEY_FINGERPRINTS", "")
+        updated = f"{existing},{fp}".strip(",")
+        os.environ["ZONATA_REVOKED_KEY_FINGERPRINTS"] = updated
+        # Also maintain ZONATA_REVOKED_AUTH_SECRETS with fingerprint for backward compatibility
+        existing_rev = os.environ.get("ZONATA_REVOKED_AUTH_SECRETS", "")
+        os.environ["ZONATA_REVOKED_AUTH_SECRETS"] = f"{existing_rev},{fp}".strip(",")
     os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET", None)
 
 def generate_secure_auth_secret(num_bytes: int = 32) -> str:
@@ -196,14 +224,14 @@ class RateLimiter:
                 except Exception:
                     pass  # Postgres or connection wrapper manages transactions via __enter__
 
-                # Opportunistic cleanup of expired timestamps
+                # 1. Scoped pruning for THIS rate_key only using idx_auth_rate_limits_key (rate_key, attempt_timestamp)
                 conn.execute(
-                    "DELETE FROM auth_rate_limits WHERE attempt_timestamp < ?",
-                    (now - window_seconds,)
+                    "DELETE FROM auth_rate_limits WHERE rate_key = ? AND attempt_timestamp < ?",
+                    (key, now - window_seconds)
                 )
                 rows = conn.execute(
-                    "SELECT attempt_timestamp FROM auth_rate_limits WHERE rate_key = ? ORDER BY attempt_timestamp ASC",
-                    (key,)
+                    "SELECT attempt_timestamp FROM auth_rate_limits WHERE rate_key = ? AND attempt_timestamp >= ? ORDER BY attempt_timestamp ASC",
+                    (key, now - window_seconds)
                 ).fetchall()
                 if len(rows) >= max_requests:
                     oldest = rows[0][0] if isinstance(rows[0], (tuple, list)) else rows[0]["attempt_timestamp"]
@@ -214,6 +242,12 @@ class RateLimiter:
                     "INSERT INTO auth_rate_limits (rate_key, attempt_timestamp) VALUES (?, ?)",
                     (key, now)
                 )
+                # 2. Probabilistic background cleanup (1 in 100 requests) to purge abandoned keys without table contention
+                if random.random() < 0.01:
+                    conn.execute(
+                        "DELETE FROM auth_rate_limits WHERE attempt_timestamp < ?",
+                        (now - 3600.0,)
+                    )
                 conn.commit()
                 return True, 0
         except Exception:
@@ -256,7 +290,13 @@ class RateLimiter:
         return True, 0, ""
 
 
-DEFAULT_PBKDF2_ITERATIONS = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
+DEFAULT_PBKDF2_ITERATIONS = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS") or os.environ.get("PBKDF2_ITERATIONS") or "600000")
+if DEFAULT_PBKDF2_ITERATIONS < 10000:
+    DEFAULT_PBKDF2_ITERATIONS = 10000
+elif DEFAULT_PBKDF2_ITERATIONS > 2000000:
+    DEFAULT_PBKDF2_ITERATIONS = 2000000
+
+MAX_PASSWORD_BYTES = 4096
 
 def evaluate_secret_entropy(secret: str) -> Dict[str, Any]:
     """
@@ -285,14 +325,24 @@ def evaluate_secret_entropy(secret: str) -> Dict[str, Any]:
 def hash_password(password: str, salt: Optional[str] = None, iterations: Optional[int] = None) -> Tuple[str, str]:
     """
     Computes PBKDF2-HMAC-SHA256 hash with unique cryptographic salt.
+    Enforces Unicode NFC normalization and 4096-byte input ceiling to prevent algorithmic DoS.
     Encodes iterations metadata in prefix to support future algorithm and parameter upgrades.
     """
     import secrets
+    if not isinstance(password, str):
+        raise TypeError("Password must be a string")
+    norm_password = unicodedata.normalize("NFC", password)
+    pw_bytes = norm_password.encode("utf-8")
+    if len(pw_bytes) > MAX_PASSWORD_BYTES:
+        raise ValueError(f"Password exceeds maximum supported length ({MAX_PASSWORD_BYTES} bytes)")
+
     if iterations is None:
-        iterations = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
+        iterations = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS") or os.environ.get("PBKDF2_ITERATIONS") or DEFAULT_PBKDF2_ITERATIONS)
+    if iterations < 10000 or iterations > 2000000:
+        iterations = DEFAULT_PBKDF2_ITERATIONS
     if not salt:
         salt = secrets.token_hex(16)
-    raw_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
+    raw_hash = hashlib.pbkdf2_hmac("sha256", pw_bytes, salt.encode("utf-8"), iterations).hex()
     formatted = f"pbkdf2_sha256${iterations}${salt}${raw_hash}"
     return formatted, salt
 
@@ -302,32 +352,44 @@ def verify_password_with_upgrade(password: str, salt: str, expected_hash: str) -
     Constant-time verification of supplied password against PBKDF2 digest.
     Returns: (is_valid: bool, needs_upgrade: bool)
     Safely rejects malformed encodings without throwing unhandled exceptions.
+    Guarantees needs_upgrade is strictly False whenever is_valid is False.
     """
-    if not expected_hash or not isinstance(expected_hash, str):
+    if not expected_hash or not isinstance(expected_hash, str) or not isinstance(password, str):
         return False, False
-    current_default_iter = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
+    norm_password = unicodedata.normalize("NFC", password)
+    pw_bytes = norm_password.encode("utf-8")
+    if len(pw_bytes) > MAX_PASSWORD_BYTES:
+        return False, False
+
+    current_default_iter = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS") or os.environ.get("PBKDF2_ITERATIONS") or DEFAULT_PBKDF2_ITERATIONS)
+    if current_default_iter < 10000 or current_default_iter > 2000000:
+        current_default_iter = DEFAULT_PBKDF2_ITERATIONS
+
     if expected_hash.startswith("pbkdf2_sha256$"):
         parts = expected_hash.split("$")
         if len(parts) == 4:
             _, iter_str, stored_salt, stored_hash = parts
             try:
                 iterations = int(iter_str)
-                if iterations <= 0 or not stored_salt or not stored_hash:
+                if iterations <= 0 or iterations > 2000000 or not stored_salt or not stored_hash:
                     return False, False
-                computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), stored_salt.encode("utf-8"), iterations).hex()
+                computed = hashlib.pbkdf2_hmac("sha256", pw_bytes, stored_salt.encode("utf-8"), iterations).hex()
                 is_valid = hmac.compare_digest(computed, stored_hash)
                 needs_upgrade = is_valid and (iterations < current_default_iter)
                 return is_valid, needs_upgrade
             except Exception:
                 return False, False
         return False, False
+
     # Backward compatibility with unformatted raw hex hashes
-    try:
-        computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), current_default_iter).hex()
-        is_valid = hmac.compare_digest(computed, expected_hash)
-        return is_valid, is_valid
-    except Exception:
-        return False, False
+    for check_iter in [current_default_iter, 100000]:
+        try:
+            computed = hashlib.pbkdf2_hmac("sha256", pw_bytes, salt.encode("utf-8"), check_iter).hex()
+            if hmac.compare_digest(computed, expected_hash):
+                return True, True
+        except Exception:
+            pass
+    return False, False
 
 
 def verify_password(password: str, salt: str, expected_hash: str) -> bool:

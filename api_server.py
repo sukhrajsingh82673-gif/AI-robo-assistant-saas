@@ -368,8 +368,27 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", req_origin)
                 self.send_header("Access-Control-Allow-Credentials", "true")
                 self.send_header("Vary", "Origin")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, PATCH")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID, X-Correlation-ID")
+
+    def _get_client_ip(self) -> str:
+        """
+        Resolves client IP address with anti-spoofing reverse proxy verification.
+        X-Forwarded-For and X-Real-IP are only trusted if direct peer is in ZONATA_TRUSTED_PROXIES.
+        """
+        peer_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        trusted_proxies_str = os.environ.get("ZONATA_TRUSTED_PROXIES", "127.0.0.1,::1")
+        trusted_proxies = {p.strip() for p in trusted_proxies_str.split(",") if p.strip()}
+        if peer_ip in trusted_proxies or os.environ.get("ZONATA_TRUST_ALL_PROXIES", "0") == "1":
+            xff = self.headers.get("X-Forwarded-For")
+            if xff:
+                client_candidate = xff.split(",")[0].strip()
+                if client_candidate:
+                    return client_candidate
+            x_real_ip = self.headers.get("X-Real-IP")
+            if x_real_ip:
+                return x_real_ip.strip()
+        return peer_ip
 
     def _get_auth_context(self) -> Dict[str, Any]:
         """
@@ -2623,11 +2642,19 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Public Authentication & Token Issuance Endpoints
         if path in ("/api/auth/token", "/api/auth/login"):
-            client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+            client_ip = self._get_client_ip()
+            email = req_data.get("email", "").strip()
             from core.auth import RateLimiter
-            allowed, retry_after = RateLimiter.is_allowed(f"login:{client_ip}", max_requests=25, window_seconds=60.0)
+            allowed, retry_after, axis = RateLimiter.rate_limit_ip_and_account(
+                client_ip,
+                email if email else None,
+                max_ip_requests=25,
+                max_account_requests=5,
+                window_seconds=60.0
+            )
             if not allowed:
-                self._send_json({"error": "Too Many Requests", "detail": f"Rate limit exceeded. Try again in {retry_after}s."}, status=429)
+                detail_msg = f"Rate limit exceeded on {axis.lower().replace('_', ' ')}. Try again in {retry_after}s."
+                self._send_json({"error": "Too Many Requests", "detail": detail_msg}, status=429)
                 return
 
             email = req_data.get("email", "").strip()
@@ -2688,14 +2715,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/auth/register":
-            client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+            client_ip = self._get_client_ip()
+            email = req_data.get("email", "").strip().lower()
             from core.auth import RateLimiter
-            allowed, retry_after = RateLimiter.is_allowed(f"register:{client_ip}", max_requests=10, window_seconds=60.0)
+            allowed, retry_after, axis = RateLimiter.rate_limit_ip_and_account(
+                client_ip,
+                email if email else None,
+                max_ip_requests=10,
+                max_account_requests=3,
+                window_seconds=60.0
+            )
             if not allowed:
-                self._send_json({"error": "Too Many Requests", "detail": f"Rate limit exceeded. Try again in {retry_after}s."}, status=429)
+                detail_msg = f"Rate limit exceeded on {axis.lower().replace('_', ' ')}. Try again in {retry_after}s."
+                self._send_json({"error": "Too Many Requests", "detail": detail_msg}, status=429)
                 return
 
-            email = req_data.get("email", "").strip().lower()
             name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
             password = req_data.get("password", "")
             tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
@@ -2709,6 +2743,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             if not password or len(password) < 8:
                 self._send_json({"error": "Bad Request", "detail": "Password must be at least 8 characters in length"}, status=400)
+                return
+
+            if len(password.encode("utf-8")) > 4096:
+                self._send_json({"error": "Bad Request", "detail": "Password exceeds maximum allowed size (4096 bytes)"}, status=400)
                 return
 
             with db.get_connection() as conn:
@@ -6360,6 +6398,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         self._send_json({"error": "Endpoint not found or method not allowed"}, status=404)
+
+    def do_PATCH(self):
+        """Dispatches HTTP PATCH requests to do_PUT for partial resource mutations."""
+        return self.do_PUT()
 
     def do_DELETE(self):
         parsed = urllib.parse.urlparse(self.path)

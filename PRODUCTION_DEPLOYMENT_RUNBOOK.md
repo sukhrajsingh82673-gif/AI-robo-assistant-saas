@@ -294,13 +294,20 @@ Disaster recovery capabilities are verified via automated rehearsal suites:
 
 3. **Emergency Secret Retirement (Compromised Key)**:
    If a signing secret is compromised or exposed:
-   - Immediately revoke the compromised key across all cluster instances:
+   - Compute the non-reversible SHA-256 key fingerprint so raw secrets are never placed in logs or environment files:
+     ```bash
+     COMPROMISED_FP=$(python3 -c "import hashlib; print(hashlib.sha256(b'<COMPROMISED_KEY>').hexdigest())")
+     ```
+   - Immediately revoke the compromised key fingerprint across all cluster instances:
      ```bash
      export ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY=1
-     export ZONATA_REVOKED_AUTH_SECRETS="<COMPROMISED_KEY>"
+     export ZONATA_REVOKED_KEY_FINGERPRINTS="$COMPROMISED_FP"
      unset ZONATA_PREVIOUS_AUTH_SECRET
      ```
-   - Generate a fresh CSPRNG secret for `ZONATA_AUTH_SECRET`.
+   - Generate a fresh CSPRNG secret for `ZONATA_AUTH_SECRET`:
+     ```bash
+     export ZONATA_AUTH_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+     ```
    - Restart the API cluster. All tokens signed with the compromised key fail closed immediately (HTTP 401).
 
 ### 7.4 Log Rotation
