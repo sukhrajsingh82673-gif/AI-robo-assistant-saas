@@ -75,10 +75,19 @@ class SpendGovernor:
         now = time.time()
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_budgets (
+            INSERT INTO enterprise_budgets (
                 entity_id, entity_type, tenant_id, company_id, allocated_usd,
                 soft_limit_pct, hard_limit_pct, is_frozen, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+            ON CONFLICT (entity_id) DO UPDATE SET
+                entity_type = EXCLUDED.entity_type,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                allocated_usd = EXCLUDED.allocated_usd,
+                soft_limit_pct = EXCLUDED.soft_limit_pct,
+                hard_limit_pct = EXCLUDED.hard_limit_pct,
+                is_frozen = EXCLUDED.is_frozen,
+                updated_at = EXCLUDED.updated_at
             """, (entity_id, entity_type, tenant_id, company_id, allocated_usd, soft_limit_pct, hard_limit_pct, now, now))
 
     def evaluate_spend(self, entity_id: str, requested_spend_usd: float) -> Tuple[str, str]:

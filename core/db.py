@@ -3455,28 +3455,123 @@ class DeferredConnectionProxy:
         pass
 
 
+TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
+    "missions": ("mission_id",),
+    "employees": ("agent_id",),
+    "a2a_skills": ("skill_id",),
+    "a2a_tasks": ("task_id",),
+    "immutable_agent_packages": ("package_id",),
+    "governed_agents": ("agent_id",),
+    "installed_applications": ("app_id",),
+    "auth_revoked_tokens": ("token_id",),
+    "automation_connector_idempotency": ("idempotency_key",),
+    "automation_sync_checkpoints": ("tenant_id", "stream_name", "connector_id"),
+    "automation_revoked_leases": ("lease_id",),
+    "enterprise_budget_allocations": ("budget_id",),
+    "coworker_background_missions": ("mission_id",),
+    "coworker_profiles": ("worker_id",),
+    "coworker_execution_graphs": ("mission_id",),
+    "coworker_execution_nodes": ("task_id",),
+    "coworker_workflow_instances": ("workflow_id",),
+    "workflow_resource_locks": ("lock_id",),
+    "workflows": ("workflow_id",),
+    "agent_blueprints": ("blueprint_id",),
+    "enterprise_files": ("file_id",),
+    "enterprise_records": ("record_id",),
+    "enterprise_reports": ("report_id",),
+    "host_capabilities": ("cap_id",),
+    "enterprise_identities": ("identity_id",),
+    "enterprise_killswitch_matrix": ("switch_id",),
+    "employee_kpis": ("kpi_id",),
+    "employee_kras": ("kra_id",),
+    "mcp_tools": ("tool_id",),
+    "mcp_resources": ("resource_id",),
+    "mcp_published_capabilities": ("published_id",),
+    "multimodal_capabilities": ("tenant_id", "capability_id"),
+    "stateful_agent_identities": ("tenant_id", "agent_id"),
+    "organization_nodes": ("node_id",),
+    "organization_edges": ("edge_id",),
+    "companies": ("company_id",),
+    "departments": ("department_id",),
+    "users": ("user_id",),
+    "data_sources": ("source_id",),
+    "tenants": ("tenant_id",),
+    "enterprise_budgets": ("entity_id",),
+    "supervisor_heartbeats": ("heartbeat_id",),
+    "temporal_workers": ("worker_id",),
+    "governed_tools": ("tool_id",),
+    "terminal_checkpoints": ("checkpoint_id",),
+    "employee_performance_records": ("record_id",),
+    "company_processes": ("process_id",),
+    "optimistic_lock_registry": ("table_name",),
+}
+
+
+def normalize_sql_for_postgres(sql: str) -> str:
+    """
+    Normalizes SQL statements for PostgreSQL compatibility:
+    - Strips SQLite PRAGMA commands (returns empty string)
+    - Replaces ? parameter placeholders with %s
+    - Converts SQLite INSERT OR IGNORE INTO to ANSI ON CONFLICT DO NOTHING
+    - Converts legacy INSERT OR REPLACE INTO to ANSI ON CONFLICT (<pk>) DO UPDATE SET ...
+    """
+    stripped = sql.strip()
+    if stripped.upper().startswith("PRAGMA "):
+        return ""
+
+    # Convert ? placeholders to %s
+    normalized = sql.replace("?", "%s")
+
+    import re
+
+    # Handle SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING
+    if re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", normalized, re.IGNORECASE):
+        normalized = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
+    # Handle SQLite INSERT OR REPLACE INTO -> PostgreSQL ANSI ON CONFLICT ... DO UPDATE SET ...
+    replace_match = re.search(
+        r"\bINSERT\s+OR\s+REPLACE\s+INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)",
+        normalized,
+        re.IGNORECASE
+    )
+    if replace_match:
+        table_name = replace_match.group(1).strip()
+        columns_str = replace_match.group(2)
+        columns = [c.strip().strip('"').strip('`') for c in columns_str.split(",") if c.strip()]
+
+        pk_cols = TABLE_PRIMARY_KEYS.get(table_name)
+        if pk_cols:
+            update_cols = [c for c in columns if c not in pk_cols and c.lower() != "created_at"]
+            pk_target = ", ".join(pk_cols)
+            if update_cols:
+                set_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
+                conflict_clause = f" ON CONFLICT ({pk_target}) DO UPDATE SET {set_clause}"
+            else:
+                conflict_clause = f" ON CONFLICT ({pk_target}) DO NOTHING"
+        else:
+            conflict_clause = " ON CONFLICT DO NOTHING"
+
+        # Substitute INSERT OR REPLACE INTO with INSERT INTO
+        normalized = re.sub(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + conflict_clause
+    elif re.search(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", normalized, re.IGNORECASE):
+        normalized = re.sub(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
+    return normalized
+
+
 class PostgresConnectionWrapper:
     """Wraps raw PostgreSQL connection with sqlite3-compatible Row and transaction semantics."""
     def __init__(self, raw_conn):
         self.raw_conn = raw_conn
 
     def _normalize_sql(self, sql: str) -> str:
-        # Strip SQLite-specific PRAGMAs that cause syntax errors in PostgreSQL
-        stripped = sql.strip()
-        if stripped.upper().startswith("PRAGMA "):
-            return ""
-
-        # Convert ? placeholders to %s
-        normalized = sql.replace("?", "%s")
-
-        # Handle SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING
-        import re
-        if re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", normalized, re.IGNORECASE):
-            normalized = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
-            if "ON CONFLICT" not in normalized.upper():
-                normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
-
-        return normalized
+        return normalize_sql_for_postgres(sql)
 
     def execute(self, sql: str, params: Any = ()):
         normalized_sql = self._normalize_sql(sql)

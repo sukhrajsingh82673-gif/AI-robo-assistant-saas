@@ -620,12 +620,27 @@ class AgentDiscoveryService:
             for s in sanitized["skills"]:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO a2a_skills (
+                    INSERT INTO a2a_skills (
                         skill_id, agent_id, tenant_id, company_id, name,
                         description, tags, risk_level, permissions, approval_required,
                         evidence_required, timeout, budget, allowed_companies,
                         allowed_tenants, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (skill_id) DO UPDATE SET
+                        agent_id = EXCLUDED.agent_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        company_id = EXCLUDED.company_id,
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        tags = EXCLUDED.tags,
+                        risk_level = EXCLUDED.risk_level,
+                        permissions = EXCLUDED.permissions,
+                        approval_required = EXCLUDED.approval_required,
+                        evidence_required = EXCLUDED.evidence_required,
+                        timeout = EXCLUDED.timeout,
+                        budget = EXCLUDED.budget,
+                        allowed_companies = EXCLUDED.allowed_companies,
+                        allowed_tenants = EXCLUDED.allowed_tenants
                     """,
                     (
                         f"skill_{agent_id}_{s['id']}",
@@ -743,12 +758,30 @@ class A2AAgentInteropProvider(AgentInteropProvider):
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO a2a_tasks (
+                INSERT INTO a2a_tasks (
                     task_id, zonata_request_id, tenant_id, company_id, workspace_id,
                     mission_id, zonata_task_id, workflow_id, run_id, agent_id,
                     skill_id, requested_by, idempotency_key, a2a_state, zonata_state,
                     data_classification, cost_spent, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (task_id) DO UPDATE SET
+                    zonata_request_id = EXCLUDED.zonata_request_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    workspace_id = EXCLUDED.workspace_id,
+                    mission_id = EXCLUDED.mission_id,
+                    zonata_task_id = EXCLUDED.zonata_task_id,
+                    workflow_id = EXCLUDED.workflow_id,
+                    run_id = EXCLUDED.run_id,
+                    agent_id = EXCLUDED.agent_id,
+                    skill_id = EXCLUDED.skill_id,
+                    requested_by = EXCLUDED.requested_by,
+                    idempotency_key = EXCLUDED.idempotency_key,
+                    a2a_state = EXCLUDED.a2a_state,
+                    zonata_state = EXCLUDED.zonata_state,
+                    data_classification = EXCLUDED.data_classification,
+                    cost_spent = EXCLUDED.cost_spent,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     task_id,

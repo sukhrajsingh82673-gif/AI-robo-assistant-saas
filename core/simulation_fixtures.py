@@ -77,8 +77,13 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         # 1. Tenant
         conn.execute(
             """
-            INSERT OR REPLACE INTO tenants (tenant_id, name, plan, status, created_at, metadata)
+            INSERT INTO tenants (tenant_id, name, plan, status, created_at, metadata)
             VALUES (?, ?, 'ENTERPRISE_QUALIFIED', 'ACTIVE', ?, ?)
+            ON CONFLICT (tenant_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                plan = EXCLUDED.plan,
+                status = EXCLUDED.status,
+                metadata = EXCLUDED.metadata
             """,
             (SIM_TENANT_ID, "Nova Enterprise Tenant (Simulation)", now, json.dumps({"simulation": True, "sandbox_mode": "ISOLATED"}))
         )
@@ -86,12 +91,27 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         # 2. Company
         conn.execute(
             """
-            INSERT OR REPLACE INTO companies (
+            INSERT INTO companies (
                 company_id, tenant_id, name, country, industry, company_type,
                 status, currency, timezone, revenue, cost, contribution,
                 understanding_pct, operating_rules, baseline_summary, created_at
             ) VALUES (?, ?, ?, 'IN', 'ENTERPRISE_AI', 'SYNTHETIC_SIMULATION', 'OPERATIONAL', '₹', 'Asia/Kolkata',
                       12500000.0, 4200000.0, 8300000.0, 95.0, ?, ?, ?)
+            ON CONFLICT (company_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                name = EXCLUDED.name,
+                country = EXCLUDED.country,
+                industry = EXCLUDED.industry,
+                company_type = EXCLUDED.company_type,
+                status = EXCLUDED.status,
+                currency = EXCLUDED.currency,
+                timezone = EXCLUDED.timezone,
+                revenue = EXCLUDED.revenue,
+                cost = EXCLUDED.cost,
+                contribution = EXCLUDED.contribution,
+                understanding_pct = EXCLUDED.understanding_pct,
+                operating_rules = EXCLUDED.operating_rules,
+                baseline_summary = EXCLUDED.baseline_summary
             """,
             (
                 SIM_COMPANY_ID,
@@ -114,8 +134,13 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         for d_id, d_name, mgr_agent in departments:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO departments (department_id, company_id, tenant_id, name, manager_agent_id, created_at)
+                INSERT INTO departments (department_id, company_id, tenant_id, name, manager_agent_id, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (department_id) DO UPDATE SET
+                    company_id = EXCLUDED.company_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    name = EXCLUDED.name,
+                    manager_agent_id = EXCLUDED.manager_agent_id
                 """,
                 (d_id, SIM_COMPANY_ID, SIM_TENANT_ID, d_name, mgr_agent, now)
             )
@@ -132,8 +157,14 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         for u_id, email, name, role in users:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO users (user_id, tenant_id, email, name, role, status, created_at)
+                INSERT INTO users (user_id, tenant_id, email, name, role, status, created_at)
                 VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    email = EXCLUDED.email,
+                    name = EXCLUDED.name,
+                    role = EXCLUDED.role,
+                    status = EXCLUDED.status
                 """,
                 (u_id, SIM_TENANT_ID, email, name, role, now)
             )
@@ -156,10 +187,20 @@ def seed_synthetic_enterprise(db_path: str) -> Dict[str, Any]:
         # 5. Corporate Budgets
         conn.execute(
             """
-            INSERT OR REPLACE INTO enterprise_budgets (
+            INSERT INTO enterprise_budgets (
                 entity_id, entity_type, tenant_id, company_id, allocated_usd,
                 spent_usd, soft_limit_pct, hard_limit_pct, is_frozen, created_at, updated_at
             ) VALUES (?, 'COMPANY', ?, ?, 10000000.0, 150000.0, 80.0, 100.0, 0, ?, ?)
+            ON CONFLICT (entity_id) DO UPDATE SET
+                entity_type = EXCLUDED.entity_type,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                allocated_usd = EXCLUDED.allocated_usd,
+                spent_usd = EXCLUDED.spent_usd,
+                soft_limit_pct = EXCLUDED.soft_limit_pct,
+                hard_limit_pct = EXCLUDED.hard_limit_pct,
+                is_frozen = EXCLUDED.is_frozen,
+                updated_at = EXCLUDED.updated_at
             """,
             (f"bdg_master_{SIM_COMPANY_ID}", SIM_TENANT_ID, SIM_COMPANY_ID, now, now)
         )

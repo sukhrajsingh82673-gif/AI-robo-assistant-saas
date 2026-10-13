@@ -58,8 +58,18 @@ class PooledConnection:
             return self.raw_conn.execute(sql, params)
         else:
             # PostgreSQL protocol simulation / driver execution
+            from core.db import normalize_sql_for_postgres
+            norm_sql = normalize_sql_for_postgres(sql)
+            if not norm_sql:
+                class DummyCursor:
+                    def fetchone(self): return None
+                    def fetchall(self): return []
+                    @property
+                    def rowcount(self): return 0
+                    def __iter__(self): return iter([])
+                return DummyCursor()
             cursor = self.raw_conn.cursor()
-            cursor.execute(sql, params)
+            cursor.execute(norm_sql, params)
             return cursor
 
     def commit(self):

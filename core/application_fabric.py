@@ -67,10 +67,19 @@ class ApplicationDiscoveryEngine:
                 with db.get_connection() as conn:
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO installed_applications (
+                        INSERT INTO installed_applications (
                             app_id, host_id, name, version, publisher, exec_path,
                             automation_interfaces, security_status, discovered_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (app_id) DO UPDATE SET
+                            host_id = EXCLUDED.host_id,
+                            name = EXCLUDED.name,
+                            version = EXCLUDED.version,
+                            publisher = EXCLUDED.publisher,
+                            exec_path = EXCLUDED.exec_path,
+                            automation_interfaces = EXCLUDED.automation_interfaces,
+                            security_status = EXCLUDED.security_status,
+                            discovered_at = EXCLUDED.discovered_at
                         """,
                         (
                             app_id, self.host_id, app_name, version, publisher,

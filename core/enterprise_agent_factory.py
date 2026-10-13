@@ -269,13 +269,34 @@ class EnterpriseAgentFactory:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO agent_blueprints (
+            INSERT INTO agent_blueprints (
                 blueprint_id, tenant_id, company_id, name, role, department,
                 mission, responsibilities, capabilities, tools, knowledge_sources,
                 memory_policy, autonomy_level, budget_limit, spending_currency,
                 approval_threshold, reporting_manager, kpis, status, test_score,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (blueprint_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                name = EXCLUDED.name,
+                role = EXCLUDED.role,
+                department = EXCLUDED.department,
+                mission = EXCLUDED.mission,
+                responsibilities = EXCLUDED.responsibilities,
+                capabilities = EXCLUDED.capabilities,
+                tools = EXCLUDED.tools,
+                knowledge_sources = EXCLUDED.knowledge_sources,
+                memory_policy = EXCLUDED.memory_policy,
+                autonomy_level = EXCLUDED.autonomy_level,
+                budget_limit = EXCLUDED.budget_limit,
+                spending_currency = EXCLUDED.spending_currency,
+                approval_threshold = EXCLUDED.approval_threshold,
+                reporting_manager = EXCLUDED.reporting_manager,
+                kpis = EXCLUDED.kpis,
+                status = EXCLUDED.status,
+                test_score = EXCLUDED.test_score,
+                updated_at = EXCLUDED.updated_at
             """, (
                 bp.blueprint_id, self.tenant_id, company_id, bp.name, bp.role,
                 bp.department, bp.mission, json.dumps(bp.responsibilities),

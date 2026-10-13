@@ -66,9 +66,16 @@ class KillSwitchMatrix:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO enterprise_killswitch_matrix (
+                INSERT INTO enterprise_killswitch_matrix (
                     switch_id, level, target_id, reason, activated_by, activated_at, is_active
                 ) VALUES (?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT (switch_id) DO UPDATE SET
+                    level = EXCLUDED.level,
+                    target_id = EXCLUDED.target_id,
+                    reason = EXCLUDED.reason,
+                    activated_by = EXCLUDED.activated_by,
+                    activated_at = EXCLUDED.activated_at,
+                    is_active = 1
             """, (switch_id, level, target_id, reason, activated_by, now))
             conn.commit()
             logger.warning(f"KILLSWITCH ENGAGED: Level={level}, Target={target_id}, Reason={reason}")

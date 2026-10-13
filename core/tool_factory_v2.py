@@ -126,12 +126,25 @@ class ToolFactoryV2:
             ))
 
             conn.execute("""
-            INSERT OR REPLACE INTO governed_tools (
+            INSERT INTO governed_tools (
                 tool_id, name, version, tenant_id, company_id,
                 source_type, risk_class, input_schema, output_schema,
                 filesystem_policy, network_policy, lifecycle_state,
                 security_status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 'CERTIFIED', ?)
+            ON CONFLICT (tool_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                version = EXCLUDED.version,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                source_type = EXCLUDED.source_type,
+                risk_class = EXCLUDED.risk_class,
+                input_schema = EXCLUDED.input_schema,
+                output_schema = EXCLUDED.output_schema,
+                filesystem_policy = EXCLUDED.filesystem_policy,
+                network_policy = EXCLUDED.network_policy,
+                lifecycle_state = EXCLUDED.lifecycle_state,
+                security_status = EXCLUDED.security_status
             """, (
                 tool_id, name, version, tenant_id, "default_company",
                 "SOURCE", risk_class, "{}", "{}",

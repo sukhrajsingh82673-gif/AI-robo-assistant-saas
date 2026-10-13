@@ -146,12 +146,27 @@ class AgentFactoryV2:
 
             # Register in governed_agents
             conn.execute("""
-            INSERT OR REPLACE INTO governed_agents (
+            INSERT INTO governed_agents (
                 agent_id, name, version, tenant_id, company_id, role,
                 parent_agent_id, delegation_depth, capabilities, allowed_tools,
                 resource_budget, lifecycle_state, health_status, is_quarantined,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 'HEALTHY', 0, ?, ?)
+            ON CONFLICT (agent_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                version = EXCLUDED.version,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                role = EXCLUDED.role,
+                parent_agent_id = EXCLUDED.parent_agent_id,
+                delegation_depth = EXCLUDED.delegation_depth,
+                capabilities = EXCLUDED.capabilities,
+                allowed_tools = EXCLUDED.allowed_tools,
+                resource_budget = EXCLUDED.resource_budget,
+                lifecycle_state = EXCLUDED.lifecycle_state,
+                health_status = EXCLUDED.health_status,
+                is_quarantined = EXCLUDED.is_quarantined,
+                updated_at = EXCLUDED.updated_at
             """, (
                 agent_id, role, version, tenant_id, company_id, role,
                 parent_agent_id, 0, json.dumps(capabilities), json.dumps(allowed_tools),

@@ -60,11 +60,20 @@ class CostGovernor:
 
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO enterprise_budget_allocations (
+                INSERT INTO enterprise_budget_allocations (
                     budget_id, tenant_id, company_id, scope_type, scope_id,
                     allocated_budget_inr, spent_inr, soft_limit_pct,
                     hard_limit_inr, status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, 0.0, 0.8, ?, 'ACTIVE', ?, ?)
+                ON CONFLICT (budget_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    scope_type = EXCLUDED.scope_type,
+                    scope_id = EXCLUDED.scope_id,
+                    allocated_budget_inr = EXCLUDED.allocated_budget_inr,
+                    hard_limit_inr = EXCLUDED.hard_limit_inr,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
             """, (budget_id, self.tenant_id, company_id, scope_type, scope_id, allocated_inr, hard_limit, now, now))
             conn.commit()
 

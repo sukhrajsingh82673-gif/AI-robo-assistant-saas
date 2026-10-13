@@ -144,11 +144,26 @@ class IdentityGateway:
         )
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_identities (
+            INSERT INTO enterprise_identities (
                 identity_id, identity_type, tenant_id, company_id, email,
                 display_name, roles, groups, departments, status,
                 auth_method, mfa_verified, created_at, updated_at, offboarded_at, metadata
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (identity_id) DO UPDATE SET
+                identity_type = EXCLUDED.identity_type,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                email = EXCLUDED.email,
+                display_name = EXCLUDED.display_name,
+                roles = EXCLUDED.roles,
+                groups = EXCLUDED.groups,
+                departments = EXCLUDED.departments,
+                status = EXCLUDED.status,
+                auth_method = EXCLUDED.auth_method,
+                mfa_verified = EXCLUDED.mfa_verified,
+                updated_at = EXCLUDED.updated_at,
+                offboarded_at = EXCLUDED.offboarded_at,
+                metadata = EXCLUDED.metadata
             """, (
                 ident.identity_id, ident.identity_type, ident.tenant_id, ident.company_id, ident.email,
                 ident.display_name, json.dumps(ident.roles), json.dumps(ident.groups), json.dumps(ident.departments),

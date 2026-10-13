@@ -130,12 +130,29 @@ class KPIKRAEngine:
         """Register a formal KPI specification for an employee."""
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO employee_kpis (
+            INSERT INTO employee_kpis (
                 kpi_id, tenant_id, company_id, employee_id, name, definition,
                 unit, target_value, threshold_value, measurement_frequency,
                 data_source, owner, calculation_method, minimum_acceptable_value,
                 warning_threshold, escalation_threshold, verification_method, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (kpi_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                employee_id = EXCLUDED.employee_id,
+                name = EXCLUDED.name,
+                definition = EXCLUDED.definition,
+                unit = EXCLUDED.unit,
+                target_value = EXCLUDED.target_value,
+                threshold_value = EXCLUDED.threshold_value,
+                measurement_frequency = EXCLUDED.measurement_frequency,
+                data_source = EXCLUDED.data_source,
+                owner = EXCLUDED.owner,
+                calculation_method = EXCLUDED.calculation_method,
+                minimum_acceptable_value = EXCLUDED.minimum_acceptable_value,
+                warning_threshold = EXCLUDED.warning_threshold,
+                escalation_threshold = EXCLUDED.escalation_threshold,
+                verification_method = EXCLUDED.verification_method
             """, (
                 kpi.kpi_id, kpi.tenant_id, kpi.company_id, kpi.employee_id,
                 kpi.name, kpi.definition, kpi.unit, kpi.target_value,
@@ -150,11 +167,23 @@ class KPIKRAEngine:
         """Register a formal KRA specification for an employee."""
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO employee_kras (
+            INSERT INTO employee_kras (
                 kra_id, tenant_id, company_id, employee_id, name, responsibility,
                 associated_workflows, associated_kpi_ids, allowed_tools,
                 authority_scope, escalation_rules, expected_outcomes, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (kra_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                employee_id = EXCLUDED.employee_id,
+                name = EXCLUDED.name,
+                responsibility = EXCLUDED.responsibility,
+                associated_workflows = EXCLUDED.associated_workflows,
+                associated_kpi_ids = EXCLUDED.associated_kpi_ids,
+                allowed_tools = EXCLUDED.allowed_tools,
+                authority_scope = EXCLUDED.authority_scope,
+                escalation_rules = EXCLUDED.escalation_rules,
+                expected_outcomes = EXCLUDED.expected_outcomes
             """, (
                 kra.kra_id, kra.tenant_id, kra.company_id, kra.employee_id,
                 kra.name, kra.responsibility, json.dumps(kra.associated_workflows),

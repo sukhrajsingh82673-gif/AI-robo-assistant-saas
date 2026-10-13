@@ -189,10 +189,20 @@ class WorkforceIntelligenceEngine:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO employees (
+                INSERT INTO employees (
                     agent_id, company_id, tenant_id, role, department, manager,
                     budget_limit, spending_limit, authority_ceiling, working_state, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (agent_id) DO UPDATE SET
+                    company_id = EXCLUDED.company_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    role = EXCLUDED.role,
+                    department = EXCLUDED.department,
+                    manager = EXCLUDED.manager,
+                    budget_limit = EXCLUDED.budget_limit,
+                    spending_limit = EXCLUDED.spending_limit,
+                    authority_ceiling = EXCLUDED.authority_ceiling,
+                    working_state = EXCLUDED.working_state
                 """,
                 (
                     agent_id, self.company_id, self.tenant_id, role_name,
@@ -203,10 +213,16 @@ class WorkforceIntelligenceEngine:
             # Initialize performance record
             conn.execute(
                 """
-                INSERT OR REPLACE INTO employee_performance_records (
+                INSERT INTO employee_performance_records (
                     record_id, tenant_id, company_id, agent_id, missions_completed,
                     verification_rate, failures, avg_cost, business_contribution, recommendation, updated_at
                 ) VALUES (?, ?, ?, ?, 0, 1.0, 0, 0.0, 0.0, 'NEW_ONBOARDING', ?)
+                ON CONFLICT (record_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    agent_id = EXCLUDED.agent_id,
+                    recommendation = EXCLUDED.recommendation,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (f"perf_{agent_id}", self.tenant_id, self.company_id, agent_id, created_at)
             )

@@ -148,11 +148,14 @@ class TestAdversarialSecurityAndChaos(unittest.TestCase):
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO temporal_workers (
+                INSERT INTO temporal_workers (
                     worker_id, tenant_id, company_id, task_queue, capability_scope,
                     status, runtime_version, worker_version, supported_activities,
                     max_concurrent_activities, max_concurrent_workflows, heartbeat_at, created_at, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (worker_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    heartbeat_at = EXCLUDED.heartbeat_at
                 """,
                 (
                     stalled_id, self.tenant_id, self.company_id, "q_high", "DEFAULT",

@@ -613,10 +613,20 @@ class CompanyApiService:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO company_processes (
+                INSERT INTO company_processes (
                     process_id, company_id, tenant_id, title, category,
                     trigger_type, sla, owner_role, stages, status, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (process_id) DO UPDATE SET
+                    company_id = EXCLUDED.company_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    title = EXCLUDED.title,
+                    category = EXCLUDED.category,
+                    trigger_type = EXCLUDED.trigger_type,
+                    sla = EXCLUDED.sla,
+                    owner_role = EXCLUDED.owner_role,
+                    stages = EXCLUDED.stages,
+                    status = EXCLUDED.status
                 """,
                 (pid, company_id, tenant_id, title, category, trigger, sla, owner, json.dumps(stages), status, now)
             )

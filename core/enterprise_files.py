@@ -131,12 +131,29 @@ class EnterpriseFilesEngine:
 
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_files (
+            INSERT INTO enterprise_files (
                 file_id, tenant_id, company_id, department, name, category,
                 document_type, size_bytes, sha256, classification, version,
                 storage_path, linked_records, tags, uploaded_by, summary,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (file_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                department = EXCLUDED.department,
+                name = EXCLUDED.name,
+                category = EXCLUDED.category,
+                document_type = EXCLUDED.document_type,
+                size_bytes = EXCLUDED.size_bytes,
+                sha256 = EXCLUDED.sha256,
+                classification = EXCLUDED.classification,
+                version = EXCLUDED.version,
+                storage_path = EXCLUDED.storage_path,
+                linked_records = EXCLUDED.linked_records,
+                tags = EXCLUDED.tags,
+                uploaded_by = EXCLUDED.uploaded_by,
+                summary = EXCLUDED.summary,
+                updated_at = EXCLUDED.updated_at
             """, (
                 fid, self.tenant_id, data.get("company_id", "comp_primary"),
                 dept, name, cat, dtype, size, sha,

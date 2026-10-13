@@ -501,10 +501,19 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
 
             conn.execute(
                 """
-                INSERT OR REPLACE INTO workflow_resource_locks (
+                INSERT INTO workflow_resource_locks (
                     lock_id, resource_id, resource_type, workflow_id, run_id,
                     tenant_id, company_id, acquired_at, expires_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (lock_id) DO UPDATE SET
+                    resource_id = EXCLUDED.resource_id,
+                    resource_type = EXCLUDED.resource_type,
+                    workflow_id = EXCLUDED.workflow_id,
+                    run_id = EXCLUDED.run_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    acquired_at = EXCLUDED.acquired_at,
+                    expires_at = EXCLUDED.expires_at
                 """,
                 (lock_id, resource_id, resource_type, workflow_id, run_id, self.tenant_id, company_id, now, expires_at)
             )
@@ -534,7 +543,7 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO workflows (
+                INSERT INTO workflows (
                     workflow_id, tenant_id, company_id, workspace_id, mission_id, task_id,
                     name, workflow_version, runtime_provider, status, current_node,
                     state_version, owner, agent_id, approval_state, risk_level,
@@ -542,6 +551,30 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
                     retry_policy, verification_policy, evidence_policy,
                     created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'LANGGRAPH', ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workflow_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    workspace_id = EXCLUDED.workspace_id,
+                    mission_id = EXCLUDED.mission_id,
+                    task_id = EXCLUDED.task_id,
+                    name = EXCLUDED.name,
+                    workflow_version = EXCLUDED.workflow_version,
+                    runtime_provider = EXCLUDED.runtime_provider,
+                    status = EXCLUDED.status,
+                    current_node = EXCLUDED.current_node,
+                    state_version = EXCLUDED.state_version,
+                    owner = EXCLUDED.owner,
+                    agent_id = EXCLUDED.agent_id,
+                    approval_state = EXCLUDED.approval_state,
+                    risk_level = EXCLUDED.risk_level,
+                    graph_definition = EXCLUDED.graph_definition,
+                    graph_definition_hash = EXCLUDED.graph_definition_hash,
+                    budget = EXCLUDED.budget,
+                    timeout = EXCLUDED.timeout,
+                    retry_policy = EXCLUDED.retry_policy,
+                    verification_policy = EXCLUDED.verification_policy,
+                    evidence_policy = EXCLUDED.evidence_policy,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     workflow_id, self.tenant_id, company_id, metadata.get("workspace_id"),

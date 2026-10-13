@@ -430,12 +430,28 @@ class MultimodalCapabilityRegistry:
             for c in caps:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO multimodal_capabilities (
+                    INSERT INTO multimodal_capabilities (
                         capability_id, tenant_id, provider, family, name, version,
                         platform, risk_level, requires_approval, permissions,
                         execution_mode, evidence_requirements, health_status,
                         latency_ms, is_enabled, metadata, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, '["SHA256_HASH", "AUDIT_RECORD"]', ?, ?, 1, ?, ?)
+                    ON CONFLICT (tenant_id, capability_id) DO UPDATE SET
+                        provider = EXCLUDED.provider,
+                        family = EXCLUDED.family,
+                        name = EXCLUDED.name,
+                        version = EXCLUDED.version,
+                        platform = EXCLUDED.platform,
+                        risk_level = EXCLUDED.risk_level,
+                        requires_approval = EXCLUDED.requires_approval,
+                        permissions = EXCLUDED.permissions,
+                        execution_mode = EXCLUDED.execution_mode,
+                        evidence_requirements = EXCLUDED.evidence_requirements,
+                        health_status = EXCLUDED.health_status,
+                        latency_ms = EXCLUDED.latency_ms,
+                        is_enabled = EXCLUDED.is_enabled,
+                        metadata = EXCLUDED.metadata,
+                        updated_at = EXCLUDED.updated_at
                     """,
                     (
                         c["id"], self.tenant_id, c["provider"], c["family"], c["name"],

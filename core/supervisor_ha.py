@@ -212,10 +212,20 @@ class CompanySupervisorHA:
         try:
             with engine.transaction(workload=WorkloadType.CONTROL_PLANE) as conn:
                 conn.execute("""
-                INSERT OR REPLACE INTO supervisor_heartbeats
-                (tenant_id, company_id, node_id, tick_count, status, last_tick)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, (self.tenant_id, self.company_id, self.node_id, self.tick_count, "HEALTHY", now))
+                INSERT INTO supervisor_heartbeats
+                (heartbeat_id, tenant_id, company_id, tick_number, health_score, active_schedules, active_workers, disk_status, anomalies_detected, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (heartbeat_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    tick_number = EXCLUDED.tick_number,
+                    health_score = EXCLUDED.health_score,
+                    active_schedules = EXCLUDED.active_schedules,
+                    active_workers = EXCLUDED.active_workers,
+                    disk_status = EXCLUDED.disk_status,
+                    anomalies_detected = EXCLUDED.anomalies_detected,
+                    timestamp = EXCLUDED.timestamp
+                """, (f"hb_{self.node_id}", self.tenant_id, self.company_id, self.tick_count, 1.0, 0, 0, "HEALTHY", self.anomalies_detected, now))
         except Exception:
             pass
 

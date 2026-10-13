@@ -943,7 +943,7 @@ class MCPGateway:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_tools (
+                INSERT INTO mcp_tools (
                     tool_id, server_id, tenant_id, company_id, name, description,
                     input_schema, output_schema, risk_class, data_classification,
                     required_scopes, required_permissions, allowed_agents, allowed_workflows,
@@ -951,6 +951,30 @@ class MCPGateway:
                     rate_limit, timeout, reversibility, idempotency, side_effect_class,
                     status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tool_id) DO UPDATE SET
+                    server_id = EXCLUDED.server_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    input_schema = EXCLUDED.input_schema,
+                    output_schema = EXCLUDED.output_schema,
+                    risk_class = EXCLUDED.risk_class,
+                    data_classification = EXCLUDED.data_classification,
+                    required_scopes = EXCLUDED.required_scopes,
+                    required_permissions = EXCLUDED.required_permissions,
+                    allowed_agents = EXCLUDED.allowed_agents,
+                    allowed_workflows = EXCLUDED.allowed_workflows,
+                    approval_requirement = EXCLUDED.approval_requirement,
+                    verification_requirement = EXCLUDED.verification_requirement,
+                    cost_model = EXCLUDED.cost_model,
+                    rate_limit = EXCLUDED.rate_limit,
+                    timeout = EXCLUDED.timeout,
+                    reversibility = EXCLUDED.reversibility,
+                    idempotency = EXCLUDED.idempotency,
+                    side_effect_class = EXCLUDED.side_effect_class,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     tool_id, server_id, self.tenant_id, self.company_id, name, description,
@@ -1091,11 +1115,24 @@ class MCPGateway:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_resources (
+                INSERT INTO mcp_resources (
                     resource_id, server_id, tenant_id, company_id, uri, name,
                     description, mime_type, data_classification, required_scopes,
                     approval_required, metadata, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (resource_id) DO UPDATE SET
+                    server_id = EXCLUDED.server_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    uri = EXCLUDED.uri,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    mime_type = EXCLUDED.mime_type,
+                    data_classification = EXCLUDED.data_classification,
+                    required_scopes = EXCLUDED.required_scopes,
+                    approval_required = EXCLUDED.approval_required,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     res_id, server_id, self.tenant_id, self.company_id, uri, name,
@@ -1716,11 +1753,24 @@ class ZonataMcpServer:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_published_capabilities (
+                INSERT INTO mcp_published_capabilities (
                     published_id, tenant_id, company_id, capability_id, name,
                     description, schema_definition, visibility, allowed_clients,
                     rate_limit_per_min, approval_required, status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (published_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    capability_id = EXCLUDED.capability_id,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    schema_definition = EXCLUDED.schema_definition,
+                    visibility = EXCLUDED.visibility,
+                    allowed_clients = EXCLUDED.allowed_clients,
+                    rate_limit_per_min = EXCLUDED.rate_limit_per_min,
+                    approval_required = EXCLUDED.approval_required,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     pub_id, self.tenant_id, self.company_id, capability_id, name,

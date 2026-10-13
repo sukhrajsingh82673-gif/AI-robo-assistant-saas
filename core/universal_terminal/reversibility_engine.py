@@ -262,10 +262,19 @@ class ReversibilityAndCheckpointEngine:
         t_id = tenant_id or self.tenant_id
         with self._get_connection() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO terminal_checkpoints (
+                """INSERT INTO terminal_checkpoints (
                     checkpoint_id, session_id, task_id, mission_id, agent_id,
                     status, created_at, updated_at, checkpoint_json, tenant_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (checkpoint_id) DO UPDATE SET
+                    session_id = EXCLUDED.session_id,
+                    task_id = EXCLUDED.task_id,
+                    mission_id = EXCLUDED.mission_id,
+                    agent_id = EXCLUDED.agent_id,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at,
+                    checkpoint_json = EXCLUDED.checkpoint_json,
+                    tenant_id = EXCLUDED.tenant_id""",
                 (
                     checkpoint.checkpoint_id, checkpoint.session_id, checkpoint.task_id,
                     checkpoint.mission_id, checkpoint.agent_id, checkpoint.status,

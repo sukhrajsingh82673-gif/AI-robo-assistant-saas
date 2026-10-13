@@ -170,13 +170,30 @@ class BackgroundMissionDispatcher:
         try:
             with self._get_connection() as conn:
                 conn.execute("""
-                INSERT OR REPLACE INTO coworker_background_missions (
+                INSERT INTO coworker_background_missions (
                     mission_id, tenant_id, company_id, initiator, prompt,
                     status, progress_percent, current_stage, subworkers_json,
                     runtimes_json, deliverables_json, evidence_id,
                     notification_message, timeline_json, human_control,
                     created_at, updated_at, completed_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (mission_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    initiator = EXCLUDED.initiator,
+                    prompt = EXCLUDED.prompt,
+                    status = EXCLUDED.status,
+                    progress_percent = EXCLUDED.progress_percent,
+                    current_stage = EXCLUDED.current_stage,
+                    subworkers_json = EXCLUDED.subworkers_json,
+                    runtimes_json = EXCLUDED.runtimes_json,
+                    deliverables_json = EXCLUDED.deliverables_json,
+                    evidence_id = EXCLUDED.evidence_id,
+                    notification_message = EXCLUDED.notification_message,
+                    timeline_json = EXCLUDED.timeline_json,
+                    human_control = EXCLUDED.human_control,
+                    updated_at = EXCLUDED.updated_at,
+                    completed_at = EXCLUDED.completed_at
                 """, (
                     mission.mission_id, mission.tenant_id, mission.company_id,
                     mission.initiator, mission.prompt, mission.status,

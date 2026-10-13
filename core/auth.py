@@ -160,7 +160,7 @@ class TokenRevocationStore:
         try:
             with db.get_connection() as conn:
                 conn.execute(
-                    "INSERT OR REPLACE INTO auth_revoked_tokens (token_id, revoked_at) VALUES (?, ?)",
+                    "INSERT INTO auth_revoked_tokens (token_id, revoked_at) VALUES (?, ?) ON CONFLICT (token_id) DO UPDATE SET revoked_at = EXCLUDED.revoked_at",
                     (token_id, time.time())
                 )
                 conn.commit()

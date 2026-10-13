@@ -686,9 +686,12 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO automation_connector_idempotency (
+                INSERT INTO automation_connector_idempotency (
                     idempotency_key, connector_id, operation, tenant_id, status, parameters, created_at
                 ) VALUES (?, 'conn_erpnext_records', 'create_purchase_order', ?, 'IN_FLIGHT', ?, ?)
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    parameters = EXCLUDED.parameters
             """, (idemp_key, self.tenant_a, json.dumps({"amount": 7500.0, "supplier": "VENDOR_XEON"}), now))
             conn.commit()
 

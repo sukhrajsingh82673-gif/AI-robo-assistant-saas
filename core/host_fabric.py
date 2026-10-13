@@ -108,9 +108,16 @@ class UniversalHostAgent:
                 cap_id = f"cap_{self.host_id}_{cap}"
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO host_capabilities (
+                    INSERT INTO host_capabilities (
                         cap_id, host_id, capability_name, category, authority_required, enabled, verified_at
                     ) VALUES (?, ?, ?, ?, ?, 1, ?)
+                    ON CONFLICT (cap_id) DO UPDATE SET
+                        host_id = EXCLUDED.host_id,
+                        capability_name = EXCLUDED.capability_name,
+                        category = EXCLUDED.category,
+                        authority_required = EXCLUDED.authority_required,
+                        enabled = EXCLUDED.enabled,
+                        verified_at = EXCLUDED.verified_at
                     """,
                     (cap_id, self.host_id, cap, cat, auth, time.time())
                 )

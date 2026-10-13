@@ -368,9 +368,13 @@ class UniversalAutomationFabric:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO automation_revoked_leases (
+                INSERT INTO automation_revoked_leases (
                     lease_id, tenant_id, reason, revoked_at
                 ) VALUES (?, ?, ?, ?)
+                ON CONFLICT (lease_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    reason = EXCLUDED.reason,
+                    revoked_at = EXCLUDED.revoked_at
             """, (lease_id, tenant_id, reason, now))
             conn.commit()
 

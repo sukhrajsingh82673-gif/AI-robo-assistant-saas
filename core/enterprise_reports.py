@@ -143,12 +143,28 @@ class EnterpriseReportsEngine:
 
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_reports (
+            INSERT INTO enterprise_reports (
                 report_id, tenant_id, company_id, title, report_category,
                 frequency, verification_state, metrics, dimensions, chart_data,
                 forecast_data, ai_executive_summary, data_freshness_seconds,
                 generated_by, export_formats, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (report_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                title = EXCLUDED.title,
+                report_category = EXCLUDED.report_category,
+                frequency = EXCLUDED.frequency,
+                verification_state = EXCLUDED.verification_state,
+                metrics = EXCLUDED.metrics,
+                dimensions = EXCLUDED.dimensions,
+                chart_data = EXCLUDED.chart_data,
+                forecast_data = EXCLUDED.forecast_data,
+                ai_executive_summary = EXCLUDED.ai_executive_summary,
+                data_freshness_seconds = EXCLUDED.data_freshness_seconds,
+                generated_by = EXCLUDED.generated_by,
+                export_formats = EXCLUDED.export_formats,
+                updated_at = EXCLUDED.updated_at
             """, (
                 rid, self.tenant_id, data.get("company_id", "comp_primary"),
                 title, cat, data.get("frequency", "MONTHLY"),

@@ -75,6 +75,12 @@ SUITES_CONFIG = [
         "name": "Frontend Navigation, Route Mapping & Workspace Integrity",
         "category": "Frontend Navigation / View Routing",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_postgresql_dialect_compatibility.py",
+        "name": "PostgreSQL SQL Dialect & ANSI ON CONFLICT Compatibility",
+        "category": "Database Integration / Dialect Compatibility",
+        "type": "automated"
     }
 ]
 

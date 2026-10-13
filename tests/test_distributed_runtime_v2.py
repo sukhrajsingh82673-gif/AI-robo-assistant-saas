@@ -43,7 +43,7 @@ class TestDistributedRuntimeV2(unittest.TestCase):
 
         # Insert test versioned record into optimistic_lock_registry
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
-            conn.execute("INSERT OR REPLACE INTO optimistic_lock_registry (table_name, version_column, created_at) VALUES ('test_entity', 'version', ?)", (time.time(),))
+            conn.execute("INSERT INTO optimistic_lock_registry (table_name, version_column, created_at) VALUES ('test_entity', 'version', ?) ON CONFLICT (table_name) DO UPDATE SET version_column = EXCLUDED.version_column", (time.time(),))
 
     def test_02_distributed_coordination_locks_leases_and_idempotency(self):
         """Verify distributed locks enforce leases, renewal, and mutual exclusion."""

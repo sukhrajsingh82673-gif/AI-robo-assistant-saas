@@ -3181,14 +3181,25 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             comp.missions.append(mis)
 
-            # Persist mission into SQLite
+            # Persist mission into database
             with db.get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO missions (
+                    INSERT INTO missions (
                         mission_id, company_id, tenant_id, title, owner_agent,
                         department, target_outcome, status, progress, verification_summary, started_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (mission_id) DO UPDATE SET
+                        company_id = EXCLUDED.company_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        title = EXCLUDED.title,
+                        owner_agent = EXCLUDED.owner_agent,
+                        department = EXCLUDED.department,
+                        target_outcome = EXCLUDED.target_outcome,
+                        status = EXCLUDED.status,
+                        progress = EXCLUDED.progress,
+                        verification_summary = EXCLUDED.verification_summary,
+                        started_at = EXCLUDED.started_at
                     """,
                     (
                         mis.mission_id, comp.company_id, tenant_id, mis.title, mis.owner_agent,
@@ -3231,14 +3242,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             )
             comp.workforce[contract.agent_id] = contract
 
-            # Persist employee into SQLite
+            # Persist employee into database
             with db.get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO employees (
+                    INSERT INTO employees (
                         agent_id, company_id, tenant_id, role, department, manager,
                         budget_limit, spending_limit, authority_ceiling, working_state, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (agent_id) DO UPDATE SET
+                        company_id = EXCLUDED.company_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        role = EXCLUDED.role,
+                        department = EXCLUDED.department,
+                        manager = EXCLUDED.manager,
+                        budget_limit = EXCLUDED.budget_limit,
+                        spending_limit = EXCLUDED.spending_limit,
+                        authority_ceiling = EXCLUDED.authority_ceiling,
+                        working_state = EXCLUDED.working_state
                     """,
                     (
                         contract.agent_id, comp.company_id, tenant_id, contract.role,
