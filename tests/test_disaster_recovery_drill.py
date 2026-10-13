@@ -24,21 +24,33 @@ from core.db import db, configure_isolated_test_db
 from core.enterprise_crm import EnterpriseCrmService
 
 MODULE_TEMP_DIR = None
+MODULE_ORIG_DB_PATH = None
+MODULE_ORIG_ENV_DB_PATH = None
 
 def setUpModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_ORIG_ENV_DB_PATH = os.environ.get("ZONATA_DB_PATH")
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "dr_module_isolated.db")
     configure_isolated_test_db(isolated_db)
 
 def tearDownModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+    if MODULE_ORIG_ENV_DB_PATH is not None:
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_ENV_DB_PATH
+    else:
+        os.environ.pop("ZONATA_DB_PATH", None)
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()
 
 
 class TestDisasterRecoveryDrill(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
+        self.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
         self.test_dir = tempfile.TemporaryDirectory()
         self.live_db_path = os.path.join(self.test_dir.name, "live_production.db")
         self.backup_dir = os.path.join(self.test_dir.name, "backups")
@@ -58,6 +70,13 @@ class TestDisasterRecoveryDrill(unittest.TestCase):
         self.crm_beta = EnterpriseCrmService(tenant_id="tnt_dr_beta")
 
     def tearDown(self):
+        if hasattr(self, "orig_db_path") and self.orig_db_path:
+            db.set_db_path(self.orig_db_path)
+        if hasattr(self, "orig_env_db_path"):
+            if self.orig_env_db_path is not None:
+                os.environ["ZONATA_DB_PATH"] = self.orig_env_db_path
+            else:
+                os.environ.pop("ZONATA_DB_PATH", None)
         try:
             self.test_dir.cleanup()
         except Exception:

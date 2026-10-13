@@ -247,7 +247,7 @@ class EnterpriseCrmService:
         if cust_id:
             cust = self.get_customer(cust_id)
             if not cust:
-                raise ValueError(f"Direct Object Access Violation: Customer '{cust_id}' not found in tenant '{self.tenant_id}'")
+                raise ValueError(f"Direct Object Access Violation: Customer '{cust_id}' not found in current organization")
 
         now = time.time()
         with db.get_connection() as conn:
@@ -288,6 +288,44 @@ class EnterpriseCrmService:
             updated = cur.rowcount > 0
             conn.commit()
         return {"deal_id": deal_id, "stage": stage, "updated_at": now, "updated": updated}
+
+    def update_deal(self, deal_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Updates deal attributes, strictly validating tenant ownership and referenced customer."""
+        now = time.time()
+        with db.get_connection() as conn:
+            existing = conn.execute(
+                "SELECT deal_id, customer_id FROM crm_deals WHERE deal_id = ? AND tenant_id = ?",
+                (deal_id, self.tenant_id)
+            ).fetchone()
+            if not existing:
+                raise KeyError(f"Deal '{deal_id}' not found in tenant '{self.tenant_id}'")
+
+            if "customer_id" in data and data["customer_id"]:
+                new_cust_id = data["customer_id"]
+                cust = self.get_customer(new_cust_id)
+                if not cust:
+                    raise ValueError(f"Direct Object Access Violation: Customer '{new_cust_id}' not found in current organization")
+
+            updates = []
+            params = []
+            for field in ["title", "stage", "closing_date", "owner", "customer_id"]:
+                if field in data:
+                    updates.append(f"{field} = ?")
+                    params.append(data[field])
+            for num_field in ["value", "probability"]:
+                if num_field in data:
+                    updates.append(f"{num_field} = ?")
+                    params.append(_parse_float(data[num_field]))
+
+            if updates:
+                updates.append("updated_at = ?")
+                params.append(now)
+                params.extend([deal_id, self.tenant_id])
+                query = f"UPDATE crm_deals SET {', '.join(updates)} WHERE deal_id = ? AND tenant_id = ?"
+                conn.execute(query, params)
+                conn.commit()
+
+        return self.get_deal(deal_id) or {"deal_id": deal_id, "updated": True}
 
     def delete_deal(self, deal_id: str) -> bool:
         """Deletes deal, verifying tenant ownership."""

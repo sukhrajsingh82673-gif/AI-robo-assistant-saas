@@ -20,21 +20,33 @@ from core.db import db, configure_isolated_test_db
 from core.enterprise_crm import EnterpriseCrmService
 
 MODULE_TEMP_DIR = None
+MODULE_ORIG_DB_PATH = None
+MODULE_ORIG_ENV_DB_PATH = None
 
 def setUpModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_ORIG_ENV_DB_PATH = os.environ.get("ZONATA_DB_PATH")
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "crm_test_isolated.db")
     configure_isolated_test_db(isolated_db)
 
 def tearDownModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+    if MODULE_ORIG_ENV_DB_PATH is not None:
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_ENV_DB_PATH
+    else:
+        os.environ.pop("ZONATA_DB_PATH", None)
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()
 
 
 class TestCrmPersistence(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
+        self.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
         self.temp_db_fd, self.temp_db_path = tempfile.mkstemp(suffix=".db")
         os.environ["ZONATA_DB_PATH"] = self.temp_db_path
         self.db = db
@@ -50,6 +62,13 @@ class TestCrmPersistence(unittest.TestCase):
         self.crm_beta = EnterpriseCrmService(tenant_id="tnt_beta")
 
     def tearDown(self):
+        if hasattr(self, "orig_db_path") and self.orig_db_path:
+            db.set_db_path(self.orig_db_path)
+        if hasattr(self, "orig_env_db_path"):
+            if self.orig_env_db_path is not None:
+                os.environ["ZONATA_DB_PATH"] = self.orig_env_db_path
+            else:
+                os.environ.pop("ZONATA_DB_PATH", None)
         try:
             os.close(self.temp_db_fd)
             if os.path.exists(self.temp_db_path):

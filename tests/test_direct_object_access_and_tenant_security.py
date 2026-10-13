@@ -27,26 +27,41 @@ from core.auth import (
     verify_password_with_upgrade,
     evaluate_secret_entropy,
     get_auth_secret_key,
-    get_verification_keys
+    get_verification_keys,
+    emergency_retire_previous_secret,
+    generate_secure_auth_secret,
+    verify_password_with_upgrade
 )
 from core.enterprise_crm import EnterpriseCrmService
 
 MODULE_TEMP_DIR = None
+MODULE_ORIG_DB_PATH = None
+MODULE_ORIG_ENV_DB_PATH = None
 
 def setUpModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_ORIG_ENV_DB_PATH = os.environ.get("ZONATA_DB_PATH")
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "idor_test_isolated.db")
     configure_isolated_test_db(isolated_db)
 
 def tearDownModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+    if MODULE_ORIG_ENV_DB_PATH is not None:
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_ENV_DB_PATH
+    else:
+        os.environ.pop("ZONATA_DB_PATH", None)
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()
 
 
 class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
+        self.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
         self.temp_db_fd, self.temp_db_path = tempfile.mkstemp(suffix=".db")
         os.environ["ZONATA_DB_PATH"] = self.temp_db_path
         self.db = db
@@ -62,6 +77,13 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         self.crm_beta = EnterpriseCrmService(tenant_id="tnt_idor_beta")
 
     def tearDown(self):
+        if hasattr(self, "orig_db_path") and self.orig_db_path:
+            db.set_db_path(self.orig_db_path)
+        if hasattr(self, "orig_env_db_path"):
+            if self.orig_env_db_path is not None:
+                os.environ["ZONATA_DB_PATH"] = self.orig_env_db_path
+            else:
+                os.environ.pop("ZONATA_DB_PATH", None)
         try:
             os.close(self.temp_db_fd)
             if os.path.exists(self.temp_db_path):
@@ -215,6 +237,124 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
             row = conn.execute("SELECT password_hash FROM auth_credentials WHERE user_id = 'usr_upg_01'").fetchone()
             upgraded_hash = row["password_hash"]
             self.assertTrue(upgraded_hash.startswith("pbkdf2_sha256$100000$"), f"Hash was not upgraded: {upgraded_hash}")
+
+    def test_07_deal_update_idor_and_cross_tenant_association(self):
+        """Verify deal updates enforce tenant boundary and prevent cross-tenant customer association."""
+        # Setup: Customer Alpha in Tenant Alpha, Customer Beta in Tenant Beta
+        cust_alpha = self.crm_alpha.create_customer("cmp_01", {"name": "Alpha Corp Prime"})
+        cust_beta = self.crm_beta.create_customer("cmp_01", {"name": "Beta Infiltration Target"})
+
+        # Deal Alpha belongs to Tenant Alpha
+        deal_alpha = self.crm_alpha.create_deal("cmp_01", {
+            "title": "Alpha Expansion Contract",
+            "customer_id": cust_alpha["customer_id"],
+            "value": 250000.0,
+            "stage": "discovery"
+        })
+        alpha_deal_id = deal_alpha["deal_id"]
+
+        # 1. Tenant Beta attempts to update Tenant Alpha's deal -> Must fail with KeyError (404)
+        with self.assertRaises(KeyError):
+            self.crm_beta.update_deal(alpha_deal_id, {"title": "Compromised by Beta"})
+
+        # 2. Tenant Alpha attempts to associate its deal with Tenant Beta's customer -> Must fail with ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_deal(alpha_deal_id, {"customer_id": cust_beta["customer_id"]})
+        self.assertIn("not found in current organization", str(ctx.exception))
+
+        # 3. Legitimate update within tenant boundary succeeds
+        updated = self.crm_alpha.update_deal(alpha_deal_id, {
+            "title": "Alpha Approved Expansion",
+            "value": 300000.0,
+            "stage": "negotiation"
+        })
+        self.assertEqual(updated["title"], "Alpha Approved Expansion")
+        self.assertEqual(updated["value"], 300000.0)
+        self.assertEqual(updated["stage"], "negotiation")
+
+    def test_08_concurrent_distributed_rate_limiting(self):
+        """Verify distributed rate limiter is concurrency-safe across simultaneous worker threads."""
+        import threading
+        test_key = "test_concurrent_worker_key"
+        max_requests = 5
+        results = []
+        threads = []
+
+        def worker_attempt():
+            ok, retry = RateLimiter.is_allowed(test_key, max_requests=max_requests, window_seconds=60.0)
+            results.append(ok)
+
+        # Launch 15 concurrent worker threads simultaneously
+        for _ in range(15):
+            t = threading.Thread(target=worker_attempt)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        # Under strict concurrency, exactly max_requests must be True, remaining must be False
+        successes = sum(1 for r in results if r is True)
+        failures = sum(1 for r in results if r is False)
+        self.assertEqual(successes, max_requests, f"Concurrency violation: {successes} allowed, expected {max_requests}")
+        self.assertEqual(failures, 10)
+
+        # Dual-axis rate limiting verification
+        allowed, retry, axis = RateLimiter.rate_limit_ip_and_account("10.0.0.99", "user@corp.com", max_ip_requests=10, max_account_requests=5)
+        self.assertTrue(allowed)
+        self.assertEqual(axis, "")
+
+    def test_09_emergency_key_retirement_and_rotation_window_expiry(self):
+        """Verify rotation window expiration and immediate emergency key retirement."""
+        key_compromised = "compromised_secret_key_rotation_2026_vuln"
+        key_primary = "current_active_secret_key_2026_safe"
+
+        os.environ["ZONATA_AUTH_SECRET"] = key_primary
+        os.environ["ZONATA_PREVIOUS_AUTH_SECRET"] = key_compromised
+
+        user = {"user_id": "usr_rot_emerg", "tenant_id": "tnt_idor_alpha"}
+        # Token signed under previous key
+        import hmac, hashlib, json
+        payload = {"user_id": "usr_rot_emerg", "tenant_id": "tnt_idor_alpha", "exp": time.time() + 3600}
+        p_str = json.dumps(payload, sort_keys=True)
+        sig = hmac.new(key_compromised.encode("utf-8"), p_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        token_under_prev = f"{p_str}.{sig}"
+
+        # 1. Initially accepted under active rotation window
+        self.assertIsNotNone(UserManager.verify_token(token_under_prev))
+
+        # 2. Window expiration: set ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT to past
+        os.environ["ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT"] = str(time.time() - 100)
+        self.assertIsNone(UserManager.verify_token(token_under_prev), "Token accepted after rotation window expired")
+
+        # Reset window
+        os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT", None)
+        self.assertIsNotNone(UserManager.verify_token(token_under_prev))
+
+        # 3. Emergency Retirement: immediately revoke compromised key
+        emergency_retire_previous_secret(key_compromised)
+        self.assertIsNone(UserManager.verify_token(token_under_prev), "Emergency retirement failed to reject token")
+
+        # Cleanup
+        os.environ.pop("ZONATA_AUTH_SECRET", None)
+        os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET", None)
+        os.environ.pop("ZONATA_REVOKED_AUTH_SECRETS", None)
+        os.environ.pop("ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY", None)
+
+    def test_10_cryptographic_secret_generation(self):
+        """Verify CSPRNG generation creates 256 bits of cryptographic entropy."""
+        secret = generate_secure_auth_secret(32)
+        self.assertEqual(len(secret), 64)
+        entropy_metrics = evaluate_secret_entropy(secret)
+        self.assertTrue(entropy_metrics["is_high_entropy"])
+        self.assertGreaterEqual(entropy_metrics["entropy_bits_per_char"], 3.5)
+
+    def test_11_malformed_hashes_and_concurrency_safety(self):
+        """Verify malformed password hashes fail closed without crashing."""
+        self.assertEqual(verify_password_with_upgrade("Pass", "salt", ""), (False, False))
+        self.assertEqual(verify_password_with_upgrade("Pass", "salt", "invalid_string"), (False, False))
+        self.assertEqual(verify_password_with_upgrade("Pass", "salt", "pbkdf2_sha256$notanumber$salt$hash"), (False, False))
+        self.assertEqual(verify_password_with_upgrade("Pass", "salt", "pbkdf2_sha256$-100$salt$hash"), (False, False))
 
 
 if __name__ == "__main__":

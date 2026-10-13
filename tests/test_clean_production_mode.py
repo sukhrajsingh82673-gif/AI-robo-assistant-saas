@@ -33,21 +33,36 @@ from core.coworker_governance import GovernedCoworkerRegistry
 from core.db import configure_isolated_test_db
 
 MODULE_TEMP_DIR = None
+MODULE_ORIG_DB_PATH = None
+MODULE_ORIG_ENV_DB_PATH = None
 
 def setUpModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_ORIG_ENV_DB_PATH = os.environ.get("ZONATA_DB_PATH")
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "clean_prod_test_isolated.db")
     configure_isolated_test_db(isolated_db)
 
 def tearDownModule():
-    global MODULE_TEMP_DIR
+    global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+    if MODULE_ORIG_ENV_DB_PATH is not None:
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_ENV_DB_PATH
+    else:
+        os.environ.pop("ZONATA_DB_PATH", None)
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()
 
 
 class TestCleanProductionMode(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
+        self.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
+        self.old_allow_sqlite = os.environ.get("ZONATA_ALLOW_SQLITE_IN_PRODUCTION")
+        os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = "1"
+
         self.temp_db_fd, self.temp_db_path = tempfile.mkstemp(suffix=".db")
         os.environ["ZONATA_DB_PATH"] = self.temp_db_path
         self.db = db
@@ -63,16 +78,30 @@ class TestCleanProductionMode(unittest.TestCase):
             conn.commit()
 
     def tearDown(self):
+        if hasattr(self, "orig_db_path") and self.orig_db_path:
+            db.set_db_path(self.orig_db_path)
+        if hasattr(self, "orig_env_db_path"):
+            if self.orig_env_db_path is not None:
+                os.environ["ZONATA_DB_PATH"] = self.orig_env_db_path
+            else:
+                os.environ.pop("ZONATA_DB_PATH", None)
+
         if self.old_env is not None:
             os.environ["APP_ENV"] = self.old_env
         else:
             os.environ.pop("APP_ENV", None)
+
+        if self.old_allow_sqlite is not None:
+            os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = self.old_allow_sqlite
+        else:
+            os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
 
         try:
             os.close(self.temp_db_fd)
             if os.path.exists(self.temp_db_path):
                 os.remove(self.temp_db_path)
         except Exception:
+            pass
             pass
 
     def test_01_clean_finance_engine(self):
@@ -156,6 +185,22 @@ class TestCleanProductionMode(unittest.TestCase):
         # Level 5 memory must be empty
         records = mem.query_memories(levels=[5])
         self.assertEqual(len(records), 0)
+
+    def test_11_production_refuses_unintended_sqlite_fallback(self):
+        """Verify production mode refuses unintended SQLite fallback when DATABASE_URL is not PostgreSQL."""
+        # Unset authorization and DATABASE_URL
+        os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
+        os.environ.pop("DATABASE_URL", None)
+        os.environ["APP_ENV"] = "production"
+
+        with self.assertRaises(RuntimeError) as ctx:
+            Database()
+        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx.exception))
+
+        # Re-authorizing via ZONATA_ALLOW_SQLITE_IN_PRODUCTION allows initialization
+        os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = "1"
+        db_authorized = Database()
+        self.assertEqual(db_authorized.get_dialect(), DatabaseDialect.SQLITE)
 
 
 if __name__ == "__main__":

@@ -2,25 +2,25 @@
 
 **Report Date**: 13 October 2026  
 **Audited Starting SHA**: `152b2da89578fcec07f1280360e2d5d3ff53eb07`  
-**Remote Head SHA**: `e9e1a0e341944feddd05b548575454435d6bb9c9`  
+**Previous Audited Commit**: `c4e28e7f61b78571d0be2c20582087e0b12c6044`  
 **Engineering Branch**: `engineering/production-readiness-gap-closure`  
 **Evaluation Scope**: Production-Readiness Verification, Security Hardening, Clean Data Proof, Dual-Engine Persistence, Real Frontend-to-Backend Operations, Disaster Recovery, and Staging Qualification.  
-**Automated Tests Executed**: **93 automated tests (93 passed, 0 failed, 100% pass rate)**
+**Automated Tests Executed**: **105 automated tests (105 passed, 0 failed, 100.00% pass rate)** across 9 suites (including 48 security-negative tests).
 
 ---
 
 ## 1. Seven Formal Qualification Decisions & Verdicts
 
-Following systematic source-code auditing, bug remediation, security hardening, automated disaster recovery drills, and exhaustive regression test execution across 93 automated tests, the seven formal qualification verdicts are rendered as follows:
+Following systematic source-code auditing, bug remediation, security hardening, automated disaster recovery drills, and exhaustive regression test execution across 105 automated tests, the seven formal qualification verdicts are rendered as follows:
 
 | Qualification Area | Formal Verdict | Summary Rationale |
 |---|---|---|
-| **1. Clean Product & Data Initialization** | **PASS** | Complete removal of mock data, fake records, and synthetic business metrics. Unconditional production gating across 9 core engines (`enterprise_finance`, `enterprise_files`, `enterprise_records`, `enterprise_reports`, `schedule_service`, `plugins_service`, `coworker_governance`, `vault_client`, `layered_executive_memory`). Zero hardcoded credentials in authentication UI. GAAP Chart of Accounts starts at clean ₹0.00. Fresh database verified with honest empty states. |
-| **2. Application Functionality** | **PASS** | Audited all 38 frontend routes (37 workspace routes + 404 router sentinel). Upgraded Commercial CRM & Pipeline (`/customers`, `/sales`, `/crm`) from partial/unconnected to fully connected relational persistence via `core/enterprise_crm.py` and `api_server.py`. Added single deal retrieval, customer updates, and customer/deal deletion endpoints. Fixed `/api/auth/me` return bug. Wired digital twin simulation in `web/app.js` to real backend API `/api/missions/simulate`. All critical user journeys verified end-to-end. |
-| **3. Authentication & Tenant Security** | **PASS** | Validated PBKDF2-HMAC-SHA256 salted password hashing (`auth_credentials`), upgrade-ready prefix formatting (`pbkdf2_sha256$100000$...`), transparent re-hash on authentication, >=8 char password rules, email regex validation, distributed rate limiting on registration via `auth_rate_limits` table, high-entropy secret enforcement (`ZONATA_AUTH_SECRET` >= 32 chars in production), Shannon entropy evaluation (`evaluate_secret_entropy`), zero-downtime key rotation preserving active sessions via `ZONATA_PREVIOUS_AUTH_SECRET`, token revocation store (`auth_revoked_tokens`), server-derived tenant identity, anti-spoofing header rejection (HTTP 403 `TENANT_SPOOFING_ATTEMPT`), and Direct Object Access (IDOR) prevention on all CRM entities. |
-| **4. The PostgreSQL Path** | **BLOCKED PENDING STAGING RUNTIME PROOF** | Dual-engine dialect switching (`DatabaseDialect.POSTGRESQL` vs `DatabaseDialect.SQLITE`) implemented in `core/db.py`. Query parameter normalization (`PostgresConnectionWrapper`) and transaction semantics verified. Docker Compose production service (`postgres:16-alpine`) configured with connection pooling. Protected baseline database `storage/roboassistant.db` is strictly guarded from mutation. **BLOCKED for live runtime execution** because dedicated physical or managed PostgreSQL 16 cluster infrastructure is not yet provisioned in this environment. |
-| **5. Deployment Readiness** | **CONDITIONAL PASS / BLOCKED** | Multi-container production composition (`docker-compose.prod.yml`) audited with 8 services. Raw host execution strictly prohibited in production (`ZONATA_ALLOW_HOST_FALLBACK=0` and refusal of `ZONATA_ALLOW_HOST_SHELL=1`). Health probes (`/health`, `/livez`, `/readyz`) and metrics (`/metrics`) operational. Runbook documents backup, restore, and key rotation drills. **BLOCKED for live production** until deployed to staging cluster with TLS reverse proxy ingress and verified third-party API credentials. |
-| **6. Disaster Recovery** | **CONDITIONAL PASS / BLOCKED** | Local relational restoration mechanism is verified via `tests/test_disaster_recovery_drill.py` (file replacement in 12.4 ms; complete local incident-to-usable cycle in 86.3 ms; RPO = 0 records lost at snapshot). **BLOCKED for physical PostgreSQL WAL continuous archiving and Point-in-Time Recovery (PITR)** pending staging cluster infrastructure. |
+| **1. Clean Product & Data Initialization** | **PASS** | Complete removal of mock data, fake records, and synthetic business metrics. Unconditional production gating across 9 core engines (`enterprise_finance`, `enterprise_files`, `enterprise_records`, `enterprise_reports`, `schedule_service`, `plugins_service`, `coworker_governance`, `vault_client`, `layered_executive_memory`). Zero hardcoded credentials in authentication UI. GAAP Chart of Accounts starts at clean ₹0.00. Fresh database verified with honest empty states. Strict refusal of unintended SQLite fallback in production mode verified. |
+| **2. Application Functionality** | **PASS** | Audited all 38 frontend routes (37 workspace routes + 404 router sentinel). Verified Commercial CRM & Pipeline (`/customers`, `/sales`, `/crm`) with relational persistence via `core/enterprise_crm.py` and `api_server.py`. Full CRUD operations supported (customer creation, retrieval, updates, deletions; deal creation, retrieval, updates, stage transitions, deletions). All critical user journeys verified end-to-end across refreshes and restarts. |
+| **3. Authentication & Tenant Security** | **PASS** | Validated PBKDF2-HMAC-SHA256 salted password hashing (`auth_credentials`), upgrade-ready prefix formatting (`pbkdf2_sha256$<iter>$<salt>$<hash>`), optimistic concurrency on credential upgrades, safe resilience to malformed hash strings, >=8 char password rules, email regex validation, concurrency-safe distributed rate limiting via `auth_rate_limits` table with transaction write-locks and dual-axis IP/account enforcement, high-entropy secret generation via system CSPRNG (256 bits true entropy), zero-downtime key rotation with expiration windows (`ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT`), emergency key retirement procedure (`emergency_retire_previous_secret`), token revocation store (`auth_revoked_tokens`), server-derived tenant identity, anti-spoofing header rejection (HTTP 403 `TENANT_SPOOFING_ATTEMPT`), and Direct Object Access (IDOR) prevention on all CRM customer and deal entities. |
+| **4. The PostgreSQL Path** | **BLOCKED PENDING STAGING RUNTIME PROOF** | Dual-engine dialect switching (`DatabaseDialect.POSTGRESQL` vs `DatabaseDialect.SQLITE`) implemented in `core/db.py`. Query parameter normalization (`PostgresConnectionWrapper`), SQL conflict normalization (`INSERT OR IGNORE` -> `ON CONFLICT DO NOTHING`), pragma suppression, dict-like row access, and transaction semantics verified. Production startup refuses unintended SQLite fallback without explicit authorization. Docker Compose production service (`postgres:16-alpine`) configured. Baseline database `storage/roboassistant.db` is strictly guarded from mutation. **BLOCKED for live runtime execution** because dedicated physical or managed PostgreSQL 16 cluster infrastructure is not yet provisioned in this environment. |
+| **5. Deployment Readiness** | **CONDITIONAL PASS / BLOCKED** | Multi-container production composition (`docker-compose.prod.yml`) audited with 8 services. Raw host execution strictly prohibited in production (`ZONATA_ALLOW_HOST_FALLBACK=0` and refusal of `ZONATA_ALLOW_HOST_SHELL=1`). Health probes (`/health`, `/livez`, `/readyz`) and metrics (`/metrics`) operational. Non-root unprivileged container execution (`UID 10001`). Runbook documents deployment, backup, restore, and key rotation drills. **BLOCKED for live production** until deployed to staging cluster with TLS reverse proxy ingress and verified third-party API credentials. |
+| **6. Disaster Recovery** | **CONDITIONAL PASS / BLOCKED** | Local relational restoration mechanism is verified via `tests/test_disaster_recovery_drill.py` (file replacement in 12.4 ms; complete local incident-to-usable cycle in 86.3 ms; RPO = 0 records lost at snapshot). **BLOCKED for physical PostgreSQL WAL continuous archiving and Point-in-Time Recovery (PITR)** pending staging cluster infrastructure. Local SQLite metrics are explicitly isolated and not used as PostgreSQL SLAs. |
 | **7. Live Production Authorization** | **BLOCKED** | **LIVE PRODUCTION DEPLOYMENT REMAINS STRICTLY BLOCKED**. While application-level code defects have been remediated and security boundaries qualified, authorization for public live traffic is blocked pending physical database cluster provisioning, genuine payment/LLM credentials, TLS reverse proxy ingress, and a verified staging disaster recovery drill. |
 
 ---
@@ -40,72 +40,84 @@ The three constitutional baseline assets were continuously verified throughout t
 ## 3. Confirmed Defects Remediated & Code Changes Summary
 
 ### 3.1 Direct Object Access (IDOR) & Cross-Tenant Entity Ownership
-- **Confirmed Defect / Risk**: In `core/enterprise_crm.py`, `create_deal` did not verify whether the referenced `customer_id` belonged to the caller's tenant. `update_deal_stage` did not verify that rows were affected, and no endpoints existed for single deal retrieval, customer updates, or customer/deal deletions.
+- **Confirmed Defect / Risk**: In `core/enterprise_crm.py`, `create_deal` and `update_deal` did not verify whether the referenced `customer_id` belonged to the caller's tenant. An adversary could associate deals across tenants or disclose customer existence.
 - **Remediation**:
-  - In `core/enterprise_crm.py`: Added ownership check in `create_deal` raising `ValueError: Direct Object Access Violation` if `customer_id` belongs to another tenant.
-  - Added `get_deal`, `update_customer`, `delete_customer`, and `delete_deal` methods with strict `tenant_id` scoping.
-  - In `api_server.py`: Wired `GET /api/crm/deals/:id`, `PATCH /api/crm/customers/:id`, `DELETE /api/crm/customers/:id`, and `DELETE /api/crm/deals/:id`, returning HTTP 404 on cross-tenant attempts.
+  - In `core/enterprise_crm.py`: Added ownership check in `create_deal` and `update_deal` verifying referenced `customer_id` belongs to caller's tenant. If not found, raises `ValueError: Direct Object Access Violation: Customer '...' not found in current organization`.
+  - Added `get_deal`, `update_deal`, `update_customer`, `delete_customer`, and `delete_deal` methods with strict `WHERE tenant_id = ?` scoping.
+  - In `api_server.py`: Wired `GET /api/crm/deals/:id`, `PATCH/PUT /api/crm/deals/:id`, `PATCH/PUT /api/crm/customers/:id`, `DELETE /api/crm/customers/:id`, and `DELETE /api/crm/deals/:id`, returning HTTP 404 on cross-tenant attempts without disclosing record existence.
 
-### 3.2 Distributed Rate Limiting Across Multi-Instance Cluster
-- **Confirmed Defect / Risk**: In-memory rate limiting only throttled requests hitting a single worker process; multi-container clusters behind a load balancer could be bypassed.
-- **Remediation**: Added `auth_rate_limits` table to schema in `core/db.py`. Updated `RateLimiter.is_allowed()` to synchronize sliding-window request timestamps across the shared database, with thread-safe in-memory fallback.
+### 3.2 Concurrency-Safe Distributed Rate Limiting
+- **Confirmed Defect / Risk**: In-memory rate limiting only throttled requests hitting a single worker process; multi-container clusters behind a load balancer could race or bypass rate limits.
+- **Remediation**: Added `auth_rate_limits` table to schema in `core/db.py`. Updated `RateLimiter.is_allowed()` to synchronize sliding-window request timestamps across the shared database with write locks (`BEGIN IMMEDIATE`), opportunistic garbage collection, and dual-axis IP/account throttling (`RateLimiter.rate_limit_ip_and_account`). Verified under 15-thread simultaneous race conditions.
 
 ### 3.3 Password Hash Format Upgrades & Secret Entropy
 - **Confirmed Defect / Risk**: Hashes were raw hex without iteration metadata, hindering future algorithm parameter upgrades. Secret checks only validated length, not Shannon entropy.
 - **Remediation**:
   - Implemented `pbkdf2_sha256$<iter>$<salt>$<hash>` format with transparent re-hashing on login.
-  - Implemented `evaluate_secret_entropy()` measuring Shannon entropy and character distribution.
-  - Verified zero-downtime key rotation via `ZONATA_PREVIOUS_AUTH_SECRET`.
+  - Added optimistic locking (`WHERE user_id = ? AND password_hash = ?`) so concurrent logins do not overwrite newer credential state.
+  - Ensured failed logins never alter stored credential hashes or salts.
+  - Implemented `generate_secure_auth_secret()` using CSPRNG (`secrets.token_hex(32)`) guaranteeing 256 bits true entropy.
+  - Verified zero-downtime key rotation with expiration windows (`ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT`) and emergency retirement (`emergency_retire_previous_secret`).
 
-### 3.4 Infinite Recursion in Schedule Service Seeding
-- **Confirmed Defect**: In `core/schedule_service.py`, `list_schedules()` re-invoked itself infinitely when seeding returned early in clean production mode.
-- **Remediation**: Updated `_seed_initial_schedules()` to return boolean flag; `list_schedules()` returns honest empty lists.
+### 3.4 Refusal of Silent SQLite Fallback in Production
+- **Confirmed Defect / Risk**: If `DATABASE_URL` was unset or misconfigured in production mode (`APP_ENV=production`), the application could silently fall back to local SQLite without operator knowledge.
+- **Remediation**: In `core/db.py`, `Database.__init__` now raises `RuntimeError: Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode...` unless explicitly authorized via `ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1`.
 
-### 3.5 Endpoint Fallthrough on `/api/auth/me`
-- **Confirmed Defect**: Missing `return` statement after sending JSON response caused 404 fallthrough.
-- **Remediation**: Added `return` statement immediately after `self._send_json({"authenticated": True, "context": ctx})`.
-
-### 3.6 Protection of Baseline Database from Schema Initialization Mutation
-- **Confirmed Defect**: `Database.__init__` executed `_init_db()` against `storage/roboassistant.db`, mutating database headers.
-- **Remediation**: Added guard in `core/db.py` completely bypassing `executescript(SCHEMA_SQL)` if target matches protected baseline asset.
+### 3.5 PostgreSQL SQL Dialect Normalization
+- **Confirmed Defect / Risk**: Raw queries using SQLite keywords (`INSERT OR IGNORE`) or SQLite pragmas (`PRAGMA foreign_keys = ON`) would cause syntax errors on PostgreSQL.
+- **Remediation**: `PostgresConnectionWrapper` converts `?` to `%s`, converts `INSERT OR IGNORE` to `ON CONFLICT DO NOTHING`, suppresses SQLite PRAGMAs, and uses `DictCursor` for row dictionary parity.
 
 ---
 
-## 4. Test Evidence & Regression Coverage
+## 4. Reconciled Test Accounting & Machine-Readable Summary
 
-All test suites were executed with zero mock compromises. Summary of automated test executions:
+A dedicated machine-generated test accounting audit was executed via `scripts/generate_test_accounting_summary.py` running each suite in an isolated subprocess. All 105 tests across 9 suites passed with zero failures and zero errors:
 
-| Test Suite File | Tests Run | Passed | Failed | Errors | Focus Area |
-|---|---|---|---|---|---|
-| `tests/test_audit_remediation_security.py` | 29 | 29 | 0 | 0 | Security boundaries, anti-spoofing, token issuance, baseline invariants |
-| `tests/test_clean_production_mode.py` | 10 | 10 | 0 | 0 | Unconditional demo seed suppression, dialect detection, clean empty states |
-| `tests/test_crm_persistence.py` | 4 | 4 | 0 | 0 | CRM customer/deal CRUD, multi-tenant isolation, connection recycling |
-| `tests/test_production_auth_security.py` | 8 | 8 | 0 | 0 | PBKDF2 hashing, HMAC tamper resistance, rate limiting, token revocation |
-| `tests/test_direct_object_access_and_tenant_security.py` | 6 | 6 | 0 | 0 | IDOR rejection, foreign key injection prevention, secret entropy, key rotation, hash upgrades |
-| `tests/test_disaster_recovery_drill.py` | 3 | 3 | 0 | 0 | Snapshot backup, catastrophic corruption simulation, RTO/RPO measurement |
-| `tests/test_overview_production.py` | 1 | 1 | 0 | 0 | Production overview metrics and aggregation |
-| `tests/test_settings_enterprise_qualification.py` | 32 | 32 | 0 | 0 | 32-category enterprise settings center persistence and diagnostics |
-| **TOTAL** | **93** | **93** | **0** | **0** | **100% Pass Rate** |
+| Test Suite File | Category | Tests Run | Passed | Failed | Errors | Focus Area |
+|---|---|---|---|---|---|---|
+| `tests/test_direct_object_access_and_tenant_security.py` | Security-Negative / Unit | 11 | 11 | 0 | 0 | IDOR CRM checks, concurrent rate limits, emergency key retirement, CSPRNG secret generation, malformed hash safety |
+| `tests/test_production_auth_security.py` | Security-Negative / Auth Unit | 8 | 8 | 0 | 0 | PBKDF2 hashing, HMAC tamper resistance, rate limiting, token revocation |
+| `tests/test_audit_remediation_security.py` | Security-Negative / API Integration | 29 | 29 | 0 | 0 | FIND-01 through FIND-08, anti-spoofing rejection, unauthenticated token issuance prevention, fail-closed sandboxes |
+| `tests/test_clean_production_mode.py` | Unit / Dialect Initialization | 11 | 11 | 0 | 0 | Unconditional demo seed suppression, dialect detection, clean empty states, fallback refusal |
+| `tests/test_crm_persistence.py` | Database Integration | 4 | 4 | 0 | 0 | CRM customer/deal CRUD, multi-tenant isolation, connection recycling |
+| `tests/test_disaster_recovery_drill.py` | Recovery / Drill | 3 | 3 | 0 | 0 | Snapshot backup, catastrophic corruption simulation, RTO/RPO measurement |
+| `tests/test_overview_production.py` | Domain Service Integration | 10 | 10 | 0 | 0 | Production overview metrics, company switching, data quality, epistemic provenance |
+| `tests/test_settings_enterprise_qualification.py` | REST API Integration | 22 | 22 | 0 | 0 | 32-category enterprise settings center persistence, audit ledger, and diagnostic endpoints |
+| `tests/test_frontend_navigation_audit.py` | Frontend Navigation / Routing | 7 | 7 | 0 | 0 | 26 sidebar nav items, route matching, view sections, workspace JS syntax |
+| **TOTAL AUTOMATED TESTS** | **Comprehensive Suite** | **105** | **105** | **0** | **0** | **100.00% Pass Rate** |
+
+### Breakdown by Functional Category:
+- **Security-Negative Tests**: **48 tests** (100% pass)
+- **Unit / Dialect Tests**: **11 tests** (100% pass)
+- **Database & Relational Persistence Tests**: **4 tests** (100% pass)
+- **REST API Integration Tests**: **22 tests** (100% pass)
+- **Domain Service & Epistemic Truth Tests**: **10 tests** (100% pass)
+- **Frontend Navigation & View Routing Tests**: **7 tests** (100% pass)
+- **Disaster Recovery Rehearsal Tests**: **3 tests** (100% pass)
+- **Blocked External Infrastructure Suites**: **3 suites (24 tests)** (Explicitly marked `BLOCKED`)
+
+Machine-readable JSON evidence artifact persisted at: `storage/evidence/test_accounting_summary.json`.
 
 ---
 
 ## 5. Formal Deliverables & Document Suite
 
 The complete qualification documentation suite is maintained in the repository:
-1. `STAGING_DEPLOYMENT_QUALIFICATION_REPORT.md`: Comprehensive evaluation of staging packaging, container topology, 5-tier connector inventory, and host safety.
-2. `POSTGRESQL_RUNTIME_QUALIFICATION_REPORT.md`: Audit of dialect abstractions, SQL placeholder translation (`?` -> `%s`), managed vs. physical database criteria, and infrastructure prerequisites.
-3. `AUTHENTICATION_TENANT_SECURITY_QUALIFICATION.md`: Verification of PBKDF2 hashing, upgrade mechanics, HMAC tokens, distributed rate limiting, token revocation, anti-spoofing header rejection, and IDOR direct object protections.
-4. `END_TO_END_WORKFLOW_QUALIFICATION_MATRIX.md`: 38-route inventory tracking real user journeys to relational persistence.
-5. `DISASTER_RECOVERY_DRILL_REPORT.md`: Rehearsal evidence of catastrophic failure and restore with sub-second RTO and RPO = 0, with explicit scope distinction from PostgreSQL PITR.
-6. `PRODUCTION_READINESS_GAP_ASSESSMENT.md`: Six-pillar gap assessment with 7 formal qualification decisions.
-7. `PRODUCTION_DEPLOYMENT_RUNBOOK.md`: Step-by-step production rollout, disaster recovery drills, and key rotation procedures.
+1. `AUTHENTICATION_TENANT_SECURITY_QUALIFICATION.md`: Verification of PBKDF2 hashing, optimistic concurrency, CSPRNG secret generation, emergency key retirement, concurrent rate limiting, and IDOR direct object protections across 48 security tests.
+2. `POSTGRESQL_RUNTIME_QUALIFICATION_REPORT.md`: Audit of dialect abstractions, SQL placeholder translation (`?` -> `%s`), `INSERT OR IGNORE` normalization, managed vs. physical database criteria, fallback refusal, and infrastructure prerequisites.
+3. `DISASTER_RECOVERY_DRILL_REPORT.md`: Rehearsal evidence of catastrophic failure and restore with sub-second RTO and RPO = 0, with explicit scope distinction from PostgreSQL PITR.
+4. `STAGING_DEPLOYMENT_QUALIFICATION_REPORT.md`: Comprehensive evaluation of staging packaging, container topology, 5-tier connector inventory, and host safety.
+5. `END_TO_END_WORKFLOW_QUALIFICATION_MATRIX.md`: 38-route inventory tracking real user journeys to relational persistence.
+6. `PRODUCTION_READINESS_GAP_ASSESSMENT.md`: Updated six-pillar assessment with 7 formal qualification decisions and 105 passed tests.
+7. `PRODUCTION_DEPLOYMENT_RUNBOOK.md`: Step-by-step production rollout, emergency key retirement procedures, disaster recovery drills, and staging qualification instructions.
 
 ---
 
 ## 6. Unresolved Blockers & Mandatory Next Actions
 
 Before Live Production Authorization can be granted:
-1. **Physical / Managed PostgreSQL 16 Cluster**: Provision dedicated PostgreSQL 16 cluster (AWS RDS, GCP Cloud SQL, or containerized service) and execute live migrations and queries.
-2. **Production Credential Injection**: Inject genuine live credentials (`STRIPE_SECRET_KEY`, `OPENAI_API_KEY`) into `.env.production`.
-3. **Ingress & TLS**: Deploy reverse proxy (NGINX/Caddy) with managed Let's Encrypt TLS 1.3 certificates and WAF rate limiting.
-4. **Staging Rehearsal**: Execute automated staging drill verifying end-to-end user journeys and PostgreSQL disaster recovery point-in-time restore before traffic cutover.
+1. **Provision Staging PostgreSQL 16 Instance**: Provide `DATABASE_URL` for an isolated managed cloud database (AWS RDS, GCP Cloud SQL, Supabase, Neon) or containerized service.
+2. **Execute Live Migrations & Integration Suite**: Run database migrations against the staging instance, verifying `SELECT version()` returns PostgreSQL 16.x.
+3. **Execute PostgreSQL Disaster Recovery Drill**: Perform `pg_dump` and `pg_restore` drill, measuring cloud RTO and verifying zero data loss.
+4. **Deploy TLS Ingress & WAF**: Deploy reverse proxy (NGINX/Caddy) with TLS 1.3 certificates and external rate limiting.
+5. **Inject Verified Provider Test Credentials**: Provide sandbox credentials for payments (Stripe) and LLM providers.

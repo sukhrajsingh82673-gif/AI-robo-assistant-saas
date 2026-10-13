@@ -39,17 +39,61 @@ def get_auth_secret_key() -> bytes:
 
 def get_verification_keys() -> List[bytes]:
     """
-    Returns the primary signing key and any previous rotated keys to support zero-downtime key rotation.
+    Returns the primary signing key and any active previous rotated keys to support zero-downtime key rotation.
+    Enforces expiration window and emergency revocation list.
     """
-    keys = [get_auth_secret_key()]
-    prev_secret = os.environ.get("ZONATA_PREVIOUS_AUTH_SECRET")
-    if prev_secret:
-        keys.append(prev_secret.encode("utf-8"))
-    from .secrets import SecretManager
-    prev_managed = SecretManager.get_secret("sec_sovereign_previous_auth_key")
-    if prev_managed:
-        keys.append(prev_managed.encode("utf-8"))
+    primary = get_auth_secret_key()
+    keys = [primary]
+
+    # Check emergency revocation list
+    revoked_str = os.environ.get("ZONATA_REVOKED_AUTH_SECRETS", "")
+    revoked_secrets = {s.strip().encode("utf-8") for s in revoked_str.split(",") if s.strip()}
+
+    # Check rotation window expiry for previous key
+    now = time.time()
+    rotation_expires_at = None
+    exp_str = os.environ.get("ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT")
+    if exp_str:
+        try:
+            rotation_expires_at = float(exp_str)
+        except ValueError:
+            rotation_expires_at = None
+
+    is_window_valid = (rotation_expires_at is None) or (now <= rotation_expires_at)
+
+    if is_window_valid and (os.environ.get("ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY", "0") != "1"):
+        prev_secret = os.environ.get("ZONATA_PREVIOUS_AUTH_SECRET")
+        if prev_secret:
+            prev_bytes = prev_secret.encode("utf-8")
+            if prev_bytes not in revoked_secrets and prev_bytes != primary:
+                keys.append(prev_bytes)
+        from .secrets import SecretManager
+        prev_managed = SecretManager.get_secret("sec_sovereign_previous_auth_key")
+        if prev_managed:
+            prev_m_bytes = prev_managed.encode("utf-8")
+            if prev_m_bytes not in revoked_secrets and prev_m_bytes != primary and prev_m_bytes not in keys:
+                keys.append(prev_m_bytes)
     return keys
+
+def emergency_retire_previous_secret(secret_to_revoke: Optional[str] = None):
+    """
+    Emergency procedure: Immediately retires and revokes previous signing secret,
+    causing all sessions signed with that key to fail verification immediately.
+    """
+    os.environ["ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY"] = "1"
+    if secret_to_revoke:
+        existing = os.environ.get("ZONATA_REVOKED_AUTH_SECRETS", "")
+        updated = f"{existing},{secret_to_revoke}".strip(",")
+        os.environ["ZONATA_REVOKED_AUTH_SECRETS"] = updated
+    os.environ.pop("ZONATA_PREVIOUS_AUTH_SECRET", None)
+
+def generate_secure_auth_secret(num_bytes: int = 32) -> str:
+    """
+    Generates a cryptographically secure random authentication secret using CSPRNG.
+    Default 32 bytes yields 256 bits of true cryptographic entropy.
+    """
+    import secrets
+    return secrets.token_hex(num_bytes)
 
 def __getattr__(name: str):
     if name == "SECRET_KEY":
@@ -144,12 +188,18 @@ class RateLimiter:
     @classmethod
     def is_allowed(cls, key: str, max_requests: int = 5, window_seconds: float = 60.0) -> Tuple[bool, int]:
         now = time.time()
-        # Attempt database-backed distributed sliding window across cluster instances
+        # Attempt database-backed distributed sliding window across cluster instances with write-lock serialization
         try:
             with db.get_connection() as conn:
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                except Exception:
+                    pass  # Postgres or connection wrapper manages transactions via __enter__
+
+                # Opportunistic cleanup of expired timestamps
                 conn.execute(
-                    "DELETE FROM auth_rate_limits WHERE rate_key = ? AND attempt_timestamp < ?",
-                    (key, now - window_seconds)
+                    "DELETE FROM auth_rate_limits WHERE attempt_timestamp < ?",
+                    (now - window_seconds,)
                 )
                 rows = conn.execute(
                     "SELECT attempt_timestamp FROM auth_rate_limits WHERE rate_key = ? ORDER BY attempt_timestamp ASC",
@@ -158,6 +208,7 @@ class RateLimiter:
                 if len(rows) >= max_requests:
                     oldest = rows[0][0] if isinstance(rows[0], (tuple, list)) else rows[0]["attempt_timestamp"]
                     retry_after = int(window_seconds - (now - oldest)) + 1
+                    conn.commit()
                     return False, max(1, retry_after)
                 conn.execute(
                     "INSERT INTO auth_rate_limits (rate_key, attempt_timestamp) VALUES (?, ?)",
@@ -166,7 +217,7 @@ class RateLimiter:
                 conn.commit()
                 return True, 0
         except Exception:
-            # Fallback to local in-memory sliding window if rate_limits table not migrated
+            # Fallback to local in-memory sliding window if rate_limits table not migrated or DB unreachable
             pass
 
         with cls._lock:
@@ -180,8 +231,32 @@ class RateLimiter:
             cls._records[key] = valid_timestamps
             return True, 0
 
+    @classmethod
+    def rate_limit_ip_and_account(
+        cls,
+        ip: str,
+        account: Optional[str] = None,
+        max_ip_requests: int = 20,
+        max_account_requests: int = 5,
+        window_seconds: float = 60.0
+    ) -> Tuple[bool, int, str]:
+        """
+        Dual-axis rate limiting evaluating both source IP address and account identifier.
+        Returns: (is_allowed: bool, retry_after: int, violation_axis: str)
+        """
+        ip_key = f"ip:{ip}"
+        ip_ok, ip_retry = cls.is_allowed(ip_key, max_requests=max_ip_requests, window_seconds=window_seconds)
+        if not ip_ok:
+            return False, ip_retry, "IP_RATE_LIMIT_EXCEEDED"
+        if account:
+            acc_key = f"account:{account.strip().lower()}"
+            acc_ok, acc_retry = cls.is_allowed(acc_key, max_requests=max_account_requests, window_seconds=window_seconds)
+            if not acc_ok:
+                return False, acc_retry, "ACCOUNT_RATE_LIMIT_EXCEEDED"
+        return True, 0, ""
 
-DEFAULT_PBKDF2_ITERATIONS = 100000
+
+DEFAULT_PBKDF2_ITERATIONS = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
 
 def evaluate_secret_entropy(secret: str) -> Dict[str, Any]:
     """
@@ -207,12 +282,14 @@ def evaluate_secret_entropy(secret: str) -> Dict[str, Any]:
     }
 
 
-def hash_password(password: str, salt: Optional[str] = None, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> Tuple[str, str]:
+def hash_password(password: str, salt: Optional[str] = None, iterations: Optional[int] = None) -> Tuple[str, str]:
     """
     Computes PBKDF2-HMAC-SHA256 hash with unique cryptographic salt.
     Encodes iterations metadata in prefix to support future algorithm and parameter upgrades.
     """
     import secrets
+    if iterations is None:
+        iterations = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
     if not salt:
         salt = secrets.token_hex(16)
     raw_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
@@ -224,23 +301,33 @@ def verify_password_with_upgrade(password: str, salt: str, expected_hash: str) -
     """
     Constant-time verification of supplied password against PBKDF2 digest.
     Returns: (is_valid: bool, needs_upgrade: bool)
+    Safely rejects malformed encodings without throwing unhandled exceptions.
     """
+    if not expected_hash or not isinstance(expected_hash, str):
+        return False, False
+    current_default_iter = int(os.environ.get("ZONATA_PBKDF2_ITERATIONS", "100000"))
     if expected_hash.startswith("pbkdf2_sha256$"):
         parts = expected_hash.split("$")
         if len(parts) == 4:
             _, iter_str, stored_salt, stored_hash = parts
             try:
                 iterations = int(iter_str)
+                if iterations <= 0 or not stored_salt or not stored_hash:
+                    return False, False
                 computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), stored_salt.encode("utf-8"), iterations).hex()
                 is_valid = hmac.compare_digest(computed, stored_hash)
-                needs_upgrade = iterations < DEFAULT_PBKDF2_ITERATIONS
+                needs_upgrade = is_valid and (iterations < current_default_iter)
                 return is_valid, needs_upgrade
             except Exception:
-                pass
+                return False, False
+        return False, False
     # Backward compatibility with unformatted raw hex hashes
-    computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), DEFAULT_PBKDF2_ITERATIONS).hex()
-    is_valid = hmac.compare_digest(computed, expected_hash)
-    return is_valid, True
+    try:
+        computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), current_default_iter).hex()
+        is_valid = hmac.compare_digest(computed, expected_hash)
+        return is_valid, is_valid
+    except Exception:
+        return False, False
 
 
 def verify_password(password: str, salt: str, expected_hash: str) -> bool:
@@ -344,8 +431,8 @@ class UserManager:
                 if needs_upgrade:
                     new_hash, new_salt = hash_password(password)
                     conn.execute(
-                        "UPDATE auth_credentials SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ?",
-                        (new_hash, new_salt, now, uid)
+                        "UPDATE auth_credentials SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ? AND password_hash = ?",
+                        (new_hash, new_salt, now, uid, cred["password_hash"])
                     )
                 else:
                     conn.execute(

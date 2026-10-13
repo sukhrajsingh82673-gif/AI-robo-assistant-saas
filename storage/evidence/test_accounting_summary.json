@@ -1,0 +1,138 @@
+{
+  "timestamp": 1791870663.809683,
+  "timestamp_iso": "2026-10-13T05:51:03Z",
+  "summary": {
+    "total_suites_executed": 9,
+    "total_tests_executed": 105,
+    "total_passed": 105,
+    "total_failed": 0,
+    "total_errors": 0,
+    "total_duration_seconds": 106.51,
+    "pass_rate_pct": 100.0,
+    "security_negative_test_count": 48
+  },
+  "executed_suites": [
+    {
+      "file": "tests/test_direct_object_access_and_tenant_security.py",
+      "name": "Direct Object Access, IDOR & Multi-Tenant IAM Security",
+      "category": "Security-Negative / Unit",
+      "test_count": 11,
+      "passed_count": 11,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 11.197,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_production_auth_security.py",
+      "name": "Production Authentication & Password Cryptography",
+      "category": "Security-Negative / Auth Unit",
+      "test_count": 8,
+      "passed_count": 8,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 10.031,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_audit_remediation_security.py",
+      "name": "Audit Remediation Security Regression (FIND-01..08)",
+      "category": "Security-Negative / API Integration",
+      "test_count": 29,
+      "passed_count": 29,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 10.339,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_clean_production_mode.py",
+      "name": "Clean Production Initialization & Fallback Refusal",
+      "category": "Unit / Dialect Initialization",
+      "test_count": 11,
+      "passed_count": 11,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 11.223,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_crm_persistence.py",
+      "name": "CRM Relational Persistence & Multi-Tenant Scoping",
+      "category": "Database Integration",
+      "test_count": 4,
+      "passed_count": 4,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 5.356,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_disaster_recovery_drill.py",
+      "name": "Disaster Recovery Drill (Snapshot & Atomic Restore)",
+      "category": "Recovery / Drill",
+      "test_count": 3,
+      "passed_count": 3,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 7.752,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_overview_production.py",
+      "name": "Executive Overview & Epistemic Truth Contracts",
+      "category": "Domain Service Integration",
+      "test_count": 10,
+      "passed_count": 10,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 4.673,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_settings_enterprise_qualification.py",
+      "name": "Enterprise Settings REST API & Governance",
+      "category": "REST API Integration",
+      "test_count": 22,
+      "passed_count": 22,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 44.833,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_frontend_navigation_audit.py",
+      "name": "Frontend Navigation, Route Mapping & Workspace Integrity",
+      "category": "Frontend Navigation / View Routing",
+      "test_count": 7,
+      "passed_count": 7,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 1.104,
+      "status": "PASS"
+    }
+  ],
+  "blocked_infrastructure_suites": [
+    {
+      "suite_name": "PostgreSQL 16 Live Cluster Integration Suite",
+      "category": "Database Staging Runtime",
+      "status": "BLOCKED",
+      "tests_planned": 12,
+      "blocker_reason": "No live managed PostgreSQL 16 connection string (DATABASE_URL) configured in PRoot environment."
+    },
+    {
+      "suite_name": "Docker Compose 8-Service Staging Deployment Suite",
+      "category": "Containerized Staging E2E",
+      "status": "BLOCKED",
+      "tests_planned": 8,
+      "blocker_reason": "Docker daemon and containerd runtime not installed or supported in host PRoot jail."
+    },
+    {
+      "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
+      "category": "Disaster Recovery Staging",
+      "status": "BLOCKED",
+      "tests_planned": 4,
+      "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with pg_dump / WAL archiving."
+    }
+  ]
+}

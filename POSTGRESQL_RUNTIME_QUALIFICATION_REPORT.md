@@ -12,9 +12,10 @@
 This qualification report audits the database engine implementation, dialect abstractions, and operational readiness for PostgreSQL 16 support in URA / ZONATA Enterprise SaaS.
 
 ### Verdict: BLOCKED PENDING STAGING RUNTIME PROOF
-- **Code-Level Implementation (Audited & Ready)**: The application code in `core/db.py` contains a complete dual-engine database abstraction layer supporting both `DatabaseDialect.SQLITE` and `DatabaseDialect.POSTGRESQL`. Parameter translation (`?` to `%s`), transactional wrappers (`PostgresConnectionWrapper`), row factory parity (`RealDictCursor`), and dialect detection logic have been fully implemented and verified in the test harness.
+- **Code-Level Implementation (Audited & Hardened)**: The application code in `core/db.py` contains a comprehensive dual-engine database abstraction layer supporting both `DatabaseDialect.SQLITE` and `DatabaseDialect.POSTGRESQL`. Parameter translation (`?` to `%s`), dialect query normalization (`INSERT OR IGNORE` -> `ON CONFLICT DO NOTHING`), pragma stripping, transactional wrappers (`PostgresConnectionWrapper`), row factory parity (`DictCursor`), and dialect detection logic have been fully implemented.
+- **Production Safety Invariant (Refusal of Unintended Fallback)**: In production mode (`APP_ENV=production`), `core/db.py` strictly refuses to silently fall back to SQLite when `DATABASE_URL` is missing, raising `RuntimeError: Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode...` unless explicitly authorized via `ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1`.
 - **Physical Staging / Managed PostgreSQL Execution (BLOCKED)**: In the present host execution environment (Linux aarch64 PRoot container), the Docker daemon is unavailable, and no live PostgreSQL 16 network server or managed cloud database instance is currently connected.
-- **Strict Anti-Fabrication Standard**: In accordance with sovereign qualification integrity, **we do not fabricate live PostgreSQL execution**. The runtime execution gate remains explicitly **BLOCKED** until verified against an authorized, running PostgreSQL 16 staging instance.
+- **Strict Anti-Fabrication Standard**: In accordance with sovereign qualification integrity, **we do not fabricate live PostgreSQL execution or container runtime logs**. The runtime execution gate remains explicitly **BLOCKED** until verified against an authorized, running PostgreSQL 16 staging instance.
 
 ---
 
@@ -25,13 +26,26 @@ A physically owned hardware server is **not** required. A properly configured, i
 | Database Option | Qualification Feasibility | Security & Isolation Requirement |
 |---|---|---|
 | **Managed Cloud RDS / Cloud SQL** | **ACCEPTED** (Recommended) | Dedicated VPC / Private Subnet, TLS encryption in transit (`sslmode=verify-full`), automated snapshots, minimum 2 vCPU / 4 GB RAM. |
-| **Managed Serverless (Aurora / Neon)** | **ACCEPTED** | Connection pooler (PgBouncer) configured to handle connection bursts; transaction isolation level `READ COMMITTED`. |
+| **Managed Serverless (Aurora / Neon / Supabase)** | **ACCEPTED** | Connection pooler (PgBouncer) configured to handle connection bursts; transaction isolation level `READ COMMITTED`. |
 | **Self-Hosted Container (Docker / K8s)** | **ACCEPTED** | Dedicated internal bridge network, persistent volume mount, non-root container process, memory limit >= 2GB. |
 | **Direct Host Installation** | **ACCEPTED** | Local Unix domain socket or loopback binding, dedicated system user `postgres`, WAL archiving configured. |
 
 ---
 
-## 3. Staging Verification Acceptance Matrix (Required Proof)
+## 3. SQL Compatibility & Dialect Layer Analysis
+
+| Feature | SQLite Behavior | PostgreSQL Requirement | Implementation in `core/db.py` |
+|---|---|---|---|
+| **Parameter Placeholders** | Positional `?` | Positional `%s` | `PostgresConnectionWrapper.execute()` transforms `?` to `%s` |
+| **Conflict Handling** | `INSERT OR IGNORE` | `ON CONFLICT DO NOTHING` | `PostgresConnectionWrapper._normalize_sql()` transforms syntax |
+| **Pragma Statements** | `PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL` | Syntax error in Postgres | `_normalize_sql()` detects and suppresses PRAGMAs safely |
+| **Row Factory Access** | `sqlite3.Row` (dict + index access) | Tuple by default | Wraps cursor with `psycopg2.extras.DictCursor` |
+| **Silent Fallback Prevention** | Defaults to SQLite | Must fail closed if DB missing in prod | `Database.__init__` raises `RuntimeError` if prod has no `DATABASE_URL` |
+| **Data Types** | Dynamic typing (`TEXT`, `REAL`, `JSON`) | Strict typing (`VARCHAR`, `FLOAT8`, `JSONB`) | Schema DDL maps to ANSI standard SQL types valid on PostgreSQL 16 |
+
+---
+
+## 4. Staging Verification Acceptance Matrix (Required Proof)
 
 To transition this gate from `BLOCKED` to `PASS`, the following evidence must be captured from a live, running PostgreSQL 16 instance:
 
@@ -54,30 +68,15 @@ To transition this gate from `BLOCKED` to `PASS`, the following evidence must be
 
 ---
 
-## 4. Concise Infrastructure Prerequisite Checklist
+## 5. Concise Infrastructure Prerequisite Checklist
 
-To execute Section 3 proof, the operator or infrastructure team must provide:
+To execute Section 4 proof, the operator or infrastructure team must provide:
 
-1. **PostgreSQL 16 Instance**:
-   - Host / Connection endpoint (e.g. `postgres-staging.internal` or Cloud RDS endpoint).
-   - Port (default `5432`).
-   - Database name (`zonata_staging`).
-   - Dedicated service user and strong password.
-2. **Network Routing**:
-   - Outbound network egress from the application runtime to port 5432 on the database host.
-3. **Python PostgreSQL Driver**:
-   - `psycopg2-binary` or `asyncpg` installed in the application container environment (already included in `docker/Dockerfile.api`).
-4. **Environment Variables Configured**:
+1. **Staging Connection String**:
    ```bash
-   export DATABASE_URL="postgresql://zonata_staging_user:StrongSecret123!@postgres-staging.internal:5432/zonata_staging?sslmode=require"
-   export APP_ENV="staging"
-   export ZONATA_STRICT_AUTH="1"
+   DATABASE_URL="postgresql://zonata_app:<STAGING_PASSWORD>@<STAGING_HOST>:5432/zonata_staging?sslmode=require"
    ```
-
----
-
-## 5. Formal Decision
-
-| Evaluation Area | Verdict | Summary |
-|---|---|---|
-| **PostgreSQL Runtime Execution** | **BLOCKED PENDING STAGING RUNTIME PROOF** | Code-level abstractions and compose manifests are validated. Runtime operation remains blocked until an authorized PostgreSQL 16 instance is connected. |
+2. **Access Isolation**: Dedicated disposable database (`zonata_staging`) with zero connection to production customer data.
+3. **Database Version**: PostgreSQL 16.x (or compatible Aurora PostgreSQL 16).
+4. **Driver Availability**: `psycopg2-binary` or `asyncpg` installed in the Python runtime environment.
+5. **Backup Utilities**: `pg_dump` and `pg_restore` (or cloud snapshot trigger access) for DR qualification.

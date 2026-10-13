@@ -275,14 +275,33 @@ Disaster recovery capabilities are verified via automated rehearsal suites:
    docker compose -f docker-compose.prod.yml exec -T postgres dropdb -U zonata_admin zonata_restore_verification
    ```
 
-### 7.3 Cryptographic Key Rotation
-To rotate `ZONATA_AUTH_SECRET`:
-1. Generate new 64-char hex secret: `NEW_SECRET=$(openssl rand -hex 32)`
-2. In `.env.production`:
+### 7.3 Cryptographic Key Rotation & Emergency Retirement
+1. **Generate Cryptographically Secure Secret (256-bit CSPRNG)**:
+   ```bash
+   NEW_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+   ```
+2. **Planned Zero-Downtime Key Rotation**:
+   In `.env.production` (or managed Secret Store):
    - Set `ZONATA_PREVIOUS_AUTH_SECRET=$ZONATA_AUTH_SECRET`
    - Set `ZONATA_AUTH_SECRET=$NEW_SECRET`
-3. Reload API server gracefully: `docker compose -f docker-compose.prod.yml restart zonata-api`
-4. All existing tokens will be accepted during the grace rotation period via `get_verification_keys()`.
+   - Set rotation grace window expiry (e.g. 7 days):
+     ```bash
+     export ZONATA_PREVIOUS_AUTH_SECRET_EXPIRES_AT=$(python3 -c "import time; print(int(time.time() + 86400 * 7))")
+     ```
+   - Reload API server gracefully: `docker compose -f docker-compose.prod.yml restart zonata-api`
+   - Existing tokens signed with the previous key will remain valid during the grace window.
+   - After the window expires, unset `ZONATA_PREVIOUS_AUTH_SECRET`.
+
+3. **Emergency Secret Retirement (Compromised Key)**:
+   If a signing secret is compromised or exposed:
+   - Immediately revoke the compromised key across all cluster instances:
+     ```bash
+     export ZONATA_EMERGENCY_RETIRE_PREVIOUS_KEY=1
+     export ZONATA_REVOKED_AUTH_SECRETS="<COMPROMISED_KEY>"
+     unset ZONATA_PREVIOUS_AUTH_SECRET
+     ```
+   - Generate a fresh CSPRNG secret for `ZONATA_AUTH_SECRET`.
+   - Restart the API cluster. All tokens signed with the compromised key fail closed immediately (HTTP 401).
 
 ### 7.4 Log Rotation
 Ensure Docker daemon log rotation is configured in `/etc/docker/daemon.json`:

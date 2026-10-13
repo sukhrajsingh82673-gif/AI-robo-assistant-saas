@@ -3262,10 +3262,38 @@ class PostgresConnectionWrapper:
     def __init__(self, raw_conn):
         self.raw_conn = raw_conn
 
+    def _normalize_sql(self, sql: str) -> str:
+        # Strip SQLite-specific PRAGMAs that cause syntax errors in PostgreSQL
+        stripped = sql.strip()
+        if stripped.upper().startswith("PRAGMA "):
+            return ""
+
+        # Convert ? placeholders to %s
+        normalized = sql.replace("?", "%s")
+
+        # Handle SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING
+        import re
+        if re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", normalized, re.IGNORECASE):
+            normalized = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+            if "ON CONFLICT" not in normalized.upper():
+                normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
+        return normalized
+
     def execute(self, sql: str, params: Any = ()):
-        # Normalize parameter placeholders: convert SQLite ? to PostgreSQL %s
-        normalized_sql = sql.replace("?", "%s")
-        cursor = self.raw_conn.cursor()
+        normalized_sql = self._normalize_sql(sql)
+        if not normalized_sql:
+            class DummyCursor:
+                def fetchone(self): return None
+                def fetchall(self): return []
+                @property
+                def rowcount(self): return 0
+            return DummyCursor()
+        try:
+            import psycopg2.extras
+            cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        except Exception:
+            cursor = self.raw_conn.cursor()
         cursor.execute(normalized_sql, params)
         return cursor
 
@@ -3297,9 +3325,18 @@ class Database:
     def __init__(self, db_path: Optional[str] = None):
         self.database_url = os.environ.get("DATABASE_URL", "").strip()
         dialect_env = os.environ.get("ZONATA_DB_DIALECT", "").lower()
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+        allow_sqlite = os.environ.get("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", "0") == "1"
+
         if self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
             self.dialect = DatabaseDialect.POSTGRESQL
         else:
+            if is_prod and not allow_sqlite:
+                raise RuntimeError(
+                    "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
+                    "A valid PostgreSQL DATABASE_URL must be configured, or explicitly authorize SQLite via ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1."
+                )
             self.dialect = DatabaseDialect.SQLITE
 
         if db_path is None:

@@ -23,6 +23,32 @@ from core.db import db
 
 
 class TestOverviewProductionRebuild(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import shutil
+        import tempfile
+        cls.orig_db_path = db.db_path
+        cls.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        src_baseline = os.path.join(BASE_DIR, "storage", "roboassistant.db")
+        cls.isolated_db = os.path.join(cls.temp_dir.name, "overview_baseline_copy.db")
+        if os.path.exists(src_baseline):
+            shutil.copy2(src_baseline, cls.isolated_db)
+        os.environ["ZONATA_DB_PATH"] = cls.isolated_db
+        db.set_db_path(cls.isolated_db)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "orig_db_path") and cls.orig_db_path:
+            db.set_db_path(cls.orig_db_path)
+        if hasattr(cls, "orig_env_db_path"):
+            if cls.orig_env_db_path is not None:
+                os.environ["ZONATA_DB_PATH"] = cls.orig_env_db_path
+            else:
+                os.environ.pop("ZONATA_DB_PATH", None)
+        if hasattr(cls, "temp_dir") and cls.temp_dir:
+            cls.temp_dir.cleanup()
+
     def setUp(self):
         self.tenant_id = "tnt_primary"
 

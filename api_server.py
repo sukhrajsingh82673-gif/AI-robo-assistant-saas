@@ -6291,20 +6291,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path.startswith("/api/crm/deals/") and len(path.split("/")) == 5:
             deal_id = path.split("/")[4]
-            stage = req_data.get("stage")
-            if not stage:
-                self._send_json({"error": "stage required"}, status=400)
-                return
             from core.enterprise_crm import EnterpriseCrmService
             svc = EnterpriseCrmService(tenant_id)
             try:
-                res = svc.update_deal_stage(deal_id, stage)
-                if not res.get("updated", True):
-                    self._send_json({"error": "Not Found", "detail": f"Deal '{deal_id}' not found in tenant"}, status=404)
+                if len(req_data) == 1 and "stage" in req_data:
+                    res = svc.update_deal_stage(deal_id, req_data["stage"])
+                else:
+                    res = svc.update_deal(deal_id, req_data)
+                if not res.get("updated", True) and not res.get("deal_id"):
+                    self._send_json({"error": "Not Found", "detail": f"Deal '{deal_id}' not found in current organization"}, status=404)
                     return
                 self._send_json(res)
             except KeyError as e:
                 self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
+            except ValueError as e:
+                self._send_json({"error": "Bad Request", "detail": str(e)}, status=400)
             return
 
         elif path.startswith("/api/crm/customers/") and len(path.split("/")) == 5:
