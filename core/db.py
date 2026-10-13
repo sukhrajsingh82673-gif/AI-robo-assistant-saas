@@ -3319,6 +3319,142 @@ class DatabaseDialect:
     POSTGRESQL = "postgresql"
 
 
+class DictRow(tuple):
+    """Row wrapper that supports both index and column name access."""
+    def __new__(cls, values, col_names):
+        inst = super().__new__(cls, values)
+        inst._col_map = {name: val for name, val in zip(col_names, values)}
+        return inst
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return self._col_map[key]
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        return self._col_map.get(key, default)
+
+    def keys(self):
+        return list(self._col_map.keys())
+
+    def values(self):
+        return list(self._col_map.values())
+
+    def items(self):
+        return list(self._col_map.items())
+
+
+class PostgresCursorWrapper:
+    """Cursor wrapper providing sqlite3.Row / DictCursor parity for pure-Python drivers."""
+    def __init__(self, raw_cursor):
+        self._raw_cursor = raw_cursor
+
+    def __getattr__(self, name):
+        return getattr(self._raw_cursor, name)
+
+    def __iter__(self):
+        while True:
+            row = self.fetchone()
+            if row is None:
+                break
+            yield row
+
+    def fetchone(self):
+        row = self._raw_cursor.fetchone()
+        if row is None:
+            return None
+        if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
+            col_names = [col[0] for col in self._raw_cursor.description]
+            return DictRow(row, col_names)
+        return row
+
+    def fetchall(self):
+        rows = self._raw_cursor.fetchall()
+        if not rows:
+            return []
+        if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
+            col_names = [col[0] for col in self._raw_cursor.description]
+            return [DictRow(r, col_names) for r in rows]
+        return rows
+
+
+class DeferredRow(tuple):
+    """Subscriptable tuple that behaves like an empty/default row during deferred import."""
+    def __new__(cls, values=(0,)):
+        return super().__new__(cls, values)
+
+    def __getitem__(self, item):
+        if isinstance(item, int) and item < len(self):
+            return super().__getitem__(item)
+        if isinstance(item, int):
+            return 0
+        return 0
+
+    def __bool__(self):
+        return False
+
+    def get(self, key, default=0):
+        return default
+
+
+class DeferredCursor:
+    """Cursor that records queries or returns empty results during deferred import mode."""
+    def __init__(self, db_instance, sql="", params=()):
+        self.db = db_instance
+        self.sql = sql
+        self.params = params
+
+    def fetchone(self):
+        return DeferredRow((0,))
+
+    def fetchall(self):
+        return []
+
+    @property
+    def rowcount(self):
+        return 0
+
+    @property
+    def lastrowid(self):
+        return 0
+
+    def __iter__(self):
+        return iter([])
+
+
+class DeferredConnectionProxy:
+    """Proxy connection returned during module import when live database is unreachable."""
+    def __init__(self, db_instance):
+        self.db = db_instance
+
+    def execute(self, sql: str, params: Any = ()):
+        self.db._deferred_queries.append(('execute', sql, params))
+        return DeferredCursor(self.db, sql, params)
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        self.db._deferred_queries.append(('executemany', sql, params_seq))
+        return DeferredCursor(self.db, sql, params_seq)
+
+    def executescript(self, sql_script: str):
+        self.db._deferred_queries.append(('executescript', sql_script, ()))
+        return DeferredCursor(self.db, sql_script)
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 class PostgresConnectionWrapper:
     """Wraps raw PostgreSQL connection with sqlite3-compatible Row and transaction semantics."""
     def __init__(self, raw_conn):
@@ -3350,18 +3486,26 @@ class PostgresConnectionWrapper:
                 def fetchall(self): return []
                 @property
                 def rowcount(self): return 0
+                def __iter__(self): return iter([])
             return DummyCursor()
         try:
             import psycopg2.extras
             cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.execute(normalized_sql, params)
+            return cursor
         except Exception:
             cursor = self.raw_conn.cursor()
-        cursor.execute(normalized_sql, params)
-        return cursor
+            cursor.execute(normalized_sql, params)
+            return PostgresCursorWrapper(cursor)
 
     def executescript(self, sql_script: str):
         cursor = self.raw_conn.cursor()
-        cursor.execute(sql_script)
+        for statement in sql_script.split(";"):
+            stmt = statement.strip()
+            if stmt:
+                norm = self._normalize_sql(stmt)
+                if norm:
+                    cursor.execute(norm)
         return cursor
 
     def commit(self):
@@ -3406,6 +3550,10 @@ class Database:
         else:
             self.dialect = DatabaseDialect.SQLITE
 
+        self._is_ready = (self.dialect == DatabaseDialect.SQLITE)
+        self._deferred_import_mode = (self.dialect == DatabaseDialect.POSTGRESQL)
+        self._deferred_queries = []
+
         if db_path is None:
             self.db_path = get_default_db_path()
         elif db_path.startswith("/roboassistant/") and not os.path.exists("/roboassistant"):
@@ -3434,6 +3582,8 @@ class Database:
             )
         self.db_path = os.path.abspath(new_path)
         self.dialect = DatabaseDialect.SQLITE
+        self._is_ready = True
+        self._deferred_import_mode = False
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
         if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
@@ -3443,6 +3593,8 @@ class Database:
             self._init_db()
 
     def initialize(self):
+        if self.dialect == DatabaseDialect.POSTGRESQL:
+            return self.verify_readiness()
         return self._init_db()
 
     def get_dialect(self) -> str:
@@ -3451,8 +3603,48 @@ class Database:
     def is_postgresql(self) -> bool:
         return self.dialect == DatabaseDialect.POSTGRESQL
 
+    def is_ready(self) -> bool:
+        """Returns True if the database connection has been verified."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            return True
+        return bool(self._is_ready)
+
+    def verify_readiness(self) -> bool:
+        """Verifies genuine database connectivity. Fails closed with actionable sanitized errors."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            self._is_ready = True
+            self._deferred_import_mode = False
+            return True
+
+        if not self.database_url:
+            raise RuntimeError(
+                "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
+                "A valid PostgreSQL DATABASE_URL must be configured."
+            )
+
+        try:
+            conn = self._get_postgresql_connection()
+            with conn:
+                cur = conn.execute("SELECT 1")
+                res = cur.fetchone()
+                if not res or res[0] != 1:
+                    raise RuntimeError("Database readiness probe returned invalid result.")
+            self._is_ready = True
+            self._deferred_import_mode = False
+            self._init_db()
+            return True
+        except Exception as e:
+            self._is_ready = False
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
+            raise RuntimeError(
+                f"Database Readiness Verification Failed for '{sanitized_url}': {sanitized_err}"
+            )
+
     def get_connection(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:
+            if self._deferred_import_mode and not self._is_ready:
+                return DeferredConnectionProxy(self)
             return self._get_postgresql_connection()
         conn = sqlite3.connect(self.db_path, timeout=60.0)
         conn.row_factory = sqlite3.Row
@@ -3463,6 +3655,7 @@ class Database:
         return conn
 
     def _get_postgresql_connection(self):
+        # 1. Try psycopg2 driver
         try:
             import psycopg2
             import psycopg2.extras
@@ -3470,9 +3663,37 @@ class Database:
             raw_conn.autocommit = False
             return PostgresConnectionWrapper(raw_conn)
         except ImportError:
+            pass
+        except Exception as e:
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
             raise RuntimeError(
-                "PostgreSQL driver (psycopg2) is not installed in the runtime environment. "
-                "Install psycopg2-binary or configure SQLITE dialect."
+                f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}"
+            )
+
+        # 2. Fallback to pg8000 pure-Python driver
+        try:
+            import pg8000
+            parsed = urllib.parse.urlsplit(self.database_url)
+            user = parsed.username or "postgres"
+            password = parsed.password or ""
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 5432
+            database = parsed.path.lstrip("/") or "postgres"
+            raw_conn = pg8000.connect(
+                user=user,
+                password=password,
+                host=host,
+                port=port,
+                database=database,
+                timeout=10
+            )
+            raw_conn.autocommit = False
+            return PostgresConnectionWrapper(raw_conn)
+        except ImportError:
+            raise RuntimeError(
+                "PostgreSQL driver (psycopg2 or pg8000) is not installed in the runtime environment. "
+                "Install psycopg2-binary or pg8000."
             )
         except Exception as e:
             sanitized_url = sanitize_db_url(self.database_url)

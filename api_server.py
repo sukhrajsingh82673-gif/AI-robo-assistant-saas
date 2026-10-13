@@ -472,7 +472,27 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         query_params = urllib.parse.parse_qs(parsed.query)
 
         # Standard Health & Liveness Endpoints (Public)
-        if path in ("/health", "/healthz", "/livez", "/readyz", "/api/v1/health"):
+        if path == "/readyz":
+            if not db.is_ready():
+                self._send_json({
+                    "status": "UNREADY",
+                    "database": "UNAVAILABLE",
+                    "error": "Database readiness verification not completed",
+                    "timestamp": time.time()
+                }, status=503)
+                return
+            self._send_json({
+                "status": "HEALTHY",
+                "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
+                "version": "1.0.0-GA",
+                "database": "CONNECTED",
+                "merkle_ledger": "INTEGRITY_VERIFIED",
+                "server_mode": "MULTI_THREADED_CONCURRENT",
+                "timestamp": time.time()
+            })
+            return
+
+        if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
@@ -6478,6 +6498,12 @@ def run_server(port=8080):
     is_prod = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
     if is_prod and os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1":
         raise RuntimeError("Security Invariant Violation: ZONATA_ALLOW_HOST_SHELL=1 is strictly prohibited in production mode. Refusing server startup.")
+
+    # Enforce database connectivity readiness verification before binding or starting workers
+    db.verify_readiness()
+    from core.database_engine import engine
+    engine.verify_readiness()
+
     print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} (Multi-Threaded Concurrent Engine)...")
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
     print("[*] Universal Automation Fabric Background Worker ACTIVE")

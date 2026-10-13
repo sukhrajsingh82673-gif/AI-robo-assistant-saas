@@ -1,0 +1,10 @@
+# URA / ZONATA Universal AI Company Operating System
+# Production Runtime Dependencies Manifest
+# Pinned packages for reproducible container builds and host runtimes
+
+psycopg2-binary==2.9.9
+pg8000>=1.31.5
+PyYAML==6.0.1
+numpy>=1.26.4
+pandas>=2.2.2
+python-dateutil==2.9.0.post0
