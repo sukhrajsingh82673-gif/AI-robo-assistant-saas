@@ -3,113 +3,81 @@
 **Report Date**: 13 October 2026  
 **Audited Branch**: `engineering/production-readiness-gap-closure`  
 **Audited Subsystems**: `core/db.py`, `docker-compose.prod.yml`, `PRODUCTION_DEPLOYMENT_RUNBOOK.md`  
-**Formal Verdict**: **CONDITIONAL PASS / BLOCKED**
+**Formal Verdict**: **BLOCKED PENDING STAGING RUNTIME PROOF**
 
 ---
 
 ## 1. Executive Summary & Verdict Rationale
 
-This qualification report audits the database engine implementation, dialect abstractions, and deployment wiring for PostgreSQL 16 support in URA / ZONATA Enterprise SaaS.
+This qualification report audits the database engine implementation, dialect abstractions, and operational readiness for PostgreSQL 16 support in URA / ZONATA Enterprise SaaS.
 
-### Verdict: CONDITIONAL PASS / BLOCKED
-- **Code-Level Implementation (PASS)**: The application code in `core/db.py` contains a complete dual-engine database abstraction layer supporting both `DatabaseDialect.SQLITE` and `DatabaseDialect.POSTGRESQL`. Parameter translation (`?` to `%s`), transactional wrappers (`PostgresConnectionWrapper`), row factory parity (`RealDictCursor`), and dialect detection logic have been fully implemented and verified via automated test suites.
-- **Physical Staging / Production Execution (BLOCKED)**: In the present host execution environment (Linux aarch64 PRoot container), the Docker daemon is unavailable, and a live PostgreSQL 16 network server is not running. In accordance with strict qualification standards, **we do not fabricate live staging execution**. Live production authorization remains blocked until the physical PostgreSQL cluster is provisioned and verified end-to-end.
+### Verdict: BLOCKED PENDING STAGING RUNTIME PROOF
+- **Code-Level Implementation (Audited & Ready)**: The application code in `core/db.py` contains a complete dual-engine database abstraction layer supporting both `DatabaseDialect.SQLITE` and `DatabaseDialect.POSTGRESQL`. Parameter translation (`?` to `%s`), transactional wrappers (`PostgresConnectionWrapper`), row factory parity (`RealDictCursor`), and dialect detection logic have been fully implemented and verified in the test harness.
+- **Physical Staging / Managed PostgreSQL Execution (BLOCKED)**: In the present host execution environment (Linux aarch64 PRoot container), the Docker daemon is unavailable, and no live PostgreSQL 16 network server or managed cloud database instance is currently connected.
+- **Strict Anti-Fabrication Standard**: In accordance with sovereign qualification integrity, **we do not fabricate live PostgreSQL execution**. The runtime execution gate remains explicitly **BLOCKED** until verified against an authorized, running PostgreSQL 16 staging instance.
 
 ---
 
-## 2. Dialect Abstraction Code Audit (`core/db.py`)
+## 2. Infrastructure Qualification Criteria: Managed vs. Self-Hosted
 
-A rigorous line-by-line inspection of `core/db.py` confirms that the database engine dynamically adapts based on environment configuration:
+A physically owned hardware server is **not** required. A properly configured, isolated, and secured managed PostgreSQL service satisfies all staging and production database requirements:
 
-### 2.1 Dialect Detection & Activation
-The database engine automatically determines whether to operate in SQLite or PostgreSQL mode:
-```python
-class DatabaseDialect(str, Enum):
-    SQLITE = "sqlite"
-    POSTGRESQL = "postgresql"
+| Database Option | Qualification Feasibility | Security & Isolation Requirement |
+|---|---|---|
+| **Managed Cloud RDS / Cloud SQL** | **ACCEPTED** (Recommended) | Dedicated VPC / Private Subnet, TLS encryption in transit (`sslmode=verify-full`), automated snapshots, minimum 2 vCPU / 4 GB RAM. |
+| **Managed Serverless (Aurora / Neon)** | **ACCEPTED** | Connection pooler (PgBouncer) configured to handle connection bursts; transaction isolation level `READ COMMITTED`. |
+| **Self-Hosted Container (Docker / K8s)** | **ACCEPTED** | Dedicated internal bridge network, persistent volume mount, non-root container process, memory limit >= 2GB. |
+| **Direct Host Installation** | **ACCEPTED** | Local Unix domain socket or loopback binding, dedicated system user `postgres`, WAL archiving configured. |
+
+---
+
+## 3. Staging Verification Acceptance Matrix (Required Proof)
+
+To transition this gate from `BLOCKED` to `PASS`, the following evidence must be captured from a live, running PostgreSQL 16 instance:
+
 ```
-The active dialect is derived from environment variables:
-1. `os.environ.get("DATABASE_URL")` with schema `postgres://` or `postgresql://`.
-2. Presence of `POSTGRES_HOST`, `POSTGRES_DB`, or `POSTGRES_USER`.
-3. If neither is present, it safely defaults to SQLite for local development and test runs.
-
-### 2.2 Parameter Normalization (`?` to `%s`)
-To allow identical business logic queries across SQLite and PostgreSQL, `PostgresConnectionWrapper` automatically normalizes query syntax:
-- Translates SQLite-style positional placeholders (`?`) to PostgreSQL-style positional format (`%s`).
-- Handles quote escaping and strings containing question marks without syntax degradation.
-- Ensures identical query parameters `(param1, param2)` can be passed unchanged.
-
-### 2.3 Row Factory Parity
-In SQLite mode, `conn.row_factory = sqlite3.Row` provides key-value dictionary access. In PostgreSQL mode, the wrapper utilizes `psycopg2.extras.RealDictCursor` to ensure identical return type contracts (`row["column_name"]`) across all business services (`EnterpriseCrmService`, `OverviewDataService`, `FinanceEngine`).
-
-### 2.4 Transaction & Connection Lifecycle
-- `get_connection()` functions as a context manager (`with db.get_connection() as conn:`).
-- Automatically commits on block exit without exception.
-- Executes `conn.rollback()` immediately on exception.
-- Closes or returns the connection to the connection pool on teardown.
-
----
-
-## 3. Database Packaging & Service Architecture
-
-The multi-container deployment architecture defined in `docker-compose.prod.yml` defines the PostgreSQL service:
-
-```yaml
-  db:
-    image: postgres:16-alpine
-    restart: always
-    environment:
-      POSTGRES_DB: zonata_prod
-      POSTGRES_USER: ${POSTGRES_USER:-zonata_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infra/init_pg.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zonata_admin} -d zonata_prod"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - zonata_backend
+[ API Server ] ---> (DATABASE_URL=postgresql://user:pass@host:5432/zonata_staging)
+                          |
+                          v
+         [ PostgreSQL 16 Staging Database ]
 ```
 
-### Key Architectural Controls:
-- **Network Isolation**: PostgreSQL is bound exclusively to the private internal `zonata_backend` bridge network, preventing direct exposure to public WAN ports.
-- **Persistent Volume**: Database tables persist in `postgres_data` Docker volume across container restarts and updates.
-- **Connection Health Checks**: Orchestrator waits for `pg_isready` before starting `app` and `api` services (`depends_on: db: condition: service_healthy`).
+| Verification Item | Acceptance Criteria | Target Evidence | Status |
+|---|---|---|---|
+| **1. Genuine PostgreSQL Connection** | Running API connects to PostgreSQL and does not fall back to SQLite | `SELECT version()` returns PostgreSQL 16.x in API startup logs | **BLOCKED** |
+| **2. Fresh Migration Execution** | Schema tables (`users`, `crm_customers`, `crm_deals`, `auth_credentials`, `system_settings`) created cleanly on empty database | Information schema table inventory; zero migration errors | **BLOCKED** |
+| **3. Core Persistence** | User registration, authentication, CRM accounts, and settings persist and reload | Records queried directly via `psql` and returned by API | **BLOCKED** |
+| **4. Tenant Isolation Enforcement** | Cross-tenant queries return empty sets; cross-tenant updates/deletes return 404 | SQL logs confirming `tenant_id` scoping on all executed queries | **BLOCKED** |
+| **5. Concurrency & Transactions** | Concurrent writes succeed; transaction rollbacks clean up uncommitted rows | Zero deadlocks; rollback leaves no orphaned rows | **BLOCKED** |
+| **6. Reconnection & Restart** | Application survives database restart and reconnects automatically without crashing | Connection pool re-establishes socket connection | **BLOCKED** |
+| **7. Backup & Restore Rehearsal** | `pg_dump` snapshot archive restored to disposable verification database | Zero data loss; row counts and foreign keys intact | **BLOCKED** |
 
 ---
 
-## 4. Protected Reference Invariant Safeguards
+## 4. Concise Infrastructure Prerequisite Checklist
 
-A critical code audit finding in `core/db.py` was the implementation of runtime guards preventing schema mutation of protected baseline files:
-- When running in SQLite mode, `_init_db()` checks if the target path is `storage/roboassistant.db`.
-- If matched, DDL script execution (`executescript(SCHEMA_SQL)`) is completely bypassed to prevent modifying the certified reference database (`ba738b...`).
-- When operating in test mode, `configure_isolated_test_db(path)` directs all initialization and DDL writes to disposable temporary paths.
+To execute Section 3 proof, the operator or infrastructure team must provide:
 
----
-
-## 5. Outstanding Physical Prerequisites for Production Unblock
-
-To transition the PostgreSQL Qualification Verdict from `CONDITIONAL PASS / BLOCKED` to `PASS`:
-
-1. **Physical Database Instance**: Deploy a dedicated PostgreSQL 16 cluster (AWS RDS, GCP Cloud SQL, or Kubernetes CloudNativePG).
-2. **Connectivity & Migration Execution**:
-   - Run live migrations from `app` container to the live PostgreSQL instance.
-   - Execute verification query:
-     ```sql
-     SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
-     ```
-3. **Multi-Tenant Scoped CRUD Re-verification**:
-   - Execute live customer creation, deal creation, and authentication requests against the PostgreSQL instance.
-4. **Automated Backup & Restore Drill**:
-   - Execute `pg_dump` snapshot and restore drill on the physical instance with zero errors.
+1. **PostgreSQL 16 Instance**:
+   - Host / Connection endpoint (e.g. `postgres-staging.internal` or Cloud RDS endpoint).
+   - Port (default `5432`).
+   - Database name (`zonata_staging`).
+   - Dedicated service user and strong password.
+2. **Network Routing**:
+   - Outbound network egress from the application runtime to port 5432 on the database host.
+3. **Python PostgreSQL Driver**:
+   - `psycopg2-binary` or `asyncpg` installed in the application container environment (already included in `docker/Dockerfile.api`).
+4. **Environment Variables Configured**:
+   ```bash
+   export DATABASE_URL="postgresql://zonata_staging_user:StrongSecret123!@postgres-staging.internal:5432/zonata_staging?sslmode=require"
+   export APP_ENV="staging"
+   export ZONATA_STRICT_AUTH="1"
+   ```
 
 ---
 
-## 6. Formal Decision
+## 5. Formal Decision
 
 | Evaluation Area | Verdict | Summary |
 |---|---|---|
-| **The PostgreSQL Path** | **CONDITIONAL PASS / BLOCKED** | Code abstractions, placeholder translations, and compose manifests are 100% verified. Live deployment remains blocked until a physical PostgreSQL cluster is provisioned and qualified. |
+| **PostgreSQL Runtime Execution** | **BLOCKED PENDING STAGING RUNTIME PROOF** | Code-level abstractions and compose manifests are validated. Runtime operation remains blocked until an authorized PostgreSQL 16 instance is connected. |

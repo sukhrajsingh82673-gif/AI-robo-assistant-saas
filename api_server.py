@@ -557,6 +557,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"deals": deals, "total": len(deals)})
             return
 
+        elif path.startswith("/api/crm/deals/"):
+            deal_id = path.split("/api/crm/deals/")[1].split("?")[0].strip()
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            d = svc.get_deal(deal_id)
+            if d:
+                self._send_json(d)
+            else:
+                self._send_json({"error": "Deal not found"}, status=404)
+            return
+
         if path in ("/api/overview", "/api/overview/snapshot"):
             cid = query_params.get("company_id", [None])[0]
             if cid in ("", "ALL", "null", "undefined", "portfolio"):
@@ -6286,8 +6297,25 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
             from core.enterprise_crm import EnterpriseCrmService
             svc = EnterpriseCrmService(tenant_id)
-            res = svc.update_deal_stage(deal_id, stage)
-            self._send_json(res)
+            try:
+                res = svc.update_deal_stage(deal_id, stage)
+                if not res.get("updated", True):
+                    self._send_json({"error": "Not Found", "detail": f"Deal '{deal_id}' not found in tenant"}, status=404)
+                    return
+                self._send_json(res)
+            except KeyError as e:
+                self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
+            return
+
+        elif path.startswith("/api/crm/customers/") and len(path.split("/")) == 5:
+            cust_id = path.split("/")[4]
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            try:
+                res = svc.update_customer(cust_id, req_data)
+                self._send_json(res)
+            except KeyError as e:
+                self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
             return
 
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
@@ -6365,6 +6393,32 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             ok = gw.disconnect_connection(conn_id)
             self._send_json({"success": ok, "connection_id": conn_id})
+            return
+        elif path.startswith("/api/crm/customers/") and len(path.split("/")) == 5:
+            cust_id = path.split("/")[4]
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            try:
+                ok = svc.delete_customer(cust_id)
+                if ok:
+                    self._send_json({"success": True, "customer_id": cust_id})
+                else:
+                    self._send_json({"error": "Not Found", "detail": f"Customer '{cust_id}' not found in tenant"}, status=404)
+            except KeyError as e:
+                self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
+            return
+        elif path.startswith("/api/crm/deals/") and len(path.split("/")) == 5:
+            deal_id = path.split("/")[4]
+            from core.enterprise_crm import EnterpriseCrmService
+            svc = EnterpriseCrmService(tenant_id)
+            try:
+                ok = svc.delete_deal(deal_id)
+                if ok:
+                    self._send_json({"success": True, "deal_id": deal_id})
+                else:
+                    self._send_json({"error": "Not Found", "detail": f"Deal '{deal_id}' not found in tenant"}, status=404)
+            except KeyError as e:
+                self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
             return
         self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
 

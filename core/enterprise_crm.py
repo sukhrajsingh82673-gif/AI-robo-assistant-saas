@@ -137,7 +137,7 @@ class EnterpriseCrmService:
                 except Exception:
                     c["contacts"] = []
 
-            # Attach deals for this customer
+            # Attach deals for this customer (strictly scoped to this tenant)
             deals_rows = conn.execute(
                 "SELECT * FROM crm_deals WHERE customer_id = ? AND tenant_id = ? ORDER BY created_at DESC",
                 (customer_id, self.tenant_id)
@@ -148,6 +148,58 @@ class EnterpriseCrmService:
                 dd["id"] = dd.get("deal_id")
                 c["deals"].append(dd)
             return c
+
+    def update_customer(self, customer_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Updates customer attributes strictly within tenant boundary."""
+        now = time.time()
+        with db.get_connection() as conn:
+            # Check existence and ownership
+            existing = conn.execute(
+                "SELECT customer_id FROM crm_customers WHERE customer_id = ? AND tenant_id = ?",
+                (customer_id, self.tenant_id)
+            ).fetchone()
+            if not existing:
+                raise KeyError(f"Customer '{customer_id}' not found in tenant '{self.tenant_id}'")
+
+            updates = []
+            params = []
+            for field in ["name", "legal_name", "tier", "industry", "status", "gstin", "address", "sla_level", "renewal_date", "assigned_agent"]:
+                if field in data:
+                    updates.append(f"{field} = ?")
+                    params.append(data[field])
+            for num_field in ["health_score", "arr", "ltv"]:
+                if num_field in data:
+                    updates.append(f"{num_field} = ?")
+                    params.append(_parse_float(data[num_field]))
+            if "contacts" in data:
+                updates.append("contacts = ?")
+                params.append(json.dumps(data["contacts"]) if isinstance(data["contacts"], (list, dict)) else "[]")
+
+            if updates:
+                updates.append("updated_at = ?")
+                params.append(now)
+                params.extend([customer_id, self.tenant_id])
+                query = f"UPDATE crm_customers SET {', '.join(updates)} WHERE customer_id = ? AND tenant_id = ?"
+                conn.execute(query, params)
+                conn.commit()
+
+        return self.get_customer(customer_id) or {"customer_id": customer_id, "updated": True}
+
+    def delete_customer(self, customer_id: str) -> bool:
+        """Deletes customer and associated deals, strictly within tenant boundary."""
+        with db.get_connection() as conn:
+            cur = conn.execute(
+                "DELETE FROM crm_customers WHERE customer_id = ? AND tenant_id = ?",
+                (customer_id, self.tenant_id)
+            )
+            deleted = cur.rowcount > 0
+            if deleted:
+                conn.execute(
+                    "DELETE FROM crm_deals WHERE customer_id = ? AND tenant_id = ?",
+                    (customer_id, self.tenant_id)
+                )
+            conn.commit()
+        return deleted
 
     def list_deals(self, company_id: Optional[str] = None, stage: Optional[str] = None) -> List[Dict[str, Any]]:
         with db.get_connection() as conn:
@@ -171,11 +223,31 @@ class EnterpriseCrmService:
                 deals.append(d)
             return deals
 
+    def get_deal(self, deal_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a single deal strictly scoped to tenant."""
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM crm_deals WHERE deal_id = ? AND tenant_id = ?",
+                (deal_id, self.tenant_id)
+            ).fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            d["id"] = d.get("deal_id")
+            return d
+
     def create_deal(self, company_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         deal_id = data.get("deal_id") or f"deal_{uuid.uuid4().hex[:8]}"
         title = data.get("title", "").strip()
         if not title:
             raise ValueError("Deal title is required")
+
+        # Object Ownership Check: Verify referenced customer belongs to this tenant
+        cust_id = data.get("customer_id")
+        if cust_id:
+            cust = self.get_customer(cust_id)
+            if not cust:
+                raise ValueError(f"Direct Object Access Violation: Customer '{cust_id}' not found in tenant '{self.tenant_id}'")
 
         now = time.time()
         with db.get_connection() as conn:
@@ -190,7 +262,7 @@ class EnterpriseCrmService:
                     deal_id,
                     self.tenant_id,
                     company_id,
-                    data.get("customer_id"),
+                    cust_id,
                     title,
                     data.get("stage", "discovery"),
                     _parse_float(data.get("value", 0.0)),
@@ -206,11 +278,24 @@ class EnterpriseCrmService:
         return {"deal_id": deal_id, "success": True}
 
     def update_deal_stage(self, deal_id: str, stage: str) -> Dict[str, Any]:
+        """Updates deal stage, strictly scoped to tenant."""
         now = time.time()
         with db.get_connection() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "UPDATE crm_deals SET stage = ?, updated_at = ? WHERE deal_id = ? AND tenant_id = ?",
                 (stage, now, deal_id, self.tenant_id)
             )
+            updated = cur.rowcount > 0
             conn.commit()
-        return {"deal_id": deal_id, "stage": stage, "updated_at": now}
+        return {"deal_id": deal_id, "stage": stage, "updated_at": now, "updated": updated}
+
+    def delete_deal(self, deal_id: str) -> bool:
+        """Deletes deal, verifying tenant ownership."""
+        with db.get_connection() as conn:
+            cur = conn.execute(
+                "DELETE FROM crm_deals WHERE deal_id = ? AND tenant_id = ?",
+                (deal_id, self.tenant_id)
+            )
+            deleted = cur.rowcount > 0
+            conn.commit()
+        return deleted

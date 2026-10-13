@@ -137,13 +137,38 @@ class TenantManager:
             return [dict(r) for r in rows]
 
 class RateLimiter:
-    """Sliding-window rate limiter for sensitive authentication endpoints."""
+    """Sliding-window rate limiter for sensitive authentication endpoints supporting distributed instances."""
     _records: Dict[str, List[float]] = {}
     _lock = threading.Lock()
 
     @classmethod
     def is_allowed(cls, key: str, max_requests: int = 5, window_seconds: float = 60.0) -> Tuple[bool, int]:
         now = time.time()
+        # Attempt database-backed distributed sliding window across cluster instances
+        try:
+            with db.get_connection() as conn:
+                conn.execute(
+                    "DELETE FROM auth_rate_limits WHERE rate_key = ? AND attempt_timestamp < ?",
+                    (key, now - window_seconds)
+                )
+                rows = conn.execute(
+                    "SELECT attempt_timestamp FROM auth_rate_limits WHERE rate_key = ? ORDER BY attempt_timestamp ASC",
+                    (key,)
+                ).fetchall()
+                if len(rows) >= max_requests:
+                    oldest = rows[0][0] if isinstance(rows[0], (tuple, list)) else rows[0]["attempt_timestamp"]
+                    retry_after = int(window_seconds - (now - oldest)) + 1
+                    return False, max(1, retry_after)
+                conn.execute(
+                    "INSERT INTO auth_rate_limits (rate_key, attempt_timestamp) VALUES (?, ?)",
+                    (key, now)
+                )
+                conn.commit()
+                return True, 0
+        except Exception:
+            # Fallback to local in-memory sliding window if rate_limits table not migrated
+            pass
+
         with cls._lock:
             timestamps = cls._records.get(key, [])
             valid_timestamps = [t for t in timestamps if now - t < window_seconds]
@@ -156,19 +181,72 @@ class RateLimiter:
             return True, 0
 
 
-def hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
-    """Computes PBKDF2-HMAC-SHA256 hash with unique cryptographic salt."""
+DEFAULT_PBKDF2_ITERATIONS = 100000
+
+def evaluate_secret_entropy(secret: str) -> Dict[str, Any]:
+    """
+    Evaluates Shannon entropy and character distribution of a signing secret.
+    Distinguishes raw secret length from true cryptographic entropy.
+    """
+    import math
+    from collections import Counter
+    if not secret:
+        return {"length": 0, "entropy_bits_per_char": 0.0, "total_entropy_bits": 0.0, "unique_chars": 0, "is_high_entropy": False}
+    counts = Counter(secret)
+    total = len(secret)
+    entropy_per_char = -sum((c / total) * math.log2(c / total) for c in counts.values())
+    total_entropy = entropy_per_char * total
+    unique_chars = len(counts)
+    is_high_entropy = (total >= 32) and (entropy_per_char >= 3.0) and (unique_chars >= 10)
+    return {
+        "length": total,
+        "entropy_bits_per_char": round(entropy_per_char, 3),
+        "total_entropy_bits": round(total_entropy, 1),
+        "unique_chars": unique_chars,
+        "is_high_entropy": is_high_entropy
+    }
+
+
+def hash_password(password: str, salt: Optional[str] = None, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> Tuple[str, str]:
+    """
+    Computes PBKDF2-HMAC-SHA256 hash with unique cryptographic salt.
+    Encodes iterations metadata in prefix to support future algorithm and parameter upgrades.
+    """
     import secrets
     if not salt:
         salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
-    return hashed, salt
+    raw_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
+    formatted = f"pbkdf2_sha256${iterations}${salt}${raw_hash}"
+    return formatted, salt
+
+
+def verify_password_with_upgrade(password: str, salt: str, expected_hash: str) -> Tuple[bool, bool]:
+    """
+    Constant-time verification of supplied password against PBKDF2 digest.
+    Returns: (is_valid: bool, needs_upgrade: bool)
+    """
+    if expected_hash.startswith("pbkdf2_sha256$"):
+        parts = expected_hash.split("$")
+        if len(parts) == 4:
+            _, iter_str, stored_salt, stored_hash = parts
+            try:
+                iterations = int(iter_str)
+                computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), stored_salt.encode("utf-8"), iterations).hex()
+                is_valid = hmac.compare_digest(computed, stored_hash)
+                needs_upgrade = iterations < DEFAULT_PBKDF2_ITERATIONS
+                return is_valid, needs_upgrade
+            except Exception:
+                pass
+    # Backward compatibility with unformatted raw hex hashes
+    computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), DEFAULT_PBKDF2_ITERATIONS).hex()
+    is_valid = hmac.compare_digest(computed, expected_hash)
+    return is_valid, True
 
 
 def verify_password(password: str, salt: str, expected_hash: str) -> bool:
     """Constant-time verification of supplied password against PBKDF2 digest."""
-    actual_hash, _ = hash_password(password, salt=salt)
-    return hmac.compare_digest(actual_hash, expected_hash)
+    is_valid, _ = verify_password_with_upgrade(password, salt, expected_hash)
+    return is_valid
 
 
 class UserManager:
@@ -261,12 +339,19 @@ class UserManager:
                 remaining = int(cred["locked_until"] - now)
                 return False, None, f"Account temporarily locked due to failed attempts. Try again in {remaining}s."
 
-            is_valid = verify_password(password, cred["salt"], cred["password_hash"])
+            is_valid, needs_upgrade = verify_password_with_upgrade(password, cred["salt"], cred["password_hash"])
             if is_valid:
-                conn.execute(
-                    "UPDATE auth_credentials SET failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ?",
-                    (now, uid)
-                )
+                if needs_upgrade:
+                    new_hash, new_salt = hash_password(password)
+                    conn.execute(
+                        "UPDATE auth_credentials SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ?",
+                        (new_hash, new_salt, now, uid)
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE auth_credentials SET failed_attempts = 0, locked_until = 0, updated_at = ? WHERE user_id = ?",
+                        (now, uid)
+                    )
                 conn.commit()
                 return True, user_dict, "OK"
             else:

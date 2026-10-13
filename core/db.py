@@ -66,6 +66,13 @@ CREATE TABLE IF NOT EXISTS auth_revoked_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_auth_revoked_tokens ON auth_revoked_tokens(token_id);
 
+-- 2d. Distributed Rate Limit Events
+CREATE TABLE IF NOT EXISTS auth_rate_limits (
+    rate_key TEXT NOT NULL,
+    attempt_timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_key ON auth_rate_limits(rate_key, attempt_timestamp);
+
 -- 3. Companies & Operating Contexts
 CREATE TABLE IF NOT EXISTS companies (
     company_id TEXT PRIMARY KEY,

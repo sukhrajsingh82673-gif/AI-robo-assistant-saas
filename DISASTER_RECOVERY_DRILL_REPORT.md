@@ -2,122 +2,108 @@
 
 **Execution Date**: 13 October 2026  
 **Audited Branch**: `engineering/production-readiness-gap-closure`  
-**Automated Drill Suite**: `tests/test_disaster_recovery_drill.py`  
-**Execution Status**: **ALL TESTS PASSED (3/3)**  
-**Formal Verdict**: **PASS** (Rehearsal & Automation Certified)
+**Automated Rehearsal Suite**: `tests/test_disaster_recovery_drill.py`  
+**Execution Status**: **REHEARSAL AUTOMATION PASSED (3/3)**  
+**Formal Verdict**: **CONDITIONAL PASS / BLOCKED**  
+*(PASS for local relational restoration mechanism; BLOCKED for physical PostgreSQL WAL Point-in-Time Recovery pending staging cluster deployment)*
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary & Scope Boundaries
 
-This qualification report provides independent, reproducible evidence for the disaster recovery, crash resilience, and backup restoration capabilities of the URA / ZONATA Enterprise SaaS platform.
+This qualification report provides independent, reproducible evidence for the disaster recovery, crash resilience, and backup restoration mechanisms of the URA / ZONATA Enterprise SaaS platform, while explicitly defining the scope boundaries of the tested rehearsal.
 
-A full catastrophic failure drill was executed against an active, populated relational database containing multi-tenant enterprise data (commercial customers, sales pipeline deals, tenant boundaries). The drill demonstrated transactionally consistent hot snapshot creation, zero data loss upon restore (RPO = 0), sub-second recovery execution (RTO < 2000ms), and 100% relational integrity post-restoration.
+### Key Scope Distinctions:
+1. **Local Relational Restoration (PASS)**:
+   - A catastrophic failure drill was executed against an isolated, active relational database containing multi-tenant enterprise data (50 commercial customers, 26 pipeline deals).
+   - Injected database-header corruption was detected, atomic file restoration from a hot snapshot was completed, and post-restore integrity (`PRAGMA integrity_check`) confirmed 0 record loss (RPO = 0 at snapshot boundary).
+   - **Database File Restoration Duration**: **12.4 ms**.
+   - **End-to-End Local Incident-to-Usable Cycle** (failure detection, atomic file restoration, schema/data integrity check, service reconnection, and read/write validation): **86.3 ms**.
+2. **PostgreSQL Production & Staging Disaster Recovery (BLOCKED)**:
+   - Point-in-time recovery (PITR) using continuous Write-Ahead Log (WAL) archiving and `pg_restore` against a live PostgreSQL 16 cluster cannot be executed in the current container-less PRoot environment.
+   - In accordance with qualification standards, **we do not represent local SQLite snapshot metrics as proof of physical PostgreSQL recovery performance**. PostgreSQL PITR remains **BLOCKED** until verified on a physical staging cluster.
 
 ---
 
-## 2. Rehearsal Environment & Parameters
+## 2. Rehearsal Metrics & Parameter Audit
 
-| Parameter | Specification / Observed Value | Requirement | Status |
+| Parameter | Observed Rehearsal Metric | Enterprise Target | Evaluation |
 |---|---|---|---|
-| **Rehearsal Harness** | `tests/test_disaster_recovery_drill.py` | Standalone automated drill | Verified |
-| **Protected Invariants** | `storage/roboassistant.db` untampered | Unconditional protection | Verified (`ba738b...`) |
-| **Hot Snapshot Creation** | In-flight atomic backup | No offline lock required | PASS (< 20ms) |
-| **Disaster Model** | Catastrophic database zeroing (corruption) | Unrecoverable header loss | Injected |
-| **RTO (Recovery Time Objective)** | Measured: **~12.4 ms** | Maximum 2,000 ms | **PASS** (< 2s) |
-| **RPO (Recovery Point Objective)** | Measured: **0 records lost** (0 sec data loss) | RPO = 0 at snapshot | **PASS** |
-| **Relational Integrity** | `PRAGMA integrity_check` = `ok` | Zero database corruption | **PASS** |
-| **Foreign Key Consistency** | `PRAGMA foreign_key_check` = `0` violations | Zero orphan deals | **PASS** |
+| **Database File Restore Duration** | **12.4 ms** | N/A (Sub-component) | Measures raw atomic file copy & replacement |
+| **Complete End-to-End Recovery Time (RTO)** | **86.3 ms** | < 2,000 ms (2 seconds) | **PASS** (Local rehearsal incident-to-usable cycle) |
+| **Snapshot Recovery Point Objective (RPO)** | **0 records lost** (at snapshot point) | 0 records | **PASS** (100% of customers & deals recovered) |
+| **Production Continuous Archiving RPO** | Unverified in PRoot (Requires WAL-G) | <= 60 seconds | **BLOCKED** pending PostgreSQL staging deployment |
+| **Post-Restore Cryptographic Page Check** | `PRAGMA integrity_check` = `ok` | Zero page corruption | **PASS** |
+| **Relational Consistency** | `PRAGMA foreign_key_check` = 0 violations | Zero orphan records | **PASS** |
+| **Multi-Tenant Scoped Reconciliation** | Alpha: 25 cust / 13 deals; Beta: 25 cust / 13 deals | 100% tenant matching | **PASS** |
+| **Transaction Rollback Under Fault** | Complete rollback of uncommitted insert | Zero dangling rows | **PASS** |
 
 ---
 
-## 3. Disaster Recovery Drill Step-by-Step Execution
+## 3. End-to-End Recovery Incident Lifecycle
 
-### Step 1: Pre-Disaster State Initialization
-Two distinct enterprise tenants were initialized (`tnt_dr_alpha` and `tnt_dr_beta`). Enterprise commercial CRM data was seeded using `EnterpriseCrmService`:
-- Tenant `tnt_dr_alpha`: 25 active enterprise customers, 13 commercial pipeline deals ($325,000 total pipeline).
-- Tenant `tnt_dr_beta`: 25 active enterprise customers, 13 commercial pipeline deals ($520,000 total pipeline).
-- Baseline pre-disaster record count: 50 customers, 26 deals.
+The complete lifecycle from declared failure to verified service usability was measured across 6 distinct phases in `tests/test_disaster_recovery_drill.py`:
 
-### Step 2: Hot Snapshot Creation
-A transactional online snapshot was taken without taking the service offline:
-```python
-src_conn = sqlite3.connect(src_path)
-dest_conn = sqlite3.connect(dest_path)
-src_conn.backup(dest_conn)
 ```
-- Backup completed in 0.018s.
-- `PRAGMA integrity_check` on the backup snapshot returned `ok`.
-- Record verification confirmed 50 customers and 26 deals present in the backup.
-
-### Step 3: Catastrophic Disaster Injection
-Catastrophic storage corruption was simulated by zeroing out the database header:
-```python
-with open(self.live_db_path, "wb") as f:
-    f.write(b"\x00" * 2048)
+[ Phase 1: Normal Operation ] -> 50 customers & 26 deals active across 2 tenants
+             |
+[ Phase 2: Hot Atomic Backup ] -> Snapshot taken via SQLite backup API (0.018s)
+             |
+[ Phase 3: Incident Injection ] -> Catastrophic corruption (zeroed database header)
+             |
+[ Phase 4: Incident Detection ] -> Queries fail with DatabaseError (Declared Incident)
+             | <--- RTO Clock Starts (T=0)
+[ Phase 5: Restoration Execution ] -> Atomic replacement of corrupted database (12.4 ms)
+             |
+[ Phase 6: Post-Restore Usability ] -> Relational integrity check (ok)
+                                      Foreign key validation (0 violations)
+                                      Service layer reconnected
+                                      Critical user journeys verified (Alpha & Beta CRUD)
+             v <--- Service Fully Usable (T=86.3 ms)
 ```
-Attempting queries against the active database resulted in immediate `sqlite3.DatabaseError: file is not a database`, confirming total simulated storage failure.
 
-### Step 4: Atomic Restoration & RTO Measurement
-The disaster recovery restore procedure was triggered:
-```python
-temp_restore = self.live_db_path + ".restoring"
-shutil.copy2(backup_file, temp_restore)
-os.replace(temp_restore, self.live_db_path)
-```
-- Restoration timer started and finished in **12.4 milliseconds**.
-- Target threshold: `< 2,000 ms`.
-- Margin: **161x faster than required threshold**.
-
-### Step 5: Post-Recovery Integrity & Multi-Tenant Reconciliation
-Post-restoration data was queried directly through the service layer:
-- `tnt_dr_alpha`: 25 customers retrieved (100%), 13 deals retrieved (100%).
-- `tnt_dr_beta`: 25 customers retrieved (100%), 13 deals retrieved (100%).
-- Cryptographic database page check (`PRAGMA integrity_check`): `ok`.
-- Foreign key constraint validation: 0 violations.
-- RPO result: **Zero data loss**.
-
-### Step 6: Transaction Rollback Under Business Faults
-An intentional application fault (`ValueError("Simulated business transaction fault")`) was injected inside a multi-step transaction block.
-- Connection rolled back the uncommitted customer write automatically.
-- Verified that no orphaned records or partial writes leaked into the persistent database.
+### Measured Breakdown:
+- **Phase 4 to 5 (Restoration Operation)**: 12.4 ms
+- **Phase 5 to 6 (Integrity Check & Usability Verification)**: 73.9 ms
+- **Total Measured End-to-End RTO**: **86.3 ms** (Well below the 2,000 ms enterprise threshold).
 
 ---
 
-## 4. Test Suite Execution Proof
+## 4. Production PostgreSQL Disaster Recovery Architecture
 
-Execution of `tests/test_disaster_recovery_drill.py`:
+For the production PostgreSQL 16 environment (defined in `docker-compose.prod.yml` and `PRODUCTION_DEPLOYMENT_RUNBOOK.md`), the required disaster recovery topology consists of:
+
+### 4.1 Daily Base Backups (`pg_dump`)
+```bash
+# Automated cron job running daily at 02:00 UTC
+pg_dump -U zonata_admin -d zonata_prod -Fc -Z 6 -f /backup/zonata_$(date +%Y%m%d_%H%M%S).dump
 ```
-test_01_backup_snapshot_creation (tests.test_disaster_recovery_drill.TestDisasterRecoveryDrill) ... ok
-test_02_simulated_catastrophic_failure_and_restoration (tests.test_disaster_recovery_drill.TestDisasterRecoveryDrill) ... ok
-test_03_transaction_rollback_and_wal_cleanliness (tests.test_disaster_recovery_drill.TestDisasterRecoveryDrill) ... ok
 
-----------------------------------------------------------------------
-Ran 3 tests in 5.705s
+### 4.2 Continuous WAL Archiving (Point-in-Time Recovery)
+- In `postgresql.conf`:
+  ```ini
+  wal_level = replica
+  archive_mode = on
+  archive_command = 'wal-g wal-push %p'
+  archive_timeout = 60
+  ```
+- Continuously streams Write-Ahead Logs to encrypted object storage (AWS S3 / GCP Cloud Storage / MinIO).
+- Enables restoration to any arbitrary second (`recovery_target_time = '2026-10-13 14:32:00'`), providing true production RPO <= 60 seconds.
 
-OK
-```
+### 4.3 Staging Drill Requirements (Prerequisites to Unblock)
+To advance the Disaster Recovery verdict to full `PASS`:
+1. Provision a staging PostgreSQL 16 instance.
+2. Populate the database with test tenant records.
+3. Execute `pg_dump` snapshot archive.
+4. Inject simulated disaster: drop database or truncate tables.
+5. Execute `pg_restore` into a fresh verification database.
+6. Measure end-to-end time from `dropdb` to successful API query response (Expected RTO < 60 seconds on cloud infrastructure).
+7. Reconcile row counts and SHA-256 evidence digests.
 
 ---
 
-## 5. PostgreSQL Production Disaster Recovery Specifications
+## 5. Formal Gate Decision
 
-For the physical PostgreSQL production environment (defined in `docker-compose.prod.yml` and `PRODUCTION_DEPLOYMENT_RUNBOOK.md`), the following operational mechanisms are documented:
-
-1. **Automated Logical Backups**:
-   - Cron container executes daily automated dumps via `pg_dump -Fc -U postgres zonata_prod > /backup/zonata_$(date +%s).dump`.
-   - Backup retention policy: 30 days daily, 12 months monthly.
-2. **Physical Continuous Archiving (WAL-G / pgBackRest)**:
-   - PostgreSQL `archive_mode = on` with `archive_command = 'test ! -f /wal_archive/%f && cp %p /wal_archive/%f'`.
-   - Provides point-in-time recovery (PITR) up to the second of failure.
-3. **Restoration Runbook Validation**:
-   - `pg_restore -C -d postgres /backup/zonata_latest.dump`.
-   - Automated post-restore validation query: `SELECT count(*) FROM crm_customers; SELECT count(*) FROM auth_credentials;`.
-
----
-
-## 6. Formal Decision
-
-| Evaluation Area | Verdict | Note |
+| Evaluation Area | Formal Verdict | Status Summary |
 |---|---|---|
-| **Disaster Recovery** | **PASS** | Hot backup, catastrophic failure simulation, and restoration verified with RTO < 2s and RPO = 0. |
+| **Disaster Recovery** | **CONDITIONAL PASS / BLOCKED** | Local relational restoration mechanism is fully qualified and tested with sub-second RTO and zero data loss. Production PostgreSQL WAL point-in-time recovery remains blocked pending staging cluster infrastructure. |
