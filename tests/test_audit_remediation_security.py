@@ -592,14 +592,23 @@ class TestWebhookAndStoragePortability(unittest.TestCase):
             custom_ledger = os.path.join(temp_dir, "custom_ledger.jsonl")
             custom_db = os.path.join(temp_dir, "custom_db.db")
 
+            orig_ev = os.environ.get("ZONATA_EVIDENCE_PATH")
+            orig_db = os.environ.get("ZONATA_DB_PATH")
             os.environ["ZONATA_EVIDENCE_PATH"] = custom_ledger
             os.environ["ZONATA_DB_PATH"] = custom_db
             try:
                 self.assertEqual(get_default_ledger_path(), custom_ledger)
                 self.assertEqual(get_default_db_path(), custom_db)
             finally:
-                del os.environ["ZONATA_EVIDENCE_PATH"]
-                del os.environ["ZONATA_DB_PATH"]
+                if orig_ev is not None:
+                    os.environ["ZONATA_EVIDENCE_PATH"] = orig_ev
+                elif "ZONATA_EVIDENCE_PATH" in os.environ:
+                    del os.environ["ZONATA_EVIDENCE_PATH"]
+
+                if orig_db is not None:
+                    os.environ["ZONATA_DB_PATH"] = orig_db
+                elif "ZONATA_DB_PATH" in os.environ:
+                    del os.environ["ZONATA_DB_PATH"]
 
     def test_04_baseline_database_integrity_preserved(self):
         """Ensures storage/roboassistant.db has not been corrupted or mutated by any test."""
