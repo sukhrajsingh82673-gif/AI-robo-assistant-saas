@@ -21,8 +21,9 @@ An adversarial source-level inspection and negative test review was conducted ac
 | **SEC-03** | Secret Material Exposure in Emergency Revocation Lists | `ZONATA_REVOKED_AUTH_SECRETS` | **HIGH** | Resolved | `test_09_emergency_key_retirement_and_rotation_window_expiry` |
 | **SEC-04** | Sub-Baseline PBKDF2 Work Factor & Password DoS | `core/auth.py:hash_password` | **MEDIUM** | Resolved | `test_06_transparent_password_hash_upgrade`, `test_12` |
 | **SEC-05** | Rate-Limit Evasion via Untrusted Client Header Spoofing | `X-Forwarded-For` in `api_server.py` | **MEDIUM** | Resolved | `api_server.py:_get_client_ip` |
-| **SEC-06** | Silent Fallback to Ephemeral SQLite in Production | `core/db.py:Database.__init__` | **HIGH** | Resolved | `test_clean_production_mode.py:test_10` |
+| **SEC-06** | Ephemeral SQLite Production Fallback & DB Credential Leakage | `core/db.py:Database.__init__` | **HIGH** | Resolved | `test_clean_production_mode.py:test_11`, `test_12` |
 | **SEC-07** | HTTP 501 Unsupported Method on RESTful Deal Mutations | `do_PATCH` in `api_server.py` | **LOW** | Resolved | `api_server.py:do_PATCH` |
+| **SEC-08** | Tampering with Immutable CRM Identity & Audit Fields | `core/enterprise_crm.py:update_customer/deal` | **HIGH** | Resolved | `test_direct_object_access_and_tenant_security.py:test_14` |
 
 ---
 
@@ -78,13 +79,13 @@ An adversarial source-level inspection and negative test review was conducted ac
 
 ---
 
-### SEC-06: Silent Fallback to Ephemeral SQLite in Production
-- **Attack Scenario**: In a production container deployment where `DATABASE_URL` is omitted or misconfigured, the application could silently create an unencrypted, ephemeral local SQLite database, resulting in data loss across container restarts and failure of high-availability clustering.
-- **Affected Route**: `core/db.py:Database.__init__`.
-- **Root Cause**: Unconditional fallback to local SQLite when `DATABASE_URL` was empty.
-- **Severity**: **HIGH (CWE-1188: Insecure Default Initialization of Resource)**.
-- **Fix**: Configured `Database.__init__` to fail closed with a fatal `RuntimeError` when `APP_ENV=production` unless explicitly authorized with `ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1`.
-- **Regression Proof**: [`tests/test_clean_production_mode.py#L112-L135`](file:///root/roboassistant/tests/test_clean_production_mode.py).
+### SEC-06: Ephemeral SQLite Production Fallback & DB Credential Leakage
+- **Attack Scenario**: 1) In production, missing or SQLite `DATABASE_URL` could allow silent fallback or unauthorized override (`ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1`), compromising durable persistence and HA clustering. 2) Failed PostgreSQL connections embedded raw connection URLs in exception messages, leaking plaintext database passwords into log collectors and stack traces.
+- **Affected Route**: `core/db.py:Database.__init__`, `Database._get_postgresql_connection`.
+- **Root Cause**: Permissive override flag in production and unmasked URL string formatting in exception handlers.
+- **Severity**: **HIGH (CWE-1188: Insecure Default Initialization / CWE-532: Insertion of Sensitive Information into Log File)**.
+- **Fix**: Completely abolished `ZONATA_ALLOW_SQLITE_IN_PRODUCTION`. Production mode strictly fails closed with `RuntimeError` if `DATABASE_URL` is absent, empty, or SQLite. Implemented `sanitize_db_url()` with regex password masking (`:***@`) across all connection exception paths and diagnostics.
+- **Regression Proof**: [`tests/test_clean_production_mode.py:test_11`, `test_12`](file:///root/roboassistant/tests/test_clean_production_mode.py).
 
 ---
 
@@ -95,3 +96,14 @@ An adversarial source-level inspection and negative test review was conducted ac
 - **Severity**: **LOW (Protocol Conformance)**.
 - **Fix**: Added `do_PATCH(self)` routing to `do_PUT()`, and added `PATCH` to CORS `Access-Control-Allow-Methods`.
 - **Regression Proof**: `api_server.py:6402-6405`.
+
+---
+
+### SEC-08: Tampering with Immutable CRM Identity & Audit Fields
+- **Attack Scenario**: An authenticated tenant issues a customer or deal update attempting to override `tenant_id`, `customer_id`, `deal_id`, `company_id`, or `created_at`, corrupting audit lineage or attempting privilege escalation.
+- **Affected Route**: `PUT /api/crm/customers/:id`, `PATCH /api/crm/customers/:id`, `PUT /api/crm/deals/:id`, `PATCH /api/crm/deals/:id`.
+- **Root Cause**: Absence of explicit rejection on attempts to mutate immutable identity and timestamp columns.
+- **Severity**: **HIGH (CWE-284: Improper Access Control / CWE-693: Protection Mechanism Failure)**.
+- **Fix**: Enforced strict validation in `update_customer()` and `update_deal()` in [`core/enterprise_crm.py`](file:///root/roboassistant/core/enterprise_crm.py), throwing `ValueError` if immutable fields differ from existing record state. Caught and returned as HTTP 400 Bad Request in `api_server.py`.
+- **Regression Proof**: [`tests/test_direct_object_access_and_tenant_security.py:test_14_immutable_identity_fields_in_crm`](file:///root/roboassistant/tests/test_direct_object_access_and_tenant_security.py).
+

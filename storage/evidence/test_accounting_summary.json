@@ -1,28 +1,28 @@
 {
-  "timestamp": 1791877562.933303,
-  "timestamp_iso": "2026-10-13T07:46:02Z",
-  "git_commit": "ddbd9da2a83bf8f3c40534447bd63becc5ac7250",
+  "timestamp": 1791880070.0759845,
+  "timestamp_iso": "2026-10-13T08:27:50Z",
+  "git_commit": "a7b515be2d852f065fcfb8f2b52773cfa6eeba5a",
   "git_branch": "engineering/production-readiness-gap-closure",
   "summary": {
     "total_suites_executed": 9,
-    "total_tests_executed": 107,
-    "total_passed": 107,
+    "total_tests_executed": 109,
+    "total_passed": 109,
     "total_failed": 0,
     "total_errors": 0,
-    "total_duration_seconds": 121.0,
+    "total_duration_seconds": 126.43,
     "pass_rate_pct": 100.0,
-    "security_negative_test_count": 50
+    "security_negative_test_count": 51
   },
   "executed_suites": [
     {
       "file": "tests/test_direct_object_access_and_tenant_security.py",
       "name": "Direct Object Access, IDOR & Multi-Tenant IAM Security",
       "category": "Security-Negative / Unit",
-      "test_count": 13,
-      "passed_count": 13,
+      "test_count": 14,
+      "passed_count": 14,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 17.126,
+      "duration_seconds": 16.374,
       "status": "PASS"
     },
     {
@@ -33,7 +33,7 @@
       "passed_count": 8,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 10.54,
+      "duration_seconds": 11.972,
       "status": "PASS"
     },
     {
@@ -44,18 +44,18 @@
       "passed_count": 29,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 11.0,
+      "duration_seconds": 13.741,
       "status": "PASS"
     },
     {
       "file": "tests/test_clean_production_mode.py",
       "name": "Clean Production Initialization & Fallback Refusal",
       "category": "Unit / Dialect Initialization",
-      "test_count": 11,
-      "passed_count": 11,
+      "test_count": 12,
+      "passed_count": 12,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 12.541,
+      "duration_seconds": 12.34,
       "status": "PASS"
     },
     {
@@ -66,7 +66,7 @@
       "passed_count": 4,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 5.107,
+      "duration_seconds": 4.852,
       "status": "PASS"
     },
     {
@@ -77,7 +77,7 @@
       "passed_count": 3,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 9.122,
+      "duration_seconds": 7.616,
       "status": "PASS"
     },
     {
@@ -88,7 +88,7 @@
       "passed_count": 10,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 4.873,
+      "duration_seconds": 5.441,
       "status": "PASS"
     },
     {
@@ -99,7 +99,7 @@
       "passed_count": 22,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 49.58,
+      "duration_seconds": 52.68,
       "status": "PASS"
     },
     {
@@ -110,7 +110,7 @@
       "passed_count": 7,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 1.116,
+      "duration_seconds": 1.417,
       "status": "PASS"
     }
   ],

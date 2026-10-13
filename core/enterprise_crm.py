@@ -151,15 +151,26 @@ class EnterpriseCrmService:
 
     def update_customer(self, customer_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Updates customer attributes strictly within tenant boundary."""
+        # Strict field immutability checks
+        if "tenant_id" in data and str(data["tenant_id"]) != self.tenant_id:
+            raise ValueError(f"Identity Invariant Violation: tenant_id is immutable and cannot be altered (attempted: {data['tenant_id']})")
+        if "customer_id" in data and str(data["customer_id"]) != customer_id:
+            raise ValueError(f"Identity Invariant Violation: customer_id is immutable and cannot be altered (attempted: {data['customer_id']})")
+        if "created_at" in data:
+            raise ValueError("Audit Invariant Violation: created_at is immutable and cannot be altered")
+
         now = time.time()
         with db.get_connection() as conn:
             # Check existence and ownership
             existing = conn.execute(
-                "SELECT customer_id FROM crm_customers WHERE customer_id = ? AND tenant_id = ?",
+                "SELECT customer_id, company_id FROM crm_customers WHERE customer_id = ? AND tenant_id = ?",
                 (customer_id, self.tenant_id)
             ).fetchone()
             if not existing:
                 raise KeyError(f"Customer '{customer_id}' not found in tenant '{self.tenant_id}'")
+
+            if "company_id" in data and str(data["company_id"]) != str(existing["company_id"]):
+                raise ValueError(f"Identity Invariant Violation: company_id is immutable and cannot be altered (attempted: {data['company_id']})")
 
             updates = []
             params = []
@@ -291,14 +302,25 @@ class EnterpriseCrmService:
 
     def update_deal(self, deal_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Updates deal attributes, strictly validating tenant ownership and referenced customer."""
+        # Strict field immutability checks
+        if "tenant_id" in data and str(data["tenant_id"]) != self.tenant_id:
+            raise ValueError(f"Identity Invariant Violation: tenant_id is immutable and cannot be altered (attempted: {data['tenant_id']})")
+        if "deal_id" in data and str(data["deal_id"]) != deal_id:
+            raise ValueError(f"Identity Invariant Violation: deal_id is immutable and cannot be altered (attempted: {data['deal_id']})")
+        if "created_at" in data:
+            raise ValueError("Audit Invariant Violation: created_at is immutable and cannot be altered")
+
         now = time.time()
         with db.get_connection() as conn:
             existing = conn.execute(
-                "SELECT deal_id, customer_id FROM crm_deals WHERE deal_id = ? AND tenant_id = ?",
+                "SELECT deal_id, customer_id, company_id FROM crm_deals WHERE deal_id = ? AND tenant_id = ?",
                 (deal_id, self.tenant_id)
             ).fetchone()
             if not existing:
                 raise KeyError(f"Deal '{deal_id}' not found in tenant '{self.tenant_id}'")
+
+            if "company_id" in data and str(data["company_id"]) != str(existing["company_id"]):
+                raise ValueError(f"Identity Invariant Violation: company_id is immutable and cannot be altered (attempted: {data['company_id']})")
 
             if "customer_id" in data and data["customer_id"]:
                 new_cust_id = data["customer_id"]

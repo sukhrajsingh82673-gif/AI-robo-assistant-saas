@@ -12,12 +12,12 @@
 | Metric | Machine-Audited Value | Audit Standard |
 | :--- | :---: | :--- |
 | **Total Test Suites Executed** | **9** | Standalone Python `unittest` modules in isolated subprocesses |
-| **Total Automated Tests Executed** | **107** | Unique executable test functions |
-| **Total Tests Passed** | **107 (100.00%)** | Zero failures, zero uncaught errors |
-| **Security-Negative Tests** | **50** | Validated tamper, IDOR, brute-force, DoS & spoofing rejections |
+| **Total Automated Tests Executed** | **109** | Unique executable test functions |
+| **Total Tests Passed** | **109 (100.00%)** | Zero failures, zero uncaught errors |
+| **Security-Negative Tests** | **51** | Validated tamper, IDOR, brute-force, DoS & spoofing rejections |
 | **Blocked External Staging Suites** | **3 (24 tests)** | Segregated and excluded from passing totals |
-| **Execution Duration** | **118.23s** | Complete clean execution across all 9 suites |
-| **Tested Git Commit** | [`ddbd9da`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/ddbd9da2a83bf8f3c40534447bd63becc5ac7250) | `git rev-parse HEAD` |
+| **Execution Duration** | **111.86s** | Complete clean execution across all 9 suites |
+| **Tested Git Commit** | Candidate HEAD | `git rev-parse HEAD` |
 
 ---
 
@@ -27,16 +27,16 @@ Every test suite was executed in an isolated subprocess with independent databas
 
 | Test Suite Module | Category | Tests Executed | Passed | Failed | Errors | Duration (s) | Security Negative |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| [`tests/test_direct_object_access_and_tenant_security.py`](file:///root/roboassistant/tests/test_direct_object_access_and_tenant_security.py) | Security-Negative / Unit | 13 | 13 | 0 | 0 | 14.80 | 13 |
-| [`tests/test_production_auth_security.py`](file:///root/roboassistant/tests/test_production_auth_security.py) | Security-Negative / Auth Unit | 8 | 8 | 0 | 0 | 11.29 | 8 |
-| [`tests/test_audit_remediation_security.py`](file:///root/roboassistant/tests/test_audit_remediation_security.py) | Security-Negative / API Integration | 29 | 29 | 0 | 0 | 11.01 | 29 |
-| [`tests/test_clean_production_mode.py`](file:///root/roboassistant/tests/test_clean_production_mode.py) | Unit / Dialect Initialization | 11 | 11 | 0 | 0 | 13.15 | 0 |
-| [`tests/test_crm_persistence.py`](file:///root/roboassistant/tests/test_crm_persistence.py) | Database Integration | 4 | 4 | 0 | 0 | 5.74 | 0 |
-| [`tests/test_disaster_recovery_drill.py`](file:///root/roboassistant/tests/test_disaster_recovery_drill.py) | Recovery / Drill | 3 | 3 | 0 | 0 | 9.01 | 0 |
-| [`tests/test_overview_production.py`](file:///root/roboassistant/tests/test_overview_production.py) | Domain Service Integration | 10 | 10 | 0 | 0 | 4.94 | 0 |
-| [`tests/test_settings_enterprise_qualification.py`](file:///root/roboassistant/tests/test_settings_enterprise_qualification.py) | REST API Integration | 22 | 22 | 0 | 0 | 47.45 | 0 |
-| [`tests/test_frontend_navigation_audit.py`](file:///root/roboassistant/tests/test_frontend_navigation_audit.py) | Frontend Navigation / View Routing | 7 | 7 | 0 | 0 | 0.88 | 0 |
-| **TOTAL** | | **107** | **107** | **0** | **0** | **118.27s** | **50** |
+| [`tests/test_direct_object_access_and_tenant_security.py`](file:///root/roboassistant/tests/test_direct_object_access_and_tenant_security.py) | Security-Negative / Unit | 14 | 14 | 0 | 0 | 15.75 | 14 |
+| [`tests/test_production_auth_security.py`](file:///root/roboassistant/tests/test_production_auth_security.py) | Security-Negative / Auth Unit | 8 | 8 | 0 | 0 | 10.94 | 8 |
+| [`tests/test_audit_remediation_security.py`](file:///root/roboassistant/tests/test_audit_remediation_security.py) | Security-Negative / API Integration | 29 | 29 | 0 | 0 | 10.96 | 29 |
+| [`tests/test_clean_production_mode.py`](file:///root/roboassistant/tests/test_clean_production_mode.py) | Unit / Dialect Initialization | 12 | 12 | 0 | 0 | 12.36 | 0 |
+| [`tests/test_crm_persistence.py`](file:///root/roboassistant/tests/test_crm_persistence.py) | Database Integration | 4 | 4 | 0 | 0 | 5.15 | 0 |
+| [`tests/test_disaster_recovery_drill.py`](file:///root/roboassistant/tests/test_disaster_recovery_drill.py) | Recovery / Drill | 3 | 3 | 0 | 0 | 7.04 | 0 |
+| [`tests/test_overview_production.py`](file:///root/roboassistant/tests/test_overview_production.py) | Domain Service Integration | 10 | 10 | 0 | 0 | 5.00 | 0 |
+| [`tests/test_settings_enterprise_qualification.py`](file:///root/roboassistant/tests/test_settings_enterprise_qualification.py) | REST API Integration | 22 | 22 | 0 | 0 | 43.62 | 0 |
+| [`tests/test_frontend_navigation_audit.py`](file:///root/roboassistant/tests/test_frontend_navigation_audit.py) | Frontend Navigation / View Routing | 7 | 7 | 0 | 0 | 1.04 | 0 |
+| **TOTAL** | | **109** | **109** | **0** | **0** | **111.86s** | **51** |
 
 ---
 

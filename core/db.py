@@ -8,6 +8,15 @@ import sqlite3
 import os
 import time
 import json
+import re
+from typing import Optional, Any, Dict, List
+
+def sanitize_db_url(url: str) -> str:
+    """Masks password credentials in database connection URLs (e.g., postgresql://user:pass@host/db -> postgresql://user:***@host/db)."""
+    if not url:
+        return ""
+    return re.sub(r':([^:@/\s]+)@', r':***@', str(url))
+
 def get_default_db_path() -> str:
     env_path = os.environ.get("ZONATA_DB_PATH") or os.environ.get("ROBOASSISTANT_DB_PATH")
     if env_path:
@@ -3328,16 +3337,21 @@ class Database:
         dialect_env = os.environ.get("ZONATA_DB_DIALECT", "").lower()
         app_env = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
         is_prod = app_env in ("production", "prod")
-        allow_sqlite = os.environ.get("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", "0") == "1"
+
+        # In production mode, SQLite is prohibited under all circumstances.
+        # Legacy ZONATA_ALLOW_SQLITE_IN_PRODUCTION is strictly rejected.
+        if is_prod:
+            if not self.database_url or self.database_url.startswith(("sqlite://", "sqlite:")) or not (
+                self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql"
+            ):
+                raise RuntimeError(
+                    "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
+                    "A valid PostgreSQL DATABASE_URL must be configured. SQLite override flags are not permitted in production."
+                )
 
         if self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
             self.dialect = DatabaseDialect.POSTGRESQL
         else:
-            if is_prod and not allow_sqlite:
-                raise RuntimeError(
-                    "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
-                    "A valid PostgreSQL DATABASE_URL must be configured, or explicitly authorize SQLite via ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1."
-                )
             self.dialect = DatabaseDialect.SQLITE
 
         if db_path is None:
@@ -3360,6 +3374,12 @@ class Database:
                 self._init_db()
 
     def set_db_path(self, new_path: str):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+        if is_prod:
+            raise RuntimeError(
+                "Production Safety Invariant Violation: Direct SQLite path reconfiguration is prohibited in production mode."
+            )
         self.db_path = os.path.abspath(new_path)
         self.dialect = DatabaseDialect.SQLITE
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -3403,8 +3423,10 @@ class Database:
                 "Install psycopg2-binary or configure SQLITE dialect."
             )
         except Exception as e:
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
             raise RuntimeError(
-                f"Failed to connect to PostgreSQL database at '{self.database_url}': {e}"
+                f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}"
             )
 
     def _init_db(self):

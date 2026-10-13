@@ -61,10 +61,16 @@ sha256sum storage/roboassistant.db storage/evidence/audit_ledger.jsonl && git ha
 ### B. Database Layer (`core/db.py`)
 1. **Timestamp Indexing**:
    - Added `CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_ts ON auth_rate_limits(attempt_timestamp);` to make background rate-limit pruning index-backed and instant.
-2. **Production Safety Invariant**:
-   - Refuses silent SQLite fallback in production mode when `DATABASE_URL` is unset, requiring explicit `ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1` override.
+2. **Production Safety Invariant (Complete Override Abolition)**:
+   - Strictly refuses SQLite in production mode under all environment flags. Completely eliminated legacy `ZONATA_ALLOW_SQLITE_IN_PRODUCTION` bypass.
+3. **Database URL Credential Masking**:
+   - Implemented `sanitize_db_url()` with regex credential redaction (`:***@`), ensuring connection failure exceptions and diagnostics never leak database passwords.
 
-### C. API Gateway (`api_server.py`)
+### C. Enterprise CRM (`core/enterprise_crm.py`)
+1. **Strict Field Immutability**:
+   - Added explicit invariant checks to `update_customer()` and `update_deal()` preventing modification of `tenant_id`, `customer_id`, `deal_id`, `company_id`, or `created_at`.
+
+### D. API Gateway (`api_server.py`)
 1. **Reverse-Proxy Client IP Validation**:
    - Added `_get_client_ip()` with anti-spoofing controls: `X-Forwarded-For` and `X-Real-IP` are trusted only if the direct TCP peer matches `ZONATA_TRUSTED_PROXIES`.
 2. **Authentication Route Throttling**:
@@ -77,8 +83,8 @@ sha256sum storage/roboassistant.db storage/evidence/audit_ledger.jsonl && git ha
 ## 4. Test Suite Execution & Reconciliation Audit
 
 All 9 standalone test suites execute against completely isolated temporary database instances:
-- **Total Tests Executed**: 107
-- **Total Tests Passed**: 107 (100.00%)
-- **Security-Negative Tests**: 50
+- **Total Tests Executed**: 109
+- **Total Tests Passed**: 109 (100.00%)
+- **Security-Negative Tests**: 51
 - **Failures / Errors**: 0
 - **Blocked External Staging Tests**: 24 (Strictly segregated in machine-readable accounting)

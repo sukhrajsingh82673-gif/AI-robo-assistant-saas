@@ -6355,6 +6355,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(res)
             except KeyError as e:
                 self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
+            except ValueError as e:
+                self._send_json({"error": "Bad Request", "detail": str(e)}, status=400)
             return
 
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:

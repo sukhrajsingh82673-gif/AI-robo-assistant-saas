@@ -60,8 +60,6 @@ class TestCleanProductionMode(unittest.TestCase):
     def setUp(self):
         self.orig_db_path = db.db_path
         self.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
-        self.old_allow_sqlite = os.environ.get("ZONATA_ALLOW_SQLITE_IN_PRODUCTION")
-        os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = "1"
 
         self.temp_db_fd, self.temp_db_path = tempfile.mkstemp(suffix=".db")
         os.environ["ZONATA_DB_PATH"] = self.temp_db_path
@@ -78,6 +76,11 @@ class TestCleanProductionMode(unittest.TestCase):
             conn.commit()
 
     def tearDown(self):
+        if self.old_env is not None:
+            os.environ["APP_ENV"] = self.old_env
+        else:
+            os.environ.pop("APP_ENV", None)
+
         if hasattr(self, "orig_db_path") and self.orig_db_path:
             db.set_db_path(self.orig_db_path)
         if hasattr(self, "orig_env_db_path"):
@@ -85,16 +88,6 @@ class TestCleanProductionMode(unittest.TestCase):
                 os.environ["ZONATA_DB_PATH"] = self.orig_env_db_path
             else:
                 os.environ.pop("ZONATA_DB_PATH", None)
-
-        if self.old_env is not None:
-            os.environ["APP_ENV"] = self.old_env
-        else:
-            os.environ.pop("APP_ENV", None)
-
-        if self.old_allow_sqlite is not None:
-            os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = self.old_allow_sqlite
-        else:
-            os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
 
         try:
             os.close(self.temp_db_fd)
@@ -187,20 +180,86 @@ class TestCleanProductionMode(unittest.TestCase):
         self.assertEqual(len(records), 0)
 
     def test_11_production_refuses_unintended_sqlite_fallback(self):
-        """Verify production mode refuses unintended SQLite fallback when DATABASE_URL is not PostgreSQL."""
-        # Unset authorization and DATABASE_URL
-        os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
-        os.environ.pop("DATABASE_URL", None)
+        """Verify production mode strictly fails closed against SQLite under all environment flags."""
         os.environ["APP_ENV"] = "production"
 
-        with self.assertRaises(RuntimeError) as ctx:
+        # 1. Production with no DATABASE_URL must raise RuntimeError
+        os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
+        with self.assertRaises(RuntimeError) as ctx1:
             Database()
-        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx.exception))
+        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx1.exception))
 
-        # Re-authorizing via ZONATA_ALLOW_SQLITE_IN_PRODUCTION allows initialization
+        # 2. Production with explicit SQLite URL must raise RuntimeError
+        os.environ["DATABASE_URL"] = "sqlite:///var/data/prod.db"
+        with self.assertRaises(RuntimeError) as ctx2:
+            Database()
+        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx2.exception))
+
+        # 3. Production with legacy override flag ZONATA_ALLOW_SQLITE_IN_PRODUCTION=1 MUST STILL FAIL CLOSED
         os.environ["ZONATA_ALLOW_SQLITE_IN_PRODUCTION"] = "1"
-        db_authorized = Database()
-        self.assertEqual(db_authorized.get_dialect(), DatabaseDialect.SQLITE)
+        os.environ.pop("DATABASE_URL", None)
+        with self.assertRaises(RuntimeError) as ctx3:
+            Database()
+        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx3.exception))
+
+        os.environ["DATABASE_URL"] = "sqlite:///var/data/prod.db"
+        with self.assertRaises(RuntimeError) as ctx4:
+            Database()
+        self.assertIn("Direct SQLite fallback is prohibited in production mode", str(ctx4.exception))
+
+        # 4. Production prohibits direct set_db_path reconfiguration
+        with self.assertRaises(RuntimeError) as ctx5:
+            self.db.set_db_path("/tmp/arbitrary.db")
+        self.assertIn("SQLite path reconfiguration is prohibited in production mode", str(ctx5.exception))
+
+        # 5. Non-production (staging/test) behaves correctly with SQLite
+        os.environ["APP_ENV"] = "staging"
+        os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
+        staging_db = Database()
+        self.assertEqual(staging_db.get_dialect(), DatabaseDialect.SQLITE)
+
+        # 6. Production with valid PostgreSQL DATABASE_URL succeeds in configuring PostgreSQL dialect
+        os.environ["APP_ENV"] = "production"
+        os.environ["DATABASE_URL"] = "postgresql://zonata_user:pass@pg.cluster.internal:5432/zonata_prod"
+        prod_pg_db = Database()
+        self.assertEqual(prod_pg_db.get_dialect(), DatabaseDialect.POSTGRESQL)
+
+        # Cleanup
+        os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("ZONATA_ALLOW_SQLITE_IN_PRODUCTION", None)
+        os.environ["APP_ENV"] = "production"
+
+    def test_12_postgresql_connection_error_redacts_credentials(self):
+        """Verify PostgreSQL connection errors and logs redact credentials."""
+        from unittest.mock import patch, MagicMock
+        from core.db import sanitize_db_url
+
+        # 1. Direct test of sanitize_db_url helper
+        raw_url = "postgresql://zonata_admin:super_secret_password_123@pgcluster.internal:5432/zonata_db"
+        sanitized = sanitize_db_url(raw_url)
+        self.assertNotIn("super_secret_password_123", sanitized)
+        self.assertIn("postgresql://zonata_admin:***@pgcluster.internal:5432/zonata_db", sanitized)
+
+        # 2. Test exception propagation redacting credentials
+        old_url = os.environ.get("DATABASE_URL")
+        try:
+            os.environ["DATABASE_URL"] = raw_url
+            pg_db = Database()
+            mock_psycopg2 = MagicMock()
+            mock_psycopg2.connect.side_effect = Exception(f"password authentication failed for user zonata_admin: {raw_url}")
+            with patch.dict("sys.modules", {"psycopg2": mock_psycopg2, "psycopg2.extras": MagicMock()}):
+                with self.assertRaises(RuntimeError) as ctx:
+                    pg_db._get_postgresql_connection()
+                err_msg = str(ctx.exception)
+                self.assertNotIn("super_secret_password_123", err_msg)
+                self.assertIn(":***@", err_msg)
+        finally:
+            if old_url is not None:
+                os.environ["DATABASE_URL"] = old_url
+            else:
+                os.environ.pop("DATABASE_URL", None)
 
 
 if __name__ == "__main__":

@@ -420,6 +420,49 @@ class TestDirectObjectAccessAndTenantSecurity(unittest.TestCase):
         self.assertEqual(axis, "ACCOUNT_RATE_LIMIT_EXCEEDED")
         self.assertGreater(retry, 0)
 
+    def test_14_immutable_identity_fields_in_crm(self):
+        """Verify CRM customer and deal update endpoints strictly forbid modifying immutable identity and audit fields."""
+        cust = self.crm_alpha.create_customer("cmp_01", {"name": "Immutable Corp", "tier": "ENTERPRISE"})
+        cid = cust["customer_id"]
+
+        deal = self.crm_alpha.create_deal("cmp_01", {"customer_id": cid, "title": "Secured Contract", "value": 100000.0})
+        did = deal["deal_id"]
+
+        # 1. Customer: Attempt to mutate tenant_id -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_customer(cid, {"name": "Tampered", "tenant_id": "tnt_malicious"})
+        self.assertIn("tenant_id is immutable", str(ctx.exception))
+
+        # 2. Customer: Attempt to mutate customer_id -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_customer(cid, {"name": "Tampered", "customer_id": "cust_forged"})
+        self.assertIn("customer_id is immutable", str(ctx.exception))
+
+        # 3. Customer: Attempt to mutate created_at -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_customer(cid, {"name": "Tampered", "created_at": 1000.0})
+        self.assertIn("created_at is immutable", str(ctx.exception))
+
+        # 4. Deal: Attempt to mutate tenant_id -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_deal(did, {"title": "Tampered", "tenant_id": "tnt_malicious"})
+        self.assertIn("tenant_id is immutable", str(ctx.exception))
+
+        # 5. Deal: Attempt to mutate deal_id -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_deal(did, {"title": "Tampered", "deal_id": "deal_forged"})
+        self.assertIn("deal_id is immutable", str(ctx.exception))
+
+        # 6. Deal: Attempt to mutate company_id -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_deal(did, {"title": "Tampered", "company_id": "comp_hijacked"})
+        self.assertIn("company_id is immutable", str(ctx.exception))
+
+        # 7. Deal: Attempt to mutate created_at -> Must raise ValueError
+        with self.assertRaises(ValueError) as ctx:
+            self.crm_alpha.update_deal(did, {"title": "Tampered", "created_at": 1000.0})
+        self.assertIn("created_at is immutable", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
