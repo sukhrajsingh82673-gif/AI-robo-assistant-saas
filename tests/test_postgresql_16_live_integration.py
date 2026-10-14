@@ -277,9 +277,9 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             conn.execute(
                 """
                 INSERT INTO enterprise_records (
-                    record_id, tenant_id, company_id, entity_type, entity_id,
-                    title, payload, security_classification, created_at, updated_at
-                ) VALUES (?, ?, ?, 'AUDIT', 'audit_01', 'Tenant A Private Record', '{}', 'RESTRICTED', ?, ?)
+                    record_id, tenant_id, company_id, department, record_type,
+                    title, actor_name, created_at, updated_at
+                ) VALUES (?, ?, ?, 'Platform', 'AUDIT', 'Tenant A Private Record', 'Agent A', ?, ?)
                 ON CONFLICT (record_id) DO NOTHING
                 """,
                 (record_a, self.tenant_a, self.company_id, self.now, self.now)
@@ -287,9 +287,9 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             conn.execute(
                 """
                 INSERT INTO enterprise_records (
-                    record_id, tenant_id, company_id, entity_type, entity_id,
-                    title, payload, security_classification, created_at, updated_at
-                ) VALUES (?, ?, ?, 'AUDIT', 'audit_02', 'Tenant B Private Record', '{}', 'RESTRICTED', ?, ?)
+                    record_id, tenant_id, company_id, department, record_type,
+                    title, actor_name, created_at, updated_at
+                ) VALUES (?, ?, ?, 'Platform', 'AUDIT', 'Tenant B Private Record', 'Agent B', ?, ?)
                 ON CONFLICT (record_id) DO NOTHING
                 """,
                 (record_b, self.tenant_b, self.company_id, self.now, self.now)
