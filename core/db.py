@@ -2012,7 +2012,7 @@ CREATE TABLE IF NOT EXISTS browser_artifacts (
     mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
     size_bytes INTEGER NOT NULL DEFAULT 0,
     sha256_digest TEXT NOT NULL,
-    redacted BOOLEAN NOT NULL DEFAULT 0,
+    redacted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at REAL NOT NULL,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
@@ -3523,6 +3523,10 @@ def normalize_sql_for_postgres(sql: str) -> str:
     normalized = sql.replace("?", "%s")
 
     import re
+
+    # Convert BOOLEAN DEFAULT 0/1 to BOOLEAN DEFAULT FALSE/TRUE
+    normalized = re.sub(r"\bBOOLEAN(\s+NOT\s+NULL)?\s+DEFAULT\s+0\b", r"BOOLEAN\1 DEFAULT FALSE", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bBOOLEAN(\s+NOT\s+NULL)?\s+DEFAULT\s+1\b", r"BOOLEAN\1 DEFAULT TRUE", normalized, flags=re.IGNORECASE)
 
     # Handle SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING
     if re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", normalized, re.IGNORECASE):

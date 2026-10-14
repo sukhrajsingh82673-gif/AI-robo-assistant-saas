@@ -724,7 +724,7 @@ class BrowserArtifactRegistry:
                 """,
                 (art_id, execution_id, session_id, tenant_id, company_id,
                  artifact_type, dest_path, mime_type, size_bytes, digest,
-                 1 if redacted else 0, now)
+                 bool(redacted), now)
             )
             conn.commit()
 
