@@ -1,0 +1,160 @@
+name: PostgreSQL 16 CI Qualification Pipeline
+
+on:
+  push:
+    branches: [ main, engineering/*, release/* ]
+  pull_request:
+    branches: [ main, engineering/* ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres16-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres16_qualification:
+    name: "PostgreSQL 16 Live Integration & Dialect Qualification"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres16:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: zonata_staging_qualification
+          POSTGRES_USER: zonata_test_user
+          POSTGRES_PASSWORD: disposable_ci_password_498273
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11 Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Application & Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Database Connectivity Smoke Test (PostgreSQL 16 Handshake)
+        env:
+          DATABASE_URL: postgresql://zonata_test_user:disposable_ci_password_498273@localhost:5432/zonata_staging_qualification
+          APP_ENV: staging
+        run: |
+          echo "Executing genuine PostgreSQL 16 connectivity handshake..."
+          python3 -c "
+          import os, sys
+          from core.db import db, sanitize_db_url
+
+          raw_url = os.environ.get('DATABASE_URL', '')
+          sanitized = sanitize_db_url(raw_url)
+          print(f'Connecting to sanitized endpoint: {sanitized}')
+          assert 'disposable_ci_password_498273' not in sanitized, 'Security Violation: Password leaked in sanitized URL!'
+
+          conn = db.get_connection()
+          cursor = conn.execute('SELECT version()')
+          row = cursor.fetchone()
+          version_str = str(row[0])
+          print(f'Connected to live database engine: {version_str}')
+          assert 'PostgreSQL 16' in version_str, f'Verification Failed: Expected PostgreSQL 16, got {version_str}'
+          print('PostgreSQL 16 handshake verification: SUCCESS')
+          "
+
+      - name: Execute Schema DDL & Additive Controlled Migrations
+        env:
+          DATABASE_URL: postgresql://zonata_test_user:disposable_ci_password_498273@localhost:5432/zonata_staging_qualification
+          APP_ENV: staging
+        run: |
+          echo "Applying complete schema DDL and additive controlled migrations..."
+          python3 -c "
+          from core.db import db
+          from core.controlled_migration_engine import ControlledMigrationEngine
+
+          # 1. Apply core relational schema DDL
+          db._init_db()
+          print('Core schema DDL executed successfully.')
+
+          # 2. Apply controlled migrations
+          engine = ControlledMigrationEngine()
+          applied = engine.apply_pending_migrations()
+          print(f'Applied {len(applied)} controlled migration steps.')
+          status = engine.get_migration_status()
+          versions = [s['version'] for s in status]
+          print(f'Migration versions recorded in schema_migrations: {versions}')
+          assert 2026100501 in versions, 'Migration 2026100501 missing!'
+          assert 2026100502 in versions, 'Migration 2026100502 missing!'
+          print('Schema initialization & migration execution: SUCCESS')
+          "
+
+      - name: Run PostgreSQL SQL Dialect Compatibility Suite (9 Tests)
+        env:
+          APP_ENV: staging
+        run: |
+          python3 -m unittest -v tests/test_postgresql_dialect_compatibility.py
+
+      - name: Run Clean Production Mode & Dialect Invariant Suite (12 Tests)
+        run: |
+          python3 -m unittest -v tests/test_clean_production_mode.py
+
+      - name: Run Live PostgreSQL 16 Cluster Integration Suite (12 Tests)
+        env:
+          DATABASE_URL: postgresql://zonata_test_user:disposable_ci_password_498273@localhost:5432/zonata_staging_qualification
+          APP_ENV: staging
+        run: |
+          python3 -m unittest -v tests/test_postgresql_16_live_integration.py
+
+      - name: Generate Reconciled Test Accounting Artifact
+        env:
+          DATABASE_URL: postgresql://zonata_test_user:disposable_ci_password_498273@localhost:5432/zonata_staging_qualification
+          APP_ENV: staging
+        run: |
+          python3 scripts/generate_test_accounting_summary.py
+
+      - name: Verify Protected Constitutional Baselines
+        run: |
+          python3 -c "
+          import hashlib, subprocess
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as f:
+                  while chunk := f.read(65536):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          db_sha = sha256('storage/roboassistant.db')
+          ledger_sha = sha256('storage/evidence/audit_ledger.jsonl')
+          res = subprocess.run(['git', 'hash-object', 'web/workflow_workspace.js'], capture_output=True, text=True)
+          js_sha = res.stdout.strip()
+
+          assert db_sha == 'ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4', f'Database baseline drift: {db_sha}'
+          assert ledger_sha == 'ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996', f'Ledger baseline drift: {ledger_sha}'
+          assert js_sha == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'Workflow JS baseline drift: {js_sha}'
+          print('Constitutional protected baseline verification: 100% MATCH')
+          "
+
+      - name: Upload Test Evidence Accounting Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres16-qualification-evidence
+          path: storage/evidence/test_accounting_summary.json
+          retention-days: 30

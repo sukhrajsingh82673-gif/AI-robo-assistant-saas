@@ -84,29 +84,56 @@ SUITES_CONFIG = [
     }
 ]
 
-BLOCKED_SUITES = [
-    {
-        "suite_name": "PostgreSQL 16 Live Cluster Integration Suite",
+# When live PostgreSQL 16 DATABASE_URL is configured (e.g. in CI or staging):
+LIVE_PG_URL = os.environ.get("DATABASE_URL", "").strip()
+if LIVE_PG_URL.startswith(("postgresql://", "postgres://")):
+    SUITES_CONFIG.append({
+        "file": "tests/test_postgresql_16_live_integration.py",
+        "name": "PostgreSQL 16 Live Cluster Integration Suite",
         "category": "Database Staging Runtime",
-        "status": "BLOCKED",
-        "tests_planned": 12,
-        "blocker_reason": "No live managed PostgreSQL 16 connection string (DATABASE_URL) configured in PRoot environment."
-    },
-    {
-        "suite_name": "Docker Compose 8-Service Staging Deployment Suite",
-        "category": "Containerized Staging E2E",
-        "status": "BLOCKED",
-        "tests_planned": 8,
-        "blocker_reason": "Docker daemon and containerd runtime not installed or supported in host PRoot jail."
-    },
-    {
-        "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
-        "category": "Disaster Recovery Staging",
-        "status": "BLOCKED",
-        "tests_planned": 4,
-        "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with pg_dump / WAL archiving."
-    }
-]
+        "type": "automated"
+    })
+    BLOCKED_SUITES = [
+        {
+            "suite_name": "Docker Compose 8-Service Staging Deployment Suite",
+            "category": "Containerized Staging E2E",
+            "status": "BLOCKED",
+            "tests_planned": 8,
+            "blocker_reason": "Docker daemon and containerd runtime not installed or supported in host PRoot jail."
+        },
+        {
+            "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
+            "category": "Disaster Recovery Staging",
+            "status": "BLOCKED",
+            "tests_planned": 4,
+            "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with pg_dump / WAL archiving."
+        }
+    ]
+else:
+    BLOCKED_SUITES = [
+        {
+            "suite_name": "PostgreSQL 16 Live Cluster Integration Suite",
+            "category": "Database Staging Runtime",
+            "status": "BLOCKED",
+            "tests_planned": 12,
+            "blocker_reason": "No live managed PostgreSQL 16 connection string (DATABASE_URL) configured in PRoot environment."
+        },
+        {
+            "suite_name": "Docker Compose 8-Service Staging Deployment Suite",
+            "category": "Containerized Staging E2E",
+            "status": "BLOCKED",
+            "tests_planned": 8,
+            "blocker_reason": "Docker daemon and containerd runtime not installed or supported in host PRoot jail."
+        },
+        {
+            "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
+            "category": "Disaster Recovery Staging",
+            "status": "BLOCKED",
+            "tests_planned": 4,
+            "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with pg_dump / WAL archiving."
+        }
+    ]
+
 
 
 class GranularTestResult(unittest.TestResult):
