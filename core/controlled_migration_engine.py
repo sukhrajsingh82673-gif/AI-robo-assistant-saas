@@ -47,6 +47,8 @@ class ControlledMigrationEngine:
     """
 
     def __init__(self):
+        if db.is_postgresql() and not db.is_ready():
+            db.verify_readiness()
         self._ensure_migrations_table()
 
     def _ensure_migrations_table(self):

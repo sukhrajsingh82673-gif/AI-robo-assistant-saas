@@ -90,6 +90,7 @@ jobs:
           from core.controlled_migration_engine import ControlledMigrationEngine
 
           # 1. Apply core relational schema DDL
+          db.verify_readiness()
           db._init_db()
           print('Core schema DDL executed successfully.')
 

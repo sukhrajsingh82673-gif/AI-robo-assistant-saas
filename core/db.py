@@ -3504,6 +3504,7 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "employee_performance_records": ("record_id",),
     "company_processes": ("process_id",),
     "optimistic_lock_registry": ("table_name",),
+    "schema_migrations": ("version",),
 }
 
 
@@ -3807,6 +3808,9 @@ class Database:
             protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
             if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
                 return
+        elif self.dialect == DatabaseDialect.POSTGRESQL and not self._is_ready:
+            self.verify_readiness()
+            return
         with self.get_connection() as conn:
             conn.executescript(SCHEMA_SQL)
             conn.commit()
