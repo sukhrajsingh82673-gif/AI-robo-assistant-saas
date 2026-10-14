@@ -88,10 +88,18 @@ jobs:
           python3 -c "
           from core.db import db
           from core.controlled_migration_engine import ControlledMigrationEngine
+          from core.enterprise_files import EnterpriseFilesEngine
+          from core.enterprise_records import EnterpriseRecordsEngine
+          from core.enterprise_reports import EnterpriseReportsEngine
+          from core.automation_fabric.data_integration_engine import SyncCheckpointManager
 
           # 1. Apply core relational schema DDL
           db.verify_readiness()
           db._init_db()
+          EnterpriseFilesEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseRecordsEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseReportsEngine(tenant_id='tnt_init')._init_db()
+          SyncCheckpointManager._ensure_tables()
           print('Core schema DDL executed successfully.')
 
           # 2. Apply controlled migrations

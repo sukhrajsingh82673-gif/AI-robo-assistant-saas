@@ -55,6 +55,15 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             # Initialize schema once for the class
             try:
                 db.verify_readiness()
+                from core.enterprise_files import EnterpriseFilesEngine
+                from core.enterprise_records import EnterpriseRecordsEngine
+                from core.enterprise_reports import EnterpriseReportsEngine
+                from core.automation_fabric.data_integration_engine import SyncCheckpointManager
+
+                EnterpriseFilesEngine(tenant_id="tnt_init")._init_db()
+                EnterpriseRecordsEngine(tenant_id="tnt_init")._init_db()
+                EnterpriseReportsEngine(tenant_id="tnt_init")._init_db()
+                SyncCheckpointManager._ensure_tables()
             except Exception:
                 pass
 
@@ -307,8 +316,10 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             with db.get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO missions (mission_id, company_id, tenant_id, title, created_at)
-                    VALUES (?, ?, ?, 'Transactional Rollback Test', ?)
+                    INSERT INTO missions (
+                        mission_id, company_id, tenant_id, title, owner_agent,
+                        department, target_outcome, started_at
+                    ) VALUES (?, ?, ?, 'Transactional Rollback Test', 'agt_test', 'Platform', 'Verify Rollback', ?)
                     """,
                     (mission_id, self.company_id, self.tenant_a, self.now)
                 )
