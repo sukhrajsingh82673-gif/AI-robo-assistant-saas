@@ -26,7 +26,7 @@ import hashlib
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, Any, List, Optional, Tuple, Callable, Union
 from dataclasses import dataclass, field, asdict
 
 from core.db import db
