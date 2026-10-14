@@ -10,7 +10,7 @@ import time
 import json
 import re
 import urllib.parse
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Tuple
 
 def sanitize_db_url(raw_input: str) -> str:
     """Safely sanitizes database connection strings and diagnostic error strings.
