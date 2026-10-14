@@ -69,6 +69,7 @@ jobs:
           print(f'Connecting to sanitized endpoint: {sanitized}')
           assert 'disposable_ci_password_498273' not in sanitized, 'Security Violation: Password leaked in sanitized URL!'
 
+          db.verify_readiness()
           conn = db.get_connection()
           cursor = conn.execute('SELECT version()')
           row = cursor.fetchone()
