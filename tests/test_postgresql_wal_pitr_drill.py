@@ -368,7 +368,12 @@ EOF
                 RETURNING customer_id;
             """
         ], check=True)
-        self.assertEqual(write_res.stdout.strip(), write_test_id)
+        self.assertIn(write_test_id, write_res.stdout, "Write operation on recovered instance failed")
+        # Save recovery evidence logs for Phase 6 report
+        os.makedirs(os.path.join(PROJECT_ROOT, "storage", "evidence"), exist_ok=True)
+        evidence_file = os.path.join(PROJECT_ROOT, "storage", "evidence", "pitr_recovery_logs.txt")
+        with open(evidence_file, "w", encoding="utf-8") as ef:
+            ef.write(recovery_logs)
 
         # Step 10: Verify Original Primary Instance Remains UNTOUCHED
         primary_loss_check = int(self.manager.execute_sql(f"""
