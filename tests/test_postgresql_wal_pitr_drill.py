@@ -217,8 +217,8 @@ class TestPostgreSQLWalPitrDrill(unittest.TestCase):
         ]
         for cid in base_customers:
             self.manager.execute_sql(f"""
-                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, email, created_at)
-                VALUES ('{cid}', '{base_tenant}', 'comp_pitr', 'Base Customer', '{cid}@zonata.internal', EXTRACT(EPOCH FROM NOW()))
+                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, created_at, updated_at)
+                VALUES ('{cid}', '{base_tenant}', 'comp_pitr', 'Base Customer', EXTRACT(EPOCH FROM NOW()), EXTRACT(EPOCH FROM NOW()))
                 ON CONFLICT (customer_id) DO NOTHING;
             """)
 
@@ -244,8 +244,8 @@ class TestPostgreSQLWalPitrDrill(unittest.TestCase):
         ]
         for cid in loss_customers:
             self.manager.execute_sql(f"""
-                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, email, created_at)
-                VALUES ('{cid}', '{base_tenant}', 'comp_pitr', 'Accidental Post-Target Loss', '{cid}@zonata.internal', EXTRACT(EPOCH FROM NOW()))
+                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, created_at, updated_at)
+                VALUES ('{cid}', '{base_tenant}', 'comp_pitr', 'Accidental Post-Target Loss', EXTRACT(EPOCH FROM NOW()), EXTRACT(EPOCH FROM NOW()))
                 ON CONFLICT (customer_id) DO NOTHING;
             """)
 
@@ -363,8 +363,8 @@ EOF
             "docker", "exec", "postgres-pitr-recovery",
             "psql", "-U", "zonata_admin", "-d", "zonata_production",
             "-tAc", f"""
-                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, email, created_at)
-                VALUES ('{write_test_id}', '{base_tenant}', 'comp_pitr', 'Post Recovery Test', 'test@zonata.internal', EXTRACT(EPOCH FROM NOW()))
+                INSERT INTO crm_customers (customer_id, tenant_id, company_id, name, created_at, updated_at)
+                VALUES ('{write_test_id}', '{base_tenant}', 'comp_pitr', 'Post Recovery Test', EXTRACT(EPOCH FROM NOW()), EXTRACT(EPOCH FROM NOW()))
                 RETURNING customer_id;
             """
         ], check=True)
