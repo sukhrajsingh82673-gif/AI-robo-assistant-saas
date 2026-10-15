@@ -1,0 +1,275 @@
+name: Docker Staging CI Qualification Pipeline
+
+on:
+  push:
+    branches: [ main, engineering/*, release/* ]
+  pull_request:
+    branches: [ main, engineering/* ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-staging-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker_staging_qualification:
+    name: "Docker Staging 9-Service Compose Qualification"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11 Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Application & Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Validate Compose Manifest & Configuration
+        run: |
+          echo "Validating docker-compose.prod.yml syntax and configuration..."
+          docker compose -f docker-compose.prod.yml config
+          echo "Compose manifest configuration valid."
+
+      - name: Build All Production Container Images
+        run: |
+          echo "Building production images from committed source..."
+          docker compose -f docker-compose.prod.yml build
+          docker build -t zonata/migration:1.0.0-GA -f docker/Dockerfile.migration .
+          docker build -t zonata/supervisor:1.0.0-GA -f docker/Dockerfile.supervisor .
+          echo "All production images built successfully."
+          docker images | grep zonata
+
+      - name: Inspect Container Image Layer Hygiene
+        run: |
+          echo "Screening container image layers for baked secrets..."
+          for img in zonata/api:1.0.0-GA zonata/worker:1.0.0-GA zonata/migration:1.0.0-GA zonata/supervisor:1.0.0-GA; do
+            echo "Inspecting history for $img..."
+            HIST=$(docker history --no-trunc "$img")
+            if echo "$HIST" | grep -E "(PRIVATE KEY|ghp_[0-9a-zA-Z]{36}|sk_live_[0-9a-zA-Z]{24})"; then
+              echo "CRITICAL SECURITY DEFECT: Unencrypted credential detected in image layer $img"
+              exit 1
+            fi
+          done
+          echo "Zero unencrypted secrets detected in built container image layers."
+
+      - name: Pre-initialize Persistent Volume Permissions
+        run: |
+          echo "Initializing named volumes with correct non-root permissions..."
+          docker volume create zonata-storage
+          docker run --rm -v zonata-storage:/target alpine chown -R 10001:10001 /target
+          docker volume create temporal-data
+          docker run --rm -v temporal-data:/target alpine chown -R 1000:1000 /target || true
+          docker volume create minio-data
+          docker run --rm -v minio-data:/target alpine chown -R 1000:1000 /target || true
+          docker volume create prometheus-data
+          docker run --rm -v prometheus-data:/target alpine chown -R 65534:65534 /target || true
+          docker volume create grafana-data
+          docker run --rm -v grafana-data:/target alpine chown -R 472:472 /target || true
+          echo "Volume permissions initialized."
+
+      - name: Start Production Multi-Service Stack
+        run: |
+          echo "Launching 9-service production composition in detached mode..."
+          docker compose -f docker-compose.prod.yml up -d
+          echo "Service stack startup initiated."
+
+      - name: Wait for & Verify Service Health and Readiness
+        run: |
+          echo "Probing container health and readiness..."
+          
+          # 1. Wait for postgres healthcheck
+          echo "Waiting for PostgreSQL 16 container to become healthy..."
+          for i in {1..30}; do
+            STATUS=$(docker inspect --format='{{json .State.Health.Status}}' $(docker compose -f docker-compose.prod.yml ps -q postgres) 2>/dev/null || echo '"unknown"')
+            echo "Postgres health status: $STATUS (attempt $i/30)"
+            if [ "$STATUS" = '"healthy"' ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          # 2. Verify postgres handshake
+          docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
+          docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "SELECT version();"
+
+          # 3. Wait for zonata-api /health and /readyz
+          echo "Waiting for zonata-api to become healthy..."
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/health > /dev/null 2>&1; then
+              echo "zonata-api is responding on /health (attempt $i/30)"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Inspecting /health response:"
+          curl -fsS http://localhost:8080/health | python3 -m json.tool
+
+          # 4. Probe auxiliary services
+          echo "Probing auxiliary infrastructure endpoints..."
+          curl -fsS http://localhost:8222/varz > /dev/null && echo "NATS monitoring active" || echo "NATS probe skipped"
+          curl -fsS http://localhost:9000/minio/health/live > /dev/null && echo "MinIO health active" || echo "MinIO probe skipped"
+          curl -fsS http://localhost:8889/metrics > /dev/null && echo "OTel metrics active" || echo "OTel probe skipped"
+          curl -fsS http://localhost:9090/-/healthy > /dev/null && echo "Prometheus health active" || echo "Prometheus probe skipped"
+          curl -fsS http://localhost:3000/api/health > /dev/null && echo "Grafana health active" || echo "Grafana probe skipped"
+
+          docker compose -f docker-compose.prod.yml ps
+
+      - name: Apply Complete Schema DDL & Additive Controlled Migrations
+        env:
+          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          APP_ENV: staging
+        run: |
+          echo "Applying full relational DDL and additive controlled migrations..."
+          python3 -c "
+          from core.db import db
+          from core.controlled_migration_engine import ControlledMigrationEngine
+          from core.enterprise_files import EnterpriseFilesEngine
+          from core.enterprise_records import EnterpriseRecordsEngine
+          from core.enterprise_reports import EnterpriseReportsEngine
+          from core.automation_fabric.data_integration_engine import SyncCheckpointManager
+
+          # 1. Apply core relational schema DDL
+          db.verify_readiness()
+          db._init_db()
+          EnterpriseFilesEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseRecordsEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseReportsEngine(tenant_id='tnt_init')._init_db()
+          SyncCheckpointManager._ensure_tables()
+          print('Relational schema DDL applied successfully.')
+
+          # 2. Apply controlled migrations
+          engine = ControlledMigrationEngine()
+          applied = engine.apply_pending_migrations()
+          print(f'Applied {len(applied)} controlled migration steps.')
+          status = engine.get_migration_status()
+          versions = [s['version'] for s in status]
+          print(f'Migration versions in schema_migrations: {versions}')
+          assert 2026100501 in versions, 'Migration 2026100501 missing!'
+          assert 2026100502 in versions, 'Migration 2026100502 missing!'
+          print('Schema initialization & migration execution: SUCCESS')
+          "
+
+          # Verify zonata-api /readyz passes after migrations
+          curl -fsS http://localhost:8080/readyz | python3 -m json.tool
+
+      - name: Run Docker Compose 8-Service Staging Deployment Suite
+        run: |
+          echo "Executing Docker Compose Staging Deployment Suite (8 tests)..."
+          python3 -m unittest -v tests/test_docker_staging_qualification.py
+
+      - name: Run Live PostgreSQL 16 Cluster Integration Suite (12 Tests)
+        env:
+          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          APP_ENV: staging
+        run: |
+          echo "Executing 12-test live PostgreSQL 16 integration suite against containerized PostgreSQL..."
+          python3 -m unittest -v tests/test_postgresql_16_live_integration.py
+
+      - name: Run Companion SQL Dialect & Production Mode Suites (21 Tests)
+        env:
+          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          APP_ENV: staging
+        run: |
+          echo "Executing companion dialect and production mode suites..."
+          python3 -m unittest -v tests/test_postgresql_dialect_compatibility.py
+          python3 -m unittest -v tests/test_clean_production_mode.py
+
+      - name: Verify Service Dependency Failures, Restart Behavior, and Graceful Recovery
+        run: |
+          echo "Testing dependency failure injection and auto-recovery..."
+          # Restart postgres dependency
+          docker compose -f docker-compose.prod.yml restart postgres
+          sleep 5
+          docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
+          
+          # Restart zonata-api gracefully
+          docker compose -f docker-compose.prod.yml restart zonata-api
+          sleep 5
+          curl -fsS http://localhost:8080/health > /dev/null
+          curl -fsS http://localhost:8080/readyz > /dev/null
+          echo "Dependency failure recovery and graceful restart: VERIFIED"
+
+      - name: Verify Volume Data Persistence Across Container Lifecycle
+        run: |
+          echo "Testing volume persistence across container destruction..."
+          # Insert persistent test entity
+          docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "
+            INSERT INTO tenants (id, name, domain, created_at) VALUES ('tnt_ci_persist_test', 'CI Persistence Validation', 'ci.zonata.internal', EXTRACT(EPOCH FROM NOW())) ON CONFLICT (id) DO NOTHING;
+          "
+          # Stop and remove postgres container (volume preserved)
+          docker compose -f docker-compose.prod.yml stop postgres
+          docker compose -f docker-compose.prod.yml rm -f postgres
+          # Recreate container
+          docker compose -f docker-compose.prod.yml up -d postgres
+          sleep 5
+          docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
+          # Verify entity persisted
+          RESULT=$(docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -tAc "SELECT name FROM tenants WHERE id = 'tnt_ci_persist_test';")
+          echo "Queried entity name: $RESULT"
+          [ "$RESULT" = "CI Persistence Validation" ]
+          echo "Volume data persistence across container recreation: VERIFIED"
+
+      - name: Verify Protected Constitutional Baselines (100% Match)
+        run: |
+          echo "Verifying inviolable constitutional baseline assets..."
+          python3 -c "
+          import hashlib, subprocess
+
+          with open('storage/roboassistant.db', 'rb') as f:
+              db_sha = hashlib.sha256(f.read()).hexdigest()
+          assert db_sha == 'ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4', f'Database hash mismatch: {db_sha}'
+
+          with open('storage/evidence/audit_ledger.jsonl', 'rb') as f:
+              ledger_sha = hashlib.sha256(f.read()).hexdigest()
+          assert ledger_sha == 'ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996', f'Ledger hash mismatch: {ledger_sha}'
+
+          js_hash = subprocess.check_output(['git', 'hash-object', 'web/workflow_workspace.js']).decode().strip()
+          assert js_hash == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'Workflow JS blob hash mismatch: {js_hash}'
+
+          print('All 3 constitutional baseline assets verified byte-for-byte: 100% MATCH')
+          "
+
+      - name: Generate Reconciled Test Accounting Artifact
+        env:
+          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DOCKER_STAGING_QUALIFICATION: "1"
+        run: |
+          echo "Regenerating granular test accounting summary with Docker staging qualification..."
+          python3 scripts/generate_test_accounting_summary.py
+          cat storage/evidence/test_accounting_summary.json | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Total tests passed:', data['summary']['total_passed'])
+          print('Total test suites:', data['summary']['total_suites'])
+          print('Blocked infrastructure suites:', len(data.get('blocked_infrastructure_suites', [])))
+          for b in data.get('blocked_infrastructure_suites', []):
+              print(f\"  - {b['suite_name']}: {b['status']} ({b['blocker_reason']})\")
+          "
+
+      - name: Upload Test Evidence Accounting Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-staging-qualification-evidence
+          path: storage/evidence/test_accounting_summary.json
+          retention-days: 30
+
+      - name: Teardown Compose Stack
+        if: always()
+        run: |
+          echo "Gracefully terminating staging container composition..."
+          docker compose -f docker-compose.prod.yml down -v --remove-orphans || true

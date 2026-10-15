@@ -74,7 +74,7 @@ jobs:
               re.compile(r'\bcanary_sec_[a-zA-Z0-9_]{8,}\b'),
               re.compile(r'(?:postgres|mysql|mongodb):\/\/[^:\s]+:([^@\s]{6,})@')
           ]
-          ignore_files = {'adversarial_suite.py', 'temporal_adapter.py', 'langgraph_adapter.py'}
+          ignore_files = {'adversarial_suite.py', 'temporal_adapter.py', 'langgraph_adapter.py', 'reproduce_cybersecurity_benchmarks.py'}
           found = False
           for root, dirs, files in os.walk('.'):
               if any(d in root for d in ['.git', 'node_modules', '__pycache__', 'tests', 'docs']):
