@@ -282,6 +282,8 @@ jobs:
           docker compose -f docker-compose.prod.yml logs zonata-worker || true
           echo "=== POSTGRES CONTAINER LOGS ==="
           docker compose -f docker-compose.prod.yml logs postgres || true
+          echo "=== TEMPORAL CONTAINER LOGS ==="
+          docker compose -f docker-compose.prod.yml logs temporal || true
 
       - name: Teardown Compose Stack
         if: always()

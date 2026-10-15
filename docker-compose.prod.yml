@@ -27,7 +27,7 @@ services:
     volumes:
       - zonata-storage:/app/storage
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -103,10 +103,16 @@ services:
     ports:
       - "7233:7233"
     environment:
-      - DB=sqlite
-      - SQLITE_STORAGE_DIR=/etc/temporal/data
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=zonata_admin
+      - POSTGRES_PWD=zonata_secure_prod_password_2026
+      - POSTGRES_SEEDS=postgres
     volumes:
       - temporal-data:/etc/temporal/data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   minio:
     image: cgr.dev/chainguard/minio:latest

@@ -4,6 +4,8 @@ Simulates real operational faults during soak testing: network partitions, provi
 worker terminations, stale leases, duplicate requests, and adversarial verification faults.
 """
 
+from __future__ import annotations
+
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 import time
 import uuid
@@ -27,7 +29,7 @@ class FailureInjectionEngine:
     state reconciliation, and failover containment.
     """
 
-    def __init__(self, engine: UniversalCoworkerEngine):
+    def __init__(self, engine: 'UniversalCoworkerEngine'):
         self.engine = engine
         self.fault_log: List[Dict[str, Any]] = []
 

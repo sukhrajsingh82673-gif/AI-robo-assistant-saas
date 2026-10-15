@@ -4,6 +4,8 @@ Integrates Nous Hermes function-calling and multi-step reasoning paradigms.
 Converts high-level AI CEO objectives into verified, policy-governed tool sequences.
 """
 
+from __future__ import annotations
+
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 import json
 import time
@@ -39,7 +41,7 @@ class HermesAgenticOrchestrator:
     Validates arguments against capability schemas before dispatching to UniversalCoworkerEngine.
     """
 
-    def __init__(self, engine: UniversalCoworkerEngine):
+    def __init__(self, engine: 'UniversalCoworkerEngine'):
         self.engine = engine
         self.conversation_memory: List[Dict[str, Any]] = []
 
