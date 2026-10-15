@@ -74,7 +74,7 @@ jobs:
           docker volume create temporal-data
           docker run --rm -v temporal-data:/target alpine chown -R 1000:1000 /target || true
           docker volume create minio-data
-          docker run --rm -v minio-data:/target alpine chown -R 1000:1000 /target || true
+          docker run --rm -v minio-data:/target alpine chown -R 65532:65532 /target || true
           docker volume create prometheus-data
           docker run --rm -v prometheus-data:/target alpine chown -R 65534:65534 /target || true
           docker volume create grafana-data
