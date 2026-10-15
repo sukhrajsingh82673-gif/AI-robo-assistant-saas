@@ -27,7 +27,10 @@ import hashlib
 import random
 import math
 import threading
+import logging
 from typing import Dict, Any, List, Optional, Tuple, Set
+
+logger = logging.getLogger("zonata.automation_fabric")
 
 from core.db import db
 from core.evidence_ledger import EvidenceLedger
@@ -280,15 +283,27 @@ class UniversalAutomationFabric:
             );
             CREATE INDEX IF NOT EXISTS idx_autosign_status ON automation_signing_keys(status);
             """)
-            try:
-                conn.execute("ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT")
-            except Exception:
-                pass
-            try:
-                conn.execute("ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT")
-            except Exception:
-                pass
-            conn.commit()
+            if getattr(db, 'dialect', None) and getattr(db.dialect, 'value', '') == 'postgresql':
+                try:
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS actor_role TEXT")
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS receipt_signature TEXT")
+                    conn.commit()
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    logger.debug(f"Approval columns check: {e}")
+            else:
+                try:
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT")
+                except Exception:
+                    pass
+                conn.commit()
 
     # =========================================================================
     # LEASE CONSUMPTION, REPLAY PREVENTION & REVOCATION
@@ -1815,6 +1830,10 @@ class UniversalAutomationFabric:
                 conn.commit()
                 return len(rows)
         except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             logger.warning(f"Could not recover crashed executions on startup: {e}")
             return 0
 
