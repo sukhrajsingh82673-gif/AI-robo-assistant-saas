@@ -70,7 +70,7 @@ jobs:
         run: |
           echo "Initializing named volumes with correct non-root permissions..."
           docker volume create zonata-storage
-          docker run --rm -v zonata-storage:/target alpine chown -R 10001:10001 /target
+          docker run --rm -v zonata-storage:/target -v $PWD/storage:/source alpine sh -c "cp -r /source/* /target/ 2>/dev/null || true; chown -R 10001:10001 /target"
           docker volume create temporal-data
           docker run --rm -v temporal-data:/target alpine chown -R 1000:1000 /target || true
           docker volume create minio-data
@@ -81,17 +81,11 @@ jobs:
           docker run --rm -v grafana-data:/target alpine chown -R 472:472 /target || true
           echo "Volume permissions initialized."
 
-      - name: Start Production Multi-Service Stack
+      - name: Launch Infrastructure Substrate (Step 4.4 in Runbook)
         run: |
-          echo "Launching 9-service production composition in detached mode..."
-          docker compose -f docker-compose.prod.yml up -d
-          echo "Service stack startup initiated."
+          echo "Launching postgres, nats, temporal, and minio..."
+          docker compose -f docker-compose.prod.yml up -d postgres nats temporal minio
 
-      - name: Wait for & Verify Service Health and Readiness
-        run: |
-          echo "Probing container health and readiness..."
-          
-          # 1. Wait for postgres healthcheck
           echo "Waiting for PostgreSQL 16 container to become healthy..."
           for i in {1..30}; do
             STATUS=$(docker inspect --format='{{json .State.Health.Status}}' $(docker compose -f docker-compose.prod.yml ps -q postgres) 2>/dev/null || echo '"unknown"')
@@ -102,34 +96,10 @@ jobs:
             sleep 2
           done
 
-          # 2. Verify postgres handshake
           docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
           docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "SELECT version();"
 
-          # 3. Wait for zonata-api /health and /readyz
-          echo "Waiting for zonata-api to become healthy..."
-          for i in {1..30}; do
-            if curl -fsS http://localhost:8080/health > /dev/null 2>&1; then
-              echo "zonata-api is responding on /health (attempt $i/30)"
-              break
-            fi
-            sleep 2
-          done
-
-          echo "Inspecting /health response:"
-          curl -fsS http://localhost:8080/health | python3 -m json.tool
-
-          # 4. Probe auxiliary services
-          echo "Probing auxiliary infrastructure endpoints..."
-          curl -fsS http://localhost:8222/varz > /dev/null && echo "NATS monitoring active" || echo "NATS probe skipped"
-          curl -fsS http://localhost:9000/minio/health/live > /dev/null && echo "MinIO health active" || echo "MinIO probe skipped"
-          curl -fsS http://localhost:8889/metrics > /dev/null && echo "OTel metrics active" || echo "OTel probe skipped"
-          curl -fsS http://localhost:9090/-/healthy > /dev/null && echo "Prometheus health active" || echo "Prometheus probe skipped"
-          curl -fsS http://localhost:3000/api/health > /dev/null && echo "Grafana health active" || echo "Grafana probe skipped"
-
-          docker compose -f docker-compose.prod.yml ps
-
-      - name: Apply Complete Schema DDL & Additive Controlled Migrations
+      - name: Apply Complete Schema DDL & Additive Controlled Migrations (Step 4.5 in Runbook)
         env:
           DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
           APP_ENV: staging
@@ -164,8 +134,41 @@ jobs:
           print('Schema initialization & migration execution: SUCCESS')
           "
 
-          # Verify zonata-api /readyz passes after migrations
+      - name: Launch Application Services (Step 4.6 in Runbook)
+        run: |
+          echo "Launching zonata-api, zonata-worker, otel-collector, prometheus, and grafana..."
+          docker compose -f docker-compose.prod.yml up -d zonata-api zonata-worker otel-collector prometheus grafana
+          echo "Complete 9-service application stack started."
+
+      - name: Wait for & Verify Service Health and Readiness
+        run: |
+          echo "Probing container health and readiness..."
+          
+          # 1. Wait for zonata-api /health and /readyz
+          echo "Waiting for zonata-api to become healthy..."
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/health > /dev/null 2>&1; then
+              echo "zonata-api is responding on /health (attempt $i/30)"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Inspecting /health response:"
+          curl -fsS http://localhost:8080/health | python3 -m json.tool
+
+          echo "Inspecting /readyz response:"
           curl -fsS http://localhost:8080/readyz | python3 -m json.tool
+
+          # 2. Probe auxiliary services
+          echo "Probing auxiliary infrastructure endpoints..."
+          curl -fsS http://localhost:8222/varz > /dev/null && echo "NATS monitoring active" || echo "NATS probe skipped"
+          curl -fsS http://localhost:9000/minio/health/live > /dev/null && echo "MinIO health active" || echo "MinIO probe skipped"
+          curl -fsS http://localhost:8889/metrics > /dev/null && echo "OTel metrics active" || echo "OTel probe skipped"
+          curl -fsS http://localhost:9090/-/healthy > /dev/null && echo "Prometheus health active" || echo "Prometheus probe skipped"
+          curl -fsS http://localhost:3000/api/health > /dev/null && echo "Grafana health active" || echo "Grafana probe skipped"
+
+          docker compose -f docker-compose.prod.yml ps
 
       - name: Run Docker Compose 8-Service Staging Deployment Suite
         run: |
@@ -267,6 +270,18 @@ jobs:
           name: docker-staging-qualification-evidence
           path: storage/evidence/test_accounting_summary.json
           retention-days: 30
+
+      - name: Diagnostic Logs on Failure
+        if: failure()
+        run: |
+          echo "=== DOCKER COMPOSE PS ==="
+          docker compose -f docker-compose.prod.yml ps -a || true
+          echo "=== ZONATA-API CONTAINER LOGS ==="
+          docker compose -f docker-compose.prod.yml logs zonata-api || true
+          echo "=== ZONATA-WORKER CONTAINER LOGS ==="
+          docker compose -f docker-compose.prod.yml logs zonata-worker || true
+          echo "=== POSTGRES CONTAINER LOGS ==="
+          docker compose -f docker-compose.prod.yml logs postgres || true
 
       - name: Teardown Compose Stack
         if: always()

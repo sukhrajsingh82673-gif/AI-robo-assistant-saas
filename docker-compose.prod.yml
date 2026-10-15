@@ -66,6 +66,8 @@ services:
         condition: service_started
       temporal:
         condition: service_started
+      zonata-api:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -153,9 +155,16 @@ services:
 
 volumes:
   zonata-storage:
+    name: zonata-storage
   postgres-data:
+    name: postgres-data
   nats-data:
+    name: nats-data
   temporal-data:
+    name: temporal-data
   minio-data:
+    name: minio-data
   prometheus-data:
+    name: prometheus-data
   grafana-data:
+    name: grafana-data

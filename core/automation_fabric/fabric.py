@@ -1760,6 +1760,12 @@ class UniversalAutomationFabric:
         self._worker_running = True
         self._worker_stop_event.clear()
 
+        # Ensure automation tables are initialized on live database
+        try:
+            self._init_automation_tables()
+        except Exception as e:
+            logger.warning(f"Could not initialize automation tables on worker start: {e}")
+
         # Startup crash recovery
         recovered = self._recover_crashed_executions_on_startup()
 
@@ -1791,22 +1797,26 @@ class UniversalAutomationFabric:
         Safely transitions them to RECOVERING so they are not silently lost or blindly replayed.
         """
         now = time.time()
-        with db.get_connection() as conn:
-            rows = conn.execute("""
-                SELECT execution_id FROM automation_executions
-                WHERE status IN ('RUNNING', 'CLAIMED')
-            """).fetchall()
-            for r in rows:
-                conn.execute("""
-                    UPDATE automation_executions
-                    SET status = 'RECOVERING',
-                        terminal_outcome = 'UNKNOWN_OUTCOME',
-                        error_message = 'Process terminated abnormally while in flight; safe recovery needed',
-                        updated_at = ?
-                    WHERE execution_id = ?
-                """, (now, r["execution_id"]))
-            conn.commit()
-            return len(rows)
+        try:
+            with db.get_connection() as conn:
+                rows = conn.execute("""
+                    SELECT execution_id FROM automation_executions
+                    WHERE status IN ('RUNNING', 'CLAIMED')
+                """).fetchall()
+                for r in rows:
+                    conn.execute("""
+                        UPDATE automation_executions
+                        SET status = 'RECOVERING',
+                            terminal_outcome = 'UNKNOWN_OUTCOME',
+                            error_message = 'Process terminated abnormally while in flight; safe recovery needed',
+                            updated_at = ?
+                        WHERE execution_id = ?
+                    """, (now, r["execution_id"]))
+                conn.commit()
+                return len(rows)
+        except Exception as e:
+            logger.warning(f"Could not recover crashed executions on startup: {e}")
+            return 0
 
     def submit_async_execution(
         self,
