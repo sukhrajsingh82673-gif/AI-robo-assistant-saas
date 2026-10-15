@@ -6,6 +6,8 @@ epistemic truth tracking, digital twin simulation, enterprise connectors,
 owner decision center ('Attention Required'), global search, and ingestion pipeline.
 """
 
+from __future__ import annotations
+
 import http.server
 import socketserver
 import json
@@ -16,6 +18,7 @@ import platform
 import time
 import uuid
 import hashlib
+from typing import Dict, List, Optional, Any, Tuple, Set, Union
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)

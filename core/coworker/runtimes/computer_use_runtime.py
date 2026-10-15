@@ -17,13 +17,14 @@ Computer Use MCP, OpenAdapt, Agent-S, UI-TARS, and OpenRPA.
 Routes to DESKTOP_NODE / WINDOWS_NODE / MACOS_NODE when running on a headless host.
 """
 
+from __future__ import annotations
 import os
 import sys
 import time
 import json
 import uuid
 import hashlib
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 
 from .base_runtime import (

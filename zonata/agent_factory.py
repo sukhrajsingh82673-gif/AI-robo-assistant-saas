@@ -7,7 +7,9 @@ Constitutional Invariant: An agent cannot become authoritative simply because th
 it must be tested, certified, and assigned an explicit authority contract before activation.
 """
 
-from typing import Dict, List, Optional, Any
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Any, Tuple
 import json
 import time
 import uuid

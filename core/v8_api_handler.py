@@ -9,11 +9,12 @@ Constitutional Invariants:
   EVIDENCE_GROUNDING (API returns cryptographic evidence references and audit receipts)
 """
 
+from __future__ import annotations
 import time
 import json
 import logging
 import uuid
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from core.db import db
 from core.ai_ceo_v8 import AICEOExecutiveOperatingLayer
