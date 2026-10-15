@@ -9,8 +9,11 @@ import json
 import uuid
 import hashlib
 import threading
+import logging
 from typing import Dict, Optional, Any
 from dataclasses import dataclass, asdict
+
+logger = logging.getLogger("zonata.action_envelope")
 
 class RiskClass:
     READ_ONLY = "READ_ONLY"

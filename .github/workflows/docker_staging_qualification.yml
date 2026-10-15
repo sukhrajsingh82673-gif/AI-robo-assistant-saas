@@ -212,17 +212,21 @@ jobs:
           echo "Testing volume persistence across container destruction..."
           # Insert persistent test entity
           docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "
-            INSERT INTO tenants (id, name, domain, created_at) VALUES ('tnt_ci_persist_test', 'CI Persistence Validation', 'ci.zonata.internal', EXTRACT(EPOCH FROM NOW())) ON CONFLICT (id) DO NOTHING;
+            INSERT INTO tenants (tenant_id, name, created_at) VALUES ('tnt_ci_persist_test', 'CI Persistence Validation', EXTRACT(EPOCH FROM NOW())) ON CONFLICT (tenant_id) DO NOTHING;
           "
           # Stop and remove postgres container (volume preserved)
           docker compose -f docker-compose.prod.yml stop postgres
           docker compose -f docker-compose.prod.yml rm -f postgres
           # Recreate container
           docker compose -f docker-compose.prod.yml up -d postgres
-          sleep 5
-          docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
+          for i in $(seq 1 30); do
+            if docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production; then
+              break
+            fi
+            sleep 1
+          done
           # Verify entity persisted
-          RESULT=$(docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -tAc "SELECT name FROM tenants WHERE id = 'tnt_ci_persist_test';")
+          RESULT=$(docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -tAc "SELECT name FROM tenants WHERE tenant_id = 'tnt_ci_persist_test';")
           echo "Queried entity name: $RESULT"
           [ "$RESULT" = "CI Persistence Validation" ]
           echo "Volume data persistence across container recreation: VERIFIED"

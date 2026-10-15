@@ -67,7 +67,7 @@ services:
       temporal:
         condition: service_started
       zonata-api:
-        condition: service_healthy
+        condition: service_started
 
   postgres:
     image: postgres:16-alpine

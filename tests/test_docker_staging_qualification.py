@@ -232,7 +232,7 @@ class TestDockerStagingQualification(unittest.TestCase):
         self.assertEqual(pg_tables.returncode, 0)
         tables = set(pg_tables.stdout.strip().splitlines())
 
-        required_tables = {"users", "companies", "tenants", "customers", "deals", "schema_migrations"}
+        required_tables = {"users", "companies", "tenants", "crm_customers", "crm_deals", "schema_migrations"}
         for t in required_tables:
             self.assertIn(t, tables, f"Required relational table '{t}' missing from PostgreSQL database")
 
@@ -311,19 +311,26 @@ class TestDockerStagingQualification(unittest.TestCase):
         insert_res = run_docker_cmd([
             "docker", "compose", "-f", self.compose_file, "exec", "-T", "postgres",
             "psql", "-U", self.postgres_user, "-d", self.postgres_db,
-            "-c", f"INSERT INTO tenants (id, name, domain, created_at) VALUES ('{test_id}', 'Persistence Test Tenant', 'persist.internal', {time.time()});"
+            "-c", f"INSERT INTO tenants (tenant_id, name, created_at) VALUES ('{test_id}', 'Persistence Test Tenant', {time.time()});"
         ])
         self.assertEqual(insert_res.returncode, 0)
 
         # Restart postgres container
         run_docker_cmd(["docker", "compose", "-f", self.compose_file, "restart", "postgres"], timeout=30)
-        time.sleep(3)
+        for _ in range(15):
+            res = run_docker_cmd([
+                "docker", "compose", "-f", self.compose_file, "exec", "-T", "postgres",
+                "pg_isready", "-U", self.postgres_user, "-d", self.postgres_db
+            ], check=False)
+            if res.returncode == 0:
+                break
+            time.sleep(1)
 
         # Verify marker record persists after container restart
         verify_res = run_docker_cmd([
             "docker", "compose", "-f", self.compose_file, "exec", "-T", "postgres",
             "psql", "-U", self.postgres_user, "-d", self.postgres_db,
-            "-tAc", f"SELECT name FROM tenants WHERE id = '{test_id}';"
+            "-tAc", f"SELECT name FROM tenants WHERE tenant_id = '{test_id}';"
         ])
         self.assertEqual(verify_res.returncode, 0)
         self.assertEqual(verify_res.stdout.strip(), "Persistence Test Tenant")
@@ -332,7 +339,7 @@ class TestDockerStagingQualification(unittest.TestCase):
         run_docker_cmd([
             "docker", "compose", "-f", self.compose_file, "exec", "-T", "postgres",
             "psql", "-U", self.postgres_user, "-d", self.postgres_db,
-            "-c", f"DELETE FROM tenants WHERE id = '{test_id}';"
+            "-c", f"DELETE FROM tenants WHERE tenant_id = '{test_id}';"
         ])
 
     # =========================================================================
