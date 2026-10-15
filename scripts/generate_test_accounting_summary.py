@@ -320,6 +320,7 @@ def main():
         "git_commit": git_commit,
         "git_branch": git_branch,
         "summary": {
+            "total_suites": len(results),
             "total_suites_executed": len(results),
             "total_tests_executed": total_tests,
             "total_passed": total_passed,

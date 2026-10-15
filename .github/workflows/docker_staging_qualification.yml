@@ -261,8 +261,8 @@ jobs:
           cat storage/evidence/test_accounting_summary.json | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
-          print('Total tests passed:', data['summary']['total_passed'])
-          print('Total test suites:', data['summary']['total_suites'])
+          print('Total tests passed:', data['summary'].get('total_passed', 0))
+          print('Total test suites:', data['summary'].get('total_suites', data['summary'].get('total_suites_executed', 0)))
           print('Blocked infrastructure suites:', len(data.get('blocked_infrastructure_suites', [])))
           for b in data.get('blocked_infrastructure_suites', []):
               print(f\"  - {b['suite_name']}: {b['status']} ({b['blocker_reason']})\")
