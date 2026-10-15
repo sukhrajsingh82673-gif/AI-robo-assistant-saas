@@ -116,7 +116,9 @@ class TestDockerStagingQualification(unittest.TestCase):
             "temporal-data",
             "minio-data",
             "prometheus-data",
-            "grafana-data"
+            "grafana-data",
+            "postgres-wal-archive",
+            "postgres-base-backups"
         ]
         for v in expected_volumes:
             self.assertIn(v, volumes, f"Expected volume '{v}' missing in docker-compose.prod.yml")

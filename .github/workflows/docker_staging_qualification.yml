@@ -79,6 +79,10 @@ jobs:
           docker run --rm -v prometheus-data:/target alpine chown -R 65534:65534 /target || true
           docker volume create grafana-data
           docker run --rm -v grafana-data:/target alpine chown -R 472:472 /target || true
+          docker volume create postgres-wal-archive
+          docker run --rm -v postgres-wal-archive:/target alpine chown -R 70:70 /target || true
+          docker volume create postgres-base-backups
+          docker run --rm -v postgres-base-backups:/target alpine chown -R 70:70 /target || true
           echo "Volume permissions initialized."
 
       - name: Launch Infrastructure Substrate (Step 4.4 in Runbook)
@@ -191,6 +195,14 @@ jobs:
           echo "Executing companion dialect and production mode suites..."
           python3 -m unittest -v tests/test_postgresql_dialect_compatibility.py
           python3 -m unittest -v tests/test_clean_production_mode.py
+
+      - name: Run PostgreSQL Continuous WAL Archiving & PITR Drill (5 Tests)
+        env:
+          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          APP_ENV: staging
+        run: |
+          echo "Executing PostgreSQL Continuous WAL Archiving & Point-In-Time Recovery Drill (5 tests)..."
+          python3 -m unittest -v tests/test_postgresql_wal_pitr_drill.py
 
       - name: Verify Service Dependency Failures, Restart Behavior, and Graceful Recovery
         run: |

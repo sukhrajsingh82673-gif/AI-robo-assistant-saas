@@ -104,6 +104,12 @@ if HAS_DOCKER_QUAL:
         "category": "Containerized Staging E2E",
         "type": "automated"
     })
+    SUITES_CONFIG.append({
+        "file": "tests/test_postgresql_wal_pitr_drill.py",
+        "name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
+        "category": "Disaster Recovery Staging",
+        "type": "automated"
+    })
 
 # Compute remaining blocked suites
 BLOCKED_SUITES = []
@@ -124,14 +130,13 @@ if not HAS_DOCKER_QUAL:
         "tests_planned": 8,
         "blocker_reason": "Docker daemon and containerd runtime not installed or supported in host PRoot jail."
     })
-
-BLOCKED_SUITES.append({
-    "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
-    "category": "Disaster Recovery Staging",
-    "status": "BLOCKED",
-    "tests_planned": 4,
-    "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with pg_dump / WAL archiving."
-})
+    BLOCKED_SUITES.append({
+        "suite_name": "PostgreSQL WAL Continuous Archiving & PITR Drill",
+        "category": "Disaster Recovery Staging",
+        "status": "BLOCKED",
+        "tests_planned": 5,
+        "blocker_reason": "Point-in-time recovery requires live PostgreSQL server with WAL archiving in Docker CI."
+    })
 
 
 
