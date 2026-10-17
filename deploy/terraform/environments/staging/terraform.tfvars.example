@@ -1,0 +1,5 @@
+aws_region                 = "us-east-1"
+environment                = "staging"
+domain_name                = "staging.yourdomain.com"
+primary_backup_bucket_name = "zonata-staging-worm-backups-UNIQUE_ACCOUNT_SUFFIX"
+replica_backup_bucket_name = "zonata-staging-worm-backups-crr-UNIQUE_ACCOUNT_SUFFIX"
