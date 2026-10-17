@@ -27,3 +27,9 @@ output "github_deployer_role_arn" {
   description = "IAM Role ARN for GitHub Actions OIDC deployer"
   value       = module.secrets_iam.github_deployer_role_arn
 }
+
+output "staging_nip_io_domain" {
+  description = "Default nip.io domain mapping to the staging public IP (zero-configuration DNS)"
+  value       = "${module.ec2_host.public_ip}.nip.io"
+}
+

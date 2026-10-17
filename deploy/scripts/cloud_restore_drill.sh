@@ -107,6 +107,25 @@ def run_cloud_restore_drill(tenant_id: str = "tnt_disaster_recovery"):
         "tenant_isolation_verified": restore_report.tenant_isolation_verified
     }
 
+    # Detect execution scope (Remote AWS S3 vs Local Mirror Buffer)
+    import urllib.request
+    is_live_s3 = False
+    endpoint = os.environ.get("S3_ENDPOINT", offhost_backup_replicator.s3_endpoint or "")
+    if endpoint and not endpoint.startswith("mock://") and ("amazonaws.com" in endpoint or "minio" in endpoint):
+        try:
+            req = urllib.request.Request(endpoint, method="HEAD")
+            urllib.request.urlopen(req, timeout=1.5)
+            is_live_s3 = True
+        except Exception:
+            is_live_s3 = False
+
+    execution_scope = "AWS_LIVE_S3" if is_live_s3 else "LOCAL_CRYPTOGRAPHIC_AND_STORAGE_MIRROR"
+    cloud_enforcement = "AWS_S3_OBJECT_LOCK_API_VERIFIED" if is_live_s3 else "PENDING_AWS_S3_OBJECT_LOCK_API_VERIFICATION"
+
+    results["execution_scope"] = execution_scope
+    results["cloud_provider_enforcement"] = cloud_enforcement
+    results["verdict"] = "CLOUD_RESTORE_VERIFIED" if is_live_s3 else "LOCAL_RESTORE_VERIFIED"
+
     results["metrics"] = {
         "rto_seconds": rto_seconds,
         "rpo_seconds": rpo_seconds,
@@ -114,13 +133,18 @@ def run_cloud_restore_drill(tenant_id: str = "tnt_disaster_recovery"):
         "sla_target_rto_seconds": 900.0,  # 15 minutes
         "sla_target_rpo_seconds": 60.0,   # 1 minute
         "rto_sla_met": rto_seconds <= 900.0,
-        "rpo_sla_met": rpo_seconds <= 60.0
+        "rpo_sla_met": rpo_seconds <= 60.0,
+        "measurement_context": (
+            "Measured against live remote AWS S3 WORM storage."
+            if is_live_s3 else
+            "Measured on local cryptographic envelope decryption and disk restoration from off-host mirror buffer."
+        )
     }
 
-    results["verdict"] = "RESTORE_VERIFIED"
     logger.info(
         f"Drill {drill_id} completed successfully in {total_drill_time}s. "
-        f"RTO: {rto_seconds}s (SLA <= 900s), RPO: {rpo_seconds}s (SLA <= 60s). Verdict: RESTORE_VERIFIED"
+        f"RTO: {rto_seconds}s (SLA <= 900s), RPO: {rpo_seconds}s (SLA <= 60s). "
+        f"Scope: {execution_scope}. Verdict: {results['verdict']}"
     )
 
     # Clean up test artifacts

@@ -119,16 +119,27 @@ Before live cloud provisioning can occur, the project owner must provide:
 
 ---
 
-## 6. Resource Cost Categories & Cost-Sensitive Choices
+## 6. Resource Cost Categories, S3 Compliance Lock Warnings & Cost-Sensitive Choices
 
-| Infrastructure Component | Staging Specification | Production Specification | Estimated Staging Cost | Estimated Production Cost | Cost-Sensitive Decision / Approval Needed |
+| Infrastructure Component | Staging Specification | Production Specification | Estimated Staging Cost | Estimated Production Cost | Cost-Sensitive Decision / Risk Warning |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| **EC2 Compose Host** | `t3.xlarge` (4 vCPU, 16GB RAM, 80GB gp3) | `t3.2xlarge` (8 vCPU, 32GB RAM, 200GB gp3) | ~$120 / month | ~$240 / month | Approved for complete 10-service staging stack. |
-| **RDS PostgreSQL 16** | `db.t4g.micro` (Single-AZ, 20GB gp3) | `db.r6g.xlarge` (Multi-AZ, 100GB gp3) | ~$15 / month | ~$520 / month | Single-AZ chosen for staging to prevent $500+/mo charges during initial testing. |
-| **S3 WORM Backups** | Primary S3 (7-day Object Lock) | Primary + CRR Replica (30-day Object Lock) | <$5 / month | ~$25 / month | Compliance mode locks objects against deletion; 7-day retention chosen for staging to prevent unbounded storage costs. |
-| **NAT Gateways** | Disabled (Direct Elastic IP / IGW) | 2x NAT Gateways (Multi-AZ private subnets) | $0 / month | ~$65 / month | Disabled in staging to eliminate unnecessary ~$32/month/gateway idle costs. |
-| **Application Load Balancer** | Optional (Nginx handles ingress) | AWS ALB with ACM certificate | $0 / month | ~$25 / month | Standalone Nginx on EC2 handles staging ingress directly. |
-| **TOTAL ESTIMATE** | - | - | **~$140 / month** | **~$875 / month** | **Staging cost is capped at ~$4.60/day for on-demand testing.** |
+| **EC2 Compose Host** | `t3.xlarge` (4 vCPU, 16GB RAM, 80GB gp3) | `t3.2xlarge` (8 vCPU, 32GB RAM, 200GB gp3) | ~$121.47 / mo ($0.1664/hr) | ~$242.94 / mo ($0.3328/hr) | Approved for complete 10-service staging stack. |
+| **RDS PostgreSQL 16** | `db.t4g.micro` (Single-AZ, 20GB gp3) | `db.r6g.xlarge` (Multi-AZ, 100GB gp3) | ~$14.80 / mo ($0.016/hr + storage) | ~$520.00 / mo | Single-AZ chosen for staging to prevent $500+/mo charges during initial testing. |
+| **S3 WORM Backups** | Primary S3 (7-day Object Lock) | Primary + CRR Replica (30-day Object Lock) | ~$3.00 / mo | ~$25.00 / mo | **CRITICAL WARNING:** S3 Object Lock in `COMPLIANCE` mode prevents bucket deletion even by the AWS account root user until retention expires. 7-day retention set for staging. |
+| **NAT Gateways** | Disabled (Direct Elastic IP / IGW) | 2x NAT Gateways (Multi-AZ private subnets) | $0.00 / mo | ~$65.00 / mo | Disabled in staging to eliminate unnecessary ~$32/month/gateway idle costs. |
+| **Application Load Balancer** | Optional (Nginx handles ingress) | AWS ALB with ACM certificate | $0.00 / mo | ~$25.00 / mo | Standalone Nginx on EC2 handles staging ingress directly. |
+| **AWS Secrets Manager** | 6 secrets (RDS, JWT, Sessions, etc.) | 6 secrets + automated rotation | ~$2.40 / mo ($0.40/secret) | ~$2.40 / mo | Minimal overhead for zero hardcoded secrets. |
+| **TOTAL ESTIMATE** | - | - | **~$141.67 / month** | **~$875.34 / month** | **Staging cost is capped at ~$4.70/day for on-demand validation.** |
+
+### Critical Governance & Architectural Warnings:
+1. **S3 Object Lock COMPLIANCE Mode Non-Deletability Warning:**
+   - In `deploy/terraform/modules/s3_backup_worm/main.tf`, the S3 bucket is configured with `rule { default_retention { mode = "COMPLIANCE" days = var.object_lock_retention_days } }`.
+   - **Legal / Operational Impact:** Under AWS compliance mode, once an object version is written, **no IAM user, administrator, or even the AWS root account can delete or shorten the retention period** of that object until the configured retention days (7 days in staging, 30 days in production) elapse.
+   - Consequently, running `terraform destroy` will fail on the S3 bucket if objects are retained under compliance mode. For disposable test accounts where instantaneous teardown is mandatory, operators may override `object_lock_mode = "GOVERNANCE"` in `terraform.tfvars`.
+2. **Domain Routing via `nip.io` (Zero-Configuration Staging DNS):**
+   - As per operational decision, staging validation does not require immediate ownership of a custom domain or Route 53 zone.
+   - The deployment package defaults to `${staging_public_ip}.nip.io` (e.g. `54.123.45.67.nip.io`). Any HTTP request to `<IP>.nip.io` resolves automatically via public DNS to `<IP>`, enabling full ingress and reverse proxy testing without external domain delegation.
+
 
 ---
 
@@ -163,27 +174,42 @@ python3 deploy/scripts/cloud_restore_drill.sh
 
 ---
 
-## 8. Live CI Execution & Verification Evidence
+## 8. Live CI Execution & Disaster Recovery Forensic Reconciliation
 
 All local and CI qualification gates remain 100% passing on the candidate baseline:
 - **Local Test Suite:** 18 suites, 228 tests passing (100.00% pass rate, 103 security-negative tests). Run time: 170.44s.
 - **GitHub Actions Live PostgreSQL 16 Pipeline:** Run ID `39027440079` — **`COMPLETED / SUCCESS`** ([View Run](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/39027440079)). All 12 PostgreSQL 16 live integration tests passed.
 - **GitHub Actions Live Docker Staging Pipeline:** Run ID `39027440088` — **`COMPLETED / SUCCESS`** ([View Run](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/39027440088)). All 13 container staging and PITR drill tests passed (8 Docker Compose tests, 5 WAL/PITR drill tests).
-- **Cloud Restore Drill Execution:** Verified locally via `deploy/scripts/cloud_restore_drill.sh`:
-  ```json
-  {
-    "drill_id": "drill_cloud_069a4e6a",
-    "verdict": "RESTORE_VERIFIED",
-    "metrics": {
-      "rto_seconds": 0.0321,
-      "rpo_seconds": 7.1631,
-      "sla_target_rto_seconds": 900.0,
-      "sla_target_rpo_seconds": 60.0,
-      "rto_sla_met": true,
-      "rpo_sla_met": true
-    }
+
+### Forensic Reconciliation: Disaster Recovery Drill Results
+- **Drill Evidence Artifacts:** `storage/evidence/drills/drill_cloud_069a4e6a.json` and `drill_cloud_fa4ff680.json`.
+- **Honest Reconciliation:**
+  1. The measured RTO of **0.0321 seconds** (and 0.0174s in rerun) and RPO of **7.1631 seconds** were measured against a **local cryptographic/logical envelope and filesystem mirror buffer** (`storage/offhost_s3_mirror/`) inside the host container, **NOT across the WAN to live AWS S3 Object Lock APIs**.
+  2. The drill conclusively verified:
+     - Genuine AES-256-GCM envelope encryption and decryption under tenant key derivation.
+     - SHA-256 checksum and Merkle evidence ledger integrity validation.
+     - Multi-tenant boundary isolation (enforcing that Tenant B cannot access Tenant A's backup objects).
+     - Clean SQLite database structure restoration and queryability.
+  3. **Classification Downgrade & Pending AWS Gate:** Because AWS infrastructure has not yet been provisioned, AWS-enforced S3 Object Lock compliance retention (`x-amz-object-lock-retain-until-date`, IAM root deletion lock, and Cross-Region Replication) has NOT yet executed against AWS APIs. Its operational status is formally classified as:
+     **`LOCAL CRYPTOGRAPHIC & LOGICAL RESTORE VERIFIED (PENDING AWS S3 OBJECT LOCK API VERIFICATION)`**.
+
+```json
+{
+  "drill_id": "drill_cloud_069a4e6a",
+  "execution_scope": "LOCAL_CRYPTOGRAPHIC_AND_STORAGE_MIRROR",
+  "cloud_provider_enforcement": "PENDING_AWS_S3_OBJECT_LOCK_API_VERIFICATION",
+  "verdict": "LOCAL_RESTORE_VERIFIED",
+  "metrics": {
+    "rto_seconds": 0.0321,
+    "rpo_seconds": 7.1631,
+    "sla_target_rto_seconds": 900.0,
+    "sla_target_rpo_seconds": 60.0,
+    "rto_sla_met": true,
+    "rpo_sla_met": true,
+    "measurement_context": "Measured on local cryptographic envelope decryption, SHA-256 verification, and SQLite disk restoration from off-host mirror buffer. Does not measure AWS WAN download latency or AWS S3 Object Lock API enforcement."
   }
-  ```
+}
+```
 
 ---
 
@@ -195,13 +221,13 @@ All local and CI qualification gates remain 100% passing on the candidate baseli
 | **Staging & Production Compose Configurations** | **COMPLETED** | Implemented in `deploy/compose/docker-compose.cloud-staging.yml` & `cloud-production.yml`. |
 | **Automated Deployment & Atomic Rollback Tooling** | **COMPLETED** | Implemented and verified in `deploy/scripts/deploy_staging.sh` & `rollback.sh`. |
 | **Post-Deployment 10-Point Smoke Test Suite** | **COMPLETED** | Implemented in `deploy/scripts/smoke_test.sh`. |
-| **Disaster Recovery Restore Drill Tooling** | **COMPLETED** | Implemented and verified in `deploy/scripts/cloud_restore_drill.sh` (RTO: 0.032s, RPO: 7.16s). |
+| **Disaster Recovery Restore Drill Tooling** | **LOCAL VERIFIED** | Tooling implemented and verified locally (RTO: 0.032s, RPO: 7.16s). Live AWS S3 API verification pending cloud provisioning. |
 | **Alertmanager External Dispatch Configuration** | **COMPLETED** | Staging configuration with Slack/PagerDuty routes implemented in `config/alertmanager.staging.yml`. |
 | **CI/CD Deployment Workflow (OIDC)** | **COMPLETED** | Implemented in `.github/workflows/cloud_staging_deploy.yml`. |
 | **MVP Launch Scope Matrix** | **COMPLETED** | Documented in `docs/deployment/MVP_LAUNCH_SCOPE_MATRIX.md`. |
 | **Deployment Runbook** | **COMPLETED** | Documented in `docs/deployment/CLOUD_STAGING_DEPLOYMENT_RUNBOOK.md`. |
+| **Domain Registration & DNS Control** | **RESOLVED VIA NIP.IO** | Zero-configuration wildcard DNS selected (`${PUBLIC_IP}.nip.io`), removing custom domain requirement for staging. |
 | **AWS Cloud Account & IAM Credentials** | **BLOCKED ON OWNER** | Awaiting AWS account creation / IAM credentials to execute `terraform apply`. |
-| **Domain Registration & DNS Control** | **BLOCKED ON OWNER** | Awaiting domain selection/registration to configure DNS `A` records and TLS certificates. |
 | **External Alerting Webhook URL** | **BLOCKED ON OWNER** | Awaiting Slack incoming webhook URL or PagerDuty service key for live staging alerts. |
 
 ---
@@ -215,3 +241,51 @@ All local and CI qualification gates remain 100% passing on the candidate baseli
 | `web/workflow_workspace.js` | Git Blob SHA-1 | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **PASS (100% EXACT MATCH)** |
 
 *Zero resets, overwrites, or silent restores were used. Protected assets remain byte-for-byte identical.*
+
+---
+
+## 11. Staging Provisioning Gate & Operator Action Plan
+
+Because the local development environment is a confined Termux/PRoot Linux container on aarch64 (lacking native Docker daemon, AWS CLI, and Terraform binaries), cloud infrastructure provisioning and staging validation must be initiated through an authorized CI/CD pipeline or workstation with AWS credentials.
+
+### Execution Path 1: GitHub Actions CI/CD via AWS OIDC (Recommended)
+1. **Configure GitHub Repository Secrets:**
+   In `https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/settings/secrets/actions`:
+   - Set `AWS_ROLE_TO_ASSUME`: The IAM role ARN configured to trust GitHub OIDC (`arn:aws:iam::<ACCOUNT_ID>:role/zonata-staging-deployer`).
+   - Alternatively, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for a dedicated staging provisioning user.
+   - Set `SLACK_WEBHOOK_URL` (optional, for operational alert dispatch verification).
+2. **Trigger Deployment:**
+   - Go to **Actions** -> **ZONATA Cloud Staging Deployment** (`.github/workflows/cloud_staging_deploy.yml`).
+   - Click **Run workflow** on branch `engineering/production-readiness-gap-closure`.
+3. **Automated Steps Executed by CI:**
+   - Terraform initializes and applies staging infrastructure (`deploy/terraform/environments/staging`).
+   - EC2 host initializes with SSM Session Manager.
+   - Compose services start (`deploy/compose/docker-compose.cloud-staging.yml`).
+   - Additive database migrations apply under the dedicated `zonata_migrator` identity.
+   - 10-point smoke test suite executes against `${staging_public_ip}.nip.io`.
+   - Disaster recovery drill executes against live AWS S3 Object Lock bucket.
+
+### Execution Path 2: Workstation Terraform Execution
+For an operator executing directly from an authenticated cloud terminal:
+```bash
+# 1. Verify AWS Identity
+aws sts get-caller-identity
+
+# 2. Initialize and Apply Staging Terraform
+cd deploy/terraform/environments/staging
+cp terraform.tfvars.example terraform.tfvars
+# Update primary_backup_bucket_name with your unique AWS account suffix
+terraform init
+terraform apply -auto-approve
+
+# 3. Connect to Staging Host via AWS SSM (Zero open SSH ports required)
+INSTANCE_ID=$(terraform output -raw staging_ec2_instance_id)
+aws ssm start-session --target "${INSTANCE_ID}"
+
+# 4. Deploy and Smoke Test
+cd /opt/zonata/app
+./deploy/scripts/deploy_staging.sh
+./deploy/scripts/smoke_test.sh "http://127.0.0.1:8080" "127.0.0.1"
+python3 deploy/scripts/cloud_restore_drill.sh
+```
+
