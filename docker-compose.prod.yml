@@ -77,6 +77,32 @@ services:
       zonata-api:
         condition: service_started
 
+  zonata-backup-replicator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: zonata/backup-replicator:1.0.0-GA
+    restart: unless-stopped
+    command: ["python3", "scripts/offhost_backup_sync.py", "--continuous", "--interval", "60"]
+    environment:
+      - APP_ENV=production
+      - ENVIRONMENT=production
+      - S3_ENDPOINT=http://minio:9000
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-zonata-backups-production}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-zonata_minio_admin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - PG_WAL_ARCHIVE_DIR=/var/lib/postgresql/wal_archive
+      - PG_BASE_BACKUP_DIR=/var/lib/postgresql/base_backups
+    volumes:
+      - postgres-wal-archive:/var/lib/postgresql/wal_archive:ro
+      - postgres-base-backups:/var/lib/postgresql/base_backups:ro
+      - zonata-storage:/app/storage:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

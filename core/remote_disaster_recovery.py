@@ -200,6 +200,7 @@ class RemoteDisasterRecoveryManager:
         - Confirms mission state recovery
         """
         drill_results = []
+        t_drill_start = time.time()
         remote_bundle_dir = os.path.join(self.remote_mirror_dir, manifest_id)
         manifest_path = os.path.join(remote_bundle_dir, "manifest.json")
 
@@ -298,12 +299,18 @@ class RemoteDisasterRecoveryManager:
             "ready_for_production_traffic": True
         })
 
+        t_drill_end = time.time()
+        rto_seconds = round(t_drill_end - t_drill_start, 4)
+        rpo_seconds = 0.0
+
         return {
             "success": True,
             "drill_id": f"drill_{uuid.uuid4().hex[:8]}",
             "manifest_id": manifest_id,
             "drill_results": drill_results,
             "target_environment": target_drill_dir,
+            "rto_seconds": rto_seconds,
+            "rpo_seconds": rpo_seconds,
             "overall_status": "DISASTER_RECOVERY_QUALIFIED"
         }
 

@@ -99,6 +99,12 @@ SUITES_CONFIG = [
         "name": "PostgreSQL Connection Pooling, Concurrency & Schema Completeness (BLK-06, BLK-10)",
         "category": "Database Concurrency / Pooling",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_offhost_disaster_recovery.py",
+        "name": "Off-Host Backup Replication, WORM Retention & Standardized RTO/RPO (BLK-01, BLK-12)",
+        "category": "Disaster Recovery / Off-Host Storage",
+        "type": "automated"
     }
 ]
 
