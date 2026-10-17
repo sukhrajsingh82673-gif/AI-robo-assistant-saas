@@ -70,6 +70,14 @@ check "6. GET /api/auth/csrf returns valid token" \
 check "7. Scheme is HTTPS" \
   "[[ '${TARGET_URL}' == https://* ]]"
 
+# 8. Neon Cloud Services Integration
+check "8. GET /api/v1/neon/services confirms Neon integration" \
+  "curl -fsS '${TARGET_URL}/api/v1/neon/services' | grep -q 'postgres'"
+
+# 9. Neon Serverless Function Invocation
+check "9. GET /api/v1/neon/functions/hello confirms function proxy" \
+  "curl -fsS '${TARGET_URL}/api/v1/neon/functions/hello' | grep -q 'Hello from Neon Functions'"
+
 echo "=============================================================================="
 echo "Smoke Test Summary: ${PASSED} PASSED, ${FAILED} FAILED"
 echo "=============================================================================="

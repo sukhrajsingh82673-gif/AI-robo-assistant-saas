@@ -6825,10 +6825,10 @@ def run_server(port=8080):
 
 if __name__ == "__main__":
     port_env = os.environ.get("PORT")
-    if len(sys.argv) > 1 and sys.argv[1].isdigit():
-        p = int(sys.argv[1])
-    elif port_env and port_env.isdigit():
+    if port_env and port_env.isdigit():
         p = int(port_env)
+    elif len(sys.argv) > 1 and sys.argv[1].isdigit():
+        p = int(sys.argv[1])
     else:
         p = 8080
     run_server(p)
