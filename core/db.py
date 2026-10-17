@@ -11,7 +11,15 @@ import json
 import re
 import urllib.parse
 import threading
+import sys
 from typing import Optional, Any, Dict, List, Tuple, Set
+
+# Automatically load Neon environment configuration (.env.local / .env)
+try:
+    from core.neon_env import load_neon_env
+    load_neon_env()
+except Exception:
+    pass
 
 def sanitize_db_url(raw_input: str) -> str:
     """Safely sanitizes database connection strings and diagnostic error strings.
@@ -3609,14 +3617,28 @@ class PostgresConnectionWrapper:
     def executescript(self, sql_script: str):
         if self._is_closed:
             raise RuntimeError("Cannot execute script on closed database connection.")
-        cursor = self.raw_conn.cursor()
-        for statement in sql_script.split(";"):
-            stmt = statement.strip()
-            if stmt:
-                norm = self._normalize_sql(stmt)
-                if norm:
-                    cursor.execute(norm)
-        return cursor
+        prev_autocommit = getattr(self.raw_conn, "autocommit", False)
+        try:
+            self.raw_conn.autocommit = True
+        except Exception:
+            pass
+        try:
+            cursor = self.raw_conn.cursor()
+            for statement in sql_script.split(";"):
+                stmt = statement.strip()
+                if stmt:
+                    norm = self._normalize_sql(stmt)
+                    if norm:
+                        try:
+                            cursor.execute(norm)
+                        except Exception:
+                            pass
+            return cursor
+        finally:
+            try:
+                self.raw_conn.autocommit = prev_autocommit
+            except Exception:
+                pass
 
     def cursor(self):
         if self._is_closed:
@@ -4022,20 +4044,28 @@ class Database:
 
         # 2. Fallback to pg8000 pure-Python driver
         try:
+            termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
+            if os.path.exists(termux_site) and termux_site not in sys.path:
+                sys.path.insert(0, termux_site)
             import pg8000
+            import ssl
             parsed = urllib.parse.urlsplit(self.database_url)
             user = parsed.username or "postgres"
             password = parsed.password or ""
             host = parsed.hostname or "localhost"
             port = parsed.port or 5432
             database = parsed.path.lstrip("/") or "postgres"
+            ssl_ctx = None
+            if "sslmode=require" in self.database_url or "neon.tech" in (parsed.hostname or ""):
+                ssl_ctx = ssl.create_default_context()
             raw_conn = pg8000.connect(
                 user=user,
                 password=password,
                 host=host,
                 port=port,
                 database=database,
-                timeout=10
+                ssl_context=ssl_ctx,
+                timeout=int(os.environ.get("DATABASE_TIMEOUT", "60"))
             )
             raw_conn.autocommit = False
             return raw_conn

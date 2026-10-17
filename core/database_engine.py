@@ -14,6 +14,12 @@ import logging
 from typing import Dict, List, Optional, Any, Tuple, Union, Callable
 from contextlib import contextmanager
 
+try:
+    from core.neon_env import load_neon_env
+    load_neon_env()
+except Exception:
+    pass
+
 logger = logging.getLogger("zonata.db")
 
 class DatabaseDialect:
@@ -283,12 +289,12 @@ class DatabaseEngine:
         self._is_ready = (self.dialect == DatabaseDialect.SQLITE)
         self._deferred_import_mode = (self.dialect == DatabaseDialect.POSTGRESQL)
 
-        # Initialize workload-separated pools
+        # Initialize workload-separated pools (serverless-optimized min_pool_size=1)
         self.pools: Dict[str, DatabaseConnectionPool] = {
             WorkloadType.CONTROL_PLANE: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=3,
+                min_pool_size=1,
                 max_pool_size=10,
                 connection_timeout=15.0,
                 pool_type=WorkloadType.CONTROL_PLANE,
@@ -297,7 +303,7 @@ class DatabaseEngine:
             WorkloadType.WRITE: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=5,
+                min_pool_size=1,
                 max_pool_size=20,
                 connection_timeout=30.0,
                 pool_type=WorkloadType.WRITE,
@@ -306,7 +312,7 @@ class DatabaseEngine:
             WorkloadType.READ: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=5,
+                min_pool_size=1,
                 max_pool_size=30,
                 connection_timeout=20.0,
                 pool_type=WorkloadType.READ,
@@ -360,7 +366,11 @@ class DatabaseEngine:
                 raise DatabaseException(f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}")
 
             try:
+                termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
+                if os.path.exists(termux_site) and termux_site not in sys.path:
+                    sys.path.insert(0, termux_site)
                 import pg8000
+                import ssl
                 import urllib.parse
                 parsed = urllib.parse.urlsplit(self.database_url)
                 user = parsed.username or "postgres"
@@ -368,13 +378,17 @@ class DatabaseEngine:
                 host = parsed.hostname or "localhost"
                 port = parsed.port or 5432
                 database = parsed.path.lstrip("/") or "postgres"
+                ssl_ctx = None
+                if "sslmode=require" in self.database_url or "neon.tech" in (parsed.hostname or ""):
+                    ssl_ctx = ssl.create_default_context()
                 conn = pg8000.connect(
                     user=user,
                     password=password,
                     host=host,
                     port=port,
                     database=database,
-                    timeout=10
+                    ssl_context=ssl_ctx,
+                    timeout=int(os.environ.get("DATABASE_TIMEOUT", "60"))
                 )
                 conn.autocommit = False
                 return conn

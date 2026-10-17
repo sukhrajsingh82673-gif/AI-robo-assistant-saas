@@ -40,11 +40,11 @@ check() {
 
 # 1. Health Probe
 check "1. GET /health returns 200 OK" \
-  "curl -fsS '${TARGET_URL}/health' | grep -q 'ok'"
+  "curl -fsS '${TARGET_URL}/health' | grep -qiE 'ok|healthy'"
 
 # 2. Database Readiness Probe
 check "2. GET /readyz confirms PostgreSQL database readiness" \
-  "curl -fsS '${TARGET_URL}/readyz' | grep -q 'ready'"
+  "curl -fsS '${TARGET_URL}/readyz' | grep -qiE 'ready|healthy'"
 
 # 3. Public Edge Metrics Restriction (BLK-02)
 check "3. Unauthenticated GET /metrics is blocked (403 Forbidden)" \

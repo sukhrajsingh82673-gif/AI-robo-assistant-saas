@@ -69,6 +69,11 @@ from core.team_catalog import EnterpriseTeamCatalog, BUNDLED_TEAMS
 from core.operating_skills import OperatingSkillRegistry, SKILLS_CATALOG
 from src.services.agent_engine import heartbeat_coordinator, delegation_engine, config_manager
 from core.settings_service import settings_service, GROUPS, CATEGORIES_CATALOG
+from core.neon_env import get_neon_services_status, load_neon_env
+from core.neon_auth import neon_auth
+from core.neon_functions import neon_functions
+from core.neon_ai_gateway import neon_ai_gateway
+from core.neon_data_api import neon_data_api
 
 SERVER_START_TIME = time.time()
 
@@ -562,6 +567,29 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "timestamp": time.time()
             })
+            return
+
+        # Neon Cloud Services Status & Gateway Endpoints
+        if path == "/api/v1/neon/services":
+            self._send_json(get_neon_services_status())
+            return
+
+        if path == "/api/v1/neon/auth/config":
+            self._send_json(neon_auth.get_public_config())
+            return
+
+        if path == "/api/v1/neon/functions/hello":
+            res = neon_functions.invoke("hello")
+            status_code = 200 if res.get("success") else 502
+            self._send_json(res, status=status_code)
+            return
+
+        if path == "/api/v1/neon/ai/status":
+            self._send_json(neon_ai_gateway.get_status())
+            return
+
+        if path == "/api/v1/neon/data-api/status":
+            self._send_json(neon_data_api.get_status())
             return
 
         # Prometheus Standard Exposition Endpoint (Public / Scraper)
@@ -2745,6 +2773,31 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             headers_dict = {k: v for k, v in self.headers.items()}
             status_code, resp_headers, resp_body = api_handler.handle_request("POST", path, headers_dict, body)
             self._send_json(resp_body, status=status_code)
+            return
+
+        # Neon Services POST Endpoints
+        if path == "/api/v1/neon/functions/invoke":
+            fn_name = req_data.get("function", "hello")
+            fn_path = req_data.get("path", "")
+            fn_method = req_data.get("method", "GET")
+            fn_payload = req_data.get("payload")
+            res = neon_functions.invoke(fn_name, path=fn_path, method=fn_method, payload=fn_payload)
+            status_code = 200 if res.get("success") else 502
+            self._send_json(res, status=status_code)
+            return
+
+        if path == "/api/v1/neon/auth/verify":
+            token = req_data.get("token", "")
+            res = neon_auth.verify_session(token)
+            self._send_json(res)
+            return
+
+        if path == "/api/v1/neon/ai/chat":
+            messages = req_data.get("messages", [])
+            model = req_data.get("model", "gpt-5-mini")
+            res = neon_ai_gateway.chat_completion(messages, model=model)
+            status_code = 200 if res.get("success") else 400
+            self._send_json(res, status=status_code)
             return
 
         # Public Authentication & Token Issuance Endpoints
@@ -6719,9 +6772,9 @@ def run_server(port=8080):
             use_tls = True
 
     proto_name = "https" if use_tls else "http"
-    print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} ({proto_name.upper()} Multi-Threaded Engine)...")
+    print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} ({proto_name.upper()} Multi-Threaded Engine)...", flush=True)
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
-    print("[*] Universal Automation Fabric Background Worker ACTIVE")
+    print("[*] Universal Automation Fabric Background Worker ACTIVE", flush=True)
 
     if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
         import threading
@@ -6733,11 +6786,11 @@ def run_server(port=8080):
             daemon=True
         )
         embedded_worker_thread.start()
-        print("[*] Embedded Asynchronous CommandBus Worker ACTIVE")
+        print("[*] Embedded Asynchronous CommandBus Worker ACTIVE", flush=True)
 
     # Register graceful shutdown signals for cloud container lifecycle (Render/PaaS)
     def _graceful_signal_handler(signum, frame):
-        print(f"\n[*] Received termination signal ({signum}). Initiating graceful shutdown...")
+        print(f"\n[*] Received termination signal ({signum}). Initiating graceful shutdown...", flush=True)
         try:
             universal_automation_fabric.stop_background_worker()
             if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
@@ -6758,8 +6811,8 @@ def run_server(port=8080):
         with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
             if use_tls and ssl_context:
                 httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
-                print(f"[*] TLS Termination ENABLED (TLS 1.2+ minimum, cert: {tls_cert})")
-            print(f"[*] Company OS 1.0 ready at {proto_name}://localhost:{port} (Threaded Concurrency Enabled)")
+                print(f"[*] TLS Termination ENABLED (TLS 1.2+ minimum, cert: {tls_cert})", flush=True)
+            print(f"[*] Company OS 1.0 ready at {proto_name}://localhost:{port} (Threaded Concurrency Enabled)", flush=True)
             httpd.serve_forever()
     finally:
         universal_automation_fabric.stop_background_worker()

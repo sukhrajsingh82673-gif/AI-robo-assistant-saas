@@ -15,6 +15,11 @@ import logging
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_ROOT)
 
+# Add Termux site-packages if present
+termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
+if os.path.exists(termux_site) and termux_site not in sys.path:
+    sys.path.insert(0, termux_site)
+
 from core.db import db, sanitize_db_url
 from core.controlled_migration_engine import ControlledMigrationEngine
 
@@ -23,17 +28,25 @@ logger = logging.getLogger("zonata.deploy.neon_migrations")
 
 
 def apply_migrations(db_url: str):
-    sanitized = sanitize_db_url(db_url)
-    logger.info(f"Initializing remote PostgreSQL database target: {sanitized}")
+    db_url = db_url.strip().strip("<>").strip()
+    
+    # Neon best practice: DDL & migrations must use direct compute endpoint rather than transaction pooler
+    migration_url = db_url.replace("-pooler.", ".")
+    
+    sanitized_runtime = sanitize_db_url(db_url)
+    sanitized_migration = sanitize_db_url(migration_url)
+    logger.info(f"Target runtime connection (pooled): {sanitized_runtime}")
+    logger.info(f"Target migration connection (direct compute): {sanitized_migration}")
 
     # Set environment variables for db engine
-    os.environ["DATABASE_URL"] = db_url
+    os.environ["DATABASE_URL"] = migration_url
     os.environ["ZONATA_DB_DIALECT"] = "postgresql"
     os.environ["APP_ENV"] = "staging"
     os.environ["ENVIRONMENT"] = "staging"
+    os.environ["DATABASE_TIMEOUT"] = "120"
 
-    # Reset internal db connection state to point to new target
-    db.database_url = db_url
+    # Reset internal db connection state to point to migration target
+    db.database_url = migration_url
     db.dialect = "postgresql"
     db._is_ready = False
     if db._pg_pool:
@@ -69,8 +82,8 @@ def apply_migrations(db_url: str):
     conn = pool.get_connection()
     verified_tables = []
     required_tables = [
-        "tenants", "users", "sessions", "missions", "evidence_ledger",
-        "async_command_queue", "audit_log", "kpi_definitions", "temporal_workflows"
+        "tenants", "users", "missions", "async_command_queue",
+        "merkle_evidence_events", "production_audit_logs", "tenant_isolation_audit", "temporal_workflows"
     ]
     with conn:
         cur = conn.cursor()
@@ -87,11 +100,10 @@ def apply_migrations(db_url: str):
             else:
                 logger.warning(f"Table '{tbl}' not found in public schema (may be SQLite-specific or created on first use).")
 
-    pool.release_connection(conn)
-
     report = {
         "status": "SUCCESS",
-        "target_database": sanitized,
+        "target_database": sanitized_runtime,
+        "migration_database": sanitized_migration,
         "migrations_applied_count": len(applied),
         "verified_tables": verified_tables,
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
