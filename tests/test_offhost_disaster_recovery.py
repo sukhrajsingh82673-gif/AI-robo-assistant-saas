@@ -226,6 +226,82 @@ class TestOffHostDisasterRecovery(unittest.TestCase):
         self.assertLess(report.rto_seconds, 2.0, "SQLite drill RTO must be < 2000ms (2.0s)")
         self.assertEqual(report.rpo_seconds, 0.0, "Snapshot restore RPO must be 0.0s (zero pre-disaster loss)")
 
+    def test_11_aes_gcm_encryption_roundtrip_and_tamper_defense(self):
+        """Verify AES-256-GCM authenticated encryption round-trip and tamper defense."""
+        raw_secret_data = b"CONFIDENTIAL_ENTERPRISE_TENANT_SNAPSHOT_DATA_12345"
+
+        # 1. Create secure envelope
+        envelope = backup_security_manager.create_secure_envelope(
+            tenant_id=self.tenant_a,
+            manifest_id="manifest_sample_001",
+            raw_payload_bytes=raw_secret_data,
+            retention_days=30
+        )
+        self.assertEqual(envelope.encryption_algorithm, "AES-256-GCM")
+        self.assertTrue(envelope.is_locked)
+        self.assertIsNotNone(envelope.iv_nonce_hex)
+
+        # 2. Encrypt with AES-256-GCM
+        nonce = bytes.fromhex(envelope.iv_nonce_hex)
+        ciphertext = backup_security_manager.encrypt_payload(
+            raw_bytes=raw_secret_data,
+            tenant_id=envelope.tenant_id,
+            manifest_id=envelope.manifest_id,
+            envelope_id=envelope.envelope_id,
+            nonce_bytes=nonce
+        )
+        self.assertEqual(hashlib.sha256(ciphertext).hexdigest(), envelope.ciphertext_sha256)
+
+        # 3. Decrypt with correct tenant -> exact match
+        decrypted = backup_security_manager.decrypt_payload(
+            ciphertext=ciphertext,
+            envelope_id=envelope.envelope_id,
+            requesting_tenant_id=self.tenant_a
+        )
+        self.assertEqual(decrypted, raw_secret_data)
+
+        # 4. Decrypt with wrong tenant -> fails closed
+        with self.assertRaises(BackupSecurityViolationError):
+            backup_security_manager.decrypt_payload(
+                ciphertext=ciphertext,
+                envelope_id=envelope.envelope_id,
+                requesting_tenant_id=self.tenant_b
+            )
+
+        # 5. Tampered ciphertext -> fails AEAD authentication tag check
+        tampered_ciphertext = bytearray(ciphertext)
+        tampered_ciphertext[0] ^= 0xFF
+        with self.assertRaises(BackupSecurityViolationError):
+            backup_security_manager.decrypt_payload(
+                ciphertext=bytes(tampered_ciphertext),
+                envelope_id=envelope.envelope_id,
+                requesting_tenant_id=self.tenant_a
+            )
+
+    def test_12_dynamic_rpo_calculation_with_timestamps(self):
+        """Verify dynamic derivation of RPO from actual acknowledged transaction timestamps."""
+        db_file = os.path.join(self.test_dir.name, "dynamic_rpo_sample.db")
+        conn = sqlite3.connect(db_file)
+        conn.execute("CREATE TABLE tenants (tenant_id TEXT PRIMARY KEY, name TEXT, created_at REAL);")
+        # Transaction timestamp 5.5 seconds prior to disaster
+        disaster_ts = time.time()
+        tx_ts = disaster_ts - 5.5
+        conn.execute("INSERT INTO tenants VALUES (?, 'Dynamic RPO Corp', ?);", (self.tenant_a, tx_ts))
+        conn.commit()
+        conn.close()
+
+        receipt = self.replicator.replicate_sqlite_snapshot(db_file, tenant_id=self.tenant_a)
+        target_dir = os.path.join(self.test_dir.name, "dynamic_rpo_env")
+        report = self.replicator.execute_offhost_disaster_recovery_drill(
+            receipt_id=receipt.receipt_id,
+            target_dir=target_dir,
+            requesting_tenant_id=self.tenant_a,
+            disaster_timestamp=disaster_ts
+        )
+
+        self.assertAlmostEqual(report.rpo_seconds, 5.5, places=2)
+        self.assertEqual(report.verdict, "QUALIFIED_PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

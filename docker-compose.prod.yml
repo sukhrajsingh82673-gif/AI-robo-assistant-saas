@@ -197,6 +197,18 @@ services:
       - ./config/prometheus_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus-data:/prometheus
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+
   grafana:
     image: grafana/grafana:10.4.0
     restart: unless-stopped
@@ -220,6 +232,8 @@ volumes:
     name: minio-data
   prometheus-data:
     name: prometheus-data
+  alertmanager-data:
+    name: alertmanager-data
   grafana-data:
     name: grafana-data
   postgres-wal-archive:

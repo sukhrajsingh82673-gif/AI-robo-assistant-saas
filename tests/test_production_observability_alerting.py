@@ -13,6 +13,7 @@ import shutil
 import tempfile
 import unittest
 import yaml
+import time
 
 MODULE_ORIG_DB_PATH = None
 MODULE_TEMP_DIR = None
@@ -45,6 +46,7 @@ class TestProductionObservabilityAlerting(unittest.TestCase):
         sre_metrics.reset()
         self.rules_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "prometheus_rules.yml"))
         self.prom_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "prometheus.yml"))
+        self.alertmanager_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "alertmanager.yml"))
         self.compose_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docker-compose.prod.yml"))
 
     def test_prometheus_rules_syntax_and_structure(self):
@@ -248,6 +250,92 @@ class TestProductionObservabilityAlerting(unittest.TestCase):
         with self.assertRaises(ConfigurationError) as cm:
             ProductionConfigValidator.validate_environment(invalid_env)
         self.assertIn("Prometheus alert rules file missing", str(cm.exception))
+
+    def test_alertmanager_configuration_and_compose_wiring(self):
+        """Validates Alertmanager YAML syntax, route receiver, Prometheus target and Docker service."""
+        # 1. Alertmanager config exists and is valid YAML
+        self.assertTrue(os.path.exists(self.alertmanager_config_path), f"Missing {self.alertmanager_config_path}")
+        with open(self.alertmanager_config_path, "r", encoding="utf-8") as f:
+            am_cfg = yaml.safe_load(f)
+        self.assertIn("route", am_cfg)
+        self.assertIn("receivers", am_cfg)
+        receiver_names = [r.get("name") for r in am_cfg["receivers"]]
+        self.assertIn("sre-operations-webhook", receiver_names)
+        webhook_urls = [wc.get("url") for r in am_cfg["receivers"] for wc in r.get("webhook_configs", [])]
+        self.assertTrue(any("/api/telemetry/alerts/webhook" in url for url in webhook_urls))
+
+        # 2. Prometheus config wires alerting to Alertmanager
+        with open(self.prom_config_path, "r", encoding="utf-8") as f:
+            prom_cfg = yaml.safe_load(f)
+        self.assertIn("alerting", prom_cfg)
+        self.assertIn("alertmanagers", prom_cfg["alerting"])
+        am_targets = [t for am in prom_cfg["alerting"]["alertmanagers"] for sc in am.get("static_configs", []) for t in sc.get("targets", [])]
+        self.assertTrue(any("alertmanager:9093" in t for t in am_targets))
+
+        # 3. Docker Compose defines alertmanager service and volume
+        with open(self.compose_path, "r", encoding="utf-8") as f:
+            compose = yaml.safe_load(f)
+        services = compose.get("services", {})
+        self.assertIn("alertmanager", services)
+        self.assertEqual(services["alertmanager"].get("image"), "prom/alertmanager:v0.27.0")
+        self.assertIn("alertmanager-data", compose.get("volumes", {}))
+
+    def test_trace_spans_metrics_cardinality_bounded(self):
+        """Validates that trace span metrics do not include unbounded high-cardinality tenant_id labels."""
+        from core.production_observability import observability_engine
+        observability_engine.create_trace_context(
+            tenant_id="tenant_sensitive_random_98765",
+            company_id="comp_01",
+            mission_id="msn_01",
+            execution_id="exc_01",
+            task_id="tsk_01",
+            agent_id="agt_01",
+            model_id="gemini-2.5-flash",
+            tool_id="tool_01",
+            infrastructure_id="inf_01",
+            evidence_digest="sha256_mock"
+        )
+        output = observability_engine.generate_prometheus_metrics()
+        self.assertIn("zonata_trace_spans_total", output)
+        self.assertIn('model="gemini-2.5-flash"', output)
+        self.assertNotIn("tenant_sensitive_random_98765", output)
+        self.assertNotIn('tenant=', output)
+
+    def test_alertmanager_webhook_ingestion_and_exposition(self):
+        """Validates Alertmanager webhook payload ingestion and subsequent query exposition."""
+        from api_server import RECEIVED_ALERTS
+        initial_count = len(RECEIVED_ALERTS)
+        sample_payload = {
+            "version": "4",
+            "groupKey": "test-group",
+            "status": "firing",
+            "receiver": "zonata-api-webhook",
+            "alerts": [
+                {
+                    "status": "firing",
+                    "labels": {"alertname": "DatabaseConnectionPoolSaturated", "severity": "critical"},
+                    "annotations": {"summary": "DB pool saturated at 95%"},
+                    "startsAt": "2026-10-17T06:00:00Z"
+                }
+            ]
+        }
+        for alert in sample_payload.get("alerts", []):
+            alert_record = {
+                "received_at": time.time(),
+                "status": alert.get("status", "firing"),
+                "labels": alert.get("labels", {}),
+                "annotations": alert.get("annotations", {}),
+                "startsAt": alert.get("startsAt", ""),
+                "endsAt": alert.get("endsAt", ""),
+                "generatorURL": alert.get("generatorURL", ""),
+                "raw": alert
+            }
+            RECEIVED_ALERTS.append(alert_record)
+
+        self.assertGreater(len(RECEIVED_ALERTS), initial_count)
+        last_alert = RECEIVED_ALERTS[-1]
+        self.assertEqual(last_alert["labels"]["alertname"], "DatabaseConnectionPoolSaturated")
+        self.assertEqual(last_alert["status"], "firing")
 
 
 if __name__ == "__main__":

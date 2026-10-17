@@ -330,11 +330,13 @@ class OffHostBackupReplicator:
         self,
         receipt_id: str,
         target_dir: str,
-        requesting_tenant_id: str
+        requesting_tenant_id: str,
+        disaster_timestamp: Optional[float] = None
     ) -> OffHostRestoreReport:
         """
         Executes a complete off-host recovery drill to a fresh target directory.
-        Measures exact RTO (< 2000ms / < 300s) and RPO (0s data loss).
+        Measures exact RTO (< 2000ms / < 300s) and derives RPO dynamically
+        from restored transactional timestamps vs disaster point.
         """
         t_start = time.time()
         drill_id = f"drill_offhost_{uuid.uuid4().hex[:8]}"
@@ -363,11 +365,25 @@ class OffHostBackupReplicator:
         # 4. Tenant isolation check
         rows = conn.execute("SELECT tenant_id FROM tenants WHERE tenant_id = ?", (requesting_tenant_id,)).fetchall()
         isolation_ok = len(rows) > 0
+
+        # 5. Dynamic RPO derivation: read latest acknowledged transaction timestamp
+        latest_tx_epoch = None
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT max(created_at) FROM tenants")
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                latest_tx_epoch = float(row[0])
+        except Exception:
+            pass
+        if latest_tx_epoch is None:
+            latest_tx_epoch = receipt.rpo_timestamp
         conn.close()
 
         t_end = time.time()
         rto_seconds = round(t_end - t_start, 4)
-        rpo_seconds = 0.0  # Exact point-in-time snapshot restored with zero loss
+        disaster_point = disaster_timestamp if disaster_timestamp is not None else receipt.rpo_timestamp
+        rpo_seconds = max(0.0, round(disaster_point - latest_tx_epoch, 4))
 
         report = OffHostRestoreReport(
             drill_id=drill_id,

@@ -216,6 +216,15 @@ class TestTlsNetworkIngress(unittest.TestCase):
         res = ProductionConfigValidator.validate_environment(good_proxy_env)
         self.assertTrue(res["valid"])
 
+    def test_07_nginx_restricts_metrics_on_public_ingress(self):
+        """Verifies Nginx ingress configuration restricts /metrics with 403 Forbidden on public edge."""
+        self.assertTrue(os.path.exists(NGINX_CONF_PATH), f"Nginx config missing at {NGINX_CONF_PATH}")
+        with open(NGINX_CONF_PATH, "r") as f:
+            conf = f.read()
+
+        self.assertIn("location = /metrics", conf)
+        self.assertIn("return 403", conf)
+
 
 if __name__ == "__main__":
     unittest.main()

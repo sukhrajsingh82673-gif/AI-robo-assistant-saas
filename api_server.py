@@ -326,6 +326,7 @@ from core.posthog_analytics import posthog_analytics
 from core.object_storage import object_store
 
 WEB_DIR = os.path.join(BASE_DIR, "web")
+RECEIVED_ALERTS: List[Dict[str, Any]] = []
 
 
 def get_real_system_host():
@@ -594,6 +595,11 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "auth_mode": "PRODUCTION_STRICT" if is_strict else ("STAGING" if app_env.lower() == "staging" else "DEV_BOOTSTRAP"),
                 "server_time": time.time()
             })
+            return
+
+        # SRE Alertmanager Ingested Alerts Exposition Endpoint
+        if path == "/api/telemetry/alerts":
+            self._send_json({"alerts": RECEIVED_ALERTS[-100:], "count": len(RECEIVED_ALERTS)})
             return
 
         # Public Static Web Content (HTML, JS, CSS, images)
@@ -2972,6 +2978,31 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"success": True, "revoked_token_id": tok_id})
             else:
                 self._send_json({"error": "Missing token or token_id to revoke"}, status=400)
+            return
+
+        # SRE Alertmanager Inbound Webhook Receiver
+        elif path == "/api/telemetry/alerts/webhook":
+            alerts = req_data.get("alerts", [])
+            if not isinstance(alerts, list):
+                alerts = [req_data] if req_data else []
+            for alert in alerts:
+                if isinstance(alert, dict):
+                    alert_record = {
+                        "received_at": time.time(),
+                        "status": alert.get("status", req_data.get("status", "firing")),
+                        "labels": alert.get("labels", {}),
+                        "annotations": alert.get("annotations", {}),
+                        "startsAt": alert.get("startsAt", ""),
+                        "endsAt": alert.get("endsAt", ""),
+                        "generatorURL": alert.get("generatorURL", ""),
+                        "raw": alert
+                    }
+                    RECEIVED_ALERTS.append(alert_record)
+            self._send_json({
+                "status": "RECEIVED",
+                "dispatched_count": len(alerts),
+                "total_stored": len(RECEIVED_ALERTS)
+            }, status=200)
             return
 
         try:
