@@ -246,6 +246,91 @@ class TestApiServerSecurityBoundaries(unittest.TestCase):
         status, _, _ = self._http_request("OPTIONS", "/health", headers=headers_disallowed)
         self.assertEqual(status, 403)
 
+    def test_09_production_mode_locks_out_bootstrap_token_minting(self):
+        """In production mode, administrative bootstrap is rejected with HTTP 403 Forbidden."""
+        os.environ["APP_ENV"] = "production"
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": self.bootstrap_secret,
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 403)
+            self.assertIn("strictly locked out in production mode", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+
+    def test_10_production_mode_bootstrap_without_secret_fails(self):
+        """In production mode with bootstrap provisioning enabled but secret missing, returns HTTP 403."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        old_secret = os.environ.pop("ZONATA_BOOTSTRAP_SECRET", None)
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": "some_secret",
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 403)
+            self.assertIn("at least 32 high-entropy characters", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            if old_secret is not None:
+                os.environ["ZONATA_BOOTSTRAP_SECRET"] = old_secret
+
+    def test_11_production_mode_bootstrap_invalid_credentials_fails(self):
+        """In production mode with bootstrap provisioning enabled, invalid secret returns HTTP 401."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        valid_sec = "a" * 32
+        os.environ["ZONATA_BOOTSTRAP_SECRET"] = valid_sec
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": "wrong_secret_12345678901234567890",
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 401)
+            self.assertIn("Invalid bootstrap credentials", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            os.environ["ZONATA_BOOTSTRAP_SECRET"] = self.bootstrap_secret
+
+    def test_12_production_mode_authorized_bootstrap_succeeds_and_locks_repeated_requests(self):
+        """Authorized production bootstrap succeeds once, and repeated bootstrap for the tenant is locked."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        valid_sec = "a" * 32
+        os.environ["ZONATA_BOOTSTRAP_SECRET"] = valid_sec
+        os.environ["ZONATA_AUTH_SECRET"] = "valid_auth_secret_32_chars_long_entropy_12345"
+        target_tnt = f"tnt_boot_{uuid.uuid4().hex[:6]}"
+        try:
+            payload = {
+                "tenant_id": target_tnt,
+                "secret": valid_sec,
+                "role": "OWNER"
+            }
+            # First request: authorized
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 200)
+            self.assertIn("token", body)
+            self.assertEqual(body.get("user", {}).get("tenant_id"), target_tnt)
+
+            # Second request: locked out
+            status2, body2, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status2, 403)
+            self.assertIn("Repeated bootstrap is locked", body2.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            os.environ.pop("ZONATA_AUTH_SECRET", None)
+            os.environ["ZONATA_BOOTSTRAP_SECRET"] = self.bootstrap_secret
+
 
 class TestRuntimeSandboxFailClosed(unittest.TestCase):
     """Verifies that terminal and agent execution fail closed when sandbox runtimes are unavailable."""

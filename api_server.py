@@ -18,7 +18,15 @@ import platform
 import time
 import uuid
 import hashlib
+import hmac
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
+
+_SERVER_BOOT_TIME = time.time()
+_BOOTSTRAP_PROVISIONED_TENANTS: Set[str] = set()
+
+def is_production_mode() -> bool:
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    return (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
@@ -2682,12 +2690,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             email = req_data.get("email", "").strip()
             req_tenant = req_data.get("tenant_id")
-            password = req_data.get("password") or req_data.get("secret")
+            password = req_data.get("password")
             bootstrap_key = req_data.get("bootstrap_key") or req_data.get("secret")
-
-            from core.auth import get_auth_secret_key
-            auth_secret = get_auth_secret_key().decode("utf-8", errors="ignore")
-            is_valid_secret = bool(bootstrap_key and (bootstrap_key == auth_secret or bootstrap_key == os.environ.get("ZONATA_BOOTSTRAP_SECRET")))
 
             target_user = None
             target_tenant = None
@@ -2702,16 +2706,73 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     target_tenant = user_dict["tenant_id"]
                     target_role = user_dict["role"]
                     target_company = user_dict.get("company_id", "comp_primary")
-                elif not is_valid_secret:
+                else:
                     self._send_json({"error": "Unauthorized", "detail": msg}, status=401)
                     return
 
-            # 2. Administrative bootstrap path with verified secret
-            if not target_user and is_valid_secret and req_tenant:
-                target_tenant = req_tenant
-                target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
-                target_role = req_data.get("role", UserRole.OWNER)
-                target_company = req_data.get("company_id", "comp_primary")
+            # 2. Administrative bootstrap path with strict production lockout & audit
+            elif bootstrap_key and req_tenant:
+                is_prod = is_production_mode()
+                if is_prod:
+                    allow_bootstrap = (os.environ.get("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", "0") == "1")
+                    if not allow_bootstrap:
+                        self._send_json({
+                            "error": "Forbidden",
+                            "detail": "Administrative bootstrap token minting is strictly locked out in production mode. Initial owner setup requires explicit bootstrap provisioning authorization or registered credentials."
+                        }, status=403)
+                        return
+
+                    configured_secret = os.environ.get("ZONATA_BOOTSTRAP_SECRET", "")
+                    if len(configured_secret.strip()) < 32:
+                        self._send_json({
+                            "error": "Forbidden",
+                            "detail": "Production Sovereign Security Violation: ZONATA_BOOTSTRAP_SECRET must be explicitly configured with at least 32 high-entropy characters."
+                        }, status=403)
+                        return
+
+                    window_sec = float(os.environ.get("ZONATA_BOOTSTRAP_WINDOW_SECONDS", "300"))
+                    if (time.time() - _SERVER_BOOT_TIME) > window_sec:
+                        self._send_json({
+                            "error": "Forbidden",
+                            "detail": "Administrative bootstrap provisioning window has expired. Bootstrap is permanently locked."
+                        }, status=403)
+                        return
+
+                    if req_tenant in _BOOTSTRAP_PROVISIONED_TENANTS:
+                        self._send_json({
+                            "error": "Forbidden",
+                            "detail": f"Administrative bootstrap has already been executed for tenant '{req_tenant}'. Repeated bootstrap is locked."
+                        }, status=403)
+                        return
+
+                    if not hmac.compare_digest(bootstrap_key, configured_secret):
+                        self._send_json({"error": "Unauthorized", "detail": "Invalid bootstrap credentials"}, status=401)
+                        return
+
+                    _BOOTSTRAP_PROVISIONED_TENANTS.add(req_tenant)
+                    target_tenant = req_tenant
+                    target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
+                    target_role = req_data.get("role", UserRole.OWNER)
+                    target_company = req_data.get("company_id", "comp_primary")
+                else:
+                    # Non-production (development / test mode)
+                    from core.auth import get_auth_secret_key
+                    auth_secret = get_auth_secret_key().decode("utf-8", errors="ignore")
+                    cfg_secret = os.environ.get("ZONATA_BOOTSTRAP_SECRET", "")
+                    is_valid = False
+                    if cfg_secret and hmac.compare_digest(bootstrap_key, cfg_secret):
+                        is_valid = True
+                    elif auth_secret and hmac.compare_digest(bootstrap_key, auth_secret):
+                        is_valid = True
+
+                    if not is_valid:
+                        self._send_json({"error": "Unauthorized", "detail": "Invalid bootstrap credentials"}, status=401)
+                        return
+
+                    target_tenant = req_tenant
+                    target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
+                    target_role = req_data.get("role", UserRole.OWNER)
+                    target_company = req_data.get("company_id", "comp_primary")
 
             if not target_user:
                 self._send_json({
