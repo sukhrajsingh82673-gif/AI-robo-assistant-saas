@@ -26,9 +26,9 @@
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
 | **0** | Baseline Inventory & Reproducible Test Foundation | **PASS** | `a3fa7c6` | `a3fa7c6` | 118 / 118 / 0 / 25 | `production_readiness/phase_00_baseline_report.md` |
 | **1** | Fix Production Security Policy Bypass | **PASS** | `a3fa7c6` | `a5ba246` | 121 / 121 / 0 / 25 | `production_readiness/phase_01_sandbox_policy_report.md` |
-| **2** | Close Privileged Bootstrap Token Vulnerability | **PASS** | `a5ba246` | `PENDING_COMMIT` | 125 / 125 / 0 / 25 | `production_readiness/phase_02_privileged_bootstrap_report.md` |
-| **3** | Production Identity, Auth & Tenant Isolation | **IN PROGRESS** | - | - | - | `production_readiness/phase_03_identity_tenancy_report.md` |
-| **4** | Remove Plaintext Secrets & Enforce Least Privilege | NOT STARTED | - | - | - | `production_readiness/phase_04_secrets_least_privilege_report.md` |
+| **2** | Close Privileged Bootstrap Token Vulnerability | **PASS** | `a5ba246` | `7e6ef3e` | 125 / 125 / 0 / 25 | `production_readiness/phase_02_privileged_bootstrap_report.md` |
+| **3** | Production Identity, Auth & Tenant Isolation | **PASS** | `7e6ef3e` | `PENDING_COMMIT` | 22 / 22 / 0 / 0 | `production_readiness/phase_03_identity_tenancy_report.md` |
+| **4** | Remove Plaintext Secrets & Enforce Least Privilege | **IN PROGRESS** | - | - | - | `production_readiness/phase_04_secrets_least_privilege_report.md` |
 | **5** | HTTPS, TLS & Network Ingress Hardening | NOT STARTED | - | - | - | `production_readiness/phase_05_tls_network_report.md` |
 | **6** | PostgreSQL Reliability, Pooling & Concurrency | NOT STARTED | - | - | - | `production_readiness/phase_06_postgresql_reliability_report.md` |
 | **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | NOT STARTED | - | - | - | `production_readiness/phase_07_offhost_recovery_report.md` |
