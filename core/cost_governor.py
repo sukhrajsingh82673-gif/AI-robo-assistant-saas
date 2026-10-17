@@ -54,7 +54,8 @@ class CostGovernor:
         allocated_inr: float,
         hard_limit_inr: Optional[float] = None
     ) -> str:
-        budget_id = f"bgt_{scope_type.lower()}_{scope_id[:8]}"
+        import hashlib
+        budget_id = f"bgt_{scope_type.lower()}_{hashlib.sha256(f'{self.tenant_id}:{company_id}:{scope_type}:{scope_id}'.encode()).hexdigest()[:16]}"
         hard_limit = hard_limit_inr if hard_limit_inr is not None else allocated_inr
         now = time.time()
 
@@ -71,8 +72,9 @@ class CostGovernor:
                     scope_type = EXCLUDED.scope_type,
                     scope_id = EXCLUDED.scope_id,
                     allocated_budget_inr = EXCLUDED.allocated_budget_inr,
+                    spent_inr = 0.0,
                     hard_limit_inr = EXCLUDED.hard_limit_inr,
-                    status = EXCLUDED.status,
+                    status = 'ACTIVE',
                     updated_at = EXCLUDED.updated_at
             """, (budget_id, self.tenant_id, company_id, scope_type, scope_id, allocated_inr, hard_limit, now, now))
             conn.commit()

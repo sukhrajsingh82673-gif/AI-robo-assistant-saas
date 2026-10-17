@@ -19,6 +19,15 @@ jobs:
     name: "Docker Staging 9-Service Compose Qualification"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      POSTGRES_USER: zonata_admin
+      POSTGRES_PASSWORD: ci_staging_secure_pg_password_2026
+      POSTGRES_DB: zonata_production
+      DB_APP_PASSWORD: ci_staging_app_password_2026
+      DB_WORKER_PASSWORD: ci_staging_worker_password_2026
+      MINIO_ROOT_USER: zonata_minio_admin
+      MINIO_ROOT_PASSWORD: ci_staging_minio_password_2026
+      GF_SECURITY_ADMIN_PASSWORD: ci_staging_grafana_password_2026
 
     steps:
       - name: Checkout Source Repository
@@ -105,7 +114,7 @@ jobs:
 
       - name: Apply Complete Schema DDL & Additive Controlled Migrations (Step 4.5 in Runbook)
         env:
-          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DATABASE_URL: postgresql://zonata_admin:ci_staging_secure_pg_password_2026@localhost:5432/zonata_production
           APP_ENV: staging
         run: |
           echo "Applying full relational DDL and additive controlled migrations..."
@@ -181,7 +190,7 @@ jobs:
 
       - name: Run Live PostgreSQL 16 Cluster Integration Suite (12 Tests)
         env:
-          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DATABASE_URL: postgresql://zonata_admin:ci_staging_secure_pg_password_2026@localhost:5432/zonata_production
           APP_ENV: staging
         run: |
           echo "Executing 12-test live PostgreSQL 16 integration suite against containerized PostgreSQL..."
@@ -189,7 +198,7 @@ jobs:
 
       - name: Run Companion SQL Dialect & Production Mode Suites (21 Tests)
         env:
-          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DATABASE_URL: postgresql://zonata_admin:ci_staging_secure_pg_password_2026@localhost:5432/zonata_production
           APP_ENV: staging
         run: |
           echo "Executing companion dialect and production mode suites..."
@@ -198,7 +207,7 @@ jobs:
 
       - name: Run PostgreSQL Continuous WAL Archiving & PITR Drill (5 Tests)
         env:
-          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DATABASE_URL: postgresql://zonata_admin:ci_staging_secure_pg_password_2026@localhost:5432/zonata_production
           APP_ENV: staging
         run: |
           echo "Executing PostgreSQL Continuous WAL Archiving & Point-In-Time Recovery Drill (5 tests)..."
@@ -265,7 +274,7 @@ jobs:
 
       - name: Generate Reconciled Test Accounting Artifact
         env:
-          DATABASE_URL: postgresql://zonata_admin:zonata_secure_prod_password_2026@localhost:5432/zonata_production
+          DATABASE_URL: postgresql://zonata_admin:ci_staging_secure_pg_password_2026@localhost:5432/zonata_production
           DOCKER_STAGING_QUALIFICATION: "1"
         run: |
           echo "Regenerating granular test accounting summary with Docker staging qualification..."

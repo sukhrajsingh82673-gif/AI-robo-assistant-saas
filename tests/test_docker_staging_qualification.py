@@ -72,7 +72,7 @@ class TestDockerStagingQualification(unittest.TestCase):
         cls.api_url = os.environ.get("STAGING_API_URL", "http://localhost:8080")
         cls.postgres_user = os.environ.get("POSTGRES_USER", "zonata_admin")
         cls.postgres_db = os.environ.get("POSTGRES_DB", "zonata_production")
-        cls.postgres_password = os.environ.get("POSTGRES_PASSWORD", "zonata_secure_prod_password_2026")
+        cls.postgres_password = os.environ.get("POSTGRES_PASSWORD", "ci_staging_secure_pg_password_2026")
 
     # =========================================================================
     # TEST 1: Compose Manifest & Syntax Validation

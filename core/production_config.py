@@ -25,7 +25,9 @@ class ProductionConfigValidator:
 
     FORBIDDEN_DEV_SECRETS = {
         "changeme", "password", "admin", "123456", "secret",
-        "dev_key", "test_key", "default", "replace_with_secure_password"
+        "dev_key", "test_key", "default", "replace_with_secure_password",
+        "zonata_secure_prod_password_2026", "zonata_minio_secret_password_2026",
+        "zonata_admin_password_2026", "replace_with_"
     }
 
     @classmethod
@@ -77,8 +79,15 @@ class ProductionConfigValidator:
                 db_url = env.get("DATABASE_URL", "")
                 if not db_url:
                     errors.append("DATABASE_URL must be specified when DATABASE_DIALECT is postgresql.")
-                elif any(bad in db_url.lower() for bad in cls.FORBIDDEN_DEV_SECRETS):
-                    errors.append("DATABASE_URL contains an insecure default password.")
+                else:
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(db_url)
+                    db_pwd = parsed.password or ""
+                    db_user = parsed.username or ""
+                    if any(bad in db_pwd.lower() for bad in cls.FORBIDDEN_DEV_SECRETS) or any(bad in db_url.lower() for bad in ("zonata_secure_prod_password_2026", "replace_with_")):
+                        errors.append("DATABASE_URL contains an insecure default password.")
+                    if (db_user in ("zonata_admin", "postgres", "admin", "root") or "://zonata_admin:" in db_url or "://postgres:" in db_url) and env.get("ZONATA_ALLOW_SUPERUSER_DB", "0") != "1":
+                        errors.append("DATABASE_URL violates least privilege: superuser role ('zonata_admin' or 'postgres') prohibited for application runtime in production. Use 'zonata_app'.")
 
             # 5. Ingress CORS check
             cors = env.get("ALLOWED_ORIGINS", "")

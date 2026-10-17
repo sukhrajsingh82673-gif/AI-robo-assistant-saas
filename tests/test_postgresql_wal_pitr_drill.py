@@ -296,7 +296,7 @@ EOF
             "-v", "postgres-wal-archive:/var/lib/postgresql/wal_archive:ro",
             "-p", "5433:5432",
             "-e", "POSTGRES_USER=zonata_admin",
-            "-e", "POSTGRES_PASSWORD=zonata_secure_prod_password_2026",
+            "-e", f"POSTGRES_PASSWORD={os.environ.get('POSTGRES_PASSWORD', 'ci_drill_secure_password_2026')}",
             "-e", "POSTGRES_DB=zonata_production",
             "postgres:16-alpine"
         ]
@@ -440,7 +440,7 @@ EOF
             "-v", "postgres-neg-data:/var/lib/postgresql/data",
             "-p", "5434:5432",
             "-e", "POSTGRES_USER=zonata_admin",
-            "-e", "POSTGRES_PASSWORD=zonata_secure_prod_password_2026",
+            "-e", f"POSTGRES_PASSWORD={os.environ.get('POSTGRES_PASSWORD', 'ci_drill_secure_password_2026')}",
             "-e", "POSTGRES_DB=zonata_production",
             "postgres:16-alpine"
         ]

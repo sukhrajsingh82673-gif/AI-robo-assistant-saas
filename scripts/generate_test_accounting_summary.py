@@ -41,6 +41,12 @@ SUITES_CONFIG = [
         "type": "automated"
     },
     {
+        "file": "tests/test_secrets_least_privilege.py",
+        "name": "Secret Redaction & Least-Privilege Database Roles (BLK-03)",
+        "category": "Security-Negative / Least Privilege",
+        "type": "automated"
+    },
+    {
         "file": "tests/test_clean_production_mode.py",
         "name": "Clean Production Initialization & Fallback Refusal",
         "category": "Unit / Dialect Initialization",

@@ -11,7 +11,8 @@ import time
 import os
 import uuid
 import json
-from core.db import db
+import tempfile
+from core.db import db, configure_isolated_test_db
 from core.production_config import ProductionConfigValidator, ConfigurationError
 from core.secret_vault import SecretVault, SecretVaultException
 from core.sovereign_key_manager import SovereignKeyManager, KeyType, SovereignAuthorityViolation
@@ -23,6 +24,26 @@ from core.reconciliation_engine import ExternalActionReconciliationEngine, Recon
 from core.observability_stack import PrometheusMetricsRegistry, SLOTracker
 from core.alerting_engine import AlertingEngine
 from core.production_gates import ProductionCertificationGates
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    """Configures a globally isolated database for all test fixtures in this suite."""
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "v10_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+
+def tearDownModule():
+    """Restores database path to original baseline."""
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 class TestV10EnterpriseProductionUnit(unittest.TestCase):
 
@@ -162,20 +183,21 @@ class TestV10EnterpriseProductionUnit(unittest.TestCase):
     def test_05_cost_governor_hard_limits(self):
         """Verify soft warnings and hard budget limit failure."""
         gov = CostGovernor(tenant_id=self.tenant_id)
-        gov.set_budget(self.company_id, "MISSION", "msn_budget_01", allocated_inr=1000.0, hard_limit_inr=1000.0)
+        msn_id = f"msn_budget_{uuid.uuid4().hex[:8]}"
+        gov.set_budget(self.company_id, "MISSION", msn_id, allocated_inr=1000.0, hard_limit_inr=1000.0)
 
         # ₹500 spend (50%) -> ACTIVE
-        r1 = gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 500.0)
+        r1 = gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 500.0)
         self.assertEqual(r1["status"], "ACTIVE")
 
         # Additional ₹350 spend (85% total) -> WARNING (soft limit reached)
-        r2 = gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 350.0)
+        r2 = gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 350.0)
         self.assertEqual(r2["status"], "WARNING")
         self.assertTrue(r2["soft_limit_breached"])
 
         # Additional ₹200 spend (105% total) -> Raises BudgetExhaustedException
         with self.assertRaises(BudgetExhaustedException):
-            gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 200.0)
+            gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 200.0)
 
     # 6. Nine-Level KillSwitch Matrix
     def test_06_killswitch_nine_levels(self):

@@ -27,8 +27,8 @@
 | **0** | Baseline Inventory & Reproducible Test Foundation | **PASS** | `a3fa7c6` | `a3fa7c6` | 118 / 118 / 0 / 25 | `production_readiness/phase_00_baseline_report.md` |
 | **1** | Fix Production Security Policy Bypass | **PASS** | `a3fa7c6` | `a5ba246` | 121 / 121 / 0 / 25 | `production_readiness/phase_01_sandbox_policy_report.md` |
 | **2** | Close Privileged Bootstrap Token Vulnerability | **PASS** | `a5ba246` | `7e6ef3e` | 125 / 125 / 0 / 25 | `production_readiness/phase_02_privileged_bootstrap_report.md` |
-| **3** | Production Identity, Auth & Tenant Isolation | **PASS** | `7e6ef3e` | `PENDING_COMMIT` | 22 / 22 / 0 / 0 | `production_readiness/phase_03_identity_tenancy_report.md` |
-| **4** | Remove Plaintext Secrets & Enforce Least Privilege | **IN PROGRESS** | - | - | - | `production_readiness/phase_04_secrets_least_privilege_report.md` |
+| **3** | Production Identity, Auth & Tenant Isolation | **PASS** | `7e6ef3e` | `e61dfa2` | 22 / 22 / 0 / 0 | `production_readiness/phase_03_identity_tenancy_report.md` |
+| **4** | Remove Plaintext Secrets & Enforce Least Privilege | **PASS** | `e61dfa2` | Pending Commit | 132 / 132 / 0 / 25 | `production_readiness/phase_04_secrets_least_privilege_report.md` |
 | **5** | HTTPS, TLS & Network Ingress Hardening | NOT STARTED | - | - | - | `production_readiness/phase_05_tls_network_report.md` |
 | **6** | PostgreSQL Reliability, Pooling & Concurrency | NOT STARTED | - | - | - | `production_readiness/phase_06_postgresql_reliability_report.md` |
 | **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | NOT STARTED | - | - | - | `production_readiness/phase_07_offhost_recovery_report.md` |
@@ -60,7 +60,7 @@
 | **BLK-08** | **P1** | Administrative bootstrap token endpoint accepts `bootstrap_key` without production lockout or time window checks | `api_server.py:2686-2715` | **RESOLVED (Phase 2)** |
 | **BLK-01** | **P0** | Zero off-host backup storage (WAL & base backups stored only on local container volumes) | Storage / DR Architecture | **QUEUED (Phase 7)** |
 | **BLK-02** | **P0** | Cleartext HTTP & universal absence of TLS termination on API and internal service boundaries | `api_server.py`, Ingress | **QUEUED (Phase 5)** |
-| **BLK-03** | **P0** | Hardcoded production plaintext passwords and unisolated superuser database credentials | `docker-compose.prod.yml` | **QUEUED (Phase 4)** |
+| **BLK-03** | **P0** | Hardcoded production plaintext passwords and unisolated superuser database credentials | `docker-compose.prod.yml` | **RESOLVED (Phase 4)** |
 | **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **QUEUED (Phase 10)** |
 | **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **QUEUED (Phase 8)** |
 | **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **QUEUED (Phase 6)** |
