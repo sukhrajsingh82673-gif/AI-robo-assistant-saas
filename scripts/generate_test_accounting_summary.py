@@ -117,6 +117,18 @@ SUITES_CONFIG = [
         "name": "Container Security, Quotas, Healthchecks & Staging Topology (BLK-09)",
         "category": "Security-Negative / Container Hardening",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_nango_integration.py",
+        "name": "Nango Governed External System Integration & Bridge Suite",
+        "category": "Integration / Governance & Subsystem Bridges",
+        "type": "automated"
+    },
+    {
+        "file": "tests/test_real_external_integrations.py",
+        "name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+        "category": "Security-Negative / Real External Business Integrations",
+        "type": "automated"
     }
 ]
 

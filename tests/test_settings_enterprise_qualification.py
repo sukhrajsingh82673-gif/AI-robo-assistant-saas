@@ -51,6 +51,9 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
         cls.test_dir = tempfile.mkdtemp(prefix="zonata_settings_qual_")
         cls.isolated_db = os.path.join(cls.test_dir, "settings_qual.db")
         configure_isolated_test_db(cls.isolated_db)
+        cls.isolated_settings = os.path.join(cls.test_dir, "isolated_settings.json")
+        cls.orig_settings_path = os.environ.get("ZONATA_SETTINGS_PATH")
+        os.environ["ZONATA_SETTINGS_PATH"] = cls.isolated_settings
 
         # Seed minimal tenant and company in isolated db
         with db.get_connection() as conn:
@@ -78,6 +81,10 @@ class TestSettingsEnterpriseQualification(unittest.TestCase):
                 cls._server_proc.server_close()
             except Exception:
                 pass
+        if hasattr(cls, "orig_settings_path") and cls.orig_settings_path:
+            os.environ["ZONATA_SETTINGS_PATH"] = cls.orig_settings_path
+        else:
+            os.environ.pop("ZONATA_SETTINGS_PATH", None)
         if cls.orig_db_path:
             db.set_db_path(cls.orig_db_path)
             os.environ["ZONATA_DB_PATH"] = cls.orig_db_path

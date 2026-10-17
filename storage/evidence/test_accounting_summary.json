@@ -1,18 +1,18 @@
 {
-  "timestamp": 1792225148.010268,
-  "timestamp_iso": "2026-10-17T08:19:08Z",
-  "git_commit": "e994738e382431f529ad56f5d896a231ea2958f8",
+  "timestamp": 1792231123.8206449,
+  "timestamp_iso": "2026-10-17T09:58:43Z",
+  "git_commit": "23a03a4b55a33346f07f675eb1ccf48546088809",
   "git_branch": "engineering/production-readiness-gap-closure",
   "summary": {
-    "total_suites": 16,
-    "total_suites_executed": 16,
-    "total_tests_executed": 183,
-    "total_passed": 183,
+    "total_suites": 18,
+    "total_suites_executed": 18,
+    "total_tests_executed": 228,
+    "total_passed": 228,
     "total_failed": 0,
     "total_errors": 0,
-    "total_duration_seconds": 108.15,
+    "total_duration_seconds": 126.98,
     "pass_rate_pct": 100.0,
-    "security_negative_test_count": 80
+    "security_negative_test_count": 103
   },
   "executed_suites": [
     {
@@ -23,7 +23,7 @@
       "passed_count": 14,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 13.604,
+      "duration_seconds": 14.143,
       "status": "PASS"
     },
     {
@@ -34,7 +34,7 @@
       "passed_count": 8,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 9.945,
+      "duration_seconds": 10.001,
       "status": "PASS"
     },
     {
@@ -45,7 +45,7 @@
       "passed_count": 36,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 6.155,
+      "duration_seconds": 6.498,
       "status": "PASS"
     },
     {
@@ -56,7 +56,7 @@
       "passed_count": 7,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 0.106,
+      "duration_seconds": 0.103,
       "status": "PASS"
     },
     {
@@ -67,7 +67,7 @@
       "passed_count": 7,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 6.06,
+      "duration_seconds": 5.814,
       "status": "PASS"
     },
     {
@@ -78,7 +78,7 @@
       "passed_count": 12,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 10.657,
+      "duration_seconds": 10.313,
       "status": "PASS"
     },
     {
@@ -89,7 +89,7 @@
       "passed_count": 4,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 3.359,
+      "duration_seconds": 3.813,
       "status": "PASS"
     },
     {
@@ -100,7 +100,7 @@
       "passed_count": 3,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 4.466,
+      "duration_seconds": 5.693,
       "status": "PASS"
     },
     {
@@ -111,7 +111,7 @@
       "passed_count": 10,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 2.661,
+      "duration_seconds": 2.343,
       "status": "PASS"
     },
     {
@@ -122,7 +122,7 @@
       "passed_count": 22,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 38.913,
+      "duration_seconds": 40.318,
       "status": "PASS"
     },
     {
@@ -133,7 +133,7 @@
       "passed_count": 7,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 0.348,
+      "duration_seconds": 0.142,
       "status": "PASS"
     },
     {
@@ -144,7 +144,7 @@
       "passed_count": 9,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 2.952,
+      "duration_seconds": 1.822,
       "status": "PASS"
     },
     {
@@ -155,7 +155,7 @@
       "passed_count": 10,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 1.287,
+      "duration_seconds": 0.95,
       "status": "PASS"
     },
     {
@@ -166,7 +166,7 @@
       "passed_count": 12,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 0.998,
+      "duration_seconds": 0.955,
       "status": "PASS"
     },
     {
@@ -177,7 +177,7 @@
       "passed_count": 14,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 5.001,
+      "duration_seconds": 4.033,
       "status": "PASS"
     },
     {
@@ -188,7 +188,29 @@
       "passed_count": 8,
       "failures": 0,
       "errors": 0,
-      "duration_seconds": 1.638,
+      "duration_seconds": 1.85,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_nango_integration.py",
+      "name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "test_count": 22,
+      "passed_count": 22,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 7.336,
+      "status": "PASS"
+    },
+    {
+      "file": "tests/test_real_external_integrations.py",
+      "name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "test_count": 23,
+      "passed_count": 23,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 10.857,
       "status": "PASS"
     }
   ],
@@ -201,7 +223,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify Tenant Beta cannot read, update, or delete Tenant Alpha customer accounts.",
       "status": "PASS",
-      "duration_seconds": 0.7007,
+      "duration_seconds": 0.7931,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -213,7 +235,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify Tenant Beta cannot read, progress, or delete Tenant Alpha commercial deals.",
       "status": "PASS",
-      "duration_seconds": 0.8927,
+      "duration_seconds": 0.8862,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -225,7 +247,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify Tenant Beta cannot associate its deals with Tenant Alpha's customers.",
       "status": "PASS",
-      "duration_seconds": 0.8108,
+      "duration_seconds": 0.8178,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -237,7 +259,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify secret entropy evaluation distinguishes raw length from cryptographic randomness.",
       "status": "PASS",
-      "duration_seconds": 0.6744,
+      "duration_seconds": 0.9333,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -249,7 +271,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify key rotation preserves sessions signed under ZONATA_PREVIOUS_AUTH_SECRET.",
       "status": "PASS",
-      "duration_seconds": 0.9541,
+      "duration_seconds": 0.9634,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -261,7 +283,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify legacy hex hash is transparently upgraded to pbkdf2_sha256 format with 600000 iterations on authentication.",
       "status": "PASS",
-      "duration_seconds": 1.4532,
+      "duration_seconds": 1.4626,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -273,7 +295,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify deal updates enforce tenant boundary and prevent cross-tenant customer association.",
       "status": "PASS",
-      "duration_seconds": 0.9165,
+      "duration_seconds": 0.8615,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -285,7 +307,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify distributed rate limiter is concurrency-safe across simultaneous worker threads.",
       "status": "PASS",
-      "duration_seconds": 1.0695,
+      "duration_seconds": 1.1094,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -297,7 +319,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify rotation window expiration and immediate emergency key retirement.",
       "status": "PASS",
-      "duration_seconds": 0.9712,
+      "duration_seconds": 0.9201,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -309,7 +331,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify CSPRNG generation creates 256 bits of cryptographic entropy.",
       "status": "PASS",
-      "duration_seconds": 0.6818,
+      "duration_seconds": 0.9604,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -321,7 +343,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify malformed password hashes fail closed without crashing.",
       "status": "PASS",
-      "duration_seconds": 0.9815,
+      "duration_seconds": 0.8555,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -333,7 +355,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify Unicode normalization matches across forms and excessive password length is rejected.",
       "status": "PASS",
-      "duration_seconds": 1.049,
+      "duration_seconds": 1.0039,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -345,7 +367,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify dual-axis rate limiting throttles IP and account independently with scoped pruning.",
       "status": "PASS",
-      "duration_seconds": 0.9646,
+      "duration_seconds": 0.9993,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -357,7 +379,7 @@
       "category": "Security-Negative / Unit",
       "description": "Verify CRM customer and deal update endpoints strictly forbid modifying immutable identity and audit fields.",
       "status": "PASS",
-      "duration_seconds": 0.8637,
+      "duration_seconds": 1.0374,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -369,7 +391,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify PBKDF2-HMAC-SHA256 salted password hashing and validation.",
       "status": "PASS",
-      "duration_seconds": 1.5161,
+      "duration_seconds": 1.5345,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -381,7 +403,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify HMAC-SHA256 token generation, signature validation, and tamper resistance.",
       "status": "PASS",
-      "duration_seconds": 1.1741,
+      "duration_seconds": 0.9734,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -393,7 +415,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify expired tokens fail verification closed.",
       "status": "PASS",
-      "duration_seconds": 2.3698,
+      "duration_seconds": 2.1309,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -405,7 +427,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "In production mode, auth secret must fail closed if under 32 chars or missing.",
       "status": "PASS",
-      "duration_seconds": 0.6791,
+      "duration_seconds": 0.8296,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -417,7 +439,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify sliding window rate limiter throttles excessive requests.",
       "status": "PASS",
-      "duration_seconds": 0.672,
+      "duration_seconds": 0.866,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -429,7 +451,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify user creation with credentials, lockout on failed attempts, and successful login.",
       "status": "PASS",
-      "duration_seconds": 1.2009,
+      "duration_seconds": 1.3294,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -441,7 +463,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify token revocation mechanism prevents revoked tokens from being accepted.",
       "status": "PASS",
-      "duration_seconds": 0.8068,
+      "duration_seconds": 0.8297,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -453,7 +475,7 @@
       "category": "Security-Negative / Auth Unit",
       "description": "Verify client-supplied headers cannot override the verified authenticated tenant.",
       "status": "PASS",
-      "duration_seconds": 0.7021,
+      "duration_seconds": 0.706,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -465,7 +487,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Unauthenticated request to protected endpoint must return 401.",
       "status": "PASS",
-      "duration_seconds": 0.1421,
+      "duration_seconds": 0.1016,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -477,7 +499,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Request with invalid bearer token must return 401.",
       "status": "PASS",
-      "duration_seconds": 0.0111,
+      "duration_seconds": 0.0099,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -489,7 +511,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Health and auth environment endpoints must be accessible publicly without credentials.",
       "status": "PASS",
-      "duration_seconds": 0.0226,
+      "duration_seconds": 0.0204,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -501,7 +523,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Attacker with token for tenant_alpha cannot spoof X-Tenant-ID: tenant_beta.",
       "status": "PASS",
-      "duration_seconds": 0.0422,
+      "duration_seconds": 0.0297,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -513,7 +535,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Matching authenticated tenant context must be accepted.",
       "status": "PASS",
-      "duration_seconds": 0.0223,
+      "duration_seconds": 0.036,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -525,7 +547,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Requesting a token without DB enrollment or bootstrap secret must fail closed with 401.",
       "status": "PASS",
-      "duration_seconds": 0.0271,
+      "duration_seconds": 0.0377,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -537,7 +559,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Requesting a token with valid bootstrap secret succeeds and issues valid JWT.",
       "status": "PASS",
-      "duration_seconds": 0.0192,
+      "duration_seconds": 0.0302,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -549,7 +571,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Allowed origins receive Access-Control-Allow-Origin; disallowed origins receive 403.",
       "status": "PASS",
-      "duration_seconds": 0.0159,
+      "duration_seconds": 0.0174,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -561,7 +583,7 @@
       "category": "Security-Negative / API Integration",
       "description": "In production mode, administrative bootstrap is rejected with HTTP 403 Forbidden.",
       "status": "PASS",
-      "duration_seconds": 0.0383,
+      "duration_seconds": 0.0166,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -573,7 +595,7 @@
       "category": "Security-Negative / API Integration",
       "description": "In production mode with bootstrap provisioning enabled but secret missing, returns HTTP 403.",
       "status": "PASS",
-      "duration_seconds": 0.0611,
+      "duration_seconds": 0.018,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -585,7 +607,7 @@
       "category": "Security-Negative / API Integration",
       "description": "In production mode with bootstrap provisioning enabled, invalid secret returns HTTP 401.",
       "status": "PASS",
-      "duration_seconds": 0.0276,
+      "duration_seconds": 0.0151,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -597,7 +619,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Authorized production bootstrap succeeds once, and repeated bootstrap for the tenant is locked.",
       "status": "PASS",
-      "duration_seconds": 0.0329,
+      "duration_seconds": 0.0357,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -609,7 +631,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Evidence created with simulated=True is sealed as SIMULATED and stored accurately.",
       "status": "PASS",
-      "duration_seconds": 0.014,
+      "duration_seconds": 0.0136,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -621,7 +643,7 @@
       "category": "Security-Negative / API Integration",
       "description": "PMS connector returns explicit is_mock=True, SIMULATED mode, and verified=False.",
       "status": "PASS",
-      "duration_seconds": 0.0036,
+      "duration_seconds": 0.0052,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -633,7 +655,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Accounting connector returns is_mock=True and ledger_verified=False.",
       "status": "PASS",
-      "duration_seconds": 0.0026,
+      "duration_seconds": 0.002,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -645,7 +667,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Payment gateway connector returns is_mock=True and payout_verified=False.",
       "status": "PASS",
-      "duration_seconds": 0.0025,
+      "duration_seconds": 0.0027,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -657,7 +679,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Desktop robot screen capture stamps simulated=True, verified=False, and SIMULATED mode.",
       "status": "PASS",
-      "duration_seconds": 0.0399,
+      "duration_seconds": 0.0743,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -669,7 +691,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Browser robot actions stamp execution_mode='SIMULATED' and verified=False.",
       "status": "PASS",
-      "duration_seconds": 0.0025,
+      "duration_seconds": 0.0043,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -681,7 +703,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Even with passing physical verifications, simulated metadata strictly forces SIMULATED status.",
       "status": "PASS",
-      "duration_seconds": 0.0129,
+      "duration_seconds": 0.0151,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -693,7 +715,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Downstream audit/reporting consumers must distinguish SIMULATED from VERIFIED records.",
       "status": "PASS",
-      "duration_seconds": 0.0092,
+      "duration_seconds": 0.0256,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -705,7 +727,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Container adapter must fail closed with code 126 and sandbox_failure flag.",
       "status": "PASS",
-      "duration_seconds": 0.0132,
+      "duration_seconds": 0.0083,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -741,7 +763,7 @@
       "category": "Security-Negative / API Integration",
       "description": "When ZONATA_ALLOW_HOST_SHELL=1 is explicitly set in non-production, controlled host execution is permitted.",
       "status": "PASS",
-      "duration_seconds": 0.0185,
+      "duration_seconds": 0.0291,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -753,7 +775,7 @@
       "category": "Security-Negative / API Integration",
       "description": "In production mode (APP_ENV=production), host-shell override is unconditionally rejected.",
       "status": "PASS",
-      "duration_seconds": 0.0034,
+      "duration_seconds": 0.0078,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -777,7 +799,7 @@
       "category": "Security-Negative / API Integration",
       "description": "When STRICT_ISOLATION_REQUIRED=1, host shell fallback is forbidden even if ZONATA_ALLOW_HOST_SHELL=1.",
       "status": "PASS",
-      "duration_seconds": 0.003,
+      "duration_seconds": 0.0059,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -789,7 +811,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Caller-supplied env dictionary cannot bypass STRICT_ISOLATION_REQUIRED restriction.",
       "status": "PASS",
-      "duration_seconds": 0.0043,
+      "duration_seconds": 0.0035,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -801,7 +823,7 @@
       "category": "Security-Negative / API Integration",
       "description": "init_simulation_environment configures STRICT_ISOLATION_REQUIRED=1 and ZONATA_ALLOW_HOST_SHELL=0.",
       "status": "PASS",
-      "duration_seconds": 0.5654,
+      "duration_seconds": 0.9234,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -825,7 +847,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Even when Docker engine is present, STRICT_ISOLATION_REQUIRED=1 strictly blocks host shell override.",
       "status": "PASS",
-      "duration_seconds": 0.001,
+      "duration_seconds": 0.0009,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -873,7 +895,7 @@
       "category": "Security-Negative / API Integration",
       "description": "get_default_ledger_path and get_default_db_path honor environment variables.",
       "status": "PASS",
-      "duration_seconds": 0.0034,
+      "duration_seconds": 0.0043,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -885,7 +907,7 @@
       "category": "Security-Negative / API Integration",
       "description": "Ensures storage/roboassistant.db has not been corrupted or mutated by any test.",
       "status": "PASS",
-      "duration_seconds": 0.0441,
+      "duration_seconds": 0.0373,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -897,7 +919,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies zero plaintext passwords in docker-compose.prod.yml.",
       "status": "PASS",
-      "duration_seconds": 0.0049,
+      "duration_seconds": 0.0033,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -909,7 +931,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies that compose manifest enforces role separation across services.",
       "status": "PASS",
-      "duration_seconds": 0.0648,
+      "duration_seconds": 0.0606,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -921,7 +943,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies that docker/init-db-roles.sql enforces least-privilege role separation.",
       "status": "PASS",
-      "duration_seconds": 0.0061,
+      "duration_seconds": 0.0067,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -933,7 +955,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies ProductionConfigValidator fails closed when default/weak secrets are passed.",
       "status": "PASS",
-      "duration_seconds": 0.0198,
+      "duration_seconds": 0.0205,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -945,7 +967,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies ProductionConfigValidator fails closed when superuser DB credentials are configured for runtime.",
       "status": "PASS",
-      "duration_seconds": 0.0021,
+      "duration_seconds": 0.0016,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -957,7 +979,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies that production.env.example documents all required least-privilege secrets.",
       "status": "PASS",
-      "duration_seconds": 0.0033,
+      "duration_seconds": 0.0037,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -969,7 +991,7 @@
       "category": "Security-Negative / Least Privilege",
       "description": "Verifies ContentSanitizer reliably redacts credentials from logs and evidence strings.",
       "status": "PASS",
-      "duration_seconds": 0.0037,
+      "duration_seconds": 0.0051,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -981,7 +1003,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies cleartext HTTP forwarded by reverse proxy is rejected with HTTP 403 in production.",
       "status": "PASS",
-      "duration_seconds": 0.0774,
+      "duration_seconds": 0.0411,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1005,7 +1027,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies ZONATA_ENFORCE_HTTPS=1 rejects cleartext connections.",
       "status": "PASS",
-      "duration_seconds": 0.006,
+      "duration_seconds": 0.0076,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1017,7 +1039,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies Strict-Transport-Security (HSTS) and critical browser defense headers are returned.",
       "status": "PASS",
-      "duration_seconds": 0.0037,
+      "duration_seconds": 0.0049,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1029,7 +1051,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies Nginx ingress configuration enforces HTTPS redirect and modern TLS ciphers.",
       "status": "PASS",
-      "duration_seconds": 0.0036,
+      "duration_seconds": 0.006,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1041,7 +1063,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies ProductionConfigValidator validates TLS cert paths and proxy declarations.",
       "status": "PASS",
-      "duration_seconds": 0.0041,
+      "duration_seconds": 0.0014,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1053,7 +1075,7 @@
       "category": "Security-Negative / TLS Ingress",
       "description": "Verifies Nginx ingress configuration restricts /metrics with 403 Forbidden on public edge.",
       "status": "PASS",
-      "duration_seconds": 0.001,
+      "duration_seconds": 0.0036,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -1065,7 +1087,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, finance engine must not seed demo transactions or fake revenue.",
       "status": "PASS",
-      "duration_seconds": 0.7829,
+      "duration_seconds": 0.6588,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1077,7 +1099,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, files engine must not seed demo files.",
       "status": "PASS",
-      "duration_seconds": 0.8169,
+      "duration_seconds": 0.5864,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1089,7 +1111,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, records engine must not seed demo governance records.",
       "status": "PASS",
-      "duration_seconds": 0.8585,
+      "duration_seconds": 1.0537,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1101,7 +1123,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, reports engine must not seed demo reports.",
       "status": "PASS",
-      "duration_seconds": 0.8129,
+      "duration_seconds": 0.8871,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1113,7 +1135,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, schedule service must not seed demo calendar events.",
       "status": "PASS",
-      "duration_seconds": 0.5698,
+      "duration_seconds": 0.8988,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1125,7 +1147,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, plugins service must not seed fake connected PMS/ERP systems.",
       "status": "PASS",
-      "duration_seconds": 1.0749,
+      "duration_seconds": 0.7529,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1137,7 +1159,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, coworker governance registry must not seed mock coworkers.",
       "status": "PASS",
-      "duration_seconds": 0.8438,
+      "duration_seconds": 0.7481,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1149,7 +1171,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "Verify database engine dialect detection and abstraction.",
       "status": "PASS",
-      "duration_seconds": 0.654,
+      "duration_seconds": 0.6062,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1161,7 +1183,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, vault client must not seed fake stripe/salesforce master keys.",
       "status": "PASS",
-      "duration_seconds": 0.6857,
+      "duration_seconds": 0.594,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1173,7 +1195,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "In production, executive memory must not seed fake hotel charters.",
       "status": "PASS",
-      "duration_seconds": 0.7532,
+      "duration_seconds": 0.6984,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1185,7 +1207,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "Verify production mode strictly fails closed against SQLite under all environment flags.",
       "status": "PASS",
-      "duration_seconds": 0.7753,
+      "duration_seconds": 1.3088,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1197,7 +1219,7 @@
       "category": "Unit / Dialect Initialization",
       "description": "Verify PostgreSQL connection errors and logs redact credentials.",
       "status": "PASS",
-      "duration_seconds": 1.4313,
+      "duration_seconds": 1.0684,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1209,7 +1231,7 @@
       "category": "Database Integration",
       "description": "Verify creating a customer persists record and is retrievable.",
       "status": "PASS",
-      "duration_seconds": 0.6983,
+      "duration_seconds": 0.5983,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1221,7 +1243,7 @@
       "category": "Database Integration",
       "description": "Verify deal creation and stage progression.",
       "status": "PASS",
-      "duration_seconds": 0.6782,
+      "duration_seconds": 1.0462,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1233,7 +1255,7 @@
       "category": "Database Integration",
       "description": "Verify Tenant Alpha cannot see or mutate Tenant Beta records.",
       "status": "PASS",
-      "duration_seconds": 0.664,
+      "duration_seconds": 0.5859,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1245,7 +1267,7 @@
       "category": "Database Integration",
       "description": "Verify data persists when database connections are completely recycled.",
       "status": "PASS",
-      "duration_seconds": 0.722,
+      "duration_seconds": 1.032,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1257,7 +1279,7 @@
       "category": "Recovery / Drill",
       "description": "Verify online snapshot backup produces an intact, uncorrupted database copy.",
       "status": "PASS",
-      "duration_seconds": 0.998,
+      "duration_seconds": 1.3152,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1269,7 +1291,7 @@
       "category": "Recovery / Drill",
       "description": "Disaster Recovery Drill:",
       "status": "PASS",
-      "duration_seconds": 2.0995,
+      "duration_seconds": 2.9867,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1281,7 +1303,7 @@
       "category": "Recovery / Drill",
       "description": "Verify transaction rollback prevents partial writes during application failure.",
       "status": "PASS",
-      "duration_seconds": 0.6889,
+      "duration_seconds": 0.8174,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1293,7 +1315,7 @@
       "category": "Domain Service Integration",
       "description": "Verify Portfolio mode produces full snapshot with aggregated data.",
       "status": "PASS",
-      "duration_seconds": 0.2394,
+      "duration_seconds": 0.1799,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1305,7 +1327,7 @@
       "category": "Domain Service Integration",
       "description": "Verify selecting a single company completely switches analytical context.",
       "status": "PASS",
-      "duration_seconds": 0.1912,
+      "duration_seconds": 0.1815,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1317,7 +1339,7 @@
       "category": "Domain Service Integration",
       "description": "Verify all time periods update the period label and date ranges.",
       "status": "PASS",
-      "duration_seconds": 1.0471,
+      "duration_seconds": 1.0277,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1329,7 +1351,7 @@
       "category": "Domain Service Integration",
       "description": "Verify 'Why did this change?' produces evidence-backed explanation with epistemic provenance.",
       "status": "PASS",
-      "duration_seconds": 0.0105,
+      "duration_seconds": 0.0078,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1341,7 +1363,7 @@
       "category": "Domain Service Integration",
       "description": "Verify Attention Center groups items by Critical, Important, Informational with actions.",
       "status": "PASS",
-      "duration_seconds": 0.1855,
+      "duration_seconds": 0.1658,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1353,7 +1375,7 @@
       "category": "Domain Service Integration",
       "description": "Verify Task Success != Business Outcome invariant in causality outcomes.",
       "status": "PASS",
-      "duration_seconds": 0.1913,
+      "duration_seconds": 0.1632,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1365,7 +1387,7 @@
       "category": "Domain Service Integration",
       "description": "Verify data quality calculation reflects baseline ledger and empty-state contracts.",
       "status": "PASS",
-      "duration_seconds": 0.2394,
+      "duration_seconds": 0.2187,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1377,7 +1399,7 @@
       "category": "Domain Service Integration",
       "description": "Verify synthetic evidence is sealed as SIMULATED and never counted as verified_records.",
       "status": "PASS",
-      "duration_seconds": 0.1644,
+      "duration_seconds": 0.1047,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1389,7 +1411,7 @@
       "category": "Domain Service Integration",
       "description": "Verify qualifying physical evidence is sealed as VERIFIED and increments verified_records.",
       "status": "PASS",
-      "duration_seconds": 0.0947,
+      "duration_seconds": 0.0745,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1401,7 +1423,7 @@
       "category": "Domain Service Integration",
       "description": "Verify all frontend files exist and are properly linked.",
       "status": "PASS",
-      "duration_seconds": 0.017,
+      "duration_seconds": 0.0109,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1413,7 +1435,7 @@
       "category": "REST API Integration",
       "description": "Verifies all 43 backend categories resolve with valid schemas and no errors.",
       "status": "PASS",
-      "duration_seconds": 5.2127,
+      "duration_seconds": 6.799,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1425,7 +1447,7 @@
       "category": "REST API Integration",
       "description": "Tests full lifecycle: GET -> POST update -> SQLite verify -> reload verify -> SHA-256 audit log.",
       "status": "PASS",
-      "duration_seconds": 0.76,
+      "duration_seconds": 0.6833,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1437,7 +1459,7 @@
       "category": "REST API Integration",
       "description": "Verifies policy-locked setting (READ_ONLY) cannot be mutated.",
       "status": "PASS",
-      "duration_seconds": 0.6308,
+      "duration_seconds": 0.6123,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1449,7 +1471,7 @@
       "category": "REST API Integration",
       "description": "Verifies non-OWNER roles are rejected with 403 Forbidden on OWNER settings.",
       "status": "PASS",
-      "duration_seconds": 0.8193,
+      "duration_seconds": 0.7828,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1461,7 +1483,7 @@
       "category": "REST API Integration",
       "description": "Verifies complete data segregation between Company A and Company B.",
       "status": "PASS",
-      "duration_seconds": 0.6031,
+      "duration_seconds": 0.9504,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1473,7 +1495,7 @@
       "category": "REST API Integration",
       "description": "Verifies cost_global_budget_monthly stops runaway compute spend.",
       "status": "PASS",
-      "duration_seconds": 0.8122,
+      "duration_seconds": 0.8536,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1485,7 +1507,7 @@
       "category": "REST API Integration",
       "description": "Verifies expenditure threshold fin_high_expense_approval triggers mandatory Owner approval.",
       "status": "PASS",
-      "duration_seconds": 0.6759,
+      "duration_seconds": 0.9036,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1497,7 +1519,7 @@
       "category": "REST API Integration",
       "description": "Verifies AI CEO autonomy level dynamically controls whether actions require human approval.",
       "status": "PASS",
-      "duration_seconds": 0.708,
+      "duration_seconds": 0.843,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1509,7 +1531,7 @@
       "category": "REST API Integration",
       "description": "Verifies emergency stop trips all execution layers (decisions, terminal, browser, budgets).",
       "status": "PASS",
-      "duration_seconds": 0.9237,
+      "duration_seconds": 1.3832,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1521,7 +1543,7 @@
       "category": "REST API Integration",
       "description": "Verifies wf_autonomous_spawning=False halts unauthorized child worker creation.",
       "status": "PASS",
-      "duration_seconds": 0.7123,
+      "duration_seconds": 0.6685,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1533,7 +1555,7 @@
       "category": "REST API Integration",
       "description": "Verifies wf_max_concurrent_agents bounds agent population.",
       "status": "PASS",
-      "duration_seconds": 0.7036,
+      "duration_seconds": 0.6449,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1545,7 +1567,7 @@
       "category": "REST API Integration",
       "description": "Verifies BrowserDomainPolicy blocks private cloud metadata and loopback destinations.",
       "status": "PASS",
-      "duration_seconds": 0.7415,
+      "duration_seconds": 0.6957,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1557,7 +1579,7 @@
       "category": "REST API Integration",
       "description": "Verifies terminal command execution respects term_execution_enabled.",
       "status": "PASS",
-      "duration_seconds": 1.0853,
+      "duration_seconds": 0.8214,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1569,7 +1591,7 @@
       "category": "REST API Integration",
       "description": "Verifies sensitive API tokens are never leaked in plain text over the API or in audit logs.",
       "status": "PASS",
-      "duration_seconds": 0.9375,
+      "duration_seconds": 0.998,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1581,7 +1603,7 @@
       "category": "REST API Integration",
       "description": "Verifies every audit record contains a mathematically valid SHA-256 evidence hash.",
       "status": "PASS",
-      "duration_seconds": 0.5876,
+      "duration_seconds": 0.6777,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1593,7 +1615,7 @@
       "category": "REST API Integration",
       "description": "Verifies HTTP 400 Bad Request on out-of-bound or invalid values.",
       "status": "PASS",
-      "duration_seconds": 1.1617,
+      "duration_seconds": 0.5916,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1605,7 +1627,7 @@
       "category": "REST API Integration",
       "description": "Verifies HTTP 409 Conflict when updating with a stale expected_version.",
       "status": "PASS",
-      "duration_seconds": 0.6118,
+      "duration_seconds": 0.5346,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1617,7 +1639,7 @@
       "category": "REST API Integration",
       "description": "Verifies zero drift between SQLite and runtime cache via /api/settings/drift.",
       "status": "PASS",
-      "duration_seconds": 6.3123,
+      "duration_seconds": 5.8883,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1629,7 +1651,7 @@
       "category": "REST API Integration",
       "description": "Verifies all 32 sequential numeric aliases (01 to 32) resolve cleanly via API with valid settings.",
       "status": "PASS",
-      "duration_seconds": 4.5542,
+      "duration_seconds": 4.5546,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1641,7 +1663,7 @@
       "category": "REST API Integration",
       "description": "Verifies Domain 17 (communication) and Domain 23 (notifications) are strictly decoupled.",
       "status": "PASS",
-      "duration_seconds": 0.6746,
+      "duration_seconds": 1.3204,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1653,7 +1675,7 @@
       "category": "REST API Integration",
       "description": "Verifies POST /api/settings/category/<cat>/reset reverts database records and generates SHA-256 receipt.",
       "status": "PASS",
-      "duration_seconds": 0.9332,
+      "duration_seconds": 1.8604,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1665,7 +1687,7 @@
       "category": "REST API Integration",
       "description": "Verifies diagnostic test endpoint executes probes with valid latency and cryptographic evidence.",
       "status": "PASS",
-      "duration_seconds": 2.5498,
+      "duration_seconds": 0.857,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1677,7 +1699,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0225,
+      "duration_seconds": 0.019,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1689,7 +1711,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0259,
+      "duration_seconds": 0.041,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1701,7 +1723,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0374,
+      "duration_seconds": 0.0141,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1713,7 +1735,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0159,
+      "duration_seconds": 0.0062,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1725,7 +1747,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0074,
+      "duration_seconds": 0.0064,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1737,7 +1759,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.0418,
+      "duration_seconds": 0.007,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1749,7 +1771,7 @@
       "category": "Frontend Navigation / View Routing",
       "description": "",
       "status": "PASS",
-      "duration_seconds": 0.1608,
+      "duration_seconds": 0.0398,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1761,7 +1783,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that zero INSERT OR REPLACE statements exist in core/ or api_server.py.",
       "status": "PASS",
-      "duration_seconds": 1.5406,
+      "duration_seconds": 1.0485,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1773,7 +1795,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that SQLite-specific PRAGMA commands are stripped for PostgreSQL.",
       "status": "PASS",
-      "duration_seconds": 0.0078,
+      "duration_seconds": 0.0069,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1785,7 +1807,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that ? parameter placeholders are converted to %s.",
       "status": "PASS",
-      "duration_seconds": 0.0101,
+      "duration_seconds": 0.0142,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1797,7 +1819,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that INSERT OR IGNORE is translated to ANSI ON CONFLICT DO NOTHING.",
       "status": "PASS",
-      "duration_seconds": 0.0072,
+      "duration_seconds": 0.0078,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1809,7 +1831,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify defense-in-depth normalization of legacy/dynamic INSERT OR REPLACE queries.",
       "status": "PASS",
-      "duration_seconds": 0.0096,
+      "duration_seconds": 0.0072,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1821,7 +1843,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify defense-in-depth normalizer correctly identifies composite primary keys.",
       "status": "PASS",
-      "duration_seconds": 0.008,
+      "duration_seconds": 0.0219,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1833,7 +1855,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that ANSI ON CONFLICT DO UPDATE SET preserves the initial created_at timestamp.",
       "status": "PASS",
-      "duration_seconds": 0.0369,
+      "duration_seconds": 0.0496,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1845,7 +1867,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify upsert behavior on tables with multi-column composite primary keys.",
       "status": "PASS",
-      "duration_seconds": 0.027,
+      "duration_seconds": 0.0314,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1857,7 +1879,7 @@
       "category": "Database Integration / Dialect Compatibility",
       "description": "Verify that tenant isolation boundaries are preserved during conflict operations.",
       "status": "PASS",
-      "duration_seconds": 0.0304,
+      "duration_seconds": 0.0328,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1869,7 +1891,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify connection pool bounds, timeout defaults, and environment parsing.",
       "status": "PASS",
-      "duration_seconds": 0.0013,
+      "duration_seconds": 0.0017,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1881,7 +1903,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify checkout creates connection and close() returns to idle pool without closing socket.",
       "status": "PASS",
-      "duration_seconds": 0.001,
+      "duration_seconds": 0.0015,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1893,7 +1915,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify context manager commits on success and returns to pool in finally.",
       "status": "PASS",
-      "duration_seconds": 0.0038,
+      "duration_seconds": 0.0048,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1905,7 +1927,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify context manager rolls back on exception and safely returns to pool.",
       "status": "PASS",
-      "duration_seconds": 0.0062,
+      "duration_seconds": 0.0033,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1917,7 +1939,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify checkout blocks and raises DatabasePoolExhaustedError when pool is saturated.",
       "status": "PASS",
-      "duration_seconds": 0.1016,
+      "duration_seconds": 0.1017,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1929,7 +1951,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify high concurrency across 10 worker threads sharing a pool of 4 connections.",
       "status": "PASS",
-      "duration_seconds": 0.2533,
+      "duration_seconds": 0.2226,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1941,7 +1963,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify pool detects broken connection during idle checkout and spawns healthy replacement.",
       "status": "PASS",
-      "duration_seconds": 0.0015,
+      "duration_seconds": 0.0049,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1953,7 +1975,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify idempotent close() does not corrupt pool and prevents use-after-free.",
       "status": "PASS",
-      "duration_seconds": 0.0014,
+      "duration_seconds": 0.0075,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1965,7 +1987,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify migrations/pg/0001_postgresql_full_schema.sql contains all operational tables (BLK-10).",
       "status": "PASS",
-      "duration_seconds": 0.0084,
+      "duration_seconds": 0.0126,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1977,7 +1999,7 @@
       "category": "Database Concurrency / Pooling",
       "description": "Verify get_stats telemetry and close_all shutdown behavior.",
       "status": "PASS",
-      "duration_seconds": 0.0013,
+      "duration_seconds": 0.0014,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -1989,7 +2011,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify replicator bucket name, mirror path, and registry state.",
       "status": "PASS",
-      "duration_seconds": 0.0038,
+      "duration_seconds": 0.0047,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2001,7 +2023,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify 16MB WAL segment is replicated off-host with exact SHA-256 and WORM envelope.",
       "status": "PASS",
-      "duration_seconds": 0.0342,
+      "duration_seconds": 0.029,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2013,7 +2035,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify PostgreSQL base backup directory is bundled, checksummed, and synced off-host.",
       "status": "PASS",
-      "duration_seconds": 0.0431,
+      "duration_seconds": 0.0462,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2025,7 +2047,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify SQLite snapshot and audit ledger replication to off-host S3 mirror.",
       "status": "PASS",
-      "duration_seconds": 0.0484,
+      "duration_seconds": 0.0483,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2037,7 +2059,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify verify_offhost_object confirms authentic, untampered off-host artifacts.",
       "status": "PASS",
-      "duration_seconds": 0.0391,
+      "duration_seconds": 0.0199,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2049,7 +2071,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify altered or corrupted off-host backups trigger BackupSecurityViolationError.",
       "status": "PASS",
-      "duration_seconds": 0.0256,
+      "duration_seconds": 0.0178,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2061,7 +2083,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify Tenant B cannot access or restore Tenant A's off-host backup.",
       "status": "PASS",
-      "duration_seconds": 0.0227,
+      "duration_seconds": 0.0167,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2073,7 +2095,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify WORM retention lock strictly rejects deletion of active off-host backups.",
       "status": "PASS",
-      "duration_seconds": 0.0253,
+      "duration_seconds": 0.0177,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2085,7 +2107,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify restoring off-host bundle to clean environment succeeds with intact database.",
       "status": "PASS",
-      "duration_seconds": 0.0678,
+      "duration_seconds": 0.0691,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2097,7 +2119,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify standardized RTO and RPO metrics reporting resolving BLK-12.",
       "status": "PASS",
-      "duration_seconds": 0.0891,
+      "duration_seconds": 0.0728,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2109,7 +2131,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify AES-256-GCM authenticated encryption round-trip and tamper defense.",
       "status": "PASS",
-      "duration_seconds": 0.019,
+      "duration_seconds": 0.0107,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2121,7 +2143,7 @@
       "category": "Disaster Recovery / Off-Host Storage",
       "description": "Verify dynamic derivation of RPO from actual acknowledged transaction timestamps.",
       "status": "PASS",
-      "duration_seconds": 0.1448,
+      "duration_seconds": 0.0539,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2133,7 +2155,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that every alert rule includes summary, description, and actionable runbook URL.",
       "status": "PASS",
-      "duration_seconds": 0.0341,
+      "duration_seconds": 0.0335,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2145,7 +2167,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that every alert rule defines valid severity and tier labels.",
       "status": "PASS",
-      "duration_seconds": 0.0174,
+      "duration_seconds": 0.0133,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2157,7 +2179,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates Alertmanager YAML syntax, route receiver, Prometheus target and Docker service.",
       "status": "PASS",
-      "duration_seconds": 0.0914,
+      "duration_seconds": 0.1221,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2169,7 +2191,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates Alertmanager webhook payload ingestion and subsequent query exposition.",
       "status": "PASS",
-      "duration_seconds": 4.1546,
+      "duration_seconds": 3.284,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2181,7 +2203,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that docker-compose.prod.yml mounts prometheus_rules.yml into the prometheus container.",
       "status": "PASS",
-      "duration_seconds": 0.0468,
+      "duration_seconds": 0.039,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2217,7 +2239,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates Gate 7 alert rules file existence check in production mode.",
       "status": "PASS",
-      "duration_seconds": 0.0076,
+      "duration_seconds": 0.0047,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2229,7 +2251,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that config/prometheus.yml includes rule_files referencing alert_rules.yml.",
       "status": "PASS",
-      "duration_seconds": 0.0031,
+      "duration_seconds": 0.0023,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2241,7 +2263,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that scrape_prometheus_format() conforms strictly to Prometheus exposition format.",
       "status": "PASS",
-      "duration_seconds": 0.0145,
+      "duration_seconds": 0.0103,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2253,7 +2275,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that config/prometheus_rules.yml is well-formed Prometheus 2.x YAML.",
       "status": "PASS",
-      "duration_seconds": 0.0156,
+      "duration_seconds": 0.0144,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2265,7 +2287,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that all 12 mandatory platform alerts are explicitly defined.",
       "status": "PASS",
-      "duration_seconds": 0.0175,
+      "duration_seconds": 0.0143,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2289,7 +2311,7 @@
       "category": "Observability / SRE Alerting",
       "description": "Validates that trace span metrics do not include unbounded high-cardinality tenant_id labels.",
       "status": "PASS",
-      "duration_seconds": 0.0079,
+      "duration_seconds": 0.0072,
       "is_security_negative": false,
       "error_detail": null
     },
@@ -2325,7 +2347,7 @@
       "category": "Security-Negative / Container Hardening",
       "description": "Validates that 100% of services define fail-closed healthcheck probes (BLK-09).",
       "status": "PASS",
-      "duration_seconds": 0.0001,
+      "duration_seconds": 0.0,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -2373,7 +2395,7 @@
       "category": "Security-Negative / Container Hardening",
       "description": "Validates unprivileged user declarations and healthcheck directives across all Dockerfiles.",
       "status": "PASS",
-      "duration_seconds": 0.0122,
+      "duration_seconds": 0.009,
       "is_security_negative": true,
       "error_detail": null
     },
@@ -2385,7 +2407,547 @@
       "category": "Security-Negative / Container Hardening",
       "description": "Verifies container runtime adapter enforces strict sandbox requirements in production (BLK-07).",
       "status": "PASS",
-      "duration_seconds": 0.9171,
+      "duration_seconds": 0.985,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_01_create_and_test_connection",
+      "method_name": "test_01_create_and_test_connection",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0804,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_02_list_and_disconnect_connection",
+      "method_name": "test_02_list_and_disconnect_connection",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1359,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_03_governed_read_action",
+      "method_name": "test_03_governed_read_action",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1908,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_04_idempotent_mutation_deduplication",
+      "method_name": "test_04_idempotent_mutation_deduplication",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.3947,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_05_financial_mutation_human_approval_escalation",
+      "method_name": "test_05_financial_mutation_human_approval_escalation",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.3666,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_06_multi_scope_killswitch",
+      "method_name": "test_06_multi_scope_killswitch",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.4385,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_07_prompt_injection_defense",
+      "method_name": "test_07_prompt_injection_defense",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0825,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_08_secret_credential_scrubbing",
+      "method_name": "test_08_secret_credential_scrubbing",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1111,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_09_webhook_signature_and_replay_defense",
+      "method_name": "test_09_webhook_signature_and_replay_defense",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0457,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_10_data_sync_and_provenance",
+      "method_name": "test_10_data_sync_and_provenance",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0629,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_11_unknown_outcome_and_reconciliation_protocol",
+      "method_name": "test_11_unknown_outcome_and_reconciliation_protocol",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0577,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_12_cross_tenant_isolation_blocked",
+      "method_name": "test_12_cross_tenant_isolation_blocked",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0784,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_13_ceo_bridge",
+      "method_name": "test_13_ceo_bridge",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1472,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_14_workforce_bridge_role_gating",
+      "method_name": "test_14_workforce_bridge_role_gating",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1741,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_15_langgraph_bridge_node",
+      "method_name": "test_15_langgraph_bridge_node",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.2112,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_16_temporal_bridge_durable_activity",
+      "method_name": "test_16_temporal_bridge_durable_activity",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.196,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_17_mcp_bridge_tool_invocation",
+      "method_name": "test_17_mcp_bridge_tool_invocation",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.1916,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_18_browser_use_fallback_routing",
+      "method_name": "test_18_browser_use_fallback_routing",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.2252,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_19_openhands_bridge",
+      "method_name": "test_19_openhands_bridge",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.0575,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_20_a2a_bridge_external_agent",
+      "method_name": "test_20_a2a_bridge_external_agent",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.4179,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_21_canonical_scenarios_matrix",
+      "method_name": "test_21_canonical_scenarios_matrix",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 2.1241,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_nango_integration.TestNangoGovernedIntegration.test_22_section_95_grand_acceptance_test",
+      "method_name": "test_22_section_95_grand_acceptance_test",
+      "suite_file": "tests/test_nango_integration.py",
+      "suite_name": "Nango Governed External System Integration & Bridge Suite",
+      "category": "Integration / Governance & Subsystem Bridges",
+      "description": "",
+      "status": "PASS",
+      "duration_seconds": 0.8623,
+      "is_security_negative": false,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_01_stripe_client_configuration_validation",
+      "method_name": "test_01_stripe_client_configuration_validation",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Stripe adapter validates API key format and fails closed on invalid/empty keys.",
+      "status": "PASS",
+      "duration_seconds": 0.2065,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_02_stripe_client_idempotency_and_request_correlation",
+      "method_name": "test_02_stripe_client_idempotency_and_request_correlation",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Validates that Stripe requests forward Idempotency-Key and X-Request-Id headers.",
+      "status": "PASS",
+      "duration_seconds": 5.723,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_03_stripe_rate_limit_retry_after_handling",
+      "method_name": "test_03_stripe_rate_limit_retry_after_handling",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies client parses HTTP 429 Retry-After header and backs off.",
+      "status": "PASS",
+      "duration_seconds": 0.3948,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_04_stripe_bounded_exponential_backoff_on_transient_5xx",
+      "method_name": "test_04_stripe_bounded_exponential_backoff_on_transient_5xx",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies client performs bounded retries on transient 500 errors.",
+      "status": "PASS",
+      "duration_seconds": 0.8897,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_05_stripe_secret_scrubbing",
+      "method_name": "test_05_stripe_secret_scrubbing",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies card details and raw credentials are scrubbed from return payloads.",
+      "status": "PASS",
+      "duration_seconds": 0.1987,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_06_stripe_webhook_signature_valid",
+      "method_name": "test_06_stripe_webhook_signature_valid",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies valid Stripe HMAC-SHA256 signature with current timestamp passes.",
+      "status": "PASS",
+      "duration_seconds": 0.0997,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_07_stripe_webhook_expired_replay_attack_rejected",
+      "method_name": "test_07_stripe_webhook_expired_replay_attack_rejected",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies webhooks older than 300 seconds are rejected as replay attacks.",
+      "status": "PASS",
+      "duration_seconds": 0.1203,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_08_stripe_webhook_forged_signature_rejected",
+      "method_name": "test_08_stripe_webhook_forged_signature_rejected",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies invalid or forged webhook signature fails closed.",
+      "status": "PASS",
+      "duration_seconds": 0.0925,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_09_gateway_webhook_dead_letter_on_signature_mismatch",
+      "method_name": "test_09_gateway_webhook_dead_letter_on_signature_mismatch",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies ExternalIntegrationGateway logs DEAD_LETTER on webhook signature mismatch.",
+      "status": "PASS",
+      "duration_seconds": 0.1726,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_10_gateway_webhook_duplicate_suppression",
+      "method_name": "test_10_gateway_webhook_duplicate_suppression",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies repeated webhook delivery with identical payload digest is suppressed.",
+      "status": "PASS",
+      "duration_seconds": 0.1565,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_11_ssrf_blocks_loopback_address",
+      "method_name": "test_11_ssrf_blocks_loopback_address",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies SSRFValidator blocks loopback (127.0.0.1, localhost).",
+      "status": "PASS",
+      "duration_seconds": 0.0586,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_12_ssrf_blocks_private_rfc1918_networks",
+      "method_name": "test_12_ssrf_blocks_private_rfc1918_networks",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies SSRFValidator blocks 10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16.",
+      "status": "PASS",
+      "duration_seconds": 0.0683,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_13_ssrf_blocks_cloud_metadata_service",
+      "method_name": "test_13_ssrf_blocks_cloud_metadata_service",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies SSRFValidator blocks AWS/GCP cloud metadata IP (169.254.169.254).",
+      "status": "PASS",
+      "duration_seconds": 0.0795,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_14_gateway_execute_action_blocks_ssrf_in_parameters",
+      "method_name": "test_14_gateway_execute_action_blocks_ssrf_in_parameters",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies ExternalIntegrationGateway fails closed when an action contains an SSRF URL parameter.",
+      "status": "PASS",
+      "duration_seconds": 0.2282,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_15_cross_tenant_connection_access_denied",
+      "method_name": "test_15_cross_tenant_connection_access_denied",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Tenant B cannot execute or inspect Tenant A's connection.",
+      "status": "PASS",
+      "duration_seconds": 0.5636,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_16_cross_tenant_connection_health_check_denied",
+      "method_name": "test_16_cross_tenant_connection_health_check_denied",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Tenant B cannot test health of Tenant A's connection.",
+      "status": "PASS",
+      "duration_seconds": 0.1593,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_17_cross_tenant_disconnect_prevented",
+      "method_name": "test_17_cross_tenant_disconnect_prevented",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Tenant B cannot disconnect Tenant A's connection.",
+      "status": "PASS",
+      "duration_seconds": 0.1574,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_18_tenant_scoped_opaque_credential_references",
+      "method_name": "test_18_tenant_scoped_opaque_credential_references",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies raw secrets are never stored in connections table, only opaque references.",
+      "status": "PASS",
+      "duration_seconds": 0.0892,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_19_unconfigured_connectors_report_blocked_or_mock",
+      "method_name": "test_19_unconfigured_connectors_report_blocked_or_mock",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies unconfigured enterprise connectors honestly declare status as BLOCKED or MOCK_ONLY.",
+      "status": "PASS",
+      "duration_seconds": 0.0958,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_20_oracle_opera_client_fails_closed_without_credentials",
+      "method_name": "test_20_oracle_opera_client_fails_closed_without_credentials",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Oracle Opera PMS client returns BLOCKED status when credentials are missing.",
+      "status": "PASS",
+      "duration_seconds": 0.1016,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_21_razorpay_client_fails_closed_without_credentials",
+      "method_name": "test_21_razorpay_client_fails_closed_without_credentials",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies Razorpay adapter fails closed with BLOCKED status when unconfigured.",
+      "status": "PASS",
+      "duration_seconds": 0.0786,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_22_quickbooks_client_fails_closed_without_credentials",
+      "method_name": "test_22_quickbooks_client_fails_closed_without_credentials",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies QuickBooks adapter returns BLOCKED status when unconfigured.",
+      "status": "PASS",
+      "duration_seconds": 0.0909,
+      "is_security_negative": true,
+      "error_detail": null
+    },
+    {
+      "test_id": "tests.test_real_external_integrations.TestRealExternalIntegrations.test_23_live_connection_dispatch_sets_real_sandbox_verified",
+      "method_name": "test_23_live_connection_dispatch_sets_real_sandbox_verified",
+      "suite_file": "tests/test_real_external_integrations.py",
+      "suite_name": "Real External Business Integrations & Sandbox Qualification Suite (Phase 10)",
+      "category": "Security-Negative / Real External Business Integrations",
+      "description": "Verifies that dispatching with valid sandbox credentials sets qualification_status to REAL_SANDBOX_VERIFIED.",
+      "status": "PASS",
+      "duration_seconds": 0.2009,
       "is_security_negative": true,
       "error_detail": null
     }
