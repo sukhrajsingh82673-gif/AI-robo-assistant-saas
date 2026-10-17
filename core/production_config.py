@@ -89,6 +89,18 @@ class ProductionConfigValidator:
                     if (db_user in ("zonata_admin", "postgres", "admin", "root") or "://zonata_admin:" in db_url or "://postgres:" in db_url) and env.get("ZONATA_ALLOW_SUPERUSER_DB", "0") != "1":
                         errors.append("DATABASE_URL violates least privilege: superuser role ('zonata_admin' or 'postgres') prohibited for application runtime in production. Use 'zonata_app'.")
 
+                    try:
+                        min_pool = int(env.get("DATABASE_MIN_POOL_SIZE", "5"))
+                        max_pool = int(env.get("DATABASE_MAX_POOL_SIZE", "20"))
+                        if min_pool < 1:
+                            errors.append(f"DATABASE_MIN_POOL_SIZE ({min_pool}) must be at least 1.")
+                        if max_pool < 1:
+                            errors.append(f"DATABASE_MAX_POOL_SIZE ({max_pool}) must be at least 1.")
+                        if min_pool > max_pool:
+                            errors.append(f"DATABASE_MIN_POOL_SIZE ({min_pool}) cannot exceed DATABASE_MAX_POOL_SIZE ({max_pool}).")
+                    except ValueError:
+                        errors.append("DATABASE_MIN_POOL_SIZE and DATABASE_MAX_POOL_SIZE must be valid integers.")
+
             # 5. Ingress CORS check
             cors = env.get("ALLOWED_ORIGINS", "")
             if cors == "*":

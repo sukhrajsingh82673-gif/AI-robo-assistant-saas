@@ -93,6 +93,12 @@ SUITES_CONFIG = [
         "name": "PostgreSQL SQL Dialect & ANSI ON CONFLICT Compatibility",
         "category": "Database Integration / Dialect Compatibility",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_postgresql_connection_pooling.py",
+        "name": "PostgreSQL Connection Pooling, Concurrency & Schema Completeness (BLK-06, BLK-10)",
+        "category": "Database Concurrency / Pooling",
+        "type": "automated"
     }
 ]
 

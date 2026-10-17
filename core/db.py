@@ -10,7 +10,8 @@ import time
 import json
 import re
 import urllib.parse
-from typing import Optional, Any, Dict, List, Tuple
+import threading
+from typing import Optional, Any, Dict, List, Tuple, Set
 
 def sanitize_db_url(raw_input: str) -> str:
     """Safely sanitizes database connection strings and diagnostic error strings.
@@ -3505,6 +3506,9 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "company_processes": ("process_id",),
     "optimistic_lock_registry": ("table_name",),
     "schema_migrations": ("version",),
+    "async_command_queue": ("command_id",),
+    "crm_customers": ("customer_id",),
+    "crm_deals": ("deal_id",),
 }
 
 
@@ -3572,13 +3576,17 @@ def normalize_sql_for_postgres(sql: str) -> str:
 
 class PostgresConnectionWrapper:
     """Wraps raw PostgreSQL connection with sqlite3-compatible Row and transaction semantics."""
-    def __init__(self, raw_conn):
+    def __init__(self, raw_conn, pool=None):
         self.raw_conn = raw_conn
+        self._pool = pool
+        self._is_closed = False
 
     def _normalize_sql(self, sql: str) -> str:
         return normalize_sql_for_postgres(sql)
 
     def execute(self, sql: str, params: Any = ()):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute query on closed database connection.")
         normalized_sql = self._normalize_sql(sql)
         if not normalized_sql:
             class DummyCursor:
@@ -3599,6 +3607,8 @@ class PostgresConnectionWrapper:
             return PostgresCursorWrapper(cursor)
 
     def executescript(self, sql_script: str):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute script on closed database connection.")
         cursor = self.raw_conn.cursor()
         for statement in sql_script.split(";"):
             stmt = statement.strip()
@@ -3608,23 +3618,216 @@ class PostgresConnectionWrapper:
                     cursor.execute(norm)
         return cursor
 
+    def cursor(self):
+        if self._is_closed:
+            raise RuntimeError("Cannot create cursor on closed database connection.")
+        try:
+            import psycopg2.extras
+            return self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        except Exception:
+            return PostgresCursorWrapper(self.raw_conn.cursor())
+
     def commit(self):
+        if self._is_closed:
+            raise RuntimeError("Cannot commit on closed database connection.")
         self.raw_conn.commit()
 
     def rollback(self):
+        if self._is_closed:
+            return
         self.raw_conn.rollback()
 
     def close(self):
-        self.raw_conn.close()
+        if self._is_closed:
+            return
+        self._is_closed = True
+        if self._pool is not None:
+            self._pool.return_connection(self.raw_conn)
+        else:
+            try:
+                self.raw_conn.close()
+            except Exception:
+                pass
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.rollback()
-        else:
-            self.commit()
+        try:
+            if exc_type is not None:
+                self.rollback()
+            else:
+                self.commit()
+        finally:
+            self.close()
+
+
+class DatabasePoolExhaustedError(RuntimeError):
+    """Raised when the PostgreSQL connection pool is exhausted and timeout expires."""
+    pass
+
+
+class PostgresConnectionPool:
+    """
+    Thread-safe connection pool for PostgreSQL clusters.
+    Supports both psycopg2 and pg8000 drivers with configurable bounds,
+    checkout timeout, health validation, auto-rollback on return,
+    and stale/broken connection eviction.
+    """
+    def __init__(
+        self,
+        db_instance: 'Database',
+        min_size: int = 5,
+        max_size: int = 20,
+        timeout: float = 30.0,
+        idle_timeout: float = 300.0,
+    ):
+        self.db_instance = db_instance
+        self.max_size = max(1, int(max_size))
+        self.min_size = max(1, min(int(min_size), self.max_size))
+        self.timeout = float(timeout)
+        self.idle_timeout = float(idle_timeout)
+
+        self._lock = threading.Lock()
+        self._cond = threading.Condition(self._lock)
+        self._idle_connections: List[Tuple[Any, float]] = []  # List of (raw_conn, last_used_timestamp)
+        self._checked_out: Set[Any] = set()
+        self._total_count: int = 0
+        self._is_closed: bool = False
+
+    def _validate_raw_connection(self, raw_conn: Any) -> bool:
+        """Probes a raw connection to ensure it is healthy and responsive."""
+        try:
+            if hasattr(raw_conn, "closed") and raw_conn.closed != 0:
+                return False
+            cursor = raw_conn.cursor()
+            cursor.execute("SELECT 1")
+            row = cursor.fetchone()
+            cursor.close()
+            return bool(row and row[0] == 1)
+        except Exception:
+            return False
+
+    def get_connection(self, timeout: Optional[float] = None) -> PostgresConnectionWrapper:
+        """
+        Acquires a connection from the pool.
+        Blocks up to timeout seconds if the pool has reached max_size.
+        """
+        wait_timeout = self.timeout if timeout is None else float(timeout)
+        deadline = time.time() + wait_timeout
+
+        with self._cond:
+            if self._is_closed:
+                raise RuntimeError("Database connection pool is closed.")
+
+            while True:
+                # 1. Check for available idle connections
+                while self._idle_connections:
+                    raw_conn, last_used = self._idle_connections.pop()
+                    is_alive = True
+                    if (time.time() - last_used) > self.idle_timeout:
+                        is_alive = self._validate_raw_connection(raw_conn)
+
+                    if is_alive:
+                        self._checked_out.add(raw_conn)
+                        return PostgresConnectionWrapper(raw_conn, pool=self)
+                    else:
+                        try:
+                            raw_conn.close()
+                        except Exception:
+                            pass
+                        self._total_count = max(0, self._total_count - 1)
+
+                # 2. Spawn a new connection if total is under max_size
+                if self._total_count < self.max_size:
+                    raw_conn = self.db_instance._create_raw_connection()
+                    self._total_count += 1
+                    self._checked_out.add(raw_conn)
+                    return PostgresConnectionWrapper(raw_conn, pool=self)
+
+                # 3. Saturated pool: wait on condition variable
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise DatabasePoolExhaustedError(
+                        f"Database connection pool exhausted: all {self.max_size} connections are in use "
+                        f"(waited {wait_timeout:.1f}s)."
+                    )
+
+                self._cond.wait(timeout=remaining)
+                if self._is_closed:
+                    raise RuntimeError("Database connection pool was closed while waiting.")
+                if time.time() >= deadline and not self._idle_connections and self._total_count >= self.max_size:
+                    raise DatabasePoolExhaustedError(
+                        f"Database connection pool exhausted: all {self.max_size} connections are in use "
+                        f"(waited {wait_timeout:.1f}s)."
+                    )
+
+    def return_connection(self, raw_conn: Any, discard: bool = False):
+        """
+        Returns a connection to the idle pool.
+        Executes a safety rollback to ensure transaction isolation.
+        """
+        with self._cond:
+            if raw_conn in self._checked_out:
+                self._checked_out.remove(raw_conn)
+
+            if self._is_closed or discard:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+                self._total_count = max(0, self._total_count - 1)
+                self._cond.notify()
+                return
+
+            # Safety rollback before returning connection to pool
+            try:
+                raw_conn.rollback()
+                self._idle_connections.append((raw_conn, time.time()))
+                self._cond.notify()
+            except Exception:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+                self._total_count = max(0, self._total_count - 1)
+                self._cond.notify()
+
+    def close_all(self):
+        """Closes all pooled connections immediately."""
+        with self._cond:
+            self._is_closed = True
+            for raw_conn, _ in self._idle_connections:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+            self._idle_connections.clear()
+
+            for raw_conn in list(self._checked_out):
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+            self._checked_out.clear()
+            self._total_count = 0
+            self._cond.notify_all()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Returns snapshot metrics of connection pool utilization."""
+        with self._lock:
+            return {
+                "dialect": "postgresql",
+                "status": "CLOSED" if self._is_closed else "HEALTHY",
+                "total_connections": self._total_count,
+                "active_connections": len(self._checked_out),
+                "idle_connections": len(self._idle_connections),
+                "min_size": self.min_size,
+                "max_size": self.max_size,
+                "timeout_sec": self.timeout,
+                "idle_timeout_sec": self.idle_timeout
+            }
+
 
 
 class Database:
@@ -3653,6 +3856,7 @@ class Database:
         self._is_ready = (self.dialect == DatabaseDialect.SQLITE)
         self._deferred_import_mode = (self.dialect == DatabaseDialect.POSTGRESQL)
         self._deferred_queries = []
+        self._pg_pool: Optional[PostgresConnectionPool] = None
 
         if db_path is None:
             self.db_path = get_default_db_path()
@@ -3680,6 +3884,9 @@ class Database:
             raise RuntimeError(
                 "Production Safety Invariant Violation: Direct SQLite path reconfiguration is prohibited in production mode."
             )
+        if self._pg_pool is not None:
+            self._pg_pool.close_all()
+            self._pg_pool = None
         self.db_path = os.path.abspath(new_path)
         self.dialect = DatabaseDialect.SQLITE
         self._is_ready = True
@@ -3723,7 +3930,8 @@ class Database:
             )
 
         try:
-            conn = self._get_postgresql_connection()
+            pool = self._ensure_pg_pool()
+            conn = pool.get_connection()
             with conn:
                 cur = conn.execute("SELECT 1")
                 res = cur.fetchone()
@@ -3745,7 +3953,7 @@ class Database:
         if self.dialect == DatabaseDialect.POSTGRESQL:
             if self._deferred_import_mode and not self._is_ready:
                 return DeferredConnectionProxy(self)
-            return self._get_postgresql_connection()
+            return self._get_pooled_postgresql_connection()
         conn = sqlite3.connect(self.db_path, timeout=60.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -3754,14 +3962,56 @@ class Database:
         conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
-    def _get_postgresql_connection(self):
+    def _ensure_pg_pool(self) -> PostgresConnectionPool:
+        if self._pg_pool is None:
+            min_size = int(os.environ.get("DATABASE_MIN_POOL_SIZE", "5"))
+            max_size = int(os.environ.get("DATABASE_MAX_POOL_SIZE", "20"))
+            timeout_ms = float(os.environ.get("DATABASE_BUSY_TIMEOUT_MS", "60000"))
+            pool_timeout = float(os.environ.get("DATABASE_POOL_TIMEOUT", str(timeout_ms / 1000.0)))
+            idle_timeout = float(os.environ.get("DATABASE_IDLE_TIMEOUT_SEC", "300"))
+            self._pg_pool = PostgresConnectionPool(
+                db_instance=self,
+                min_size=min_size,
+                max_size=max_size,
+                timeout=pool_timeout,
+                idle_timeout=idle_timeout
+            )
+        return self._pg_pool
+
+    def _get_pooled_postgresql_connection(self) -> PostgresConnectionWrapper:
+        pool = self._ensure_pg_pool()
+        return pool.get_connection()
+
+    def get_pool_stats(self) -> Dict[str, Any]:
+        """Returns connection pool metrics for Prometheus / SRE telemetry."""
+        if self.dialect == DatabaseDialect.POSTGRESQL and self._pg_pool is not None:
+            return self._pg_pool.get_stats()
+        return {
+            "dialect": self.dialect,
+            "status": "UNPOOLED" if self.dialect == DatabaseDialect.SQLITE else "UNINITIALIZED",
+            "total_connections": 0,
+            "active_connections": 0,
+            "idle_connections": 0,
+            "min_size": 1,
+            "max_size": 1,
+            "timeout_sec": 60.0,
+            "idle_timeout_sec": 300.0
+        }
+
+    def close(self):
+        """Closes all active and idle pooled connections."""
+        if self._pg_pool is not None:
+            self._pg_pool.close_all()
+            self._pg_pool = None
+
+    def _create_raw_connection(self):
         # 1. Try psycopg2 driver
         try:
             import psycopg2
             import psycopg2.extras
             raw_conn = psycopg2.connect(self.database_url, connect_timeout=10)
             raw_conn.autocommit = False
-            return PostgresConnectionWrapper(raw_conn)
+            return raw_conn
         except ImportError:
             pass
         except Exception as e:
@@ -3789,7 +4039,7 @@ class Database:
                 timeout=10
             )
             raw_conn.autocommit = False
-            return PostgresConnectionWrapper(raw_conn)
+            return raw_conn
         except ImportError:
             raise RuntimeError(
                 "PostgreSQL driver (psycopg2 or pg8000) is not installed in the runtime environment. "
@@ -3801,6 +4051,10 @@ class Database:
             raise RuntimeError(
                 f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}"
             )
+
+    def _get_postgresql_connection(self):
+        raw_conn = self._create_raw_connection()
+        return PostgresConnectionWrapper(raw_conn)
 
     def _init_db(self):
         if self.dialect == DatabaseDialect.SQLITE:

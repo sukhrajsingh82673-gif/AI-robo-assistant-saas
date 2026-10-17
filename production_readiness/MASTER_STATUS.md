@@ -29,8 +29,8 @@
 | **2** | Close Privileged Bootstrap Token Vulnerability | **PASS** | `a5ba246` | `7e6ef3e` | 125 / 125 / 0 / 25 | `production_readiness/phase_02_privileged_bootstrap_report.md` |
 | **3** | Production Identity, Auth & Tenant Isolation | **PASS** | `7e6ef3e` | `e61dfa2` | 22 / 22 / 0 / 0 | `production_readiness/phase_03_identity_tenancy_report.md` |
 | **4** | Remove Plaintext Secrets & Enforce Least Privilege | **PASS** | `e61dfa2` | `2a84b62` | 132 / 132 / 0 / 25 | `production_readiness/phase_04_secrets_least_privilege_report.md` |
-| **5** | HTTPS, TLS & Network Ingress Hardening | **PASS** | `2a84b62` | Pending Commit | 138 / 138 / 0 / 25 | `production_readiness/phase_05_tls_network_report.md` |
-| **6** | PostgreSQL Reliability, Pooling & Concurrency | NOT STARTED | - | - | - | `production_readiness/phase_06_postgresql_reliability_report.md` |
+| **5** | HTTPS, TLS & Network Ingress Hardening | **PASS** | `2a84b62` | `6697741` | 138 / 138 / 0 / 25 | `production_readiness/phase_05_tls_network_report.md` |
+| **6** | PostgreSQL Reliability, Pooling & Concurrency | **PASS** | `6697741` | Pending Commit | 148 / 148 / 0 / 25 | `production_readiness/phase_06_postgresql_reliability_report.md` |
 | **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | NOT STARTED | - | - | - | `production_readiness/phase_07_offhost_recovery_report.md` |
 | **8** | Production Alerting, Observability & SRE | NOT STARTED | - | - | - | `production_readiness/phase_08_observability_report.md` |
 | **9** | Container Security & 9-Service Staging Qualification | NOT STARTED | - | - | - | `production_readiness/phase_09_container_qualification_report.md` |
@@ -63,9 +63,9 @@
 | **BLK-03** | **P0** | Hardcoded production plaintext passwords and unisolated superuser database credentials | `docker-compose.prod.yml` | **RESOLVED (Phase 4)** |
 | **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **QUEUED (Phase 10)** |
 | **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **QUEUED (Phase 8)** |
-| **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **QUEUED (Phase 6)** |
+| **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **RESOLVED (Phase 6)** |
 | **BLK-09** | **P1** | Staging containers lack memory/CPU limits and health checks | Container Infrastructure | **QUEUED (Phase 9)** |
-| **BLK-10** | **P1** | Standalone SQL migrations miss operational tables (e.g. `async_command_queue`) | `migrations/pg/` | **QUEUED (Phase 6/18)** |
+| **BLK-10** | **P1** | Standalone SQL migrations miss operational tables (e.g. `async_command_queue`) | `migrations/pg/` | **RESOLVED (Phase 6)** |
 | **BLK-11** | **P2** | Stubbed deployment stages in CI, absence of automated registry push | `.github/workflows/` | **QUEUED (Phase 18)** |
 | **BLK-12** | **P2** | RTO/RPO measurement discrepancies in recovery drills | DR Documentation | **QUEUED (Phase 7/19)** |
 | **BLK-13** | **P2** | Unpinned/broad version bounds in `requirements.txt` & missing supply-chain scanning | Supply Chain | **QUEUED (Phase 15)** |
