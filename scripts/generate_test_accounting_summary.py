@@ -111,6 +111,12 @@ SUITES_CONFIG = [
         "name": "Production Alerting, Prometheus SRE Metrics & SLO Tracking (BLK-05)",
         "category": "Observability / SRE Alerting",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_container_security_staging.py",
+        "name": "Container Security, Quotas, Healthchecks & Staging Topology (BLK-09)",
+        "category": "Security-Negative / Container Hardening",
+        "type": "automated"
     }
 ]
 

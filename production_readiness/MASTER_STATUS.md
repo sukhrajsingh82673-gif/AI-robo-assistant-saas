@@ -33,7 +33,7 @@
 | **6** | PostgreSQL Reliability, Pooling & Concurrency | **PASS** | `6697741` | `7e4e817` | 148 / 148 / 0 / 25 | `production_readiness/phase_06_postgresql_reliability_report.md` |
 | **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | **PASS** | `7e4e817` | `c9097aa` | 160 / 160 / 0 / 25 | `production_readiness/phase_07_offhost_recovery_report.md` |
 | **8** | Production Alerting, Observability & SRE | **PASS** | `c9097aa` | `2d47355` | 175 / 175 / 0 / 25 | `production_readiness/phase_08_observability_report.md` |
-| **9** | Container Security & 9-Service Staging Qualification | NOT STARTED | - | - | - | `production_readiness/phase_09_container_qualification_report.md` |
+| **9** | Container Security & 12-Service Staging Qualification | **PASS** | `e994738` | `HEAD` | 183 / 183 / 0 / 25 | `production_readiness/phase_09_container_qualification_report.md` |
 | **10** | Real External Business Integrations | NOT STARTED | - | - | - | `production_readiness/phase_10_integration_qualification_report.md` |
 | **11** | AI CEO, Agents & Tool Governance | NOT STARTED | - | - | - | `production_readiness/phase_11_agent_governance_report.md` |
 | **12** | SaaS Commercial Model, Lifecycle & Billing | NOT STARTED | - | - | - | `production_readiness/phase_12_saas_commercial_report.md` |
@@ -64,7 +64,7 @@
 | **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **QUEUED (Phase 10)** |
 | **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **RESOLVED (Phase 8 - Prometheus Rules, Alertmanager & Low Cardinality)** |
 | **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **RESOLVED (Phase 6)** |
-| **BLK-09** | **P1** | Staging containers lack memory/CPU limits and health checks | Container Infrastructure | **QUEUED (Phase 9)** |
+| **BLK-09** | **P1** | Staging containers lack memory/CPU limits and health checks | Container Infrastructure | **RESOLVED (Phase 9 - Resource Quotas, Healthchecks & Network Isolation)** |
 | **BLK-10** | **P1** | Standalone SQL migrations miss operational tables (e.g. `async_command_queue`) | `migrations/pg/` | **RESOLVED (Phase 6)** |
 | **BLK-11** | **P2** | Stubbed deployment stages in CI, absence of automated registry push | `.github/workflows/` | **QUEUED (Phase 18)** |
 | **BLK-12** | **P2** | RTO/RPO measurement discrepancies in recovery drills | DR Documentation | **RESOLVED (Phase 7 - Dynamic RPO Derivation from Transaction Timestamps)** |
