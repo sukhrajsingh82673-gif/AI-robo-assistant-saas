@@ -34,7 +34,8 @@
 | **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | **PASS** | `7e4e817` | `c9097aa` | 160 / 160 / 0 / 25 | `production_readiness/phase_07_offhost_recovery_report.md` |
 | **8** | Production Alerting, Observability & SRE | **PASS** | `c9097aa` | `2d47355` | 175 / 175 / 0 / 25 | `production_readiness/phase_08_observability_report.md` |
 | **9** | Container Security & 12-Service Staging Qualification | **PASS** | `e994738` | `23a03a4` | 183 / 183 / 0 / 25 | `production_readiness/phase_09_container_qualification_report.md` |
-| **10** | Real External Business Integrations | **PASS (LOCAL QUALIFIED)** | `23a03a4` | `HEAD` | 228 / 228 / 0 / 25 | `production_readiness/phase_10_integration_qualification_report.md` |
+| **10** | Real External Business Integrations | **PASS (LOCAL QUALIFIED)** | `23a03a4` | `a4977a2` | 228 / 228 / 0 / 25 | `production_readiness/phase_10_integration_qualification_report.md` |
+| **10.1** | Forensic Evidence Reconciliation & Qualification Closure | **PASS (EVIDENCE RECONCILED)** | `a4977a2` | `HEAD` | 228 / 228 / 0 / 25 | `production_readiness/phase_10_1_evidence_reconciliation_report.md` |
 | **11** | AI CEO, Agents & Tool Governance | NOT STARTED | - | - | - | `production_readiness/phase_11_agent_governance_report.md` |
 | **12** | SaaS Commercial Model, Lifecycle & Billing | NOT STARTED | - | - | - | `production_readiness/phase_12_saas_commercial_report.md` |
 | **13** | API, Frontend & E2E Product Journeys | NOT STARTED | - | - | - | `production_readiness/phase_13_product_e2e_report.md` |
@@ -61,7 +62,7 @@
 | **BLK-01** | **P0** | Zero off-host backup storage (WAL & base backups stored only on local container volumes) | Storage / DR Architecture | **RESOLVED (Phase 7 - S3 Mirror, AES-256-GCM & WORM Lock)** |
 | **BLK-02** | **P0** | Cleartext HTTP & universal absence of TLS termination on API and internal service boundaries | `api_server.py`, Ingress | **RESOLVED (Phase 5 - TLS Enforcement & Edge /metrics Block)** |
 | **BLK-03** | **P0** | Hardcoded production plaintext passwords and unisolated superuser database credentials | `docker-compose.prod.yml` | **RESOLVED (Phase 4)** |
-| **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **PARTIALLY RESOLVED (Phase 10: Real Stripe Adapter & Webhooks Verified; Razorpay Implemented; PMS/QuickBooks Gated on Partner Credentials)** |
+| **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **PARTIALLY RESOLVED (Phase 10.1 Reconciled: Stripe & Razorpay Real Adapters Implemented; Sandbox Verification Gated on CI Secrets; PMS/QuickBooks Gated on Partner Credentials)** |
 | **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **RESOLVED (Phase 8 - Prometheus Rules, Alertmanager & Low Cardinality)** |
 | **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **RESOLVED (Phase 6)** |
 | **BLK-09** | **P1** | Staging containers lack memory/CPU limits and health checks | Container Infrastructure | **RESOLVED (Phase 9 - Resource Quotas, Healthchecks & Network Isolation)** |

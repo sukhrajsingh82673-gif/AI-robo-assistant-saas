@@ -274,7 +274,7 @@ class StripeIntegrationAdapter:
                     result = json.loads(resp_body)
                     result["_request_id"] = req_id
                     result["_execution_mode"] = self.get_execution_mode().value
-                    result["_qualification_status"] = ConnectorQualificationStatus.REAL_SANDBOX_VERIFIED.value
+                    result["_qualification_status"] = ConnectorQualificationStatus.IMPLEMENTED_UNVERIFIED.value
                     return scrub_sensitive_data(result)
 
             except urllib.error.HTTPError as http_err:

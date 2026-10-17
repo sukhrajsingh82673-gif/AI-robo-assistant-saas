@@ -351,7 +351,7 @@ class NangoAdapter(ExternalIntegrationProvider):
             provider_id = connection.get("provider_id", "unknown")
             if res.get("is_mock") is False:
                 res.setdefault("adapter_type", "REAL_API_CLIENT")
-                res.setdefault("qualification_status", "REAL_SANDBOX_VERIFIED")
+                res.setdefault("qualification_status", "IMPLEMENTED_UNVERIFIED")
                 res.setdefault("provenance", "LIVE_PROVIDER")
             else:
                 res.setdefault("is_mock", True)

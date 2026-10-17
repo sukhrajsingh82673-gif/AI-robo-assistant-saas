@@ -407,8 +407,8 @@ class TestRealExternalIntegrations(unittest.TestCase):
         self.assertFalse(adapter.is_configured())
         self.assertEqual(adapter.get_qualification_status(), ConnectorQualificationStatus.BLOCKED)
 
-    def test_23_live_connection_dispatch_sets_real_sandbox_verified(self):
-        """Verifies that dispatching with valid sandbox credentials sets qualification_status to REAL_SANDBOX_VERIFIED."""
+    def test_23_live_connection_dispatch_sets_implemented_unverified(self):
+        """Verifies that dispatching with local/mocked sandbox credentials sets qualification_status to IMPLEMENTED_UNVERIFIED."""
         from core.connectors import StripeIntegrationAdapter
 
         # Configure connection with test key
@@ -421,7 +421,7 @@ class TestRealExternalIntegrations(unittest.TestCase):
             "id": "in_test_123456",
             "customer": "cus_99812",
             "status": "draft",
-            "_qualification_status": "REAL_SANDBOX_VERIFIED",
+            "_qualification_status": "IMPLEMENTED_UNVERIFIED",
             "_execution_mode": "SANDBOX"
         }
 
@@ -433,7 +433,7 @@ class TestRealExternalIntegrations(unittest.TestCase):
             )
             self.assertEqual(res["status"], "SUCCESS")
             result_payload = res["result"]
-            self.assertEqual(result_payload.get("_qualification_status"), "REAL_SANDBOX_VERIFIED")
+            self.assertEqual(result_payload.get("_qualification_status"), "IMPLEMENTED_UNVERIFIED")
             self.assertEqual(result_payload.get("_execution_mode"), "SANDBOX")
 
 
