@@ -111,6 +111,7 @@ jobs:
 
           docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U zonata_admin -d zonata_production
           docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "SELECT version();"
+          docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "ALTER ROLE zonata_app WITH PASSWORD '${DB_APP_PASSWORD}'; ALTER ROLE zonata_worker WITH PASSWORD '${DB_WORKER_PASSWORD}';"
 
       - name: Apply Complete Schema DDL & Additive Controlled Migrations (Step 4.5 in Runbook)
         env:
