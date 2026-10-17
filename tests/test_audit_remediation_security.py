@@ -13,6 +13,7 @@ Verifies all remediations against FIND-01 through FIND-08:
 """
 
 import unittest
+from unittest.mock import patch
 import os
 import sys
 import json
@@ -395,13 +396,88 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def test_09_simulation_fixtures_enforce_strict_isolation(self):
         """init_simulation_environment configures STRICT_ISOLATION_REQUIRED=1 and ZONATA_ALLOW_HOST_SHELL=0."""
         from core.simulation_fixtures import init_simulation_environment
-        with tempfile.TemporaryDirectory() as td:
-            fixture_db = os.path.join(td, "sim_test.db")
-            cfg = init_simulation_environment(fixture_db)
-            self.assertEqual(os.environ.get("STRICT_ISOLATION_REQUIRED"), "1")
-            self.assertEqual(os.environ.get("ZONATA_ALLOW_HOST_SHELL"), "0")
-            self.assertTrue(cfg.get("strict_isolation"))
-            self.assertFalse(cfg.get("allow_host_shell"))
+        old_strict = os.environ.get("STRICT_ISOLATION_REQUIRED")
+        old_shell = os.environ.get("ZONATA_ALLOW_HOST_SHELL")
+        old_db_path = db.db_path
+        old_env_db = os.environ.get("ZONATA_DB_PATH")
+        old_env_ev = os.environ.get("ZONATA_EVIDENCE_PATH")
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                fixture_db = os.path.join(td, "sim_test.db")
+                cfg = init_simulation_environment(fixture_db)
+                self.assertEqual(os.environ.get("STRICT_ISOLATION_REQUIRED"), "1")
+                self.assertEqual(os.environ.get("ZONATA_ALLOW_HOST_SHELL"), "0")
+                self.assertTrue(cfg.get("strict_isolation"))
+                self.assertFalse(cfg.get("allow_host_shell"))
+        finally:
+            db.set_db_path(old_db_path)
+            for k, v in [
+                ("STRICT_ISOLATION_REQUIRED", old_strict),
+                ("ZONATA_ALLOW_HOST_SHELL", old_shell),
+                ("ZONATA_DB_PATH", old_env_db),
+                ("ZONATA_EVIDENCE_PATH", old_env_ev),
+            ]:
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    @patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value="docker")
+    def test_10_docker_present_production_mode_refuses_host_shell_override(self, mock_detect):
+        """Even when Docker engine is present on host, APP_ENV=production strictly refuses host shell override."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = ContainerRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_docker_prod",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited in production mode", res.get("stderr", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
+
+    @patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value="docker")
+    def test_11_docker_present_strict_isolation_blocks_host_shell_override(self, mock_detect):
+        """Even when Docker engine is present, STRICT_ISOLATION_REQUIRED=1 strictly blocks host shell override."""
+        os.environ["STRICT_ISOLATION_REQUIRED"] = "1"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = ContainerRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_docker_strict",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited when strict isolation is required", res.get("stderr", ""))
+        finally:
+            os.environ.pop("STRICT_ISOLATION_REQUIRED", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
+
+    @patch.object(VMRuntimeAdapter, "_has_virtualization", return_value=True)
+    def test_12_vm_virtualization_present_production_mode_refuses_host_shell_override(self, mock_virt):
+        """Even when KVM/hardware virtualization is present, APP_ENV=production strictly refuses host shell override."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = VMRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_vm_prod",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited in production mode", res.get("stderr", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
 
 
 class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
