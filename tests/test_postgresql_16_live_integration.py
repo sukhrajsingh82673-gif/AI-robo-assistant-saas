@@ -55,6 +55,7 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             # Initialize schema once for the class
             try:
                 db.verify_readiness()
+                db._init_db()
                 from core.enterprise_files import EnterpriseFilesEngine
                 from core.enterprise_records import EnterpriseRecordsEngine
                 from core.enterprise_reports import EnterpriseReportsEngine

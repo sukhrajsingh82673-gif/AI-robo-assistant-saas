@@ -3939,7 +3939,6 @@ class Database:
                     raise RuntimeError("Database readiness probe returned invalid result.")
             self._is_ready = True
             self._deferred_import_mode = False
-            self._init_db()
             return True
         except Exception as e:
             self._is_ready = False
@@ -4064,7 +4063,6 @@ class Database:
                 return
         elif self.dialect == DatabaseDialect.POSTGRESQL and not self._is_ready:
             self.verify_readiness()
-            return
         with self.get_connection() as conn:
             conn.executescript(SCHEMA_SQL)
             conn.commit()
