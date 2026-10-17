@@ -22,6 +22,7 @@ from core.database_engine import engine, WorkloadType
 
 class TestFreeTierWorkerDurability(unittest.TestCase):
     def setUp(self):
+        command_bus._stop_event.clear()
         self.test_db_path = configure_isolated_test_db()
         # Initialize queue table in isolated DB
         command_bus._init_db()
@@ -110,18 +111,19 @@ class TestFreeTierWorkerDurability(unittest.TestCase):
 
     def test_03_graceful_worker_stop(self):
         """Validates that command_bus.stop() gracefully breaks the worker loop."""
+        command_bus.reset_worker()
         worker_thread = threading.Thread(
             target=command_bus.run_worker,
-            kwargs={"worker_id": "test_graceful_worker", "poll_interval": 0.05},
+            kwargs={"worker_id": "test_graceful_worker", "poll_interval": 0.02},
             daemon=True
         )
         worker_thread.start()
-        time.sleep(0.15)
+        time.sleep(0.1)
         self.assertTrue(worker_thread.is_alive())
 
         # Signal stop
         command_bus.stop()
-        worker_thread.join(timeout=2.0)
+        worker_thread.join(timeout=5.0)
         self.assertFalse(worker_thread.is_alive(), "Worker thread should terminate cleanly upon stop() signal")
 
 

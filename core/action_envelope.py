@@ -138,6 +138,10 @@ class AsynchronousCommandBus:
         """Signals background worker to stop gracefully."""
         self._stop_event.set()
 
+    def reset_worker(self):
+        """Resets stop event to allow starting/restarting worker."""
+        self._stop_event.clear()
+
     def recover_interrupted_jobs(self, timeout_seconds: float = 300.0) -> int:
         """
         Detects actions left in ASSIGNED status from an interrupted worker,
@@ -322,8 +326,11 @@ class AsynchronousCommandBus:
         from core.action_gateway import ZonataActionGateway
         worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
         iterations = 0
-        self._stop_event.clear()
         logger.info(f"Asynchronous worker '{worker_id}' started.")
+
+        if self._stop_event.is_set():
+            logger.info(f"Worker '{worker_id}' stop event already set; aborting loop.")
+            return
 
         # On worker startup: immediately recover any orphaned jobs left in flight
         try:

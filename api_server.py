@@ -6726,6 +6726,7 @@ def run_server(port=8080):
     if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
         import threading
         from core.action_envelope import command_bus
+        command_bus.reset_worker()
         embedded_worker_thread = threading.Thread(
             target=command_bus.run_worker,
             kwargs={"worker_id": f"embedded_worker_{port}", "poll_interval": 1.0},
