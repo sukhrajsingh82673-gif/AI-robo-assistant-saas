@@ -566,6 +566,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Prometheus Standard Exposition Endpoint (Public / Scraper)
         if path == "/metrics":
+            # Edge protection guard when running directly on public PaaS without Nginx
+            if os.environ.get("ZONATA_PROTECT_METRICS", "0") == "1":
+                auth_header = self.headers.get("Authorization", "")
+                metrics_token = os.environ.get("METRICS_AUTH_TOKEN", "")
+                is_authorized = bool(metrics_token and auth_header == f"Bearer {metrics_token}")
+                if not is_authorized:
+                    self.send_response(403)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Forbidden: Public access to /metrics is restricted."}).encode('utf-8'))
+                    return
+
             from core.observability_stack import sre_metrics
             from core.production_observability import observability_engine
             content1 = sre_metrics.scrape_prometheus_format()
@@ -6710,6 +6722,18 @@ def run_server(port=8080):
     print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} ({proto_name.upper()} Multi-Threaded Engine)...")
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
     print("[*] Universal Automation Fabric Background Worker ACTIVE")
+
+    if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
+        import threading
+        from core.action_envelope import command_bus
+        embedded_worker_thread = threading.Thread(
+            target=command_bus.run_worker,
+            kwargs={"worker_id": f"embedded_worker_{port}", "poll_interval": 1.0},
+            daemon=True
+        )
+        embedded_worker_thread.start()
+        print("[*] Embedded Asynchronous CommandBus Worker ACTIVE")
+
     try:
         with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
             if use_tls and ssl_context:
@@ -6721,5 +6745,12 @@ def run_server(port=8080):
         universal_automation_fabric.stop_background_worker()
 
 if __name__ == "__main__":
-    p = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    port_env = os.environ.get("PORT")
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        p = int(sys.argv[1])
+    elif port_env and port_env.isdigit():
+        p = int(port_env)
+    else:
+        p = 8080
     run_server(p)
+

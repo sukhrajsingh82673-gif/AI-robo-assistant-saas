@@ -1,0 +1,45 @@
+# ==============================================================================
+# ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
+# Render Blueprint Specification (Free-First Staging Deployment)
+# Deploys security-hardened container against persistent serverless PostgreSQL
+# ==============================================================================
+
+services:
+  - type: web
+    name: zonata-staging
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: engineering/production-readiness-gap-closure
+    healthCheckPath: /readyz
+    autoDeploy: false
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: ENVIRONMENT
+        value: staging
+      - key: ZONATA_STRICT_AUTH
+        value: "1"
+      - key: ZONATA_DISABLE_DEMO_SEED
+        value: "1"
+      - key: ZONATA_CLEAN_STARTUP
+        value: "1"
+      - key: ZONATA_ALLOW_HOST_SHELL
+        value: "0"
+      - key: ZONATA_EMBEDDED_WORKER
+        value: "1"
+      - key: ZONATA_PROTECT_METRICS
+        value: "1"
+      - key: DATABASE_MIN_POOL_SIZE
+        value: "2"
+      - key: DATABASE_MAX_POOL_SIZE
+        value: "8"
+      - key: DATABASE_URL
+        sync: false # Injected by operator from Neon Serverless PostgreSQL 16 Free Tier
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: METRICS_AUTH_TOKEN
+        generateValue: true
