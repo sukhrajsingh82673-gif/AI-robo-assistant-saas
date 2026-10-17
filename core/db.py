@@ -4079,4 +4079,10 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         tmp.close()
     db.set_db_path(custom_path)
     os.environ["ZONATA_DB_PATH"] = custom_path
+    try:
+        from core.database_engine import engine
+        engine.db_path = custom_path
+    except Exception:
+        pass
     return custom_path
+

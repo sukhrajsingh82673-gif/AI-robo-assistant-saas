@@ -239,6 +239,20 @@ class DatabaseConnectionPool:
             self._active_connections = 0
             self._cond.notify_all()
 
+    def reset(self):
+        """Gracefully terminate existing connections and reset pool for new operations."""
+        with self._lock:
+            for conn in self._pool:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._pool.clear()
+            self._active_connections = 0
+            self._closed = False
+            self._cond.notify_all()
+
+
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
             in_use_count = sum(1 for c in self._pool if c.in_use)
@@ -313,6 +327,10 @@ class DatabaseEngine:
     @db_path.setter
     def db_path(self, val: str):
         self._custom_db_path = os.path.abspath(val) if val else None
+        if hasattr(self, 'pools') and self.pools:
+            for p in self.pools.values():
+                p.reset()
+
 
     def _create_raw_connection(self) -> Any:
         """Create dialect-specific raw database connection."""

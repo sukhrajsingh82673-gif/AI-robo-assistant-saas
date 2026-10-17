@@ -6734,6 +6734,25 @@ def run_server(port=8080):
         embedded_worker_thread.start()
         print("[*] Embedded Asynchronous CommandBus Worker ACTIVE")
 
+    # Register graceful shutdown signals for cloud container lifecycle (Render/PaaS)
+    def _graceful_signal_handler(signum, frame):
+        print(f"\n[*] Received termination signal ({signum}). Initiating graceful shutdown...")
+        try:
+            universal_automation_fabric.stop_background_worker()
+            if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
+                from core.action_envelope import command_bus
+                command_bus.stop()
+        except Exception:
+            pass
+        sys.exit(0)
+
+    try:
+        import signal
+        signal.signal(signal.SIGTERM, _graceful_signal_handler)
+        signal.signal(signal.SIGINT, _graceful_signal_handler)
+    except Exception:
+        pass
+
     try:
         with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
             if use_tls and ssl_context:
@@ -6743,6 +6762,12 @@ def run_server(port=8080):
             httpd.serve_forever()
     finally:
         universal_automation_fabric.stop_background_worker()
+        if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
+            try:
+                from core.action_envelope import command_bus
+                command_bus.stop()
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     port_env = os.environ.get("PORT")

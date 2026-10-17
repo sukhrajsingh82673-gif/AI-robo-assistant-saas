@@ -14,7 +14,7 @@ To satisfy the mandate of **rapid, zero-cost public staging deployment** without
 
 1. **Persistent Database (Neon Serverless PostgreSQL 16):**
    - Staging data cannot be stored on an ephemeral container disk (Render free instances discard local SQLite files on sleep/restart).
-   - Neon provides genuine PostgreSQL 16 with 0.5 GB persistent NVMe storage for free.
+   - Neon provides genuine PostgreSQL 16 with 1.0 GB persistent NVMe storage for free (expanded from 0.5 GB in Oct 2026).
    - Unlike Render's free PostgreSQL (which is deleted after 30 days), Neon's free tier does not expire.
    - ZONATA's connection pool, SSL enforcement (`sslmode=require`), and schema migrations work out of the box.
 
@@ -23,11 +23,19 @@ To satisfy the mandate of **rapid, zero-cost public staging deployment** without
    - Terminates TLS 1.3 automatically and issues a Let's Encrypt wildcard certificate (`https://<service-name>.onrender.com`).
    - Handles public HTTP-to-HTTPS redirection.
 
-3. **In-Process Embedded Worker (`ZONATA_EMBEDDED_WORKER=1`):**
+3. **In-Process Embedded Worker (`ZONATA_EMBEDDED_WORKER=1`) & Crash Recovery:**
    - Runs `UniversalAutomationFabric` and `AsynchronousCommandBus` within the same container.
    - Eliminates the need for a separate $7/month paid background worker on Render.
+   - **Durability across Sleep/Restarts:** Render free web services spin down after 15 minutes of inactivity. When restarted, `command_bus.recover_interrupted_jobs(timeout_seconds=0.0)` automatically detects actions left in `ASSIGNED` status from interrupted workers and restores them to `QUEUED`.
+   - **Retry Governance:** If a failing task causes repeated container interruptions (>3 attempts), it is safely transitioned to `FAILED` with failure audit evidence to prevent infinite loops.
+   - **Graceful Termination:** SIGTERM/SIGINT signals trigger graceful worker stop via threading events, allowing current tasks to complete cleanly.
 
-4. **Edge Security & Metric Protection (`ZONATA_PROTECT_METRICS=1`):**
+4. **In-Process Event Bus & Durable Execution Architecture:**
+   - **JetStream Engine (`core/nats_jetstream.py`):** Operates as an in-process thread-safe event bus with PostgreSQL audit ledger persistence, providing stream delivery without needing a standalone external NATS daemon.
+   - **Temporal Gateway (`core/temporal_durable_execution_runtime.py`):** Implements durable workflow execution, state machines, and compensation sagas backed by relational tables (`automation_executions`, `saga_compensations`) in PostgreSQL, fitting comfortably within Render's 512 MB RAM footprint.
+   - *Enterprise Note:* The full AWS Compose/Terraform package (`deploy/compose/`) provisions standalone external NATS and Temporal cluster containers when deployed on enterprise infrastructure.
+
+5. **Edge Security & Metric Protection (`ZONATA_PROTECT_METRICS=1`):**
    - Enforces BLK-02 by returning `403 Forbidden` for unauthenticated requests to `/metrics`, blocking public metric scraping without an authorization token.
 
 ---
@@ -36,7 +44,7 @@ To satisfy the mandate of **rapid, zero-cost public staging deployment** without
 
 | Service | Purpose | Platform Signup URL | Free Tier Quota | Credit Card Required? |
 | :--- | :--- | :--- | :--- | :---: |
-| **Neon** | Serverless PostgreSQL 16 Persistence | [https://console.neon.tech/register](https://console.neon.tech/register) | 0.5 GB storage, serverless autoscaling, active branching | **NO** |
+| **Neon** | Serverless PostgreSQL 16 Persistence | [https://console.neon.tech/register](https://console.neon.tech/register) | 1.0 GB NVMe storage, serverless autoscaling, active branching | **NO** |
 | **Render** | Container Web Ingress & Runtime | [https://dashboard.render.com/register](https://dashboard.render.com/register) | 512MB RAM, 0.1 vCPU, 750 free instance hrs/mo, 100 GB egress | **NO** |
 | **GitHub** | Code Repository & CI/CD | [https://github.com/join](https://github.com/join) | Unlimited public repo CI/CD runners | **NO** |
 
@@ -136,9 +144,9 @@ ALL FREE-TIER STAGING GATES PASSED (100%)
 
 | Feature / Behavior | Free-Tier Reality | Mitigation / Guidance |
 | :--- | :--- | :--- |
-| **Idle Sleep** | Render spins down free web services after 15 minutes of inactivity. | The first request after sleep takes ~50 seconds to wake. Persistent data is unharmed because it resides in Neon PostgreSQL. |
+| **Idle Sleep & Worker Restarts** | Render spins down free web services after 15 minutes of inactivity. | The first request after sleep takes ~50 seconds to wake. Persistent data is unharmed because it resides in Neon PostgreSQL. Any in-flight commands left in `ASSIGNED` state are automatically reclaimed back to `QUEUED` upon worker wake-up (`recover_interrupted_jobs`). |
 | **Storage Persistence** | Render local disk is ephemeral; files written to `/app/storage` are wiped on sleep. | Critical business data is stored exclusively in Neon PostgreSQL. Encrypted backup envelopes can be sent to Cloudflare R2 (10 GB free). |
 | **Compute Quota** | 750 free instance hours per month on Render. | Sufficient for 1 continuous web service for the entire 31-day month (744 hours max). |
 | **Bandwidth Quota** | 100 GB outbound egress per month on Render. | Ample for staging and demonstration traffic. |
-| **Database Quota** | 0.5 GB storage on Neon. | Ample for thousands of tenants, users, and audit records. |
+| **Database Quota** | 1.0 GB NVMe storage on Neon. | Ample for tens of thousands of tenants, users, and audit records (expanded from 0.5 GB in Oct 2026). |
 | **Cost Safeguard** | Render and Neon will pause services rather than billing if quotas are exceeded. | **Guaranteed $0.00 bill.** No surprise cloud charges. |
