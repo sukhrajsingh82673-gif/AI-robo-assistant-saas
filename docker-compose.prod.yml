@@ -194,6 +194,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus-data:/prometheus
 
   grafana:

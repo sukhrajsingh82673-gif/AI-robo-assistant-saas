@@ -45,7 +45,7 @@ class ProductionConfigValidator:
         Raises ConfigurationError if in production and invalid.
         """
         env = env_vars if env_vars is not None else dict(os.environ)
-        current_env = env.get("ZONATA_ENV", "development").lower().strip()
+        current_env = (env.get("ZONATA_ENV") or env.get("APP_ENV") or "development").lower().strip()
         errors: List[str] = []
         warnings: List[str] = []
 
@@ -118,6 +118,16 @@ class ProductionConfigValidator:
                 errors.append(f"TLS_CERT_PATH specified ('{tls_cert}') but certificate file does not exist on disk.")
             if tls_key and not os.path.exists(tls_key):
                 errors.append(f"TLS_KEY_PATH specified ('{tls_key}') but private key file does not exist on disk.")
+
+            # 7. Production Observability & Alerting Rules Verification (BLK-05)
+            prom_rules_path = env.get("PROMETHEUS_RULES_PATH", "config/prometheus_rules.yml")
+            if os.path.isabs(prom_rules_path):
+                rule_file = prom_rules_path
+            else:
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                rule_file = os.path.join(base_dir, prom_rules_path)
+            if not os.path.exists(rule_file):
+                errors.append(f"Prometheus alert rules file missing at '{prom_rules_path}' (BLK-05). Production requires verified alerting rules.")
 
         if errors:
             raise ConfigurationError(f"Production Configuration Validation Failed:\n" + "\n".join(f" - {e}" for e in errors))

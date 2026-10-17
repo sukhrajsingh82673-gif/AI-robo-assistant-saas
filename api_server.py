@@ -479,6 +479,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def _send_json(self, data, status=200):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
+        try:
+            from core.observability_stack import sre_metrics
+            sre_metrics.inc_counter("zonata_api_requests_total", 1.0)
+            if status >= 500:
+                sre_metrics.inc_counter("zonata_api_errors_total", 1.0)
+            elif status in (401, 403):
+                sre_metrics.inc_counter("zonata_auth_failures_total", 1.0)
+            start_time = getattr(self, "_start_time", None)
+            if start_time:
+                sre_metrics.observe_latency((time.time() - start_time) * 1000.0)
+        except Exception:
+            pass
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._apply_cors_headers()
@@ -513,6 +525,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        self._start_time = time.time()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
@@ -548,6 +561,22 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "timestamp": time.time()
             })
+            return
+
+        # Prometheus Standard Exposition Endpoint (Public / Scraper)
+        if path == "/metrics":
+            from core.observability_stack import sre_metrics
+            from core.production_observability import observability_engine
+            content1 = sre_metrics.scrape_prometheus_format()
+            content2 = observability_engine.generate_prometheus_metrics()
+            combined = content1.strip() + "\n\n" + content2.strip() + "\n"
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(combined.encode('utf-8'))
             return
 
         # Enforce transport security for API and application endpoints
@@ -591,21 +620,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
         except AuthExceptions.TenantIsolationViolation as e:
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
-            return
-
-        if path == "/metrics":
-            from core.observability_stack import sre_metrics
-            from core.production_observability import observability_engine
-            content1 = sre_metrics.scrape_prometheus_format()
-            content2 = observability_engine.generate_prometheus_metrics()
-            combined = content1.strip() + "\n\n" + content2.strip() + "\n"
-            self.send_response(200)
-            self.send_header('Content-type', 'text/plain; version=0.0.4; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.end_headers()
-            self.wfile.write(combined.encode('utf-8'))
             return
 
         if path == "/api/auth/me":
@@ -2687,6 +2701,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json({"error": "Endpoint not found"}, status=404)
 
     def do_POST(self):
+        self._start_time = time.time()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
@@ -6448,6 +6463,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json({"error": "Endpoint not found"}, status=404)
 
     def do_PUT(self):
+        self._start_time = time.time()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
@@ -6558,6 +6574,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         return self.do_PUT()
 
     def do_DELETE(self):
+        self._start_time = time.time()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 

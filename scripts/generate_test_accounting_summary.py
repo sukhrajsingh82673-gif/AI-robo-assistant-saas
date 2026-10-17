@@ -105,6 +105,12 @@ SUITES_CONFIG = [
         "name": "Off-Host Backup Replication, WORM Retention & Standardized RTO/RPO (BLK-01, BLK-12)",
         "category": "Disaster Recovery / Off-Host Storage",
         "type": "automated"
+    },
+    {
+        "file": "tests/test_production_observability_alerting.py",
+        "name": "Production Alerting, Prometheus SRE Metrics & SLO Tracking (BLK-05)",
+        "category": "Observability / SRE Alerting",
+        "type": "automated"
     }
 ]
 

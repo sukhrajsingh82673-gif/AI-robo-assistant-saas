@@ -31,8 +31,8 @@
 | **4** | Remove Plaintext Secrets & Enforce Least Privilege | **PASS** | `e61dfa2` | `2a84b62` | 132 / 132 / 0 / 25 | `production_readiness/phase_04_secrets_least_privilege_report.md` |
 | **5** | HTTPS, TLS & Network Ingress Hardening | **PASS** | `2a84b62` | `6697741` | 138 / 138 / 0 / 25 | `production_readiness/phase_05_tls_network_report.md` |
 | **6** | PostgreSQL Reliability, Pooling & Concurrency | **PASS** | `6697741` | `7e4e817` | 148 / 148 / 0 / 25 | `production_readiness/phase_06_postgresql_reliability_report.md` |
-| **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | **PASS** | `7e4e817` | `a10a7f1` | 158 / 158 / 0 / 25 | `production_readiness/phase_07_offhost_recovery_report.md` |
-| **8** | Production Alerting, Observability & SRE | NOT STARTED | - | - | - | `production_readiness/phase_08_observability_report.md` |
+| **7** | Off-Host Backups, WAL Archiving & Disaster Recovery | **PASS** | `7e4e817` | `c9097aa` | 158 / 158 / 0 / 25 | `production_readiness/phase_07_offhost_recovery_report.md` |
+| **8** | Production Alerting, Observability & SRE | **PASS** | `c9097aa` | `b5305ad` | 169 / 169 / 0 / 25 | `production_readiness/phase_08_observability_report.md` |
 | **9** | Container Security & 9-Service Staging Qualification | NOT STARTED | - | - | - | `production_readiness/phase_09_container_qualification_report.md` |
 | **10** | Real External Business Integrations | NOT STARTED | - | - | - | `production_readiness/phase_10_integration_qualification_report.md` |
 | **11** | AI CEO, Agents & Tool Governance | NOT STARTED | - | - | - | `production_readiness/phase_11_agent_governance_report.md` |
@@ -62,7 +62,7 @@
 | **BLK-02** | **P0** | Cleartext HTTP & universal absence of TLS termination on API and internal service boundaries | `api_server.py`, Ingress | **RESOLVED (Phase 5)** |
 | **BLK-03** | **P0** | Hardcoded production plaintext passwords and unisolated superuser database credentials | `docker-compose.prod.yml` | **RESOLVED (Phase 4)** |
 | **BLK-04** | **P0** | 100% mocked external integrations (PMS, ERP, Payment Gateway, Browser automation) | Connectors & Integrations | **QUEUED (Phase 10)** |
-| **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **QUEUED (Phase 8)** |
+| **BLK-05** | **P0** | Zero actionable alerts in Prometheus configuration (`rule_files: []`) | Observability Stack | **RESOLVED (Phase 8)** |
 | **BLK-06** | **P0** | Missing database connection pooling under high concurrency (`Database.get_connection` creates unpooled TCP) | `core/db.py` | **RESOLVED (Phase 6)** |
 | **BLK-09** | **P1** | Staging containers lack memory/CPU limits and health checks | Container Infrastructure | **QUEUED (Phase 9)** |
 | **BLK-10** | **P1** | Standalone SQL migrations miss operational tables (e.g. `async_command_queue`) | `migrations/pg/` | **RESOLVED (Phase 6)** |
