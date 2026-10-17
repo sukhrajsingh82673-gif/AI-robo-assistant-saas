@@ -401,6 +401,41 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return x_real_ip.strip()
         return peer_ip
 
+    def _validate_transport_security(self) -> bool:
+        """
+        Enforces transport layer security (TLS/HTTPS) boundaries:
+        - In production mode (APP_ENV=production or ZONATA_STRICT_AUTH=1 or is_production_mode()):
+          1. If request is forwarded via reverse proxy with X-Forwarded-Proto: http (and ZONATA_ALLOW_INSECURE_HTTP != '1'),
+             rejects with HTTP 403 Forbidden.
+          2. If ZONATA_ENFORCE_HTTPS=1 is set, requires either TLS socket or X-Forwarded-Proto: https.
+        - Returns True if transport security is satisfied, False if rejected (and sends error response).
+        """
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod")) or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or is_production_mode()
+
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "").lower().strip()
+
+        if is_prod and os.environ.get("ZONATA_ALLOW_INSECURE_HTTP", "0") != "1":
+            if forwarded_proto == "http":
+                self._send_json({
+                    "error": "HTTPS Required",
+                    "detail": "Insecure HTTP connections are prohibited in production mode. Please connect via HTTPS.",
+                    "code": "TLS_TRANSPORT_SECURITY_VIOLATION"
+                }, status=403)
+                return False
+
+            if os.environ.get("ZONATA_ENFORCE_HTTPS", "0") == "1":
+                is_ssl_socket = hasattr(self.connection, "getpeercert")
+                if not is_ssl_socket and forwarded_proto != "https":
+                    self._send_json({
+                        "error": "HTTPS Required",
+                        "detail": "Encrypted HTTPS transport is strictly enforced. Cleartext connections rejected.",
+                        "code": "TLS_ENCRYPTION_MANDATORY"
+                    }, status=403)
+                    return False
+
+        return True
+
     def _get_auth_context(self) -> Dict[str, Any]:
         """
         Constitutional Invariant: UNAUTHENTICATED REQUEST != TENANT IDENTITY.
@@ -513,6 +548,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "timestamp": time.time()
             })
+            return
+
+        # Enforce transport security for API and application endpoints
+        if not self._validate_transport_security():
             return
 
         # Public Auth Environment Endpoint
@@ -2652,6 +2691,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
         length = int(self.headers.get('Content-Length', 0))
+
+        # Enforce transport security for POST endpoints
+        if not self._validate_transport_security():
+            return
 
         # Hard boundary: Guard against memory exhaustion via oversized POST payloads (>10MB)
         if length > 10 * 1024 * 1024:
@@ -6408,6 +6451,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # Enforce transport security for PUT endpoints
+        if not self._validate_transport_security():
+            return
+
         try:
             auth_ctx = self._get_auth_context()
             tenant_id = auth_ctx.get("tenant_id")
@@ -6514,6 +6561,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # Enforce transport security for DELETE endpoints
+        if not self._validate_transport_security():
+            return
+
         try:
             auth_ctx = self._get_auth_context()
             tenant_id = auth_ctx.get("tenant_id")
@@ -6589,12 +6640,34 @@ def run_server(port=8080):
     from core.database_engine import engine
     engine.verify_readiness()
 
-    print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} (Multi-Threaded Concurrent Engine)...")
+    tls_cert = os.environ.get("TLS_CERT_PATH") or os.environ.get("SSL_CERTFILE")
+    tls_key = os.environ.get("TLS_KEY_PATH") or os.environ.get("SSL_KEYFILE")
+    use_tls = False
+    ssl_context = None
+
+    if tls_cert and tls_key:
+        if not os.path.exists(tls_cert) or not os.path.exists(tls_key):
+            if is_prod:
+                raise RuntimeError(f"Production TLS Configuration Error: Configured certificate '{tls_cert}' or key '{tls_key}' does not exist.")
+            else:
+                print(f"[!] Warning: TLS cert/key not found on disk ({tls_cert}, {tls_key}). Starting without TLS.")
+        else:
+            import ssl
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            ssl_context.load_cert_chain(certfile=tls_cert, keyfile=tls_key)
+            use_tls = True
+
+    proto_name = "https" if use_tls else "http"
+    print(f"[*] Starting RoboAssistant Company OS 1.0 Server on port {port} ({proto_name.upper()} Multi-Threaded Engine)...")
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
     print("[*] Universal Automation Fabric Background Worker ACTIVE")
     try:
         with ThreadedHTTPServer(("", port), RoboAssistantRequestHandler) as httpd:
-            print(f"[*] Company OS 1.0 ready at http://localhost:{port} (Threaded Concurrency Enabled)")
+            if use_tls and ssl_context:
+                httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
+                print(f"[*] TLS Termination ENABLED (TLS 1.2+ minimum, cert: {tls_cert})")
+            print(f"[*] Company OS 1.0 ready at {proto_name}://localhost:{port} (Threaded Concurrency Enabled)")
             httpd.serve_forever()
     finally:
         universal_automation_fabric.stop_background_worker()

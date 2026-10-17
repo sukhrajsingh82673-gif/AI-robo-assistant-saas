@@ -47,6 +47,12 @@ SUITES_CONFIG = [
         "type": "automated"
     },
     {
+        "file": "tests/test_tls_network_ingress.py",
+        "name": "HTTPS, TLS Transport & Ingress Reverse Proxy (BLK-02)",
+        "category": "Security-Negative / TLS Ingress",
+        "type": "automated"
+    },
+    {
         "file": "tests/test_clean_production_mode.py",
         "name": "Clean Production Initialization & Fallback Refusal",
         "category": "Unit / Dialect Initialization",

@@ -94,6 +94,19 @@ class ProductionConfigValidator:
             if cors == "*":
                 errors.append("ALLOWED_ORIGINS cannot be '*' wildcard in production.")
 
+            # 6. Network Ingress & TLS Verification
+            tls_cert = env.get("TLS_CERT_PATH", "")
+            tls_key = env.get("TLS_KEY_PATH", "")
+            behind_proxy = env.get("ZONATA_BEHIND_INGRESS_PROXY", "0") == "1"
+            require_tls = env.get("ZONATA_REQUIRE_TLS", "0") == "1"
+
+            if require_tls and not behind_proxy and not (tls_cert and tls_key):
+                errors.append("TLS enforcement active (ZONATA_REQUIRE_TLS=1) but neither TLS certificates (TLS_CERT_PATH, TLS_KEY_PATH) nor ZONATA_BEHIND_INGRESS_PROXY=1 are configured.")
+            if tls_cert and not os.path.exists(tls_cert):
+                errors.append(f"TLS_CERT_PATH specified ('{tls_cert}') but certificate file does not exist on disk.")
+            if tls_key and not os.path.exists(tls_key):
+                errors.append(f"TLS_KEY_PATH specified ('{tls_key}') but private key file does not exist on disk.")
+
         if errors:
             raise ConfigurationError(f"Production Configuration Validation Failed:\n" + "\n".join(f" - {e}" for e in errors))
 
