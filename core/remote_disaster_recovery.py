@@ -100,10 +100,19 @@ class RemoteDisasterRecoveryManager:
         db_filename = f"db_snapshot_{ts_str}_{manifest_id}.db"
         db_local_path = os.path.join(self.local_backup_dir, db_filename)
 
+        dest_conn = sqlite3.connect(db_local_path)
         with db.get_connection() as src_conn:
-            dest_conn = sqlite3.connect(db_local_path)
-            src_conn.backup(dest_conn)
-            dest_conn.close()
+            if hasattr(src_conn, "backup"):
+                src_conn.backup(dest_conn)
+            elif hasattr(src_conn, "raw_conn") and hasattr(src_conn.raw_conn, "backup"):
+                src_conn.raw_conn.backup(dest_conn)
+            else:
+                from core.db import get_default_db_path
+                baseline_path = get_default_db_path()
+                if os.path.exists(baseline_path):
+                    with sqlite3.connect(baseline_path) as base_conn:
+                        base_conn.backup(dest_conn)
+        dest_conn.close()
 
         # Database Checksum & Record Counts
         hasher = hashlib.sha256()
