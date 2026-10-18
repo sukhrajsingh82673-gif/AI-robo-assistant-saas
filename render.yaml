@@ -41,6 +41,8 @@ services:
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
+      - key: ZONATA_AUTH_SECRET
+        generateValue: true
       - key: METRICS_AUTH_TOKEN
         generateValue: true
       - key: NEON_AUTH_BASE_URL

@@ -25,7 +25,11 @@ def get_auth_secret_key() -> bytes:
     4. In development mode, falls back to internal dev secret.
     """
     from .secrets import SecretManager
-    secret = os.environ.get("ZONATA_AUTH_SECRET")
+    secret = (
+        os.environ.get("ZONATA_AUTH_SECRET")
+        or os.environ.get("JWT_SECRET")
+        or os.environ.get("SESSION_SECRET")
+    )
     app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
     is_strict = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_REQUIRE_EXPLICIT_SECRET", "0") == "1")
     if secret:
