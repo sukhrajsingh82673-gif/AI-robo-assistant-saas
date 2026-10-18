@@ -14,6 +14,8 @@ import json
 import os
 import sys
 import urllib.parse
+import urllib.request
+import logging
 import platform
 import time
 import uuid
@@ -21,6 +23,7 @@ import hashlib
 import hmac
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
 
+logger = logging.getLogger("api_server")
 _SERVER_BOOT_TIME = time.time()
 _BOOTSTRAP_PROVISIONED_TENANTS: Set[str] = set()
 
@@ -497,18 +500,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 sre_metrics.observe_latency((time.time() - start_time) * 1000.0)
         except Exception:
             pass
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self._apply_cors_headers()
-        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("X-XSS-Protection", "1; mode=block")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';")
-        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
-        self.send_header("X-Request-ID", req_id)
-        self.end_headers()
-        self.wfile.write(json.dumps(data, default=str).encode("utf-8"))
+        body_bytes = json.dumps(data, default=str).encode("utf-8")
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body_bytes)))
+            self._apply_cors_headers()
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("X-XSS-Protection", "1; mode=block")
+            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';")
+            self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+            self.send_header("X-Request-ID", req_id)
+            self.end_headers()
+            self.wfile.write(body_bytes)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def do_OPTIONS(self):
         req_origin = self.headers.get("Origin")
@@ -592,6 +601,153 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(neon_data_api.get_status())
             return
 
+        # Google OAuth / Enterprise SSO Public Endpoints
+        if path == "/api/auth/oauth/google/config":
+            client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+            configured = bool(client_id)
+            host_header = self.headers.get("Host", "localhost")
+            proto = self.headers.get("X-Forwarded-Proto", "https" if "render.com" in host_header else "http")
+            callback_uri = f"{proto}://{host_header}/api/auth/oauth/google/callback"
+            self._send_json({
+                "configured": configured,
+                "provider": "google",
+                "client_id": client_id if configured else "",
+                "redirect_uri": callback_uri,
+                "auth_url": "/api/auth/oauth/google/login" if configured else "",
+                "neon_auth_configured": bool(os.environ.get("NEON_AUTH_BASE_URL")),
+                "message": "Google OAuth is ready" if configured else "Google OAuth credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) not configured."
+            })
+            return
+
+        if path == "/api/auth/oauth/google/login":
+            client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+            if not client_id:
+                self._send_json({
+                    "error": "Enterprise Identity Provider Not Configured",
+                    "detail": "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on this host. Please set them in your deployment environment variables or sign in with host password.",
+                    "code": "OAUTH_NOT_CONFIGURED"
+                }, status=503)
+                return
+            host_header = self.headers.get("Host", "localhost")
+            proto = self.headers.get("X-Forwarded-Proto", "https" if "render.com" in host_header else "http")
+            redirect_uri = f"{proto}://{host_header}/api/auth/oauth/google/callback"
+            state_val = uuid.uuid4().hex
+            scope = urllib.parse.quote("openid email profile")
+            google_auth_url = (
+                f"https://accounts.google.com/o/oauth2/v2/auth"
+                f"?response_type=code"
+                f"&client_id={urllib.parse.quote(client_id)}"
+                f"&redirect_uri={urllib.parse.quote(redirect_uri)}"
+                f"&scope={scope}"
+                f"&state={state_val}"
+                f"&prompt=select_account"
+            )
+            self.send_response(302)
+            self.send_header("Location", google_auth_url)
+            self.end_headers()
+            return
+
+        if path == "/api/auth/oauth/google/callback":
+            code = query_params.get("code", [""])[0]
+            client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+            client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+            if not code or not client_id or not client_secret:
+                err_msg = query_params.get("error", ["OAuth exchange failed: missing credentials or authorization code"])[0]
+                self.send_response(302)
+                self.send_header("Location", f"/?error={urllib.parse.quote(err_msg)}")
+                self.end_headers()
+                return
+
+            try:
+                host_header = self.headers.get("Host", "localhost")
+                proto = self.headers.get("X-Forwarded-Proto", "https" if "render.com" in host_header else "http")
+                redirect_uri = f"{proto}://{host_header}/api/auth/oauth/google/callback"
+
+                token_url = "https://oauth2.googleapis.com/token"
+                token_data = urllib.parse.urlencode({
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code"
+                }).encode("utf-8")
+                token_req = urllib.request.Request(token_url, data=token_data, method="POST", headers={"Content-Type": "application/x-www-form-urlencoded"})
+                with urllib.request.urlopen(token_req, timeout=15) as t_resp:
+                    t_json = json.loads(t_resp.read().decode("utf-8"))
+
+                access_token = t_json.get("access_token")
+                user_req = urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": f"Bearer {access_token}"})
+                with urllib.request.urlopen(user_req, timeout=15) as u_resp:
+                    user_info = json.loads(u_resp.read().decode("utf-8"))
+
+                email = user_info.get("email", "").strip().lower()
+                name = user_info.get("name") or user_info.get("given_name") or (email.split("@")[0] if "@" in email else "Host")
+
+                if not email:
+                    raise RuntimeError("Google profile did not contain a verified email address.")
+
+                with db.get_connection() as conn:
+                    existing_user = conn.execute(
+                        "SELECT user_id, tenant_id, role, company_id FROM users WHERE email = ? AND status = 'ACTIVE'",
+                        (email,)
+                    ).fetchone()
+
+                if existing_user:
+                    user_id = existing_user["user_id"]
+                    tenant_id = existing_user["tenant_id"]
+                    role = existing_user["role"]
+                    company_id = existing_user["company_id"] or f"comp_{tenant_id}"
+                else:
+                    tenant = TenantManager.create_tenant(name=f"{name} Enterprise", plan="ENTERPRISE")
+                    tenant_id = tenant["tenant_id"]
+                    company_id = f"comp_{tenant_id}"
+                    oauth_pw = uuid.uuid4().hex + uuid.uuid4().hex
+                    user = UserManager.create_user_with_credentials(
+                        tenant_id=tenant_id,
+                        email=email,
+                        name=name,
+                        password=oauth_pw,
+                        role=UserRole.OWNER,
+                        company_id=company_id
+                    )
+                    user_id = user["user_id"]
+                    role = UserRole.OWNER
+                    now = time.time()
+                    with db.get_connection() as conn:
+                        conn.execute(
+                            """
+                            INSERT INTO companies (
+                                company_id, tenant_id, name, country, industry,
+                                company_type, status, currency, timezone, revenue,
+                                cost, contribution, created_at
+                            ) VALUES (?, ?, ?, 'US', 'Enterprise Cloud & SaaS', 'EXISTING', 'OPERATIONAL', '$', 'UTC', 0.0, 0.0, 0.0, ?)
+                            ON CONFLICT (company_id) DO NOTHING
+                            """,
+                            (company_id, tenant_id, f"{name} Enterprise", now)
+                        )
+                        conn.commit()
+
+                user_data = {
+                    "user_id": user_id,
+                    "tenant_id": tenant_id,
+                    "company_id": company_id,
+                    "email": email,
+                    "name": name,
+                    "role": role,
+                    "permissions": ["*"] if role == UserRole.OWNER else ["read", "execute"]
+                }
+                token = UserManager.generate_token(user_data, expires_in_seconds=86400 * 7)
+                self.send_response(302)
+                self.send_header("Location", f"/?token={urllib.parse.quote(token)}")
+                self.end_headers()
+                return
+            except Exception as e:
+                logger.exception(f"Google OAuth callback error: {e}")
+                self.send_response(302)
+                self.send_header("Location", f"/?error={urllib.parse.quote(f'SSO authentication failed: {str(e)}')}")
+                self.end_headers()
+                return
+
         # Prometheus Standard Exposition Endpoint (Public / Scraper)
         if path == "/metrics":
             # Edge protection guard when running directly on public PaaS without Nginx
@@ -649,6 +805,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 clean_path = 'index.html'
             file_path = os.path.join(WEB_DIR, clean_path)
             if os.path.exists(file_path) and os.path.isfile(file_path):
+                self.path = '/' + clean_path
                 return super().do_GET()
             self.path = '/index.html'
             return super().do_GET()
@@ -2737,6 +2894,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             clean_path = 'index.html'
         file_path = os.path.join(WEB_DIR, clean_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
+            self.path = '/' + clean_path
             return super().do_GET()
 
         # SPA Routing: Any non-API route serves index.html
@@ -2928,99 +3086,109 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/auth/register":
-            client_ip = self._get_client_ip()
-            email = req_data.get("email", "").strip().lower()
-            from core.auth import RateLimiter
-            allowed, retry_after, axis = RateLimiter.rate_limit_ip_and_account(
-                client_ip,
-                email if email else None,
-                max_ip_requests=10,
-                max_account_requests=3,
-                window_seconds=60.0
-            )
-            if not allowed:
-                detail_msg = f"Rate limit exceeded on {axis.lower().replace('_', ' ')}. Try again in {retry_after}s."
-                self._send_json({"error": "Too Many Requests", "detail": detail_msg}, status=429)
-                return
-
-            name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
-            password = req_data.get("password", "")
-            tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
-            plan = req_data.get("plan", "ENTERPRISE")
-
-            import re
-            email_pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-            if not email or not re.match(email_pattern, email):
-                self._send_json({"error": "Bad Request", "detail": "A valid email address is required for registration"}, status=400)
-                return
-
-            if not password or len(password) < 8:
-                self._send_json({"error": "Bad Request", "detail": "Password must be at least 8 characters in length"}, status=400)
-                return
-
-            if len(password.encode("utf-8")) > 4096:
-                self._send_json({"error": "Bad Request", "detail": "Password exceeds maximum allowed size (4096 bytes)"}, status=400)
-                return
-
-            with db.get_connection() as conn:
-                existing_user = conn.execute(
-                    "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
-                    (email,)
-                ).fetchone()
-
-            if existing_user:
-                self._send_json({
-                    "error": "Conflict",
-                    "detail": "An active account with this email already exists. Please sign in instead."
-                }, status=409)
-                return
-
-            # Atomic tenant and credential provisioning
-            from core.auth import TenantManager
-            tenant = TenantManager.create_tenant(name=tenant_name, plan=plan)
-            tenant_id = tenant["tenant_id"]
-            user = UserManager.create_user_with_credentials(
-                tenant_id=tenant_id,
-                email=email,
-                name=name,
-                password=password,
-                role=UserRole.OWNER,
-                company_id="comp_primary"
-            )
-
-            # Create default primary company entity for the new tenant
-            now = time.time()
-            with db.get_connection() as conn:
-                conn.execute(
-                    """
-                    INSERT OR IGNORE INTO companies (
-                        company_id, tenant_id, name, country, industry,
-                        company_type, status, currency, timezone, revenue,
-                        cost, contribution, created_at
-                    ) VALUES (?, ?, ?, 'US', 'Enterprise Cloud & SaaS', 'EXISTING', 'OPERATIONAL', '$', 'UTC', 0.0, 0.0, 0.0, ?)
-                    """,
-                    ("comp_primary", tenant_id, tenant_name, now)
+            try:
+                client_ip = self._get_client_ip()
+                email = req_data.get("email", "").strip().lower()
+                from core.auth import RateLimiter
+                allowed, retry_after, axis = RateLimiter.rate_limit_ip_and_account(
+                    client_ip,
+                    email if email else None,
+                    max_ip_requests=10,
+                    max_account_requests=3,
+                    window_seconds=60.0
                 )
-                conn.commit()
+                if not allowed:
+                    detail_msg = f"Rate limit exceeded on {axis.lower().replace('_', ' ')}. Try again in {retry_after}s."
+                    self._send_json({"error": "Too Many Requests", "detail": detail_msg}, status=429)
+                    return
 
-            user_data = {
-                "user_id": user["user_id"],
-                "tenant_id": tenant_id,
-                "company_id": "comp_primary",
-                "email": email,
-                "name": name,
-                "role": UserRole.OWNER,
-                "permissions": ["*"]
-            }
-            token = UserManager.generate_token(user_data, expires_in_seconds=86400 * 7)
-            self._send_json({
-                "token": token,
-                "token_type": "Bearer",
-                "expires_in": 86400 * 7,
-                "user": user_data,
-                "tenant": tenant
-            }, status=201)
-            return
+                name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
+                password = req_data.get("password", "")
+                tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
+                plan = req_data.get("plan", "ENTERPRISE")
+
+                import re
+                email_pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+                if not email or not re.match(email_pattern, email):
+                    self._send_json({"error": "Bad Request", "detail": "A valid email address is required for registration"}, status=400)
+                    return
+
+                if not password or len(password) < 8:
+                    self._send_json({"error": "Bad Request", "detail": "Password must be at least 8 characters in length"}, status=400)
+                    return
+
+                if len(password.encode("utf-8")) > 4096:
+                    self._send_json({"error": "Bad Request", "detail": "Password exceeds maximum allowed size (4096 bytes)"}, status=400)
+                    return
+
+                with db.get_connection() as conn:
+                    existing_user = conn.execute(
+                        "SELECT * FROM users WHERE email = ? AND status = 'ACTIVE'",
+                        (email,)
+                    ).fetchone()
+
+                if existing_user:
+                    self._send_json({
+                        "error": "Conflict",
+                        "detail": "An active account with this email already exists. Please sign in instead."
+                    }, status=409)
+                    return
+
+                # Atomic tenant and credential provisioning
+                from core.auth import TenantManager
+                tenant = TenantManager.create_tenant(name=tenant_name, plan=plan)
+                tenant_id = tenant["tenant_id"]
+                company_id = f"comp_{tenant_id}"
+                user = UserManager.create_user_with_credentials(
+                    tenant_id=tenant_id,
+                    email=email,
+                    name=name,
+                    password=password,
+                    role=UserRole.OWNER,
+                    company_id=company_id
+                )
+
+                # Create default primary company entity for the new tenant
+                now = time.time()
+                with db.get_connection() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO companies (
+                            company_id, tenant_id, name, country, industry,
+                            company_type, status, currency, timezone, revenue,
+                            cost, contribution, created_at
+                        ) VALUES (?, ?, ?, 'US', 'Enterprise Cloud & SaaS', 'EXISTING', 'OPERATIONAL', '$', 'UTC', 0.0, 0.0, 0.0, ?)
+                        ON CONFLICT (company_id) DO NOTHING
+                        """,
+                        (company_id, tenant_id, tenant_name, now)
+                    )
+                    conn.commit()
+
+                user_data = {
+                    "user_id": user["user_id"],
+                    "tenant_id": tenant_id,
+                    "company_id": company_id,
+                    "email": email,
+                    "name": name,
+                    "role": UserRole.OWNER,
+                    "permissions": ["*"]
+                }
+                token = UserManager.generate_token(user_data, expires_in_seconds=86400 * 7)
+                self._send_json({
+                    "token": token,
+                    "token_type": "Bearer",
+                    "expires_in": 86400 * 7,
+                    "user": user_data,
+                    "tenant": tenant
+                }, status=201)
+                return
+            except Exception as e:
+                logger.exception(f"Unhandled registration error: {e}")
+                self._send_json({
+                    "error": "Registration Failed",
+                    "detail": f"Registration failed due to server error: {str(e)}"
+                }, status=500)
+                return
 
         elif path == "/api/auth/revoke":
             try:

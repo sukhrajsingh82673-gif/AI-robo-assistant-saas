@@ -3617,6 +3617,10 @@ class PostgresConnectionWrapper:
     def executescript(self, sql_script: str):
         if self._is_closed:
             raise RuntimeError("Cannot execute script on closed database connection.")
+        try:
+            self.raw_conn.rollback()
+        except Exception:
+            pass
         prev_autocommit = getattr(self.raw_conn, "autocommit", False)
         try:
             self.raw_conn.autocommit = True
@@ -4110,9 +4114,18 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     db.set_db_path(custom_path)
     os.environ["ZONATA_DB_PATH"] = custom_path
     try:
-        from core.database_engine import engine
+        from core.database_engine import engine, DatabaseDialect
+        engine.dialect = DatabaseDialect.SQLITE
         engine.db_path = custom_path
+        engine._is_ready = True
+        engine._deferred_import_mode = False
+        if hasattr(engine, 'pools') and engine.pools:
+            for p in engine.pools.values():
+                p.dialect = DatabaseDialect.SQLITE
+                p._deferred_import_mode = False
+                p.reset()
     except Exception:
         pass
     return custom_path
+
 

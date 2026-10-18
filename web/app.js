@@ -174,9 +174,9 @@ window.ThemeManager = ThemeManager;
 ThemeManager.apply();
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   ThemeManager.init();
-  loadStoredSession();
+  await loadStoredSession();
   loadData();
   setupEventListeners();
   renderApp();
@@ -184,6 +184,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Session Management — P0 Environment-Aware Authentication Boundary
 async function loadStoredSession() {
+  // Handle SSO OAuth Redirect Callback params (?token=... or ?error=...)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthError = urlParams.get('error');
+    const oauthToken = urlParams.get('token') || urlParams.get('auth_token');
+    if (oauthError) {
+      if (typeof showToast === 'function') {
+        showToast(decodeURIComponent(oauthError), 'error');
+      }
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    } else if (oauthToken) {
+      let hostUser = null;
+      try {
+        const payloadStr = oauthToken.includes('.') ? oauthToken.split('.')[0] : oauthToken;
+        hostUser = JSON.parse(payloadStr);
+      } catch (e) {
+        hostUser = { name: 'Host & Owner', role: 'OWNER', email: 'owner@zonata.internal' };
+      }
+      saveSession(hostUser, oauthToken);
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+      if (typeof showToast === 'function') {
+        showToast(`Welcome, ${hostUser.name || hostUser.email}! Authenticated via SSO.`, 'success');
+      }
+    }
+  } catch (e) {
+    console.warn('OAuth URL param check error:', e);
+  }
+
   const session = localStorage.getItem('zonata_host_session');
   const storedToken = localStorage.getItem('zonata_auth_token');
   if (session) {
@@ -1058,7 +1088,54 @@ window.switchAuthTab = function(tab) {
   }
 };
 
-window.handleSocialAuth = function(provider) {
+window.handleSocialAuth = async function(provider) {
+  if (provider === 'Google') {
+    try {
+      const res = await fetch('/api/auth/oauth/google/config');
+      if (res.ok) {
+        const config = await res.json();
+        if (config.configured && config.auth_url) {
+          window.location.href = config.auth_url;
+          return;
+        }
+      }
+    } catch (e) {
+      // Configuration probe failed, fallback to setup modal
+    }
+
+    const redirectUri = `${window.location.origin}/api/auth/oauth/google/callback`;
+    openModal(`Google Enterprise Single Sign-On (SSO)`, `
+      <div style="font-size:13.5px; line-height:1.6; color:var(--text-secondary); padding:4px 0;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <span style="font-size:22px;">🔑</span>
+          <div>
+            <strong style="color:var(--text-primary); font-size:14.5px; display:block;">Google OAuth 2.0 Credentials Needed</strong>
+            <span style="font-size:12px; color:var(--accent-blue);">Enterprise SSO Identity Gateway</span>
+          </div>
+        </div>
+        <p style="margin-bottom:12px;">Google OAuth authentication requires registering this deployment with Google Cloud Console and setting credentials on the host environment.</p>
+
+        <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Authorized Redirect URI (Copy for Google Cloud):</div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" id="googleRedirectUriInput" class="form-input" value="${redirectUri}" readonly style="font-size:12px; font-family:var(--font-mono); padding:6px 8px;" />
+            <button class="btn btn-secondary" style="font-size:12px; padding:6px 12px; white-space:nowrap;" onclick="navigator.clipboard.writeText('${redirectUri}').then(() => showToast('Redirect URI copied to clipboard!', 'success'))">Copy</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">
+            Required Environment Variables on Host (Render / PaaS):<br>
+            <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="closeModal(); switchAuthTab('signin');">Continue with Host Password</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
   openModal(`${provider} Single Sign-On (SSO)`, `
     <div style="font-size:13.5px; line-height:1.6; color:var(--text-secondary); padding:8px 0;">
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
@@ -1084,42 +1161,57 @@ window.handleAuthSubmit = async function(e, type) {
   }
 
   try {
-    if (type === 'signin') {
+    const isSignIn = (type === 'signin');
+    const endpoint = isSignIn ? '/api/auth/login' : '/api/auth/register';
+    let payload = {};
+
+    if (isSignIn) {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.detail || data.error || 'Authentication failed. Please verify credentials.', 'error');
-        return;
-      }
-      saveSession(data.user, data.token);
-      showToast(`Welcome back, ${data.user.name || data.user.email}!`, 'success');
-      renderApp();
+      payload = { email, password };
     } else {
       const name = document.getElementById('newHostName').value.trim();
       const email = document.getElementById('newHostEmail').value.trim();
       const password = document.getElementById('newHostPassword').value;
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.detail || data.error || 'Registration failed.', 'error');
-        return;
-      }
-      saveSession(data.user, data.token);
-      showToast(`Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
-      renderApp();
+      payload = { name, email, password };
     }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // Safe response parsing: never crash with "Unexpected end of JSON input"
+    let data = null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        data = null;
+      }
+    }
+    if (!data) {
+      const rawText = await res.text().catch(() => '');
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        data = { error: rawText.slice(0, 200) || `Server response status: HTTP ${res.status} ${res.statusText || ''}` };
+      }
+    }
+
+    if (!res.ok) {
+      const msg = data.detail || data.error || (isSignIn ? 'Authentication failed. Please verify credentials.' : 'Registration failed.');
+      showToast(msg, 'error');
+      return;
+    }
+
+    saveSession(data.user, data.token);
+    showToast(isSignIn ? `Welcome back, ${data.user.name || data.user.email}!` : `Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
+    renderApp();
   } catch (err) {
-    showToast(`Network or server connection error: ${err.message}`, 'error');
+    showToast(`Network or connection error: ${err.message}`, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
