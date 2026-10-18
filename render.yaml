@@ -13,7 +13,7 @@ services:
     region: oregon
     branch: engineering/production-readiness-gap-closure
     healthCheckPath: /readyz
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: APP_ENV
         value: staging
