@@ -601,6 +601,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(neon_data_api.get_status())
             return
 
+        if path == "/api/auth/csrf":
+            import secrets
+            token = secrets.token_hex(32)
+            self._send_json({"csrf_token": token, "timestamp": time.time()})
+            return
+
         # Google OAuth / Enterprise SSO Public Endpoints
         if path == "/api/auth/oauth/google/config":
             client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
