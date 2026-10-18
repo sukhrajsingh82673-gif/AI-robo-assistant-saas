@@ -37,9 +37,10 @@
 | **10** | Real External Business Integrations | **PASS (LOCAL QUALIFIED)** | `23a03a4` | `a4977a2` | 228 / 228 / 0 / 25 | `production_readiness/phase_10_integration_qualification_report.md` |
 | **10.1** | Forensic Evidence Reconciliation & Qualification Closure | **PASS (EVIDENCE RECONCILED)** | `a4977a2` | `206b933` | 228 / 228 / 0 / 25 | `production_readiness/phase_10_1_evidence_reconciliation_report.md` |
 | **10.1.1** | Current-Candidate CI Closure & Release Baseline | **PASS (CANDIDATE BASELINE QUALIFIED)** | `206b933` | `26d553b` | 228 / 228 / 0 / 0 (CI: 25 / 25 / 0 / 0) | `production_readiness/phase_10_1_1_current_candidate_ci_report.md` |
-| **10.2** | Cloud Staging & Production Deployment Package | **DEPLOYMENT PACKAGE READY (WAITING FOR CLOUD ACCESS)** | `26d553b` | `af2671c` | 228 / 228 / 0 / 0 (CI: 25 / 25 / 0 / 0) | `production_readiness/phase_10_2_cloud_staging_deployment_package_report.md` |
-| **10.3** | Free-Tier-First Staging Deployment Package | **FREE-TIER STAGING READY (AWAITING OPERATOR ACTIVATION)** | `af2671c` | `HEAD` | 43 / 43 / 0 / 0 | `production_readiness/phase_10_3_free_tier_staging_package_report.md` |
-| **11** | AI CEO, Agents & Tool Governance | NOT STARTED | - | - | - | `production_readiness/phase_11_agent_governance_report.md` |
+| **10.3** | Free-Tier-First Staging Deployment Package | **PASS (PACKAGE READY)** | `af2671c` | `9b1b84a` | 46 / 46 / 0 / 0 | `production_readiness/phase_10_3_free_tier_staging_package_report.md` |
+| **10.4** | Staging Defect Remediation & Neon Setup | **PASS (REMEDIATED)** | `9b1b84a` | `ad114d7` | 96 / 96 / 0 / 0 | `production_readiness/phase_10_4_staging_remediation_report.md` |
+| **10.5** | Live Staging Qualification (Public Render + Neon) | **PASS (LIVE STAGING QUALIFIED)** | `ad114d7` | `20d6081` | 18 / 18 / 0 / 0 (Live) | `production_readiness/phase_10_5_live_qualification_report.md` |
+| **11** | AI CEO, Agents & Tool Governance | READY TO START | - | - | - | `production_readiness/phase_11_agent_governance_report.md` |
 | **12** | SaaS Commercial Model, Lifecycle & Billing | NOT STARTED | - | - | - | `production_readiness/phase_12_saas_commercial_report.md` |
 | **13** | API, Frontend & E2E Product Journeys | NOT STARTED | - | - | - | `production_readiness/phase_13_product_e2e_report.md` |
 | **14** | Object Storage, Evidence & Audit Integrity | NOT STARTED | - | - | - | `production_readiness/phase_14_evidence_storage_report.md` |
