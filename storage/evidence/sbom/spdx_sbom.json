@@ -1,0 +1,976 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "zonata-enterprise-supply-chain-sbom",
+  "documentNamespace": "https://zonata.ai/spdxdocs/zonata-enterprise-1.0.0-7b60f293-b0ec-4d00-9e9f-afc6992a0e98",
+  "creationInfo": {
+    "created": "2026-10-19T06:13:04Z",
+    "creators": [
+      "Tool: ZONATA-SBOM-Generator-1.0",
+      "Organization: ZONATA Technologies"
+    ],
+    "licenseListVersion": "3.22"
+  },
+  "documentDescribes": [
+    "SPDXRef-Package-zonata-enterprise"
+  ],
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-zonata-enterprise",
+      "name": "zonata-enterprise",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "Copyright (c) 2026 ZONATA Technologies. All rights reserved.",
+      "description": "ZONATA Universal AI Company Operating System"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-psycopg2-binary-2.9.9",
+      "name": "psycopg2-binary",
+      "versionInfo": "2.9.9",
+      "downloadLocation": "https://pypi.org/project/psycopg2-binary",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "LGPL-3.0-or-later WITH OpenSSL-Exception",
+      "copyrightText": "NOASSERTION",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/psycopg2-binary@2.9.9"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pg8000-1.31.5",
+      "name": "pg8000",
+      "versionInfo": "1.31.5",
+      "downloadLocation": "https://pypi.org/project/pg8000",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "description": "Pure-Python PostgreSQL DB-API 2.0 driver",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pg8000@1.31.5"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-PyYAML-6.0.1",
+      "name": "PyYAML",
+      "versionInfo": "6.0.1",
+      "downloadLocation": "https://pypi.org/project/PyYAML",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "YAML parser and emitter for Python",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pyyaml@6.0.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-numpy-1.26.4",
+      "name": "numpy",
+      "versionInfo": "1.26.4",
+      "downloadLocation": "https://pypi.org/project/numpy",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "description": "Fundamental package for scientific computing with Python",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/numpy@1.26.4"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pandas-2.2.2",
+      "name": "pandas",
+      "versionInfo": "2.2.2",
+      "downloadLocation": "https://pypi.org/project/pandas",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "description": "Powerful data structures for data analysis and relational operations",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pandas@2.2.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-python-dateutil-2.9.0.post0",
+      "name": "python-dateutil",
+      "versionInfo": "2.9.0.post0",
+      "downloadLocation": "https://pypi.org/project/python-dateutil",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Extensions to the standard Python datetime module",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/python-dateutil@2.9.0.post0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-cryptography-46.0.5",
+      "name": "cryptography",
+      "versionInfo": "46.0.5",
+      "downloadLocation": "https://pypi.org/project/cryptography",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Cryptographic recipes and primitives for Python developers",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/cryptography@46.0.5"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-bcrypt-5.0.0",
+      "name": "bcrypt",
+      "versionInfo": "5.0.0",
+      "downloadLocation": "https://pypi.org/project/bcrypt",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Modern password hashing for Python",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/bcrypt@5.0.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-1.3.0",
+      "name": "@napi-rs/keyring",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-darwin-arm64-1.3.0",
+      "name": "@napi-rs/keyring-darwin-arm64",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-darwin-arm64",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-darwin-arm64",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-darwin-arm64@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-darwin-x64-1.3.0",
+      "name": "@napi-rs/keyring-darwin-x64",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-darwin-x64",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-darwin-x64",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-darwin-x64@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-freebsd-x64-1.3.0",
+      "name": "@napi-rs/keyring-freebsd-x64",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-freebsd-x64",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-freebsd-x64",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-freebsd-x64@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-arm-gnueabihf-1.3.0",
+      "name": "@napi-rs/keyring-linux-arm-gnueabihf",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-arm-gnueabihf",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm-gnueabihf",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-arm-gnueabihf@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-arm64-gnu-1.3.0",
+      "name": "@napi-rs/keyring-linux-arm64-gnu",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-arm64-gnu",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm64-gnu",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-arm64-gnu@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-arm64-musl-1.3.0",
+      "name": "@napi-rs/keyring-linux-arm64-musl",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-arm64-musl",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm64-musl",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-arm64-musl@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-riscv64-gnu-1.3.0",
+      "name": "@napi-rs/keyring-linux-riscv64-gnu",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-riscv64-gnu",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-riscv64-gnu",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-riscv64-gnu@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-x64-gnu-1.3.0",
+      "name": "@napi-rs/keyring-linux-x64-gnu",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-x64-gnu",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-x64-gnu",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-x64-gnu@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-linux-x64-musl-1.3.0",
+      "name": "@napi-rs/keyring-linux-x64-musl",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-linux-x64-musl",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-x64-musl",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-linux-x64-musl@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-win32-arm64-msvc-1.3.0",
+      "name": "@napi-rs/keyring-win32-arm64-msvc",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-win32-arm64-msvc",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-arm64-msvc",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-win32-arm64-msvc@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-win32-ia32-msvc-1.3.0",
+      "name": "@napi-rs/keyring-win32-ia32-msvc",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-win32-ia32-msvc",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-ia32-msvc",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-win32-ia32-msvc@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-napi-rs-keyring-win32-x64-msvc-1.3.0",
+      "name": "@napi-rs/keyring-win32-x64-msvc",
+      "versionInfo": "1.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@napi-rs/keyring-win32-x64-msvc",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-x64-msvc",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@napi-rs/keyring-win32-x64-msvc@1.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-neon-config-1.9.2",
+      "name": "@neon/config",
+      "versionInfo": "1.9.2",
+      "downloadLocation": "https://www.npmjs.com/package/@neon/config",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @neon/config",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@neon/config@1.9.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-neon-env-1.6.3",
+      "name": "@neon/env",
+      "versionInfo": "1.6.3",
+      "downloadLocation": "https://www.npmjs.com/package/@neon/env",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @neon/env",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@neon/env@1.6.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-neon-sdk-7.3.0",
+      "name": "@neon/sdk",
+      "versionInfo": "7.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/@neon/sdk",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module @neon/sdk",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@neon/sdk@7.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-ansi-regex-6.4.0",
+      "name": "ansi-regex",
+      "versionInfo": "6.4.0",
+      "downloadLocation": "https://www.npmjs.com/package/ansi-regex",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module ansi-regex",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/ansi-regex@6.4.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-ansi-styles-6.2.3",
+      "name": "ansi-styles",
+      "versionInfo": "6.2.3",
+      "downloadLocation": "https://www.npmjs.com/package/ansi-styles",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module ansi-styles",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/ansi-styles@6.2.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-cliui-9.0.1",
+      "name": "cliui",
+      "versionInfo": "9.0.1",
+      "downloadLocation": "https://www.npmjs.com/package/cliui",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ISC",
+      "licenseDeclared": "ISC",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module cliui",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/cliui@9.0.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-cliui-string-width-7.2.0",
+      "name": "cliui/string-width",
+      "versionInfo": "7.2.0",
+      "downloadLocation": "https://www.npmjs.com/package/cliui/string-width",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module cliui/string-width",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/cliui/string-width@7.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-emoji-regex-10.6.0",
+      "name": "emoji-regex",
+      "versionInfo": "10.6.0",
+      "downloadLocation": "https://www.npmjs.com/package/emoji-regex",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module emoji-regex",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/emoji-regex@10.6.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-escalade-3.2.0",
+      "name": "escalade",
+      "versionInfo": "3.2.0",
+      "downloadLocation": "https://www.npmjs.com/package/escalade",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module escalade",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/escalade@3.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-get-caller-file-2.0.5",
+      "name": "get-caller-file",
+      "versionInfo": "2.0.5",
+      "downloadLocation": "https://www.npmjs.com/package/get-caller-file",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ISC",
+      "licenseDeclared": "ISC",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module get-caller-file",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/get-caller-file@2.0.5"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-get-east-asian-width-1.7.0",
+      "name": "get-east-asian-width",
+      "versionInfo": "1.7.0",
+      "downloadLocation": "https://www.npmjs.com/package/get-east-asian-width",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module get-east-asian-width",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/get-east-asian-width@1.7.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-jiti-2.7.0",
+      "name": "jiti",
+      "versionInfo": "2.7.0",
+      "downloadLocation": "https://www.npmjs.com/package/jiti",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module jiti",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/jiti@2.7.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-string-width-8.3.0",
+      "name": "string-width",
+      "versionInfo": "8.3.0",
+      "downloadLocation": "https://www.npmjs.com/package/string-width",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module string-width",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/string-width@8.3.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-strip-ansi-7.2.0",
+      "name": "strip-ansi",
+      "versionInfo": "7.2.0",
+      "downloadLocation": "https://www.npmjs.com/package/strip-ansi",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module strip-ansi",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/strip-ansi@7.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-wrap-ansi-9.0.2",
+      "name": "wrap-ansi",
+      "versionInfo": "9.0.2",
+      "downloadLocation": "https://www.npmjs.com/package/wrap-ansi",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module wrap-ansi",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/wrap-ansi@9.0.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-wrap-ansi-string-width-7.2.0",
+      "name": "wrap-ansi/string-width",
+      "versionInfo": "7.2.0",
+      "downloadLocation": "https://www.npmjs.com/package/wrap-ansi/string-width",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module wrap-ansi/string-width",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/wrap-ansi/string-width@7.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-y18n-5.0.8",
+      "name": "y18n",
+      "versionInfo": "5.0.8",
+      "downloadLocation": "https://www.npmjs.com/package/y18n",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ISC",
+      "licenseDeclared": "ISC",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module y18n",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/y18n@5.0.8"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-yargs-18.2.0",
+      "name": "yargs",
+      "versionInfo": "18.2.0",
+      "downloadLocation": "https://www.npmjs.com/package/yargs",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module yargs",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/yargs@18.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-yargs-parser-22.0.0",
+      "name": "yargs-parser",
+      "versionInfo": "22.0.0",
+      "downloadLocation": "https://www.npmjs.com/package/yargs-parser",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ISC",
+      "licenseDeclared": "ISC",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module yargs-parser",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/yargs-parser@22.0.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-zod-4.6.7",
+      "name": "zod",
+      "versionInfo": "4.6.7",
+      "downloadLocation": "https://www.npmjs.com/package/zod",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "description": "Node.js runtime module zod",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/zod@4.6.7"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-psycopg2-binary-2.9.9",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-pg8000-1.31.5",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-PyYAML-6.0.1",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-numpy-1.26.4",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-pandas-2.2.2",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-python-dateutil-2.9.0.post0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-cryptography-46.0.5",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-bcrypt-5.0.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-darwin-arm64-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-darwin-x64-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-freebsd-x64-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-arm-gnueabihf-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-arm64-gnu-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-arm64-musl-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-riscv64-gnu-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-x64-gnu-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-linux-x64-musl-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-win32-arm64-msvc-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-win32-ia32-msvc-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-napi-rs-keyring-win32-x64-msvc-1.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-neon-config-1.9.2",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-neon-env-1.6.3",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-neon-sdk-7.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-ansi-regex-6.4.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-ansi-styles-6.2.3",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-cliui-9.0.1",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-cliui-string-width-7.2.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-emoji-regex-10.6.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-escalade-3.2.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-get-caller-file-2.0.5",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-get-east-asian-width-1.7.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-jiti-2.7.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-string-width-8.3.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-strip-ansi-7.2.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-wrap-ansi-9.0.2",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-wrap-ansi-string-width-7.2.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-y18n-5.0.8",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-yargs-18.2.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-yargs-parser-22.0.0",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-zonata-enterprise",
+      "relatedSpdxElement": "SPDXRef-Package-zod-4.6.7",
+      "relationshipType": "DEPENDS_ON"
+    }
+  ]
+}

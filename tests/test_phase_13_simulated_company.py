@@ -93,9 +93,10 @@ class TestPhase13SimulatedCompany(unittest.TestCase):
     def tearDownClass(cls):
         if cls.orig_db_path:
             db.set_db_path(cls.orig_db_path)
-            os.environ["ZONATA_DB_PATH"] = cls.orig_db_path
-        if cls.orig_ev_path:
+        if getattr(cls, "orig_ev_path", None):
             os.environ["ZONATA_EVIDENCE_PATH"] = cls.orig_ev_path
+        elif "ZONATA_EVIDENCE_PATH" in os.environ:
+            del os.environ["ZONATA_EVIDENCE_PATH"]
         cls.temp_dir.cleanup()
 
     def test_01_synthetic_enterprise_initialization_9_departments(self):

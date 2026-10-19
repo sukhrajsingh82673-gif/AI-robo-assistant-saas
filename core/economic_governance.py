@@ -478,6 +478,22 @@ class EconomicGovernanceEngine:
                 overrun_usd = max(0.0, actual_usd - reserved_usd)
                 overrun_tokens = max(0, actual_tokens - reserved_tokens)
 
+                # Atomically claim reservation by conditional status update
+                cur = conn.execute("""
+                    UPDATE enterprise_budget_reservations
+                    SET status = 'SETTLED',
+                        settled_at = ?,
+                        actual_usd = ?,
+                        actual_tokens = ?,
+                        metadata = ?
+                    WHERE reservation_id = ? AND status = 'RESERVED'
+                """, (now, actual_usd, actual_tokens, json.dumps(metadata or {}), reservation_id))
+
+                if cur.rowcount == 0:
+                    raise ReservationExpiredException(
+                        f"Reservation '{reservation_id}' not found or already settled/released."
+                    )
+
                 # Settle each entity in the scope chain
                 for item in scopes:
                     eid = item.get("id")
@@ -494,16 +510,6 @@ class EconomicGovernanceEngine:
                         WHERE entity_id = ?
                     """, (reserved_usd, reserved_usd, reserved_tokens, reserved_tokens, actual_usd, actual_tokens, now, eid))
 
-                # Mark reservation SETTLED
-                conn.execute("""
-                    UPDATE enterprise_budget_reservations
-                    SET status = 'SETTLED',
-                        settled_at = ?,
-                        actual_usd = ?,
-                        actual_tokens = ?,
-                        metadata = ?
-                    WHERE reservation_id = ?
-                """, (now, actual_usd, actual_tokens, json.dumps(metadata or {}), reservation_id))
                 conn.commit()
 
         return BudgetSettlement(
@@ -538,6 +544,15 @@ class EconomicGovernanceEngine:
             scope_key_raw = row["scope_key"]
             scopes = json.loads(scope_key_raw) if isinstance(scope_key_raw, str) else scope_key_raw
 
+            cur = conn.execute("""
+                UPDATE enterprise_budget_reservations
+                SET status = 'RELEASED', settled_at = ?
+                WHERE reservation_id = ? AND status = 'RESERVED'
+            """, (now, reservation_id))
+
+            if cur.rowcount == 0:
+                return False
+
             for item in scopes:
                 eid = item.get("id")
                 if not eid:
@@ -550,11 +565,6 @@ class EconomicGovernanceEngine:
                     WHERE entity_id = ?
                 """, (reserved_usd, reserved_usd, reserved_tokens, reserved_tokens, now, eid))
 
-            conn.execute("""
-                UPDATE enterprise_budget_reservations
-                SET status = 'RELEASED', settled_at = ?
-                WHERE reservation_id = ?
-            """, (now, reservation_id))
             conn.commit()
 
         logger.info(f"Released budget reservation {reservation_id}: {reason}")

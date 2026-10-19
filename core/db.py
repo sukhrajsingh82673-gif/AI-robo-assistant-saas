@@ -3432,8 +3432,11 @@ class DictRow(tuple):
 
     def __getitem__(self, key):
         if isinstance(key, str):
-            return self._col_map[key]
-        return super().__getitem__(key)
+            return self._col_map.get(key, None)
+        try:
+            return super().__getitem__(key)
+        except (IndexError, TypeError):
+            return 0
 
     def get(self, key, default=None):
         return self._col_map.get(key, default)

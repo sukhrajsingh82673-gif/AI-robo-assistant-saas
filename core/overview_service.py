@@ -20,6 +20,24 @@ from .evidence_ledger import EvidenceLedger
 from .models import EvidenceStatus
 
 
+def _safe_scalar(res, default=0):
+    if res is None:
+        return default
+    try:
+        row = res.fetchone() if hasattr(res, 'fetchone') else res
+        if row is None:
+            return default
+        if hasattr(row, '__getitem__'):
+            try:
+                val = row[0]
+                return default if val is None else val
+            except (IndexError, TypeError):
+                return default
+        return default
+    except Exception:
+        return default
+
+
 class OverviewDataService:
     @staticmethod
     def get_snapshot(tenant_id: str = "tnt_primary", company_id: Optional[str] = None, period: str = "30d") -> Dict[str, Any]:
@@ -721,15 +739,15 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13. Governed Agent Network (A2A Protocol v1.0 — Section 55)
             # -------------------------------------------------------------
-            conn_agents = cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
-            online_agents = cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ? AND status = 'ONLINE'", (tenant_id,)).fetchone()[0]
-            trusted_agents = cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ? AND trust_level = 'TRUSTED'", (tenant_id,)).fetchone()[0]
-            active_del = cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state = 'TASK_STATE_WORKING'", (tenant_id,)).fetchone()[0]
-            comp_del = cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state = 'TASK_STATE_COMPLETED'", (tenant_id,)).fetchone()[0]
-            waiting_tasks = cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND (a2a_state = 'TASK_STATE_INPUT_REQUIRED' OR zonata_state = 'WAITING_FOR_APPROVAL')", (tenant_id,)).fetchone()[0]
-            failed_tasks = cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state IN ('TASK_STATE_FAILED', 'TASK_STATE_REJECTED')", (tenant_id,)).fetchone()[0]
-            policy_blocks = cur.execute("SELECT COUNT(*) FROM a2a_security_events WHERE tenant_id = ? AND event_type = 'POLICY_VIOLATION'", (tenant_id,)).fetchone()[0]
-            sec_events = cur.execute("SELECT COUNT(*) FROM a2a_security_events WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
+            conn_agents = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ?", (tenant_id,)))
+            online_agents = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ? AND status = 'ONLINE'", (tenant_id,)))
+            trusted_agents = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_agents WHERE tenant_id = ? AND trust_level = 'TRUSTED'", (tenant_id,)))
+            active_del = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state = 'TASK_STATE_WORKING'", (tenant_id,)))
+            comp_del = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state = 'TASK_STATE_COMPLETED'", (tenant_id,)))
+            waiting_tasks = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND (a2a_state = 'TASK_STATE_INPUT_REQUIRED' OR zonata_state = 'WAITING_FOR_APPROVAL')", (tenant_id,)))
+            failed_tasks = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_tasks WHERE tenant_id = ? AND a2a_state IN ('TASK_STATE_FAILED', 'TASK_STATE_REJECTED')", (tenant_id,)))
+            policy_blocks = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_security_events WHERE tenant_id = ? AND event_type = 'POLICY_VIOLATION'", (tenant_id,)))
+            sec_events = _safe_scalar(cur.execute("SELECT COUNT(*) FROM a2a_security_events WHERE tenant_id = ?", (tenant_id,)))
 
             agent_network_data = {
                 "connected_agents": conn_agents,
@@ -749,17 +767,17 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13b. Governed Model Context Protocol (MCP - Project 06, Section 48)
             # -------------------------------------------------------------
-            mcp_srv_count = cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
-            mcp_active_conn = cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ? AND status = 'ONLINE'", (tenant_id,)).fetchone()[0]
-            mcp_avail_caps = cur.execute("SELECT COUNT(*) FROM mcp_tools WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
-            mcp_tool_invocations = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
-            mcp_success_execs = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'VERIFIED'", (tenant_id,)).fetchone()[0]
-            mcp_failed_execs = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status NOT IN ('VERIFIED', 'APPROVAL_REQUIRED')", (tenant_id,)).fetchone()[0]
-            mcp_awaiting_approval = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'APPROVAL_REQUIRED'", (tenant_id,)).fetchone()[0]
-            mcp_policy_blocks = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'POLICY_DENIED'", (tenant_id,)).fetchone()[0]
-            mcp_sec_events = cur.execute("SELECT COUNT(*) FROM mcp_security_events WHERE tenant_id = ?", (tenant_id,)).fetchone()[0]
-            mcp_verif_success = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'", (tenant_id,)).fetchone()[0]
-            mcp_unknown_outcomes = cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'UNKNOWN'", (tenant_id,)).fetchone()[0]
+            mcp_srv_count = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ?", (tenant_id,)))
+            mcp_active_conn = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_servers WHERE tenant_id = ? AND status = 'ONLINE'", (tenant_id,)))
+            mcp_avail_caps = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_tools WHERE tenant_id = ?", (tenant_id,)))
+            mcp_tool_invocations = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ?", (tenant_id,)))
+            mcp_success_execs = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'VERIFIED'", (tenant_id,)))
+            mcp_failed_execs = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status NOT IN ('VERIFIED', 'APPROVAL_REQUIRED')", (tenant_id,)))
+            mcp_awaiting_approval = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'APPROVAL_REQUIRED'", (tenant_id,)))
+            mcp_policy_blocks = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'POLICY_DENIED'", (tenant_id,)))
+            mcp_sec_events = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_security_events WHERE tenant_id = ?", (tenant_id,)))
+            mcp_verif_success = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'", (tenant_id,)))
+            mcp_unknown_outcomes = _safe_scalar(cur.execute("SELECT COUNT(*) FROM mcp_executions WHERE tenant_id = ? AND execution_status = 'UNKNOWN'", (tenant_id,)))
 
             has_mcp_activity = bool(mcp_tool_invocations > 0 or mcp_srv_count > 0)
 
@@ -782,51 +800,51 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13c. Governed OpenHands Execution Runtime (Project 07, Section 49)
             # -------------------------------------------------------------
-            oh_active_exec = cur.execute(
+            oh_active_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status IN ('RUNNING', 'WAITING', 'WORKSPACE_PREPARING', 'INITIALIZING', 'VERIFYING')",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_completed_exec = cur.execute(
+            ))
+            oh_completed_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status = 'COMPLETED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_failed_exec = cur.execute(
+            ))
+            oh_failed_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND execution_status IN ('FAILED', 'DENIED', 'CANCELLED', 'TERMINATED', 'TIMEOUT', 'VERIFICATION_FAILED')",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_avg_time = cur.execute(
+            ))
+            oh_avg_time = _safe_scalar(cur.execute(
                 "SELECT AVG(latency_ms) FROM openhands_commands WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_verif_total = cur.execute(
+            ))
+            oh_verif_total = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND verification_status != 'UNVERIFIED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_verif_succ = cur.execute(
+            ))
+            oh_verif_succ = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'",
                 (tenant_id,)
-            ).fetchone()[0]
+            ))
             oh_verif_rate = round((oh_verif_succ / oh_verif_total * 100.0) if oh_verif_total > 0 else 100.0, 1)
-            oh_policy_blocks = cur.execute(
+            oh_policy_blocks = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_security_events WHERE tenant_id = ? AND event_type IN ('COMMAND_BLOCKED', 'TOOL_BLOCKED', 'POLICY_VIOLATION')",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_approval_reqs = cur.execute(
+            ))
+            oh_approval_reqs = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_approvals WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_active_ws = cur.execute(
+            ))
+            oh_active_ws = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_workspaces WHERE tenant_id = ? AND status = 'ACTIVE'",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_artifacts = cur.execute(
+            ))
+            oh_artifacts = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_artifacts WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            oh_sec_events = cur.execute(
+            ))
+            oh_sec_events = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM openhands_security_events WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
+            ))
 
             has_oh_activity = bool(oh_active_exec > 0 or oh_completed_exec > 0 or oh_failed_exec > 0 or oh_active_ws > 0 or oh_artifacts > 0)
 
@@ -850,38 +868,38 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13d. Governed Browser Use Execution Layer (Project 08, Section 64)
             # -------------------------------------------------------------
-            br_active_sess = cur.execute(
+            br_active_sess = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_sessions WHERE tenant_id = ? AND status = 'ACTIVE'",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_total_exec = cur.execute(
+            ))
+            br_total_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_completed_exec = cur.execute(
+            ))
+            br_completed_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status = 'COMPLETE'",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_failed_exec = cur.execute(
+            ))
+            br_failed_exec = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status IN ('DENIED', 'AUTH_FAILED', 'NAVIGATION_FAILED', 'ACTION_FAILED', 'TIMEOUT', 'CANCELLED', 'BLOCKED', 'VERIFICATION_FAILED', 'TERMINATED')",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_awaiting_appr = cur.execute(
+            ))
+            br_awaiting_appr = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_approvals WHERE tenant_id = ? AND status = 'PENDING'",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_blocked_ops = cur.execute(
+            ))
+            br_blocked_ops = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_security_events WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_verif_succ = cur.execute(
+            ))
+            br_verif_succ = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND verification_status = 'VERIFIED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            br_unknown_outcomes = cur.execute(
+            ))
+            br_unknown_outcomes = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM browser_executions WHERE tenant_id = ? AND execution_status IN ('UNKNOWN', 'RECONCILIATION_REQUIRED')",
                 (tenant_id,)
-            ).fetchone()[0]
+            ))
             br_sec_events = br_blocked_ops
 
             has_br_activity = bool(br_total_exec > 0 or br_active_sess > 0)
@@ -908,46 +926,46 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13.5 Temporal Governed Durable Execution Layer (Project 09)
             # -------------------------------------------------------------
-            temp_total_wf = cur.execute(
+            temp_total_wf = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_active_wf = cur.execute(
+            ))
+            temp_active_wf = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'RUNNING'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_completed_wf = cur.execute(
+            ))
+            temp_completed_wf = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'COMPLETED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_failed_wf = cur.execute(
+            ))
+            temp_failed_wf = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'FAILED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_awaiting_appr = cur.execute(
+            ))
+            temp_awaiting_appr = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_approvals WHERE tenant_id = ? AND status = 'PENDING'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_unknown_outcomes = cur.execute(
+            ))
+            temp_unknown_outcomes = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workflows WHERE tenant_id = ? AND status = 'UNKNOWN_OUTCOME'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_reconciled = cur.execute(
+            ))
+            temp_reconciled = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_reconciliations WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_workers = cur.execute(
+            ))
+            temp_workers = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_workers WHERE tenant_id = ? AND status = 'ONLINE'",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_queues = cur.execute(
+            ))
+            temp_queues = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_task_queues WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            temp_sec_events = cur.execute(
+            ))
+            temp_sec_events = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM temporal_security_events WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
+            ))
 
             has_temp_activity = bool(temp_total_wf > 0 or temp_workers > 0)
             temp_recovery_rate = round((temp_completed_wf / max(1, temp_completed_wf + temp_failed_wf)) * 100.0, 1) if (temp_completed_wf + temp_failed_wf) > 0 else 100.0
@@ -971,62 +989,62 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 13e. External Integration & Connectivity Telemetry (Nango - Project 10)
             # -------------------------------------------------------------
-            nango_total_conn = cur.execute(
+            nango_total_conn = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_active_conn = cur.execute(
+            ))
+            nango_active_conn = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND status = 'ACTIVE'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_healthy_conn = cur.execute(
+            ))
+            nango_healthy_conn = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'HEALTHY'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_degraded_conn = cur.execute(
+            ))
+            nango_degraded_conn = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'DEGRADED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_reauth_conn = cur.execute(
+            ))
+            nango_reauth_conn = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_connections WHERE tenant_id = ? AND health_status = 'AUTH_REQUIRED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_total_execs = cur.execute(
+            ))
+            nango_total_execs = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_success_execs = cur.execute(
+            ))
+            nango_success_execs = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'SUCCESS'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_pending_appr = cur.execute(
+            ))
+            nango_pending_appr = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'AWAITING_APPROVAL'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_unknown_outcomes = cur.execute(
+            ))
+            nango_unknown_outcomes = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_executions WHERE tenant_id = ? AND status = 'UNKNOWN_OUTCOME'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_reconciled = cur.execute(
+            ))
+            nango_reconciled = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_reconciliations WHERE tenant_id = ? AND status = 'RECONCILED'",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_sync_records = cur.execute(
+            ))
+            nango_sync_records = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_sync_records WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_webhooks = cur.execute(
+            ))
+            nango_webhooks = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_webhooks WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_sec_events = cur.execute(
+            ))
+            nango_sec_events = _safe_scalar(cur.execute(
                 "SELECT COUNT(*) FROM nango_security_events WHERE tenant_id = ?",
                 (tenant_id,)
-            ).fetchone()[0]
-            nango_avg_lat = cur.execute(
+            ))
+            nango_avg_lat = _safe_scalar(cur.execute(
                 "SELECT AVG(latency_ms) FROM nango_executions WHERE tenant_id = ? AND status = 'SUCCESS'",
                 (tenant_id,)
-            ).fetchone()[0] or 0.0
+            )) or 0.0
 
             has_nango_activity = bool(nango_total_conn > 0 or nango_total_execs > 0 or nango_sync_records > 0)
             nango_success_rate = round((nango_success_execs / max(1, nango_total_execs)) * 100.0, 1) if nango_total_execs > 0 else 100.0
@@ -1159,14 +1177,14 @@ class OverviewDataService:
                     c_profit = c_contrib if c_contrib != 0 else (c_rev - c_cost)
 
                     # Employees for this company
-                    c_emps = cur.execute("SELECT COUNT(*) FROM employees WHERE company_id = ?", (cid,)).fetchone()[0]
+                    c_emps = _safe_scalar(cur.execute("SELECT COUNT(*) FROM employees WHERE company_id = ?", (cid,)))
                     # Missions for this company
-                    c_mis = cur.execute("SELECT COUNT(*) FROM missions WHERE company_id = ?", (cid,)).fetchone()[0]
+                    c_mis = _safe_scalar(cur.execute("SELECT COUNT(*) FROM missions WHERE company_id = ?", (cid,)))
                     # Risks for this company
-                    c_risks = cur.execute(
+                    c_risks = _safe_scalar(cur.execute(
                         "SELECT COUNT(*) FROM enterprise_events WHERE company_id = ? AND severity IN ('CRITICAL', 'HIGH')",
                         (cid,)
-                    ).fetchone()[0]
+                    ))
 
                     companies_table.append({
                         "id": cid,

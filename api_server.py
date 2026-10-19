@@ -882,17 +882,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path in ("/api/overview", "/api/overview/snapshot"):
             try:
-                cid = query_params.get("company_id", [None])[0]
+                cid = query_params.get("company_id", [None])[0] if query_params.get("company_id") else None
                 if cid in ("", "ALL", "null", "undefined", "portfolio"):
                     cid = None
-                period = query_params.get("period", ["30d"])[0]
+                period = query_params.get("period", ["30d"])[0] if query_params.get("period") else "30d"
                 snapshot = OverviewDataService.get_snapshot(tenant_id, company_id=cid, period=period)
                 self._send_json(snapshot)
             except Exception as e:
                 logger.error(f"Failed to retrieve overview snapshot for tenant {tenant_id}: {e}", exc_info=True)
                 self._send_json({
                     "error": "Internal Server Error",
-                    "detail": f"Failed to retrieve overview snapshot: {type(e).__name__}"
+                    "detail": f"Failed to retrieve overview snapshot: {type(e).__name__}: {str(e)}"
                 }, status=500)
             return
 
