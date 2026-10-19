@@ -4218,7 +4218,9 @@ class Database:
                     "A valid PostgreSQL DATABASE_URL must be configured. SQLite override flags are not permitted in production."
                 )
 
-        if self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
+        if not is_prod and (dialect_env == "sqlite" or bool(os.environ.get("ZONATA_DB_PATH"))):
+            self.dialect = DatabaseDialect.SQLITE
+        elif self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
             self.dialect = DatabaseDialect.POSTGRESQL
         else:
             self.dialect = DatabaseDialect.SQLITE
@@ -4268,6 +4270,19 @@ class Database:
         else:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
             self._init_db()
+        try:
+            from core.database_engine import engine
+            engine.dialect = DatabaseDialect.SQLITE
+            engine.db_path = self.db_path
+            engine._is_ready = True
+            engine._deferred_import_mode = False
+            if hasattr(engine, 'pools') and engine.pools:
+                for p in engine.pools.values():
+                    p.dialect = DatabaseDialect.SQLITE
+                    p._deferred_import_mode = False
+                    p.reset()
+        except Exception:
+            pass
 
     def initialize(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:

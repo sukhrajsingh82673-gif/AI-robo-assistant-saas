@@ -236,7 +236,16 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         if shutil.which("podman"):
             return "podman"
         if shutil.which("bwrap"):
-            return "bubblewrap"
+            try:
+                probe = subprocess.run(
+                    ["bwrap", "--ro-bind", "/", "/", "--bind", "/tmp", "/tmp", "--unshare-all", "true"],
+                    capture_output=True,
+                    timeout=2.0
+                )
+                if probe.returncode == 0:
+                    return "bubblewrap"
+            except Exception:
+                pass
         return None
 
     def provision(self, session_id: str, profile: RuntimeProfile, workspace: str) -> Dict[str, Any]:
@@ -383,6 +392,17 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
                 text=True,
                 timeout=timeout_sec
             )
+            if proc.returncode != 0 and ("bwrap:" in proc.stderr or "docker:" in proc.stderr or "podman:" in proc.stderr):
+                return {
+                    "exit_code": 126,
+                    "stdout": proc.stdout,
+                    "stderr": f"Execution Rejected: Container sandbox failure: {proc.stderr.strip()}",
+                    "timed_out": False,
+                    "engine": engine,
+                    "degraded": True,
+                    "sandbox_failure": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
             return {
                 "exit_code": proc.returncode,
                 "stdout": proc.stdout,

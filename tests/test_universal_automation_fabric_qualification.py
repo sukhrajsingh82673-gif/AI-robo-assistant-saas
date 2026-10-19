@@ -1558,7 +1558,8 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
         import subprocess
 
         worker_script = (
-            "import time\n"
+            "import os, sys, time\n"
+            "sys.path.insert(0, os.getcwd())\n"
             "from core.automation_fabric.fabric import universal_automation_fabric\n"
             "claimed = 0\n"
             "for _ in range(6):\n"

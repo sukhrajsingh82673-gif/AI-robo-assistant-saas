@@ -280,7 +280,12 @@ class DatabaseEngine:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv("DATABASE_URL", "")
         dialect_env = os.getenv("ZONATA_DB_DIALECT", "").lower()
-        if (self.database_url and (self.database_url.startswith("postgresql://") or self.database_url.startswith("postgres://"))) or dialect_env == "postgresql":
+        app_env = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+
+        if not is_prod and (dialect_env == "sqlite" or bool(os.getenv("ZONATA_DB_PATH"))):
+            self.dialect = DatabaseDialect.SQLITE
+        elif (self.database_url and (self.database_url.startswith("postgresql://") or self.database_url.startswith("postgres://"))) or dialect_env == "postgresql":
             self.dialect = DatabaseDialect.POSTGRESQL
         else:
             self.dialect = DatabaseDialect.SQLITE

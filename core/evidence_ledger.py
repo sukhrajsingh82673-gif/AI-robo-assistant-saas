@@ -144,10 +144,24 @@ class EvidenceLedger:
         raw_str = f"{action_id}:{mission_id}:{agent_id}:{now}:{status.value}:{json.dumps(verification_payload, sort_keys=True)}"
         sha256_digest = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
 
+        # Guard constitutional audit ledger from test modification
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        protected_ledger = os.path.abspath(os.path.join(base_dir, "storage", "evidence", "audit_ledger.jsonl"))
+        target_file = self.ledger_file
+        if os.path.abspath(target_file) == protected_ledger and (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("ZONATA_TEST_MODE")):
+            diverted = os.environ.get("ZONATA_EVIDENCE_PATH")
+            if not diverted or os.path.abspath(diverted) == protected_ledger:
+                import tempfile
+                diverted = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False).name
+                os.environ["ZONATA_EVIDENCE_PATH"] = diverted
+            target_file = diverted
+            self._ledger_file = target_file
+            self._is_explicit_file = True
+
         # Atomic Append with Exclusive OS File Locking (fcntl.flock)
         # Prevents concurrent writer forks across threads and processes
-        os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True)
-        with open(self.ledger_file, "a+", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(target_file), exist_ok=True)
+        with open(target_file, "a+", encoding="utf-8") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 # Read true physical tail from disk

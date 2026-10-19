@@ -52,6 +52,9 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
             cls.live_postgres_available = False
         else:
             cls.live_postgres_available = True
+            from core.db import DatabaseDialect
+            db.dialect = DatabaseDialect.POSTGRESQL
+            db.database_url = cls.database_url
             # Initialize schema once for the class
             try:
                 db.verify_readiness()
@@ -67,6 +70,11 @@ class TestPostgreSql16LiveIntegration(unittest.TestCase):
                 SyncCheckpointManager._ensure_tables()
             except Exception:
                 pass
+
+    @classmethod
+    def tearDownClass(cls):
+        from core.db import configure_isolated_test_db
+        configure_isolated_test_db()
 
     def setUp(self):
         if not self.live_postgres_available:

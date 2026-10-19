@@ -28,7 +28,10 @@ import hashlib
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field, asdict
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+except ImportError:
+    AESGCM = None
 
 logger = logging.getLogger("zonata.infra.backup_security")
 
