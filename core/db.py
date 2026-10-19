@@ -3449,12 +3449,25 @@ class DictRow(tuple):
 
 
 class PostgresCursorWrapper:
-    """Cursor wrapper providing sqlite3.Row / DictCursor parity for pure-Python drivers."""
-    def __init__(self, raw_cursor):
+    """Cursor wrapper providing sqlite3.Row / DictCursor parity and method chaining for PostgreSQL."""
+    def __init__(self, raw_cursor, normalize_fn=None):
         self._raw_cursor = raw_cursor
+        self._normalize_fn = normalize_fn or normalize_sql_for_postgres
 
     def __getattr__(self, name):
         return getattr(self._raw_cursor, name)
+
+    def execute(self, sql: str, params: Any = ()):
+        norm = self._normalize_fn(sql)
+        if norm:
+            self._raw_cursor.execute(norm, params)
+        return self
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        norm = self._normalize_fn(sql)
+        if norm:
+            self._raw_cursor.executemany(norm, params_seq)
+        return self
 
     def __iter__(self):
         while True:
@@ -3467,6 +3480,8 @@ class PostgresCursorWrapper:
         row = self._raw_cursor.fetchone()
         if row is None:
             return None
+        if isinstance(row, DictRow):
+            return row
         if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
             col_names = [col[0] for col in self._raw_cursor.description]
             return DictRow(row, col_names)
@@ -3476,6 +3491,8 @@ class PostgresCursorWrapper:
         rows = self._raw_cursor.fetchall()
         if not rows:
             return []
+        if rows and isinstance(rows[0], DictRow):
+            return rows
         if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
             col_names = [col[0] for col in self._raw_cursor.description]
             return [DictRow(r, col_names) for r in rows]
@@ -3508,6 +3525,14 @@ class DeferredCursor:
         self.sql = sql
         self.params = params
 
+    def execute(self, sql: str, params: Any = ()):
+        self.db._deferred_queries.append(('execute', sql, params))
+        return self
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        self.db._deferred_queries.append(('executemany', sql, params_seq))
+        return self
+
     def fetchone(self):
         return DeferredRow((0,))
 
@@ -3530,6 +3555,17 @@ class DeferredConnectionProxy:
     """Proxy connection returned during module import when live database is unreachable."""
     def __init__(self, db_instance):
         self.db = db_instance
+
+    @property
+    def row_factory(self):
+        return getattr(self, "_row_factory", None)
+
+    @row_factory.setter
+    def row_factory(self, val):
+        self._row_factory = val
+
+    def cursor(self):
+        return self
 
     def execute(self, sql: str, params: Any = ()):
         self.db._deferred_queries.append(('execute', sql, params))
@@ -3689,6 +3725,14 @@ class PostgresConnectionWrapper:
         self._pool = pool
         self._is_closed = False
 
+    @property
+    def row_factory(self):
+        return getattr(self, "_row_factory", None)
+
+    @row_factory.setter
+    def row_factory(self, val):
+        self._row_factory = val
+
     def _normalize_sql(self, sql: str) -> str:
         return normalize_sql_for_postgres(sql)
 
@@ -3708,11 +3752,11 @@ class PostgresConnectionWrapper:
             import psycopg2.extras
             cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cursor.execute(normalized_sql, params)
-            return cursor
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
         except Exception:
             cursor = self.raw_conn.cursor()
             cursor.execute(normalized_sql, params)
-            return PostgresCursorWrapper(cursor)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
 
     def executescript(self, sql_script: str):
         if self._is_closed:
@@ -3749,9 +3793,10 @@ class PostgresConnectionWrapper:
             raise RuntimeError("Cannot create cursor on closed database connection.")
         try:
             import psycopg2.extras
-            return self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            raw_cur = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         except Exception:
-            return PostgresCursorWrapper(self.raw_conn.cursor())
+            raw_cur = self.raw_conn.cursor()
+        return PostgresCursorWrapper(raw_cur, normalize_fn=self._normalize_sql)
 
     def commit(self):
         if self._is_closed:

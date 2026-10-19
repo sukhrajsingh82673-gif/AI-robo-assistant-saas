@@ -50,8 +50,12 @@ class OverviewDataService:
         mode = "company" if company_id and company_id not in ("", "ALL", "null", "undefined", "portfolio") else "portfolio"
 
         with db.get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
+            if hasattr(conn, "row_factory"):
+                try:
+                    conn.row_factory = sqlite3.Row
+                except Exception:
+                    pass
+            cur = conn.cursor() if hasattr(conn, "cursor") else conn
 
             # -------------------------------------------------------------
             # 1. Company Metadata / Portfolio Metadata
@@ -1250,8 +1254,12 @@ class OverviewDataService:
         AI-generated analytical variance explanation strictly backed by evidence.
         """
         with db.get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
+            if hasattr(conn, "row_factory"):
+                try:
+                    conn.row_factory = sqlite3.Row
+                except Exception:
+                    pass
+            cur = conn.cursor() if hasattr(conn, "cursor") else conn
 
             causality = cur.execute(
                 "SELECT * FROM business_causality_chains WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5",

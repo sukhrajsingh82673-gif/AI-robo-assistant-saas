@@ -302,96 +302,134 @@ class EconomicGovernanceEngine:
 
         with self._lock:
             with db.get_connection() as conn:
-                # 1. First pass: verify and reserve on all configured scopes
-                reserved_entities = []
-            try:
-                for etype, eid in unique_chain:
-                    row = conn.execute(
-                        "SELECT entity_id, allocated_usd, spent_usd, reserved_usd, allocated_tokens, spent_tokens, reserved_tokens, hard_limit_pct, is_frozen FROM enterprise_budgets WHERE entity_id = ?",
-                        (eid,)
-                    ).fetchone()
+                try:
+                    for etype, eid in unique_chain:
+                        row = conn.execute(
+                            "SELECT entity_id, allocated_usd, spent_usd, reserved_usd, allocated_tokens, spent_tokens, reserved_tokens, hard_limit_pct, is_frozen FROM enterprise_budgets WHERE entity_id = ?",
+                            (eid,)
+                        ).fetchone()
 
-                    if not row:
-                        continue  # Unconfigured scope level defaults to uncapped
+                        if not row:
+                            continue  # Unconfigured scope level defaults to uncapped
 
-                    if row["is_frozen"]:
-                        raise BudgetFrozenException(
-                            f"Execution HALTED: Budget for entity '{eid}' ({etype}) is FROZEN under emergency stop.",
-                            entity_id=eid,
-                            scope=etype
-                        )
+                        if row["is_frozen"]:
+                            raise BudgetFrozenException(
+                                f"Execution HALTED: Budget for entity '{eid}' ({etype}) is FROZEN under emergency stop.",
+                                entity_id=eid,
+                                scope=etype
+                            )
 
-                    alloc_usd = float(row["allocated_usd"])
-                    spent_usd = float(row["spent_usd"])
-                    res_usd = float(row.get("reserved_usd", 0.0) if hasattr(row, "get") else row["reserved_usd"])
-                    hard_pct = float(row["hard_limit_pct"]) / 100.0
-                    hard_ceiling_usd = alloc_usd * hard_pct
+                        alloc_usd = float(row["allocated_usd"])
+                        spent_usd = float(row["spent_usd"])
+                        res_usd = float(row.get("reserved_usd", 0.0) if hasattr(row, "get") else row["reserved_usd"])
+                        hard_pct = float(row["hard_limit_pct"]) / 100.0
+                        hard_ceiling_usd = alloc_usd * hard_pct
 
-                    if (spent_usd + res_usd + requested_usd) > hard_ceiling_usd:
-                        raise BudgetExhaustionException(
-                            f"Hard budget ceiling breached for {etype} '{eid}': "
-                            f"Projected (${spent_usd + res_usd + requested_usd:.2f}) > Ceiling (${hard_ceiling_usd:.2f}).",
-                            entity_id=eid,
-                            scope=etype,
-                            details={
-                                "allocated_usd": alloc_usd,
-                                "spent_usd": spent_usd,
-                                "reserved_usd": res_usd,
-                                "requested_usd": requested_usd,
-                                "ceiling_usd": hard_ceiling_usd
-                            }
-                        )
-
-                    # Token limit check
-                    alloc_tok = int(row.get("allocated_tokens", 0) if hasattr(row, "get") else row["allocated_tokens"])
-                    spent_tok = int(row.get("spent_tokens", 0) if hasattr(row, "get") else row["spent_tokens"])
-                    res_tok = int(row.get("reserved_tokens", 0) if hasattr(row, "get") else row["reserved_tokens"])
-
-                    if alloc_tok > 0:
-                        hard_ceiling_tok = int(alloc_tok * hard_pct)
-                        if (spent_tok + res_tok + requested_tokens) > hard_ceiling_tok:
+                        if (spent_usd + res_usd + requested_usd) > hard_ceiling_usd:
                             raise BudgetExhaustionException(
-                                f"Token budget ceiling breached for {etype} '{eid}': "
-                                f"Projected ({spent_tok + res_tok + requested_tokens}) > Ceiling ({hard_ceiling_tok}).",
+                                f"Hard budget ceiling breached for {etype} '{eid}': "
+                                f"Projected (${spent_usd + res_usd + requested_usd:.2f}) > Ceiling (${hard_ceiling_usd:.2f}).",
                                 entity_id=eid,
                                 scope=etype,
                                 details={
-                                    "allocated_tokens": alloc_tok,
-                                    "spent_tokens": spent_tok,
-                                    "reserved_tokens": res_tok,
-                                    "requested_tokens": requested_tokens,
-                                    "ceiling_tokens": hard_ceiling_tok
+                                    "allocated_usd": alloc_usd,
+                                    "spent_usd": spent_usd,
+                                    "reserved_usd": res_usd,
+                                    "requested_usd": requested_usd,
+                                    "ceiling_usd": hard_ceiling_usd
                                 }
                             )
 
-                    # Atomic reservation update
-                    conn.execute("""
-                        UPDATE enterprise_budgets
-                        SET reserved_usd = reserved_usd + ?,
-                            reserved_tokens = reserved_tokens + ?,
-                            updated_at = ?
-                        WHERE entity_id = ?
-                    """, (requested_usd, requested_tokens, now, eid))
-                    reserved_entities.append(eid)
+                        # Token limit check
+                        alloc_tok = int(row.get("allocated_tokens", 0) if hasattr(row, "get") else row["allocated_tokens"])
+                        spent_tok = int(row.get("spent_tokens", 0) if hasattr(row, "get") else row["spent_tokens"])
+                        res_tok = int(row.get("reserved_tokens", 0) if hasattr(row, "get") else row["reserved_tokens"])
 
-                # 2. Record reservation manifest
-                scope_key = json.dumps([{"type": t, "id": i} for t, i in unique_chain])
-                primary_entity = unique_chain[-1][1] if unique_chain else tenant_id
-                conn.execute("""
-                    INSERT INTO enterprise_budget_reservations (
-                        reservation_id, tenant_id, scope_key, entity_id,
-                        reserved_usd, reserved_tokens, status, created_at,
-                        expires_at, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'RESERVED', ?, ?, ?)
-                """, (
-                    reservation_id, tenant_id, scope_key, primary_entity,
-                    requested_usd, requested_tokens, now, expires_at,
-                    json.dumps(metadata or {})
-                ))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
+                        if alloc_tok > 0:
+                            hard_ceiling_tok = int(alloc_tok * hard_pct)
+                            if (spent_tok + res_tok + requested_tokens) > hard_ceiling_tok:
+                                raise BudgetExhaustionException(
+                                    f"Token budget ceiling breached for {etype} '{eid}': "
+                                    f"Projected ({spent_tok + res_tok + requested_tokens}) > Ceiling ({hard_ceiling_tok}).",
+                                    entity_id=eid,
+                                    scope=etype,
+                                    details={
+                                        "allocated_tokens": alloc_tok,
+                                        "spent_tokens": spent_tok,
+                                        "reserved_tokens": res_tok,
+                                        "requested_tokens": requested_tokens,
+                                        "ceiling_tokens": hard_ceiling_tok
+                                    }
+                                )
+
+                        # Distributed & multi-process safe atomic reservation update
+                        cur = conn.execute("""
+                            UPDATE enterprise_budgets
+                            SET reserved_usd = reserved_usd + ?,
+                                reserved_tokens = reserved_tokens + ?,
+                                updated_at = ?
+                            WHERE entity_id = ?
+                              AND is_frozen = 0
+                              AND (spent_usd + reserved_usd + ?) <= (allocated_usd * hard_limit_pct / 100.0 + 0.0001)
+                              AND (allocated_tokens = 0 OR (spent_tokens + reserved_tokens + ?) <= (allocated_tokens * hard_limit_pct / 100.0))
+                        """, (requested_usd, requested_tokens, now, eid, requested_usd, requested_tokens))
+
+                        if cur.rowcount == 0:
+                            # Concurrency breach or limit exhausted by another process/thread
+                            fresh = conn.execute(
+                                "SELECT allocated_usd, spent_usd, reserved_usd, allocated_tokens, spent_tokens, reserved_tokens, hard_limit_pct, is_frozen FROM enterprise_budgets WHERE entity_id = ?",
+                                (eid,)
+                            ).fetchone()
+                            if fresh and fresh["is_frozen"]:
+                                raise BudgetFrozenException(
+                                    f"Execution HALTED: Budget for entity '{eid}' ({etype}) is FROZEN under emergency stop.",
+                                    entity_id=eid,
+                                    scope=etype
+                                )
+                            if fresh:
+                                f_spent = float(fresh["spent_usd"])
+                                f_res = float(fresh.get("reserved_usd", 0.0) if hasattr(fresh, "get") else fresh["reserved_usd"])
+                                f_alloc = float(fresh["allocated_usd"])
+                                f_pct = float(fresh["hard_limit_pct"]) / 100.0
+                                f_ceil = f_alloc * f_pct
+                                if (f_spent + f_res + requested_usd) > f_ceil:
+                                    raise BudgetExhaustionException(
+                                        f"Hard budget ceiling breached for {etype} '{eid}': "
+                                        f"Projected (${f_spent + f_res + requested_usd:.2f}) > Ceiling (${f_ceil:.2f}).",
+                                        entity_id=eid,
+                                        scope=etype,
+                                        details={
+                                            "allocated_usd": f_alloc,
+                                            "spent_usd": f_spent,
+                                            "reserved_usd": f_res,
+                                            "requested_usd": requested_usd,
+                                            "ceiling_usd": f_ceil
+                                        }
+                                    )
+                            raise BudgetExhaustionException(
+                                f"Atomic budget reservation conflict or capacity exhausted for {etype} '{eid}'.",
+                                entity_id=eid,
+                                scope=etype
+                            )
+
+                    # 2. Record reservation manifest
+                    scope_key = json.dumps([{"type": t, "id": i} for t, i in unique_chain])
+                    primary_entity = unique_chain[-1][1] if unique_chain else tenant_id
+                    conn.execute("""
+                        INSERT INTO enterprise_budget_reservations (
+                            reservation_id, tenant_id, scope_key, entity_id,
+                            reserved_usd, reserved_tokens, status, created_at,
+                            expires_at, metadata
+                        ) VALUES (?, ?, ?, ?, ?, ?, 'RESERVED', ?, ?, ?)
+                    """, (
+                        reservation_id, tenant_id, scope_key, primary_entity,
+                        requested_usd, requested_tokens, now, expires_at,
+                        json.dumps(metadata or {})
+                    ))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
 
         return BudgetReservation(
             reservation_id=reservation_id,
@@ -427,46 +465,46 @@ class EconomicGovernanceEngine:
                 WHERE reservation_id = ? AND status = 'RESERVED'
             """, (reservation_id,)).fetchone()
 
-            if not row:
-                raise ReservationExpiredException(
-                    f"Reservation '{reservation_id}' not found or already settled/released."
-                )
+                if not row:
+                    raise ReservationExpiredException(
+                        f"Reservation '{reservation_id}' not found or already settled/released."
+                    )
 
-            reserved_usd = float(row["reserved_usd"])
-            reserved_tokens = int(row["reserved_tokens"])
-            scope_key_raw = row["scope_key"]
-            scopes = json.loads(scope_key_raw) if isinstance(scope_key_raw, str) else scope_key_raw
+                reserved_usd = float(row["reserved_usd"])
+                reserved_tokens = int(row["reserved_tokens"])
+                scope_key_raw = row["scope_key"]
+                scopes = json.loads(scope_key_raw) if isinstance(scope_key_raw, str) else scope_key_raw
 
-            overrun_usd = max(0.0, actual_usd - reserved_usd)
-            overrun_tokens = max(0, actual_tokens - reserved_tokens)
+                overrun_usd = max(0.0, actual_usd - reserved_usd)
+                overrun_tokens = max(0, actual_tokens - reserved_tokens)
 
-            # Settle each entity in the scope chain
-            for item in scopes:
-                eid = item.get("id")
-                if not eid:
-                    continue
-                # Decrement reserved balance and increment spent balance
+                # Settle each entity in the scope chain
+                for item in scopes:
+                    eid = item.get("id")
+                    if not eid:
+                        continue
+                    # Decrement reserved balance and increment spent balance (ANSI SQL CASE WHEN)
+                    conn.execute("""
+                        UPDATE enterprise_budgets
+                        SET reserved_usd = CASE WHEN reserved_usd >= ? THEN reserved_usd - ? ELSE 0.0 END,
+                            reserved_tokens = CASE WHEN reserved_tokens >= ? THEN reserved_tokens - ? ELSE 0 END,
+                            spent_usd = spent_usd + ?,
+                            spent_tokens = spent_tokens + ?,
+                            updated_at = ?
+                        WHERE entity_id = ?
+                    """, (reserved_usd, reserved_usd, reserved_tokens, reserved_tokens, actual_usd, actual_tokens, now, eid))
+
+                # Mark reservation SETTLED
                 conn.execute("""
-                    UPDATE enterprise_budgets
-                    SET reserved_usd = MAX(0.0, reserved_usd - ?),
-                        reserved_tokens = MAX(0, reserved_tokens - ?),
-                        spent_usd = spent_usd + ?,
-                        spent_tokens = spent_tokens + ?,
-                        updated_at = ?
-                    WHERE entity_id = ?
-                """, (reserved_usd, reserved_tokens, actual_usd, actual_tokens, now, eid))
-
-            # Mark reservation SETTLED
-            conn.execute("""
-                UPDATE enterprise_budget_reservations
-                SET status = 'SETTLED',
-                    settled_at = ?,
-                    actual_usd = ?,
-                    actual_tokens = ?,
-                    metadata = ?
-                WHERE reservation_id = ?
-            """, (now, actual_usd, actual_tokens, json.dumps(metadata or {}), reservation_id))
-            conn.commit()
+                    UPDATE enterprise_budget_reservations
+                    SET status = 'SETTLED',
+                        settled_at = ?,
+                        actual_usd = ?,
+                        actual_tokens = ?,
+                        metadata = ?
+                    WHERE reservation_id = ?
+                """, (now, actual_usd, actual_tokens, json.dumps(metadata or {}), reservation_id))
+                conn.commit()
 
         return BudgetSettlement(
             reservation_id=reservation_id,
@@ -506,11 +544,11 @@ class EconomicGovernanceEngine:
                     continue
                 conn.execute("""
                     UPDATE enterprise_budgets
-                    SET reserved_usd = MAX(0.0, reserved_usd - ?),
-                        reserved_tokens = MAX(0, reserved_tokens - ?),
+                    SET reserved_usd = CASE WHEN reserved_usd >= ? THEN reserved_usd - ? ELSE 0.0 END,
+                        reserved_tokens = CASE WHEN reserved_tokens >= ? THEN reserved_tokens - ? ELSE 0 END,
                         updated_at = ?
                     WHERE entity_id = ?
-                """, (reserved_usd, reserved_tokens, now, eid))
+                """, (reserved_usd, reserved_usd, reserved_tokens, reserved_tokens, now, eid))
 
             conn.execute("""
                 UPDATE enterprise_budget_reservations
