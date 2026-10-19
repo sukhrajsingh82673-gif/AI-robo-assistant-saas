@@ -139,8 +139,8 @@ class OverviewDataService:
                     (tenant_id, company_id)
                 ).fetchall()
                 causality_records = cur.execute(
-                    "SELECT * FROM business_causality_chains WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%') AND company_id = ?",
-                    (tenant_id, company_id)
+                    "SELECT * FROM business_causality_chains WHERE (tenant_id = ? OR tenant_id LIKE ?) AND company_id = ?",
+                    (tenant_id, 'tnt_sales_%', company_id)
                 ).fetchall()
 
                 base_rev = float(selected_company_row["revenue"] or 0.0)
@@ -156,8 +156,8 @@ class OverviewDataService:
                     (tenant_id,)
                 ).fetchall()
                 causality_records = cur.execute(
-                    "SELECT * FROM business_causality_chains WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%')",
-                    (tenant_id,)
+                    "SELECT * FROM business_causality_chains WHERE (tenant_id = ? OR tenant_id LIKE ?)",
+                    (tenant_id, 'tnt_sales_%')
                 ).fetchall()
 
                 base_rev = sum(float(c["revenue"] or 0.0) for c in all_companies)
@@ -251,13 +251,13 @@ class OverviewDataService:
             # -------------------------------------------------------------
             if mode == "company":
                 leads_rows = cur.execute(
-                    "SELECT * FROM sales_leads WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%') AND company_id = ?",
-                    (tenant_id, company_id)
+                    "SELECT * FROM sales_leads WHERE (tenant_id = ? OR tenant_id LIKE ?) AND company_id = ?",
+                    (tenant_id, 'tnt_sales_%', company_id)
                 ).fetchall()
             else:
                 leads_rows = cur.execute(
-                    "SELECT * FROM sales_leads WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%')",
-                    (tenant_id,)
+                    "SELECT * FROM sales_leads WHERE (tenant_id = ? OR tenant_id LIKE ?)",
+                    (tenant_id, 'tnt_sales_%')
                 ).fetchall()
 
             has_sales_data = len(leads_rows) > 0 or len(causality_records) > 0
@@ -583,13 +583,13 @@ class OverviewDataService:
             # Also check unhandled enterprise events
             if mode == "company":
                 event_rows = cur.execute(
-                    "SELECT * FROM enterprise_events WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%') AND company_id = ? ORDER BY created_at DESC LIMIT 10",
-                    (tenant_id, company_id)
+                    "SELECT * FROM enterprise_events WHERE (tenant_id = ? OR tenant_id LIKE ?) AND company_id = ? ORDER BY created_at DESC LIMIT 10",
+                    (tenant_id, 'tnt_sales_%', company_id)
                 ).fetchall()
             else:
                 event_rows = cur.execute(
-                    "SELECT * FROM enterprise_events WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%') ORDER BY created_at DESC LIMIT 10",
-                    (tenant_id,)
+                    "SELECT * FROM enterprise_events WHERE (tenant_id = ? OR tenant_id LIKE ?) ORDER BY created_at DESC LIMIT 10",
+                    (tenant_id, 'tnt_sales_%')
                 ).fetchall()
 
             for ev in event_rows:

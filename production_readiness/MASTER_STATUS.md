@@ -44,7 +44,7 @@
 | **12** | SaaS Commercial Model, Lifecycle & Billing | **PASS (QUALIFIED)** | `347b667` | `72feaf5` | 29 / 29 / 0 / 0 (Regression: 141 / 141) | `production_readiness/phase_12_commercial_lifecycle_report.md` |
 | **13** | 9-Department Company Simulation, Economic Concurrency & Homepage Remediation | **PASS (QUALIFIED)** | `72feaf5` | `a19e7c3` | 11 / 11 / 0 / 0 (Regression: 152 / 152) | `production_readiness/phase_13_simulated_company_qualification.md` |
 | **14** | Independent Verification, Defect Closure & Free-Tier Company Simulation | **PASS (QUALIFIED FOR FREE-TIER ENTERPRISE WORKLOADS)** | `13be43e` | `913d2d2` | 22 / 22 / 0 / 0 (Regression: 174 / 174) | `production_readiness/phase_14_simulated_company_qualification.md` |
-| **15** | Software Supply Chain, SBOM & License Audit | NOT STARTED | - | - | - | `production_readiness/phase_15_supply_chain_report.md` |
+| **15** | Software Supply Chain, SBOM, License Audit & Deployment Blocker Closure | **PASS (STAGING QUALIFIED & SUPPLY-CHAIN AUDITED)** | `913d2d2` | `HEAD` | 175 / 175 / 0 / 0 | `production_readiness/phase_15_test_evidence.md` |
 | **16** | Rate Limiting, Abuse & Tenant Fairness | NOT STARTED | - | - | - | `production_readiness/phase_16_abuse_resilience_report.md` |
 | **17** | Performance, Load & Concurrency Qualification | NOT STARTED | - | - | - | `production_readiness/phase_17_load_qualification_report.md` |
 | **18** | CI/CD Release Pipeline Hardening | NOT STARTED | - | - | - | `production_readiness/phase_18_cicd_release_report.md` |
@@ -73,4 +73,4 @@
 | **BLK-10** | **P1** | Standalone SQL migrations miss operational tables (e.g. `async_command_queue`) | `migrations/pg/` | **RESOLVED (Phase 6)** |
 | **BLK-11** | **P2** | Stubbed deployment stages in CI, absence of automated registry push | `.github/workflows/` | **QUEUED (Phase 18)** |
 | **BLK-12** | **P2** | RTO/RPO measurement discrepancies in recovery drills | DR Documentation | **RESOLVED (Phase 7 - Dynamic RPO Derivation from Transaction Timestamps)** |
-| **BLK-13** | **P2** | Unpinned/broad version bounds in `requirements.txt` & missing supply-chain scanning | Supply Chain | **QUEUED (Phase 15)** |
+| **BLK-13** | **P2** | Unpinned/broad version bounds in `requirements.txt` & missing supply-chain scanning | Supply Chain | **RESOLVED (Phase 15 - CycloneDX v1.5 JSON, SPDX v2.3 JSON, License Compliance Audit & Dependency Lock)** |

@@ -312,6 +312,28 @@ class TestPostgreSqlDialectCompatibility(unittest.TestCase):
             r2 = conn.execute("SELECT * FROM enterprise_files WHERE file_id = ? AND tenant_id = ?", (file_id, other_tenant)).fetchone()
             self.assertIsNone(r2)
 
+    def test_08_sql_normalizer_escapes_literal_percent_for_psycopg2(self):
+        """Verify that literal % characters in queries, strings, and comments are escaped to %% for psycopg2."""
+        sql = "SELECT * FROM causality WHERE (tenant_id = ? OR tenant_id LIKE 'tnt_sales_%') AND company_id = ?"
+        normalized = normalize_sql_for_postgres(sql)
+        self.assertEqual(
+            normalized,
+            "SELECT * FROM causality WHERE (tenant_id = %s OR tenant_id LIKE 'tnt_sales_%%') AND company_id = %s"
+        )
+        # Verify simulated psycopg2 tuple formatting succeeds without IndexError
+        params = ("tnt_1", "comp_1")
+        formatted = normalized % params
+        self.assertEqual(
+            formatted,
+            "SELECT * FROM causality WHERE (tenant_id = tnt_1 OR tenant_id LIKE 'tnt_sales_%') AND company_id = comp_1"
+        )
+
+        # Modulo query
+        mod_sql = "SELECT id FROM items WHERE (id % 2 = 0) AND tenant_id = ?"
+        norm_mod = normalize_sql_for_postgres(mod_sql)
+        self.assertIn("%% 2 = 0", norm_mod)
+        self.assertIn("%s", norm_mod)
+
 
 if __name__ == "__main__":
     unittest.main()

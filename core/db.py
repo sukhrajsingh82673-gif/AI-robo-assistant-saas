@@ -3690,12 +3690,30 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
         # Handle comments when not in string literal
         if not in_single_quote and not in_double_quote and not in_dollar_quote:
             if in_line_comment:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
                 out.append(c)
                 if c == "\n":
                     in_line_comment = False
                 i += 1
                 continue
             elif in_block_comment:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
                 out.append(c)
                 if c == "*" and next_c == "/":
                     out.append(next_c)
@@ -3742,6 +3760,15 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
         # Handle single and double quotes
         if not in_line_comment and not in_block_comment and not in_dollar_quote:
             if in_single_quote:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
                 out.append(c)
                 if c == "'":
                     if next_c == "'":  # Escaped single quote: ''
@@ -3755,6 +3782,15 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
                 i += 1
                 continue
             elif in_double_quote:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
                 out.append(c)
                 if c == '"':
                     if next_c == '"':  # Escaped double quote: ""
@@ -3780,6 +3816,19 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
                     out.append("%s")
                     i += 1
                     continue
+                elif c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    elif next_c == "s" or next_c == "(":
+                        out.append("%")
+                        i += 1
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
 
         out.append(c)
         i += 1
