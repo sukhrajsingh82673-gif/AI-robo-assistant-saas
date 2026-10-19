@@ -486,7 +486,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             raise AuthExceptions.AuthenticationError("Authenticated context has no valid tenant_id")
         return tenant_id
 
-    def _send_json(self, data, status=200):
+    def _send_json(self, data, status=200, headers=None):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
         try:
             from core.observability_stack import sre_metrics
@@ -495,6 +495,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 sre_metrics.inc_counter("zonata_api_errors_total", 1.0)
             elif status in (401, 403):
                 sre_metrics.inc_counter("zonata_auth_failures_total", 1.0)
+            elif status == 429:
+                sre_metrics.inc_counter("zonata_rate_limit_exceeded_total", 1.0)
             start_time = getattr(self, "_start_time", None)
             if start_time:
                 sre_metrics.observe_latency((time.time() - start_time) * 1000.0)
@@ -513,11 +515,43 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';")
             self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
             self.send_header("X-Request-ID", req_id)
+            if headers:
+                for k, v in headers.items():
+                    self.send_header(k, str(v))
+            elif getattr(self, "_last_rate_limit_headers", None):
+                for k, v in self._last_rate_limit_headers.items():
+                    self.send_header(k, str(v))
             self.end_headers()
             self.wfile.write(body_bytes)
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def _enforce_tenant_fairness(self, path: str, method: str, auth_context: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Evaluates hierarchical rate limiting, tenant fairness, and endpoint abuse protection.
+        Returns True if request is permitted to proceed, or False if HTTP 429 was sent.
+        """
+        try:
+            client_ip = self._get_client_ip()
+            from core.tenant_fairness import tenant_fairness_engine
+            decision = tenant_fairness_engine.evaluate_request(path, method, client_ip, auth_context=auth_context)
+            if not decision.is_allowed:
+                err_payload = {
+                    "error": "Too Many Requests",
+                    "detail": decision.detail or "Rate limit exceeded. Please try again later.",
+                    "limit": decision.limit,
+                    "remaining": decision.remaining,
+                    "retry_after": decision.retry_after,
+                    "violation_axis": decision.violation_axis
+                }
+                self._send_json(err_payload, status=429, headers=decision.headers)
+                return False
+            self._last_rate_limit_headers = decision.headers
+            return True
+        except Exception as e:
+            logger.warning(f"Tenant fairness evaluation encountered error: {e}")
+            return True
 
     def do_OPTIONS(self):
         req_origin = self.headers.get("Origin")
@@ -576,6 +610,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "timestamp": time.time()
             })
+            return
+
+        # Enforce IP-level rate limiting for public unauthenticated endpoints (healthz/readyz exempt above)
+        if not self._enforce_tenant_fairness(path, "GET", auth_context=None):
             return
 
         # Neon Cloud Services Status & Gateway Endpoints
@@ -823,12 +861,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
-            tenant_id = self._get_tenant_id()
+            auth_context = self._get_auth_context()
+            tenant_id = auth_context.get("tenant_id")
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
         except AuthExceptions.TenantIsolationViolation as e:
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
+            return
+
+        if not self._enforce_tenant_fairness(path, "GET", auth_context=auth_context):
             return
 
         if path == "/api/auth/me":
@@ -3038,6 +3080,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(resp_body, status=status_code)
             return
 
+        # Enforce IP-level rate limiting for public unauthenticated POST endpoints
+        if not self._enforce_tenant_fairness(path, "POST", auth_context=None):
+            return
+
         # Neon Services POST Endpoints
         if path == "/api/v1/neon/functions/invoke":
             fn_name = req_data.get("function", "hello")
@@ -3362,12 +3408,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
-            tenant_id = self._get_tenant_id()
+            auth_context = self._get_auth_context()
+            tenant_id = auth_context.get("tenant_id")
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
         except AuthExceptions.TenantIsolationViolation as e:
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
+            return
+
+        if not self._enforce_tenant_fairness(path, "POST", auth_context=auth_context):
             return
 
         if path == "/api/crm/customers":
@@ -7084,6 +7134,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
             return
 
+        if not self._enforce_tenant_fairness(path, "PUT", auth_context=auth_ctx):
+            return
+
         company_id = auth_ctx.get("company_id") or self.headers.get("X-Company-ID", "comp_primary")
         actor = auth_ctx.get("user_id", "usr_unknown")
         actor_role = auth_ctx.get("role", UserRole.OPERATOR)
@@ -7195,6 +7248,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"error": "Forbidden", "detail": str(e), "security_event": "TENANT_SPOOFING_ATTEMPT"}, status=403)
             return
 
+        if not self._enforce_tenant_fairness(path, "DELETE", auth_context=auth_ctx):
+            return
+
         if path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
             server_id = path.split("/")[4]
             ok = mcp_gateway.disconnect_server(server_id)
@@ -7239,6 +7295,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
             return
         self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
+
+
+# Backward-compatibility and architectural alias
+SaaSHTTPRequestHandler = RoboAssistantRequestHandler
 
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):

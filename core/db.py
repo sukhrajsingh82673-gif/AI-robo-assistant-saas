@@ -144,6 +144,24 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
 CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_key ON auth_rate_limits(rate_key, attempt_timestamp);
 CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_ts ON auth_rate_limits(attempt_timestamp);
 
+-- 2e. Distributed Tenant Rate Limits & Fairness Windows
+CREATE TABLE IF NOT EXISTS tenant_rate_limits (
+    rate_key TEXT NOT NULL,
+    attempt_timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_rate_limits_key ON tenant_rate_limits(rate_key, attempt_timestamp);
+CREATE INDEX IF NOT EXISTS idx_tenant_rate_limits_ts ON tenant_rate_limits(attempt_timestamp);
+
+-- 2f. Distributed Tenant Concurrency Leases
+CREATE TABLE IF NOT EXISTS tenant_concurrency_leases (
+    lease_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    lease_type TEXT NOT NULL, -- WORKFLOW, AGENT_MISSION, AI_GENERATION
+    acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_leases_tenant ON tenant_concurrency_leases(tenant_id, expires_at);
+
 -- 3. Companies & Operating Contexts
 CREATE TABLE IF NOT EXISTS companies (
     company_id TEXT PRIMARY KEY,
@@ -3600,6 +3618,7 @@ class DeferredConnectionProxy:
 
 TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "missions": ("mission_id",),
+    "tenant_concurrency_leases": ("lease_id",),
     "employees": ("agent_id",),
     "a2a_skills": ("skill_id",),
     "a2a_tasks": ("task_id",),
