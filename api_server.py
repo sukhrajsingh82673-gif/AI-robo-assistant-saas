@@ -329,7 +329,7 @@ from core.nats_jetstream import jetstream_engine, nats_broker
 from core.vault_client import vault_client
 from core.keycloak_idp import keycloak_idp
 from core.agent_evaluation import agent_evaluation_engine
-from core.saas_billing import saas_billing_engine, SubscriptionTier
+from core.saas_billing import saas_billing_engine, SubscriptionTier, SubscriptionStatus, TIER_ENTITLEMENTS, InvalidSubscriptionTransitionError
 from core.posthog_analytics import posthog_analytics
 from core.object_storage import object_store
 
@@ -1128,9 +1128,62 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"reports": reports, "count": len(reports)})
             return
 
-        elif path == "/api/billing/usage":
+        elif path == "/api/billing/usage" or path == "/api/v1/billing/usage":
             snapshot = saas_billing_engine.get_or_create_tenant(tenant_id=tenant_id)
             self._send_json(snapshot.to_dict())
+            return
+
+        elif path in ("/api/billing/subscription", "/api/v1/billing/subscriptions"):
+            sub = saas_billing_engine.get_or_create_subscription(tenant_id=tenant_id)
+            self._send_json(sub.to_dict())
+            return
+
+        elif path in ("/api/billing/entitlements", "/api/v1/billing/entitlements"):
+            sub = saas_billing_engine.get_or_create_subscription(tenant_id=tenant_id)
+            plan = TIER_ENTITLEMENTS.get(sub.tier, TIER_ENTITLEMENTS[SubscriptionTier.FREE])
+            metric = query_params.get("metric", [None])[0]
+            amount_str = query_params.get("amount", ["1.0"])[0]
+            try:
+                amount = float(amount_str)
+            except ValueError:
+                amount = 1.0
+
+            if metric:
+                allowed, reason = saas_billing_engine.check_entitlement(tenant_id=tenant_id, metric=metric, requested_amount=amount)
+                self._send_json({
+                    "allowed": allowed,
+                    "reason": reason,
+                    "metric": metric,
+                    "amount": amount,
+                    "tier": sub.tier.value,
+                    "status": sub.status.value
+                })
+            else:
+                self._send_json({
+                    "tier": sub.tier.value,
+                    "status": sub.status.value,
+                    "entitlements": {
+                        "max_tokens_per_month": plan.max_tokens_per_month,
+                        "max_browser_minutes_per_month": plan.max_browser_minutes_per_month,
+                        "max_terminal_seconds_per_month": plan.max_terminal_seconds_per_month,
+                        "max_storage_bytes": plan.max_storage_bytes,
+                        "max_agents": plan.max_agents,
+                        "max_seats": plan.max_seats,
+                        "max_concurrency": plan.max_concurrency,
+                        "features_allowed": plan.features_allowed,
+                        "monthly_price_usd": plan.monthly_price_usd
+                    }
+                })
+            return
+
+        elif path in ("/api/billing/invoices", "/api/v1/billing/invoices"):
+            now = time.time()
+            inv = saas_billing_engine.generate_tenant_invoice(
+                tenant_id=tenant_id,
+                period_start=now - (86400 * 30),
+                period_end=now
+            )
+            self._send_json({"invoices": [inv], "count": 1})
             return
 
         elif path == "/api/analytics/posthog/funnel":
@@ -3271,6 +3324,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "dispatched_count": len(alerts),
                 "total_stored": len(RECEIVED_ALERTS)
             }, status=200)
+            return
+
+        # Stripe Webhook Endpoint (HMAC-SHA256 verified, public callback)
+        if path in ("/api/billing/webhook/stripe", "/api/v1/billing/webhook/stripe"):
+            sig_header = self.headers.get("Stripe-Signature", "")
+            payload_str = body.decode("utf-8", errors="replace")
+            res = saas_billing_engine.process_stripe_webhook(payload_str=payload_str, sig_header=sig_header)
+            status_code = res.get("code", 200) if not res.get("success") else 200
+            self._send_json(res, status=status_code)
+            return
+
+        # Razorpay Webhook Endpoint (HMAC-SHA256 verified, public callback)
+        if path in ("/api/billing/webhook/razorpay", "/api/v1/billing/webhook/razorpay"):
+            sig_header = self.headers.get("X-Razorpay-Signature", "")
+            payload_str = body.decode("utf-8", errors="replace")
+            res = saas_billing_engine.process_razorpay_webhook(payload_str=payload_str, sig_header=sig_header)
+            status_code = res.get("code", 200) if not res.get("success") else 200
+            self._send_json(res, status=status_code)
             return
 
         try:
@@ -6844,7 +6915,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # SaaS Billing Plan Upgrade & Usage Record
-        elif path == "/api/billing/upgrade":
+        elif path in ("/api/billing/upgrade", "/api/v1/billing/upgrade"):
             tenant = tenant_id
             tier_str = req_data.get("tier", "pro").upper()
             try:
@@ -6855,13 +6926,84 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"success": True, "tenant": snapshot.to_dict()})
             return
 
-        elif path == "/api/billing/record":
+        elif path in ("/api/billing/record", "/api/v1/billing/record"):
             tenant = tenant_id
             metric = req_data.get("metric", "api_call")
             amount = float(req_data.get("amount", 1.0))
             cost = float(req_data.get("cost_usd", 0.0))
-            saas_billing_engine.record_usage(tenant_id=tenant, metric=metric, amount=amount, cost_usd=cost)
-            self._send_json({"success": True, "tenant_id": tenant, "metric": metric, "amount": amount})
+            idempotency_key = req_data.get("idempotency_key")
+            recorded = saas_billing_engine.record_usage(
+                tenant_id=tenant, metric=metric, amount=amount, cost_usd=cost, idempotency_key=idempotency_key
+            )
+            self._send_json({"success": recorded, "tenant_id": tenant, "metric": metric, "amount": amount})
+            return
+
+        elif path in ("/api/billing/subscription/transition", "/api/v1/billing/subscription/transition"):
+            target_status_str = req_data.get("status", "").upper()
+            reason = req_data.get("reason", "API request")
+            grace_period = req_data.get("grace_period_seconds")
+            try:
+                target_status = SubscriptionStatus[target_status_str]
+                sub = saas_billing_engine.transition_subscription_status(
+                    tenant_id=tenant_id,
+                    target_status=target_status,
+                    reason=reason,
+                    grace_period_seconds=grace_period
+                )
+                self._send_json({"success": True, "subscription": sub.to_dict()})
+            except KeyError:
+                self._send_json({"error": "Bad Request", "detail": f"Unknown status: '{target_status_str}'"}, status=400)
+            except InvalidSubscriptionTransitionError as e:
+                self._send_json({"error": "Illegal Transition", "detail": str(e)}, status=409)
+            return
+
+        elif path in ("/api/billing/checkout", "/api/v1/billing/checkout"):
+            provider = req_data.get("provider", "stripe").lower()
+            target_tier_str = req_data.get("tier", "pro").upper()
+            try:
+                tier = SubscriptionTier[target_tier_str]
+            except KeyError:
+                tier = SubscriptionTier.PRO
+            plan = TIER_ENTITLEMENTS.get(tier, TIER_ENTITLEMENTS[SubscriptionTier.PRO])
+
+            if provider == "stripe":
+                cust = saas_billing_engine.stripe.create_customer(tenant_id=tenant_id, email=req_data.get("email", f"{tenant_id}@zonata.io"))
+                self._send_json({
+                    "success": True,
+                    "checkout_session_id": f"cs_live_{uuid.uuid4().hex[:16]}",
+                    "customer_id": cust.get("stripe_customer_id"),
+                    "tier": tier.value,
+                    "amount_usd": plan.monthly_price_usd,
+                    "url": f"https://checkout.stripe.com/pay/{uuid.uuid4().hex[:12]}"
+                })
+            elif provider == "razorpay":
+                order = saas_billing_engine.razorpay.create_order(
+                    amount_inr=plan.monthly_price_usd * 85.0,
+                    tenant_id=tenant_id,
+                    receipt=f"rcpt_{tenant_id}"
+                )
+                self._send_json({
+                    "success": True,
+                    "order_id": order.get("order_id"),
+                    "tier": tier.value,
+                    "amount_inr": plan.monthly_price_usd * 85.0,
+                    "currency": "INR"
+                })
+            else:
+                self._send_json({"error": "Bad Request", "detail": f"Unsupported provider: {provider}"}, status=400)
+            return
+
+        elif path in ("/api/billing/settlement/reconcile", "/api/v1/billing/settlement/reconcile"):
+            res_id = req_data.get("reservation_id", "")
+            actual_tokens = int(req_data.get("actual_tokens", 0))
+            actual_usd = float(req_data.get("actual_usd", 0.0))
+            res = saas_billing_engine.reconcile_economic_settlement(
+                tenant_id=tenant_id,
+                reservation_id=res_id,
+                actual_tokens=actual_tokens,
+                actual_usd=actual_usd
+            )
+            self._send_json(res)
             return
 
         # PostHog Product Analytics Capture

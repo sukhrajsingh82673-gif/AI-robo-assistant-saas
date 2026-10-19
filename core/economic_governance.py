@@ -14,6 +14,7 @@ import time
 import json
 import uuid
 import logging
+import threading
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -117,6 +118,7 @@ class EconomicGovernanceEngine:
     _table_initialized = False
 
     def __init__(self):
+        self._lock = threading.RLock()
         self._ensure_tables()
 
     def _ensure_tables(self):
@@ -298,9 +300,10 @@ class EconomicGovernanceEngine:
                 seen_entities.add(eid)
                 unique_chain.append((etype, eid))
 
-        with db.get_connection() as conn:
-            # 1. First pass: verify and reserve on all configured scopes
-            reserved_entities = []
+        with self._lock:
+            with db.get_connection() as conn:
+                # 1. First pass: verify and reserve on all configured scopes
+                reserved_entities = []
             try:
                 for etype, eid in unique_chain:
                     row = conn.execute(
@@ -417,8 +420,9 @@ class EconomicGovernanceEngine:
         self._ensure_tables()
         now = time.time()
 
-        with db.get_connection() as conn:
-            row = conn.execute("""
+        with self._lock:
+            with db.get_connection() as conn:
+                row = conn.execute("""
                 SELECT * FROM enterprise_budget_reservations
                 WHERE reservation_id = ? AND status = 'RESERVED'
             """, (reservation_id,)).fetchone()
