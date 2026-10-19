@@ -889,10 +889,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 snapshot = OverviewDataService.get_snapshot(tenant_id, company_id=cid, period=period)
                 self._send_json(snapshot)
             except Exception as e:
-                logger.error(f"Failed to retrieve overview snapshot for tenant {tenant_id}: {e}", exc_info=True)
+                import traceback
+                tb = traceback.format_exc()
+                logger.error(f"Failed to retrieve overview snapshot for tenant {tenant_id}: {e}\n{tb}", exc_info=True)
                 self._send_json({
                     "error": "Internal Server Error",
-                    "detail": f"Failed to retrieve overview snapshot: {type(e).__name__}: {str(e)}"
+                    "detail": f"Failed to retrieve overview snapshot: {type(e).__name__}: {str(e)}",
+                    "traceback": tb.splitlines()[-5:]
                 }, status=500)
             return
 
