@@ -101,7 +101,12 @@ def run_phase_10_5_qualification(target_url, metrics_token=None):
     results = []
     
     def record(gate_num, name, passed, detail, critical=True):
-        status = "PASS" if passed else "FAIL"
+        if passed is True:
+            status = "PASS"
+        elif passed is False:
+            status = "FAIL"
+        else:
+            status = "SKIPPED"
         print(f"[{status}] Gate {gate_num}: {name} - {detail}")
         results.append({
             "gate": gate_num,
@@ -158,13 +163,13 @@ def run_phase_10_5_qualification(target_url, metrics_token=None):
     reg_json = safe_parse_json(r_reg)
     auth_token = None
     tenant_id = None
-    if r_reg["status_code"] in (200, 201) and reg_json and "token" in reg_json:
+    if r_reg["status_code"] == 201 and reg_json and "token" in reg_json:
         auth_token = reg_json["token"]
         tenant_id = reg_json.get("user", {}).get("tenant_id")
-        record(4, "Host Registration (POST /api/auth/register)", True, f"HTTP 200 OK. Tenant assigned: {tenant_id}")
+        record(4, "Host Registration (POST /api/auth/register)", True, f"HTTP 201 Created. Tenant assigned: {tenant_id}")
     else:
         err_msg = reg_json.get("error") if reg_json else r_reg["text"][:120]
-        record(4, "Host Registration (POST /api/auth/register)", False, f"HTTP {r_reg['status_code']} - {err_msg}")
+        record(4, "Host Registration (POST /api/auth/register)", False, f"HTTP {r_reg['status_code']} (Expected 201 Created) - {err_msg}")
 
     # Duplicate Registration Conflict Gate
     r_dup = make_request(f"{target_url}/api/auth/register", method="POST", data={
@@ -238,7 +243,7 @@ def run_phase_10_5_qualification(target_url, metrics_token=None):
         metrics_valid = (r_metrics_auth["status_code"] == 200 and "http_requests_total" in r_metrics_auth["text"])
         record("9b", "Authenticated Prometheus Metrics", metrics_valid, f"HTTP {r_metrics_auth['status_code']}")
     else:
-        record("9b", "Authenticated Prometheus Metrics", True, "Skipped (METRICS_AUTH_TOKEN not provided)", critical=False)
+        record("9b", "Authenticated Prometheus Metrics", None, "Skipped / Unverified (METRICS_AUTH_TOKEN not provided)", critical=False)
 
     # --- GATE 10: Neon Cloud Services Integration ---
     r_neon = make_request(f"{target_url}/api/v1/neon/services")
@@ -251,11 +256,12 @@ def run_phase_10_5_qualification(target_url, metrics_token=None):
 
     # --- SUMMARY ---
     total_gates = len(results)
-    passed_gates = sum(1 for r in results if r["passed"])
-    failed_critical = sum(1 for r in results if not r["passed"] and r["critical"])
+    passed_gates = sum(1 for r in results if r["passed"] is True)
+    skipped_gates = sum(1 for r in results if r["passed"] is None)
+    failed_critical = sum(1 for r in results if r["passed"] is False and r["critical"])
 
     print("=" * 80)
-    print(f"PHASE 10.5 QUALIFICATION SUMMARY: {passed_gates}/{total_gates} PASSED")
+    print(f"PHASE 10.5 QUALIFICATION SUMMARY: {passed_gates}/{total_gates} PASSED ({skipped_gates} SKIPPED/UNVERIFIED)")
     if failed_critical == 0:
         print("VERDICT: STAGING QUALIFICATION PASSED (READY FOR PHASE 11)")
     else:

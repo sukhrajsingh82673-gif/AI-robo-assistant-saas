@@ -45,7 +45,7 @@ Timestamp:  2026-10-18T10:02:28Z
 [PASS] Gate 2: Health Probe (GET /health) - HTTP 200
 [PASS] Gate 2b: Database Readiness (GET /readyz) - HTTP 200
 [PASS] Gate 3: Google OAuth Discovery - Unconfigured (Safe fallback active. Required Redirect URI: https://zonata-staging.onrender.com/api/auth/oauth/google/callback)
-[PASS] Gate 4: Host Registration (POST /api/auth/register) - HTTP 200 OK. Tenant assigned: tnt_72d963e9
+[PASS] Gate 4: Host Registration (POST /api/auth/register) - HTTP 201 Created. Tenant assigned: tnt_72d963e9
 [PASS] Gate 4b: Duplicate Registration 409 Conflict - HTTP 409 (Expected 409)
 [PASS] Gate 5: Host Password Login (POST /api/auth/login) - HTTP 200 OK. Token issued.
 [PASS] Gate 6: Negative Auth: Invalid Password - HTTP 401 (Expected 401)
@@ -54,11 +54,11 @@ Timestamp:  2026-10-18T10:02:28Z
 [PASS] Gate 7: Cross-Tenant Spoofing Rebuffed - HTTP 403 (Tenant header spoofing rejected)
 [PASS] Gate 8: PostgreSQL Session & Tenant Persistence - HTTP 200
 [PASS] Gate 9: Public Metrics Blocked (BLK-02) - HTTP 403 Forbidden (Edge security active)
-[PASS] Gate 9b: Authenticated Prometheus Metrics - Skipped (METRICS_AUTH_TOKEN not provided)
+[SKIPPED] Gate 9b: Authenticated Prometheus Metrics - Skipped / Unverified (METRICS_AUTH_TOKEN not provided)
 [PASS] Gate 10: Neon Services Gateway Probe - HTTP 200
 [PASS] Gate 10b: Neon Serverless Function Proxy - HTTP 200
 ================================================================================
-PHASE 10.5 QUALIFICATION SUMMARY: 18/18 PASSED
+PHASE 10.5 QUALIFICATION SUMMARY: 17/18 PASSED (1 SKIPPED/UNVERIFIED)
 VERDICT: STAGING QUALIFICATION PASSED (READY FOR PHASE 11)
 ================================================================================
 ```

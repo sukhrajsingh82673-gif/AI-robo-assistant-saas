@@ -1248,6 +1248,35 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(summary)
             return
 
+        # --- PHASE 11 GOVERNANCE & ECONOMIC COMMAND ENDPOINTS (GET) ---
+        elif path == "/api/v1/economic/budgets":
+            from core.economic_governance import economic_governor
+            from dataclasses import asdict
+            entity_id = query_params.get("entity_id", [None])[0]
+            if entity_id:
+                b = economic_governor.get_budget(entity_id)
+                self._send_json({"budget": asdict(b) if b else None})
+            else:
+                with db.get_connection() as conn:
+                    rows = conn.execute("SELECT * FROM enterprise_budgets WHERE tenant_id = ?", (tenant_id,)).fetchall()
+                    budgets = [dict(r) for r in rows]
+                self._send_json({"budgets": budgets, "total": len(budgets)})
+            return
+
+        elif path == "/api/v1/economic/reservations":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM enterprise_budget_reservations WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50", (tenant_id,)).fetchall()
+                res_list = [dict(r) for r in rows]
+            self._send_json({"reservations": res_list, "total": len(res_list)})
+            return
+
+        elif path == "/api/v1/approvals/cryptographic/nonces":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT nonce, approval_id, tenant_id, action_digest, approver_id, approver_role, risk_class, status, issued_at, expires_at, consumed_at, consumed_by_action_id FROM action_approval_nonces WHERE tenant_id = ? ORDER BY issued_at DESC LIMIT 50", (tenant_id,)).fetchall()
+                nonces = [dict(r) for r in rows]
+            self._send_json({"nonces": nonces, "total": len(nonces)})
+            return
+
         # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (GET) ---
         elif path == "/api/v1/zonata/discovery/session":
             companies = portfolio.list_companies()
@@ -3721,6 +3750,148 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
             review = ExecutiveCouncil(tenant_id, cid).review_proposal(topic, proposal, data)
             self._send_json(review)
+            return
+
+        # --- PHASE 11 GOVERNANCE & ECONOMIC COMMAND ENDPOINTS (POST) ---
+        elif path == "/api/v1/economic/budgets":
+            from core.economic_governance import economic_governor
+            from dataclasses import asdict
+            eid = req_data.get("entity_id", f"ent_{uuid.uuid4().hex[:8]}")
+            etype = req_data.get("entity_type", "WORKFLOW")
+            cid = req_data.get("company_id", "comp_primary")
+            alloc_usd = float(req_data.get("allocated_usd", 1000.0))
+            alloc_tok = int(req_data.get("allocated_tokens", 0))
+            soft_pct = float(req_data.get("soft_limit_pct", 80.0))
+            hard_pct = float(req_data.get("hard_limit_pct", 100.0))
+            b = economic_governor.configure_budget(
+                entity_id=eid,
+                entity_type=etype,
+                tenant_id=tenant_id,
+                company_id=cid,
+                allocated_usd=alloc_usd,
+                allocated_tokens=alloc_tok,
+                soft_limit_pct=soft_pct,
+                hard_limit_pct=hard_pct
+            )
+            self._send_json({"success": True, "budget": asdict(b)})
+            return
+
+        elif path == "/api/v1/economic/reserve":
+            from core.economic_governance import economic_governor, BudgetExhaustionException
+            from dataclasses import asdict
+            scopes_raw = req_data.get("scope_chain", [("TENANT", tenant_id)])
+            scope_chain = [(s[0], s[1]) if isinstance(s, (list, tuple)) else (s.get("type", "ENTITY"), s.get("id", "")) for s in scopes_raw]
+            req_usd = float(req_data.get("requested_usd", 0.0))
+            req_tokens = int(req_data.get("requested_tokens", 0))
+            ttl = float(req_data.get("ttl_seconds", 300.0))
+            task_id = req_data.get("task_id")
+            try:
+                reservation = economic_governor.reserve_budget(
+                    tenant_id=tenant_id,
+                    scope_chain=scope_chain,
+                    requested_usd=req_usd,
+                    requested_tokens=req_tokens,
+                    ttl_seconds=ttl,
+                    task_id=task_id,
+                    metadata=req_data.get("metadata")
+                )
+                self._send_json({"success": True, "reservation": asdict(reservation)})
+            except BudgetExhaustionException as e:
+                self._send_json({"error": "Budget Exhausted", "detail": str(e), "details": getattr(e, "details", {})}, status=402)
+            return
+
+        elif path == "/api/v1/economic/settle":
+            from core.economic_governance import economic_governor, ReservationExpiredException
+            from dataclasses import asdict
+            res_id = req_data.get("reservation_id", "")
+            act_usd = float(req_data.get("actual_usd", 0.0))
+            act_tokens = int(req_data.get("actual_tokens", 0))
+            try:
+                settlement = economic_governor.settle_budget(
+                    reservation_id=res_id,
+                    actual_usd=act_usd,
+                    actual_tokens=act_tokens,
+                    metadata=req_data.get("metadata")
+                )
+                self._send_json({"success": True, "settlement": asdict(settlement)})
+            except ReservationExpiredException as e:
+                self._send_json({"error": "Bad Request", "detail": str(e)}, status=400)
+            return
+
+        elif path == "/api/v1/economic/release":
+            from core.economic_governance import economic_governor
+            res_id = req_data.get("reservation_id", "")
+            reason = req_data.get("reason", "API caller cancelled")
+            ok = economic_governor.release_reservation(res_id, reason=reason)
+            self._send_json({"success": ok, "released": ok})
+            return
+
+        elif path == "/api/v1/approvals/cryptographic/sign":
+            from core.cryptographic_approvals import cryptographic_approvals
+            action_payload = req_data.get("action_payload", {})
+            action_payload["tenant_id"] = tenant_id  # Guarantee tenant binding
+            approver_id = req_data.get("approver_id", "usr_executive_owner")
+            approver_role = req_data.get("approver_role", "OWNER")
+            ttl = float(req_data.get("ttl_seconds", 3600.0))
+            cert = cryptographic_approvals.issue_approval(
+                action_payload=action_payload,
+                approver_id=approver_id,
+                approver_role=approver_role,
+                ttl_seconds=ttl,
+                metadata=req_data.get("metadata")
+            )
+            self._send_json({"success": True, "certificate": cert.to_dict()})
+            return
+
+        elif path == "/api/v1/approvals/cryptographic/verify":
+            from core.cryptographic_approvals import (
+                cryptographic_approvals,
+                ApprovalCertificate,
+                CryptographicApprovalException
+            )
+            action_payload = req_data.get("action_payload", {})
+            action_payload["tenant_id"] = tenant_id
+            cert_dict = req_data.get("certificate", {})
+            consuming_action_id = req_data.get("consuming_action_id", f"act_{uuid.uuid4().hex[:8]}")
+            try:
+                cert = ApprovalCertificate.from_dict(cert_dict)
+                v_res = cryptographic_approvals.verify_and_consume_approval(
+                    action_payload=action_payload,
+                    certificate=cert,
+                    consuming_action_id=consuming_action_id
+                )
+                self._send_json({"success": True, "verification": v_res})
+            except CryptographicApprovalException as e:
+                self._send_json({"error": "Cryptographic Verification Failed", "detail": str(e), "details": getattr(e, "details", {})}, status=403)
+            return
+
+        elif path == "/api/v1/memory/sync":
+            from core.stateful_agent_runtime import StatefulAgentMemoryGateway, ConflictResolution
+            action = req_data.get("action", "STORE")
+            gw = StatefulAgentMemoryGateway(tenant_id=tenant_id)
+            if action == "STORE":
+                mem = gw.store_memory(
+                    scope=req_data.get("scope", "COMPANY"),
+                    scope_id=req_data.get("scope_id", "comp_primary"),
+                    memory_key=req_data.get("memory_key", "k1"),
+                    content=req_data.get("content", ""),
+                    memory_type=req_data.get("memory_type", "CORE"),
+                    category=req_data.get("category", "FACT"),
+                    metadata=req_data.get("metadata")
+                )
+                self._send_json({"success": True, "record": mem.to_dict()})
+            elif action == "RESOLVE_CONFLICT":
+                cid = req_data.get("conflict_id", "")
+                choice = req_data.get("choice", "USE_A")
+                res = gw.resolve_conflict(
+                    conflict_id=cid,
+                    choice=choice,
+                    resolved_by=req_data.get("resolved_by", "AI_CEO"),
+                    merged_content=req_data.get("merged_content")
+                )
+                self._send_json({"success": True, "resolution": res})
+            else:
+                self._send_json({"error": "Unknown action"}, status=400)
             return
 
         elif path == "/api/chief-of-staff/items":

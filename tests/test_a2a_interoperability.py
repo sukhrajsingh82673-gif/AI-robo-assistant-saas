@@ -28,7 +28,7 @@ import json
 import uuid
 import os
 
-from core.db import db
+from core.db import db, configure_isolated_test_db
 from core.models import EvidenceStatus
 from core.evidence_ledger import EvidenceLedger
 from core.approvals import ApprovalPipeline
@@ -62,6 +62,11 @@ from zonata.a2a_adapter import (
 class TestA2AInteroperability(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.test_db_path = configure_isolated_test_db()
+        import tempfile
+        cls.test_evidence_file = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False).name
+        os.environ["ZONATA_EVIDENCE_PATH"] = cls.test_evidence_file
+
         cls.tenant_id = "tnt_test_a2a"
         cls.company_id = "comp_test_a2a"
         cls.foreign_tenant = "tnt_foreign_a2a"
@@ -77,6 +82,15 @@ class TestA2AInteroperability(unittest.TestCase):
 
         cls.gateway = A2AGateway(cls.tenant_id, cls.company_id)
         cls.scenarios = A2ACanonicalScenarios(cls.tenant_id, cls.company_id)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "test_evidence_file") and os.path.exists(cls.test_evidence_file):
+            try:
+                os.remove(cls.test_evidence_file)
+            except OSError:
+                pass
+        os.environ.pop("ZONATA_EVIDENCE_PATH", None)
 
     def tearDown(self):
         # Guarantee KillSwitch is reset after tests

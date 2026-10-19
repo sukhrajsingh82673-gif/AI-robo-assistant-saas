@@ -3137,12 +3137,57 @@ CREATE TABLE IF NOT EXISTS enterprise_budgets (
                 company_id TEXT NOT NULL,
                 allocated_usd REAL NOT NULL,
                 spent_usd REAL NOT NULL DEFAULT 0.0,
+                reserved_usd REAL NOT NULL DEFAULT 0.0,
+                allocated_tokens BIGINT NOT NULL DEFAULT 0,
+                spent_tokens BIGINT NOT NULL DEFAULT 0,
+                reserved_tokens BIGINT NOT NULL DEFAULT 0,
                 soft_limit_pct REAL NOT NULL DEFAULT 80.0,
                 hard_limit_pct REAL NOT NULL DEFAULT 100.0,
                 is_frozen INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
             );
+
+CREATE TABLE IF NOT EXISTS enterprise_budget_reservations (
+                reservation_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                reserved_usd REAL NOT NULL DEFAULT 0.0,
+                reserved_tokens BIGINT NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'RESERVED',
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                settled_at REAL,
+                actual_usd REAL DEFAULT 0.0,
+                actual_tokens BIGINT DEFAULT 0,
+                metadata JSON,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_budget_res_tenant ON enterprise_budget_reservations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_budget_res_entity ON enterprise_budget_reservations(entity_id);
+CREATE INDEX IF NOT EXISTS idx_budget_res_status ON enterprise_budget_reservations(status);
+
+CREATE TABLE IF NOT EXISTS action_approval_nonces (
+                nonce TEXT PRIMARY KEY,
+                approval_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                action_digest TEXT NOT NULL,
+                approver_id TEXT NOT NULL,
+                approver_role TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                risk_class TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                issued_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                consumed_at REAL,
+                consumed_by_action_id TEXT,
+                metadata JSON,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_tenant ON action_approval_nonces(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_status ON action_approval_nonces(status);
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_digest ON action_approval_nonces(action_digest);
 
 CREATE TABLE IF NOT EXISTS security_incidents (
                 incident_id TEXT PRIMARY KEY,
@@ -3506,6 +3551,8 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "data_sources": ("source_id",),
     "tenants": ("tenant_id",),
     "enterprise_budgets": ("entity_id",),
+    "enterprise_budget_reservations": ("reservation_id",),
+    "action_approval_nonces": ("nonce",),
     "supervisor_heartbeats": ("heartbeat_id",),
     "temporal_workers": ("worker_id",),
     "governed_tools": ("tool_id",),
