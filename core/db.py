@@ -3656,11 +3656,139 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
 }
 
 
+def _tokenize_and_replace_placeholders(sql: str) -> str:
+    """
+    Safely converts SQLite '?' parameter placeholders to PostgreSQL '%s'
+    while strictly preserving literal question marks inside:
+    - Single-quoted string literals ('...')
+    - Double-quoted identifiers ("...")
+    - Single-line SQL comments (-- ...)
+    - Multi-line block comments (/* ... */)
+    - Dollar-quoted string constants ($$...$$ or $tag$...$tag$)
+    """
+    if "?" not in sql:
+        return sql
+
+    out = []
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+    in_dollar_quote = False
+    dollar_tag = ""
+
+    i = 0
+    n = len(sql)
+
+    while i < n:
+        c = sql[i]
+        next_c = sql[i + 1] if i + 1 < n else ""
+
+        # Handle comments when not in string literal
+        if not in_single_quote and not in_double_quote and not in_dollar_quote:
+            if in_line_comment:
+                out.append(c)
+                if c == "\n":
+                    in_line_comment = False
+                i += 1
+                continue
+            elif in_block_comment:
+                out.append(c)
+                if c == "*" and next_c == "/":
+                    out.append(next_c)
+                    in_block_comment = False
+                    i += 2
+                    continue
+                i += 1
+                continue
+            elif c == "-" and next_c == "-":
+                in_line_comment = True
+                out.append("--")
+                i += 2
+                continue
+            elif c == "/" and next_c == "*":
+                in_block_comment = True
+                out.append("/*")
+                i += 2
+                continue
+
+        # Handle dollar quotes ($$...$$ or $tag$...$tag$)
+        if not in_single_quote and not in_double_quote and not in_line_comment and not in_block_comment:
+            if in_dollar_quote:
+                out.append(c)
+                if c == "$" and sql[i:i + len(dollar_tag)] == dollar_tag:
+                    out.append(dollar_tag[1:])
+                    i += len(dollar_tag)
+                    in_dollar_quote = False
+                    dollar_tag = ""
+                    continue
+                i += 1
+                continue
+            elif c == "$":
+                end_dollar = sql.find("$", i + 1)
+                if end_dollar != -1 and end_dollar - i <= 32:
+                    tag_candidate = sql[i:end_dollar + 1]
+                    inner = tag_candidate[1:-1]
+                    if inner == "" or inner.isidentifier():
+                        in_dollar_quote = True
+                        dollar_tag = tag_candidate
+                        out.append(tag_candidate)
+                        i = end_dollar + 1
+                        continue
+
+        # Handle single and double quotes
+        if not in_line_comment and not in_block_comment and not in_dollar_quote:
+            if in_single_quote:
+                out.append(c)
+                if c == "'":
+                    if next_c == "'":  # Escaped single quote: ''
+                        out.append(next_c)
+                        i += 2
+                        continue
+                    elif i > 0 and sql[i - 1] == "\\":  # Backslash escape \'
+                        pass
+                    else:
+                        in_single_quote = False
+                i += 1
+                continue
+            elif in_double_quote:
+                out.append(c)
+                if c == '"':
+                    if next_c == '"':  # Escaped double quote: ""
+                        out.append(next_c)
+                        i += 2
+                        continue
+                    else:
+                        in_double_quote = False
+                i += 1
+                continue
+            else:
+                if c == "'":
+                    in_single_quote = True
+                    out.append(c)
+                    i += 1
+                    continue
+                elif c == '"':
+                    in_double_quote = True
+                    out.append(c)
+                    i += 1
+                    continue
+                elif c == "?":
+                    out.append("%s")
+                    i += 1
+                    continue
+
+        out.append(c)
+        i += 1
+
+    return "".join(out)
+
+
 def normalize_sql_for_postgres(sql: str) -> str:
     """
     Normalizes SQL statements for PostgreSQL compatibility:
     - Strips SQLite PRAGMA commands (returns empty string)
-    - Replaces ? parameter placeholders with %s
+    - Safely replaces ? parameter placeholders with %s outside string literals/comments
     - Converts SQLite INSERT OR IGNORE INTO to ANSI ON CONFLICT DO NOTHING
     - Converts legacy INSERT OR REPLACE INTO to ANSI ON CONFLICT (<pk>) DO UPDATE SET ...
     """
@@ -3668,8 +3796,8 @@ def normalize_sql_for_postgres(sql: str) -> str:
     if stripped.upper().startswith("PRAGMA "):
         return ""
 
-    # Convert ? placeholders to %s
-    normalized = sql.replace("?", "%s")
+    # Convert ? placeholders to %s safely outside literals and comments
+    normalized = _tokenize_and_replace_placeholders(sql)
 
     import re
 

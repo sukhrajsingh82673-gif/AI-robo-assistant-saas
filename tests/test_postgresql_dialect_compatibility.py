@@ -113,6 +113,29 @@ class TestPostgreSqlDialectCompatibility(unittest.TestCase):
         normalized = normalize_sql_for_postgres(sql)
         self.assertEqual(normalized, "SELECT * FROM users WHERE tenant_id = %s AND status = %s")
 
+    def test_03b_sql_normalizer_preserves_question_marks_in_literals_and_comments(self):
+        """Verify that literal ? inside quotes, comments, and identifiers are strictly preserved."""
+        # Single-quoted string literals with question marks
+        sql1 = "SELECT * FROM support_tickets WHERE query = 'Why is this failing?' AND tenant_id = ?"
+        norm1 = normalize_sql_for_postgres(sql1)
+        self.assertEqual(norm1, "SELECT * FROM support_tickets WHERE query = 'Why is this failing?' AND tenant_id = %s")
+
+        # Escaped single-quotes inside literals
+        sql2 = "SELECT * FROM audit_logs WHERE message = 'User asked ''how?'' in chat' AND event_id = ?"
+        norm2 = normalize_sql_for_postgres(sql2)
+        self.assertEqual(norm2, "SELECT * FROM audit_logs WHERE message = 'User asked ''how?'' in chat' AND event_id = %s")
+
+        # Single-line and multi-line comments containing ?
+        sql3 = "-- Is this safe?\nSELECT * FROM billing WHERE amount > ? /* Should we check? */ AND tenant_id = ?"
+        norm3 = normalize_sql_for_postgres(sql3)
+        self.assertEqual(norm3, "-- Is this safe?\nSELECT * FROM billing WHERE amount > %s /* Should we check? */ AND tenant_id = %s")
+
+        # Double-quoted column identifier with ?
+        sql4 = 'SELECT "col?1", "col?2" FROM metrics WHERE tenant_id = ?'
+        norm4 = normalize_sql_for_postgres(sql4)
+        self.assertEqual(norm4, 'SELECT "col?1", "col?2" FROM metrics WHERE tenant_id = %s')
+
+
     def test_04_sql_normalizer_insert_or_ignore(self):
         """Verify that INSERT OR IGNORE is translated to ANSI ON CONFLICT DO NOTHING."""
         sql = "INSERT OR IGNORE INTO tenants (tenant_id, name) VALUES (?, ?)"

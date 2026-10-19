@@ -881,21 +881,35 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if path in ("/api/overview", "/api/overview/snapshot"):
-            cid = query_params.get("company_id", [None])[0]
-            if cid in ("", "ALL", "null", "undefined", "portfolio"):
-                cid = None
-            period = query_params.get("period", ["30d"])[0]
-            snapshot = OverviewDataService.get_snapshot(tenant_id, company_id=cid, period=period)
-            self._send_json(snapshot)
+            try:
+                cid = query_params.get("company_id", [None])[0]
+                if cid in ("", "ALL", "null", "undefined", "portfolio"):
+                    cid = None
+                period = query_params.get("period", ["30d"])[0]
+                snapshot = OverviewDataService.get_snapshot(tenant_id, company_id=cid, period=period)
+                self._send_json(snapshot)
+            except Exception as e:
+                logger.error(f"Failed to retrieve overview snapshot for tenant {tenant_id}: {e}", exc_info=True)
+                self._send_json({
+                    "error": "Internal Server Error",
+                    "detail": f"Failed to retrieve overview snapshot: {type(e).__name__}"
+                }, status=500)
             return
 
         elif path == "/api/overview/explain-variance":
-            cid = query_params.get("company_id", [None])[0]
-            if cid in ("", "ALL", "null", "undefined", "portfolio"):
-                cid = None
-            metric = query_params.get("metric", ["revenue"])[0]
-            explanation = OverviewDataService.explain_variance(tenant_id, company_id=cid, metric=metric)
-            self._send_json(explanation)
+            try:
+                cid = query_params.get("company_id", [None])[0]
+                if cid in ("", "ALL", "null", "undefined", "portfolio"):
+                    cid = None
+                metric = query_params.get("metric", ["revenue"])[0]
+                explanation = OverviewDataService.explain_variance(tenant_id, company_id=cid, metric=metric)
+                self._send_json(explanation)
+            except Exception as e:
+                logger.error(f"Failed to explain variance for tenant {tenant_id}: {e}", exc_info=True)
+                self._send_json({
+                    "error": "Internal Server Error",
+                    "detail": f"Failed to explain variance: {type(e).__name__}"
+                }, status=500)
             return
 
         elif path == "/api/portfolio":
