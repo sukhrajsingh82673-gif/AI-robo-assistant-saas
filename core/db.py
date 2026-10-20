@@ -4283,6 +4283,22 @@ class Database:
                     p.reset()
         except Exception:
             pass
+        try:
+            from core.evidence_service import evidence_service
+            evidence_service._init_db()
+        except Exception:
+            pass
+        try:
+            from core.automation_fabric.fabric import universal_automation_fabric
+            universal_automation_fabric._init_automation_tables()
+            universal_automation_fabric._ensure_signing_keys_table()
+        except Exception:
+            pass
+        try:
+            from core.security_center import security_center
+            security_center._init_db()
+        except Exception:
+            pass
 
     def initialize(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:
@@ -4483,6 +4499,22 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
                 p.dialect = DatabaseDialect.SQLITE
                 p._deferred_import_mode = False
                 p.reset()
+    except Exception:
+        pass
+    try:
+        from core.evidence_service import evidence_service
+        evidence_service._init_db()
+    except Exception:
+        pass
+    try:
+        from core.automation_fabric.fabric import universal_automation_fabric
+        universal_automation_fabric._init_automation_tables()
+        universal_automation_fabric._ensure_signing_keys_table()
+    except Exception:
+        pass
+    try:
+        from core.security_center import security_center
+        security_center._init_db()
     except Exception:
         pass
     return custom_path

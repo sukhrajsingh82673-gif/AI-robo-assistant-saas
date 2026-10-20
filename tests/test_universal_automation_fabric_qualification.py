@@ -81,8 +81,7 @@ def tearDownModule():
     """Restores original database and evidence ledger paths."""
     global MODULE_ORIG_DB_PATH, MODULE_ORIG_EV_PATH, MODULE_TEMP_DIR
     if MODULE_ORIG_DB_PATH:
-        db.set_db_path(MODULE_ORIG_DB_PATH)
-        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+        configure_isolated_test_db(MODULE_ORIG_DB_PATH)
     if MODULE_ORIG_EV_PATH is not None:
         os.environ["ZONATA_EVIDENCE_PATH"] = MODULE_ORIG_EV_PATH
     elif "ZONATA_EVIDENCE_PATH" in os.environ:

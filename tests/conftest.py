@@ -13,7 +13,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+os.environ["ZONATA_DB_DIALECT"] = "sqlite"
+os.environ["ZONATA_TEST_MODE"] = "1"
+
 from core.db import configure_isolated_test_db, db
+configure_isolated_test_db()
 
 AUXILIARY_SCHEMA_TARGETS = [
     ("core.settings_service", "settings_service", "_ensure_schema"),
@@ -59,6 +63,33 @@ def init_all_subsystem_schemas():
                 getattr(obj, meth_name)()
         except Exception:
             pass
+
+    # Tenant security and governance managers
+    try:
+        from core.killswitch_matrix import KillSwitchMatrix
+        KillSwitchMatrix("tnt_bootstrap")._ensure_table()
+    except Exception:
+        pass
+    try:
+        from core.cost_governor import CostGovernor
+        CostGovernor("tnt_bootstrap")._ensure_table()
+    except Exception:
+        pass
+    try:
+        from core.secret_vault import SecretVault
+        SecretVault()._ensure_table()
+    except Exception:
+        pass
+    try:
+        from core.sovereign_key_manager import SovereignKeyManager
+        SovereignKeyManager("tnt_bootstrap")._ensure_table()
+    except Exception:
+        pass
+    try:
+        from core.approval_revocation import ApprovalRevocationEngine
+        ApprovalRevocationEngine("tnt_bootstrap")._ensure_table()
+    except Exception:
+        pass
 
 @pytest.fixture(scope="session", autouse=True)
 def isolate_test_environment():

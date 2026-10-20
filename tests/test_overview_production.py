@@ -29,6 +29,7 @@ class TestOverviewProductionRebuild(unittest.TestCase):
         import tempfile
         cls.orig_db_path = db.db_path
         cls.orig_env_db_path = os.environ.get("ZONATA_DB_PATH")
+        cls.orig_ev_path = os.environ.get("ZONATA_EVIDENCE_PATH")
         cls.temp_dir = tempfile.TemporaryDirectory()
         src_baseline = os.path.join(BASE_DIR, "storage", "roboassistant.db")
         cls.isolated_db = os.path.join(cls.temp_dir.name, "overview_baseline_copy.db")
@@ -36,6 +37,12 @@ class TestOverviewProductionRebuild(unittest.TestCase):
             shutil.copy2(src_baseline, cls.isolated_db)
         os.environ["ZONATA_DB_PATH"] = cls.isolated_db
         db.set_db_path(cls.isolated_db)
+
+        src_evidence = os.path.join(BASE_DIR, "storage", "evidence", "audit_ledger.jsonl")
+        cls.isolated_ev = os.path.join(cls.temp_dir.name, "audit_ledger_copy.jsonl")
+        if os.path.exists(src_evidence):
+            shutil.copy2(src_evidence, cls.isolated_ev)
+            os.environ["ZONATA_EVIDENCE_PATH"] = cls.isolated_ev
 
     @classmethod
     def tearDownClass(cls):
@@ -46,6 +53,11 @@ class TestOverviewProductionRebuild(unittest.TestCase):
                 os.environ["ZONATA_DB_PATH"] = cls.orig_env_db_path
             else:
                 os.environ.pop("ZONATA_DB_PATH", None)
+        if hasattr(cls, "orig_ev_path"):
+            if cls.orig_ev_path is not None:
+                os.environ["ZONATA_EVIDENCE_PATH"] = cls.orig_ev_path
+            else:
+                os.environ.pop("ZONATA_EVIDENCE_PATH", None)
         if hasattr(cls, "temp_dir") and cls.temp_dir:
             cls.temp_dir.cleanup()
 

@@ -589,10 +589,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "timestamp": time.time()
                 }, status=503)
                 return
+            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "70e1501"
+            git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": "1.0.0-GA",
+                "commit": git_commit,
+                "branch": git_branch,
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
@@ -601,10 +605,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
+            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "70e1501"
+            git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": "1.0.0-GA",
+                "commit": git_commit,
+                "branch": git_branch,
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",

@@ -427,6 +427,13 @@ class MultimodalCapabilityRegistry:
         ]
 
         with db.get_connection() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO tenants (tenant_id, name, status, created_at) VALUES (?, ?, 'ACTIVE', ?) ON CONFLICT(tenant_id) DO NOTHING",
+                    (self.tenant_id, "System Primary", now)
+                )
+            except Exception:
+                pass
             for c in caps:
                 conn.execute(
                     """
