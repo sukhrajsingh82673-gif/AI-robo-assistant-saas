@@ -22,6 +22,11 @@ import uuid
 import hashlib
 import hmac
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
+try:
+    import cryptography
+    CRYPTOGRAPHY_VERSION = getattr(cryptography, "__version__", "unknown")
+except Exception:
+    CRYPTOGRAPHY_VERSION = "unavailable"
 
 logger = logging.getLogger("api_server")
 _SERVER_BOOT_TIME = time.time()
@@ -600,6 +605,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
+                "cryptography_version": CRYPTOGRAPHY_VERSION,
                 "timestamp": time.time()
             })
             return
@@ -616,6 +622,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
+                "cryptography_version": CRYPTOGRAPHY_VERSION,
                 "timestamp": time.time()
             })
             return
