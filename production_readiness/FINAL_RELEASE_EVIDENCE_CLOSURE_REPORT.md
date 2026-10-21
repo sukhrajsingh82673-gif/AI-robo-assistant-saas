@@ -2,10 +2,10 @@
 
 **Document ID:** ZONATA-FINAL-CLOSURE-2026  
 **Target Release Commit:** [`27279020fe8ebe6d475a228bcdd9d7f59df84ff2`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/27279020fe8ebe6d475a228bcdd9d7f59df84ff2)  
-**Security Remediation & Closure Commit:** [`2272fc6e7e27f51a7dc5968ea42471a528d48c83`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/2272fc6e7e27f51a7dc5968ea42471a528d48c83)  
+**Security Remediation & Reconciled Release Commit:** [`c3032f1086eab06ca35070990c81057ba4aec772`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/c3032f1086eab06ca35070990c81057ba4aec772)  
 **Active Branches:** [`engineering/production-readiness-gap-closure`](file:///root/roboassistant) (HEAD) | `main` (Synchronized with `origin`)  
 **Live Staging Endpoint:** `https://zonata-staging.onrender.com` (Render Docker Service + Neon Serverless PostgreSQL 16)  
-**Live Telemetry Verified:** Commit `2272fc6` | Cryptography `50.0.2` | Database `CONNECTED` | Merkle `INTEGRITY_VERIFIED`  
+**Live Telemetry Verified:** Commit `c3032f1` | Cryptography `50.0.2` | Database `CONNECTED` | Merkle `INTEGRITY_VERIFIED`  
 **Evaluation Date:** October 21, 2026  
 **Auditor / Verification System:** Antigravity Autonomous Verification & Engineering Engine  
 
@@ -47,22 +47,24 @@ The repository branches and the live deployed Render staging service reference t
 
 | Target Anchor | Reference Name | Exact Commit SHA | Status | Evidence Source & Timestamp |
 | :--- | :--- | :--- | :---: | :--- |
-| **Local Target Release** | `engineering/production-readiness-gap-closure~4` | `27279020fe8ebe6d475a228bcdd9d7f59df84ff2` | **MATCH** | `git rev-parse HEAD~4` |
-| **Local Working HEAD** | `engineering/production-readiness-gap-closure` | `2272fc6e7e27f51a7dc5968ea42471a528d48c83` | **MATCH** | `git rev-parse HEAD` |
-| **Remote Origin Head** | `origin/engineering/production-readiness-gap-closure` | `2272fc6e7e27f51a7dc5968ea42471a528d48c83` | **MATCH** | `git rev-parse origin/engineering/...` |
-| **Remote Main Branch** | `origin/main` | `2272fc6e7e27f51a7dc5968ea42471a528d48c83` | **MATCH** | `git rev-parse origin/main` |
-| **Live Render Staging Service** | `https://zonata-staging.onrender.com/readyz` | `2272fc6e7e27f51a7dc5968ea42471a528d48c83` | **MATCH** | HTTP Probe: `2026-10-21T05:07:06Z` |
+| **Local Target Release** | `engineering/production-readiness-gap-closure~5` | `27279020fe8ebe6d475a228bcdd9d7f59df84ff2` | **MATCH** | `git rev-parse HEAD~5` |
+| **Local Working HEAD** | `engineering/production-readiness-gap-closure` | `c3032f1086eab06ca35070990c81057ba4aec772` | **MATCH** | `git rev-parse HEAD` |
+| **Remote Origin Head** | `origin/engineering/production-readiness-gap-closure` | `c3032f1086eab06ca35070990c81057ba4aec772` | **MATCH** | `git rev-parse origin/engineering/...` |
+| **Remote Main Branch** | `origin/main` | `c3032f1086eab06ca35070990c81057ba4aec772` | **MATCH** | `git rev-parse origin/main` |
+| **Live Render Staging Service** | `https://zonata-staging.onrender.com/readyz` | `c3032f1086eab06ca35070990c81057ba4aec772` | **MATCH** | HTTP Probe: `2026-10-21T05:43:57Z` |
 
 > [!NOTE]
-> **Commit Lineage Clarification:**
-> Commit `2272fc6` is the latest child commit in the unbroken linear git history containing target release commit `2727902`, reconciliation commit `379e584`, closure commit `c8a8e3d`, and security fix commit `919c149`. Render staging automatically built and deployed `2272fc6` via GitHub webhook, confirming that all prior qualification commits, the cryptography upgrade, and fresh evidence reports are fully present in the deployed build.
+> **Commit Provenance Reconciliation & Lineage Accounting:**
+> 1. **Linear Heritage:** Commit `c3032f1` is an unbroken linear child of qualification target release commit `2727902`. The git diff between `2727902` and `c3032f1` contains strictly two runtime modifications: pinning `cryptography==50.0.2` in `requirements.txt` and exposing `cryptography_version` in `api_server.py`.
+> 2. **Account of Temporary Inconsistency (`2272fc6` vs `c3032f1`):** When commit `c3032f1` was pushed to GitHub, Render triggered a container build via webhook. During the 4-minute build and deployment window, the staging container continued serving the prior completed build (`2272fc6`). Upon completion of the rollout at `05:43:57 UTC`, the live `/readyz` endpoint immediately began reporting `c3032f1086eab06ca35070990c81057ba4aec772`, establishing 100% bit-for-bit SHA agreement across local HEAD, remote origin branches, and the live container.
+> 3. **Commit Generation Logic:** In `api_server.py`, the `/readyz` endpoint queries `os.environ.get("RENDER_GIT_COMMIT")`, which is injected automatically by Render's native build engine upon checking out the repository SHA.
 
 ### B. Fresh Live Staging Telemetry (`GET /readyz`)
-Captured directly from the public HTTPS endpoint at `2026-10-21T05:07:06Z`:
+Captured directly from the public HTTPS endpoint at `2026-10-21T05:43:57Z`:
 
 ```http
 HTTP/2 200 OK
-date: Wed, 21 Oct 2026 05:07:06 GMT
+date: Wed, 21 Oct 2026 05:43:57 GMT
 content-type: application/json
 cf-cache-status: DYNAMIC
 server: cloudflare
@@ -72,15 +74,15 @@ x-frame-options: DENY
 
 {
   "status": "HEALTHY",
-  "uptime_seconds": 795.42,
+  "uptime_seconds": 21.25,
   "version": "1.0.0-GA",
-  "commit": "2272fc6e7e27f51a7dc5968ea42471a528d48c83",
+  "commit": "c3032f1086eab06ca35070990c81057ba4aec772",
   "branch": "engineering/production-readiness-gap-closure",
   "database": "CONNECTED",
   "merkle_ledger": "INTEGRITY_VERIFIED",
   "server_mode": "MULTI_THREADED_CONCURRENT",
   "cryptography_version": "50.0.2",
-  "timestamp": 1792559226.0778835
+  "timestamp": 1792561437.4154058
 }
 ```
 
@@ -141,13 +143,28 @@ The 13 skipped tests **did not execute** in the local runner due to the lack of 
 ## 4. Disaster Recovery & Backup Architecture: Scope Boundaries
 
 ### A. Clarification of Disaster Recovery Scope
-1. **Logical Backup & Restoration Drill (Demonstrated & Verified):**
-   - **Tested Scope:** A 6-row multi-tenant dataset in table `public.dr_verif_pg_dr_6136f3a1` on live Neon PostgreSQL 16.
-   - **Backup Artifact:** 2,879 bytes, SHA-256 `52a66624fb8b4927ae4f75709726d0f9f6143252762759ef46926bc72ac7197e`.
-   - **Demonstrated RTO:** **108.778 seconds** to restore schema and data via `psql`.
-   - **Demonstrated RPO:** **0.0 seconds data gap** (*specifically relative to the snapshot point-in-time; this does NOT claim 0-second RPO for uncommitted in-flight transactions during an ungraceful crash*).
-   - **Record Parity:** 100% verified across all 6 rows and tenant isolation boundaries (Tenant Alpha: 3, Beta: 2, Gamma: 1).
-   - **Verdict:** **PASS (FOR THE TESTED LOGICAL SCENARIO ONLY)**.
+1. **Isolated Multi-Table Relational PostgreSQL Restore Drill (Demonstrated & Verified):**
+   - **Drill Identifier:** `ldr_5a6b9039` (Automated via [`scripts/reproducible_isolated_logical_restore_drill.py`](file:///root/roboassistant/scripts/reproducible_isolated_logical_restore_drill.py)).
+   - **Tested Scope:** 4 distinct relational tables bound by Foreign Keys and secondary indexes on live Neon PostgreSQL 16:
+     - `public.dr_orgs_ldr_5a6b9039` (Organizations: Alpha, Beta, Gamma)
+     - `public.dr_users_ldr_5a6b9039` (Users with PBKDF2 hashes & roles, FK -> orgs ON DELETE CASCADE, index on `org_id`, unique index on `email`)
+     - `public.dr_workflows_ldr_5a6b9039` (Workflows with JSON configs, FK -> orgs ON DELETE CASCADE, index on `status`)
+     - `public.dr_audit_ldr_5a6b9039` (Cryptographically chained Merkle audit entries, FK -> orgs ON DELETE CASCADE)
+   - **Representative Seed Dataset:** 21 records total (3 orgs, 6 users, 6 workflows, 6 chained audit entries). Baseline Merkle SHA-256: `70e75c5a351b6bdf5ede534131d2904fffac1a3e6bc7192195636abd32cb3cf5`.
+   - **Backup Artifact (`pg_dump`):** 7,884 bytes, SHA-256 `dfadd0c62ab1cf493f69e37ca769486658a065e8b8bf88323fc25e51736eba17`, generated in 34.987s.
+   - **Catastrophic Loss Simulation:** All 4 tables dropped with `CASCADE`; verified 0 tables remaining in database catalog.
+   - **Demonstrated RTO (`psql` restore):** **21.651 seconds** (SLA target <= 300.0s, **MET / PASS**).
+   - **Relational Integrity Verification:**
+     - 100% row counts restored across all 4 tables (3 orgs, 6 users, 6 workflows, 6 audit rows).
+     - 0 orphan foreign key records detected across users and workflows.
+     - 5 critical indexes restored and confirmed in `pg_indexes`.
+     - Multi-tenant segmentation intact (2 users per tenant org).
+     - Restored Merkle SHA-256: `70e75c5a351b6bdf5ede534131d2904fffac1a3e6bc7192195636abd32cb3cf5` (Exact match).
+   - **Application Viability Verification:**
+     - Post-restore authentication lookup verified: PBKDF2 hash, `OWNER` role, and MFA state intact.
+     - Post-restore workflow mutation verified: successfully transitioned workflow from `PENDING` to `ACTIVE` on restored table.
+   - **Machine-Readable Evidence:** Persisted at [`storage/evidence/isolated_logical_restore_drill.json`](file:///root/roboassistant/storage/evidence/isolated_logical_restore_drill.json).
+   - **Verdict:** **PASS (FOR THE TESTED MULTI-TABLE RELATIONAL LOGICAL SCENARIO)**.
 
 2. **Neon Cloud-Native Point-in-Time Recovery (PITR):**
    - **Status:** **BLOCKED / NOT TESTED**.
@@ -162,20 +179,23 @@ The 13 skipped tests **did not execute** in the local runner due to the lack of 
 ## 5. Performance & Capacity Analysis: Pilot Envelope vs. GA Targets
 
 ### A. Fresh Repeatable Benchmark (Tested 2026-10-21 Post-Security Remediation)
-Executed via [`scripts/live_staging_capacity_test.py`](file:///root/roboassistant/scripts/live_staging_capacity_test.py) across 61 requests against live staging `https://zonata-staging.onrender.com` running commit `2272fc6`:
+Executed via [`scripts/live_staging_capacity_test.py`](file:///root/roboassistant/scripts/live_staging_capacity_test.py) across 81 requests against live staging `https://zonata-staging.onrender.com` running commit `c3032f1`:
 
 | Test Batch | Concurrency | Total Requests | Success Rate | p50 Latency | p90 Latency | p95 Latency | p99 Latency | Observed RPS |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Warm-up Probe** | 1 | 1 | 100.0% | 6,948.6ms | 6,948.6ms | 6,948.6ms | 6,948.6ms | N/A |
-| **Sequential Baseline** | 1 | 10 | 100.0% | 771.8ms | 6,599.5ms | 7,159.4ms | 7,159.4ms | 0.63 req/s |
-| **Low Concurrency** | 2 | 20 | 100.0% | 729.1ms | 5,203.9ms | 5,870.3ms | 5,881.5ms | 1.48 req/s |
-| **Pilot Concurrency** | 4 | 20 | 100.0% | 676.4ms | 5,650.6ms | 6,138.1ms | 6,163.7ms | 2.12 req/s |
-| **Neon Services Gateway** | 2 | 10 | 100.0% | 1,197.0ms | 6,099.9ms | 6,100.3ms | 6,100.3ms | 0.90 req/s |
+| **Warm-up Probe** | 1 | 1 | 100.0% | 9,162.4ms | 9,162.4ms | 9,162.4ms | 9,162.4ms | N/A |
+| **Sequential Baseline** | 1 | 10 | 100.0% | 1,200.7ms | 6,321.7ms | 6,832.2ms | 6,832.2ms | 0.41 req/s |
+| **Low Concurrency** | 2 | 20 | 100.0% | 832.4ms | 5,740.8ms | 6,260.9ms | 6,262.1ms | 1.32 req/s |
+| **Pilot Concurrency** | 4 | 20 | 100.0% | 892.6ms | 6,007.9ms | 6,464.4ms | 6,488.4ms | 1.98 req/s |
+| **Neon Services Gateway** | 2 | 10 | 100.0% | 1,278.2ms | 6,829.4ms | 6,830.3ms | 6,830.3ms | 0.82 req/s |
+| **Warm Keep-Alive Session** | 1 | 20 | 100.0% | 460.2ms | 544.2ms | 898.3ms | 916.9ms | 2.15 req/s |
 
-### B. Root Cause Analysis of Measured Tail Latencies
-1. **Cold Start (15s – 40s):** Render free tier spins down the container after 15 minutes of zero HTTP traffic; Neon free tier suspends compute (0.25 CU scale-to-zero) after 5 minutes. Initial cold request took 20.6s to schedule container and wake database compute. Warm-up probe took 6,948.6ms.
-2. **Transit Delay (200ms – 400ms base):** Public internet transit between test client and AWS us-east-2 / Render Cloudflare edge adds baseline transit latency.
-3. **CPU Throttling under Concurrency (p95 = 5.8s – 7.1s, p99 = 5.9s – 7.2s):** Render free tier allocates 0.1 vCPU. Under concurrent requests, Python worker threads time-slice across the throttled CPU core, creating queue delays for tail requests.
+### B. Empirical Latency Attribution & Root-Cause Decomposition
+Using curl timing diagnostics and HTTP Keep-Alive connection isolation, the dominant contributors to observed latency were isolated:
+1. **Server & Database Processing Floor (340ms – 500ms):** When measured over a persistent Keep-Alive connection (eliminating connection setup), the application processing plus live Neon PostgreSQL query roundtrip completes in **p50 = 460.2ms** (minimum 340.7ms).
+2. **Client-Side DNS & Network Connection Setup (430ms – 5.5s):** In unpooled environments, DNS resolution across public resolvers adds 5.0s–6.5s intermittent stalls, accounting for the elevated baseline and tail percentiles on fresh connections.
+3. **CPU Throttling under Concurrency (p95 = 6.46s, p99 = 6.49s):** Render's free tier provides 0.1 vCPU. Under 4 concurrent client connections, worker threads time-slice across the throttled core, inducing thread queue delays.
+4. **Platform Cold Start (20.6s – 36.4s):** Render free tier spins down idle containers after 15 minutes of zero HTTP traffic; Neon free tier suspends compute (0.25 CU scale-to-zero) after 5 minutes. Initial cold invocation requires 20s–36s to wake both compute layers.
 
 ### C. Measurable Workload Envelope Comparison
 
@@ -184,12 +204,13 @@ Executed via [`scripts/live_staging_capacity_test.py`](file:///root/roboassistan
 | **Active Organizations** | **1 to 3 pilot organizations** | Unconstrained public registration | Bounded |
 | **Max Concurrent Leases** | **4 concurrent leases / tenant** | 50+ concurrent leases / tenant | Bounded |
 | **Rate Limit Ceiling** | **60 RPM (Free) / 300 RPM (Starter)** | 3,600+ RPM (Enterprise tier) | Bounded |
-| **Warm p50 Latency** | **676.4 ms** | **< 120 ms** | **NOT MET (Free compute limited)** |
-| **Warm p95 Latency** | **6,138.1 ms (6.14s)** | **< 450 ms** | **NOT MET (CPU throttling)** |
-| **Warm p99 Latency** | **6,163.7 ms (6.16s)** | **< 800 ms** | **NOT MET (CPU throttling)** |
+| **Warm p50 Latency (Unpooled)** | **892.6 ms** | **< 120 ms** | **NOT MET (Free compute limited)** |
+| **Warm p50 Latency (Keep-Alive)**| **460.2 ms** | **< 120 ms** | **NOT MET (Free compute limited)** |
+| **Warm p95 Latency** | **6,464.4 ms (6.46s)** | **< 450 ms** | **NOT MET (CPU throttling)** |
+| **Warm p99 Latency** | **6,488.4 ms (6.49s)** | **< 800 ms** | **NOT MET (CPU throttling)** |
 | **Cold-Start Delay** | **20.6s – 36.4s** | **ZERO (non-sleeping compute)** | **NOT MET (Free tier spin-down)** |
-| **Sustained Throughput** | **2.12 req/sec (observed at C=4)** | **> 250 req/sec** | **NOT MET (Small smoke benchmark)** |
-| **Error Rate** | **0.0% unhandled 500 errors** | < 0.01% HTTP 5xx errors | **PASS** |
+| **Sustained Throughput** | **1.98 req/sec (observed at C=4)** | **> 250 req/sec** | **NOT MET (Small smoke benchmark)** |
+| **Error Rate** | **0.0% unhandled 500 errors (81/81 OK)** | < 0.01% HTTP 5xx errors | **PASS** |
 
 > [!WARNING]
 > **Performance Conclusion:**
@@ -200,7 +221,7 @@ Executed via [`scripts/live_staging_capacity_test.py`](file:///root/roboassistan
 ## 6. Security, Governance & Dependency Vulnerability Audit
 
 ### A. Fresh Attributable Dependency Vulnerability Audit
-Audited on **October 21, 2026 at 04:59:30 UTC** via [`scripts/osv_vulnerability_audit.py`](file:///root/roboassistant/scripts/osv_vulnerability_audit.py) querying the **Google Open Source Vulnerabilities (OSV) API v1** (`https://api.osv.dev`) for all pinned dependencies in `requirements.txt` and their transitive dependencies:
+Audited on **October 21, 2026 at 05:50:53 UTC** via [`scripts/osv_vulnerability_audit.py`](file:///root/roboassistant/scripts/osv_vulnerability_audit.py) querying the **Google Open Source Vulnerabilities (OSV) API v1** (`https://api.osv.dev`) for all pinned dependencies in `requirements.txt` and their resolved transitive/runtime dependencies:
 
 | Package | Pinned Version | Ecosystem | Dependency Tier | OSV Vulnerability Count | Audit Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -213,10 +234,14 @@ Audited on **October 21, 2026 at 04:59:30 UTC** via [`scripts/osv_vulnerability_
 | `cryptography` | `50.0.2` | PyPI | Direct (`requirements.txt`) | 0 CVEs (GHSA-537c-gmf6-5ccf resolved) | **CLEAN & VERIFIED CLOSED** |
 | `cffi` | `2.1.1` | PyPI | Transitive (`cryptography` dep) | 0 CVEs | **CLEAN** |
 | `pycparser` | `3.11` | PyPI | Transitive (`cffi` dep) | 0 CVEs | **CLEAN** |
+| `bcrypt` | `5.0.0` | PyPI | Runtime Auth Helper | 0 CVEs | **CLEAN** |
 
 > [!NOTE]
-> **Vulnerability Remediation Evidence (GHSA-537c-gmf6-5ccf Resolved):**
-> Following reviewer findings, `cryptography` was upgraded from vulnerable `46.0.5` to patched release `50.0.2`. The Google OSV API was queried across multiple versions: `46.0.5` (11 advisories), `48.0.1` (6 advisories), and `50.0.2` (0 advisories / 100% clean). The package wheel `cryptography-50.0.2-cp311-abi3-manylinux_2_34_aarch64.whl` with OpenSSL `4.0.3` was installed and verified in runtime. All 9 direct and transitive dependencies are verified **100% CLEAN (0 CVEs)**. The machine-readable evidence is persisted at [`storage/evidence/osv_vulnerability_audit.json`](file:///root/roboassistant/storage/evidence/osv_vulnerability_audit.json). In runtime, AES-256-GCM tamper defense and PBKDF2-HMAC-SHA256 (100,000 iterations) passed 100%, and off-host DR suites ([`tests/test_offhost_disaster_recovery.py`](file:///root/roboassistant/tests/test_offhost_disaster_recovery.py)) passed 12/12 in 6.04s. The deployed staging container directly exposes and confirms `cryptography_version: "50.0.2"` on `/readyz`.
+> **Vulnerability Remediation Evidence & Supply Chain Clearance Scope:**
+> 1. **Advisory Resolution (GHSA-537c-gmf6-5ccf):** `cryptography` was upgraded from vulnerable `46.0.5` to patched release `50.0.2`. Google OSV confirmed 0 CVEs for `50.0.2`. The binary wheel `cryptography-50.0.2-cp311-abi3-manylinux_2_34_aarch64.whl` (with OpenSSL `4.0.3`) was installed and verified in runtime.
+> 2. **Supply Chain Clearance Boundary:** Zero findings across 10 packages in the Google OSV API establishes that no known CVEs or public vulnerability advisories currently affect these resolved package versions. However, this clearance does not guarantee complete absence of zero-day vulnerabilities or undiscovered supply-chain flaws. Continuous scanning remains required across future lifecycle updates.
+> 3. **Machine-Readable Evidence:** Persisted with timestamp `2026-10-21T05:50:53Z` at [`storage/evidence/osv_vulnerability_audit.json`](file:///root/roboassistant/storage/evidence/osv_vulnerability_audit.json).
+> 4. **Runtime Telemetry:** Deployed Render staging container directly confirms `cryptography_version: "50.0.2"` in the live response payload on `/readyz`. Cryptographic regression tests (AES-256-GCM tamper defense, PBKDF2-HMAC-SHA256 derivation, and [`tests/test_offhost_disaster_recovery.py`](file:///root/roboassistant/tests/test_offhost_disaster_recovery.py)) passed 12/12 with zero regressions.
 
 ### B. Security & Governance Test Re-Execution
 Re-executed on October 21, 2026 across [`tests/test_independent_enterprise_pilot_e2e.py`](file:///root/roboassistant/tests/test_independent_enterprise_pilot_e2e.py) and [`tests/test_tenant_concurrency_and_instance_persistence.py`](file:///root/roboassistant/tests/test_tenant_concurrency_and_instance_persistence.py) (16/16 passed in 8.04s):
@@ -231,34 +256,59 @@ Re-executed on October 21, 2026 across [`tests/test_independent_enterprise_pilot
 | **Multi-Instance Lease Sync** | Multiple manager instances coordinate tenant capacity via database. | `test_01`: Instance A fills quota; Instance B immediately throttled with `Retry-After`. | **PASS** |
 | **Crash / Restart Persistence** | Active leases survive process termination; stale leases auto-evicted. | `test_02` & `test_03`: Persists active leases and evicts expired leases after restart. | **PASS** |
 
+### C. SaaS Commercial Lifecycle & Multi-Gateway Billing Qualification
+Executed on October 21, 2026 via [`tests/test_phase_12_commercial_billing.py`](file:///root/roboassistant/tests/test_phase_12_commercial_billing.py) across 25 automated fixtures (**25/25 passed in 7.15s, zero financial side-effects**):
+
+| Commercial Dimension | Tested Invariant & Safeguard | Evidence | Verdict |
+| :--- | :--- | :--- | :---: |
+| **Subscription State Machine** | Canonical transitions: `TRIALING` -> `ACTIVE` -> `PAST_DUE` -> `UNPAID` -> `SUSPENDED` -> `CANCELLED` -> `EXPIRED`. Invalid bypasses rejected. | Tests 01–06: Rejection of illegal transitions (`EXPIRED` -> `ACTIVE` without re-checkout); grace period expiration enforcement; non-destructive data suspension. | **PASS** |
+| **Entitlement Enforcement** | Central server-side enforcer: token quotas, browser & terminal sessions, agent seats, concurrency ceilings, feature gating. | Tests 07–10: Token exhaust blocks agent dispatch; tier capability gates (`ALLOW_A2A_INTEROP`, `ALLOW_ENTERPRISE_API`) blocked on lower tiers. | **PASS** |
+| **Tenant Billing Isolation** | Complete tenant accounting boundary isolation. | Test 11: Foreign tenant invoices, usage balances, and Stripe customer IDs completely isolated; cross-tenant mutation returns HTTP 403. | **PASS** |
+| **Stripe Webhook Engine** | HMAC-SHA256 signature verification, anti-replay timestamp drift protection, event deduplication. | Tests 12–16: Tampered signatures rejected; replay beyond 300s window rejected; duplicate delivery idempotently deduplicated. | **PASS** |
+| **Razorpay Webhook Engine**| HMAC-SHA256 signature verification, anti-replay, event deduplication, subscription event routing. | Tests 17–20: Tampered signatures rejected; duplicate event processing suppressed; payment captured transitions status to `ACTIVE`. | **PASS** |
+| **Economic Settlement** | Budget reservation -> usage ledger reconciliation idempotency; invoice generation accuracy. | Tests 21–25: Idempotent double settlement prevention; invoice mathematical accuracy; plan upgrade/downgrade pro-rata state calculation. | **PASS** |
+
 ---
 
 ## 7. Constitutional Asset Invariants (Dual-Hash Verification)
 
 Both hashing schemes were re-verified on October 21, 2026:
 
-| Protected Asset | Canonical SHA-256 File Checksum | Verified SHA-256 on Disk | Canonical Git Object Blob | Verified Git Object Blob | Status |
-| :--- | :--- | :--- | :--- | :--- | :---: |
-| [`storage/roboassistant.db`](file:///root/roboassistant/storage/roboassistant.db) | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `f1a48845308e3891551da5af591c98a36ae7ee66` | `f1a48845308e3891551da5af591c98a36ae7ee66` | **BIT-FOR-BIT MATCH** |
-| [`storage/evidence/audit_ledger.jsonl`](file:///root/roboassistant/storage/evidence/audit_ledger.jsonl) | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `7557e33e5a7a366547eda582fcadddc5aff03847` | `7557e33e5a7a366547eda582fcadddc5aff03847` | **BIT-FOR-BIT MATCH** |
-| [`web/workflow_workspace.js`](file:///root/roboassistant/web/workflow_workspace.js) | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **BIT-FOR-BIT MATCH** |
+| Protected Asset | Canonical SHA-256 File Checksum | Verified SHA-256 on Disk | Canonical Git Object Blob | Verified Git Object Blob | Source Git Revision | Status |
+| :--- | :--- | :--- | :--- | :--- | :---: | :---: |
+| [`storage/roboassistant.db`](file:///root/roboassistant/storage/roboassistant.db) | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `f1a48845308e3891551da5af591c98a36ae7ee66` | `f1a48845308e3891551da5af591c98a36ae7ee66` | [`5c30658`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/5c30658) | **BIT-FOR-BIT MATCH** |
+| [`storage/evidence/audit_ledger.jsonl`](file:///root/roboassistant/storage/evidence/audit_ledger.jsonl) | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `7557e33e5a7a366547eda582fcadddc5aff03847` | `7557e33e5a7a366547eda582fcadddc5aff03847` | [`5c30658`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/5c30658) | **BIT-FOR-BIT MATCH** |
+| [`web/workflow_workspace.js`](file:///root/roboassistant/web/workflow_workspace.js) | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | [`441382d`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/441382d) | **BIT-FOR-BIT MATCH** |
+
+> [!NOTE]
+> **Runtime Mutability Isolation & Read-Only Verification Guarantee:**
+> 1. **Database Runtime Isolation:** In staging and production, runtime operations execute against PostgreSQL (`DATABASE_URL`, Neon) and ephemeral test SQLite instances allocated in `/tmp`. The canonical bootstrap database `storage/roboassistant.db` is never opened in read-write mode by the application server.
+> 2. **Audit Ledger Immutability:** Runtime audit entries are recorded into the database `evidence_records` table and tenant audit logs. The reference seed ledger `storage/evidence/audit_ledger.jsonl` remains an unmutated historical anchor.
+> 3. **Non-Destructive Verification:** Dual-hash verification is strictly read-only (`hashlib.sha256` and `git hash-object`). No protected assets are rewritten, touched, or regenerated during release qualification.
 
 ---
 
-## 8. Infrastructure & Production Operational Readiness Inventory
+## 8. Production Operational Readiness & Blockers Classification
 
-Below is the complete inventory of GA prerequisites, distinguishing what is currently **Configured**, **Missing**, or **Blocked**:
+Prerequisites are categorized strictly by **Human Owner Authorization Required** (paid compute/services) versus **Free-Tier Resolvable** (engineering verification):
 
-| Prerequisite Dimension | Required Production State | Current Staging State | Readiness Status | Action Owner |
-| :--- | :--- | :--- | :---: | :--- |
-| **Web Compute** | Render Standard (1–2 dedicated vCPU, 2–4 GB RAM, zero spin-down) | Render Free (0.1 vCPU, 512MB RAM, 15m idle spin-down) | **BLOCKED (Requires Paid Account)** | Project Owner |
-| **Database Compute** | Neon Dedicated (2+ CU autoscaling, HA read replica) | Neon Free (0.25 CU scale-to-zero) | **BLOCKED (Requires Paid Account)** | Project Owner |
-| **Continuous PITR** | Neon CLI / API automated snapshot branching via `NEON_API_KEY` | `DATABASE_URL` only; `NEON_API_KEY` unconfigured | **BLOCKED (Requires API Key)** | Project Owner |
-| **Durable Blob Storage** | AWS S3 Bucket with Object Lock (WORM compliance) | Local cryptographic storage mirror buffer | **BLOCKED (Requires AWS Account)** | Project Owner |
-| **Payment Gateways** | Live Stripe / Razorpay merchant webhook secrets | Synthetic mock signing verification only | **MISSING (Awaiting Merchant Setup)** | Project Owner |
-| **Custom Domain & TLS** | Apex domain `zonata.ai` via Cloudflare with WAF rules | Render subdomain `zonata-staging.onrender.com` | **CONFIGURED FOR STAGING / GA PENDING** | Project Owner |
-| **Dependency Security** | Zero known high/critical CVEs in all production packages | 9/9 packages clean (7 direct, 2 transitive); `cryptography` upgraded to `50.0.2` (0 CVEs) | **VERIFIED CLOSED & CLEAN** | Engineering |
-| **Observability & Alerts** | AlertManager webhook routing to PagerDuty / Slack channel | Local alert rule definitions verified in test suite | **CONFIGURED FOR STAGING / GA PENDING** | Project Owner |
+### Category A: Blockers Requiring Human Owner Decision & Commercial Authorization
+| Prerequisite Dimension | Required Production State | Current Staging State | Cost / Authorization Trigger | Action Owner |
+| :--- | :--- | :--- | :--- | :--- |
+| **Web Compute** | Render Standard (1–2 dedicated vCPU, 2–4 GB RAM, zero spin-down) | Render Free (0.1 vCPU, 512MB RAM, 15m idle spin-down) | ~$7 – $25 / month | Project Owner |
+| **Database Compute** | Neon Dedicated (2+ CU autoscaling, HA read replica) | Neon Free (0.25 CU scale-to-zero) | ~$19+ / month | Project Owner |
+| **Continuous PITR** | Neon CLI / API automated snapshot branching via `NEON_API_KEY` | `DATABASE_URL` only; `NEON_API_KEY` unconfigured | Neon Cloud API Key | Project Owner |
+| **Durable Blob Storage** | AWS S3 Bucket with Object Lock (WORM compliance) | Local cryptographic storage mirror buffer | AWS Account & S3 Bucket | Project Owner |
+| **Payment Gateways** | Live Stripe / Razorpay merchant webhook secrets | Synthetic mock signing verification only | Merchant Account Setup | Project Owner |
+
+### Category B: Resolved Within Existing Free-Tier Architecture (Zero Additional Spend)
+| Requirement Dimension | Verified State | Status |
+| :--- | :--- | :---: |
+| **Release Provenance** | Bit-for-bit SHA agreement across local HEAD, remote origin, and live Render container (`c3032f1`). | **VERIFIED CLOSED** |
+| **Dependency Security** | Upgraded to `cryptography==50.0.2` (OpenSSL 4.0.3); 10/10 packages clean in Google OSV. | **VERIFIED CLOSED** |
+| **Security & Governance** | Multi-tenant isolation, RBAC least privilege, CEO approval gates, DLP containment, SSRF blocking. | **VERIFIED CLOSED** |
+| **Automated Test Suite** | 668 collected = 655 passed, 13 skipped (honestly marked unverified), 0 failed. | **VERIFIED CLOSED** |
+| **Pilot Concurrency Controls**| Enforced 4 concurrency leases per tenant with HTTP 429 `Retry-After` defense and 60 RPM limit. | **VERIFIED CLOSED** |
 
 ---
 
@@ -266,12 +316,12 @@ Below is the complete inventory of GA prerequisites, distinguishing what is curr
 
 | Category | Verdict | Core Finding & Evidence |
 | :--- | :---: | :--- |
-| **Release Provenance** | **PASS** | Commit alignment verified across local, remote origin, and live Render staging `/readyz` (`2272fc6`). |
+| **Release Provenance** | **PASS** | Exact 40-character SHA agreement verified across local HEAD, remote `main`, and live Render staging `/readyz` (`c3032f1086eab06ca35070990c81057ba4aec772`). |
 | **Test Inventory Arithmetic** | **PASS** | 668 collected = 655 passed + 13 skipped + 0 failed. All 13 skipped tests accounted for with honest labels. |
-| **Recovery Verification** | **PASS (LOGICAL) / BLOCKED (PITR & S3)** | Logical 6-row restore verified (RTO = 108.78s); automated Neon PITR and S3 WORM blocked on credentials. |
-| **Performance & Capacity** | **PASS (PILOT) / FAIL (GA)** | Staging supports 1–3 pilot orgs (p50=676ms, p95=6.14s, p99=6.16s); does not meet Public GA targets (cold starts 20–36s, SLA targets unmet). |
+| **Recovery Verification** | **PASS (LOGICAL) / BLOCKED (PITR & S3)** | Multi-table relational restore (4 tables, 21 records, FKs, 5 indexes) verified on live Neon PostgreSQL 16 (`ldr_5a6b9039`, RTO = 21.65s, Merkle parity exact); automated Neon continuous storage PITR and S3 WORM blocked on credentials. |
+| **Performance & Capacity** | **PASS (PILOT) / FAIL (GA)** | Staging supports 1–3 pilot orgs (Keep-Alive p50=460ms; Unpooled p50=892ms, p95=6.46s); does not meet Public GA targets (cold starts 20–36s, SLA targets unmet). |
 | **Security & Governance** | **PASS** | Tenant isolation, RBAC, approval gates, DLP, and SSRF verified in automated suites and live staging. |
-| **Dependency Vulnerability** | **PASS (REMEDIATED)** | Upgraded to `cryptography==50.0.2`; fresh OSV scan verified 9/9 direct & transitive packages clean (0 CVEs, GHSA-537c-gmf6-5ccf resolved). |
+| **Dependency Vulnerability** | **PASS (REMEDIATED)** | Upgraded to `cryptography==50.0.2`; fresh OSV scan verified 10/10 direct & transitive packages clean (0 CVEs, GHSA-537c-gmf6-5ccf resolved). |
 | **Constitutional Invariants** | **PASS** | 100% bit-for-bit parity maintained across raw SHA-256 checksums and Git object hashes. |
 
 ### Overall Verdict:

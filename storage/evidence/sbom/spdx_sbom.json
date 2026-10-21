@@ -136,9 +136,9 @@
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-cryptography-46.0.5",
+      "SPDXID": "SPDXRef-Package-cryptography-50.0.2",
       "name": "cryptography",
-      "versionInfo": "46.0.5",
+      "versionInfo": "50.0.2",
       "downloadLocation": "https://pypi.org/project/cryptography",
       "filesAnalyzed": false,
       "licenseConcluded": "Apache-2.0",
@@ -149,7 +149,7 @@
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/cryptography@46.0.5"
+          "referenceLocator": "pkg:pypi/cryptography@50.0.2"
         }
       ]
     },
@@ -799,7 +799,7 @@
     },
     {
       "spdxElementId": "SPDXRef-Package-zonata-enterprise",
-      "relatedSpdxElement": "SPDXRef-Package-cryptography-46.0.5",
+      "relatedSpdxElement": "SPDXRef-Package-cryptography-50.0.2",
       "relationshipType": "DEPENDS_ON"
     },
     {

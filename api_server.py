@@ -377,6 +377,8 @@ if _env_origins:
             ALLOWED_ORIGINS.add(_o.strip())
 
 class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def __init__(self, *args, **kwargs):
         self._request_id = f"req_{uuid.uuid4().hex[:10]}"
         super().__init__(*args, directory=WEB_DIR, **kwargs)

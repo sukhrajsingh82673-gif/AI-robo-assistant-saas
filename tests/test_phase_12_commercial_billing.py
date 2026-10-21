@@ -413,6 +413,25 @@ class TestPhase12CommercialBilling(unittest.TestCase):
         sub = self.engine.get_or_create_subscription(t_id)
         self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
 
+        # 3. Stripe customer.subscription.deleted -> CANCELLED
+        del_event = {
+            "id": f"evt_del_{uuid.uuid4().hex[:8]}",
+            "type": "customer.subscription.deleted",
+            "data": {"object": {"metadata": {"tenant_id": t_id}}}
+        }
+        del_str = json.dumps(del_event)
+        sig3 = self._generate_stripe_header(del_str, self.engine.stripe.webhook_secret, int(time.time()))
+        res3 = self.engine.process_stripe_webhook(del_str, sig3)
+        self.assertTrue(res3["success"])
+
+        sub = self.engine.get_or_create_subscription(t_id)
+        self.assertEqual(sub.status, SubscriptionStatus.CANCELLED)
+
+        # Entitlement check after cancellation must be rejected
+        allowed, msg = self.engine.check_entitlement(t_id, "tokens", 1000)
+        self.assertFalse(allowed)
+        self.assertIn("CANCELLED", msg)
+
     # =========================================================================
     # WORKSTREAM 4: RAZORPAY CRYPTOGRAPHIC WEBHOOK ENGINE
     # =========================================================================
@@ -506,6 +525,25 @@ class TestPhase12CommercialBilling(unittest.TestCase):
 
         sub = self.engine.get_or_create_subscription(t_id)
         self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
+
+        # 3. Razorpay subscription.cancelled -> CANCELLED
+        canc_ev = {
+            "event_id": f"evt_canc_{uuid.uuid4().hex[:8]}",
+            "event": "subscription.cancelled",
+            "payload": {"subscription": {"entity": {"notes": {"tenant_id": t_id}}}}
+        }
+        canc_str = json.dumps(canc_ev)
+        sig3 = self._generate_razorpay_header(canc_str, self.engine.razorpay.webhook_secret)
+        res3 = self.engine.process_razorpay_webhook(canc_str, sig3)
+        self.assertTrue(res3["success"])
+
+        sub = self.engine.get_or_create_subscription(t_id)
+        self.assertEqual(sub.status, SubscriptionStatus.CANCELLED)
+
+        # Entitlement check after cancellation must be rejected
+        allowed, msg = self.engine.check_entitlement(t_id, "tokens", 1000)
+        self.assertFalse(allowed)
+        self.assertIn("CANCELLED", msg)
 
     # =========================================================================
     # WORKSTREAM 5: ECONOMIC GOVERNOR RECONCILIATION & INVOICING

@@ -60,6 +60,66 @@ def probe_endpoint(url: str, headers: Dict[str, str] = None, timeout: float = 30
             "error": str(e)
         }
 
+def run_keepalive_batch(url_path: str, total_requests: int) -> Dict[str, Any]:
+    import http.client
+    print(f"--> Testing Warm Keep-Alive Session across {total_requests} requests on {url_path}...")
+    ctx = ssl.create_default_context()
+    conn = http.client.HTTPSConnection("zonata-staging.onrender.com", 443, context=ctx, timeout=20)
+    
+    latencies: List[float] = []
+    status_counts: Dict[int, int] = {}
+    
+    batch_start = time.time()
+    for _ in range(total_requests):
+        t_start = time.perf_counter()
+        try:
+            conn.request("GET", url_path, headers={"User-Agent": "Zonata-KeepAlive-Tester/1.0"})
+            resp = conn.getresponse()
+            _ = resp.read()
+            duration = (time.perf_counter() - t_start) * 1000.0
+            status_counts[resp.status] = status_counts.get(resp.status, 0) + 1
+            if resp.status == 200:
+                latencies.append(duration)
+        except Exception as e:
+            status_counts[0] = status_counts.get(0, 0) + 1
+            try:
+                conn.close()
+                conn = http.client.HTTPSConnection("zonata-staging.onrender.com", 443, context=ctx, timeout=20)
+            except Exception:
+                pass
+    batch_duration = time.time() - batch_start
+    try:
+        conn.close()
+    except Exception:
+        pass
+        
+    p50 = statistics.median(latencies) if latencies else 0.0
+    p90 = statistics.quantiles(latencies, n=10)[8] if len(latencies) >= 10 else (max(latencies) if latencies else 0.0)
+    p95 = statistics.quantiles(latencies, n=20)[18] if len(latencies) >= 20 else (max(latencies) if latencies else 0.0)
+    p99 = statistics.quantiles(latencies, n=100)[98] if len(latencies) >= 100 else (max(latencies) if latencies else 0.0)
+    
+    rps = round(total_requests / batch_duration, 2)
+    success_rate = round((status_counts.get(200, 0) / total_requests) * 100.0, 1)
+    
+    return {
+        "concurrency": 1,
+        "mode": "HTTP_KEEPALIVE_PERSISTENT",
+        "total_requests": total_requests,
+        "duration_seconds": round(batch_duration, 2),
+        "requests_per_second": rps,
+        "success_rate_percent": success_rate,
+        "status_distribution": status_counts,
+        "latency_ms": {
+            "min": round(min(latencies), 1) if latencies else 0.0,
+            "p50": round(p50, 1),
+            "p90": round(p90, 1),
+            "p95": round(p95, 1),
+            "p99": round(p99, 1),
+            "max": round(max(latencies), 1) if latencies else 0.0,
+            "avg": round(statistics.mean(latencies), 1) if latencies else 0.0
+        }
+    }
+
 def run_concurrency_batch(url: str, concurrency: int, total_requests: int) -> Dict[str, Any]:
     print(f"--> Testing Concurrency={concurrency} across {total_requests} requests on {url}...")
     results: List[Dict[str, Any]] = []
@@ -125,11 +185,20 @@ def run_capacity_test_suite() -> Dict[str, Any]:
     # 5. Neon services endpoint probe
     neon_batch = run_concurrency_batch(f"{TARGET_URL}/api/v1/neon/services", concurrency=2, total_requests=10)
     
+    # 6. Persistent Keep-Alive baseline (isolates server + database processing from connection setup)
+    keepalive_batch = run_keepalive_batch("/readyz", total_requests=20)
+    
     summary = {
         "target_url": TARGET_URL,
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "warmup_ms": round(warmup["duration_ms"], 1),
-        "test_batches": [baseline, low_conc, pilot_conc, neon_batch],
+        "test_batches": [baseline, low_conc, pilot_conc, neon_batch, keepalive_batch],
+        "latency_attribution": {
+            "warm_keepalive_p50_ms": keepalive_batch["latency_ms"]["p50"],
+            "warm_keepalive_p95_ms": keepalive_batch["latency_ms"]["p95"],
+            "server_and_database_floor_ms": keepalive_batch["latency_ms"]["min"],
+            "connection_and_dns_overhead_p50_ms": round(pilot_conc["latency_ms"]["p50"] - keepalive_batch["latency_ms"]["p50"], 1)
+        },
         "pilot_envelope_verdict": {
             "supported_concurrent_users_free_tier": "1 to 3 active enterprise pilot organizations",
             "max_concurrency_leases_per_tenant": 4,
@@ -137,6 +206,7 @@ def run_capacity_test_suite() -> Dict[str, Any]:
             "observed_healthy_rps": pilot_conc["requests_per_second"],
             "p50_latency_ms": pilot_conc["latency_ms"]["p50"],
             "p95_latency_ms": pilot_conc["latency_ms"]["p95"],
+            "p99_latency_ms": pilot_conc["latency_ms"]["p99"],
             "paid_migration_trigger": "Sustained traffic > 15 RPS, > 4 concurrent leases/tenant, or > 500 MB memory usage"
         }
     }
