@@ -1,25 +1,25 @@
 {
-  "drill_id": "ldr_5a6b9039",
+  "drill_id": "ldr_ef97ece5",
   "database_engine": "Neon Serverless PostgreSQL 16 (AWS us-east-2)",
   "sanitized_endpoint": "postgresql://Postgres_owner:***@ep-broad-sky-b4jnm313-pooler.c-6.us-east-2.aws.neon.tech/Postgres?sslmode=require&channel_binding=require",
-  "timestamp_utc": "2026-10-21T07:18:29.004622+00:00",
+  "timestamp_utc": "2026-10-22T01:44:23.940459+00:00",
   "drill_scope": "Representative Multi-Table Relational Schema with Foreign Keys & Indexes",
   "tables_tested": [
-    "public.dr_orgs_ldr_5a6b9039",
-    "public.dr_users_ldr_5a6b9039",
-    "public.dr_workflows_ldr_5a6b9039",
-    "public.dr_audit_ldr_5a6b9039"
+    "public.dr_orgs_ldr_ef97ece5",
+    "public.dr_users_ldr_ef97ece5",
+    "public.dr_workflows_ldr_ef97ece5",
+    "public.dr_audit_ldr_ef97ece5"
   ],
   "stages": {
     "stage_1_schema_creation": {
       "status": "SUCCESS",
-      "duration_ms": 12420.2,
+      "duration_ms": 11437.9,
       "tables_created": 4,
       "indexes_created": 3
     },
     "stage_2_data_seeding": {
       "status": "SUCCESS",
-      "duration_ms": 14617.5,
+      "duration_ms": 16141.8,
       "organizations_seeded": 3,
       "users_seeded": 6,
       "workflows_seeded": 6,
@@ -29,25 +29,25 @@
     },
     "stage_3_pg_dump": {
       "status": "SUCCESS",
-      "duration_seconds": 34.987,
+      "duration_seconds": 40.02,
       "dump_size_bytes": 7884,
-      "dump_file_sha256": "dfadd0c62ab1cf493f69e37ca769486658a065e8b8bf88323fc25e51736eba17"
+      "dump_file_sha256": "9a834b0d6940c9bc7b9ec158a0e395a0427e31a30c6e2ba386741b7bc97e77a3"
     },
     "stage_4_data_loss_simulation": {
       "status": "SUCCESS",
-      "duration_ms": 10762.8,
+      "duration_ms": 10953.0,
       "tables_dropped": 4,
       "verified_absent": true,
-      "simulated_data_loss_utc": "2026-10-21T07:19:41.800079+00:00"
+      "simulated_data_loss_utc": "2026-10-22T01:45:42.496975+00:00"
     },
     "stage_5_psql_restore": {
       "status": "SUCCESS",
-      "rto_seconds": 21.651,
+      "rto_seconds": 20.653,
       "rto_sla_met": true
     },
     "stage_6_integrity_verification": {
       "status": "SUCCESS",
-      "duration_ms": 74448.0,
+      "duration_ms": 83553.0,
       "restored_counts": {
         "orgs": 3,
         "users": 6,
@@ -62,19 +62,19 @@
     },
     "stage_7_application_viability": {
       "status": "SUCCESS",
-      "duration_ms": 15000.0,
+      "duration_ms": 23767.2,
       "post_restore_auth_verified": true,
       "post_restore_workflow_mutation_verified": true
     }
   },
   "verdict": "PASS",
   "metrics": {
-    "backup_creation_seconds": 34.987,
-    "restore_execution_seconds_rto": 21.651,
-    "end_to_end_data_cycle_seconds": 56.638,
+    "backup_creation_seconds": 40.02,
+    "restore_execution_seconds_rto": 20.653,
+    "end_to_end_data_cycle_seconds": 60.673,
     "sla_target_rto_seconds": 300.0,
     "rto_sla_met": true,
-    "total_drill_duration_seconds": 192.025,
+    "total_drill_duration_seconds": 214.867,
     "safety_isolation_verified": true,
     "data_loss_boundary": "Point of logical backup creation (pg_dump timestamp)",
     "recovery_scope_distinction": {
