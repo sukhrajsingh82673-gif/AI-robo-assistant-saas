@@ -165,10 +165,12 @@ class ConcurrencyLeaseManager:
         # 1. Database-backed acquisition (Shared across Render / Neon instances)
         try:
             with db.get_connection() as conn:
-                try:
-                    conn.execute("BEGIN IMMEDIATE")
-                except Exception:
-                    pass
+                from core.db import DatabaseDialect
+                if db.get_dialect() == DatabaseDialect.SQLITE:
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                    except Exception:
+                        pass
 
                 # Purge expired leases for this tenant
                 conn.execute(
@@ -201,6 +203,10 @@ class ConcurrencyLeaseManager:
                 return True, lease_id, 0
         except Exception as e:
             logger.warning(f"Database lease acquisition fallback to in-memory: {e}")
+            from core.db import DatabaseDialect
+            if db.get_dialect() == DatabaseDialect.POSTGRESQL or os.environ.get("PRODUCTION_MODE") == "true":
+                logger.error(f"PostgreSQL concurrency lease failed: {e}. Failing closed to prevent multi-instance split-brain.")
+                return False, None, 5
 
         # 2. In-memory fallback
         with self._lock:
@@ -281,10 +287,12 @@ class TenantFairnessEngine:
         # 1. Database-backed distributed sliding window
         try:
             with db.get_connection() as conn:
-                try:
-                    conn.execute("BEGIN IMMEDIATE")
-                except Exception:
-                    pass
+                from core.db import DatabaseDialect
+                if db.get_dialect() == DatabaseDialect.SQLITE:
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                    except Exception:
+                        pass
 
                 # Scoped pruning for THIS rate_key
                 conn.execute(
@@ -323,6 +331,10 @@ class TenantFairnessEngine:
                 return True, remaining, 0
         except Exception as e:
             logger.debug(f"Database sliding window fallback to in-memory: {e}")
+            from core.db import DatabaseDialect
+            if db.get_dialect() == DatabaseDialect.POSTGRESQL or os.environ.get("PRODUCTION_MODE") == "true":
+                logger.error(f"PostgreSQL rate limit check failed: {e}. Failing closed.")
+                return False, 0, 5
 
         # 2. Thread-safe in-memory sliding window fallback
         with self._lock:

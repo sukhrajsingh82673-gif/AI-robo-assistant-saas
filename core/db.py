@@ -3878,6 +3878,8 @@ def normalize_sql_for_postgres(sql: str) -> str:
     stripped = sql.strip()
     if stripped.upper().startswith("PRAGMA "):
         return ""
+    if stripped.upper() in ("BEGIN IMMEDIATE", "BEGIN IMMEDIATE;"):
+        return ""
 
     # Convert ? placeholders to %s safely outside literals and comments
     normalized = _tokenize_and_replace_placeholders(sql)
