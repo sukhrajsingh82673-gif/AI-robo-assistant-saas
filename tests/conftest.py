@@ -101,6 +101,7 @@ def isolate_test_environment():
     os.environ["ZONATA_EVIDENCE_PATH"] = tmp_evidence.name
 
     test_db_path = configure_isolated_test_db()
+    os.environ["ZONATA_SESSION_TEST_DB"] = test_db_path
     init_all_subsystem_schemas()
     yield test_db_path
     try:
@@ -108,3 +109,16 @@ def isolate_test_environment():
             os.remove(tmp_evidence.name)
     except Exception:
         pass
+
+@pytest.fixture(autouse=True)
+def preserve_test_database_isolation():
+    """Ensures test database pointer remains valid across test classes with destructive teardowns."""
+    session_db = os.environ.get("ZONATA_SESSION_TEST_DB")
+    if session_db and (not db.db_path or not os.path.exists(os.path.dirname(os.path.abspath(db.db_path)))):
+        db.set_db_path(session_db)
+        os.environ["ZONATA_DB_PATH"] = session_db
+    yield
+    session_db = os.environ.get("ZONATA_SESSION_TEST_DB")
+    if session_db and (not db.db_path or not os.path.exists(os.path.dirname(os.path.abspath(db.db_path)))):
+        db.set_db_path(session_db)
+        os.environ["ZONATA_DB_PATH"] = session_db

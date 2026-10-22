@@ -95,6 +95,7 @@ def _mp_worker_release(db_path: str, reservation_id: str, queue: Any):
 
 class TestPhase14CrossProcessGovernance(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
         self.ctx = mp.get_context("fork")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "cross_process_governance.db")
@@ -116,6 +117,9 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
             conn.commit()
 
     def tearDown(self):
+        if getattr(self, "orig_db_path", None) and os.path.exists(os.path.dirname(os.path.abspath(self.orig_db_path))):
+            db.set_db_path(self.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = self.orig_db_path
         self.temp_dir.cleanup()
 
     def test_01_cross_process_budget_reservation_contention(self):

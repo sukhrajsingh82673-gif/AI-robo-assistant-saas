@@ -30,6 +30,7 @@ from core.economic_governance import (
 
 class TestPhase13MultiProcessGovernance(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "pg_governance_concurrency.db")
         configure_isolated_test_db(self.db_path)
@@ -49,6 +50,9 @@ class TestPhase13MultiProcessGovernance(unittest.TestCase):
             conn.commit()
 
     def tearDown(self):
+        if getattr(self, "orig_db_path", None) and os.path.exists(os.path.dirname(os.path.abspath(self.orig_db_path))):
+            db.set_db_path(self.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = self.orig_db_path
         self.temp_dir.cleanup()
 
     def test_01_concurrent_budget_reservations_atomic_sql(self):

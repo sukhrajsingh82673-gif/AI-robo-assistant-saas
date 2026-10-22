@@ -4354,6 +4354,12 @@ class Database:
             if self._deferred_import_mode and not self._is_ready:
                 return DeferredConnectionProxy(self)
             return self._get_pooled_postgresql_connection()
+        if not self.db_path or not os.path.exists(os.path.dirname(os.path.abspath(self.db_path))):
+            session_db = os.environ.get("ZONATA_SESSION_TEST_DB")
+            if session_db and os.path.exists(os.path.dirname(os.path.abspath(session_db))):
+                self.set_db_path(session_db)
+            else:
+                configure_isolated_test_db()
         conn = sqlite3.connect(self.db_path, timeout=60.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -4515,6 +4521,11 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     try:
         from core.security_center import security_center
         security_center._init_db()
+    except Exception:
+        pass
+    try:
+        from tests.conftest import init_all_subsystem_schemas
+        init_all_subsystem_schemas()
     except Exception:
         pass
     return custom_path

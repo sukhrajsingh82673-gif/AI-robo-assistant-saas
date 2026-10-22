@@ -63,6 +63,7 @@ from core.simulation_fixtures import seed_synthetic_enterprise, SIM_TENANT_ID, S
 
 class TestPhase14NineDepartmentLifecycle(unittest.TestCase):
     def setUp(self):
+        self.orig_db_path = db.db_path
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "nine_dept_lifecycle.db")
         configure_isolated_test_db(self.db_path)
@@ -77,6 +78,9 @@ class TestPhase14NineDepartmentLifecycle(unittest.TestCase):
         self.fixtures = seed_synthetic_enterprise(self.db_path)
 
     def tearDown(self):
+        if getattr(self, "orig_db_path", None) and os.path.exists(os.path.dirname(os.path.abspath(self.orig_db_path))):
+            db.set_db_path(self.orig_db_path)
+            os.environ["ZONATA_DB_PATH"] = self.orig_db_path
         self.temp_dir.cleanup()
 
     def test_01_all_nine_departments_provisioned_and_queryable(self):
