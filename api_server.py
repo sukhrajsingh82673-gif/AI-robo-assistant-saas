@@ -146,8 +146,8 @@ terminal_agent = TerminalHandlingAgent(tenant_id="tnt_primary")
 
 from core.enterprise_records import records_engine
 from core.enterprise_files import files_engine
-from core.enterprise_reports import reports_engine
-from core.enterprise_finance import finance_engine
+from core.enterprise_reports import reports_engine, EnterpriseReportsEngine
+from core.enterprise_finance import finance_engine, EnterpriseFinanceEngine
 from core.enterprise_agent_factory import agent_factory
 from core.enterprise_integrations import integrations_registry
 from core.unified_search import unified_search
@@ -1060,7 +1060,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/portfolio":
-            summary = portfolio.get_portfolio_summary()
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            summary = target_portfolio.get_portfolio_summary()
             companies = [
                 {
                     "id": c.company_id,
@@ -1075,7 +1076,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "missions_count": len(c.missions),
                     "rules": c.operating_rules
                 }
-                for c in portfolio.list_companies()
+                for c in target_portfolio.list_companies()
             ]
             self._send_json({"summary": summary, "companies": companies})
             return
@@ -1152,7 +1153,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/employees":
             emp_list = []
-            for c in portfolio.list_companies():
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            for c in target_portfolio.list_companies():
                 for e in c.workforce.values():
                     emp_list.append({
                         "id": e.agent_id,
@@ -2221,15 +2223,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             comp_id = query_params.get("company_id", [None])[0]
             cat = query_params.get("category", [None])[0]
             sq = query_params.get("q", [None])[0]
-            reps = reports_engine.list_reports(company_id=comp_id, category=cat, search_query=sq)
+            engine = EnterpriseReportsEngine(tenant_id=tenant_id)
+            reps = engine.list_reports(company_id=comp_id, category=cat, search_query=sq)
             self._send_json({"reports": reps, "count": len(reps)})
             return
 
         elif path.startswith("/api/reports/") and path.endswith("/export"):
             rid = path.split("/")[3]
             fmt = query_params.get("format", ["csv"])[0].lower()
+            engine = EnterpriseReportsEngine(tenant_id=tenant_id)
             if fmt == "csv":
-                csv_data = reports_engine.export_report_csv(rid)
+                csv_data = engine.export_report_csv(rid)
                 self.send_response(200)
                 self.send_header("Content-Type", "text/csv; charset=utf-8")
                 self.send_header("Content-Disposition", f'attachment; filename="report_{rid}.csv"')
@@ -2238,13 +2242,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(csv_data.encode("utf-8"))
                 return
             else:
-                rep = reports_engine.get_report(rid)
+                rep = engine.get_report(rid)
                 self._send_json(rep if rep else {"error": "Report not found"})
                 return
 
         elif path.startswith("/api/reports/"):
             rid = path.split("/")[3]
-            rep = reports_engine.get_report(rid)
+            engine = EnterpriseReportsEngine(tenant_id=tenant_id)
+            rep = engine.get_report(rid)
             if rep:
                 self._send_json(rep)
             else:
@@ -2256,7 +2261,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/finance/summary":
             comp_id = query_params.get("company_id", ["comp_primary"])[0]
-            summary = finance_engine.get_financial_summary(company_id=comp_id)
+            engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
+            summary = engine.get_financial_summary(company_id=comp_id)
             self._send_json(summary)
             return
 
@@ -3953,13 +3959,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/employees":
             role = req_data.get("role", "Specialist Agent")
             dept = req_data.get("department", "Operations")
-            companies = portfolio.list_companies()
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            companies = target_portfolio.list_companies()
             if not companies:
                 comp = CompanyOnboardingEngine.onboard_new_company(
                     name="Default Operations",
-                    industry="Services"
+                    industry="Services",
+                    tenant_id=tenant_id
                 )
-                portfolio.register_company(comp)
+                target_portfolio.register_company(comp)
             else:
                 comp = companies[0]
 
@@ -5185,12 +5193,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/reports":
-            rep = reports_engine.generate_report(req_data)
+            engine = EnterpriseReportsEngine(tenant_id=tenant_id)
+            rep = engine.generate_report(req_data)
             self._send_json({"success": True, "report": rep})
             return
 
         elif path == "/api/finance/expenses":
-            res = finance_engine.create_expense(req_data)
+            engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
+            res = engine.create_expense(req_data)
             self._send_json(res)
             return
 

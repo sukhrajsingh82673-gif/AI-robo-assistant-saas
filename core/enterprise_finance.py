@@ -191,25 +191,24 @@ class EnterpriseFinanceEngine:
             if cnt > 0:
                 return
 
-        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
-        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
-        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
-        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        # Invariant: SaaS tenants always start with clean, zero-balance ledgers.
+        # Synthetic mock transactions are forbidden in production, staging, and live tenant sessions.
+        clean_mode = os.environ.get("ZONATA_SEED_MOCK_TEST_FIXTURES", "0") != "1"
 
         now = time.time()
         coa = [
-            ("acc_1010", "1010", "Petty Cash & Cash on Hand", "ASSET", "CASH", 0.0 if clean_mode else 185000.0),
-            ("acc_1020", "1020", "Operating Bank Account (HDFC Treasury)", "ASSET", "BANK", 0.0 if clean_mode else 4620000.0),
-            ("acc_1030", "1030", "Payment Gateway Escrow (Stripe / Razorpay)", "ASSET", "BANK", 0.0 if clean_mode else 950000.0),
-            ("acc_1100", "1100", "Accounts Receivable (Trade Debtors)", "ASSET", "AR", 0.0 if clean_mode else 2100000.0),
-            ("acc_2010", "2010", "Accounts Payable (Trade Creditors)", "LIABILITY", "AP", 0.0 if clean_mode else 1450000.0),
-            ("acc_2020", "2020", "Statutory Tax Payable (GST / TDS)", "LIABILITY", "AP", 0.0 if clean_mode else 380000.0),
-            ("acc_3010", "3010", "Owner Equity & Retained Earnings", "EQUITY", "EQUITY", 0.0 if clean_mode else 5000000.0),
-            ("acc_4010", "4010", "Enterprise Operations & SaaS Revenue", "REVENUE", "SALES", 0.0 if clean_mode else 12450000.0),
-            ("acc_5010", "5010", "Cost of Goods Sold & Direct Material", "EXPENSE", "COGS", 0.0 if clean_mode else 4120000.0),
-            ("acc_6010", "6010", "Workforce Salaries & Contractor Payroll", "EXPENSE", "OPEX", 0.0 if clean_mode else 2850000.0),
-            ("acc_6020", "6020", "Cloud Compute & AI Model Infrastructure", "EXPENSE", "OPEX", 0.0 if clean_mode else 490000.0),
-            ("acc_6030", "6030", "General Admin & Facilities Operations", "EXPENSE", "OPEX", 0.0 if clean_mode else 500000.0)
+            ("acc_1010", "1010", "Petty Cash & Cash on Hand", "ASSET", "CASH", 0.0),
+            ("acc_1020", "1020", "Operating Bank Account", "ASSET", "BANK", 0.0),
+            ("acc_1030", "1030", "Payment Gateway Escrow", "ASSET", "BANK", 0.0),
+            ("acc_1100", "1100", "Accounts Receivable (Trade Debtors)", "ASSET", "AR", 0.0),
+            ("acc_2010", "2010", "Accounts Payable (Trade Creditors)", "LIABILITY", "AP", 0.0),
+            ("acc_2020", "2020", "Statutory Tax Payable (GST / TDS)", "LIABILITY", "AP", 0.0),
+            ("acc_3010", "3010", "Owner Equity & Retained Earnings", "EQUITY", "EQUITY", 0.0),
+            ("acc_4010", "4010", "Enterprise Operations & SaaS Revenue", "REVENUE", "SALES", 0.0),
+            ("acc_5010", "5010", "Cost of Goods Sold & Direct Material", "EXPENSE", "COGS", 0.0),
+            ("acc_6010", "6010", "Workforce Salaries & Contractor Payroll", "EXPENSE", "OPEX", 0.0),
+            ("acc_6020", "6020", "Cloud Compute & AI Model Infrastructure", "EXPENSE", "OPEX", 0.0),
+            ("acc_6030", "6030", "General Admin & Facilities Operations", "EXPENSE", "OPEX", 0.0)
         ]
 
         with db.get_connection() as conn:
