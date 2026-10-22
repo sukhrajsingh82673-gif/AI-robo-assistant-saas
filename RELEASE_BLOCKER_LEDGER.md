@@ -16,7 +16,8 @@
 |   RELEASE STATUS SUMMARY:                                                                          |
 |   - Category A (Owner Authorization & Paid Spend Required):    5 Items (BLOCKING PUBLIC GA)        |
 |   - Category B (Resolved Within Free-Tier Architecture):        7 Items (VERIFIED CLOSED)           |
-|   - Internal Simulations & Controlled Pilot Verdict:           GO / CONDITIONAL GO                 |
+|   - Restricted Production Pilot Verdict (Milestone M):         RESTRICTED GO (PILOT SCOPE)         |
+|   - Scope: Bounded to 1–3 design-partner pilot orgs, max 4 concurrency leases, 60 RPM.             |
 |   - Unrestricted Public General Availability Verdict:          NO-GO (AWAITING OWNER AUTHORIZATION)|
 +====================================================================================================+
 ```

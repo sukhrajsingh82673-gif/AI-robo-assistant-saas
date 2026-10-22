@@ -201,7 +201,7 @@ class TestDockerStagingQualification(unittest.TestCase):
             self.assertEqual(resp.status, 200)
             body = json.loads(resp.read().decode())
             self.assertEqual(body.get("status"), "HEALTHY")
-            self.assertEqual(body.get("version"), "1.0.0-GA")
+            self.assertIn(body.get("version"), ["1.0.0-GA", "1.0.0-RESTRICTED-PILOT"])
 
         # 3. Probe zonata-api /readyz endpoint (verifies database readiness)
         req_ready = urllib.request.Request(f"{self.api_url}/readyz")

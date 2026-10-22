@@ -1,10 +1,9 @@
 # URA / ZONATA — Free-Tier Qualification & Simulation Report
-## Realistic Company Simulation & Live Free-Tier Verification
+## Realistic Company Simulation & Restricted Pilot Verification
 
-**Document ID:** ZONATA-FREE-TIER-QUAL-2026  
-**Target Platform:** ZONATA Universal AI Company Operating System  
-**Verified Candidate Commit:** [`40810d0f77bfeb166164d1f2bce434c4f346b0a7`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/40810d0f77bfeb166164d1f2bce434c4f346b0a7)  
-**Parent Release Anchor:** [`87c3dd97d15c222567b4f627be8de24c7d39232f`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/87c3dd97d15c222567b4f627be8de24c7d39232f)  
+**Document ID:** ZONATA-FREE-TIER-QUAL-2026-V2  
+**Target Platform:** URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA (v1.0.0-RESTRICTED-PILOT)  
+**Parent Release Anchor:** [`08f3d1434bda9f33f76102ad7c24de7b7e6c3285`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/08f3d1434bda9f33f76102ad7c24de7b7e6c3285)  
 **Staging Host:** `https://zonata-staging.onrender.com` (Render Free Web Service)  
 **Database Host:** Neon Serverless PostgreSQL 16.15 (`ep-broad-sky-b4jnm313-pooler.c-6.us-east-2.aws.neon.tech`)  
 **Operating Cost:** $0.00 / month (100% Free-Tier Architecture)  
@@ -18,12 +17,14 @@ The URA / ZONATA Universal AI Company Operating System has undergone complete fr
 
 ```
 +====================================================================================================+
-|   FREE-TIER QUALIFICATION STATUS: >>> FULL PASS (PILOT SCOPE) <<<                                  |
+|   RESTRICTED PRODUCTION STATUS: >>> RESTRICTED GO (PILOT SCOPE) <<<                                |
 |                                                                                                    |
-|   - 101/101 Automated Qualification & Regression Tests Passed (100% Pass Rate).                    |
+|   - 104/104 Automated Qualification & Regression Tests Passed (100% Pass Rate).                    |
+|   - Maximum 3 Design-Partner Organizations Enforced (4th registration blocked with HTTP 403).       |
+|   - Maximum 4 Concurrency Leases per Tenant Enforced (5th lease blocked with HTTP 429).            |
 |   - Multi-Department Company Simulation (9 Corporate Departments) Verified with Zero Overdraft.    |
-|   - Distributed Concurrency Leases (4 leases/tenant) & Sliding-Window Quotas Verified across DB.   |
-|   - Live Render Staging (/readyz) Actively Serving HTTP 200 OK with Zero 5xx Errors.               |
+|   - Distributed Concurrency Leases & Sliding-Window Quotas Verified across Neon PostgreSQL.        |
+|   - Live Render Staging (/readyz & /healthz) Verified with Status HEALTHY and Version Metadata.    |
 |   - Neon Serverless PostgreSQL 16 Multi-Table Restore Drill Verified (RTO = 20.653s, 100% Parity). |
 |   - Cryptography CVE GHSA-537c-gmf6-5ccf Verified Remediated & Closed (OSV: 0 CVEs).               |
 +====================================================================================================+

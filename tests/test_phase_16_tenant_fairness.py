@@ -41,6 +41,7 @@ from core.tenant_fairness import (
 class TestPhase16TenantFairness(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.orig_db_path = db.db_path
         cls.temp_dir = tempfile.TemporaryDirectory()
         cls.test_db_path = os.path.join(cls.temp_dir.name, "phase16_test.db")
         configure_isolated_test_db(cls.test_db_path)
@@ -84,6 +85,7 @@ class TestPhase16TenantFairness(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        db.set_db_path(cls.orig_db_path)
         cls.temp_dir.cleanup()
 
     def test_01_requests_below_and_above_limits(self):

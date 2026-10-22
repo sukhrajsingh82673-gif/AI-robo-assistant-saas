@@ -71,6 +71,22 @@ DEFAULT_TIER_QUOTAS: Dict[str, TenantQuotaConfig] = {
         mutating_rpm=30,
         identity_rpm=60,
     ),
+    "PILOT": TenantQuotaConfig(
+        tier="PILOT",
+        requests_per_minute=60,
+        max_concurrency=4,
+        expensive_rpm=10,
+        mutating_rpm=30,
+        identity_rpm=60,
+    ),
+    "RESTRICTED_PILOT": TenantQuotaConfig(
+        tier="RESTRICTED_PILOT",
+        requests_per_minute=60,
+        max_concurrency=4,
+        expensive_rpm=10,
+        mutating_rpm=30,
+        identity_rpm=60,
+    ),
     "STARTER": TenantQuotaConfig(
         tier="STARTER",
         requests_per_minute=300,
@@ -116,6 +132,8 @@ EXEMPT_ENDPOINTS = {
     "/health",
     "/metrics",
     "/api/v1/health",
+    "/api/pilot/envelope",
+    "/api/v1/pilot/envelope",
 }
 
 
@@ -348,10 +366,15 @@ class TenantFairnessEngine:
         plan_tier = "ENTERPRISE"
         try:
             with db.get_connection() as conn:
-                row = conn.execute("SELECT plan FROM tenants WHERE tenant_id = ?", (tenant_id,)).fetchone()
-                if row:
-                    raw_plan = row[0] if isinstance(row, (tuple, list)) else row["plan"]
-                    plan_tier = str(raw_plan).strip().upper()
+                # Check if tenant is registered in pilot_organizations registry
+                p_row = conn.execute("SELECT tenant_id FROM pilot_organizations WHERE tenant_id = ? AND status = 'ACTIVE'", (tenant_id,)).fetchone()
+                if p_row:
+                    plan_tier = "PILOT"
+                else:
+                    row = conn.execute("SELECT plan FROM tenants WHERE tenant_id = ?", (tenant_id,)).fetchone()
+                    if row:
+                        raw_plan = row[0] if isinstance(row, (tuple, list)) else row["plan"]
+                        plan_tier = str(raw_plan).strip().upper()
         except Exception:
             pass
 

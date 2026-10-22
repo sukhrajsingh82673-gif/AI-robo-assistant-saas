@@ -596,35 +596,83 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "timestamp": time.time()
                 }, status=503)
                 return
-            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "70e1501"
+            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
             git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
+            release_version = os.environ.get("APP_RELEASE_VERSION", "1.0.0-RESTRICTED-PILOT")
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
-                "version": "1.0.0-GA",
+                "version": release_version,
+                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
+                "pilot_envelope": {
+                    "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3")),
+                    "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "4")),
+                    "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "60")),
+                    "status": "ENFORCED"
+                },
                 "timestamp": time.time()
             })
             return
 
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
-            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "70e1501"
+            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
             git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
+            release_version = os.environ.get("APP_RELEASE_VERSION", "1.0.0-RESTRICTED-PILOT")
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
-                "version": "1.0.0-GA",
+                "version": release_version,
+                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
+                "pilot_envelope": {
+                    "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3")),
+                    "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "4")),
+                    "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "60")),
+                    "status": "ENFORCED"
+                },
+                "timestamp": time.time()
+            })
+            return
+
+        # Milestone J: Restricted Pilot Operating Envelope Specification
+        if path in ("/api/pilot/envelope", "/api/v1/pilot/envelope"):
+            max_pilot_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3"))
+            max_concurrency = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
+            max_rpm = int(os.environ.get("PILOT_MAX_RPM", "60"))
+            active_pilot_count = 0
+            try:
+                with db.get_connection() as conn:
+                    row = conn.execute("SELECT COUNT(*) FROM pilot_organizations WHERE status = 'ACTIVE'").fetchone()
+                    if row:
+                        active_pilot_count = row[0] if isinstance(row, (tuple, list)) else row["COUNT(*)"]
+            except Exception:
+                pass
+            self._send_json({
+                "status": "ENFORCED",
+                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
+                "target_audience": "1–3 Controlled Design-Partner Organizations",
+                "pilot_envelope": {
+                    "max_organizations": max_pilot_orgs,
+                    "active_pilot_organizations": active_pilot_count,
+                    "available_pilot_slots": max(0, max_pilot_orgs - active_pilot_count),
+                    "max_concurrency_leases_per_tenant": max_concurrency,
+                    "max_requests_per_minute_per_tenant": max_rpm,
+                    "request_timeout_seconds": 60,
+                    "execution_timeout_seconds": 300,
+                    "enterprise_sla": "NOT_OFFERED_ON_FREE_TIER",
+                    "public_ga_qualified": False
+                },
                 "timestamp": time.time()
             })
             return
@@ -896,6 +944,31 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"authenticated": True, "context": ctx})
             except AuthExceptions.AuthenticationError as e:
                 self._send_json({"authenticated": False, "error": str(e)}, status=401)
+            return
+
+        # Milestone J: Tenant Concurrency Leases Inspection
+        if path == "/api/concurrency/leases":
+            max_leases = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
+            now = time.time()
+            active_count = 0
+            leases_list = []
+            try:
+                with db.get_connection() as conn:
+                    rows = conn.execute(
+                        "SELECT lease_id, lease_type, acquired_at, expires_at FROM tenant_concurrency_leases WHERE tenant_id = ? AND expires_at >= ?",
+                        (tenant_id, now)
+                    ).fetchall()
+                    active_count = len(rows)
+                    leases_list = [dict(r) for r in rows]
+            except Exception:
+                pass
+            self._send_json({
+                "tenant_id": tenant_id,
+                "active_leases_count": active_count,
+                "max_concurrency": max_leases,
+                "available_slots": max(0, max_leases - active_count),
+                "leases": leases_list
+            })
             return
         if path == "/api/crm/customers":
             from core.enterprise_crm import EnterpriseCrmService
@@ -3273,7 +3346,25 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 name = req_data.get("name", "").strip() or (email.split("@")[0] if "@" in email else "Host")
                 password = req_data.get("password", "")
                 tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
-                plan = req_data.get("plan", "ENTERPRISE")
+
+                # Milestone J: Enforce Restricted Pilot Envelope (Maximum 3 Design-Partner Organizations)
+                is_pilot_mode = os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "1"
+                max_pilot_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3"))
+                if is_pilot_mode:
+                    with db.get_connection() as conn:
+                        p_row = conn.execute("SELECT COUNT(*) FROM pilot_organizations WHERE status = 'ACTIVE'").fetchone()
+                        active_count = p_row[0] if isinstance(p_row, (tuple, list)) else p_row["COUNT(*)"]
+                        if active_count >= max_pilot_orgs:
+                            self._send_json({
+                                "error": "Pilot Capacity Limit Exceeded",
+                                "detail": f"Restricted Production Pilot is strictly capped at maximum {max_pilot_orgs} design-partner organizations. Maximum onboarding capacity reached.",
+                                "limit": max_pilot_orgs,
+                                "current_active": active_count,
+                                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+                            }, status=403)
+                            return
+
+                plan = req_data.get("plan", "PILOT" if is_pilot_mode else "ENTERPRISE")
 
                 import re
                 email_pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
@@ -3330,6 +3421,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                         """,
                         (company_id, tenant_id, tenant_name, now)
                     )
+                    if is_pilot_mode:
+                        conn.execute(
+                            """
+                            INSERT INTO pilot_organizations (
+                                tenant_id, org_name, contact_email, status, registered_at
+                            ) VALUES (?, ?, ?, 'ACTIVE', ?)
+                            ON CONFLICT (tenant_id) DO NOTHING
+                            """,
+                            (tenant_id, tenant_name, email, now)
+                        )
                     conn.commit()
 
                 user_data = {
@@ -3435,6 +3536,48 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if not self._enforce_tenant_fairness(path, "POST", auth_context=auth_context):
+            return
+
+        # Milestone J: Tenant Concurrency Lease Acquisition & Release
+        if path == "/api/concurrency/lease/acquire":
+            max_leases = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
+            ttl = float(req_data.get("ttl_seconds", 300.0))
+            lease_type = req_data.get("lease_type", "WORKFLOW")
+            from core.tenant_fairness import tenant_fairness_engine
+            ok, lease_id, retry_after = tenant_fairness_engine.concurrency_manager.acquire_lease(
+                tenant_id=tenant_id,
+                max_concurrency=max_leases,
+                lease_type=lease_type,
+                ttl_seconds=ttl
+            )
+            if not ok:
+                self._send_json({
+                    "error": "Too Many Requests",
+                    "detail": f"Tenant concurrency lease limit ({max_leases} active leases) exceeded. Try again in {retry_after}s.",
+                    "limit": max_leases,
+                    "retry_after": retry_after,
+                    "violation_axis": "CONCURRENCY_LIMIT_EXCEEDED"
+                }, status=429, headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(max_leases),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Axis": "CONCURRENCY_LIMIT_EXCEEDED"
+                })
+                return
+            self._send_json({
+                "success": True,
+                "lease_id": lease_id,
+                "tenant_id": tenant_id,
+                "max_concurrency": max_leases,
+                "expires_in": ttl
+            })
+            return
+
+        if path == "/api/concurrency/lease/release":
+            lease_id = req_data.get("lease_id")
+            from core.tenant_fairness import tenant_fairness_engine
+            rel_ok = tenant_fairness_engine.concurrency_manager.release_lease(lease_id)
+            self._send_json({"success": rel_ok, "lease_id": lease_id, "released": rel_ok})
             return
 
         if path == "/api/crm/customers":
@@ -5410,10 +5553,35 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = parts[3]
             inputs = req_data.get("inputs", {})
             ctx = req_data.get("context", {})
+            max_leases = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
+            from core.tenant_fairness import tenant_fairness_engine
+            acq_ok, lease_id, retry_after = tenant_fairness_engine.concurrency_manager.acquire_lease(
+                tenant_id=tenant_id,
+                max_concurrency=max_leases,
+                lease_type="WORKFLOW",
+                ttl_seconds=300.0
+            )
+            if not acq_ok:
+                self._send_json({
+                    "error": "Too Many Requests",
+                    "detail": f"Tenant workflow concurrency limit ({max_leases} active leases) exceeded. Try again in {retry_after}s.",
+                    "limit": max_leases,
+                    "retry_after": retry_after,
+                    "violation_axis": "CONCURRENCY_LIMIT_EXCEEDED"
+                }, status=429, headers={
+                    "Retry-After": str(retry_after),
+                    "X-RateLimit-Limit": str(max_leases),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Axis": "CONCURRENCY_LIMIT_EXCEEDED"
+                })
+                return
             try:
                 res = governed_workflow_runtime.start_workflow(wf_id, inputs, ctx)
+                if isinstance(res, dict):
+                    res["lease_id"] = lease_id
                 self._send_json(res)
             except Exception as e:
+                tenant_fairness_engine.concurrency_manager.release_lease(lease_id)
                 self._send_json({"error": str(e)}, status=400)
             return
 

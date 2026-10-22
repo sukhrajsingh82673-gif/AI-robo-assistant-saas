@@ -101,6 +101,18 @@ CREATE TABLE IF NOT EXISTS tenants (
     metadata JSON
 );
 
+-- 1b. Restricted Pilot Organizations Registry (Milestone J Operating Envelope)
+CREATE TABLE IF NOT EXISTS pilot_organizations (
+    tenant_id TEXT PRIMARY KEY,
+    org_name TEXT NOT NULL,
+    contact_email TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    registered_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pilot_orgs_status ON pilot_organizations(status);
+
 -- 2. Users & IAM
 CREATE TABLE IF NOT EXISTS users (
     user_id TEXT PRIMARY KEY,
