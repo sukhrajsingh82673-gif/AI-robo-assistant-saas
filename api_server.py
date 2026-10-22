@@ -607,6 +607,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
+                "database_dialect": db.get_dialect(),
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
@@ -632,6 +633,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
+                "database_dialect": db.get_dialect(),
                 "merkle_ledger": "INTEGRITY_VERIFIED",
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
@@ -675,6 +677,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 },
                 "timestamp": time.time()
             })
+            return
+
+        # Milestone J: List Active Pilot Organizations
+        if path in ("/api/pilot/organizations", "/api/v1/pilot/organizations"):
+            try:
+                with db.get_connection() as conn:
+                    rows = conn.execute("SELECT tenant_id, org_name, status, registered_at FROM pilot_organizations WHERE status = 'ACTIVE'").fetchall()
+                    self._send_json({"pilot_organizations": [dict(r) for r in rows], "count": len(rows)})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=500)
             return
 
         # Enforce IP-level rate limiting for public unauthenticated endpoints (healthz/readyz exempt above)
@@ -7434,6 +7446,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if not self._enforce_tenant_fairness(path, "DELETE", auth_context=auth_ctx):
+            return
+
+        # Milestone J: Deactivate Pilot Organization Slot
+        if path in ("/api/pilot/organizations/me", f"/api/pilot/organizations/{tenant_id}"):
+            try:
+                with db.get_connection() as conn:
+                    conn.execute("UPDATE pilot_organizations SET status = 'DEACTIVATED' WHERE tenant_id = ?", (tenant_id,))
+                    conn.commit()
+                self._send_json({"success": True, "tenant_id": tenant_id, "status": "DEACTIVATED"})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=500)
             return
 
         if path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
