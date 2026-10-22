@@ -1,9 +1,9 @@
 # URA / ZONATA — Authoritative Release Blocker Ledger
 ## Complete Classification of Open, Blocked, Accepted & Remediated Release Requirements
 
-**Document ID:** ZONATA-BLOCKER-LEDGER-2026  
-**Candidate Release Commit:** [`40810d0f77bfeb166164d1f2bce434c4f346b0a7`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/40810d0f77bfeb166164d1f2bce434c4f346b0a7)  
-**Parent Release Anchor:** [`87c3dd97d15c222567b4f627be8de24c7d39232f`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/87c3dd97d15c222567b4f627be8de24c7d39232f)  
+**Document ID:** ZONATA-BLOCKER-LEDGER-2026-V2  
+**Candidate Release Commit:** [`9dd97c8`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/9dd97c8)  
+**Parent Release Anchors:** [`caf0f2c`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/caf0f2c) | [`d86a504`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/d86a504)  
 **Evaluation Date:** October 22, 2026  
 **Auditor:** Antigravity Autonomous DevSecOps Lead & Release Manager  
 
@@ -15,8 +15,8 @@
 +====================================================================================================+
 |   RELEASE STATUS SUMMARY:                                                                          |
 |   - Category A (Owner Authorization & Paid Spend Required):    5 Items (BLOCKING PUBLIC GA)        |
-|   - Category B (Resolved Within Free-Tier Architecture):        7 Items (VERIFIED CLOSED)           |
-|   - Restricted Production Pilot Verdict (Milestone M):         RESTRICTED GO (PILOT SCOPE)         |
+|   - Category B (Resolved Within Free-Tier Architecture):        9 Items (VERIFIED CLOSED)           |
+|   - Restricted Production Pilot Verdict:                       RESTRICTED GO (PILOT SCOPE)         |
 |   - Scope: Bounded to 1–3 design-partner pilot orgs, max 4 concurrency leases, 60 RPM.             |
 |   - Unrestricted Public General Availability Verdict:          NO-GO (AWAITING OWNER AUTHORIZATION)|
 +====================================================================================================+
@@ -44,13 +44,15 @@ All engineering, security, and persistence requirements resolvable without spend
 
 | Requirement ID | Capability Dimension | Previous State | Verified Current State | Evidence & Verification Reference | Status |
 | :--- | :--- | :--- | :--- | :--- | :---: |
-| **RES-01** | **Test Database Isolation** | Destructive test teardowns left global `db` pointer directed at unlinked temporary paths. | Resilient fallback added to `core/db.py`; autouse fixture added to `tests/conftest.py`; automatic subsystem schema initialization verified. | Commit [`40810d0`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/40810d0f77bfeb166164d1f2bce434c4f346b0a7); 101/101 core qualification tests passing with zero errors. | **VERIFIED CLOSED** |
+| **RES-01** | **Test Database Isolation** | Destructive test teardowns left global `db` pointer directed at unlinked temporary paths. | Resilient fallback added to `core/db.py`; autouse fixture added to `tests/conftest.py`; automatic subsystem schema initialization verified. | Commit [`40810d0`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/40810d0); 108/108 qualification tests passing with zero errors. | **VERIFIED CLOSED** |
 | **RES-02** | **Dependency Vulnerabilities** | CVE GHSA-537c-gmf6-5ccf in `cryptography<49.0.0`. | Upgraded to `cryptography==50.0.2` (OpenSSL 4.0.3); Google OSV API audit confirmed 0 CVEs across 10/10 packages. | [`storage/evidence/osv_vulnerability_audit.json`](file:///root/roboassistant/storage/evidence/osv_vulnerability_audit.json); live telemetry on `/readyz`. | **VERIFIED CLOSED** |
 | **RES-03** | **Relational Disaster Recovery** | Single-table logical restore drill previously recorded. | Multi-table relational restore drill (`ldr_ef97ece5`) executed live on Neon 16 (4 tables, FKs, 5 indexes, RTO = 20.653s, 100% Merkle parity). | [`storage/evidence/isolated_logical_restore_drill.json`](file:///root/roboassistant/storage/evidence/isolated_logical_restore_drill.json). | **VERIFIED CLOSED** |
 | **RES-04** | **Constitutional Assets Integrity** | Risk of asset modification during test execution. | Bit-for-bit SHA-256 and Git blob hashes verified: `roboassistant.db` (`ba738b6...`), `audit_ledger.jsonl` (`ca8181e...`), `workflow_workspace.js` (`88888ca...`). | Disk and Git object hash verification on October 22, 2026. | **VERIFIED CLOSED** |
-| **RES-05** | **Commit SHA Parity** | Risk of branch drift across local, origin, and staging. | Exact commit alignment verified: local HEAD, `main`, `origin/engineering/...`, and `origin/main` match commit `40810d0`; live staging serving healthy parent anchor `87c3dd9`. | Git log and live HTTP probe on `https://zonata-staging.onrender.com/readyz`. | **VERIFIED CLOSED** |
-| **RES-06** | **Multi-Tenant Security Boundaries** | Potential IDOR and cross-tenant leakage under concurrency. | Tenant spoofing returns HTTP 403; cross-tenant queries return `None`; zero leakage across all 9 simulated corporate departments. | `test_phase_14_nine_department_lifecycle.py` and `test_adversarial_security_and_chaos.py`. | **VERIFIED CLOSED** |
-| **RES-07** | **Free-Tier Staging Stability** | Risk of unhandled container 5xx crashes under load. | Zero unhandled HTTP 500 errors across 80+ benchmark probes on Render staging. Uptime stable. | [`storage/evidence/capacity_test_evidence.json`](file:///root/roboassistant/storage/evidence/capacity_test_evidence.json). | **VERIFIED CLOSED** |
+| **RES-05** | **Commit SHA Lineage Parity** | Risk of branch drift across local, origin, and staging. | Exact commit alignment verified: local HEAD, `main`, `origin/engineering/...`, and `origin/main` match commit `9dd97c8`; live staging serving parent release `caf0f2c`. | Git log and live HTTP probe on `https://zonata-staging.onrender.com/readyz`. | **VERIFIED CLOSED** |
+| **RES-06** | **Database Dialect Integrity** | SQLite fallback reported on earlier `/readyz` probe. | Staging verified connected to Neon PostgreSQL 16 (`"database_dialect": "postgresql"`); `BEGIN IMMEDIATE` stripped to prevent transaction abortions. | `core/db.py`, `core/tenant_fairness.py`, live `/readyz` probe. | **VERIFIED CLOSED** |
+| **RES-07** | **Multi-Instance Lease Coordination** | In-memory fallback risk permitting independent process lease counts. | Shared Neon PostgreSQL table `tenant_concurrency_leases` coordinates leases across processes; fail-closed behavior on database error enforced in PostgreSQL mode. | `tests/test_cross_process_concurrency_coordination.py` passing (2/2 tests). | **VERIFIED CLOSED** |
+| **RES-08** | **Restricted Operating Envelope** | Risk of unbounded public onboarding and lease runaway. | Hard ceiling enforced in API server: max 3 design-partner organizations (4th rejected with HTTP 403); max 4 concurrency leases (5th rejected with HTTP 429). | `tests/test_restricted_pilot_operating_envelope.py` passing (5/5 tests); live staging verification. | **VERIFIED CLOSED** |
+| **RES-09** | **Free-Tier Staging Stability** | Risk of unhandled container 5xx crashes under load. | Zero unhandled HTTP 500 errors across 80+ benchmark probes on Render staging. Uptime stable. | [`storage/evidence/capacity_test_evidence.json`](file:///root/roboassistant/storage/evidence/capacity_test_evidence.json). | **VERIFIED CLOSED** |
 
 ---
 
