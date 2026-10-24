@@ -3971,6 +3971,28 @@ class PostgresConnectionWrapper:
             cursor.execute(normalized_sql, params)
             return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
 
+    def executemany(self, sql: str, params_seq: Any = ()):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute query on closed database connection.")
+        normalized_sql = self._normalize_sql(sql)
+        if not normalized_sql:
+            class DummyCursor:
+                def fetchone(self): return None
+                def fetchall(self): return []
+                @property
+                def rowcount(self): return 0
+                def __iter__(self): return iter([])
+            return DummyCursor()
+        try:
+            import psycopg2.extras
+            cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.executemany(normalized_sql, params_seq)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+        except Exception:
+            cursor = self.raw_conn.cursor()
+            cursor.executemany(normalized_sql, params_seq)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+
     def executescript(self, sql_script: str):
         if self._is_closed:
             raise RuntimeError("Cannot execute script on closed database connection.")

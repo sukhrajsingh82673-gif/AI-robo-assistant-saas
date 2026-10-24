@@ -1730,6 +1730,50 @@ class EnterpriseSettingsService:
         company_id: str = "comp_primary"
     ) -> Dict[str, Any]:
         """Provides real, live effective settings for all primary governance dimensions."""
+        keys = (
+            "ceo_autonomy_level", "ceo_spending_limit", "host_emergency_stop",
+            "wf_max_concurrent_agents", "wf_autonomous_spawning", "term_execution_enabled",
+            "term_max_lease_seconds", "browser_ssrf_protection", "cost_global_budget_monthly",
+            "fin_high_expense_approval", "sec_require_mfa", "audit_immutability_mode",
+            "audit_ledger_hashing"
+        )
+        try:
+            with db.get_connection() as conn:
+                placeholders = ",".join(["?"] * len(keys))
+                rows = conn.execute(f"""
+                    SELECT tenant_id, company_id, setting_key, setting_value_json
+                    FROM enterprise_settings
+                    WHERE setting_key IN ({placeholders})
+                """, list(keys)).fetchall()
+                resolved: Dict[str, Any] = {}
+                for r in rows:
+                    t_id = r[0] if isinstance(r, (list, tuple)) else r["tenant_id"]
+                    c_id = r[1] if isinstance(r, (list, tuple)) else r["company_id"]
+                    k = r[2] if isinstance(r, (list, tuple)) else r["setting_key"]
+                    raw_val = r[3] if isinstance(r, (list, tuple)) else r["setting_value_json"]
+                    try:
+                        parsed = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                    except Exception:
+                        parsed = raw_val
+
+                    prio = 0
+                    if t_id == tenant_id and c_id == company_id:
+                        prio = 3
+                    elif t_id == tenant_id and c_id == "comp_primary":
+                        prio = 2
+                    elif t_id == "tnt_primary" and c_id == "comp_primary":
+                        prio = 1
+
+                    if prio > 0:
+                        cur_prio, _ = resolved.get(k, (0, None))
+                        if prio >= cur_prio:
+                            resolved[k] = (prio, parsed)
+
+                for k, (_, val) in resolved.items():
+                    self._effective_cache[(tenant_id, company_id, k)] = val
+        except Exception:
+            pass
+
         ceo_autonomy = self.get_effective_setting(tenant_id, company_id, "ceo_autonomy_level", "Level 3 — Execute Within Policy")
         ceo_spend = self.get_effective_setting(tenant_id, company_id, "ceo_spending_limit", 50000)
         em_stop = self.get_effective_setting(tenant_id, company_id, "host_emergency_stop", False)
