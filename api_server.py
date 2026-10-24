@@ -3750,8 +3750,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/ceo/decision-room":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            companies = target_portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
             intent = req_data.get("objective_intent", "Increase company profitability")
             spending_limit = float(req_data.get("spending_limit", 1000000.0))
             room = CEOExecutiveBrain.convene_decision_room(tenant_id, cid, intent, spending_limit)
@@ -4022,8 +4023,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             reason = req_data.get("reason", "Required operational step")
             risk = req_data.get("risk_level", "MEDIUM")
             consequence = req_data.get("consequence", "Production state change")
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_none"
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            companies = target_portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
 
             req = ApprovalPipeline.create_request(
                 tenant_id=tenant_id,
@@ -4054,8 +4056,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Company OS 2.0 POST Endpoints
         elif path == "/api/ceo/chat":
             instruction = req_data.get("message", "")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            companies = target_portfolio.list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
             chat_res = ceo_engine.chat_directive(cid, instruction)
             self._send_json(chat_res)
             return
@@ -6475,11 +6478,11 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             user_agent = req_data.get("user_agent", "ZonataGovernedBrowser/1.0")
             allowed_domains = req_data.get("allowed_domains", [])
             blocked_domains = req_data.get("blocked_domains", [])
+            agent_id = req_data.get("agent_id", "agent_browser_user")
             sess = browser_gateway.create_session(
+                agent_id=agent_id,
                 profile_type=profile_type,
-                user_agent=user_agent,
-                allowed_domains=allowed_domains,
-                blocked_domains=blocked_domains
+                allowed_domains=allowed_domains
             )
             self._send_json(sess)
             return

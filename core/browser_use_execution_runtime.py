@@ -1231,7 +1231,7 @@ class BrowserExecutionGateway:
 
     def create_session(
         self,
-        agent_id: str,
+        agent_id: str = "agent_browser_user",
         profile_type: str = BrowserProfileType.EPHEMERAL.value,
         browser_type: str = "chromium",
         allowed_domains: Optional[List[str]] = None,
