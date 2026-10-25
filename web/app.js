@@ -228,7 +228,8 @@ async function loadStoredSession() {
     } else if (oauthToken) {
       let hostUser = null;
       try {
-        const payloadStr = oauthToken.includes('.') ? oauthToken.split('.')[0] : oauthToken;
+        const lastDot = oauthToken.lastIndexOf('.');
+        const payloadStr = lastDot > 0 ? oauthToken.slice(0, lastDot) : oauthToken;
         hostUser = JSON.parse(payloadStr);
       } catch (e) {
         hostUser = { name: 'Host & Owner', role: 'OWNER', email: 'owner@zonata.internal' };
@@ -261,7 +262,9 @@ async function loadStoredSession() {
         let tokenExp = state.host.exp;
         if (!tokenExp && typeof state.host.token === 'string' && state.host.token.includes('.')) {
           try {
-            const parsedPayload = JSON.parse(state.host.token.split('.')[0]);
+            const lastDot = state.host.token.lastIndexOf('.');
+            const payloadStr = lastDot > 0 ? state.host.token.slice(0, lastDot) : state.host.token;
+            const parsedPayload = JSON.parse(payloadStr);
             tokenExp = parsedPayload.exp;
           } catch(e) {}
         }
@@ -312,15 +315,23 @@ async function loadStoredSession() {
 }
 
 function saveSession(hostData, token) {
-  state.host = hostData;
+  state.host = hostData || {};
   if (token) {
     state.host.token = token;
     localStorage.setItem('zonata_auth_token', token);
+    try {
+      const lastDot = token.lastIndexOf('.');
+      const payloadStr = lastDot > 0 ? token.slice(0, lastDot) : token;
+      const parsed = JSON.parse(payloadStr);
+      if (parsed.exp) {
+        state.host.exp = parsed.exp;
+      }
+    } catch (e) {}
   }
-  if (hostData && hostData.tenant_id) {
-    localStorage.setItem('zonata_active_tenant_id', hostData.tenant_id);
+  if (state.host && state.host.tenant_id) {
+    localStorage.setItem('zonata_active_tenant_id', state.host.tenant_id);
   }
-  localStorage.setItem('zonata_host_session', JSON.stringify(hostData));
+  localStorage.setItem('zonata_host_session', JSON.stringify(state.host));
 }
 
 function clearSession() {
