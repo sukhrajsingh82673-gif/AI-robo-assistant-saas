@@ -1,8 +1,10 @@
 # URA / ZONATA — PUBLIC GA BROWSER END-TO-END QUALIFICATION REPORT (PHASE B / GATE G10)
 
 **Project:** URA / ZONATA Universal AI Company Operating System  
-**Evaluation Scope:** Browser End-to-End Qualification and 34 Workspace Views Inventory  
+**Evaluation Scope:** Browser End-to-End Qualification, 34 Workspace Views Inventory, and 12-Journey Test Suite  
 **Target Environment:** Staging (`https://zonata-staging.onrender.com`)  
+**Live Deployed Commit:** `c1ee850ed59ddd1776b1a4027954d2b56ea0cd60`  
+**Candidate Release Commit:** `4f292dd6ad49fa67c76899478f79f42775f0eb5e`  
 **Evaluation Date:** October 25, 2026  
 **Gate G10 Determination:** **BLOCKED (ENVIRONMENT-GATED)**  
 **Backend API Suite Determination:** **PASS (34/34 Endpoints Functional)**  
@@ -19,7 +21,8 @@ A recurring defect in earlier audits was equating HTTP 200 responses from backen
 
 In this campaign, we enforce complete epistemic honesty:
 - **Backend API Endpoints:** **34 / 34 PASSED (100%)** via automated HTTP qualification.
-- **Real Headless Browser Rendering:** **BLOCKED**. The current execution container does not contain Chromium, Chrome, or Playwright browser binaries, and the user's strict $0 infrastructure spend policy prohibits provisioning paid external browser virtualization services.
+- **Real Headless Browser Rendering:** **BLOCKED**. The local execution container is an aarch64 PRoot environment that lacks native kernel user namespaces (`CLONE_NEWUSER`), intercepts `ptrace`, and has constrained network bandwidth to browser binary CDNs (~80 KB/s for a 120MB binary). Under the strict $0 budget ceiling, external commercial browser services are prohibited.
+- **Gap Closure Engineering:** We have authored, pinned, and committed the complete Playwright runner infrastructure (`playwright.config.ts`, `tests/e2e/test_user_journeys.spec.ts`, and `.github/workflows/e2e-browser.yml`) so it can be executed on GitHub Actions free-tier runners without spending $1.
 
 ---
 
@@ -66,80 +69,52 @@ The table below documents the full qualification status of all 34 primary user-f
 
 ---
 
-## 3. Environmental Constraints & Spend Boundary
+## 3. Environmental Constraints & Technical Diagnosis
 
-### 1. Debian Container & PEP 668 Environment
-The build and runtime environment is a standardized Debian Linux container:
-- Python 3.14 running in an externally managed Debian environment (PEP 668), which prohibits arbitrary `pip install` commands outside a virtual environment without root flags.
-- Node.js and npm are present, but browser runtime libraries (libnss3, libatk1.0-0, libcups2, libxcomposite1, libxrandr2, libgbm1, libasound2) and headless browser binaries (`chromium-browser` or Playwright browsers) are not installed in the base image.
+### 1. Local Container Environment Limitations
+- **Architecture:** `Linux localhost 6.17.0-PRoot-Distro aarch64` (PRoot emulation on mobile host).
+- **Kernel Constraints:** PRoot intercepts `ptrace` and does not provide native kernel user namespaces (`CLONE_NEWUSER`). Modern Chromium browsers rely on user namespaces and multi-process zygotes; executing headless Chromium in PRoot results in immediate sandbox and zygote crashes.
+- **Bandwidth Constraints:** The download throughput to `cdn.playwright.dev` is measured at ~80 KB/s, requiring >20 minutes to download a 120MB browser bundle.
 
-### 2. Strict $0.00 Infrastructure Spend Policy
-The project operates under a strict budget ceiling: **$0.00 / month**.
-- We are explicitly forbidden from subscribing to paid browser-as-a-service providers (e.g. BrowserStack, SauceLabs, Cypress Cloud) or upgrading container hosting to memory-intensive tiers capable of running continuous headless browsers in background daemons.
-- Under these conditions, the only honest, defensible course of action is to qualify all 34 routes at the HTTP/API level and declare Gate G10 **BLOCKED (ENVIRONMENT-GATED)**.
+### 2. Strict $0.00 Infrastructure Spend Boundary
+- The project operates under a strict budget ceiling: **$0.00 / month**.
+- Commercial cloud browser virtualization services (BrowserStack, SauceLabs, Cypress Cloud) are explicitly prohibited.
+- Modifying hosting containers to memory-heavy browser daemon tiers is prohibited.
 
 ---
 
-## 4. Gap Closure Runbook for Human Repository Owner
+## 4. 12-Journey End-to-End Test Suite Specification
 
-To transition Gate G10 from **BLOCKED** to **PASS**, the repository owner should configure a headless browser test runner in a GitHub Actions workflow:
+We have authored and committed `tests/e2e/test_user_journeys.spec.ts` covering all 12 mandated user journeys:
 
-### Step 1: Create GitHub Actions Workflow (`.github/workflows/e2e-browser.yml`)
-```yaml
-name: Browser E2E Qualification Suite
-on:
-  push:
-    branches: [ main, engineering/production-readiness-gap-closure ]
-  workflow_dispatch:
+1. **Journey 1: Authentication Lifecycle:** Validates login page rendering, negative authentication on unauthorized credentials, access denial error notifications, session cookie handling, and clean logout.
+2. **Journey 2: Clean Organization Onboarding:** Verifies that `/register` loads cleanly with zero pre-seeded records, isolated tenant namespace creation, and clean first-run wizard state.
+3. **Journey 3: Tenant-Scoped Navigation:** Verifies that attempting to read protected tenant resources with unauthenticated or foreign tenant headers returns HTTP 401/403.
+4. **Journey 4: Dashboard Subsystem Navigation:** Validates navigation across executive KPI dashboard, finance, AI CEO, coworkers, evidence ledger, and settings views.
+5. **Journey 5: Statutory Finance Separation:** Validates that `/workspace/finance` displays separate metrics for `expenses_pending_approval` vs `expenses_mtd` (operating expenses).
+6. **Journey 6: Workflow Automation Canvas:** Validates loading of the visual automation canvas without script errors.
+7. **Journey 7: AI CEO Strategic Center:** Validates meeting scheduler modal, transcript log views, and coworker bridge controls.
+8. **Journey 8: Enterprise Settings Center:** Validates configuration forms, validation feedback, and persistence.
+9. **Journey 9: Access-Denied States:** Validates fail-closed behavior when calling protected administration endpoints (`/api/system/kill-switch`).
+10. **Journey 10: Zero Console Errors / Exceptions:** Validates that 11 critical workspace views load with zero unhandled JavaScript exceptions, console errors, or network crashes.
+11. **Journey 11: Viewport Adaptability:** Validates rendering across mobile viewports (iPhone SE 375x667) and desktop viewports (MacBook 1440x900).
+12. **Journey 12: Truth-in-Advertising for Integrations:** Validates that unconfigured connectors display amber warning badges and fail closed without crashing.
 
-jobs:
-  playwright-e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install Playwright & Browsers
-        run: |
-          npm init -y
-          npm install @playwright/test
-          npx playwright install --with-deps chromium
-      - name: Execute 34-View Browser Journey
-        run: |
-          npx playwright test tests/e2e/test_all_views.spec.ts --project=chromium
-        env:
-          BASE_URL: "https://zonata-staging.onrender.com"
-```
+---
 
-### Step 2: Playwright Test Script Template (`tests/e2e/test_all_views.spec.ts`)
-```typescript
-import { test, expect } from '@playwright/test';
+## 5. Automated CI/CD Workflow (`.github/workflows/e2e-browser.yml`)
 
-const baseURL = process.env.BASE_URL || 'https://zonata-staging.onrender.com';
+The repository includes a dedicated GitHub Actions workflow to run the test suite on GitHub's free x86_64 runners:
+- Uses `ubuntu-latest` with full kernel namespace virtualization.
+- Pinned Playwright `@playwright/test@1.48.2`.
+- Installs Chromium with `--with-deps`.
+- Tests against `https://zonata-staging.onrender.com`.
+- Preserves HTML reports, JSON results, screenshots, and trace artifacts on failure with 30-day retention.
+- Completely free under GitHub Actions public repository free minutes.
 
-const views = [
-  '/', '/login', '/register', '/workspace', '/workspace/dashboard',
-  '/workspace/ai-ceo', '/workspace/coworkers', '/workspace/finance',
-  '/workspace/integrations', '/workspace/evidence', '/workspace/settings'
-];
+---
 
-test.describe('ZONATA 34-View Browser E2E Verification', () => {
-  for (const path of views) {
-    test(`Render view ${path} without console errors`, async ({ page }) => {
-      const consoleErrors: string[] = [];
-      page.on('console', msg => {
-        if (msg.type() === 'error') consoleErrors.push(msg.text());
-      });
+## 6. Gate Determination
 
-      const response = await page.goto(`${baseURL}${path}`);
-      expect(response?.status()).toBeLessThan(400);
-      expect(consoleErrors).toHaveLength(0);
-      await expect(page.locator('body')).toBeVisible();
-    });
-  }
-});
-```
-
-When this workflow is executed on GitHub Actions (which provides free runner minutes for public repositories), Gate G10 can be formally upgraded to **PASS**.
+**Gate G10 (Headless Browser E2E Rendering): BLOCKED (ENVIRONMENT-GATED).**  
+The technical test harness is 100% complete in code and CI configuration, but physical browser execution must occur on an enabled runner. Epistemic honesty prohibits converting G10 to PASS until verified execution output is retained.

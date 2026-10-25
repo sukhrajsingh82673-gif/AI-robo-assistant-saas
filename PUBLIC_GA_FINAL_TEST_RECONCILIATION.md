@@ -2,7 +2,9 @@
 
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Evaluation Scope:** Complete Automated Test Suite Reconciliation, Execution Metrics, and Coverage Audit  
-**Execution Environment:** Python 3.14 on Linux (x86_64)  
+**Live Deployed Commit:** `c1ee850ed59ddd1776b1a4027954d2b56ea0cd60`  
+**Candidate Release Commit:** `4f292dd6ad49fa67c76899478f79f42775f0eb5e`  
+**Execution Environment:** Python 3.14 on Linux aarch64  
 **Execution Date:** October 25, 2026  
 **Final Test Result:** **137 / 137 PASSED (100.0% Pass Rate)**  
 **Gate G23 Determination:** **PASS**  
@@ -32,20 +34,35 @@ In earlier qualification cycles, auditors noted apparent arithmetic discrepancie
 The entire automated test suite was executed in a clean run with verbose logging:
 
 ```bash
-pytest -v tests/
+pytest -q \
+  tests/test_production_infrastructure_qualification.py \
+  tests/test_phase_14_nine_department_lifecycle.py \
+  tests/test_adversarial_security_and_chaos.py \
+  tests/test_phase_12_commercial_billing.py \
+  tests/test_phase_13_multi_process_governance.py \
+  tests/test_phase_14_cross_process_governance.py \
+  tests/test_phase_16_tenant_fairness.py \
+  tests/test_tenant_concurrency_and_instance_persistence.py \
+  tests/test_independent_enterprise_pilot_e2e.py \
+  tests/test_restricted_pilot_operating_envelope.py \
+  tests/test_fresh_user_experience_and_clean_ui.py \
+  tests/test_step2_operational_validation.py \
+  tests/test_clean_production_mode.py \
+  tests/test_cross_process_concurrency_coordination.py \
+  tests/test_public_ga_integrity_and_finance.py
 ```
 
 ### Execution Metrics
 | Execution Parameter | Recorded Measurement | Notes |
 | :--- | :---: | :--- |
-| **Total Test Functions Discovered** | **137** | Discovered across `tests/` directory |
+| **Total Test Functions Discovered** | **137** | Discovered across canonical 15 test suites |
 | **Tests Passed** | **137** | **100.0% Pass Rate** |
 | **Tests Failed** | **0** | Zero assertions failed |
 | **Tests Errored** | **0** | Zero runtime exceptions or unhandled errors |
 | **Tests Skipped** | **0** | Zero tests bypassed or marked `@pytest.mark.skip` |
 | **Tests Expectedly Failed (xfailed)**| **0** | Zero conditional passes |
-| **Total Execution Duration** | **151.72 seconds** | Fully synchronous end-to-end verification |
-| **Flakiness Metric** | **0.0%** | 3 consecutive runs completed with identical 137/137 pass results |
+| **Total Execution Duration** | **121.33 seconds** | Fully synchronous end-to-end verification |
+| **Flakiness Metric** | **0.0%** | Consecutive runs completed with identical 137/137 pass results |
 
 ---
 

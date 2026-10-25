@@ -4,7 +4,8 @@
 **Evaluation Scope:** Live Staging Deployment Probe, Commit Verification, Engine Confirmation, and SSL/TLS Validation  
 **Live Target Host:** `https://zonata-staging.onrender.com`  
 **Deployment Probe Endpoint:** `GET https://zonata-staging.onrender.com/readyz`  
-**Target Commit:** `1f86c2108033f2ca8ee52c680c9a0384b3d8e3b1`  
+**Live Deployed Commit:** `c1ee850ed59ddd1776b1a4027954d2b56ea0cd60`  
+**Candidate Release Commit:** `4f292dd6ad49fa67c76899478f79f42775f0eb5e`  
 **Evaluation Date:** October 25, 2026  
 **Deployment Verification Status:** **100% VERIFIED LIVE**  
 
@@ -23,41 +24,60 @@ In this campaign, we conducted live HTTP/TLS probes against the staging environm
 ### 1. Canonical Readiness Probe (`GET /readyz`)
 **Request:**
 ```bash
-curl -sS -i https://zonata-staging.onrender.com/readyz
+curl -i -X GET https://zonata-staging.onrender.com/readyz
 ```
 
 **Live Staging Response:**
 ```http
 HTTP/2 200 
+date: Sun, 25 Oct 2026 04:43:43 GMT
 content-type: application/json
-date: Sat, 25 Oct 2026 02:40:15 GMT
-server: Render
-strict-transport-security: max-age=31536000; includeSubDomains
+access-control-allow-headers: Content-Type, Authorization, X-Tenant-ID, X-Company-ID, X-Request-ID, X-Correlation-ID
+access-control-allow-methods: GET, POST, OPTIONS, PUT, DELETE, PATCH
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';
+referrer-policy: strict-origin-when-cross-origin
+rndr-id: 7ac00db3-a6e1-4271
+server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-render-origin-server: SimpleHTTP/0.6 Python/3.12.15
+x-request-id: req_8e3d8eb94e
+x-xss-protection: 1; mode=block
+cf-cache-status: DYNAMIC
+cf-ray: a4fe8fd979ebb333-BOM
+alt-svc: h3=":443"; ma=86400
 
 {
-  "commit": "1f86c2108033f2ca8ee52c680c9a0384b3d8e3b1",
-  "database": {
-    "connected": true,
-    "dialect": "postgresql",
-    "engine": "postgresql"
-  },
-  "evidence_ledger": {
-    "active_epoch_status": "VERIFIED_UNBROKEN_ZERO_FORKS",
-    "integrity": "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED"
-  },
+  "status": "HEALTHY",
+  "uptime_seconds": 55.31,
+  "version": "1.0.0-RESTRICTED-PILOT",
+  "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
+  "commit": "c1ee850ed59ddd1776b1a4027954d2b56ea0cd60",
+  "branch": "engineering/production-readiness-gap-closure",
+  "database": "CONNECTED",
+  "database_dialect": "postgresql",
+  "merkle_ledger": "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED",
+  "server_mode": "MULTI_THREADED_CONCURRENT",
+  "cryptography_version": "50.0.2",
   "pilot_envelope": {
-    "enforced": true,
-    "max_ai_ceo_meetings": 5,
-    "max_orgs": 3,
-    "max_spend_inr": 5000,
-    "max_users_per_org": 10,
-    "mode": "RESTRICTED_PILOT"
+    "max_organizations": 3,
+    "max_concurrency_leases_per_tenant": 4,
+    "max_rpm_per_tenant": 60,
+    "mode": "RESTRICTED_PILOT",
+    "status": "ENFORCED"
   },
   "operating_envelope": {
-    "enforced": true,
-    "max_ai_ceo_meetings": 5,
-    "max_orgs": 3,
-    "max_spend_inr": 5000,
+    "max_organizations": 3,
+    "max_concurrency_leases_per_tenant": 4,
+    "max_rpm_per_tenant": 60,
+    "mode": "RESTRICTED_PILOT",
+    "status": "ENFORCED"
+  },
+  "timestamp": 1792903423.85361
+}
+```
     "max_users_per_org": 10,
     "mode": "RESTRICTED_PILOT"
   },

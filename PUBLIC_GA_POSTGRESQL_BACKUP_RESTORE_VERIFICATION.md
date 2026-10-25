@@ -4,8 +4,10 @@
 **Evaluation Scope:** Live Neon Serverless PostgreSQL 16 Backup, Restore & Disaster Recovery Certification  
 **Target Database Engine:** Neon Serverless PostgreSQL 16.15 on `aarch64-unknown-linux-gnu`  
 **Connection Endpoint:** `ep-broad-sky-b4jnm313-pooler.c-6.us-east-2.aws.neon.tech/Postgres`  
+**Live Deployed Commit:** `c1ee850ed59ddd1776b1a4027954d2b56ea0cd60`  
+**Candidate Release Commit:** `4f292dd6ad49fa67c76899478f79f42775f0eb5e`  
 **Evaluation Date:** October 25, 2026  
-**Gate G17 (Disaster Recovery Verification):** **PASS**  
+**Gate G17 (Disaster Recovery Verification):** **PASS (with Off-Site Immutable Storage Caveat)**  
 
 ---
 
@@ -115,7 +117,19 @@ Because ZONATA operates under the strict **$0.00 infrastructure limit**, the fol
 
 ---
 
-## 7. Gate Determination
+## 7. Off-Site & Immutable Storage Analysis (Compliance Disclosure)
 
-**Gate G17 (PostgreSQL Disaster Recovery): PASS.**  
-The disaster recovery capabilities of ZONATA on live Neon PostgreSQL have been physically demonstrated, independently timed, cryptographically verified, and 100% reconciled.
+Per Section 5.4 of the Public GA Release Standards:
+1. **Current Protection Model:**
+   - Database disaster recovery is currently established via Neon Serverless PostgreSQL automated rolling 24-hour Point-In-Time Recovery (PITR) snapshots in AWS us-east-2, complemented by verified logical `pg_dump` dumps.
+   - The restore drill into schema `dr_restore_drill_isolated` verified 100% row-level reconciliation (117/117 rows across 5 critical tables: `tenants`, `finance_accounts`, `finance_expenses`, `finance_transactions`, `pilot_organizations`) with an RTO of 19.64 seconds and RPO of 0.0 seconds.
+2. **Identified Gap for Enterprise Public GA:**
+   - Under the current **$0.00 infrastructure spend ceiling**, an independent secondary cloud provider destination (e.g. AWS S3 WORM Object Lock or AWS Glacier Vault Lock) has **not** been provisioned.
+   - While the current database backup is safe for restricted pilot operations, we explicitly do **not** claim immutable, multi-region, off-site WORM compliance. Provisioning an independent S3 bucket with Object Lock requires explicit owner spending authorization.
+
+---
+
+## 8. Gate Determination
+
+**Gate G17 (PostgreSQL Disaster Recovery): PASS (Restricted Pilot Qualified; Off-site WORM Caveat Noted).**  
+The disaster recovery capabilities of ZONATA on live Neon PostgreSQL have been physically demonstrated, independently timed, cryptographically verified, and 100% reconciled across all business-critical tables.
