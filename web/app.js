@@ -252,13 +252,26 @@ async function loadStoredSession() {
       if (storedToken && !state.host.token) {
         state.host.token = storedToken;
       }
-      // Validate token expiration
-      if (state.host && state.host.exp && state.host.exp < Date.now() / 1000) {
-        console.warn('[Security] Host token expired. Session invalidated.');
+      // Security invariant: A valid authenticated session MUST have a non-empty token
+      if (!state.host || !state.host.token) {
+        console.warn('[Security] Session without authentication token detected. Invalidating.');
         clearSession();
+      } else {
+        // Validate token expiration if available
+        let tokenExp = state.host.exp;
+        if (!tokenExp && typeof state.host.token === 'string' && state.host.token.includes('.')) {
+          try {
+            const parsedPayload = JSON.parse(state.host.token.split('.')[0]);
+            tokenExp = parsedPayload.exp;
+          } catch(e) {}
+        }
+        if (tokenExp && tokenExp < Date.now() / 1000) {
+          console.warn('[Security] Host token expired. Session invalidated.');
+          clearSession();
+        }
       }
     } catch (e) {
-      state.host = null;
+      clearSession();
     }
   }
 
@@ -373,6 +386,9 @@ function loadData() {
 }
 
 async function syncWithBackend() {
+  const token = localStorage.getItem('zonata_auth_token');
+  if (!token || !state.host) return;
+
   try {
     const res = await fetch('/api/portfolio');
     if (res.ok) {
@@ -1292,6 +1308,12 @@ window.handleAuthSubmit = async function(e, type) {
     }
 
     saveSession(data.user, data.token);
+    if (window.CurrentCompanyContext && typeof window.CurrentCompanyContext.refresh === 'function') {
+      window.CurrentCompanyContext.refresh();
+    }
+    if (typeof syncWithBackend === 'function') {
+      syncWithBackend();
+    }
     showToast(isSignIn ? `Welcome back, ${data.user.name || data.user.email}!` : `Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
     renderApp();
   } catch (err) {

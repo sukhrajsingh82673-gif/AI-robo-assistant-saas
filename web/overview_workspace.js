@@ -34,6 +34,14 @@
 
       const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
 
+      const token = localStorage.getItem('zonata_auth_token');
+      if (!token) {
+        console.warn('[OverviewWorkspace] Unauthenticated access attempted. Directing to auth.');
+        if (typeof clearSession === 'function') clearSession();
+        if (typeof renderApp === 'function') renderApp();
+        return;
+      }
+
       this.isLoading = true;
       this.renderLoading(container);
 

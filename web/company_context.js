@@ -32,6 +32,10 @@
     }
 
     async refresh() {
+      // Unauthenticated visitors do not need to poll /api/companies
+      const token = localStorage.getItem('zonata_auth_token');
+      if (!token) return;
+
       try {
         const res = await fetch('/api/companies');
         if (res.ok) {
