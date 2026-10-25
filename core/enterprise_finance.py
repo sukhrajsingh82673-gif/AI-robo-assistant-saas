@@ -92,7 +92,7 @@ class EnterpriseFinanceEngine:
             ar_total = sum(r["balance"] for r in accounts if r["category"] == "AR")
             ap_total = sum(r["balance"] for r in accounts if r["category"] == "AP")
             revenue_total = sum(r["balance"] for r in accounts if r["account_type"] == "REVENUE")
-            expense_total = sum(r["balance"] for r in accounts if r["account_type"] == "EXPENSE")
+            account_expense_total = sum(r["balance"] for r in accounts if r["account_type"] == "EXPENSE")
 
             # Recent transactions
             tx_rows = conn.execute(
@@ -105,6 +105,11 @@ class EnterpriseFinanceEngine:
                 "SELECT * FROM finance_expenses WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC LIMIT 15",
                 (self.tenant_id, company_id)
             ).fetchall()
+
+            # Statutory reconciliation: Posted GL accounts + approved reimbursement claims
+            approved_claims = sum(r["amount"] for r in exp_rows if r["status"] in ("APPROVED", "PAID", "RECONCILED"))
+            pending_claims = sum(r["amount"] for r in exp_rows if r["status"] in ("SUBMITTED", "PENDING", "DRAFT"))
+            expense_total = max(account_expense_total, approved_claims)
 
             coa = [{
                 "account_id": r["account_id"],
@@ -149,6 +154,7 @@ class EnterpriseFinanceEngine:
                     "accounts_payable": ap_total,
                     "gross_revenue_mtd": revenue_total,
                     "expenses_mtd": expense_total,
+                    "expenses_pending_approval": pending_claims,
                     "operating_profit": revenue_total - expense_total,
                     "operating_margin_pct": round(((revenue_total - expense_total) / revenue_total * 100), 1) if revenue_total > 0 else 0.0,
                     "currency": "₹"
@@ -161,6 +167,11 @@ class EnterpriseFinanceEngine:
     def create_expense(self, data: Dict[str, Any]) -> Dict[str, Any]:
         eid = f"exp_{uuid.uuid4().hex[:8]}"
         now = time.time()
+        status = data.get("status", "SUBMITTED")
+        company_id = data.get("company_id", "comp_primary")
+        category = data.get("category", "OFFICE")
+        amount = float(data.get("amount", 0.0))
+
         with db.get_connection() as conn:
             conn.execute("""
             INSERT INTO finance_expenses (
@@ -169,21 +180,72 @@ class EnterpriseFinanceEngine:
                 description, approval_id, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                eid, self.tenant_id, data.get("company_id", "comp_primary"),
+                eid, self.tenant_id, company_id,
                 data.get("claimant_name", "Employee"),
                 data.get("department", "Operations"),
-                data.get("category", "OFFICE"),
-                float(data.get("amount", 0.0)),
+                category, amount,
                 data.get("currency", "₹"),
                 data.get("payment_mode", "CORPORATE_CARD"),
-                data.get("status", "SUBMITTED"),
+                status,
                 data.get("receipt_file"),
                 data.get("description", "Operational expense"),
                 data.get("approval_id"),
                 now, now
             ))
+            if status == "APPROVED":
+                self._post_expense_to_gl(conn, eid, company_id, category, amount, now)
             conn.commit()
-        return {"expense_id": eid, "success": True}
+        return {"expense_id": eid, "success": True, "status": status}
+
+    def approve_expense(self, expense_id: str, approver: str = "Executive Approver") -> Dict[str, Any]:
+        """Approve an expense and post double-entry transaction to GL."""
+        now = time.time()
+        with db.get_connection() as conn:
+            exp = conn.execute(
+                "SELECT * FROM finance_expenses WHERE expense_id = ? AND tenant_id = ?",
+                (expense_id, self.tenant_id)
+            ).fetchone()
+            if not exp:
+                return {"success": False, "error": "Expense record not found"}
+
+            conn.execute(
+                "UPDATE finance_expenses SET status = 'APPROVED', updated_at = ? WHERE expense_id = ? AND tenant_id = ?",
+                (now, expense_id, self.tenant_id)
+            )
+            self._post_expense_to_gl(conn, expense_id, exp["company_id"], exp["category"], exp["amount"], now)
+            conn.commit()
+        return {"success": True, "expense_id": expense_id, "status": "APPROVED"}
+
+    def _post_expense_to_gl(self, conn, expense_id: str, company_id: str, category: str, amount: float, timestamp: float):
+        """Map expense category to GL Account code and post ledger entry."""
+        cat_map = {
+            "SOFTWARE": "acc_6020",
+            "CLOUD": "acc_6020",
+            "PROCUREMENT": "acc_5010",
+            "SALARIES": "acc_6010",
+            "PAYROLL": "acc_6010",
+            "OFFICE": "acc_6030",
+            "TRAVEL": "acc_6030",
+            "MARKETING": "acc_6030",
+            "UTILITIES": "acc_6030"
+        }
+        acc_id = cat_map.get(category.upper(), "acc_6030")
+        conn.execute(
+            "UPDATE finance_accounts SET balance = balance + ?, updated_at = ? WHERE account_id = ? AND tenant_id = ? AND company_id = ?",
+            (amount, timestamp, acc_id, self.tenant_id, company_id)
+        )
+        tx_id = f"tx_{uuid.uuid4().hex[:8]}"
+        conn.execute("""
+        INSERT INTO finance_transactions (
+            transaction_id, tenant_id, company_id, account_id, tx_type,
+            amount, currency, category, entity_name, reference_no, status,
+            evidence_id, created_at
+        ) VALUES (?, ?, ?, ?, 'DEBIT', ?, '₹', ?, ?, ?, 'RECONCILED', ?, ?)
+        """, (
+            tx_id, self.tenant_id, company_id, acc_id,
+            amount, category, "Expense Claim Posting", expense_id,
+            f"evi_gl_{expense_id}", timestamp
+        ))
 
     def _seed_default_finance_if_empty(self):
         with db.get_connection() as conn:

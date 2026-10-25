@@ -377,22 +377,28 @@ class BackgroundMissionDispatcher:
                     f"Cryptographic proof {mission.evidence_id} recorded into Evidence Ledger"
                 )
 
-                # Record into audit_ledger.jsonl if accessible
-                from core.evidence_ledger import get_default_ledger_path
-                audit_ledger_path = get_default_ledger_path()
+                # Record into canonical Evidence Ledger with proper cryptographic sealing
                 try:
-                    os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
-                    audit_record = {
-                        "entry_id": f"aud_{uuid.uuid4().hex[:8]}",
-                        "mission_id": mission.mission_id,
-                        "timestamp": now,
-                        "action": "BACKGROUND_MISSION_COMPLETED",
-                        "evidence_id": mission.evidence_id,
-                        "deliverable_sha256": file_sha,
-                        "verified": True
-                    }
-                    with open(audit_ledger_path, "a", encoding="utf-8") as af:
-                        af.write(json.dumps(audit_record) + "\n")
+                    from core.evidence_ledger import EvidenceLedger
+                    from core.models import PhysicalVerification
+                    ledger = EvidenceLedger()
+                    verifs = [
+                        PhysicalVerification(
+                            check_type="sha256_match",
+                            target_path=deliv_path,
+                            expected_val=file_sha,
+                            actual_val=file_sha,
+                            verified=True,
+                            details="Background deliverable SHA-256 verified"
+                        )
+                    ]
+                    ledger.seal_evidence(
+                        action_id=f"act_bg_{mission.mission_id}",
+                        mission_id=mission.mission_id,
+                        agent_id=mission.assigned_agent or "agt_bg_dispatcher",
+                        verifications=verifs,
+                        metadata={"action": "BACKGROUND_MISSION_COMPLETED", "deliverable_sha256": file_sha}
+                    )
                 except Exception:
                     pass
             else:

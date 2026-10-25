@@ -598,25 +598,43 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
             git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
             git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
-            release_version = os.environ.get("APP_RELEASE_VERSION", "1.0.0-RESTRICTED-PILOT")
+            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
+            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
+            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
+            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+            # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
+            try:
+                ledger_audit = ledger.verify_full_chain_integrity()
+                if ledger_audit["valid"]:
+                    merkle_status = "INTEGRITY_VERIFIED"
+                elif ledger_audit.get("active_epoch_valid"):
+                    merkle_status = "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED"
+                else:
+                    merkle_status = "INTEGRITY_FAILED"
+            except Exception as e:
+                ledger_audit = {}
+                merkle_status = f"INTEGRITY_CHECK_ERROR: {str(e)[:100]}"
+            envelope_data = {
+                "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "100" if is_ga_mode else "3")),
+                "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "10" if is_ga_mode else "4")),
+                "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "120" if is_ga_mode else "60")),
+                "mode": "GA" if is_ga_mode else "RESTRICTED_PILOT",
+                "status": "ENFORCED"
+            }
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": release_version,
-                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
+                "release_scope": release_scope,
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
                 "database_dialect": db.get_dialect(),
-                "merkle_ledger": "INTEGRITY_VERIFIED",
+                "merkle_ledger": merkle_status,
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
-                "pilot_envelope": {
-                    "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3")),
-                    "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "4")),
-                    "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "60")),
-                    "status": "ENFORCED"
-                },
+                "pilot_envelope": envelope_data,
+                "operating_envelope": envelope_data,
                 "timestamp": time.time()
             })
             return
@@ -624,57 +642,83 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
             git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
             git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
-            release_version = os.environ.get("APP_RELEASE_VERSION", "1.0.0-RESTRICTED-PILOT")
+            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
+            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
+            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
+            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+            # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
+            try:
+                ledger_audit = ledger.verify_full_chain_integrity()
+                if ledger_audit["valid"]:
+                    merkle_status = "INTEGRITY_VERIFIED"
+                elif ledger_audit.get("active_epoch_valid"):
+                    merkle_status = "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED"
+                else:
+                    merkle_status = "INTEGRITY_FAILED"
+            except Exception as e:
+                ledger_audit = {}
+                merkle_status = f"INTEGRITY_CHECK_ERROR: {str(e)[:100]}"
+            envelope_data = {
+                "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "100" if is_ga_mode else "3")),
+                "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "10" if is_ga_mode else "4")),
+                "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "120" if is_ga_mode else "60")),
+                "mode": "GA" if is_ga_mode else "RESTRICTED_PILOT",
+                "status": "ENFORCED"
+            }
             self._send_json({
                 "status": "HEALTHY",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": release_version,
-                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
+                "release_scope": release_scope,
                 "commit": git_commit,
                 "branch": git_branch,
                 "database": "CONNECTED",
                 "database_dialect": db.get_dialect(),
-                "merkle_ledger": "INTEGRITY_VERIFIED",
+                "merkle_ledger": merkle_status,
                 "server_mode": "MULTI_THREADED_CONCURRENT",
                 "cryptography_version": CRYPTOGRAPHY_VERSION,
-                "pilot_envelope": {
-                    "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3")),
-                    "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "4")),
-                    "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "60")),
-                    "status": "ENFORCED"
-                },
+                "pilot_envelope": envelope_data,
+                "operating_envelope": envelope_data,
                 "timestamp": time.time()
             })
             return
 
-        # Milestone J: Restricted Pilot Operating Envelope Specification
-        if path in ("/api/pilot/envelope", "/api/v1/pilot/envelope"):
-            max_pilot_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3"))
-            max_concurrency = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
-            max_rpm = int(os.environ.get("PILOT_MAX_RPM", "60"))
-            active_pilot_count = 0
+        # Operating Envelope — supports both GA and Restricted Pilot modes
+        if path in ("/api/pilot/envelope", "/api/v1/pilot/envelope", "/api/operating-envelope"):
+            is_pilot_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") != "1" and os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "1"
+            is_ga_mode = not is_pilot_mode
+            max_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3" if is_pilot_mode else "100"))
+            max_concurrency = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4" if is_pilot_mode else "10"))
+            max_rpm = int(os.environ.get("PILOT_MAX_RPM", "60" if is_pilot_mode else "120"))
+            active_org_count = 0
             try:
                 with db.get_connection() as conn:
                     row = conn.execute("SELECT COUNT(*) FROM pilot_organizations WHERE status = 'ACTIVE'").fetchone()
                     if row:
-                        active_pilot_count = row[0] if isinstance(row, (tuple, list)) else row["COUNT(*)"]
+                        active_org_count = row[0] if isinstance(row, (tuple, list)) else row["COUNT(*)"]
             except Exception:
                 pass
+            release_scope = "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA" if is_pilot_mode else "URA / ZONATA — PUBLIC GA PRODUCTION"
+            env_dict = {
+                "max_organizations": max_orgs,
+                "active_organizations": active_org_count,
+                "active_pilot_organizations": active_org_count,
+                "available_slots": max(0, max_orgs - active_org_count),
+                "available_pilot_slots": max(0, max_orgs - active_org_count),
+                "max_concurrency_leases_per_tenant": max_concurrency,
+                "max_requests_per_minute_per_tenant": max_rpm,
+                "request_timeout_seconds": 60,
+                "execution_timeout_seconds": 300,
+                "enterprise_sla": "BEST_EFFORT" if is_ga_mode else "NOT_OFFERED_ON_FREE_TIER",
+                "public_ga_qualified": is_ga_mode
+            }
             self._send_json({
                 "status": "ENFORCED",
-                "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
-                "target_audience": "1–3 Controlled Design-Partner Organizations",
-                "pilot_envelope": {
-                    "max_organizations": max_pilot_orgs,
-                    "active_pilot_organizations": active_pilot_count,
-                    "available_pilot_slots": max(0, max_pilot_orgs - active_pilot_count),
-                    "max_concurrency_leases_per_tenant": max_concurrency,
-                    "max_requests_per_minute_per_tenant": max_rpm,
-                    "request_timeout_seconds": 60,
-                    "execution_timeout_seconds": 300,
-                    "enterprise_sla": "NOT_OFFERED_ON_FREE_TIER",
-                    "public_ga_qualified": False
-                },
+                "release_scope": release_scope,
+                "mode": "GA" if is_ga_mode else "RESTRICTED_PILOT",
+                "target_audience": "Public GA — All Organizations" if is_ga_mode else "1–3 Controlled Design-Partner Organizations",
+                "pilot_envelope": env_dict,
+                "operating_envelope": env_dict,
                 "timestamp": time.time()
             })
             return
@@ -1173,11 +1217,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/evidence":
             records = ledger.chain
             root = ledger.get_merkle_root()
-            integrity = ledger.verify_ledger_integrity()
+            ledger_audit = ledger.verify_full_chain_integrity()
             self._send_json({
                 "merkle_root": root,
-                "unbroken_integrity": integrity,
+                "unbroken_integrity": ledger_audit["valid"],
+                "active_epoch_integrity": ledger_audit.get("active_epoch_valid", True),
+                "active_epoch_records": ledger_audit.get("active_epoch_records", 0),
+                "epochs_count": ledger_audit.get("epochs_count", 1),
                 "total_records": len(records),
+                "status": "INTEGRITY_VERIFIED" if ledger_audit["valid"] else ("ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED" if ledger_audit.get("active_epoch_valid") else "INTEGRITY_FAILED"),
                 "records": records[-10:] if records else []
             })
             return
@@ -3365,18 +3413,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 password = req_data.get("password", "")
                 tenant_name = req_data.get("tenant_name", "").strip() or f"{name} Enterprise"
 
-                # Milestone J: Enforce Restricted Pilot Envelope (Maximum 3 Design-Partner Organizations)
-                is_pilot_mode = os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "1"
-                max_pilot_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3"))
+                # Operating Envelope: Enforce organization limits (GA or Restricted Pilot)
+                is_pilot_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") != "1" and os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "1"
+                max_orgs = int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "3" if is_pilot_mode else "100"))
                 if is_pilot_mode:
                     with db.get_connection() as conn:
                         p_row = conn.execute("SELECT COUNT(*) FROM pilot_organizations WHERE status = 'ACTIVE'").fetchone()
                         active_count = p_row[0] if isinstance(p_row, (tuple, list)) else p_row["COUNT(*)"]
-                        if active_count >= max_pilot_orgs:
+                        if active_count >= max_orgs:
                             self._send_json({
                                 "error": "Pilot Capacity Limit Exceeded",
-                                "detail": f"Restricted Production Pilot is strictly capped at maximum {max_pilot_orgs} design-partner organizations. Maximum onboarding capacity reached.",
-                                "limit": max_pilot_orgs,
+                                "detail": f"Restricted Production Pilot is strictly capped at maximum {max_orgs} design-partner organizations. Maximum onboarding capacity reached.",
+                                "limit": max_orgs,
                                 "current_active": active_count,
                                 "release_scope": "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
                             }, status=403)
@@ -5205,6 +5253,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
             res = engine.create_expense(req_data)
             self._send_json(res)
+            return
+
+        elif path == "/api/finance/expenses/approve" or (path.startswith("/api/finance/expenses/") and path.endswith("/approve")):
+            expense_id = req_data.get("expense_id") or path.split("/")[4]
+            engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
+            res = engine.approve_expense(expense_id, approver=auth_context.get("email", "Executive Approver") if auth_context else "Executive Approver")
+            self._send_json(res, status=200 if res.get("success") else 400)
             return
 
         elif path == "/api/agent-factory/synthesize":

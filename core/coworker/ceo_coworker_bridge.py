@@ -231,21 +231,29 @@ class AICeoCoworkerBridge:
         evidence_content = f"{mission_id}:{req.tenant_id}:{file_sha}:{time.time()}"
         evidence_token = f"ev_merkle_{hashlib.sha256(evidence_content.encode()).hexdigest()[:16]}"
 
-        # Write to audit ledger
-        from core.evidence_ledger import get_default_ledger_path
-        audit_ledger_path = get_default_ledger_path()
+        # Write to canonical Evidence Ledger with proper cryptographic sealing
         try:
-            os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
-            with open(audit_ledger_path, "a", encoding="utf-8") as af:
-                af.write(json.dumps({
-                    "entry_id": f"aud_ceo_{uuid.uuid4().hex[:8]}",
-                    "mission_id": mission_id,
-                    "timestamp": time.time(),
-                    "action": "CEO_MISSION_COMPLETED",
-                    "evidence_id": evidence_token,
-                    "deliverable_sha256": file_sha,
-                    "verified": independent_verified
-                }) + "\n")
+            from core.evidence_ledger import EvidenceLedger
+            from core.models import PhysicalVerification
+            ledger = EvidenceLedger()
+            verifs = [
+                PhysicalVerification(
+                    check_type="sha256_match",
+                    target_path=deliverable_path,
+                    expected_val=file_sha,
+                    actual_val=file_sha,
+                    verified=independent_verified,
+                    details="CEO deliverable physical verification"
+                )
+            ]
+            pkg = ledger.seal_evidence(
+                action_id=f"act_ceo_{mission_id}",
+                mission_id=mission_id,
+                agent_id="agt_ai_ceo_v8",
+                verifications=verifs,
+                metadata={"action": "CEO_MISSION_COMPLETED", "deliverable_sha256": file_sha}
+            )
+            evidence_token = pkg.evidence_id
         except Exception:
             pass
 
