@@ -93,7 +93,8 @@ class MCPKillSwitch:
         company_id: Optional[str] = None,
         server_id: Optional[str] = None,
         tool_id: Optional[str] = None,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
+        **kwargs
     ):
         if tool_id:
             cls._active_tools.add(tool_id)

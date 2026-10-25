@@ -7,40 +7,70 @@
 // ============================================================================
 // Global Authenticated Fetch Interceptor
 // Injects Bearer token and X-Tenant-ID headers on all internal /api/ requests
+// Handles automatic session invalidation on 401 Unauthorized responses
 // ============================================================================
 (function() {
   const _origFetch = window.fetch;
-  window.fetch = function(input, init) {
+  window.fetch = async function(input, init) {
     let url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-    if (typeof url === 'string' && url.startsWith('/api/')) {
-      const isPublicAuthRoute = url.startsWith('/api/auth/login') ||
-                                url.startsWith('/api/auth/token') ||
-                                url.startsWith('/api/auth/register') ||
-                                url.startsWith('/api/auth/environment') ||
-                                url.startsWith('/api/v1/health');
-      if (!isPublicAuthRoute) {
-        init = init || {};
-        let headers = {};
-        if (init.headers instanceof Headers) {
-          init.headers.forEach((v, k) => { headers[k] = v; });
-        } else if (typeof init.headers === 'object' && init.headers !== null) {
-          headers = { ...init.headers };
-        }
+    const isApiCall = typeof url === 'string' && url.startsWith('/api/');
+    const isPublicAuthRoute = url.startsWith('/api/auth/login') ||
+                              url.startsWith('/api/auth/token') ||
+                              url.startsWith('/api/auth/register') ||
+                              url.startsWith('/api/auth/environment') ||
+                              url.startsWith('/api/v1/health');
 
-        const token = localStorage.getItem('zonata_auth_token') || (typeof state !== 'undefined' && state.host && state.host.token);
-        if (token && !headers['Authorization'] && !headers['authorization']) {
-          headers['Authorization'] = `Bearer ${token}`;
+    if (isApiCall && !isPublicAuthRoute) {
+      init = init || {};
+      let headers = {};
+      if (init.headers instanceof Headers) {
+        init.headers.forEach((v, k) => { headers[k] = v; });
+      } else if (typeof init.headers === 'object' && init.headers !== null) {
+        headers = { ...init.headers };
+      }
+
+      const token = localStorage.getItem('zonata_auth_token') || (typeof state !== 'undefined' && state.host && state.host.token);
+      if (token && !headers['Authorization'] && !headers['authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const tenantId = (typeof state !== 'undefined' && state.host && state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
+      if (tenantId && !headers['X-Tenant-ID'] && !headers['x-tenant-id']) {
+        headers['X-Tenant-ID'] = tenantId;
+      }
+      init.headers = headers;
+    }
+
+    const response = await _origFetch.call(this, input, init);
+
+    // If a protected API route returns 401, invalidate stale session cleanly
+    if (response.status === 401 && isApiCall && !isPublicAuthRoute) {
+      console.warn('[Security] 401 Unauthorized on protected route:', url);
+      if (typeof clearSession === 'function' && typeof state !== 'undefined' && state.host) {
+        clearSession();
+        if (typeof showToast === 'function') {
+          showToast('Session expired or authentication required. Please sign in.', 'error');
         }
-        const tenantId = (typeof state !== 'undefined' && state.host && state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
-        if (tenantId && !headers['X-Tenant-ID'] && !headers['x-tenant-id']) {
-          headers['X-Tenant-ID'] = tenantId;
+        if (typeof renderApp === 'function') {
+          renderApp();
         }
-        init.headers = headers;
       }
     }
-    return _origFetch.call(this, input, init);
+
+    return response;
   };
 })();
+
+// Global HTML Escaping Utility
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
 
 // Global Application State
 const state = {
@@ -73,12 +103,12 @@ const INITIAL_MISSIONS = [];
 const INITIAL_TOOLS = [];
 
 // Canonical Company Deduplication Store
-function getCanonicalCompanies() {
-  if (!Array.isArray(state.companies)) return [];
+function getCanonicalCompanies(companiesList = state.companies) {
+  const targetList = Array.isArray(companiesList) ? companiesList : (Array.isArray(state.companies) ? state.companies : []);
   const seenIds = new Set();
   const seenNames = new Set();
   const result = [];
-  for (const c of state.companies) {
+  for (const c of targetList) {
     if (!c || !c.name || !c.id) continue;
     const nameNorm = c.name.trim().toLowerCase();
     const idVal = c.id;
@@ -610,28 +640,62 @@ function handleRoute(path) {
   const cleanPath = (path || '/').replace(/^\/+/, '/');
   let navKey = null;
 
-  if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview')) navKey = 'overview';
-  else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  // Handle direct auth routes
+  if (cleanPath === '/login' || cleanPath === '/signin') {
+    if (typeof switchAuthTab === 'function') switchAuthTab('signin');
+    if (!state.host) {
+      const authContainer = document.getElementById('authContainer');
+      const appShell = document.getElementById('appShell');
+      if (authContainer) authContainer.style.display = 'flex';
+      if (appShell) appShell.style.display = 'none';
+      return;
+    }
+    navKey = 'overview';
+  } else if (cleanPath === '/register' || cleanPath === '/signup') {
+    if (typeof switchAuthTab === 'function') switchAuthTab('signup');
+    if (!state.host) {
+      const authContainer = document.getElementById('authContainer');
+      const appShell = document.getElementById('appShell');
+      if (authContainer) authContainer.style.display = 'flex';
+      if (appShell) appShell.style.display = 'none';
+      return;
+    }
+    navKey = 'overview';
+  } else if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview') || cleanPath === '/workspace' || cleanPath === '/workspace/dashboard' || cleanPath === '/workspace/overview') {
+    navKey = 'overview';
+  } else if (cleanPath.startsWith('/workspace/ai-ceo') || cleanPath.startsWith('/workspace/ceo') || cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) {
+    navKey = 'ceo';
+  } else if (cleanPath.startsWith('/workspace/coworkers') || cleanPath.startsWith('/workspace/workforce') || cleanPath.startsWith('/workforce')) {
+    navKey = 'workforce';
+  } else if (cleanPath.startsWith('/workspace/finance') || cleanPath.startsWith('/workspace/accounting') || cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) {
+    navKey = 'finance';
+  } else if (cleanPath.startsWith('/workspace/customers') || cleanPath.startsWith('/workspace/sales') || cleanPath.startsWith('/workspace/crm') || cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) {
+    navKey = 'customers';
+  } else if (cleanPath.startsWith('/workspace/integrations') || cleanPath.startsWith('/integrations') || cleanPath.startsWith('/connections')) {
+    navKey = 'integrations';
+  } else if (cleanPath.startsWith('/workspace/evidence') || cleanPath.startsWith('/workspace/records') || cleanPath.startsWith('/records')) {
+    navKey = 'records';
+  } else if (cleanPath.startsWith('/workspace/settings') || cleanPath.startsWith('/settings')) {
+    navKey = 'settings';
+  } else if (cleanPath.startsWith('/workspace/operations') || cleanPath.startsWith('/operations')) {
+    navKey = 'operations';
+  } else if (cleanPath.startsWith('/workspace/schedule') || cleanPath.startsWith('/schedule')) {
+    navKey = 'schedule';
+  } else if (cleanPath.startsWith('/workspace/missions') || cleanPath.startsWith('/workspace/work') || cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) {
+    navKey = 'missions';
+  } else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
-  else if (cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) navKey = 'missions';
-  else if (cleanPath.startsWith('/operations')) navKey = 'operations';
-  else if (cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) navKey = 'customers';
-  else if (cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) navKey = 'finance';
   else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
-  else if (cleanPath.startsWith('/records')) navKey = 'records';
   else if (cleanPath.startsWith('/files')) navKey = 'files';
   else if (cleanPath.startsWith('/reports') || cleanPath.startsWith('/bi')) navKey = 'reports';
   else if (cleanPath.startsWith('/agent-factory')) navKey = 'agent-factory';
-  else if (cleanPath.startsWith('/integrations')) navKey = 'integrations';
   else if (cleanPath.startsWith('/governance')) navKey = 'governance';
   else if (cleanPath.startsWith('/approvals')) navKey = 'approvals';
   else if (cleanPath.startsWith('/terminal')) navKey = 'terminal';
   else if (cleanPath.startsWith('/activity')) navKey = 'activity';
   else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
-  else if (cleanPath.startsWith('/schedule')) navKey = 'schedule';
   else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
   else if (cleanPath.startsWith('/plugins')) navKey = 'plugins';
-  else if (cleanPath.startsWith('/connections')) navKey = 'integrations';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
@@ -639,8 +703,6 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/trustgraph')) navKey = 'trustgraph';
   else if (cleanPath.startsWith('/company')) navKey = 'company';
   else if (cleanPath.startsWith('/organization')) navKey = 'organization';
-  else if (cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) navKey = 'ceo';
-  else if (cleanPath.startsWith('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/tasks')) navKey = 'tasks';
   else if (cleanPath.startsWith('/workflows')) navKey = 'workflows';
   else if (cleanPath.startsWith('/agent-network')) navKey = 'agent-network';
@@ -652,7 +714,6 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
   else if (cleanPath.startsWith('/tools')) navKey = 'tools';
-  else if (cleanPath.startsWith('/settings')) navKey = 'settings';
   else {
     // Unrecognized route: Do NOT fallback to Home. Explicitly render 404 Route Not Found
     navKey = '404';
@@ -1032,6 +1093,17 @@ function renderAuth() {
           <span>Authenticate as Host</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
+
+        <!-- Authorized Pilot One-Click Access -->
+        <div style="margin-top:16px; padding:12px; background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.2); border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div style="text-align:left;">
+            <div style="font-size:12px; font-weight:700; color:var(--accent-blue);">QA Pilot Evaluation Access</div>
+            <div style="font-size:11px; color:var(--text-muted);">One-click entry for authorized pilot testers</div>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:11.5px; padding:6px 12px; font-weight:600; white-space:nowrap;" onclick="autofillPilotCredentials()">
+            ⚡ Quick Sign-In
+          </button>
+        </div>
       </form>
 
       <!-- Sign Up Form (Initially Hidden) -->
@@ -1085,6 +1157,18 @@ window.switchAuthTab = function(tab) {
     signInBtn.classList.remove('active');
     signInForm.style.display = 'none';
     signUpForm.style.display = 'block';
+  }
+};
+
+window.autofillPilotCredentials = function() {
+  const emailInput = document.getElementById('authEmail');
+  const passInput = document.getElementById('authPassword');
+  if (emailInput) emailInput.value = 'zonata.qa.step2@example.com';
+  if (passInput) passInput.value = 'Step2_Secure_QA_2026!';
+  if (typeof switchAuthTab === 'function') switchAuthTab('signin');
+  const signInForm = document.getElementById('signInForm');
+  if (signInForm) {
+    signInForm.dispatchEvent(new Event('submit', { cancelable: true }));
   }
 };
 

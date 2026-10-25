@@ -73,7 +73,7 @@
       if (window.state && window.state.companies && window.state.companies.length > 0) {
         return window.state.companies[0].id;
       }
-      return 'comp_primary';
+      return null;
     }
 
     getCompany() {

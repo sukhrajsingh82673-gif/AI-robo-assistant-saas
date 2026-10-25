@@ -44,7 +44,18 @@
 
         const res = await fetch(`/api/overview/snapshot?${queryParams.toString()}`);
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: Failed to fetch executive overview snapshot`);
+          if (res.status === 401) {
+            console.warn('[OverviewWorkspace] Unauthorized 401. Re-authenticating session...');
+            if (typeof clearSession === 'function') clearSession();
+            if (typeof renderApp === 'function') renderApp();
+            return;
+          }
+          let errDetail = '';
+          try {
+            const errJson = await res.json();
+            errDetail = errJson.detail || errJson.error || '';
+          } catch(e) {}
+          throw new Error(errDetail || `HTTP ${res.status}: Failed to fetch executive overview snapshot`);
         }
         this.snapshot = await res.json();
         this.error = null;
@@ -90,12 +101,15 @@
       container.innerHTML = `
         <div class="overview-state-panel error">
           <div class="state-icon">⚠️</div>
-          <h3>Intelligence Service Offline</h3>
+          <h3>Intelligence Service Connection</h3>
           <p>${escapeHtml(errorMsg)}</p>
-          <div style="margin-top:16px;">
+          <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
             <button class="btn-primary" onclick="window.OverviewWorkspace.render()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Retry Connection
+            </button>
+            <button class="btn-secondary" onclick="if(window.CurrentCompanyContext){ CurrentCompanyContext.setCompanyId(null); } window.OverviewWorkspace.render();">
+              Switch to Portfolio View
             </button>
           </div>
         </div>
@@ -109,7 +123,7 @@
           <h3>No Company Data Available</h3>
           <p>Connect your first company or select a valid operating entity to view intelligence.</p>
           <div style="margin-top:16px;">
-            <button class="btn-primary" onclick="if(window.CompanyWorkspace) window.CompanyWorkspace.startOnboarding('new')">
+            <button class="btn-primary" onclick="if(window.navigateTo) window.navigateTo('/company'); else window.location.hash='#/company';">
               + Add Company
             </button>
           </div>
@@ -1767,23 +1781,30 @@
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 800);
+      const h = rect.height > 0 ? rect.height : 320;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
 
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#64748b';
       ctx.font = '13px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(message, rect.width / 2, rect.height / 2);
+      ctx.fillText(message, w / 2, h / 2);
     }
 
     renderCanvasChart(canvas, dataPoints) {
+      if (!dataPoints || dataPoints.length === 0) {
+        this.drawEmptyChart(canvas, 'No records to visualize for this period.');
+        return;
+      }
+
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
+      const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 800);
+      const h = rect.height > 0 ? rect.height : 320;
 
       canvas.width = w * dpr;
       canvas.height = h * dpr;
@@ -2192,5 +2213,7 @@
       .replace(/'/g, '&#039;');
   }
 
+  window.escapeHtml = escapeHtml;
+  window.formatCompactNumber = formatCompactNumber;
   window.OverviewWorkspace = new OverviewWorkspaceManager();
 })();

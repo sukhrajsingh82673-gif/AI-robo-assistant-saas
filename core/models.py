@@ -108,6 +108,14 @@ class EvidencePackage:
     execution_classification: str = "LIVE"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def merkle_root(self) -> str:
+        return self.sha256_digest
+
+    @property
+    def package_id(self) -> str:
+        return self.evidence_id
+
 @dataclass
 class DataSource:
     source_id: str

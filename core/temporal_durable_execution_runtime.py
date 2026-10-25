@@ -956,10 +956,19 @@ class TemporalDurableExecutionGateway:
             if not row:
                 return None
             d = dict(row)
-            d["input_payload"] = json.loads(d["input_payload"] or "{}")
-            d["result_payload"] = json.loads(d["result_payload"] or "{}") if d["result_payload"] else None
-            d["execution_budget"] = json.loads(d["execution_budget"] or "{}") if d["execution_budget"] else {}
-            d["resource_usage"] = json.loads(d["resource_usage"] or "{}") if d["resource_usage"] else {}
+            def _safe_json(val, default):
+                if val is None:
+                    return default
+                if isinstance(val, (dict, list)):
+                    return val
+                try:
+                    return json.loads(val or "{}")
+                except Exception:
+                    return default
+            d["input_payload"] = _safe_json(d.get("input_payload"), {})
+            d["result_payload"] = _safe_json(d.get("result_payload"), None)
+            d["execution_budget"] = _safe_json(d.get("execution_budget"), {})
+            d["resource_usage"] = _safe_json(d.get("resource_usage"), {})
             return d
 
     # -------------------------------------------------------------------------

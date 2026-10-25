@@ -529,6 +529,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 for k, v in self._last_rate_limit_headers.items():
                     self.send_header(k, str(v))
             self.end_headers()
+            if getattr(self, "_head_only", False):
+                return
             self.wfile.write(body_bytes)
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
@@ -579,6 +581,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-XSS-Protection", "1; mode=block")
         self.end_headers()
+
+    def do_HEAD(self):
+        """Handle HTTP HEAD requests identically to GET, omitting response body per RFC 7231."""
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def do_GET(self):
         self._start_time = time.time()
