@@ -7871,6 +7871,26 @@ mark {
   flex-shrink: 0;
 }
 
+.dot-amber {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot-red {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .vital-desc {
   font-size: 11px;
   color: #94a3b8;

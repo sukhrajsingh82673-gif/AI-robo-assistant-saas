@@ -242,24 +242,7 @@ class TestPrompt03Features(unittest.TestCase):
         updated_p = self.plugins_service.toggle_plugin_enabled(p1["plugin_id"], False)
         self.assertEqual(updated_p["enabled"], False)
 
-        # 2. External Connections
-        conns = self.plugins_service.list_connections("comp_primary")
-        self.assertTrue(len(conns) >= 3)
-        c1 = conns[0]
-        self.assertIn("health_score", c1)
-        self.assertIn("field_mappings", c1)
-
-        # Test ping connection
-        ping = self.plugins_service.test_connection(c1["connection_id"])
-        self.assertEqual(ping["handshake_verified"], True)
-        self.assertTrue(ping["latency_ms"] > 0)
-
-        # Sync connection
-        sync = self.plugins_service.sync_connection(c1["connection_id"])
-        self.assertEqual(sync["status"], "SYNCED_CLEAN")
-        self.assertTrue(sync["records_synced"] > 0)
-
-        # Create new connection
+        # 2. External Connections — created explicitly, never demo-seeded
         new_conn = self.plugins_service.create_connection({
             "company_id": "comp_primary",
             "name": "Custom Stripe Payments Gateway",
@@ -268,6 +251,24 @@ class TestPrompt03Features(unittest.TestCase):
         })
         self.assertIsNotNone(new_conn.get("connection_id"))
         self.assertEqual(new_conn["name"], "Custom Stripe Payments Gateway")
+
+        conns = self.plugins_service.list_connections("comp_primary")
+        self.assertTrue(any(c["connection_id"] == new_conn["connection_id"] for c in conns))
+        c1 = next(c for c in conns if c["connection_id"] == new_conn["connection_id"])
+        self.assertIn("health_score", c1)
+        self.assertIn("field_mappings", c1)
+
+        # Probe reports only measured facts: a real reachability check, no
+        # fabricated handshake success.
+        ping = self.plugins_service.test_connection(c1["connection_id"])
+        self.assertIn(ping["status"], ("CONNECTED", "UNREACHABLE"))
+        self.assertFalse(ping["handshake_verified"])
+        self.assertGreaterEqual(ping["latency_ms"], 0)
+
+        # Bulk sync has no adapter wired, so it must not invent record counts.
+        sync = self.plugins_service.sync_connection(c1["connection_id"])
+        self.assertEqual(sync["status"], "NOT_IMPLEMENTED")
+        self.assertEqual(sync["records_synced"], 0)
 
 if __name__ == '__main__':
     unittest.main()

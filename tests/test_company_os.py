@@ -312,14 +312,19 @@ class TestRoboAssistantCompanyOS(unittest.TestCase):
 
         records = pms.fetch_night_audit_records()
         self.assertFalse(records["ledger_verified"])
-        self.assertTrue(records.get("is_mock"))
-        self.assertEqual(records.get("execution_mode"), "SIMULATED")
+        self.assertFalse(records.get("is_mock"))
+        self.assertEqual(records.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(records.get("execution_mode"), "DISCONNECTED")
         self.assertEqual(records["permission"], ConnectorPermission.READ_ONLY_VISIBILITY)
+        self.assertEqual(records.get("folios"), [])
 
         acc = AccountingConnector()
         acc.connect({"token_hash": "sha256_mock_tally_token"})
         gl = acc.fetch_general_ledger()
-        self.assertEqual(gl["accounts_reconciled"], 18)
+        # No simulated ledger values: unconfigured connector reports honestly.
+        self.assertEqual(gl.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(gl.get("accounts_reconciled"), 0)
+        self.assertEqual(gl.get("entries"), [])
 
     def test_12_inter_agent_communication_bus(self):
         """Verify governed agent messaging and blocking of privilege escalation attempts."""

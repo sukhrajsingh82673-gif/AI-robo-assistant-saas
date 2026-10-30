@@ -160,15 +160,25 @@ class TestHostAndRobot(unittest.TestCase):
     def test_browser_robot_structured_automation(self):
         browser = BrowserExecutionFabric()
         nav_res = browser.navigate("https://example.com/bookings")
-        self.assertTrue(nav_res["success"])
         self.assertEqual(nav_res["url"], "https://example.com/bookings")
+        # Navigation is a real HTTP GET: either it succeeds with an observed
+        # status code, or it fails with a real transport error.
+        if nav_res["success"]:
+            self.assertEqual(nav_res["execution_mode"], "LIVE_HTTP")
+            self.assertTrue(nav_res["http_status"] >= 200)
+        else:
+            self.assertIn("error", nav_res)
+        self.assertFalse(nav_res["simulated"])
 
+        # No DOM engine is installed: extraction returns no fixtures.
         ext_res = browser.extract_structured_data(query="rates")
-        self.assertTrue(ext_res["success"])
-        self.assertGreaterEqual(len(ext_res["extracted_items"]), 1)
+        self.assertFalse(ext_res["success"])
+        self.assertEqual(ext_res["code"], "DOM_ENGINE_NOT_AVAILABLE")
+        self.assertEqual(ext_res["extracted_items"], [])
 
         form_res = browser.submit_form("login_form", {"user": "admin", "password": "SuperSecretPassword123"})
-        self.assertTrue(form_res["success"])
+        self.assertFalse(form_res["success"])
+        self.assertEqual(form_res["code"], "BROWSER_DRIVER_NOT_CONFIGURED")
         self.assertEqual(form_res["fields_submitted"]["password"], "***REDACTED***")
 
 if __name__ == "__main__":

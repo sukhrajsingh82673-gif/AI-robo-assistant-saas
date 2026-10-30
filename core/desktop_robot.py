@@ -223,45 +223,41 @@ class UniversalDesktopRobot:
         }
 
     def _handle_screen_capture(self, contract: ActionContract, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Simulates / executes screen capture telemetry.
-        In headless Linux cloud, provides terminal and active display state diagnostics.
-        """
-        output_file = os.path.join(self.sandbox_dir, f"screen_{uuid.uuid4().hex[:6]}.json")
-        screen_data = {
-            "host_id": self.host.host_id,
-            "resolution": "1920x1080",
-            "active_windows": ["RoboAssistant Web Cockpit", "Terminal bash"],
-            "visible_text": "RoboAssistant Company OS 2.0 Operational Dashboard",
-            "timestamp": time.time()
-        }
-        with open(output_file, "w") as f:
-            json.dump(screen_data, f)
-
+        """No display server is attached in this deployment; capture fails closed."""
+        display = os.environ.get("DISPLAY", "")
+        wayland = os.environ.get("WAYLAND_DISPLAY", "")
         return {
-            "success": True,
-            "simulated": True,
-            "verification_type": "simulated_screen_state",
-            "capture_file": output_file,
-            "visible_text": screen_data["visible_text"],
-            "details": "Screen state telemetrically captured (SIMULATED)"
+            "success": False,
+            "simulated": False,
+            "error": "No physical display server is attached to this host.",
+            "code": "DISPLAY_NOT_AVAILABLE",
+            "verification_type": "display_unavailable",
+            "display_env": display or None,
+            "wayland_env": wayland or None,
+            "details": (
+                "Screen capture requires a real display (DISPLAY/WAYLAND_DISPLAY). "
+                "No pixels were captured and no telemetry was fabricated."
+            ),
         }
 
     def _handle_window_inspect(self, contract: ActionContract, params: Dict[str, Any]) -> Dict[str, Any]:
         return {
-            "success": True,
-            "simulated": True,
-            "verification_type": "simulated_window_detected",
-            "focused_application": params.get("app_name", "RoboAssistant Core Server"),
-            "details": "Active window detected (SIMULATED)"
+            "success": False,
+            "simulated": False,
+            "error": "No window manager is available on this host.",
+            "code": "WINDOW_MANAGER_NOT_AVAILABLE",
+            "verification_type": "window_manager_unavailable",
+            "details": "Window inspection requires a desktop session; nothing was detected.",
         }
 
     def _handle_input_event(self, contract: ActionContract, params: Dict[str, Any]) -> Dict[str, Any]:
         return {
-            "success": True,
-            "simulated": True,
-            "verification_type": "simulated_input_event_dispatched",
+            "success": False,
+            "simulated": False,
+            "error": "No input injection channel is available on this host.",
+            "code": "INPUT_CHANNEL_NOT_AVAILABLE",
+            "verification_type": "input_channel_unavailable",
             "event_type": contract.capability,
             "target": contract.target,
-            "details": f"Dispatched {contract.capability} to {contract.target} (SIMULATED)"
+            "details": f"'{contract.capability}' was not dispatched; no input device was reached.",
         }

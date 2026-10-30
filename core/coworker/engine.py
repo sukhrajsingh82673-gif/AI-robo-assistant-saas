@@ -76,13 +76,16 @@ class UniversalCoworkerEngine:
     _instances: Dict[str, "UniversalCoworkerEngine"] = {}
 
     @classmethod
-    def get_instance(cls, tenant_id: str = "tnt_primary") -> "UniversalCoworkerEngine":
-        if tenant_id not in cls._instances:
-            cls._instances[tenant_id] = cls(tenant_id=tenant_id)
-        return cls._instances[tenant_id]
+    def get_instance(cls, tenant_id: str = "tnt_primary", company_id: str = "comp_primary") -> "UniversalCoworkerEngine":
+        key = f"{tenant_id}::{company_id}"
+        if key not in cls._instances:
+            cls._instances[key] = cls(tenant_id=tenant_id, company_id=company_id)
+        return cls._instances[key]
 
-    def __init__(self, tenant_id: str = "tnt_primary", db_path: Optional[str] = None):
+    def __init__(self, tenant_id: str = "tnt_primary", company_id: str = "comp_primary",
+                 db_path: Optional[str] = None):
         self.tenant_id = tenant_id
+        self.company_id = company_id
         self.db_path = db_path or get_default_db_path()
 
         # 1. Registries & Providers
@@ -149,6 +152,7 @@ class UniversalCoworkerEngine:
             subworker_coord=self.subworker_coordinator,
             runtime_router=self.runtime_router,
             tenant_id=tenant_id,
+            company_id=company_id,
             db_path=db_path
         )
 

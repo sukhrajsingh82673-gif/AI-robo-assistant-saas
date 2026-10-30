@@ -70,7 +70,9 @@ def run_manufacturing_bottleneck_analysis(company: OperatingContext, kernel: Uni
             "Projected new OEE: 86.4%"
         ],
         "projected_cost_savings_monthly": 185000.0,
-        "actionable_by_operator": True
+        "actionable_by_operator": True,
+        "data_provenance": "REFERENCE_SCENARIO_FIXTURE",
+        "is_reference_data": True
     }
 
     raw_bytes = json.dumps(plan_data, indent=2).encode("utf-8")

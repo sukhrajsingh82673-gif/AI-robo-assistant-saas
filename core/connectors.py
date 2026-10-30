@@ -548,8 +548,8 @@ class BaseConnector:
         name: str,
         connector_type: str,
         endpoint: str,
-        is_mock: bool = True,
-        qualification_status: ConnectorQualificationStatus = ConnectorQualificationStatus.MOCK_ONLY
+        is_mock: bool = False,
+        qualification_status: ConnectorQualificationStatus = ConnectorQualificationStatus.BLOCKED
     ):
         self.connector_id = connector_id
         self.name = name
@@ -561,7 +561,7 @@ class BaseConnector:
         self.last_sync = None
         self.is_mock = is_mock
         self.qualification_status = qualification_status
-        self.execution_mode = "SIMULATED" if is_mock else "LIVE"
+        self.execution_mode = ConnectorExecutionMode.SIMULATED.value if is_mock else ConnectorExecutionMode.LIVE.value
 
     def connect(self, credentials_meta: Dict[str, str]) -> bool:
         """Establishes authenticated handshake without exposing secrets to LLM context."""
@@ -591,111 +591,203 @@ class BaseConnector:
 
 
 class HospitalityPMSConnector(BaseConnector):
+    """Oracle Hospitality OPERA PMS connector.
+
+    There is no simulated data path: if the adapter is not configured the
+    connector reports ``NOT_CONFIGURED`` and returns an empty result set.
+    """
+
     def __init__(
         self,
-        name: str = "Oracle Hospitality Opera PMS (Mock/Simulated)",
+        name: str = "Oracle Hospitality OPERA PMS",
         adapter: Optional[OracleOperaPMSAdapter] = None
     ):
+        self.adapter = adapter or OracleOperaPMSAdapter()
+        configured = self.adapter.is_configured()
         super().__init__(
             f"conn_pms_{uuid.uuid4().hex[:6]}",
             name,
             ConnectorType.PMS_HOSPITALITY,
             "https://api.pms.enterprise/v1",
-            is_mock=(adapter is None or not adapter.is_configured()),
-            qualification_status=(adapter.get_qualification_status() if adapter else ConnectorQualificationStatus.MOCK_ONLY)
+            is_mock=False,
+            qualification_status=(
+                self.adapter.get_qualification_status() if configured
+                else ConnectorQualificationStatus.BLOCKED
+            )
         )
-        self.adapter = adapter or OracleOperaPMSAdapter()
 
     def fetch_night_audit_records(self) -> Dict[str, Any]:
         if not self.connected:
-            return {"error": "PMS_DISCONNECTED", "folios": [], "qualification_status": self.qualification_status.value}
+            return {
+                "error": "PMS_DISCONNECTED",
+                "code": "CONNECTOR_DISCONNECTED",
+                "folios": [],
+                "records": [],
+                "verified": False,
+                "ledger_verified": False,
+                "is_mock": False,
+                "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+                "qualification_status": self.qualification_status.value,
+            }
         if self.adapter.is_configured():
             return self.adapter.fetch_night_audit_folios()
         return {
+            "error": "FEATURE_NOT_CONFIGURED",
+            "code": "NOT_CONFIGURED",
             "source": self.name,
             "permission": self.permission_level,
-            "folios_audited": 42,
-            "ledger_verified": False,
+            "folios": [],
+            "records_count": 0,
             "verified": False,
-            "is_mock": True,
-            "execution_mode": "SIMULATED",
-            "qualification_status": ConnectorQualificationStatus.MOCK_ONLY.value,
-            "provenance": "SYNTHETIC_PMS_FIXTURE",
-            "timestamp": time.time()
+            "ledger_verified": False,
+            "is_mock": False,
+            "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+            "qualification_status": ConnectorQualificationStatus.BLOCKED.value,
+            "provenance": "NO_PROVIDER_CONFIGURED",
+            "required_prerequisites": ["OPERA_PMS_CLIENT_ID", "OPERA_PMS_CLIENT_SECRET", "OPERA_PMS_PROPERTY"],
+            "detail": "Connect Oracle OPERA credentials in Settings → Connectors to read night audit data.",
+            "timestamp": time.time(),
         }
 
 
 class AccountingConnector(BaseConnector):
+    """QUICKBOOKS / Tally accounting connector.
+
+    No synthetic ledger: unconfigured connectors return ``NOT_CONFIGURED``.
+    """
+
     def __init__(
         self,
-        name: str = "Tally ERP / QuickBooks Online (Mock/Simulated)",
+        name: str = "QuickBooks Online / Tally ERP",
         adapter: Optional[QuickBooksAccountingAdapter] = None
     ):
+        self.adapter = adapter or QuickBooksAccountingAdapter()
+        configured = self.adapter.is_configured()
         super().__init__(
             f"conn_acc_{uuid.uuid4().hex[:6]}",
             name,
             ConnectorType.ACCOUNTING,
             "https://api.accounting.enterprise/v2",
-            is_mock=(adapter is None or not adapter.is_configured()),
-            qualification_status=(adapter.get_qualification_status() if adapter else ConnectorQualificationStatus.MOCK_ONLY)
+            is_mock=False,
+            qualification_status=(
+                self.adapter.get_qualification_status() if configured
+                else ConnectorQualificationStatus.BLOCKED
+            )
         )
-        self.adapter = adapter or QuickBooksAccountingAdapter()
 
     def fetch_general_ledger(self) -> Dict[str, Any]:
         if not self.connected:
-            return {"error": "ACCOUNTING_DISCONNECTED", "entries": [], "qualification_status": self.qualification_status.value}
+            return {
+                "error": "ACCOUNTING_DISCONNECTED",
+                "code": "CONNECTOR_DISCONNECTED",
+                "entries": [],
+                "verified": False,
+                "is_mock": False,
+                "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+                "qualification_status": self.qualification_status.value,
+            }
+        if not self.adapter.is_configured():
+            return {
+                "error": "FEATURE_NOT_CONFIGURED",
+                "code": "NOT_CONFIGURED",
+                "source": self.name,
+                "permission": self.permission_level,
+                "entries": [],
+                "accounts_reconciled": 0,
+                "verified": False,
+                "is_mock": False,
+                "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+                "qualification_status": ConnectorQualificationStatus.BLOCKED.value,
+                "provenance": "NO_PROVIDER_CONFIGURED",
+                "required_prerequisites": ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_REALM_ID"],
+                "detail": "Connect QuickBooks or Tally credentials in Settings → Connectors to read the general ledger.",
+                "timestamp": time.time(),
+            }
         return {
+            "error": "PROVIDER_CALL_NOT_IMPLEMENTED",
+            "code": "ADAPTER_METHOD_MISSING",
             "source": self.name,
-            "permission": self.permission_level,
-            "accounts_reconciled": 18,
-            "unbalanced_credits": 0.0,
+            "entries": [],
             "verified": False,
-            "is_mock": True,
-            "execution_mode": "SIMULATED",
-            "qualification_status": ConnectorQualificationStatus.MOCK_ONLY.value,
-            "provenance": "SYNTHETIC_ACCOUNTING_FIXTURE",
-            "timestamp": time.time()
+            "is_mock": False,
+            "execution_mode": ConnectorExecutionMode.LIVE.value,
+            "qualification_status": self.qualification_status.value,
+            "detail": "Credentials are configured but ledger extraction for this provider is not yet implemented.",
+            "timestamp": time.time(),
         }
 
 
 class PaymentGatewayConnector(BaseConnector):
+    """Stripe / Razorpay payment connector without synthetic settlements."""
+
     def __init__(
         self,
-        name: str = "Razorpay / Stripe Payments (Mock/Simulated)",
+        name: str = "Stripe / Razorpay Payments",
         stripe_adapter: Optional[StripeIntegrationAdapter] = None,
         razorpay_adapter: Optional[RazorpayIntegrationAdapter] = None
     ):
-        configured = bool((stripe_adapter and stripe_adapter.is_configured()) or (razorpay_adapter and razorpay_adapter.is_configured()))
-        status = ConnectorQualificationStatus.MOCK_ONLY
-        if stripe_adapter and stripe_adapter.is_configured():
-            status = stripe_adapter.get_qualification_status()
-        elif razorpay_adapter and razorpay_adapter.is_configured():
-            status = razorpay_adapter.get_qualification_status()
+        self.stripe_adapter = stripe_adapter or StripeIntegrationAdapter()
+        self.razorpay_adapter = razorpay_adapter or RazorpayIntegrationAdapter()
+        configured = self.stripe_adapter.is_configured() or self.razorpay_adapter.is_configured()
+        if self.stripe_adapter.is_configured():
+            status = self.stripe_adapter.get_qualification_status()
+        elif self.razorpay_adapter.is_configured():
+            status = self.razorpay_adapter.get_qualification_status()
+        else:
+            status = ConnectorQualificationStatus.BLOCKED
         super().__init__(
             f"conn_pay_{uuid.uuid4().hex[:6]}",
             name,
             ConnectorType.PAYMENTS,
             "https://api.payments.enterprise/v1",
-            is_mock=not configured,
+            is_mock=False,
             qualification_status=status
         )
-        self.stripe_adapter = stripe_adapter or StripeIntegrationAdapter()
-        self.razorpay_adapter = razorpay_adapter or RazorpayIntegrationAdapter()
+        self._configured = configured
 
     def fetch_settlement_batch(self) -> Dict[str, Any]:
         if not self.connected:
-            return {"error": "GATEWAY_DISCONNECTED", "settlements": [], "qualification_status": self.qualification_status.value}
+            return {
+                "error": "GATEWAY_DISCONNECTED",
+                "code": "CONNECTOR_DISCONNECTED",
+                "settlements": [],
+                "verified": False,
+                "payout_verified": False,
+                "is_mock": False,
+                "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+                "qualification_status": self.qualification_status.value,
+            }
+        if not self._configured:
+            return {
+                "error": "FEATURE_NOT_CONFIGURED",
+                "code": "NOT_CONFIGURED",
+                "source": self.name,
+                "permission": self.permission_level,
+                "settlements": [],
+                "settlement_status": "NOT_CONFIGURED",
+                "payout_verified": False,
+                "verified": False,
+                "is_mock": False,
+                "execution_mode": ConnectorExecutionMode.DISCONNECTED.value,
+                "qualification_status": ConnectorQualificationStatus.BLOCKED.value,
+                "provenance": "NO_PROVIDER_CONFIGURED",
+                "required_prerequisites": ["STRIPE_SECRET_KEY or RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET"],
+                "detail": "Connect Stripe or Razorpay credentials in Settings → Connectors to read settlements.",
+                "timestamp": time.time(),
+            }
         return {
+            "error": "PROVIDER_CALL_NOT_IMPLEMENTED",
+            "code": "ADAPTER_METHOD_MISSING",
             "source": self.name,
-            "permission": self.permission_level,
-            "settlement_status": "SIMULATED_CAPTURED",
+            "settlements": [],
+            "settlement_status": "LIVE",
             "payout_verified": False,
             "verified": False,
-            "is_mock": self.is_mock,
-            "execution_mode": self.execution_mode,
+            "is_mock": False,
+            "execution_mode": ConnectorExecutionMode.LIVE.value,
             "qualification_status": self.qualification_status.value,
-            "provenance": "SYNTHETIC_PAYMENTS_FIXTURE",
-            "timestamp": time.time()
+            "detail": "Credentials are configured but settlement reconciliation for this provider is not yet implemented.",
+            "timestamp": time.time(),
         }
 
 
@@ -718,7 +810,7 @@ class ConnectorRegistry:
                 "connected": c.connected,
                 "permission": c.permission_level,
                 "trust_score": c.trust_score,
-                "qualification_status": c.qualification_status.value if hasattr(c, "qualification_status") else "MOCK_ONLY",
+                "qualification_status": c.qualification_status.value if hasattr(c, "qualification_status") else "BLOCKED",
                 "last_sync": c.last_sync
             }
             for c in self.connectors.values()

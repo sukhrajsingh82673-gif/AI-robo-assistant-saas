@@ -24,6 +24,7 @@ import urllib.parse
 
 import socket
 import threading
+from unittest.mock import patch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
@@ -40,17 +41,42 @@ from core.coworker.runtimes.terminal_runtime import TerminalWorkerRuntime
 from core.coworker.memory_tier import GovernedMemoryManager, MemoryTier
 from core.coworker.contracts import RiskLevel, ExecutionState, VerificationStatus
 from core.killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+from core.llm_runtime import LLMResult
 
 def get_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
+def _deterministic_chat(self, tenant_id, company_id, messages, system=None,
+                        max_tokens=None, temperature=None, intent="general"):
+    """Test double for the LLM runtime: deterministic text, no network."""
+    objective = ""
+    for m in (messages or []):
+        if m.get("role") == "user":
+            objective = str(m.get("content", ""))[:400]
+            break
+    return LLMResult(
+        content=(
+            "## Execution Plan\n"
+            "- Review the stated objective and available tenant data.\n"
+            "- Identify missing data sources explicitly.\n\n"
+            "## Deliverable\n"
+            f"Objective: {objective}\n\n"
+            "## Data gaps\n"
+            "- This is a deterministic test double; no external sources were queried."
+        ),
+        provider="test_stub", model="deterministic-test", degraded=False,
+        latency_ms=0.5,
+    )
+
+
 class TestAssistantCoworkerCompoundMission(unittest.TestCase):
     orig_db_path = None
     cls_temp_dir = None
     _server = None
     base_url = None
+    _llm_patcher = None
 
     @classmethod
     def setUpClass(cls):
@@ -76,8 +102,18 @@ class TestAssistantCoworkerCompoundMission(unittest.TestCase):
         cls._thread.start()
         time.sleep(1.0)
 
+        # Mission execution now requires a real model. Use a deterministic
+        # in-process double so the test verifies the pipeline without network.
+        cls._llm_patcher = patch("core.llm_runtime.LLMRuntime.chat", _deterministic_chat)
+        cls._llm_patcher.start()
+
     @classmethod
     def tearDownClass(cls):
+        if cls._llm_patcher is not None:
+            try:
+                cls._llm_patcher.stop()
+            except Exception:
+                pass
         if hasattr(cls, "_server") and cls._server:
             try:
                 cls._server.shutdown()
@@ -145,11 +181,12 @@ class TestAssistantCoworkerCompoundMission(unittest.TestCase):
         self.assertTrue(m3.evidence_id.startswith("ev_merkle_"))
         self.assertIsNotNone(m3.notification_message)
 
-        # Validate physical file content on disk
-        with open(deliverable_file, "r") as f:
-            data = json.load(f)
-        self.assertEqual(data["mission_id"], mission.mission_id)
-        self.assertEqual(data["tenant_id"], "tnt_test")
+        # Validate physical file content on disk (Markdown deliverable).
+        with open(deliverable_file, "r", encoding="utf-8") as f:
+            data = f.read()
+        self.assertIn(mission.mission_id, data)
+        self.assertIn("tnt_test", data)
+        self.assertIn("Deliverable", data)
 
     # 2. Compound Developer Mission (Inspect Repo, Self-Extension, Test Run, Verification)
     def test_compound_developer_mission(self):

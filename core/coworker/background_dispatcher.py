@@ -296,8 +296,15 @@ class BackgroundMissionDispatcher:
         Executes real progression of the compound mission with real artifacts and SHA-256 evidence.
         """
         mission = self._missions.get(mission_id)
-        if not mission or mission.status in [MissionState.COMPLETED.value, MissionState.FAILED.value, MissionState.CANCELLED.value]:
+        if not mission or mission.status in [
+            MissionState.COMPLETED.value, MissionState.FAILED.value,
+            MissionState.CANCELLED.value, MissionState.BLOCKED.value,
+        ]:
             return mission
+
+        # Tenant isolation: a mission id is only addressable by its owner.
+        if mission.tenant_id != self.tenant_id or mission.company_id != self.company_id:
+            return None
 
         if mission.human_control:
             mission.add_timeline_event("PAUSED", "Execution paused under human operator takeover")
@@ -305,37 +312,119 @@ class BackgroundMissionDispatcher:
 
         now = time.time()
 
-        # Stage 1: Research & Discovery
+        # Stage 1: Planning & synthesis (real model call, no fabricated claims)
         if mission.progress_percent < 45.0:
             mission.progress_percent = 50.0
-            mission.current_stage = "Web and repository intelligence collected; synthesizing findings"
-            mission.add_timeline_event("RESEARCH_COLLECTED", "Data aggregated via OpenClaw / Governed Terminal")
+            mission.current_stage = "Planning and drafting with the configured language model"
+            mission.add_timeline_event(
+                "PLAN_STARTED",
+                "Objective dispatched to the governed LLM runtime for decomposition and drafting"
+            )
+
+            from core.llm_runtime import llm_runtime
+            plan = llm_runtime.chat(
+                tenant_id=mission.tenant_id,
+                company_id=mission.company_id,
+                system=(
+                    "You are a governed AI operations worker inside a company operating system. "
+                    "Produce concrete, verifiable work — not claims. If you lack data, say exactly "
+                    "what is missing. Never invent figures, customers, or sources."
+                ),
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Objective: {mission.prompt}\n\n"
+                        "Return a short execution plan (max 6 bullets) and list any data you would "
+                        "need from the company's connected systems."
+                    ),
+                }],
+                max_tokens=500,
+                temperature=0.2,
+                intent="mission_plan",
+            )
+            mission._plan = plan.content if not plan.degraded else ""
+            mission._plan_provider = plan.provider
+            mission._plan_degraded = plan.degraded
+            if plan.degraded:
+                mission.add_timeline_event(
+                    "MODEL_DEGRADED",
+                    "No language model was reachable; mission work cannot be completed honestly.",
+                    "WARNING"
+                )
+            else:
+                mission.add_timeline_event(
+                    "PLAN_READY",
+                    f"Plan drafted with {plan.provider}/{plan.model} ({int(plan.latency_ms)}ms)"
+                )
 
         # Stage 2: Deliverable Synthesis & File Write
         elif mission.progress_percent < 80.0:
             mission.progress_percent = 80.0
             mission.current_stage = "Writing verified deliverable report to company workspace"
 
+            if getattr(mission, "_plan_degraded", True):
+                mission.status = MissionState.BLOCKED.value
+                mission.current_stage = "BLOCKED — no language model provider is available"
+                mission.add_timeline_event(
+                    "MODEL_UNAVAILABLE",
+                    "Mission blocked instead of fabricating a deliverable. Configure an LLM provider in "
+                    "Settings → AI Models & Providers, or install the embedded model.",
+                    "ERROR"
+                )
+                mission.updated_at = time.time()
+                self._persist_mission(mission)
+                return mission
+
+            from core.llm_runtime import llm_runtime
+            draft = llm_runtime.chat(
+                tenant_id=mission.tenant_id,
+                company_id=mission.company_id,
+                system=(
+                    "You are a governed AI worker. Write the requested deliverable in Markdown. "
+                    "Be explicit about assumptions and missing data. Do not fabricate sources, "
+                    "metrics, or customer names. Include a short 'Data gaps' section."
+                ),
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Objective: {mission.prompt}\n\n"
+                        f"Approved plan:\n{getattr(mission, '_plan', '')}\n\n"
+                        "Now produce the complete deliverable."
+                    ),
+                }],
+                max_tokens=1800,
+                temperature=0.4,
+                intent="mission_deliverable",
+            )
+            if draft.degraded or not draft.content.strip():
+                mission.status = MissionState.BLOCKED.value
+                mission.current_stage = "BLOCKED — deliverable generation failed"
+                mission.add_timeline_event("DELIVERABLE_FAILED", "Model returned no usable content", "ERROR")
+                mission.updated_at = time.time()
+                self._persist_mission(mission)
+                return mission
+
             workspace_dir = os.path.join(
                 os.path.dirname(os.path.abspath(self.db_path)),
-                "workspaces"
+                "workspaces",
+                mission.tenant_id,
             )
             os.makedirs(workspace_dir, exist_ok=True)
-            deliverable_filename = f"mission_{mission.mission_id[:8]}_deliverable.json"
+            deliverable_filename = f"mission_{mission.mission_id[:8]}_deliverable.md"
             deliverable_path = os.path.join(workspace_dir, deliverable_filename)
 
-            report_data = {
-                "mission_id": mission.mission_id,
-                "objective": mission.prompt,
-                "tenant_id": mission.tenant_id,
-                "company_id": mission.company_id,
-                "runtimes_involved": mission.runtimes_used,
-                "subworkers_count": len(mission.subworkers),
-                "summary": f"Completed objective: '{mission.prompt}'. All operational assertions independently verified.",
-                "created_at": now
-            }
+            header = (
+                f"# Mission Deliverable\n\n"
+                f"- Mission: `{mission.mission_id}`\n"
+                f"- Tenant: `{mission.tenant_id}`\n"
+                f"- Company: `{mission.company_id}`\n"
+                f"- Objective: {mission.prompt}\n"
+                f"- Model: `{draft.provider}/{draft.model}`\n"
+                f"- Generated: {time.strftime('%Y-%m-%d %H:%M:%SZ', time.gmtime(now))}\n\n"
+                f"---\n\n"
+            )
             with open(deliverable_path, "w", encoding="utf-8") as f:
-                json.dump(report_data, f, indent=2)
+                f.write(header + draft.content + "\n")
 
             with open(deliverable_path, "rb") as f:
                 post_sha = hashlib.sha256(f.read()).hexdigest()
@@ -377,15 +466,16 @@ class BackgroundMissionDispatcher:
                     f"Cryptographic proof {mission.evidence_id} recorded into Evidence Ledger"
                 )
 
-                # Record into canonical Evidence Ledger with proper cryptographic sealing
+                # Record into the tenant-isolated Evidence Ledger.
                 try:
                     from core.evidence_ledger import EvidenceLedger
+                    from core.tenancy import tenant_ledger_path
                     from core.models import PhysicalVerification
-                    ledger = EvidenceLedger()
+                    ledger = EvidenceLedger(tenant_ledger_path(mission.tenant_id))
                     verifs = [
                         PhysicalVerification(
                             check_type="sha256_match",
-                            target_path=deliv_path,
+                            target_path=mission.deliverables[-1],
                             expected_val=file_sha,
                             actual_val=file_sha,
                             verified=True,
@@ -395,9 +485,14 @@ class BackgroundMissionDispatcher:
                     ledger.seal_evidence(
                         action_id=f"act_bg_{mission.mission_id}",
                         mission_id=mission.mission_id,
-                        agent_id=mission.assigned_agent or "agt_bg_dispatcher",
+                        agent_id=getattr(mission, "assigned_agent", None) or "agt_bg_dispatcher",
                         verifications=verifs,
-                        metadata={"action": "BACKGROUND_MISSION_COMPLETED", "deliverable_sha256": file_sha}
+                        metadata={
+                            "action": "BACKGROUND_MISSION_COMPLETED",
+                            "deliverable_sha256": file_sha,
+                            "tenant_id": mission.tenant_id,
+                            "company_id": mission.company_id,
+                        }
                     )
                 except Exception:
                     pass

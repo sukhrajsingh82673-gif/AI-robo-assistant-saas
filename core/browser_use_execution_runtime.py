@@ -31,6 +31,9 @@ import json
 import time
 import uuid
 import hashlib
+import shutil
+import subprocess
+import tempfile
 import ipaddress
 import urllib.parse
 import urllib.request
@@ -1179,11 +1182,30 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
         }
 
     def capture_screenshot(self, session_id: str) -> bytes:
-        session = self._active_sessions.get(session_id, {})
-        url = session.get("current_url", "about:blank")
-        # Deterministic lightweight PNG image header + payload representing screen
-        mock_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00\x5c\x72\xa8\x66" + url.encode("utf-8")
-        return mock_png
+        """
+        Captures a real viewport only when a browser/display capture engine is
+        present. Returns empty bytes when no capture engine exists: callers must
+        treat that as "not captured" rather than as an image.
+        """
+        if session_id not in self._active_sessions:
+            return b""
+        for engine in ("scrot", "import", "gnome-screenshot", "grim"):
+            exe = shutil.which(engine)
+            if not exe or not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY"):
+                continue
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                target = tmp.name
+            try:
+                proc = subprocess.run([exe, target], capture_output=True, timeout=10)
+                if proc.returncode == 0 and os.path.getsize(target) > 0:
+                    with open(target, "rb") as fh:
+                        return fh.read()
+            except Exception:
+                pass
+            finally:
+                if os.path.exists(target):
+                    os.unlink(target)
+        return b""
 
     def close_session(self, session_id: str) -> bool:
         if session_id in self._active_sessions:
@@ -1252,6 +1274,15 @@ class BrowserExecutionGateway:
         # Ensure active runtime exists
         runtime_id = f"rt_br_{uuid.uuid4().hex[:8]}"
         with db.get_connection() as conn:
+            # browser_sessions/browser_runtimes carry a FK to tenants; make the
+            # owning tenant row exist before inserting runtime/session state.
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at)
+                VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?)
+                """,
+                (self.tenant_id, f"Tenant {self.tenant_id}", now),
+            )
             conn.execute(
                 """
                 INSERT OR IGNORE INTO browser_runtimes (
@@ -1666,18 +1697,20 @@ class BrowserExecutionGateway:
         session_id = exec_row["session_id"]
         actual_url = exec_row["current_url"]
 
-        # 1. Capture Viewport Screenshot Artifact
+        # 1. Capture Viewport Screenshot Artifact (only if a real capture exists)
         screen_bytes = self.provider.capture_screenshot(session_id)
-        screen_art = self.artifact_registry.save_artifact(
-            tenant_id=self.tenant_id,
-            company_id=self.company_id,
-            session_id=session_id,
-            execution_id=execution_id,
-            artifact_type="SCREENSHOT",
-            rel_filename="viewport_final.png",
-            content_bytes=screen_bytes,
-            mime_type="image/png"
-        )
+        screen_art: Optional[Dict[str, Any]] = None
+        if screen_bytes:
+            screen_art = self.artifact_registry.save_artifact(
+                tenant_id=self.tenant_id,
+                company_id=self.company_id,
+                session_id=session_id,
+                execution_id=execution_id,
+                artifact_type="SCREENSHOT",
+                rel_filename="viewport_final.png",
+                content_bytes=screen_bytes,
+                mime_type="image/png"
+            )
 
         # 2. Independent Physical Verification
         is_verified, verifications = BrowserVerificationEngine.verify_browser_outcome(
@@ -1698,7 +1731,8 @@ class BrowserExecutionGateway:
             metadata={
                 "session_id": session_id,
                 "current_url": actual_url,
-                "screenshot_sha256": screen_art["sha256_digest"],
+                "screenshot_status": "CAPTURED" if screen_art else "NOT_CAPTURED",
+                "screenshot_sha256": screen_art["sha256_digest"] if screen_art else None,
                 "tenant_id": self.tenant_id,
                 "company_id": self.company_id
             }
@@ -1727,7 +1761,8 @@ class BrowserExecutionGateway:
             "verified": is_verified,
             "evidence_id": evidence_pkg.evidence_id,
             "sha256_digest": evidence_pkg.sha256_digest,
-            "screenshot_id": screen_art["artifact_id"],
+            "screenshot_id": screen_art["artifact_id"] if screen_art else None,
+            "screenshot_status": "CAPTURED" if screen_art else "NOT_CAPTURED",
             "url": actual_url
         }
 

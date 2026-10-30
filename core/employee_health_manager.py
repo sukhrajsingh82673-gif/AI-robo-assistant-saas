@@ -53,6 +53,19 @@ class EmployeeHealthManager:
     def __init__(self):
         self._init_db()
 
+    def _ensure_schema(self):
+        """Creates the vitals table if the active database does not have it yet.
+
+        The engine can point at a different database than the one present at
+        import time (tests, fresh installs, tenant shards), so the table is
+        verified lazily before every read/write.
+        """
+        try:
+            with engine.connection(workload=WorkloadType.READ) as conn:
+                conn.execute("SELECT 1 FROM ai_employee_health_vitals LIMIT 1").fetchone()
+        except Exception:
+            self._init_db()
+
     def _init_db(self):
         with engine.transaction(workload=WorkloadType.CONTROL_PLANE) as conn:
             conn.execute("""
@@ -85,6 +98,7 @@ class EmployeeHealthManager:
         outcome_quality: float = 1.0
     ) -> HealthState:
         """Record mission outcome and recompute operational health state."""
+        self._ensure_schema()
         now = time.time()
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             # Upsert vitals
@@ -159,6 +173,7 @@ class EmployeeHealthManager:
 
     def get_vitals(self, employee_id: str) -> Optional[EmployeeVitals]:
         """Fetch employee health vitals record."""
+        self._ensure_schema()
         with engine.connection(workload=WorkloadType.READ) as conn:
             cursor = conn.execute(
                 "SELECT * FROM ai_employee_health_vitals WHERE employee_id = ?",

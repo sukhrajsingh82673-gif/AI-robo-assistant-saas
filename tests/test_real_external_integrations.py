@@ -357,8 +357,8 @@ class TestRealExternalIntegrations(unittest.TestCase):
     # 5. Qualification Status Taxonomy & Connector Integrity
     # ------------------------------------------------------------------------
 
-    def test_19_unconfigured_connectors_report_blocked_or_mock(self):
-        """Verifies unconfigured enterprise connectors honestly declare status as BLOCKED or MOCK_ONLY."""
+    def test_19_unconfigured_connectors_report_blocked(self):
+        """Verifies unconfigured enterprise connectors honestly declare status as BLOCKED."""
         from core.connectors import (
             HospitalityPMSConnector,
             AccountingConnector,
@@ -367,13 +367,13 @@ class TestRealExternalIntegrations(unittest.TestCase):
         )
 
         pms = HospitalityPMSConnector()
-        self.assertEqual(pms.qualification_status, ConnectorQualificationStatus.MOCK_ONLY)
+        self.assertEqual(pms.qualification_status, ConnectorQualificationStatus.BLOCKED)
 
         acc = AccountingConnector()
-        self.assertEqual(acc.qualification_status, ConnectorQualificationStatus.MOCK_ONLY)
+        self.assertEqual(acc.qualification_status, ConnectorQualificationStatus.BLOCKED)
 
         pay = PaymentGatewayConnector()
-        self.assertEqual(pay.qualification_status, ConnectorQualificationStatus.MOCK_ONLY)
+        self.assertEqual(pay.qualification_status, ConnectorQualificationStatus.BLOCKED)
 
     def test_20_oracle_opera_client_fails_closed_without_credentials(self):
         """Verifies Oracle Opera PMS client returns BLOCKED status when credentials are missing."""

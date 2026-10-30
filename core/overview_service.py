@@ -18,6 +18,7 @@ from .db import db
 from .decision_center import OwnerDecisionCenter
 from .evidence_ledger import EvidenceLedger
 from .models import EvidenceStatus
+from .tenancy import tenant_ledger_path
 
 
 def _safe_scalar(res, default=0):
@@ -461,13 +462,16 @@ class OverviewDataService:
                 "active_workers": active_ai + (human_workers_count if human_workers_count > 0 else 0),
                 "idle_workers": idle_ai,
                 "blocked_workers": blocked_ai,
-                "workforce_utilization_pct": 82.5 if total_workforce > 0 else None,
+                "workforce_utilization_pct": (
+                    round((active_ai / total_workforce) * 100, 1) if total_workforce > 0 else None
+                ),
                 "departments": [{"department": k, "ai_count": v} for k, v in dept_counts.items()],
                 "capability_coverage": {
-                    "required_capabilities": 12,
-                    "active_capabilities": len(dept_counts) * 2,
-                    "coverage_pct": min(100, int((len(dept_counts) * 2 / 12) * 100)) if dept_counts else 40,
-                    "open_gaps": ["Commercial Sales Telephony Operator", "Automated Tally / ERP Reconciler"]
+                    "required_capabilities": None,
+                    "active_capabilities": len(dept_counts),
+                    "coverage_pct": None,
+                    "open_gaps": [],
+                    "note": "Coverage is not estimated; connect a capability registry to measure it."
                 },
                 "source": "Dynamic Workforce Factory & Org Ledger",
                 "last_updated": "Updated 5m ago",
@@ -700,18 +704,33 @@ class OverviewDataService:
             # -------------------------------------------------------------
             # 12. Data Quality / Trust Indicator
             # -------------------------------------------------------------
-            el = EvidenceLedger()
-            verified_count = sum(1 for r in el.chain if r.get("status") in ("VERIFIED", EvidenceStatus.VERIFIED.value))
-            simulated_or_test_count = sum(1 for r in el.chain if r.get("status") in ("SIMULATED", "TEST", "PENDING_EVIDENCE", EvidenceStatus.SIMULATED.value, EvidenceStatus.TEST.value))
-            unverified_count = simulated_or_test_count if el.chain else (3 if not has_financial_data else 1)
+            el = EvidenceLedger(tenant_ledger_path(tenant_id))
+            chain = el.chain
+
+            def _status(rec):
+                return str(rec.get("status") or "").upper()
+
+            verified_count = sum(1 for r in chain if _status(r) == "VERIFIED")
+            unverified_count = sum(
+                1 for r in chain
+                if _status(r) in ("SIMULATED", "TEST", "PENDING_EVIDENCE", "SELF_TESTED", "")
+            )
+            conflicting_count = 0
             integrity_ok = el.verify_ledger_integrity()
 
-            fin_score = 94 if has_financial_data else 0
-            sales_score = 90 if has_sales_data else 0
-            ops_score = 95
-            mkt_score = 80 if has_marketing_data else 0
-
-            completeness_score = round((fin_score * 0.35) + (sales_score * 0.25) + (ops_score * 0.25) + (mkt_score * 0.15))
+            # Completeness is the share of tracked operational domains that
+            # actually contain tenant data. No invented baseline percentages.
+            domain_flags = [
+                bool(has_financial_data),
+                bool(has_sales_data),
+                bool(has_ops_data or mission_data.get("has_data")),
+                bool(has_marketing_data),
+            ]
+            fin_score = 100 if domain_flags[0] else 0
+            sales_score = 100 if domain_flags[1] else 0
+            ops_score = 100 if domain_flags[2] else 0
+            mkt_score = 100 if domain_flags[3] else 0
+            completeness_score = round((sum(domain_flags) / len(domain_flags)) * 100)
 
             data_quality = {
                 "overall_completeness_pct": completeness_score,
@@ -721,7 +740,7 @@ class OverviewDataService:
                 "marketing_pct": mkt_score,
                 "verified_records": verified_count,
                 "unverified_records": unverified_count,
-                "conflicting_records": 0,
+                "conflicting_records": conflicting_count,
                 "merkle_integrity": "UNBROKEN" if integrity_ok else "DEGRADED",
                 "missing_sources": [
                     s for s, present in [

@@ -72,7 +72,9 @@ def run_hospitality_night_audit(company: OperatingContext, kernel: UniversalCont
         "gateway_settlements_received": 1187056.0,
         "variance": 0.0,
         "reconciliation_status": "MATCHED_EXACT",
-        "auditor_agent": auditor.agent_id
+        "auditor_agent": auditor.agent_id,
+        "data_provenance": "REFERENCE_SCENARIO_FIXTURE",
+        "is_reference_data": True
     }
     raw_bytes = json.dumps(audit_data, indent=2).encode("utf-8")
     with open(output_path, "wb") as f:

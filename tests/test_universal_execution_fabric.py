@@ -67,10 +67,18 @@ class TestUniversalExecutionFabric(unittest.TestCase):
         self.assertIsInstance(resp, AICeoMissionResponse)
         self.assertEqual(resp.execution_status, "COMPLETED")
         self.assertTrue(resp.verification["verified"])
-        self.assertTrue(resp.evidence.startswith("ev_merkle_"))
+        # Evidence must be a real sealed ledger record, not a synthetic token.
+        self.assertTrue(resp.evidence)
+        self.assertTrue(
+            resp.evidence.startswith("EV-"),
+            f"expected sealed ledger evidence id, got {resp.evidence!r}",
+        )
         self.assertGreater(len(resp.artifacts), 0)
         self.assertIn("web.extract_table", resp.capabilities_used)
         self.assertFalse(resp.uncertainty)
+        # Cost is not metered by this bridge and must not be invented.
+        self.assertEqual(resp.cost, 0.0)
+        self.assertTrue(any("not metered" in w.lower() for w in resp.warnings))
 
         # Confirm artifact exists physically on disk
         artifact = resp.artifacts[0]

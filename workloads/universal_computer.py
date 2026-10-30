@@ -8,6 +8,10 @@ and return independently verified results—without requiring a developer to pre
 
 import json
 import os
+import platform
+import shutil
+import subprocess
+import time
 import hashlib
 import sqlite3
 from core.models import (
@@ -36,7 +40,9 @@ def run_universal_capability_discovery_task(
 
     # 2. Autonomous Capability Gap Identification & Discovery
     discovery_engine = ToolDiscoveryEngine(registry)
-    required_tool = "sqlite3"
+    # The analytics step runs `python3` with the sqlite3 standard library, so that
+    # is the tool this workload genuinely needs on the host.
+    required_tool = "python3"
 
     # Strict Invariant Test: Capability != Authority
     # Operating authority ceiling is AUTOMATIC_IDEMPOTENT (sandboxed)
@@ -57,7 +63,7 @@ def run_universal_capability_discovery_task(
         manager="AI CEO",
         responsibilities=["Provision SQLite schema", "Execute batch analytical queries", "Verify data constraints"],
         objectives=["100% database integrity", "Zero unhandled transaction errors"],
-        allowed_tools=["sqlite3", "python3"],
+        allowed_tools=["python3"],
         budget_limit=1000.0,
         spending_limit=0.0
     )
@@ -88,12 +94,15 @@ def run_universal_capability_discovery_task(
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute("DROP TABLE IF EXISTS operational_events"); cur.execute("CREATE TABLE operational_events (id INTEGER PRIMARY KEY, host TEXT, latency_ms REAL, status TEXT)")
-    cur.executemany("INSERT INTO operational_events (host, latency_ms, status) VALUES (?, ?, ?)", [
-        ("Linux-Cloud-Node-1", 12.4, "HEALTHY"),
-        ("macOS-Studio-Worker", 24.1, "HEALTHY"),
-        ("Windows-Workstation", 18.9, "HEALTHY"),
-        ("Android-Host-Companion", 45.2, "HEALTHY")
-    ])
+    # Measure real command latency on this host instead of inventing telemetry.
+    host_name = platform.node() or "local-host"
+    measurements = []
+    for _ in range(4):
+        t0 = time.perf_counter()
+        proc = subprocess.run([required_tool, "-c", "pass"], capture_output=True, timeout=30)
+        elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+        measurements.append((host_name, elapsed_ms, "HEALTHY" if proc.returncode == 0 else "FAILED"))
+    cur.executemany("INSERT INTO operational_events (host, latency_ms, status) VALUES (?, ?, ?)", measurements)
     conn.commit()
 
     cur.execute("SELECT host, AVG(latency_ms) FROM operational_events GROUP BY host")
@@ -105,6 +114,7 @@ def run_universal_capability_discovery_task(
         "tool_discovered": required_tool,
         "tool_license": discovery_res["license"],
         "authority_invariant_tested": "Capability != Authority confirmed respected",
+        "provenance": "LIVE_LOCAL_MEASUREMENT",
         "database_file": db_path,
         "records_aggregated": len(rows),
         "fleet_latencies": {r[0]: r[1] for r in rows},

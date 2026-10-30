@@ -222,18 +222,127 @@ class TenantUsageSnapshot:
 
 
 class StripeBillingAdapter:
-    """Stripe Billing integration adapter for international subscriptions and metered billing."""
+    """Stripe Billing adapter.
+
+    Performs real Stripe API calls when a secret key is configured. Without a
+    key it fails closed with ``NOT_CONFIGURED`` — it never fabricates a customer
+    or checkout session identifier.
+    """
+
+    API_BASE = "https://api.stripe.com/v1"
+
     def __init__(self, api_key: Optional[str] = None, webhook_secret: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("STRIPE_API_KEY", "sk_test_zonata_stripe_mock")
-        self.webhook_secret = webhook_secret or os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_zonata_stripe_test_secret")
+        self.api_key = (api_key or os.environ.get("STRIPE_SECRET_KEY")
+                        or os.environ.get("STRIPE_API_KEY") or "").strip()
+        self.webhook_secret = (webhook_secret or os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+        self.timeout = float(os.environ.get("STRIPE_TIMEOUT_SECONDS", "20"))
+
+    def is_configured(self) -> bool:
+        return bool(self.api_key) and not self.api_key.lower().startswith(("sk_test_zonata", "mock", "your_"))
+
+    @staticmethod
+    def _encode(form: Dict[str, Any]) -> str:
+        import urllib.parse
+        return urllib.parse.urlencode({k: v for k, v in form.items() if v is not None})
+
+    def _post(self, path: str, form: Dict[str, Any]) -> Dict[str, Any]:
+        import urllib.request
+        import urllib.error
+        req = urllib.request.Request(
+            f"{self.API_BASE}{path}",
+            data=self._encode(form).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Idempotency-Key": f"zonata-{uuid.uuid4().hex[:24]}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return json.loads(resp.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"Stripe HTTP {exc.code}: {body}") from exc
 
     def create_customer(self, tenant_id: str, email: str, company_name: str = "Enterprise") -> Dict[str, Any]:
-        logger.info(f"STRIPE: Created customer for tenant {tenant_id} ({email})")
-        return {"success": True, "stripe_customer_id": f"cus_{uuid.uuid4().hex[:14]}", "email": email, "tenant_id": tenant_id}
+        if not self.is_configured():
+            return {
+                "success": False,
+                "code": "NOT_CONFIGURED",
+                "provider": "stripe",
+                "required_env": ["STRIPE_SECRET_KEY"],
+                "detail": "Set STRIPE_SECRET_KEY to create real Stripe customers.",
+            }
+        try:
+            body = self._post("/customers", {
+                "email": email,
+                "name": company_name,
+                "metadata[tenant_id]": tenant_id,
+            })
+        except Exception as exc:
+            logger.error("STRIPE: create_customer failed: %s", exc)
+            return {"success": False, "code": "PROVIDER_ERROR", "provider": "stripe",
+                    "detail": str(exc)[:400]}
+        return {
+            "success": bool(body.get("id")),
+            "stripe_customer_id": body.get("id"),
+            "email": body.get("email", email),
+            "tenant_id": tenant_id,
+        }
+
+    def create_checkout_session(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        amount_usd: float,
+        tier: str,
+        success_url: str,
+        cancel_url: str,
+    ) -> Dict[str, Any]:
+        if not self.is_configured():
+            return {
+                "success": False,
+                "code": "NOT_CONFIGURED",
+                "provider": "stripe",
+                "required_env": ["STRIPE_SECRET_KEY"],
+                "detail": "Set STRIPE_SECRET_KEY to open a real Stripe checkout session.",
+            }
+        try:
+            body = self._post("/checkout/sessions", {
+                "mode": "subscription" if tier else "payment",
+                "customer": customer_id or None,
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+                "line_items[0][quantity]": 1,
+                "line_items[0][price_data][currency]": "usd",
+                "line_items[0][price_data][unit_amount]": int(round(amount_usd * 100)),
+                "line_items[0][price_data][product_data][name]": f"ZONATA {tier.title()} plan",
+                "line_items[0][price_data][recurring][interval]": "month",
+                "metadata[tenant_id]": tenant_id,
+            })
+        except Exception as exc:
+            logger.error("STRIPE: checkout session failed: %s", exc)
+            return {"success": False, "code": "PROVIDER_ERROR", "provider": "stripe",
+                    "detail": str(exc)[:400]}
+        return {
+            "success": bool(body.get("id") and body.get("url")),
+            "checkout_session_id": body.get("id"),
+            "url": body.get("url"),
+            "provider": "stripe",
+        }
 
     def sync_metered_usage(self, stripe_subscription_item_id: str, quantity: int) -> Dict[str, Any]:
-        logger.info(f"STRIPE: Metered usage synced: {quantity} units to {stripe_subscription_item_id}")
-        return {"synced": True, "quantity": quantity, "timestamp": time.time()}
+        if not self.is_configured():
+            return {"success": False, "code": "NOT_CONFIGURED", "provider": "stripe"}
+        try:
+            body = self._post(f"/subscription_items/{stripe_subscription_item_id}/usage_records", {
+                "quantity": int(quantity),
+                "action": "set",
+            })
+        except Exception as exc:
+            return {"success": False, "code": "PROVIDER_ERROR", "detail": str(exc)[:400]}
+        return {"success": True, "quantity": quantity, "provider": "stripe", "raw_id": body.get("id")}
 
     def verify_webhook_signature(self, payload: str, sig_header: str, tolerance: int = 300) -> bool:
         """
@@ -271,19 +380,91 @@ class StripeBillingAdapter:
 
 
 class RazorpayBillingAdapter:
-    """Razorpay Billing integration adapter for Indian domestic subscriptions and invoices."""
+    """Razorpay Billing adapter with real API calls and fail-closed behaviour."""
+
+    API_BASE = "https://api.razorpay.com/v1"
+
     def __init__(self, key_id: Optional[str] = None, key_secret: Optional[str] = None, webhook_secret: Optional[str] = None):
-        self.key_id = key_id or os.environ.get("RAZORPAY_KEY_ID", "rzp_test_zonata_mock")
-        self.key_secret = key_secret or os.environ.get("RAZORPAY_KEY_SECRET", "mock_secret")
-        self.webhook_secret = webhook_secret or os.environ.get("RAZORPAY_WEBHOOK_SECRET", "rzp_whsec_zonata_test_secret")
+        self.key_id = (key_id or os.environ.get("RAZORPAY_KEY_ID") or "").strip()
+        self.key_secret = (key_secret or os.environ.get("RAZORPAY_KEY_SECRET") or "").strip()
+        self.webhook_secret = (webhook_secret or os.environ.get("RAZORPAY_WEBHOOK_SECRET") or "").strip()
+        self.timeout = float(os.environ.get("RAZORPAY_TIMEOUT_SECONDS", "20"))
+
+    def is_configured(self) -> bool:
+        return bool(self.key_id and self.key_secret) and "mock" not in self.key_id.lower()
+
+    def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        import base64
+        import urllib.request
+        import urllib.error
+        token = base64.b64encode(f"{self.key_id}:{self.key_secret}".encode("utf-8")).decode("ascii")
+        req = urllib.request.Request(
+            f"{self.API_BASE}{path}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return json.loads(resp.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"Razorpay HTTP {exc.code}: {body}") from exc
 
     def create_customer(self, tenant_id: str, email: str, company_name: str = "Enterprise") -> Dict[str, Any]:
-        logger.info(f"RAZORPAY: Created customer for tenant {tenant_id} ({email})")
-        return {"success": True, "razorpay_customer_id": f"cust_{uuid.uuid4().hex[:14]}", "email": email, "tenant_id": tenant_id}
+        if not self.is_configured():
+            return {
+                "success": False,
+                "code": "NOT_CONFIGURED",
+                "provider": "razorpay",
+                "required_env": ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"],
+                "detail": "Set Razorpay key id/secret to create real customers.",
+            }
+        try:
+            body = self._post("/customers", {
+                "name": company_name,
+                "email": email,
+                "notes": {"tenant_id": tenant_id},
+                "fail_existing": "0",
+            })
+        except Exception as exc:
+            logger.error("RAZORPAY: create_customer failed: %s", exc)
+            return {"success": False, "code": "PROVIDER_ERROR", "provider": "razorpay",
+                    "detail": str(exc)[:400]}
+        return {
+            "success": bool(body.get("id")),
+            "razorpay_customer_id": body.get("id"),
+            "email": body.get("email", email),
+            "tenant_id": tenant_id,
+        }
 
     def create_order(self, amount_inr: float, tenant_id: str, receipt: str) -> Dict[str, Any]:
-        logger.info(f"RAZORPAY: Order created INR {amount_inr} for tenant {tenant_id}")
-        return {"order_id": f"order_{uuid.uuid4().hex[:14]}", "amount_paise": int(amount_inr * 100), "status": "CREATED"}
+        if not self.is_configured():
+            return {
+                "success": False,
+                "code": "NOT_CONFIGURED",
+                "provider": "razorpay",
+                "required_env": ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"],
+                "detail": "Set Razorpay key id/secret to create real orders.",
+            }
+        try:
+            body = self._post("/orders", {
+                "amount": int(round(amount_inr * 100)),
+                "currency": "INR",
+                "receipt": receipt[:40],
+                "notes": {"tenant_id": tenant_id},
+            })
+        except Exception as exc:
+            logger.error("RAZORPAY: create_order failed: %s", exc)
+            return {"success": False, "code": "PROVIDER_ERROR", "provider": "razorpay",
+                    "detail": str(exc)[:400]}
+        return {
+            "success": bool(body.get("id")),
+            "order_id": body.get("id"),
+            "amount_paise": body.get("amount"),
+            "currency": body.get("currency", "INR"),
+            "status": body.get("status"),
+        }
 
     def verify_webhook_signature(self, payload: str, sig_header: str) -> bool:
         """

@@ -68,14 +68,10 @@ from core.webhooks import WebhookSecurityGateway
 from core.secrets import SecretManager, ContentSanitizer
 from core.kpis import DynamicKpiEngine, KpiVerificationState
 from core.handover import HandoverManager, CompanyLifecycleState
-from workloads.hospitality import run_hospitality_night_audit
-from workloads.manufacturing import run_manufacturing_bottleneck_analysis
-from workloads.saas import run_saas_churn_analysis
-from workloads.personal import run_personal_file_hygiene
-from workloads.universal_computer import run_universal_capability_discovery_task
 from core.team_catalog import EnterpriseTeamCatalog, BUNDLED_TEAMS
 from core.operating_skills import OperatingSkillRegistry, SKILLS_CATALOG
-from src.services.agent_engine import heartbeat_coordinator, delegation_engine, config_manager
+from src.services.agent_engine import config_manager
+# Heartbeat/delegation state is tenant-scoped; see _heartbeat()/_delegation().
 from core.settings_service import settings_service, GROUPS, CATEGORIES_CATALOG
 from core.neon_env import get_neon_services_status, load_neon_env
 from core.neon_auth import neon_auth
@@ -87,13 +83,11 @@ SERVER_START_TIME = time.time()
 
 # Initialize Core Subsystems
 from core.evidence_ledger import get_default_ledger_path
+from core.tenancy import get_runtime, get_portfolio, get_ledger, get_coworker, invalidate as invalidate_tenant_runtime
 LEDGER_FILE = get_default_ledger_path()
-ledger = EvidenceLedger(LEDGER_FILE)
-kernel = UniversalControlKernel(ledger)
+# No tenant data is instantiated at import time. All stateful runtimes are
+# created per authenticated tenant via core.tenancy.get_runtime().
 registry = CapabilityRegistry()
-portfolio = CompanyPortfolioManager(tenant_id="tnt_primary", load_from_db=True)
-ceo_command = CeoCommandEngine(portfolio)
-ceo_reports = ExecutiveReportEngine(portfolio)
 
 # Company OS 2.0 Subsystems
 from core.ceo_engine import CEOExecutiveEngine
@@ -108,25 +102,12 @@ from core.interactive_meeting import InteractiveMeetingSystem
 from core.business_causality import BusinessCausalityEngine
 from core.workforce_intelligence import WorkforceIntelligenceEngine
 
-ceo_engine = CEOExecutiveEngine(portfolio, tenant_id="tnt_primary")
-host_agent = UniversalHostAgent(tenant_id="tnt_primary")
-desktop_robot = UniversalDesktopRobot(host_agent, ledger=ledger)
-event_engine = EnterpriseEventEngine(portfolio, tenant_id="tnt_primary")
-interactive_meetings = InteractiveMeetingSystem(portfolio, tenant_id="tnt_primary")
-sales_workforce = AISalesWorkforce(tenant_id="tnt_primary")
-voice_agent = GovernedVoiceAgent(tenant_id="tnt_primary")
-business_causality = BusinessCausalityEngine(tenant_id="tnt_primary")
-workforce_intel = WorkforceIntelligenceEngine(tenant_id="tnt_primary")
 from core.overview_service import OverviewDataService
 from core.schedule_service import UniversalScheduleService
 from core.meeting_service import AiCeoMeetingService
 from core.assistant_service import FloatingAssistantService
 from core.plugins_service import PluginsAndConnectionsService
 
-schedule_service = UniversalScheduleService(tenant_id="tnt_primary")
-meeting_service = AiCeoMeetingService(tenant_id="tnt_primary")
-assistant_service = FloatingAssistantService(tenant_id="tnt_primary")
-plugins_service = PluginsAndConnectionsService(tenant_id="tnt_primary")
 from core.production_api import api_handler
 from core.coworker.engine import UniversalCoworkerEngine
 from core.coworker.runtimes.terminal_runtime import TerminalWorkerRuntime, TerminalCommandRisk, TerminalSecurityAnalyzer
@@ -137,10 +118,6 @@ from core.universal_terminal import (
     AICeoTerminalInstruction, AICeoTerminalResult
 )
 
-coworker_engine = UniversalCoworkerEngine.get_instance(tenant_id="tnt_primary")
-terminal_runtime = TerminalWorkerRuntime(tenant_id="tnt_primary")
-universal_terminal = UniversalTerminal(tenant_id="tnt_primary")
-terminal_agent = TerminalHandlingAgent(tenant_id="tnt_primary")
 
 
 
@@ -168,7 +145,6 @@ zonata_competitive = CompetitiveIntelligenceEngine()
 zonata_org_designer = OrganizationDesignEngine()
 zonata_agent_factory = GovernedAgentFactory()
 from zonata.company_api_service import CompanyApiService
-company_api_service = CompanyApiService(portfolio)
 from zonata.agent_swarm_adapter import AgentWorkforceAdapter, workforce_planner
 from zonata.stateful_agent_adapter import stateful_agent_adapter
 from core.stateful_agent_runtime import (
@@ -224,8 +200,7 @@ from core.a2a_interoperability_runtime import (
 )
 from zonata.a2a_adapter import A2ACanonicalScenarios, A2ACeoBridge
 
-a2a_gateway = A2AGateway("tnt_primary", "comp_primary")
-a2a_scenarios = A2ACanonicalScenarios("tnt_primary", "comp_primary")
+# NOTE: A2A gateway/scenarios are constructed per tenant via _a2a()/get_runtime().a2a.
 
 # MCP (Model Context Protocol - Project 06)
 from core.mcp_interoperability_runtime import (
@@ -243,9 +218,7 @@ from core.mcp_interoperability_runtime import (
 )
 from zonata.mcp_adapter import McpCanonicalScenarios, McpCeoBridge
 
-mcp_gateway = MCPGateway("tnt_primary", "comp_primary")
-mcp_scenarios = McpCanonicalScenarios("tnt_primary", "comp_primary")
-mcp_inbound_server = ZonataMcpServer("tnt_primary", "comp_primary")
+# NOTE: MCP gateway/server/scenarios are constructed per tenant via _mcp()/get_runtime().
 
 # OpenHands (Governed Agent Execution Runtime - Project 07)
 from core.openhands_execution_runtime import (
@@ -261,8 +234,7 @@ from core.openhands_execution_runtime import (
 )
 from zonata.openhands_adapter import OpenHandsCanonicalScenarios, OpenHandsCeoBridge
 
-openhands_gateway = OpenHandsRuntimeGateway("tnt_primary", "comp_primary")
-openhands_scenarios = OpenHandsCanonicalScenarios("tnt_primary", "comp_primary")
+# NOTE: OpenHands gateway/scenarios are constructed per tenant via get_runtime().
 
 # Browser Use (Governed Autonomous Browser Execution Layer - Project 08)
 from core.browser_use_execution_runtime import (
@@ -278,8 +250,7 @@ from core.browser_use_execution_runtime import (
 )
 from zonata.browser_use_adapter import BrowserUseCanonicalScenarios, BrowserUseCeoBridge
 
-browser_gateway = BrowserExecutionGateway("tnt_primary", "comp_primary")
-browser_scenarios = BrowserUseCanonicalScenarios("tnt_primary", "comp_primary")
+# NOTE: Browser gateway/scenarios are constructed per tenant via _browser()/get_runtime().
 
 # Temporal (Governed Durable Execution & Long-Running Mission Reliability Layer - Project 09)
 from core.temporal_durable_execution_runtime import (
@@ -298,8 +269,7 @@ from core.temporal_durable_execution_runtime import (
 )
 from zonata.temporal_adapter import TemporalCanonicalScenarios, TemporalCeoBridge
 
-temporal_gateway = TemporalDurableExecutionGateway("tnt_primary", "comp_primary")
-temporal_scenarios = TemporalCanonicalScenarios("tnt_primary", "comp_primary")
+# NOTE: temporal gateway/scenarios are constructed per tenant via _temporal().
 
 # Nango (Governed External System Connectivity & Integration Layer - Project 10)
 from core.nango_integration_runtime import (
@@ -316,8 +286,7 @@ from core.nango_integration_runtime import (
 )
 from zonata.nango_adapter import NangoCanonicalScenarios, NangoCeoBridge
 
-nango_gateway = ExternalIntegrationGateway("tnt_primary", "comp_primary")
-nango_scenarios = NangoCanonicalScenarios("tnt_primary", "comp_primary")
+# NOTE: Nango gateway/scenarios are constructed per tenant via _nango()/get_runtime().
 
 # Connectors and Agent Bus
 connector_registry = ConnectorRegistry()
@@ -342,7 +311,7 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 RECEIVED_ALERTS: List[Dict[str, Any]] = []
 
 
-def get_real_system_host():
+def get_real_system_host(tenant_id: str = "tnt_primary"):
     """Inspects the actual execution machine environment."""
     uname = platform.uname()
     load = 0
@@ -358,10 +327,175 @@ def get_real_system_host():
         "architecture": uname.machine,
         "is_primary": True,
         "status": "Online",
-        "agents": sum(len(c.workforce) for c in portfolio.list_companies()),
+        "agents": sum(len(c.workforce) for c in get_portfolio(tenant_id).list_companies()),
         "load": load,
         "latency_ms": 1
     }
+
+def _cw(tenant_id: str, company_id: str = None):
+    """Tenant-scoped Universal Co-worker engine."""
+    return get_coworker(tenant_id, company_id)
+
+
+def _ceo_engine(tenant_id: str, company_id: str = None):
+    """Tenant-scoped AI CEO engine."""
+    return get_runtime(tenant_id, company_id).ceo_engine
+
+
+def _company_service(tenant_id: str):
+    """Tenant-scoped Company API service."""
+    return get_runtime(tenant_id).company_service
+
+
+def _ledger_for(tenant_id: str):
+    """Tenant-scoped evidence ledger."""
+    return get_ledger(tenant_id)
+
+
+def _heartbeat(tenant_id: str):
+    return get_runtime(tenant_id).heartbeat
+
+
+def _delegation(tenant_id: str):
+    return get_runtime(tenant_id).delegation
+
+
+def _a2a(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).a2a
+
+
+def _a2a_scenarios(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).a2a_scenarios
+
+
+def _mcp(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).mcp
+
+
+def _mcp_scenarios(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).mcp_scenarios
+
+
+def _mcp_server(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).mcp_server
+
+
+def _openhands(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).openhands
+
+
+def _openhands_scenarios(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).openhands_scenarios
+
+
+def _browser(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).browser
+
+
+def _browser_scenarios(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).browser_scenarios
+
+
+def _nango(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).nango
+
+
+def _nango_scenarios(tenant_id: str, company_id: str = None):
+    return get_runtime(tenant_id, company_id).nango_scenarios
+
+
+_GIT_META: Dict[str, str] = {}
+
+
+def _git_metadata() -> Dict[str, str]:
+    """Commit/branch of the running deployment, resolved honestly (no constants)."""
+    if _GIT_META:
+        return _GIT_META
+    commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or ""
+    branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or ""
+    if not commit or not branch:
+        try:
+            import subprocess
+            base = os.path.dirname(os.path.abspath(__file__))
+            if not commit:
+                commit = subprocess.run(
+                    ["git", "-C", base, "rev-parse", "--short", "HEAD"],
+                    capture_output=True, text=True, timeout=3,
+                ).stdout.strip()
+            if not branch:
+                branch = subprocess.run(
+                    ["git", "-C", base, "rev-parse", "--abbrev-ref", "HEAD"],
+                    capture_output=True, text=True, timeout=3,
+                ).stdout.strip()
+        except Exception:
+            pass
+    _GIT_META.update({"commit": commit or "unknown", "branch": branch or "unknown"})
+    return _GIT_META
+
+
+def _database_status() -> str:
+    try:
+        with db.get_connection() as conn:
+            conn.execute("SELECT 1").fetchone()
+        return "CONNECTED"
+    except Exception:
+        return "UNAVAILABLE"
+
+
+def _temporal(tenant_id: str, company_id: str = None):
+    """Tenant-scoped durable execution gateway."""
+    return get_runtime(tenant_id, company_id).temporal
+
+
+def _temporal_scenarios(tenant_id: str, company_id: str = None):
+    """Tenant-scoped canonical durable-execution scenario suite."""
+    return get_runtime(tenant_id, company_id).temporal_scenarios
+
+
+def _safe_company_key(company_id: str) -> str:
+    """Reject path traversal in company identifiers used for filesystem paths."""
+    import re as _re
+    key = (company_id or "").strip()
+    if not key or not _re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", key) or ".." in key:
+        raise ValueError(f"Invalid company id: {company_id!r}")
+    return key
+
+
+def _draft_path(tenant_id: str, company_id: str) -> str:
+    """Tenant-isolated draft location (one directory per tenant)."""
+    key = _safe_company_key(company_id)
+    tkey = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in tenant_id or "unknown")
+    return os.path.join(BASE_DIR, "storage", "drafts", tkey, f"{key}.json")
+
+
+_MERKLE_CACHE: Dict[str, Any] = {"ts": 0.0, "value": "UNVERIFIED", "lock": __import__("threading").Lock()}
+_MERKLE_TTL = 30.0
+
+
+def _platform_merkle_status() -> str:
+    """Cached platform ledger verification (30s TTL) for liveness probes."""
+    now = time.time()
+    cached = _MERKLE_CACHE["value"]
+    if now - _MERKLE_CACHE["ts"] < _MERKLE_TTL and cached != "UNVERIFIED":
+        return cached
+    with _MERKLE_CACHE["lock"]:
+        now = time.time()
+        if now - _MERKLE_CACHE["ts"] < _MERKLE_TTL and _MERKLE_CACHE["value"] != "UNVERIFIED":
+            return _MERKLE_CACHE["value"]
+        try:
+            audit = get_ledger("tnt_primary").verify_full_chain_integrity()
+            if audit.get("valid"):
+                value = "INTEGRITY_VERIFIED"
+            elif audit.get("active_epoch_valid"):
+                value = "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED"
+            else:
+                value = "INTEGRITY_FAILED"
+        except Exception as exc:
+            value = f"INTEGRITY_CHECK_ERROR: {str(exc)[:100]}"
+        _MERKLE_CACHE["ts"] = time.time()
+        _MERKLE_CACHE["value"] = value
+        return value
+
 
 ALLOWED_ORIGINS = {
     "http://localhost:8000",
@@ -493,6 +627,38 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             raise AuthExceptions.AuthenticationError("Authenticated context has no valid tenant_id")
         return tenant_id
 
+    def _resolve_company_id(self, auth_context: Dict[str, Any],
+                            query_params: Optional[Dict[str, List[str]]] = None) -> str:
+        """
+        Resolve the active company for this request, trusting only the verified
+        token. A client-supplied X-Company-ID / ?company_id is honoured only if
+        the company is proven to belong to the authenticated tenant.
+        """
+        tenant_id = auth_context.get("tenant_id") or ""
+        token_company = auth_context.get("company_id")
+
+        requested = self.headers.get("X-Company-ID")
+        if not requested and query_params:
+            requested = (query_params.get("company_id") or [None])[0]
+        if isinstance(requested, str):
+            requested = requested.strip()
+        if not requested or requested.lower() in ("portfolio", "all", "null", "undefined", "none"):
+            return token_company or f"comp_{tenant_id}"
+        if requested == token_company:
+            return requested
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT company_id FROM companies WHERE company_id = ? AND tenant_id = ?",
+                    (requested, tenant_id),
+                ).fetchone()
+            if row:
+                return requested
+        except Exception:
+            pass
+        # Fail closed to the token's own company.
+        return token_company or f"comp_{tenant_id}"
+
     def _send_json(self, data, status=200, headers=None):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
         try:
@@ -606,24 +772,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "timestamp": time.time()
                 }, status=503)
                 return
-            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
-            git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
+            git_meta = _git_metadata()
+            git_commit = git_meta["commit"]
+            git_branch = git_meta["branch"]
+            db_state = _database_status()
             is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
             default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
             release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
             release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
-            # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
-            try:
-                ledger_audit = ledger.verify_full_chain_integrity()
-                if ledger_audit["valid"]:
-                    merkle_status = "INTEGRITY_VERIFIED"
-                elif ledger_audit.get("active_epoch_valid"):
-                    merkle_status = "ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED"
-                else:
-                    merkle_status = "INTEGRITY_FAILED"
-            except Exception as e:
-                ledger_audit = {}
-                merkle_status = f"INTEGRITY_CHECK_ERROR: {str(e)[:100]}"
+            # Authoritative Merkle ledger integrity check, cached briefly so
+            # liveness probes stay fast under concurrent load. The cached value
+            # is a real verification result, not a fabricated constant.
+            merkle_status = _platform_merkle_status()
             envelope_data = {
                 "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "100" if is_ga_mode else "3")),
                 "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "10" if is_ga_mode else "4")),
@@ -632,13 +792,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "ENFORCED"
             }
             self._send_json({
-                "status": "HEALTHY",
+                "status": "HEALTHY" if db_state == "CONNECTED" else "DEGRADED",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": release_version,
                 "release_scope": release_scope,
                 "commit": git_commit,
                 "branch": git_branch,
-                "database": "CONNECTED",
+                "database": db_state,
                 "database_dialect": db.get_dialect(),
                 "merkle_ledger": merkle_status,
                 "server_mode": "MULTI_THREADED_CONCURRENT",
@@ -650,15 +810,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
-            git_commit = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "08f3d14"
-            git_branch = os.environ.get("RENDER_GIT_BRANCH") or os.environ.get("GIT_BRANCH") or "engineering/production-readiness-gap-closure"
+            git_meta = _git_metadata()
+            git_commit = git_meta["commit"]
+            git_branch = git_meta["branch"]
+            db_state = _database_status()
             is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
             default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
             release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
             release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
             # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
             try:
-                ledger_audit = ledger.verify_full_chain_integrity()
+                ledger_audit = _ledger_for("tnt_primary").verify_full_chain_integrity()
                 if ledger_audit["valid"]:
                     merkle_status = "INTEGRITY_VERIFIED"
                 elif ledger_audit.get("active_epoch_valid"):
@@ -676,13 +838,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "ENFORCED"
             }
             self._send_json({
-                "status": "HEALTHY",
+                "status": "HEALTHY" if db_state == "CONNECTED" else "DEGRADED",
                 "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
                 "version": release_version,
                 "release_scope": release_scope,
                 "commit": git_commit,
                 "branch": git_branch,
-                "database": "CONNECTED",
+                "database": db_state,
                 "database_dialect": db.get_dialect(),
                 "merkle_ledger": merkle_status,
                 "server_mode": "MULTI_THREADED_CONCURRENT",
@@ -973,6 +1135,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"alerts": RECEIVED_ALERTS[-100:], "count": len(RECEIVED_ALERTS)})
             return
 
+        # Real OpenAPI document (previously the SPA fallback returned HTML here).
+        if path in ("/openapi.json", "/api/openapi.json"):
+            from core.openapi_spec import build_openapi
+            self._send_json(build_openapi())
+            return
+
         # Public Static Web Content (HTML, JS, CSS, images)
         if not path.startswith("/api/") and path != "/metrics":
             clean_path = path.lstrip('/')
@@ -982,6 +1150,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if os.path.exists(file_path) and os.path.isfile(file_path):
                 self.path = '/' + clean_path
                 return super().do_GET()
+            if path.startswith("/api/"):
+                self._send_json({
+                    "error": "Not Found",
+                    "code": "UNKNOWN_ENDPOINT",
+                    "path": path,
+                    "docs": "/openapi.json",
+                }, status=404)
+                return
             self.path = '/index.html'
             return super().do_GET()
 
@@ -994,6 +1170,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             auth_context = self._get_auth_context()
             tenant_id = auth_context.get("tenant_id")
+            company_id = self._resolve_company_id(auth_context, query_params)
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
@@ -1114,7 +1291,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/portfolio":
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
+            target_portfolio = get_portfolio(tenant_id)
             summary = target_portfolio.get_portfolio_summary()
             companies = [
                 {
@@ -1130,7 +1307,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "missions_count": len(c.missions),
                     "rules": c.operating_rules
                 }
-                for c in target_portfolio.list_companies()
+                for c in get_portfolio(tenant_id).list_companies()
             ]
             self._send_json({"summary": summary, "companies": companies})
             return
@@ -1141,7 +1318,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/attention":
-            companies = portfolio.list_companies()
+            companies = get_portfolio(tenant_id).list_companies()
             cid = companies[0].company_id if companies else None
             attention = OwnerDecisionCenter.get_attention_required_items(tenant_id, cid)
             self._send_json(attention)
@@ -1158,8 +1335,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "OPERATIONAL",
                 "default_adapter": config_manager.get("default_model_adapter", "gemini_local"),
                 "heartbeat_interval_seconds": config_manager.get("heartbeat_interval_seconds", 30),
-                "active_runs_count": len(heartbeat_coordinator.runs),
-                "active_plans_count": len(delegation_engine.plans),
+                "active_runs_count": len(_heartbeat(tenant_id).runs),
+                "active_plans_count": len(_delegation(tenant_id).plans),
                 "total_bundled_teams": len(BUNDLED_TEAMS),
                 "total_skills": len(SKILLS_CATALOG)
             })
@@ -1176,19 +1353,26 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/agent-engine/plans":
-            plans = list(delegation_engine.plans.values())
+            plans = list(_delegation(tenant_id).plans.values())
             self._send_json({"plans": plans})
             return
 
         elif path == "/api/agent-engine/heartbeats":
-            runs = list(heartbeat_coordinator.runs.values())
+            runs = list(_heartbeat(tenant_id).runs.values())
             self._send_json({"runs": runs[-20:] if runs else []})
             return
 
         elif path == "/api/morning-meeting":
-            companies = portfolio.list_companies()
-            cname = companies[0].name if companies else "Enterprise Portfolio"
-            cid = companies[0].company_id if companies else "comp_none"
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company before requesting a morning meeting.",
+                }, status=409)
+                return
+            cname = companies[0].name
+            cid = companies[0].company_id
             missions = [{"mission_id": m.mission_id, "status": m.status.value} for m in (companies[0].missions if companies else [])]
             ovn = OvernightOperationsEngine.execute_night_shift(
                 tenant_id=tenant_id,
@@ -1207,8 +1391,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/employees":
             emp_list = []
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
-            for c in target_portfolio.list_companies():
+            target_portfolio = get_portfolio(tenant_id)
+            for c in get_portfolio(tenant_id).list_companies():
                 for e in c.workforce.values():
                     emp_list.append({
                         "id": e.agent_id,
@@ -1225,10 +1409,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/evidence":
-            records = ledger.chain
-            root = ledger.get_merkle_root()
-            ledger_audit = ledger.verify_full_chain_integrity()
+            tenant_ledger = _ledger_for(tenant_id)
+            # Defense in depth: even if a legacy ledger file contains records
+            # from other tenants, never return them to this tenant.
+            records = [
+                r for r in tenant_ledger.chain
+                if (r.get("metadata") or {}).get("tenant_id") in (None, tenant_id)
+            ]
+            root = tenant_ledger.get_merkle_root()
+            ledger_audit = tenant_ledger.verify_full_chain_integrity()
             self._send_json({
+                "tenant_id": tenant_id,
                 "merkle_root": root,
                 "unbroken_integrity": ledger_audit["valid"],
                 "active_epoch_integrity": ledger_audit.get("active_epoch_valid", True),
@@ -1241,13 +1432,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/hosts":
-            real_host = get_real_system_host()
+            real_host = get_real_system_host(tenant_id)
             self._send_json({"hosts": [real_host]})
             return
 
         elif path == "/api/missions":
             missions_list = []
-            for c in portfolio.list_companies():
+            for c in get_portfolio(tenant_id).list_companies():
                 for m in c.missions:
                     missions_list.append({
                         "id": m.mission_id,
@@ -1263,8 +1454,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/departments":
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_none"
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = companies[0].company_id if companies else ""
             depts = DepartmentControlUnit.list_departments(tenant_id, cid)
             self._send_json({"departments": depts})
             return
@@ -1275,16 +1466,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/knowledge":
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_none"
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = companies[0].company_id if companies else ""
             facts = CoreKnowledgeGraph.query_facts(tenant_id, cid)
             baseline = CoreKnowledgeGraph.get_company_baseline(tenant_id, cid)
             self._send_json({"baseline": baseline, "facts": facts})
             return
 
         elif path == "/api/intelligence":
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_none"
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = companies[0].company_id if companies else ""
             items = RiskEngine.list_intelligence_items(tenant_id, cid)
             self._send_json({"items": items})
             return
@@ -1428,8 +1619,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
         elif path == "/api/ceo/intelligence":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company to view AI CEO intelligence.",
+                }, status=409)
+                return
+            cid = self._resolve_company_id(auth_context, query_params)
             intel = CEOExecutiveBrain.get_company_intelligence_summary(tenant_id, cid)
             self._send_json(intel)
             return
@@ -1440,13 +1638,43 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/kpis":
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_none"
-            kpis = [
-                DynamicKpiEngine.register_kpi(tenant_id, cid, "Net Contribution Margin", "Operating profit percentage", "%", 25.0, 18.0),
-                DynamicKpiEngine.register_kpi(tenant_id, cid, "Evidence Audit Integrity", "Cryptographically sealed action ratio", "%", 100.0, 100.0)
-            ]
-            self._send_json({"kpis": kpis})
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({"kpis": [], "company_id": None, "code": "NO_COMPANY"})
+                return
+            cid = self._resolve_company_id(auth_context, query_params)
+            comp = next((c for c in companies if c.company_id == cid), companies[0])
+            revenue = float(getattr(comp, "revenue", 0.0) or 0.0)
+            cost = float(getattr(comp, "cost", 0.0) or 0.0)
+            margin_pct = round(((revenue - cost) / revenue) * 100.0, 2) if revenue > 0 else None
+            ledger = _ledger_for(tenant_id)
+            audit = ledger.verify_full_chain_integrity()
+            records = len(ledger.chain)
+            integrity_pct = 100.0 if audit.get("valid") else 0.0
+            kpis = []
+            if margin_pct is not None:
+                kpis.append({
+                    "kpi_id": "kpi_net_contribution_margin",
+                    "name": "Net Contribution Margin",
+                    "description": "Operating profit as a percentage of booked revenue",
+                    "unit": "%",
+                    "value": margin_pct,
+                    "source": "companies.revenue / companies.cost",
+                })
+            kpis.append({
+                "kpi_id": "kpi_evidence_integrity",
+                "name": "Evidence Audit Integrity",
+                "description": "Merkle chain verification across this tenant's evidence ledger",
+                "unit": "%",
+                "value": integrity_pct,
+                "records": records,
+                "source": "tenant evidence ledger",
+            })
+            self._send_json({
+                "kpis": kpis,
+                "company_id": cid,
+                "financials_available": margin_pct is not None,
+            })
             return
 
         elif path == "/api/connectors":
@@ -1461,64 +1689,71 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Company OS 2.0 Endpoints
         elif path == "/api/ceo/cycle":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
-            cycle_res = ceo_engine.execute_executive_cycle(cid)
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company before running an executive cycle.",
+                }, status=409)
+                return
+            cid = self._resolve_company_id(auth_context, query_params)
+            cycle_res = _ceo_engine(tenant_id, company_id).execute_executive_cycle(cid)
             self._send_json(cycle_res)
             return
 
         elif path == "/api/council/members":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else ""])[0]
             members = ExecutiveCouncil(tenant_id, cid).list_members()
             self._send_json({"members": members})
             return
 
         elif path == "/api/council/debates":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else ""])[0]
             debates = ExecutiveCouncil(tenant_id, cid).list_debates()
             self._send_json({"debates": debates})
             return
 
         elif path == "/api/chief-of-staff/dossier":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else ""])[0]
             dossier = ChiefOfStaff(tenant_id, cid).compile_executive_dossier()
             self._send_json(dossier)
             return
 
         elif path == "/api/chief-of-staff/items":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else ""])[0]
             items = ChiefOfStaff(tenant_id, cid).list_items()
             self._send_json({"items": items})
             return
 
         elif path == "/api/host/telemetry":
-            telemetry = host_agent.get_telemetry()
+            telemetry = get_runtime(tenant_id).host_agent.get_telemetry()
             self._send_json(telemetry)
             return
 
         elif path == "/api/sales/leads":
-            leads = sales_workforce.list_leads()
+            leads = get_runtime(tenant_id).sales.list_leads()
             self._send_json({"leads": leads})
             return
 
         elif path == "/api/events":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_none"])[0]
-            events = event_engine.list_unhandled_events(cid)
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = query_params.get("company_id", [companies[0].company_id if companies else ""])[0]
+            events = get_runtime(tenant_id).event_engine.list_unhandled_events(cid)
             self._send_json({"events": events})
             return
 
         elif path == "/api/meetings":
-            meetings = interactive_meetings.list_recent_meetings()
+            meetings = get_runtime(tenant_id).meetings.list_recent_meetings()
             self._send_json({"meetings": meetings})
             return
 
         elif path == "/api/causality/summary":
-            summary = business_causality.get_causality_summary()
+            summary = get_runtime(tenant_id).causality.get_causality_summary()
             self._send_json(summary)
             return
 
@@ -1553,22 +1788,22 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (GET) ---
         elif path == "/api/v1/zonata/discovery/session":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             session = zonata_discovery.get_or_create_session(tenant_id, cid)
             self._send_json(session.to_dict())
             return
 
         elif path == "/api/v1/zonata/discovery/facts":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             facts = zonata_discovery.list_findings(tenant_id, cid)
             self._send_json({"facts": facts, "count": len(facts)})
             return
 
         elif path == "/api/v1/zonata/interview/next":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             q = zonata_interview.get_next_question(tenant_id, cid)
             score, missing = zonata_interview.calculate_completeness(tenant_id, cid)
             self._send_json({
@@ -1581,15 +1816,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/interview/history":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             history = zonata_interview.get_interview_history(tenant_id, cid)
             self._send_json({"history": history, "count": len(history)})
             return
 
         elif path == "/api/v1/zonata/knowledge-graph":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             kg = CompanyKnowledgeGraph(tenant_id, cid)
             self._send_json({
                 "summary": kg.export_summary(),
@@ -1598,15 +1833,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/health":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             model = zonata_health.evaluate_company_health(tenant_id, cid)
             self._send_json(model.to_dict())
             return
 
         elif path == "/api/v1/zonata/org-design":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             with db.get_connection() as conn:
                 row = conn.execute(
                     "SELECT * FROM zonata_org_blueprints WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
@@ -1628,8 +1863,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/competitors":
-            companies = portfolio.list_companies()
-            cid = query_params.get("company_id", [companies[0].company_id if companies else "comp_primary"])[0]
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             comps = zonata_competitive.list_competitors(tenant_id, cid)
             opps = zonata_competitive.analyze_competitive_opportunities(tenant_id, cid)
             self._send_json({
@@ -1640,7 +1875,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/companies":
             comps = []
-            for c in portfolio.list_companies():
+            for c in get_portfolio(tenant_id).list_companies():
                 comps.append({
                     "id": c.company_id,
                     "name": c.name,
@@ -1660,15 +1895,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/companies/") and path.endswith("/draft"):
             cid = path.split("/")[3]
-            draft_file = os.path.join(BASE_DIR, f"storage/draft_{cid}.json")
+            try:
+                draft_file = _draft_path(tenant_id, cid)
+            except ValueError as exc:
+                self._send_json({"error": "Invalid company id", "code": "INVALID_COMPANY_ID",
+                                 "detail": str(exc)}, status=400)
+                return
             if os.path.exists(draft_file):
                 try:
-                    with open(draft_file, "r") as f:
-                        self._send_json({"draft": json.load(f)})
+                    with open(draft_file, "r", encoding="utf-8") as f:
+                        self._send_json({"draft": json.load(f), "company_id": cid,
+                                         "tenant_id": tenant_id})
                         return
-                except Exception:
-                    pass
-            self._send_json({"draft": None})
+                except Exception as exc:
+                    self._send_json({"error": "Draft file is unreadable",
+                                     "code": "DRAFT_UNREADABLE",
+                                     "detail": f"{type(exc).__name__}: {exc}"}, status=500)
+                    return
+            self._send_json({"draft": None, "company_id": cid, "tenant_id": tenant_id})
             return
 
         elif path.startswith("/api/companies/"):
@@ -1678,34 +1922,34 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 sub_action = parts[4] if len(parts) >= 5 else None
 
                 if sub_action == "context":
-                    ctx = company_api_service.get_company_context(tenant_id, cid)
+                    ctx = _company_service(tenant_id).get_company_context(tenant_id, cid)
                     if not ctx:
                         self._send_json({"error": "Company not found"}, status=404)
                     else:
                         self._send_json(ctx)
                     return
                 elif sub_action == "organization":
-                    org = company_api_service.get_organization(tenant_id, cid)
+                    org = _company_service(tenant_id).get_organization(tenant_id, cid)
                     self._send_json(org)
                     return
                 elif sub_action == "workforce":
-                    wf = company_api_service.get_workforce(tenant_id, cid)
+                    wf = _company_service(tenant_id).get_workforce(tenant_id, cid)
                     self._send_json({"workforce": wf, "count": len(wf)})
                     return
                 elif sub_action == "missions":
-                    msns = company_api_service.get_missions(tenant_id, cid)
+                    msns = _company_service(tenant_id).get_missions(tenant_id, cid)
                     self._send_json({"missions": msns, "count": len(msns)})
                     return
                 elif sub_action == "processes":
-                    procs = company_api_service.get_processes(tenant_id, cid)
+                    procs = _company_service(tenant_id).get_processes(tenant_id, cid)
                     self._send_json({"processes": procs, "count": len(procs)})
                     return
                 elif sub_action == "trustgraph":
-                    tg = company_api_service.get_trustgraph(tenant_id, cid)
+                    tg = _company_service(tenant_id).get_trustgraph(tenant_id, cid)
                     self._send_json(tg)
                     return
                 elif len(parts) == 4:
-                    c = portfolio.get_company(cid)
+                    c = get_portfolio(tenant_id).get_company(cid)
                     if c:
                         self._send_json({
                             "company": {
@@ -1747,7 +1991,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             try:
                 with db.get_connection() as conn:
-                    h_rows = conn.execute("SELECT * FROM host_capabilities WHERE host_id = 'host_localhost'").fetchall()
+                    h_rows = conn.execute(
+                        "SELECT hc.* FROM host_capabilities hc "
+                        "JOIN hosts h ON h.host_id = hc.host_id "
+                        "WHERE h.tenant_id = ?",
+                        (tenant_id,),
+                    ).fetchall()
                     for hr in h_rows:
                         cat_map = {
                             "SCREEN": "Desktop & Robot",
@@ -1775,36 +2024,64 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 pass
 
             for conn_item in connector_registry.list_connectors():
+                configured = bool(
+                    conn_item.get("connected")
+                    and str(conn_item.get("qualification_status")) not in ("BLOCKED", "MOCK_ONLY")
+                )
                 tools_list.append({
-                    "id": f"conn_{conn_item['name'].lower().replace(' ', '_')}",
+                    "id": "conn_" + "".join(
+                        ch if ch.isalnum() else "_" for ch in conn_item["name"].lower()
+                    ).strip("_"),
                     "name": conn_item["name"],
                     "category": "Connected Service",
                     "source": "Connected Integration",
-                    "availability": "Available" if conn_item.get("connected") else "Needs configuration",
+                    "availability": "Available" if configured else "Needs configuration",
                     "permission": conn_item.get("permission", "AUDITED_TRANSACTIONAL"),
                     "version": "1.0",
-                    "health": "Healthy",
-                    "last_verified": "Active",
-                    "description": f"Enterprise connector gateway ({conn_item.get('type', 'system')})."
+                    "health": "Healthy" if configured else "Not configured",
+                    "qualification_status": conn_item.get("qualification_status"),
+                    "last_verified": "Active" if configured else "Never",
+                    "description": (
+                        f"Enterprise connector gateway ({conn_item.get('type', 'system')})."
+                        if configured else
+                        f"Connector ({conn_item.get('type', 'system')}) is registered but has no provider credentials; "
+                        "it returns NOT_CONFIGURED until configured in Settings → Connectors."
+                    ),
                 })
 
-            custom_tools_file = os.path.join(BASE_DIR, "storage/custom_tools.json")
-            if os.path.exists(custom_tools_file):
-                try:
-                    with open(custom_tools_file, "r") as f:
-                        for ct in json.load(f):
-                            tools_list.append(ct)
-                except Exception:
-                    pass
+            try:
+                with db.get_connection() as conn:
+                    for tr in conn.execute(
+                        "SELECT tool_id, name, version, risk_class, status, signature, created_at "
+                        "FROM tool_packages WHERE tenant_id = ? ORDER BY created_at DESC",
+                        (tenant_id,),
+                    ).fetchall():
+                        tools_list.append({
+                            "id": tr["tool_id"],
+                            "name": tr["name"],
+                            "category": "Custom Automation",
+                            "source": "User Created",
+                            "availability": "Available" if tr["status"] == "ACTIVE" else tr["status"],
+                            "permission": "AUDITED_TRANSACTIONAL",
+                            "risk_class": tr["risk_class"],
+                            "version": tr["version"],
+                            "health": "Registered",
+                            "last_verified": "Registration only (never executed)",
+                            "signature": tr["signature"],
+                            "created_at": tr["created_at"],
+                            "description": "Tenant-created tool registered through Tool Factory V2 after AST security validation.",
+                        })
+            except Exception:
+                pass
 
             # HAL Multimodal Capabilities (Requirement 41)
-            for mc in multimodal_registry.list_capabilities():
+            for mc in get_runtime(tenant_id).multimodal.list_capabilities():
                 tools_list.append({
                     "id": mc["capability_id"],
                     "name": mc["name"],
                     "category": f"Multimodal & {mc['family'].replace('_', ' ').title()}",
                     "source": "HAL9000 Multimodal Layer",
-                    "availability": "Available" if mc["health_status"] == "HEALTHY" else mc["health_status"],
+                    "availability": "Available" if (mc["health_status"] == "HEALTHY" and mc["is_enabled"]) else mc["health_status"],
                     "permission": "AUDITED_TRANSACTIONAL" if mc["requires_approval"] else "AUTOMATIC_IDEMPOTENT",
                     "version": mc["version"],
                     "platform": mc["platform"],
@@ -1813,17 +2090,29 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "dependencies": "OpenCV, PyAudio, Whisper, Edge-TTS",
                     "license": "MIT License",
                     "sandbox": mc["execution_mode"],
-                    "test_status": "Verified",
+                    "test_status": mc["health_status"],
                     "evidence_support": "Cryptographic SHA-256 Ledger",
-                    "last_verified": "Realtime",
+                    "last_verified": "Host probe at registration",
                     "description": f"Governed HAL capability ({mc['family']}). Risk: {mc['risk_level']}."
                 })
 
             self._send_json({"tools": tools_list})
             return
 
+        elif path in ("/api/llm/status", "/api/v1/llm/status"):
+            from core.llm_runtime import llm_runtime
+            self._send_json(llm_runtime.status(tenant_id, company_id))
+            return
+
+        elif path in ("/api/llm/providers", "/api/v1/llm/providers"):
+            from core.llm_runtime import llm_runtime
+            st = llm_runtime.status(tenant_id, company_id)
+            self._send_json({"providers": st["providers"], "configured_provider": st["configured_provider"],
+                             "configured_model": st["configured_model"], "privacy_note": st["privacy_note"]})
+            return
+
         elif path == "/api/settings":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             categories_cat = settings_service.get_categories_catalog(tenant_id, company_id)
             self._send_json({
                 "groups": GROUPS,
@@ -1835,7 +2124,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings/search":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             q = query_params.get("q", [""])[0]
             results = settings_service.search_settings(q, tenant_id, company_id)
             self._send_json({
@@ -1848,13 +2137,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             detail = settings_service.get_category_detail(cat_id, tenant_id, company_id)
             self._send_json(detail)
             return
 
         elif path == "/api/settings/audit":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             cat = query_params.get("category", [None])[0]
             actor = query_params.get("actor", [None])[0]
             risk = query_params.get("risk", [None])[0]
@@ -1864,7 +2153,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings/effective":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             enforcements = settings_service.get_all_effective_enforcements(tenant_id, company_id)
             self._send_json({
                 "tenant_id": tenant_id,
@@ -1875,7 +2164,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings/drift":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             drift = settings_service.check_runtime_drift(tenant_id, company_id)
             self._send_json(drift)
             return
@@ -1885,7 +2174,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/schedules/recommendations":
             company_id = query_params.get("company_id", [None])[0]
-            recs = schedule_service.get_ai_ceo_recommendations(company_id)
+            recs = get_runtime(tenant_id).schedule.get_ai_ceo_recommendations(company_id)
             self._send_json({"recommendations": recs})
             return
 
@@ -1896,13 +2185,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             status = query_params.get("status", [None])[0]
             start_after = float(query_params.get("start_after", [0])[0]) if "start_after" in query_params else None
             start_before = float(query_params.get("start_before", [0])[0]) if "start_before" in query_params else None
-            items = schedule_service.list_schedules(company_id, item_type, priority, status, start_after, start_before)
+            items = get_runtime(tenant_id).schedule.list_schedules(company_id, item_type, priority, status, start_after, start_before)
             self._send_json({"schedules": items, "count": len(items)})
             return
 
         elif path.startswith("/api/schedules/"):
             sched_id = path.split("/")[3]
-            item = schedule_service.get_schedule(sched_id)
+            item = get_runtime(tenant_id).schedule.get_schedule(sched_id)
             if item:
                 self._send_json(item)
             else:
@@ -1913,43 +2202,43 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Prompt 03: AI CEO Meeting Room Endpoints (GET)
         # =====================================================================
         elif path == "/api/meetings/active":
-            company_id = query_params.get("company_id", ["comp_primary"])[0] or "comp_primary"
-            meeting = meeting_service.get_or_create_active_meeting(company_id)
+            # company_id was resolved from the verified token (see _resolve_company_id)
+            meeting = get_runtime(tenant_id).meeting_service.get_or_create_active_meeting(company_id)
             self._send_json(meeting)
             return
 
         elif path == "/api/meetings/decisions":
             company_id = query_params.get("company_id", [None])[0]
-            decisions = meeting_service.list_decisions(company_id)
+            decisions = get_runtime(tenant_id).meeting_service.list_decisions(company_id)
             self._send_json({"decisions": decisions})
             return
 
         elif path == "/api/meetings/reports":
-            company_id = query_params.get("company_id", ["comp_primary"])[0] or "comp_primary"
-            reports = meeting_service.get_shared_reports(company_id)
+            # company_id was resolved from the verified token (see _resolve_company_id)
+            reports = get_runtime(tenant_id).meeting_service.get_shared_reports(company_id)
             self._send_json(reports)
             return
 
         elif path.startswith("/api/meetings/") and path.endswith("/transcripts"):
             parts = path.split("/")
             meeting_id = parts[3]
-            transcripts = meeting_service.get_transcripts(meeting_id)
+            transcripts = get_runtime(tenant_id).meeting_service.get_transcripts(meeting_id)
             self._send_json({"meeting_id": meeting_id, "transcripts": transcripts})
             return
 
         elif path.startswith("/api/meetings/") and path.endswith("/reports"):
             parts = path.split("/")
             meeting_id = parts[3]
-            meeting = meeting_service.get_meeting(meeting_id)
-            cid = meeting["company_id"] if meeting else "comp_primary"
-            reports = meeting_service.get_shared_reports(cid)
+            meeting = get_runtime(tenant_id).meeting_service.get_meeting(meeting_id)
+            cid = meeting["company_id"] if meeting else company_id
+            reports = get_runtime(tenant_id).meeting_service.get_shared_reports(cid)
             self._send_json(reports)
             return
 
         elif path.startswith("/api/meetings/"):
             parts = path.split("/")
             meeting_id = parts[3]
-            meeting = meeting_service.get_meeting(meeting_id)
+            meeting = get_runtime(tenant_id).meeting_service.get_meeting(meeting_id)
             if meeting:
                 self._send_json(meeting)
             else:
@@ -1961,14 +2250,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/assistant/coworker/tasks":
             ws_mode = query_params.get("workspace_mode", [None])[0]
-            tasks = assistant_service.list_coworker_tasks(ws_mode)
+            tasks = get_runtime(tenant_id).assistant.list_coworker_tasks(ws_mode)
             self._send_json({"tasks": tasks, "count": len(tasks)})
             return
 
         elif path.startswith("/api/assistant/coworker/tasks/"):
             parts = path.split("/")
             task_id = parts[5] if len(parts) > 5 else ""
-            task = assistant_service.get_coworker_task(task_id)
+            task = get_runtime(tenant_id).assistant.get_coworker_task(task_id)
             if task:
                 self._send_json(task)
             else:
@@ -1979,12 +2268,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # ZONATA AI Assistant & Universal Co-Worker Endpoints (GET)
         # =====================================================================
         elif path == "/api/coworker/dashboard":
-            snap = coworker_engine.dashboard.get_dashboard_snapshot()
+            snap = _cw(tenant_id, company_id).dashboard.get_dashboard_snapshot()
             self._send_json(snap)
             return
 
         elif path == "/api/coworker/missions":
-            raw_missions = coworker_engine.background_dispatcher.list_missions()
+            raw_missions = _cw(tenant_id, company_id).background_dispatcher.list_missions()
             seen_prompts = set()
             missions = []
             for m in raw_missions:
@@ -2020,7 +2309,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/coworker/missions/"):
             mid = path.split("/")[4]
-            m = coworker_engine.background_dispatcher.get_mission(mid)
+            m = _cw(tenant_id, company_id).background_dispatcher.get_mission(mid)
             if m:
                 self._send_json({
                     "mission_id": m.mission_id,
@@ -2044,7 +2333,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/coworker/reality-matrix":
-            mat = coworker_engine.get_reality_matrix()
+            mat = _cw(tenant_id, company_id).get_reality_matrix()
             self._send_json({"reality_matrix": mat, "count": len(mat)})
             return
 
@@ -2054,7 +2343,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/terminal/profiles":
-            profiles = universal_terminal.registry.list_profiles()
+            profiles = get_runtime(tenant_id).terminal.registry.list_profiles()
             res = [{
                 "profile_id": p.profile_id,
                 "distribution": p.distribution,
@@ -2078,14 +2367,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/terminal/tools":
-            tools = universal_terminal.registry.list_tools()
+            tools = get_runtime(tenant_id).terminal.registry.list_tools()
             self._send_json({"tools": tools, "count": len(tools)})
             return
 
         elif path == "/api/terminal/checkpoints":
             session_id = query_params.get("session_id", [None])[0]
             if session_id:
-                chk = universal_terminal.get_resumable_checkpoint(session_id)
+                chk = get_runtime(tenant_id).terminal.get_resumable_checkpoint(session_id)
                 self._send_json({"checkpoint": chk})
             else:
                 self._send_json({"error": "Missing session_id query parameter"}, status=400)
@@ -2093,13 +2382,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/terminal/knowledge/evolution":
             topic = query_params.get("topic", [None])[0]
-            entries = universal_terminal.get_evolution_knowledge(topic=topic)
+            entries = get_runtime(tenant_id).terminal.get_evolution_knowledge(topic=topic)
             self._send_json({"knowledge": entries, "count": len(entries)})
             return
 
         elif path == "/api/terminal/tools/sbom":
             tool_id = query_params.get("tool_id", [None])[0]
-            sbom_entries = universal_terminal.get_sbom(tool_id=tool_id)
+            sbom_entries = get_runtime(tenant_id).terminal.get_sbom(tool_id=tool_id)
             self._send_json({"sbom": sbom_entries, "count": len(sbom_entries)})
             return
 
@@ -2107,7 +2396,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/coworker/approvals":
             approvals = []
             seen_prompts = set()
-            for m in coworker_engine.background_dispatcher.list_missions():
+            for m in _cw(tenant_id, company_id).background_dispatcher.list_missions():
                 if m.status in ["AWAITING_APPROVAL", "WAITING"]:
                     norm_p = m.prompt.strip().lower()
                     if norm_p in seen_prompts:
@@ -2166,7 +2455,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/coworker/nodes":
             nodes_list = []
-            for nid, node in coworker_engine.node_registry._nodes.items():
+            for nid, node in _cw(tenant_id, company_id).node_registry._nodes.items():
                 nodes_list.append(node.to_dict())
             self._send_json({"nodes": nodes_list, "count": len(nodes_list)})
             return
@@ -2187,12 +2476,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/coworker/recovery/events":
             mid = query_params.get("mission_id", [None])[0]
-            events = coworker_engine.recovery_controller.get_events(mid)
+            events = _cw(tenant_id, company_id).recovery_controller.get_events(mid)
             self._send_json({"events": events, "count": len(events)})
             return
 
         elif path == "/api/coworker/mcp/servers":
-            servers = coworker_engine.mcp_controller.list_servers()
+            servers = _cw(tenant_id, company_id).mcp_controller.list_servers()
             self._send_json({"servers": servers, "count": len(servers)})
             return
 
@@ -2201,13 +2490,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/plugins":
             category = query_params.get("category", [None])[0]
-            plugins = plugins_service.list_plugins(category)
+            plugins = get_runtime(tenant_id).plugins.list_plugins(category)
             self._send_json({"plugins": plugins, "count": len(plugins)})
             return
 
         elif path.startswith("/api/plugins/"):
             plugin_id = path.split("/")[3]
-            plugin = plugins_service.get_plugin(plugin_id)
+            plugin = get_runtime(tenant_id).plugins.get_plugin(plugin_id)
             if plugin:
                 self._send_json(plugin)
             else:
@@ -2216,13 +2505,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/connections":
             company_id = query_params.get("company_id", [None])[0]
-            conns = plugins_service.list_connections(company_id)
+            conns = get_runtime(tenant_id).plugins.list_connections(company_id)
             self._send_json({"connections": conns, "count": len(conns)})
             return
 
         elif path.startswith("/api/connections/"):
             conn_id = path.split("/")[3]
-            conn = plugins_service.get_connection(conn_id)
+            conn = get_runtime(tenant_id).plugins.get_connection(conn_id)
             if conn:
                 self._send_json(conn)
             else:
@@ -2318,7 +2607,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Enterprise Finance & Accounting Endpoints (GET)
         # =====================================================================
         elif path == "/api/finance/summary":
-            comp_id = query_params.get("company_id", ["comp_primary"])[0]
+            comp_id = company_id
             engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
             summary = engine.get_financial_summary(company_id=comp_id)
             self._send_json(summary)
@@ -2343,7 +2632,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/integrations/connections":
-            comp_id = query_params.get("company_id", ["comp_primary"])[0]
+            comp_id = company_id
             conns = integrations_registry.list_connections(company_id=comp_id)
             self._send_json({"connections": conns, "count": len(conns)})
             return
@@ -2445,13 +2734,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/multimodal/capabilities":
             family = query_params.get("family", [None])[0]
-            caps = multimodal_registry.list_capabilities(family=family)
+            caps = get_runtime(tenant_id).multimodal.list_capabilities(family=family)
             self._send_json({"capabilities": caps, "count": len(caps)})
             return
 
         elif path == "/api/multimodal/status":
-            env = multimodal_registry._probe_environment()
-            caps = multimodal_registry.list_capabilities()
+            env = get_runtime(tenant_id).multimodal._probe_environment()
+            caps = get_runtime(tenant_id).multimodal.list_capabilities()
             healthy_count = sum(1 for c in caps if c["health_status"] == "HEALTHY")
             self._send_json({
                 "provider": "HAL9000 Multimodal Layer",
@@ -2474,7 +2763,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/multimodal/sessions/"):
             parts = path.split("/")
             sess_id = parts[4]
-            sess = execution_manager.get_session(sess_id)
+            sess = get_runtime(tenant_id).multimodal_execution.get_session(sess_id)
             if sess:
                 self._send_json({"session": sess})
             else:
@@ -2628,7 +2917,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # A2A (AGENT2AGENT PROTOCOL) GET ENDPOINTS
         # =====================================================================
         elif path == "/.well-known/agent-card.json":
-            card = a2a_gateway.server_adapter.generate_agent_card(host_url=f"http://{self.headers.get('Host', 'localhost:8080')}")
+            card = _a2a(tenant_id, company_id).server_adapter.generate_agent_card(host_url=f"http://{self.headers.get('Host', 'localhost:8080')}")
             self._send_json(card)
             return
 
@@ -2688,7 +2977,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             task_id = parts[4] if path.startswith("/api/") else parts[3]
             try:
-                task_data = a2a_gateway.client_adapter.get_task(task_id)
+                task_data = _a2a(tenant_id, company_id).client_adapter.get_task(task_id)
                 self._send_json({"task": task_data})
             except Exception as e:
                 self._send_json({"error": str(e)}, status=404)
@@ -2718,7 +3007,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/a2a/metrics":
-            metrics = a2a_gateway.get_operational_metrics()
+            metrics = _a2a(tenant_id, company_id).get_operational_metrics()
             self._send_json({"metrics": metrics})
             return
 
@@ -2734,7 +3023,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/a2a/ceo/report":
-            ceo_bridge = A2ACeoBridge(tenant_id, "comp_primary")
+            ceo_bridge = A2ACeoBridge(tenant_id, company_id)
             report = ceo_bridge.generate_external_delegations_report()
             self._send_json(report)
             return
@@ -2744,7 +3033,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/mcp/servers":
             trust = query_params.get("trust_state", [None])[0]
-            servers = mcp_gateway.list_servers()
+            servers = _mcp(tenant_id, company_id).list_servers()
             if trust:
                 servers = [s for s in servers if s.get("trust_state") == trust]
             self._send_json({"servers": servers, "count": len(servers)})
@@ -2752,7 +3041,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
             server_id = path.split("/")[4]
-            srv = mcp_gateway.get_server(server_id)
+            srv = _mcp(tenant_id, company_id).get_server(server_id)
             if not srv:
                 self._send_json({"error": "MCP server not found"}, status=404)
                 return
@@ -2771,7 +3060,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/mcp/tools":
             server_id = query_params.get("server_id", [None])[0]
             risk = query_params.get("risk_class", [None])[0]
-            tools = mcp_gateway.list_tools(server_id=server_id)
+            tools = _mcp(tenant_id, company_id).list_tools(server_id=server_id)
             if risk:
                 tools = [t for t in tools if t.get("risk_class") == risk]
             self._send_json({"tools": tools, "count": len(tools)})
@@ -2779,7 +3068,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/mcp/tools/") and len(path.split("/")) == 5:
             tool_id = path.split("/")[4]
-            t = mcp_gateway.get_tool(tool_id)
+            t = _mcp(tenant_id, company_id).get_tool(tool_id)
             if not t:
                 self._send_json({"error": "MCP tool not found"}, status=404)
                 return
@@ -2810,13 +3099,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/mcp/executions":
             limit = int(query_params.get("limit", [50])[0])
-            execs = mcp_gateway.list_executions(limit=limit)
+            execs = _mcp(tenant_id, company_id).list_executions(limit=limit)
             self._send_json({"executions": execs, "count": len(execs)})
             return
 
         elif path.startswith("/api/mcp/executions/") and path.endswith("/evidence"):
             exec_id = path.split("/")[4]
-            ev = mcp_gateway.get_execution_evidence(exec_id)
+            ev = _mcp(tenant_id, company_id).get_execution_evidence(exec_id)
             if not ev:
                 self._send_json({"error": "Evidence not found for execution"}, status=404)
                 return
@@ -2825,7 +3114,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/mcp/executions/") and len(path.split("/")) == 5:
             exec_id = path.split("/")[4]
-            ex = mcp_gateway.get_execution(exec_id)
+            ex = _mcp(tenant_id, company_id).get_execution(exec_id)
             if not ex:
                 self._send_json({"error": "Execution record not found"}, status=404)
                 return
@@ -2834,17 +3123,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/mcp/security/events":
             limit = int(query_params.get("limit", [50])[0])
-            events = mcp_gateway.list_security_events(limit=limit)
+            events = _mcp(tenant_id, company_id).list_security_events(limit=limit)
             self._send_json({"security_events": events, "count": len(events)})
             return
 
         elif path == "/api/mcp/metrics":
-            metrics = mcp_gateway.get_metrics()
+            metrics = _mcp(tenant_id, company_id).get_metrics()
             self._send_json({"metrics": metrics})
             return
 
         elif path == "/api/mcp/published":
-            pubs = mcp_inbound_server.list_published()
+            pubs = _mcp_server(tenant_id, company_id).list_published()
             self._send_json({"published_capabilities": pubs, "count": len(pubs)})
             return
 
@@ -2880,13 +3169,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/openhands/executions":
             limit = int(query_params.get("limit", [50])[0])
-            execs = openhands_gateway.list_executions(limit=limit)
+            execs = _openhands(tenant_id, company_id).list_executions(limit=limit)
             self._send_json({"executions": execs, "count": len(execs)})
             return
 
         elif path.startswith("/api/openhands/executions/") and len(path.split("/")) == 5:
             exec_id = path.split("/")[4]
-            ex = openhands_gateway.get_execution(exec_id)
+            ex = _openhands(tenant_id, company_id).get_execution(exec_id)
             if not ex:
                 self._send_json({"error": "OpenHands execution record not found"}, status=404)
                 return
@@ -2895,25 +3184,25 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/openhands/workspaces":
             limit = int(query_params.get("limit", [50])[0])
-            workspaces = openhands_gateway.list_workspaces(limit=limit)
+            workspaces = _openhands(tenant_id, company_id).list_workspaces(limit=limit)
             self._send_json({"workspaces": workspaces, "count": len(workspaces)})
             return
 
         elif path == "/api/openhands/artifacts":
             exec_id = query_params.get("execution_id", [None])[0]
             limit = int(query_params.get("limit", [50])[0])
-            artifacts = openhands_gateway.list_artifacts(execution_id=exec_id, limit=limit)
+            artifacts = _openhands(tenant_id, company_id).list_artifacts(execution_id=exec_id, limit=limit)
             self._send_json({"artifacts": artifacts, "count": len(artifacts)})
             return
 
         elif path == "/api/openhands/security/events":
             limit = int(query_params.get("limit", [50])[0])
-            events = openhands_gateway.list_security_events(limit=limit)
+            events = _openhands(tenant_id, company_id).list_security_events(limit=limit)
             self._send_json({"security_events": events, "count": len(events)})
             return
 
         elif path == "/api/openhands/metrics":
-            metrics = openhands_gateway.get_metrics()
+            metrics = _openhands(tenant_id, company_id).get_metrics()
             self._send_json({"metrics": metrics})
             return
 
@@ -2931,13 +3220,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/browser/sessions":
             limit = int(query_params.get("limit", [50])[0])
             status = query_params.get("status", [None])[0]
-            sessions = browser_gateway.list_sessions(status=status, limit=limit)
+            sessions = _browser(tenant_id, company_id).list_sessions(status=status, limit=limit)
             self._send_json({"sessions": sessions, "count": len(sessions)})
             return
 
         elif path.startswith("/api/browser/sessions/") and len(path.split("/")) == 5:
             sess_id = path.split("/")[4]
-            session = browser_gateway.get_session(sess_id)
+            session = _browser(tenant_id, company_id).get_session(sess_id)
             if session:
                 self._send_json(session)
             else:
@@ -2948,20 +3237,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             limit = int(query_params.get("limit", [50])[0])
             sess_id = query_params.get("session_id", [None])[0]
             status = query_params.get("status", [None])[0]
-            execs = browser_gateway.list_executions(session_id=sess_id, status=status, limit=limit)
+            execs = _browser(tenant_id, company_id).list_executions(session_id=sess_id, status=status, limit=limit)
             self._send_json({"executions": execs, "count": len(execs)})
             return
 
         elif path.startswith("/api/browser/executions/") and path.endswith("/history"):
             parts = path.split("/")
             exec_id = parts[4]
-            actions = browser_gateway.list_actions(exec_id)
+            actions = _browser(tenant_id, company_id).list_actions(exec_id)
             self._send_json({"actions": actions, "count": len(actions), "execution_id": exec_id})
             return
 
         elif path.startswith("/api/browser/executions/") and len(path.split("/")) == 5:
             exec_id = path.split("/")[4]
-            ex = browser_gateway.get_execution(exec_id)
+            ex = _browser(tenant_id, company_id).get_execution(exec_id)
             if ex:
                 self._send_json(ex)
             else:
@@ -2972,30 +3261,30 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             limit = int(query_params.get("limit", [50])[0])
             exec_id = query_params.get("execution_id", [None])[0]
             sess_id = query_params.get("session_id", [None])[0]
-            artifacts = browser_gateway.list_artifacts(execution_id=exec_id, session_id=sess_id, limit=limit)
+            artifacts = _browser(tenant_id, company_id).list_artifacts(execution_id=exec_id, session_id=sess_id, limit=limit)
             self._send_json({"artifacts": artifacts, "count": len(artifacts)})
             return
 
         elif path == "/api/browser/security/events":
             limit = int(query_params.get("limit", [50])[0])
-            events = browser_gateway.list_security_events(limit=limit)
+            events = _browser(tenant_id, company_id).list_security_events(limit=limit)
             self._send_json({"security_events": events, "count": len(events)})
             return
 
         elif path == "/api/browser/metrics":
-            metrics = browser_gateway.get_metrics()
+            metrics = _browser(tenant_id, company_id).get_metrics()
             self._send_json({"metrics": metrics})
             return
 
         elif path == "/api/browser/approvals":
             limit = int(query_params.get("limit", [50])[0])
             status = query_params.get("status", [None])[0]
-            approvals = browser_gateway.list_approvals(status=status, limit=limit)
+            approvals = _browser(tenant_id, company_id).list_approvals(status=status, limit=limit)
             self._send_json({"approvals": approvals, "count": len(approvals)})
             return
 
         elif path == "/api/browser/killswitch":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             killed, reason = BrowserKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
             self._send_json({
                 "killswitch_active": killed,
@@ -3010,46 +3299,70 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Governed Temporal Durable Execution Layer Endpoints (GET - Project 09)
         # =====================================================================
         elif path == "/api/temporal/clusters":
-            self._send_json({
-                "clusters": [{
-                    "cluster_id": "cls_zonata_temporal_primary",
-                    "name": "Zonata Sovereign Temporal Cluster",
-                    "server_version": "1.26.2",
-                    "sdk_version": "1.7.0",
-                    "status": "ONLINE",
-                    "namespace": "default",
-                    "durable_storage": "SQLite Normalized Durable Engine"
+            # Report only what this deployment actually has. No invented
+            # server/SDK versions: either an external Temporal host is
+            # configured, or the embedded durable engine is in use.
+            external_host = (os.environ.get("TEMPORAL_HOST") or "").strip()
+            namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+            db_state = _database_status()
+            if external_host:
+                clusters = [{
+                    "cluster_id": "cls_external_temporal",
+                    "name": "External Temporal Cluster",
+                    "host": external_host,
+                    "namespace": namespace,
+                    "server_version": None,
+                    "sdk_version": None,
+                    "status": "CONFIGURED" if db_state == "CONNECTED" else "UNVERIFIED",
+                    "durable_storage": "external Temporal persistence",
+                    "verification": "Server version is reported by the Temporal cluster and is not assumed here.",
                 }]
+            else:
+                clusters = [{
+                    "cluster_id": "cls_zonata_local_durable",
+                    "name": "Zonata Embedded Durable Execution Engine",
+                    "host": None,
+                    "namespace": namespace,
+                    "server_version": None,
+                    "sdk_version": None,
+                    "status": "EMBEDDED" if db_state == "CONNECTED" else "UNAVAILABLE",
+                    "durable_storage": "SQLite normalized durable engine",
+                    "verification": "No external Temporal server is configured (TEMPORAL_HOST unset).",
+                }]
+            self._send_json({
+                "clusters": clusters,
+                "count": len(clusters),
+                "external_temporal_configured": bool(external_host),
             })
             return
 
         elif path == "/api/temporal/workers":
-            workers = temporal_gateway.list_workers()
+            workers = _temporal(tenant_id, company_id).list_workers()
             self._send_json({"workers": workers, "count": len(workers)})
             return
 
         elif path == "/api/temporal/queues":
-            queues = temporal_gateway.list_queues()
+            queues = _temporal(tenant_id, company_id).list_queues()
             self._send_json({"queues": queues, "count": len(queues)})
             return
 
         elif path == "/api/temporal/workflows":
             limit = int(query_params.get("limit", [50])[0])
             status = query_params.get("status", [None])[0]
-            workflows = temporal_gateway.list_workflows(status=status, limit=limit)
+            workflows = _temporal(tenant_id, company_id).list_workflows(status=status, limit=limit)
             self._send_json({"workflows": workflows, "count": len(workflows)})
             return
 
         elif path.startswith("/api/temporal/workflows/") and path.endswith("/history"):
             parts = path.split("/")
             wf_id = parts[4]
-            history = temporal_gateway.get_workflow_history(wf_id)
+            history = _temporal(tenant_id, company_id).get_workflow_history(wf_id)
             self._send_json({"history": history, "count": len(history), "workflow_id": wf_id})
             return
 
         elif path.startswith("/api/temporal/workflows/") and len(path.split("/")) == 5:
             wf_id = path.split("/")[4]
-            wf = temporal_gateway.get_workflow_status(wf_id)
+            wf = _temporal(tenant_id, company_id).get_workflow_status(wf_id)
             if wf:
                 self._send_json(wf)
             else:
@@ -3058,23 +3371,23 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/temporal/approvals":
             status = query_params.get("status", [None])[0]
-            approvals = temporal_gateway.list_approvals(status=status)
+            approvals = _temporal(tenant_id, company_id).list_approvals(status=status)
             self._send_json({"approvals": approvals, "count": len(approvals)})
             return
 
         elif path == "/api/temporal/security/events":
             limit = int(query_params.get("limit", [50])[0])
-            events = temporal_gateway.list_security_events(limit=limit)
+            events = _temporal(tenant_id, company_id).list_security_events(limit=limit)
             self._send_json({"security_events": events, "count": len(events)})
             return
 
         elif path == "/api/temporal/metrics":
-            metrics = temporal_gateway.get_metrics()
+            metrics = _temporal(tenant_id, company_id).get_metrics()
             self._send_json({"metrics": metrics})
             return
 
         elif path == "/api/temporal/killswitch":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             killed, reason = TemporalKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
             self._send_json({
                 "killswitch_active": killed,
@@ -3088,12 +3401,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # --- NANGO EXTERNAL INTEGRATION API (Project 10) ---
         elif path == "/api/nango/providers":
             cat = query_params.get("category", [None])[0]
-            providers = nango_gateway.list_providers(category=cat)
+            providers = _nango(tenant_id, company_id).list_providers(category=cat)
             self._send_json({"providers": providers, "count": len(providers)})
             return
 
         elif path == "/api/nango/connections":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             conns = gw.list_connections()
             self._send_json({"connections": conns, "count": len(conns)})
@@ -3101,7 +3414,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/nango/connections/") and len(path.split("/")) == 5:
             conn_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             conn_data = gw.get_connection(conn_id)
             if conn_data:
@@ -3158,7 +3471,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/nango/sync-records":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             conn_id = query_params.get("connection_id", [None])[0]
             model = query_params.get("model", [None])[0]
@@ -3168,14 +3481,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/nango/metrics":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             metrics = gw.get_metrics()
             self._send_json({"metrics": metrics})
             return
 
         elif path == "/api/nango/killswitch":
-            company_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            # company_id was resolved from the verified token (see _resolve_company_id)
             prov_id = query_params.get("provider_id", ["salesforce"])[0]
             halted, reason = IntegrationKillSwitch.is_halted(tenant_id=tenant_id, company_id=company_id, provider_id=prov_id)
             self._send_json({
@@ -3193,7 +3506,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # ZONATA V8: AI CEO Executive Operating Layer Routes
         if path.startswith("/api/v8/"):
             from core.v8_api_handler import V8ApiHandler
-            c_id = self.headers.get("X-Company-ID") or query_params.get("company_id", ["comp_primary"])[0]
+            c_id = company_id
             v8_res = V8ApiHandler.handle_get(path, query_params, tenant_id, c_id)
             if v8_res:
                 data, code = v8_res
@@ -3357,7 +3670,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     target_tenant = req_tenant
                     target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
                     target_role = req_data.get("role", UserRole.OWNER)
-                    target_company = req_data.get("company_id", "comp_primary")
+                    target_company = req_data.get("company_id") or f"comp_{req_tenant}"
                 else:
                     # Non-production (development / test mode)
                     from core.auth import get_auth_secret_key
@@ -3376,7 +3689,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     target_tenant = req_tenant
                     target_user = req_data.get("user_id", f"usr_{uuid.uuid4().hex[:8]}")
                     target_role = req_data.get("role", UserRole.OWNER)
-                    target_company = req_data.get("company_id", "comp_primary")
+                    target_company = req_data.get("company_id") or f"comp_{req_tenant}"
 
             if not target_user:
                 self._send_json({
@@ -3604,6 +3917,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             auth_context = self._get_auth_context()
             tenant_id = auth_context.get("tenant_id")
+            company_id = self._resolve_company_id(auth_context, query_params)
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
@@ -3657,7 +3971,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if path == "/api/crm/customers":
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             from core.enterprise_crm import EnterpriseCrmService
             svc = EnterpriseCrmService(tenant_id)
             try:
@@ -3668,7 +3982,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/crm/deals":
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             from core.enterprise_crm import EnterpriseCrmService
             svc = EnterpriseCrmService(tenant_id)
             try:
@@ -3686,7 +4000,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/webhooks/verify":
-            secret = req_data.get("secret", "default_webhook_secret")
+            secret = str(req_data.get("secret") or "").strip()
+            if not secret:
+                self._send_json({
+                    "error": "Missing webhook secret",
+                    "code": "MISSING_SECRET",
+                    "detail": "A shared secret is required to verify a signature; the platform does not fall back to a built-in default.",
+                }, status=400)
+                return
             payload = json.dumps(req_data.get("payload", {})).encode("utf-8")
             sig = req_data.get("signature", "")
             ts = req_data.get("timestamp", str(time.time()))
@@ -3697,21 +4018,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/agent-engine/teams/deploy":
             company_id = req_data.get("company_id")
-            companies = portfolio.list_companies()
-            if not company_id or not portfolio.get_company(company_id):
-                if companies:
-                    company_id = companies[0].company_id
-                else:
-                    comp = CompanyOnboardingEngine.onboard_new_company(
-                        name="CloudScale Digital SaaS",
-                        industry="Technology & SaaS"
-                    )
-                    portfolio.register_company(comp)
-                    company_id = comp.company_id
+            companies = get_portfolio(tenant_id).list_companies()
+            if not company_id or not get_portfolio(tenant_id).get_company(company_id):
+                if not companies:
+                    self._send_json({
+                        "error": "No company is onboarded for this tenant",
+                        "code": "NO_COMPANY",
+                        "detail": "Onboard a company before deploying a team. The platform will not invent one.",
+                    }, status=409)
+                    return
+                company_id = companies[0].company_id
             team_id = req_data.get("team_id", "core_executive_suite")
             try:
                 res = EnterpriseTeamCatalog.deploy_team_to_company(
-                    portfolio_manager=portfolio,
+                    portfolio_manager=get_portfolio(tenant_id),
                     company_id=company_id,
                     team_id=team_id,
                     tenant_id=tenant_id
@@ -3722,15 +4042,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/agent-engine/heartbeat":
-            agent_id = req_data.get("agent_id", "agent_ceo_001")
-            role = req_data.get("role", "Chief Executive Officer (CEO)")
-            company_id = req_data.get("company_id")
-            if not company_id:
-                companies = portfolio.list_companies()
-                company_id = companies[0].company_id if companies else "comp_primary"
+            agent_id = (req_data.get("agent_id") or "").strip()
+            role = (req_data.get("role") or "").strip()
+            if not agent_id or not role:
+                self._send_json({
+                    "error": "Missing agent identity",
+                    "code": "MISSING_AGENT_IDENTITY",
+                    "detail": "Provide 'agent_id' and 'role' for the agent whose heartbeat should run.",
+                }, status=400)
+                return
             trigger = req_data.get("trigger", "manual")
             tasks = req_data.get("tasks", [])
-            res = heartbeat_coordinator.execute_heartbeat_turn(
+            res = _heartbeat(tenant_id).execute_heartbeat_turn(
                 agent_id=agent_id,
                 company_id=company_id,
                 role=role,
@@ -3741,20 +4064,54 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/agent-engine/delegate":
-            goal_id = req_data.get("goal_id", f"goal_{uuid.uuid4().hex[:8]}")
-            goal_title = req_data.get("goal_title", "Execute Strategic Growth Initiative")
+            goal_id = req_data.get("goal_id") or f"goal_{uuid.uuid4().hex[:8]}"
+            goal_title = (req_data.get("goal_title") or "").strip()
             lead_agent_id = req_data.get("lead_agent_id", "agent_ceo")
-            subtasks = req_data.get("subtasks", [])
+            subtasks = req_data.get("subtasks") or []
             requires_board_approval = req_data.get("requires_board_approval", False)
-            if not subtasks:
-                subtasks = [
-                    {"title": "Formulate Architectural Roadmap", "target_role": "Chief Technology Officer (CTO)", "priority": "high", "dependencies": []},
-                    {"title": "Draft Feature Specifications", "target_role": "Lead Product Manager", "priority": "high", "dependencies": []},
-                    {"title": "Implement Core API", "target_role": "Senior Fullstack Engineer", "priority": "urgent", "dependencies": ["s1"]},
-                    {"title": "Verify Security & CI/CD", "target_role": "QA & Reliability Engineer", "priority": "medium", "dependencies": ["s2"]}
-                ]
+
+            # The platform no longer invents a delegation plan. A plan must be
+            # grounded in explicit subtasks supplied by the caller (or produced
+            # by the LLM planner) before it can be assigned to real agents.
+            if not goal_title:
+                self._send_json({
+                    "error": "Missing goal title",
+                    "code": "MISSING_GOAL_TITLE",
+                    "detail": "Provide 'goal_title' describing the outcome to delegate.",
+                }, status=400)
+                return
+            if not isinstance(subtasks, list) or not subtasks:
+                self._send_json({
+                    "error": "Missing subtasks",
+                    "code": "MISSING_SUBTASKS",
+                    "detail": (
+                        "Provide a non-empty 'subtasks' array. Each item needs at least "
+                        "'title' and 'target_role'. Generated plans must come from the "
+                        "mission planner, not a hardcoded template."
+                    ),
+                    "example": {
+                        "goal_title": "Cut onboarding time by 30%",
+                        "subtasks": [
+                            {"title": "Map current onboarding steps", "target_role": "Operations Manager", "priority": "high", "dependencies": []},
+                        ],
+                    },
+                }, status=400)
+                return
+            invalid = [
+                i for i, st in enumerate(subtasks)
+                if not isinstance(st, dict) or not str(st.get("title") or "").strip()
+                or not str(st.get("target_role") or "").strip()
+            ]
+            if invalid:
+                self._send_json({
+                    "error": "Invalid subtasks",
+                    "code": "INVALID_SUBTASKS",
+                    "detail": "Every subtask requires a non-empty 'title' and 'target_role'.",
+                    "invalid_indexes": invalid,
+                }, status=400)
+                return
             try:
-                plan = delegation_engine.create_delegation_plan(
+                plan = _delegation(tenant_id).create_delegation_plan(
                     goal_id=goal_id,
                     goal_title=goal_title,
                     lead_agent_id=lead_agent_id,
@@ -3768,7 +4125,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/agent-engine/plans/approve":
             goal_id = req_data.get("goal_id")
-            plan = delegation_engine.plans.get(goal_id)
+            plan = _delegation(tenant_id).plans.get(goal_id)
             if plan:
                 plan["approval_status"] = "approved"
                 for st in plan["subtasks"]:
@@ -3782,19 +4139,33 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/agent-engine/subtasks/complete":
             goal_id = req_data.get("goal_id")
             subtask_id = req_data.get("subtask_id")
-            result_text = req_data.get("result", "Completed successfully")
+            result_text = (req_data.get("result") or "").strip()
+            if not goal_id or not subtask_id:
+                self._send_json({
+                    "error": "Missing identifiers",
+                    "code": "MISSING_IDS",
+                    "detail": "Provide 'goal_id' and 'subtask_id'.",
+                }, status=400)
+                return
+            if not result_text:
+                self._send_json({
+                    "error": "Missing result",
+                    "code": "MISSING_RESULT",
+                    "detail": "Provide 'result' describing what was actually produced. Completions are never assumed.",
+                }, status=400)
+                return
             try:
-                res = delegation_engine.complete_subtask(goal_id, subtask_id, result_text)
-                self._send_json({"success": True, "update": res, "plan": delegation_engine.plans.get(goal_id)})
+                res = _delegation(tenant_id).complete_subtask(goal_id, subtask_id, result_text)
+                self._send_json({"success": True, "update": res, "plan": _delegation(tenant_id).plans.get(goal_id)})
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
             return
 
         elif path == "/api/handover/package":
-            companies = portfolio.list_companies()
+            companies = get_portfolio(tenant_id).list_companies()
             c = companies[0] if companies else None
             cname = c.name if c else "Operating Entity"
-            cid = c.company_id if c else "comp_primary"
+            cid = c.company_id if c else company_id
             pkg = HandoverManager.generate_handover_package(
                 tenant_id=tenant_id,
                 company_id=cid,
@@ -3808,8 +4179,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/ceo/decision-room":
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
-            companies = target_portfolio.list_companies()
+            target_portfolio = get_portfolio(tenant_id)
+            companies = get_portfolio(tenant_id).list_companies()
             cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
             intent = req_data.get("objective_intent", "Increase company profitability")
             spending_limit = float(req_data.get("spending_limit", 1000000.0))
@@ -3825,7 +4196,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/simulate":
-            companies = portfolio.list_companies()
+            companies = get_portfolio(tenant_id).list_companies()
             c = companies[0] if companies else None
             ctx = {
                 "name": c.name if c else "General Enterprise",
@@ -3844,8 +4215,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/ingest":
-            companies = portfolio.list_companies()
-            cid = companies[0].company_id if companies else "comp_primary"
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = companies[0].company_id if companies else company_id
             res = DataIngestionPipeline.ingest_external_dataset(
                 tenant_id=tenant_id,
                 company_id=cid,
@@ -3862,7 +4233,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 sender_id=req_data.get("sender_id", "ceo_core"),
                 receiver_id=req_data.get("receiver_id", "agt_specialist"),
                 tenant_id=tenant_id,
-                company_id=req_data.get("company_id", "comp_primary"),
+                company_id=company_id,
                 purpose=req_data.get("purpose", "Coordination"),
                 payload=req_data.get("payload", {})
             )
@@ -3899,7 +4270,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if baseline_profile:
                 comp.baseline_summary = baseline_profile
 
-            portfolio.register_company(comp)
+            get_portfolio(tenant_id).register_company(comp)
 
             # Record in Organizational Memory
             OrganizationalMemory.store_memory(
@@ -3921,7 +4292,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/chat":
             instruction = req_data.get("message", "")
-            companies = portfolio.list_companies()
+            companies = get_portfolio(tenant_id).list_companies()
             if not companies:
                 self._send_json({
                     "success": False,
@@ -3931,102 +4302,109 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             target_comp = companies[0]
-            res = ceo_command.execute_directive(target_comp.company_id, instruction)
+            cid = req_data.get("company_id") or target_comp.company_id
+            from core.ceo_chat import ceo_chat
+            res = ceo_chat(tenant_id, cid, instruction)
 
-            # Meter CEO Interaction
-            UsageMeteringEngine.record_usage(
-                tenant_id=tenant_id,
-                company_id=target_comp.company_id,
-                agent_id="ceo_core",
-                mission_id=None,
-                model="claude-3-7-sonnet",
-                input_tokens=len(instruction) * 2,
-                output_tokens=len(res.get("ceo_response", "")) * 2,
-                cost=0.0005
-            )
+            usage = res.get("usage") or {}
+            try:
+                UsageMeteringEngine.record_usage(
+                    tenant_id=tenant_id,
+                    company_id=cid,
+                    agent_id="ceo_core",
+                    mission_id=None,
+                    model=f"{res.get('provider', 'deterministic')}/{res.get('model', 'none')}",
+                    input_tokens=int(usage.get("prompt_tokens", 0) or 0),
+                    output_tokens=int(usage.get("completion_tokens", 0) or 0),
+                    cost=0.0
+                )
+            except Exception:
+                pass
 
             self._send_json(res)
             return
 
         elif path == "/api/run-workload":
-            wtype = req_data.get("workload", "hospitality")
-
-            companies = portfolio.list_companies()
-            if not companies:
-                comp = CompanyOnboardingEngine.onboard_existing_company(
-                    name="Operating Enterprise",
-                    industry="Commercial Operations"
-                )
-                portfolio.register_company(comp)
-            else:
-                comp = companies[0]
-
-            if wtype == "hospitality":
-                mis = run_hospitality_night_audit(comp, kernel)
-            elif wtype == "manufacturing":
-                mis = run_manufacturing_bottleneck_analysis(comp, kernel)
-            elif wtype == "saas":
-                mis = run_saas_churn_analysis(comp, kernel)
-            elif wtype == "personal":
-                mis = run_personal_file_hygiene(comp, kernel)
-            elif wtype == "universal":
-                mis = run_universal_capability_discovery_task(comp, kernel, registry)
-            else:
-                self._send_json({"error": "Unknown workload type"}, status=400)
+            wtype = str(req_data.get("workload", "") or "").strip().lower()
+            objectives = {
+                "hospitality": (
+                    "Perform a hotel night-audit reconciliation: compare PMS folio postings, "
+                    "payment-gateway settlements, and occupancy records for the most recent "
+                    "closed business date. Report variances and list every data source used. "
+                    "If no PMS or payment connector is configured, state exactly which "
+                    "credentials are required instead of estimating numbers."
+                ),
+                "manufacturing": (
+                    "Analyse the production line for bottlenecks using available MES data. "
+                    "Identify constrained stations, quantify impact only from observed data, "
+                    "and list missing telemetry. Do not invent throughput figures."
+                ),
+                "saas": (
+                    "Decompose subscription churn by cohort using available billing data. "
+                    "Identify the strongest observed churn drivers and propose a bounded "
+                    "retention experiment. Mark any metric that is unavailable."
+                ),
+                "personal": (
+                    "Audit the configured workspace for file hygiene: duplicates, stale files, "
+                    "and oversized artefacts. Report only files actually observed."
+                ),
+                "universal": (
+                    "Discover which capabilities this deployment can genuinely execute right "
+                    "now, and list capabilities that require credentials or installation."
+                ),
+            }
+            if wtype not in objectives:
+                self._send_json({
+                    "error": "Unknown workload type",
+                    "code": "UNKNOWN_WORKLOAD",
+                    "supported": sorted(objectives.keys()),
+                }, status=400)
                 return
 
-            comp.missions.append(mis)
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company before launching operational workloads.",
+                }, status=409)
+                return
 
-            # Persist mission into database
-            with db.get_connection() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO missions (
-                        mission_id, company_id, tenant_id, title, owner_agent,
-                        department, target_outcome, status, progress, verification_summary, started_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT (mission_id) DO UPDATE SET
-                        company_id = EXCLUDED.company_id,
-                        tenant_id = EXCLUDED.tenant_id,
-                        title = EXCLUDED.title,
-                        owner_agent = EXCLUDED.owner_agent,
-                        department = EXCLUDED.department,
-                        target_outcome = EXCLUDED.target_outcome,
-                        status = EXCLUDED.status,
-                        progress = EXCLUDED.progress,
-                        verification_summary = EXCLUDED.verification_summary,
-                        started_at = EXCLUDED.started_at
-                    """,
-                    (
-                        mis.mission_id, comp.company_id, tenant_id, mis.title, mis.owner_agent,
-                        mis.department, mis.target_outcome, mis.status.value, 100, mis.verification_summary, mis.started_at
-                    )
-                )
-                conn.commit()
-
+            requested_cid = company_id
+            cid = next((c.company_id for c in companies if c.company_id == requested_cid), companies[0].company_id)
+            dispatcher = _cw(tenant_id, cid).background_dispatcher
+            mission = dispatcher.submit_background_prompt(
+                objectives[wtype], initiator="Workload Launcher"
+            )
+            dispatcher.execute_compound_mission_step(mission.mission_id)
+            mission = dispatcher.get_mission(mission.mission_id) or mission
             self._send_json({
-                "success": (mis.status == MissionStatus.SUCCESS),
-                "mission_id": mis.mission_id,
-                "title": mis.title,
-                "status": mis.status.value,
-                "verification_summary": mis.verification_summary,
-                "evidence_count": len(mis.evidence_packages),
-                "merkle_root": ledger.get_merkle_root()
+                "success": mission.status not in ("BLOCKED", "FAILED", "CANCELLED"),
+                "mission_id": mission.mission_id,
+                "workload": wtype,
+                "company_id": cid,
+                "prompt": mission.prompt,
+                "status": mission.status,
+                "current_stage": mission.current_stage,
+                "progress_percent": mission.progress_percent,
+                "deliverables": mission.deliverables,
+                "evidence_id": mission.evidence_id,
+                "timeline": mission.timeline[-8:],
             })
             return
 
         elif path == "/api/employees":
             role = req_data.get("role", "Specialist Agent")
             dept = req_data.get("department", "Operations")
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
-            companies = target_portfolio.list_companies()
+            target_portfolio = get_portfolio(tenant_id)
+            companies = get_portfolio(tenant_id).list_companies()
             if not companies:
                 comp = CompanyOnboardingEngine.onboard_new_company(
                     name="Default Operations",
                     industry="Services",
                     tenant_id=tenant_id
                 )
-                target_portfolio.register_company(comp)
+                get_portfolio(tenant_id).register_company(comp)
             else:
                 comp = companies[0]
 
@@ -4081,9 +4459,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             reason = req_data.get("reason", "Required operational step")
             risk = req_data.get("risk_level", "MEDIUM")
             consequence = req_data.get("consequence", "Production state change")
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
-            companies = target_portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = req_data.get("company_id") or (companies[0].company_id if companies else "")
+            if not cid or not get_portfolio(tenant_id).get_company(cid):
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company before raising an approval request.",
+                }, status=409)
+                return
 
             req = ApprovalPipeline.create_request(
                 tenant_id=tenant_id,
@@ -4112,12 +4496,26 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # Company OS 2.0 POST Endpoints
+        elif path == "/api/ceo/cycle":
+            companies = get_portfolio(tenant_id).list_companies()
+            if not companies:
+                self._send_json({
+                    "error": "No company is onboarded for this tenant",
+                    "code": "NO_COMPANY",
+                    "detail": "Onboard a company before running an executive cycle.",
+                }, status=409)
+                return
+            cid = company_id
+            cycle_res = _ceo_engine(tenant_id, company_id).execute_executive_cycle(cid)
+            self._send_json(cycle_res)
+            return
+
         elif path == "/api/ceo/chat":
             instruction = req_data.get("message", "")
-            target_portfolio = portfolio if tenant_id == "tnt_primary" else CompanyPortfolioManager(tenant_id=tenant_id, load_from_db=True)
-            companies = target_portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else f"comp_{tenant_id}")
-            chat_res = ceo_engine.chat_directive(cid, instruction)
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
+            from core.ceo_chat import ceo_chat
+            chat_res = ceo_chat(tenant_id, cid, instruction)
             self._send_json(chat_res)
             return
 
@@ -4125,8 +4523,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             topic = req_data.get("topic", "Executive Proposal")
             proposal = req_data.get("proposal", "")
             data = req_data.get("data", {})
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "")
             review = ExecutiveCouncil(tenant_id, cid).review_proposal(topic, proposal, data)
             self._send_json(review)
             return
@@ -4137,7 +4535,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             from dataclasses import asdict
             eid = req_data.get("entity_id", f"ent_{uuid.uuid4().hex[:8]}")
             etype = req_data.get("entity_type", "WORKFLOW")
-            cid = req_data.get("company_id", "comp_primary")
+            cid = company_id
             alloc_usd = float(req_data.get("allocated_usd", 1000.0))
             alloc_tok = int(req_data.get("allocated_tokens", 0))
             soft_pct = float(req_data.get("soft_limit_pct", 80.0))
@@ -4251,7 +4649,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if action == "STORE":
                 mem = gw.store_memory(
                     scope=req_data.get("scope", "COMPANY"),
-                    scope_id=req_data.get("scope_id", "comp_primary"),
+                    scope_id=req_data.get("scope_id") or company_id,
                     memory_key=req_data.get("memory_key", "k1"),
                     content=req_data.get("content", ""),
                     memory_type=req_data.get("memory_type", "CORE"),
@@ -4278,15 +4676,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             title = req_data.get("title", "New Item")
             details = req_data.get("details", "")
             priority = req_data.get("priority", "MEDIUM")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "")
             item_id = ChiefOfStaff(tenant_id, cid).add_inbox_item(itype, title, details, priority)
             self._send_json({"success": True, "item_id": item_id})
             return
 
         elif path == "/api/host/quarantine":
             reason = req_data.get("reason", "Manual security quarantine")
-            host_agent.quarantine(reason)
+            get_runtime(tenant_id).host_agent.quarantine(reason)
             self._send_json({"success": True, "quarantined": True, "status": "QUARANTINED"})
             return
 
@@ -4294,14 +4692,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             name = req_data.get("contact_name", "Lead Contact")
             channel = req_data.get("channel", "WEB_CHAT")
             inquiry = req_data.get("inquiry", "Product inquiry")
-            lead = sales_workforce.ingest_lead(name, channel, inquiry)
+            lead = get_runtime(tenant_id).sales.ingest_lead(name, channel, inquiry)
             self._send_json(lead)
             return
 
         elif path == "/api/sales/message":
             lead_id = req_data.get("lead_id", "")
             message = req_data.get("message", "")
-            res = sales_workforce.process_customer_message(lead_id, message)
+            res = get_runtime(tenant_id).sales.process_customer_message(lead_id, message)
             self._send_json(res)
             return
 
@@ -4309,31 +4707,31 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             caller_id = req_data.get("caller_id", "+91-0000000000")
             direction = req_data.get("direction", "INBOUND")
             consent = req_data.get("consent_given", True)
-            call = voice_agent.initiate_call_session(caller_id, direction, consent)
+            call = get_runtime(tenant_id).voice.initiate_call_session(caller_id, direction, consent)
             self._send_json(call)
             return
 
         elif path == "/api/voice/utterance":
             session_id = req_data.get("session_id", "")
             text = req_data.get("text", "")
-            turn = voice_agent.process_utterance(session_id, text)
+            turn = get_runtime(tenant_id).voice.process_utterance(session_id, text)
             self._send_json(turn)
             return
 
         elif path == "/api/events":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id", companies[0].company_id if companies else "comp_none")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = req_data.get("company_id", companies[0].company_id if companies else "")
             etype = req_data.get("event_type", "REVENUE_ANOMALY")
             category = req_data.get("category", "OPERATIONAL")
             severity = req_data.get("severity", "MEDIUM")
             details = req_data.get("details", {})
-            evt = event_engine.emit_event(cid, etype, category, severity, details)
+            evt = get_runtime(tenant_id).event_engine.emit_event(cid, etype, category, severity, details)
             self._send_json(evt)
             return
 
         elif path == "/api/meetings/conduct":
             mtype = req_data.get("meeting_type", "MORNING_OPERATING")
-            rec = interactive_meetings.conduct_executive_operating_meeting(mtype)
+            rec = get_runtime(tenant_id).meetings.conduct_executive_operating_meeting(mtype)
             self._send_json(rec)
             return
 
@@ -4341,14 +4739,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             chain_id = req_data.get("chain_id", "")
             tx_id = req_data.get("transaction_id", "tx_verified")
             rev = float(req_data.get("revenue", 0.0))
-            res = business_causality.verify_outcome_with_transaction(chain_id, tx_id, rev)
+            res = get_runtime(tenant_id).causality.verify_outcome_with_transaction(chain_id, tx_id, rev)
             self._send_json(res)
             return
 
         # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (POST) ---
         elif path == "/api/v1/zonata/discovery/ingest":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             stmt = req_data.get("statement")
             findings = []
             if stmt:
@@ -4365,8 +4763,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/interview/answer":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             qid = req_data.get("question_id", "q_general")
             ans = req_data.get("answer", "")
             res = zonata_interview.submit_answer(tenant_id, cid, qid, ans)
@@ -4374,16 +4772,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/org-design/generate":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             ind_override = req_data.get("industry")
             org = zonata_org_designer.design_organization(tenant_id, cid, ind_override)
             self._send_json(org.to_dict())
             return
 
         elif path == "/api/v1/zonata/org-design/mission-workforce":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             mis = req_data.get("mission_objective", "Increase company profitability")
             dept = req_data.get("target_department")
             wf = zonata_org_designer.generate_mission_workforce(tenant_id, cid, mis, dept)
@@ -4401,8 +4799,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/v1/zonata/competitors/add":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             c = zonata_competitive.register_competitor(
                 tenant_id=tenant_id,
                 company_id=cid,
@@ -4418,17 +4816,27 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/companies/") and path.endswith("/draft"):
             cid = path.split("/")[3]
+            try:
+                draft_file = _draft_path(tenant_id, cid)
+            except ValueError as exc:
+                self._send_json({"error": "Invalid company id", "code": "INVALID_COMPANY_ID",
+                                 "detail": str(exc)}, status=400)
+                return
             draft_data = req_data.get("draft", req_data)
-            draft_file = os.path.join(BASE_DIR, f"storage/draft_{cid}.json")
+            if not isinstance(draft_data, dict) or not draft_data:
+                self._send_json({"error": "Empty draft", "code": "EMPTY_DRAFT",
+                                 "detail": "Provide a non-empty 'draft' object."}, status=400)
+                return
             os.makedirs(os.path.dirname(draft_file), exist_ok=True)
-            with open(draft_file, "w") as f:
+            with open(draft_file, "w", encoding="utf-8") as f:
                 json.dump(draft_data, f, indent=2)
-            self._send_json({"success": True, "draft_saved": True, "company_id": cid})
+            self._send_json({"success": True, "draft_saved": True, "company_id": cid,
+                             "tenant_id": tenant_id, "bytes": os.path.getsize(draft_file)})
             return
 
         elif path.startswith("/api/companies/") and path.endswith("/activate"):
             cid = path.split("/")[3]
-            comp = portfolio.get_company(cid)
+            comp = get_portfolio(tenant_id).get_company(cid)
             if comp:
                 comp.status = "OPERATIONAL"
                 with db.get_connection() as conn:
@@ -4437,19 +4845,36 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"success": True, "status": "OPERATIONAL", "company": {"company_id": cid, "name": comp.name}})
                 return
 
-            draft_file = os.path.join(BASE_DIR, f"storage/drafts/{cid}.json")
+            try:
+                draft_file = _draft_path(tenant_id, cid)
+            except ValueError as exc:
+                self._send_json({"error": "Invalid company id", "code": "INVALID_COMPANY_ID",
+                                 "detail": str(exc)}, status=400)
+                return
             draft_data = {}
             if os.path.exists(draft_file):
                 try:
-                    with open(draft_file, "r") as f:
+                    with open(draft_file, "r", encoding="utf-8") as f:
                         draft_data = json.load(f)
                 except Exception:
-                    pass
-            c_name = req_data.get("name") or draft_data.get("legalName") or draft_data.get("name") or "New Activated Company"
-            c_ind = req_data.get("industry") or draft_data.get("industry") or "General Business"
-            c_country = req_data.get("country") or draft_data.get("country") or "IN"
+                    draft_data = {}
+            c_name = (req_data.get("name") or draft_data.get("legalName")
+                      or draft_data.get("name") or "").strip()
+            c_ind = (req_data.get("industry") or draft_data.get("industry") or "").strip()
+            c_country = (req_data.get("country") or draft_data.get("country") or "").strip()
+            if not c_name or not c_ind:
+                self._send_json({
+                    "error": "Incomplete company draft",
+                    "code": "INCOMPLETE_DRAFT",
+                    "detail": (
+                        "A company cannot be activated without at least a name and an industry. "
+                        f"Found name={c_name!r}, industry={c_ind!r}. Save the draft first or "
+                        "supply 'name' and 'industry'."
+                    ),
+                }, status=400)
+                return
             c_type = "EXISTING" if draft_data.get("mode") == "existing" or req_data.get("is_existing") else "NEW"
-            new_comp = portfolio.onboard_company(
+            new_comp = get_portfolio(tenant_id).onboard_company(
                 name=c_name,
                 country=c_country,
                 industry=c_ind,
@@ -4465,168 +4890,707 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 cid = parts[3]
                 sub_action = parts[4]
                 if sub_action == "organization" and len(parts) >= 6 and parts[5] == "propose":
-                    res = company_api_service.propose_organization(tenant_id, cid, req_data.get("industry"))
+                    res = _company_service(tenant_id).propose_organization(tenant_id, cid, req_data.get("industry"))
                     self._send_json(res)
                     return
                 elif sub_action == "organization" and len(parts) >= 6 and parts[5] == "approve":
                     bp_id = req_data.get("blueprint_id")
-                    res = company_api_service.approve_organization(tenant_id, cid, bp_id)
+                    res = _company_service(tenant_id).approve_organization(tenant_id, cid, bp_id)
                     self._send_json(res)
                     return
                 elif sub_action == "workforce":
-                    res = company_api_service.create_workforce_member(tenant_id, cid, req_data)
+                    res = _company_service(tenant_id).create_workforce_member(tenant_id, cid, req_data)
                     self._send_json(res)
                     return
                 elif sub_action == "missions" and len(parts) >= 7 and parts[6] == "plan":
-                    self._send_json({"success": True, "message": "Mission plan refreshed"})
+                    objective = (req_data.get("objective") or req_data.get("title")
+                                 or req_data.get("prompt") or "").strip()
+                    if not objective:
+                        self._send_json({
+                            "error": "Missing objective",
+                            "code": "MISSING_OBJECTIVE",
+                            "detail": "Provide 'objective' so the plan can be produced by the LLM runtime.",
+                        }, status=400)
+                        return
+                    dispatcher = _cw(tenant_id, cid).background_dispatcher
+                    mission = dispatcher.submit_background_prompt(
+                        objective, initiator="Mission Planner"
+                    )
+                    dispatcher.execute_compound_mission_step(mission.mission_id)
+                    mission = dispatcher.get_mission(mission.mission_id) or mission
+                    self._send_json({
+                        "success": mission.status not in ("BLOCKED", "FAILED", "CANCELLED"),
+                        "mission_id": mission.mission_id,
+                        "company_id": cid,
+                        "status": mission.status,
+                        "current_stage": mission.current_stage,
+                        "progress_percent": mission.progress_percent,
+                        "timeline": mission.timeline[-6:],
+                    })
                     return
                 elif sub_action == "missions":
-                    res = company_api_service.create_mission(tenant_id, cid, req_data)
+                    res = _company_service(tenant_id).create_mission(tenant_id, cid, req_data)
                     self._send_json(res)
                     return
                 elif sub_action == "processes":
-                    res = company_api_service.create_or_update_process(tenant_id, cid, req_data)
+                    res = _company_service(tenant_id).create_or_update_process(tenant_id, cid, req_data)
                     self._send_json(res)
                     return
                 elif sub_action == "command":
                     directive = req_data.get("directive", "")
-                    res = company_api_service.execute_ceo_command(tenant_id, cid, directive)
+                    res = _company_service(tenant_id).execute_ceo_command(tenant_id, cid, directive)
                     self._send_json(res)
                     return
 
+        elif path.startswith("/api/tools/") and path.endswith("/disable"):
+            tool_id = path.split("/")[3]
+            if tool_id.startswith("cap_") or tool_id.startswith("conn_"):
+                self._send_json({
+                    "tool_id": tool_id,
+                    "code": "NOT_DISABLEABLE",
+                    "detail": (
+                        "Built-in host capabilities and enterprise connectors are not registry tools. "
+                        "Remove provider credentials in Settings → Connectors to deactivate a connector."
+                    ),
+                }, status=400)
+                return
+            try:
+                with db.get_connection() as conn:
+                    cur = conn.execute(
+                        "UPDATE tool_packages SET status = 'REVOKED' "
+                        "WHERE tool_id = ? AND tenant_id = ? AND status != 'REVOKED'",
+                        (tool_id, tenant_id),
+                    )
+                    conn.commit()
+                    changed = cur.rowcount
+            except Exception as exc:
+                self._send_json({
+                    "error": "Disable failed",
+                    "code": "DISABLE_FAILED",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }, status=500)
+                return
+            if not changed:
+                with db.get_connection() as conn:
+                    exists = conn.execute(
+                        "SELECT status FROM tool_packages WHERE tool_id = ? AND tenant_id = ?",
+                        (tool_id, tenant_id),
+                    ).fetchone()
+                if not exists:
+                    self._send_json({
+                        "tool_id": tool_id,
+                        "error": "Tool not found in this tenant's registry",
+                        "code": "TOOL_NOT_FOUND",
+                    }, status=404)
+                    return
+            try:
+                from core.models import PhysicalVerification as _PV
+                pkg = _ledger_for(tenant_id).seal_evidence(
+                    action_id=f"act_disable_{uuid.uuid4().hex[:8]}",
+                    mission_id="mis_tool_registry",
+                    agent_id="TOOL_FACTORY",
+                    verifications=[_PV(
+                        check_type="registry_state",
+                        target_path=tool_id,
+                        expected_val="REVOKED",
+                        actual_val="REVOKED",
+                        verified=True,
+                        details="Tool revoked from the tenant tool registry.",
+                    )],
+                    metadata={"tool_id": tool_id, "action": "DISABLE_TOOL"},
+                )
+                evidence_id = pkg.evidence_id
+            except Exception as exc:
+                evidence_id = None
+                logger.warning("Evidence sealing for tool disable failed: %s", exc)
+            self._send_json({
+                "success": True,
+                "tool_id": tool_id,
+                "status": "REVOKED",
+                "evidence_id": evidence_id,
+                "detail": "The tool is revoked and will not be offered to mission planners.",
+            })
+            return
+
+        elif path.startswith("/api/tools/") and path.endswith("/probe"):
+            import shutil as _shutil
+            import subprocess as _subprocess
+
+            tool_id = path.split("/")[3]
+            ledger = _ledger_for(tenant_id)
+
+            if tool_id.startswith("cap_"):
+                cap_name = tool_id[len("cap_"):]
+                cap = registry.get_capability(cap_name) or registry.get_capability(cap_name.lower())
+                if not cap:
+                    self._send_json({
+                        "tool_id": tool_id,
+                        "status": "NOT_FOUND",
+                        "detail": f"No local capability named '{cap_name}' is registered on this host.",
+                    }, status=404)
+                    return
+                binary = cap.binary_path if os.path.exists(cap.binary_path) else _shutil.which(cap.name)
+                if not binary:
+                    self._send_json({
+                        "tool_id": tool_id,
+                        "status": "FAILED",
+                        "detail": f"Registered capability '{cap.name}' no longer exists on disk.",
+                    })
+                    return
+                started = time.time()
+                try:
+                    proc = _subprocess.run(
+                        [binary, "--version"],
+                        capture_output=True, text=True, timeout=8,
+                        env={"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "/tmp")},
+                    )
+                    output = ((proc.stdout or "") + (proc.stderr or "")).strip()
+                    ok = proc.returncode == 0
+                    detail = (
+                        f"{os.path.basename(binary)} --version exited {proc.returncode}: "
+                        f"{output.splitlines()[0][:200] if output else '(no output)'}"
+                    )
+                    result_payload = {
+                        "tool_id": tool_id,
+                        "status": "PASSED" if ok else "FAILED",
+                        "exit_code": proc.returncode,
+                        "output": output[:2000],
+                        "binary": binary,
+                        "latency_ms": round((time.time() - started) * 1000, 2),
+                        "detail": detail,
+                    }
+                except _subprocess.TimeoutExpired:
+                    result_payload = {
+                        "tool_id": tool_id,
+                        "status": "FAILED",
+                        "exit_code": None,
+                        "binary": binary,
+                        "detail": f"{os.path.basename(binary)} --version timed out after 8s.",
+                    }
+                except Exception as exc:
+                    result_payload = {
+                        "tool_id": tool_id,
+                        "status": "FAILED",
+                        "exit_code": None,
+                        "binary": binary,
+                        "detail": f"Probe failed: {type(exc).__name__}: {exc}",
+                    }
+
+                try:
+                    from core.models import PhysicalVerification as _PV
+                    pkg = ledger.seal_evidence(
+                        action_id=f"act_probe_{uuid.uuid4().hex[:8]}",
+                        mission_id="mis_capability_probe",
+                        agent_id="TOOL_FACTORY_PROBE",
+                        verifications=[_PV(
+                            check_type="exit_code_zero",
+                            target_path=binary,
+                            expected_val="0",
+                            actual_val=str(result_payload.get("exit_code")),
+                            verified=result_payload["status"] == "PASSED",
+                            details=result_payload["detail"][:300],
+                        )],
+                        metadata={"tool_id": tool_id, "probe": "version_flag"},
+                    )
+                    result_payload["evidence_id"] = pkg.evidence_id
+                    result_payload["evidence_status"] = str(pkg.status)
+                except Exception as exc:
+                    result_payload["evidence_error"] = f"{type(exc).__name__}: {exc}"
+
+                self._send_json(result_payload)
+                return
+
+            # Tenant-created tools: registration is real, execution is not implied.
+            try:
+                with db.get_connection() as conn:
+                    pkg_row = conn.execute(
+                        "SELECT tool_id, name, status FROM tool_packages "
+                        "WHERE tool_id = ? AND tenant_id = ?",
+                        (tool_id, tenant_id),
+                    ).fetchone()
+            except Exception:
+                pkg_row = None
+            if pkg_row:
+                self._send_json({
+                    "tool_id": tool_id,
+                    "status": "NOT_EXECUTED",
+                    "detail": (
+                        f"'{pkg_row['name']}' is registered ({pkg_row['status']}) but has never been executed. "
+                        "Run it through a governed ActionContract to produce execution evidence; the factory "
+                        "does not simulate a probe."
+                    ),
+                })
+                return
+
+            # Connectors: report configuration state, do not invent a call.
+            for conn_item in connector_registry.list_connectors():
+                if tool_id == "conn_" + "".join(
+                    ch if ch.isalnum() else "_" for ch in conn_item["name"].lower()
+                ).strip("_"):
+                    configured = bool(
+                        conn_item.get("connected")
+                        and str(conn_item.get("qualification_status")) not in ("BLOCKED", "MOCK_ONLY")
+                    )
+                    self._send_json({
+                        "tool_id": tool_id,
+                        "status": "AVAILABLE" if configured else "NOT_CONFIGURED",
+                        "detail": (
+                            "Connector is configured; use its read methods to fetch real data."
+                            if configured else
+                            "Connector has no provider credentials, so no probe was executed."
+                        ),
+                        "qualification_status": conn_item.get("qualification_status"),
+                    })
+                    return
+
+            self._send_json({
+                "tool_id": tool_id,
+                "status": "NOT_SUPPORTED",
+                "detail": "No live probe is implemented for this capability.",
+            }, status=404)
+            return
+
         elif path == "/api/tools/discover":
+            import re as _re
+            import shutil as _shutil
+
             requirement = (req_data.get("requirement") or "").strip()
-            req_lower = requirement.lower()
+            if not requirement:
+                self._send_json({
+                    "error": "Missing requirement",
+                    "code": "MISSING_REQUIREMENT",
+                    "detail": "Provide 'requirement' describing the capability you need.",
+                }, status=400)
+                return
 
-            eval_steps = [
-                {"step": "1. Understand requested capability", "status": "COMPLETED", "detail": f"Analyzed requirement: '{requirement}'"},
-                {"step": "2. Search registered capabilities", "status": "CHECKED", "detail": "Queried CapabilityRegistry & Host Contracts"},
-                {"step": "3. Search connected integrations", "status": "CHECKED", "detail": "Queried ConnectorRegistry (PMS, Accounting, Gateway)"},
-                {"step": "4. Check browser automation", "status": "CHECKED", "detail": "Evaluated Playwright / Headless Browser Fabric"},
-                {"step": "5. Check desktop capabilities", "status": "CHECKED", "detail": "Checked OS UI hooks, Window fabric, Screen Perception"},
-                {"step": "6. Check approved local software", "status": "CHECKED", "detail": "Audited local binary paths"},
-                {"step": "7. Check open-source catalogs", "status": "CHECKED", "detail": "Vetted CVE and licensing against policy"}
+            stop = {"the", "and", "for", "with", "that", "this", "from", "into",
+                    "need", "needs", "want", "wants", "able", "can", "our", "you",
+                    "your", "using", "use", "via", "build", "create", "make"}
+            req_tokens = {
+                t for t in _re.findall(r"[a-z0-9]+", requirement.lower())
+                if len(t) > 2 and t not in stop
+            }
+
+            steps: List[Dict[str, Any]] = []
+            candidates: List[Dict[str, Any]] = []
+
+            # ---- 1. Local, vetted binaries in the capability registry -------
+            local_matches = [
+                (name, cap) for name, cap in registry._capabilities.items()
+                if name.lower() in req_tokens
             ]
+            steps.append({
+                "step": "Local capability registry",
+                "status": "MATCHED" if local_matches else "NO_MATCH",
+                "detail": (
+                    f"{len(local_matches)} of {len(registry._capabilities)} vetted binaries matched: "
+                    + ", ".join(sorted(n for n, _ in local_matches))
+                ) if local_matches else (
+                    f"{len(registry._capabilities)} vetted local binaries registered; none matched the requirement."
+                ),
+            })
+            for name, cap in local_matches:
+                candidates.append({
+                    "name": name,
+                    "capability": f"Local sandboxed execution of {name}",
+                    "source": "Local capability registry",
+                    "status": "AVAILABLE",
+                    "permission": "SANDBOXED_READ_ONLY" if cap.is_sandboxed else "AUTOMATIC_IDEMPOTENT",
+                    "verified": True,
+                    "detail": f"{cap.binary_path} ({cap.license_type})",
+                    "action": "Use capability",
+                })
 
-            found_tool = None
-            if any(k in req_lower for k in ["invoice", "accounting", "payment", "reconcil", "ledger"]):
-                found_tool = {
-                    "name": "Accounting & Financial Connector",
-                    "capability": "Invoice creation & ledger reconciliation",
-                    "source": "Connected Integration (AccountingConnector)",
-                    "status": "Available",
-                    "permission": "Requires Finance Approval (AUDITED_TRANSACTIONAL)",
-                    "action": "Use capability"
-                }
-            elif any(k in req_lower for k in ["hotel", "reservation", "pms", "booking", "guest"]):
-                found_tool = {
-                    "name": "Hospitality PMS Connector",
-                    "capability": "PMS reservations & room rate management",
-                    "source": "Connected Integration (HospitalityPMSConnector)",
-                    "status": "Available",
-                    "permission": "Scoped Transactional",
-                    "action": "Use capability"
-                }
-            elif any(k in req_lower for k in ["screen", "click", "mouse", "type", "window", "desktop"]):
-                found_tool = {
-                    "name": "Desktop Robot Runtime",
-                    "capability": "Screen perception, keyboard & mouse automation",
-                    "source": "Host Fabric",
-                    "status": "Available",
-                    "permission": "AUTOMATIC_IDEMPOTENT",
-                    "action": "Use capability"
-                }
-            elif any(k in req_lower for k in ["scrape", "browser", "web page", "navigate", "dom"]):
-                found_tool = {
-                    "name": "Headless Browser Automation",
-                    "capability": "Dynamic DOM interaction, web scraping & form automation",
-                    "source": "Host Fabric",
-                    "status": "Available",
-                    "permission": "AUTOMATIC_IDEMPOTENT",
-                    "action": "Use capability"
-                }
+            # ---- 2. Enterprise connectors: report their real configuration ---
+            connector_aliases = {
+                "accounting": {"invoice", "accounting", "ledger", "reconciliation", "reconcil",
+                               "tally", "quickbooks", "gst", "tax", "finance", "bookkeeping"},
+                "payments": {"payment", "stripe", "razorpay", "settlement", "payout",
+                             "refund", "gateway", "transaction"},
+                "pms_hospitality": {"hotel", "reservation", "pms", "booking", "guest",
+                                    "folio", "opera", "hospitality", "room", "checkin", "checkout"},
+            }
+            connector_prereqs = {
+                "pms_hospitality": ["OPERA_PMS_CLIENT_ID", "OPERA_PMS_CLIENT_SECRET", "OPERA_PMS_PROPERTY"],
+                "accounting": ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_REALM_ID"],
+                "payments": ["STRIPE_SECRET_KEY or RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET"],
+            }
+            conn_checked = 0
+            conn_matches = 0
+            for conn in connector_registry.connectors.values():
+                conn_checked += 1
+                aliases = connector_aliases.get(conn.connector_type, set())
+                if not (req_tokens & aliases):
+                    continue
+                conn_matches += 1
+                qualified = str(getattr(conn, "qualification_status", "BLOCKED"))
+                configured = bool(conn.connected and "BLOCKED" not in qualified)
+                candidates.append({
+                    "name": conn.name,
+                    "capability": f"{conn.connector_type.replace('_', ' ').title()} data access",
+                    "source": f"Enterprise connector ({conn.__class__.__name__})",
+                    "status": "AVAILABLE" if configured else "NOT_CONFIGURED",
+                    "permission": str(conn.permission_level),
+                    "verified": configured,
+                    "detail": (
+                        "Connector handshake complete; live data access is available."
+                        if configured else
+                        "No provider credentials are configured, so this connector cannot return real data."
+                    ),
+                    "required_prerequisites": (
+                        [] if configured else connector_prereqs.get(conn.connector_type, [])
+                    ),
+                    "action": "Use capability" if configured else "Configure in Settings → Connectors",
+                })
+            steps.append({
+                "step": "Enterprise connectors",
+                "status": "MATCHED" if conn_matches else "NO_MATCH",
+                "detail": (
+                    f"{conn_matches} of {conn_checked} registered connectors matched; "
+                    f"{sum(1 for c in candidates if c['status'] == 'AVAILABLE' and c['source'].startswith('Enterprise'))} configured."
+                ) if conn_matches else (
+                    f"{conn_checked} registered connectors checked; none matched the requirement."
+                ),
+            })
 
-            if found_tool:
+            # ---- 3. Browser automation: real binary/package detection --------
+            browser_tokens = {"browser", "scrape", "scraping", "dom", "navigate",
+                              "webpage", "html", "crawl", "selenium", "playwright"}
+            if req_tokens & browser_tokens:
+                chromium = (
+                    _shutil.which("chromium") or _shutil.which("chromium-browser")
+                    or _shutil.which("google-chrome") or _shutil.which("chrome")
+                )
+                has_playwright = False
+                try:
+                    import playwright  # noqa: F401
+                    has_playwright = True
+                except Exception:
+                    has_playwright = False
+                available = bool(chromium or has_playwright)
+                candidates.append({
+                    "name": "Headless browser automation",
+                    "capability": "DOM interaction, scraping, and form submission",
+                    "source": "Host fabric (browser runtime)",
+                    "status": "AVAILABLE" if available else "NOT_INSTALLED",
+                    "permission": "AUTOMATIC_IDEMPOTENT",
+                    "verified": available,
+                    "detail": (
+                        f"Chromium={chromium or 'n/a'}, playwright={has_playwright}."
+                        if available else
+                        "No Chromium binary and no Playwright package are installed on this host."
+                    ),
+                    "action": "Use capability" if available else "Install Chromium or Playwright",
+                })
+                steps.append({
+                    "step": "Browser automation",
+                    "status": "MATCHED",
+                    "detail": (
+                        f"Chromium={chromium or 'n/a'}, playwright={has_playwright}."
+                    ),
+                })
+            else:
+                steps.append({
+                    "step": "Browser automation",
+                    "status": "SKIPPED",
+                    "detail": "Requirement does not reference browser or DOM automation.",
+                })
+
+            # ---- 4. Desktop automation: needs a graphical session ------------
+            desktop_tokens = {"desktop", "screen", "mouse", "keyboard", "click",
+                              "window", "gui", "x11", "screenshot"}
+            if req_tokens & desktop_tokens:
+                display = os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+                xdotool = _shutil.which("xdotool")
+                available = bool(display and xdotool)
+                candidates.append({
+                    "name": "Desktop robot runtime",
+                    "capability": "Screen perception and keyboard/mouse automation",
+                    "source": "Host fabric (desktop robot)",
+                    "status": "AVAILABLE" if available else "NOT_CONFIGURED",
+                    "permission": "AUTOMATIC_IDEMPOTENT",
+                    "verified": available,
+                    "detail": (
+                        f"DISPLAY={display}, xdotool={xdotool}."
+                        if available else
+                        "No graphical session (DISPLAY/WAYLAND_DISPLAY) or xdotool binary is available on this host."
+                    ),
+                    "action": "Use capability" if available else "Run on a host with a desktop session",
+                })
+                steps.append({
+                    "step": "Desktop automation",
+                    "status": "MATCHED",
+                    "detail": f"DISPLAY={display or 'unset'}, xdotool={xdotool or 'missing'}.",
+                })
+            else:
+                steps.append({
+                    "step": "Desktop automation",
+                    "status": "SKIPPED",
+                    "detail": "Requirement does not reference desktop/GUI automation.",
+                })
+
+            # ---- 5. Governed terminal ---------------------------------------
+            terminal_tokens = {"shell", "terminal", "command", "cli", "script", "bash"}
+            if req_tokens & terminal_tokens:
+                bash = _shutil.which("bash") or _shutil.which("sh")
+                candidates.append({
+                    "name": "Governed terminal runtime",
+                    "capability": "Sandboxed shell command execution",
+                    "source": "Coordinator terminal runtime",
+                    "status": "AVAILABLE" if bash else "NOT_INSTALLED",
+                    "permission": "AUDITED_TRANSACTIONAL",
+                    "verified": bool(bash),
+                    "detail": f"Shell binary: {bash}." if bash else "No POSIX shell found on this host.",
+                    "action": "Use capability" if bash else "Install a POSIX shell",
+                })
+                steps.append({
+                    "step": "Governed terminal",
+                    "status": "MATCHED",
+                    "detail": f"Shell binary: {bash or 'missing'}.",
+                })
+            else:
+                steps.append({
+                    "step": "Governed terminal",
+                    "status": "SKIPPED",
+                    "detail": "Requirement does not reference shell execution.",
+                })
+
+            # ---- 6. Tenant-owned tools created through the tool factory ------
+            try:
+                with db.get_connection() as conn:
+                    rows = conn.execute(
+                        "SELECT tool_id, name, version, risk_class FROM tool_packages "
+                        "WHERE tenant_id = ? AND status = 'ACTIVE'",
+                        (tenant_id,),
+                    ).fetchall()
+            except Exception:
+                rows = []
+            tenant_tool_matches = [
+                r for r in rows
+                if (r["name"] or "").lower() in req_tokens
+                or any(tok in (r["name"] or "").lower() for tok in req_tokens)
+            ]
+            for r in tenant_tool_matches:
+                candidates.append({
+                    "name": r["name"],
+                    "capability": f"Tenant-created governed tool ({r['risk_class']})",
+                    "source": "Tool Factory (tenant registry)",
+                    "status": "AVAILABLE",
+                    "permission": "AUDITED_TRANSACTIONAL",
+                    "verified": True,
+                    "detail": f"tool_id={r['tool_id']} version={r['version']}",
+                    "action": "Use capability",
+                })
+            steps.append({
+                "step": "Tenant tool registry",
+                "status": "MATCHED" if tenant_tool_matches else "NO_MATCH",
+                "detail": (
+                    f"{len(tenant_tool_matches)} of {len(rows)} tenant-created tools matched."
+                    if rows else "No tools have been created by this tenant."
+                ),
+            })
+
+            available = [c for c in candidates if c["status"] == "AVAILABLE"]
+            not_ready = [c for c in candidates if c["status"] != "AVAILABLE"]
+
+            if available:
+                best = available[0]
                 self._send_json({
                     "found": True,
-                    "capability": found_tool,
-                    "evaluation_steps": eval_steps,
-                    "recommendation": "USE_EXISTING"
+                    "capability": best,
+                    "candidates": candidates,
+                    "blocked_candidates": not_ready,
+                    "evaluation_steps": steps,
+                    "recommendation": "USE_EXISTING",
+                })
+            elif not_ready:
+                self._send_json({
+                    "found": False,
+                    "reason": (
+                        "A matching capability exists in this deployment but is not usable: "
+                        + ", ".join(f"{c['name']} ({c['status']})" for c in not_ready)
+                    ),
+                    "candidates": candidates,
+                    "blocked_candidates": not_ready,
+                    "evaluation_steps": steps,
+                    "recommendation": "CONFIGURE_EXISTING",
                 })
             else:
                 self._send_json({
                     "found": False,
-                    "reason": "No registered capability directly satisfies this requirement.",
-                    "evaluation_steps": eval_steps,
+                    "reason": "No registered capability, configured connector, or installed runtime satisfies this requirement.",
+                    "candidates": [],
+                    "blocked_candidates": [],
+                    "evaluation_steps": steps,
                     "recommendation": "TOOL_FACTORY",
                     "suggested_spec": {
-                        "name": f"{requirement.split()[0].title() if requirement else 'Custom'} Specialist Tool",
+                        "name": f"{(requirement.split()[0].title() if requirement else 'Custom')} Specialist Tool",
                         "purpose": requirement,
-                        "category": "Custom Automation",
-                        "runtime": "Python 3 Sandboxed",
-                        "permissions": ["Filesystem read", "Network access"]
-                    }
+                        "runtime": "Python 3 (rootless container, network blocked by default)",
+                        "permissions": ["Filesystem read (sandbox)"],
+                        "note": "A tool is only registered after it passes the AST security scan in Tool Factory V2.",
+                    },
                 })
             return
 
         elif path == "/api/tools/build":
-            tool_name = (req_data.get("name") or "Custom Tool").strip()
-            purpose = req_data.get("purpose", "")
-            category = req_data.get("category", "Custom Automation")
-            runtime = req_data.get("runtime", "Python 3 Sandboxed")
-            permissions = req_data.get("permissions", ["Filesystem read"])
+            from core.tool_factory_v2 import tool_factory_v2, ToolSecurityViolation
 
-            tool_id = f"tool_custom_{uuid.uuid4().hex[:8]}"
-            test_results = [
-                {"stage": "Build", "status": "Passed", "detail": "Tool specification parsed and contract compiled successfully."},
-                {"stage": "Unit test", "status": "Passed", "detail": "Schema and parameter contracts validated."},
-                {"stage": "Integration test", "status": "Passed", "detail": "Process execution sandbox isolation verified."},
-                {"stage": "Security validation", "status": "Passed", "detail": "Credential leak audit passed. Authority boundary checked."},
-                {"stage": "Permission validation", "status": "Passed", "detail": f"Permissions granted: {', '.join(permissions)}."},
-                {"stage": "Runtime validation", "status": "Passed", "detail": f"Runtime environment verified on {platform.system()}."},
-                {"stage": "Postcondition verification", "status": "Passed", "detail": "Cryptographic SHA-256 evidence package created."},
-                {"stage": "Registration", "status": "Passed", "detail": "Tool registered into Company OS Capability Registry."}
-            ]
+            tool_name = (req_data.get("name") or "").strip()
+            purpose = (req_data.get("purpose") or "").strip()
+            source_code = req_data.get("source_code") or ""
+            risk_class = req_data.get("risk_class", "LOW_RISK")
+            version = req_data.get("version", "1.0.0")
 
-            new_tool = {
-                "id": tool_id,
-                "name": tool_name,
-                "category": category,
-                "source": "User Created",
-                "availability": "Available",
-                "permission": "AUDITED_TRANSACTIONAL",
-                "permissions_list": permissions,
-                "version": "1.0.0",
-                "health": "Healthy",
-                "last_verified": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "runtime": runtime,
-                "purpose": purpose,
-                "description": purpose or "User created tool synthesized through ZONATA Tool Factory.",
-                "created_at": time.time()
-            }
+            if not tool_name:
+                self._send_json({
+                    "error": "Missing tool name",
+                    "code": "MISSING_NAME",
+                    "detail": "Provide 'name' for the tool being registered.",
+                }, status=400)
+                return
+            if not source_code.strip():
+                self._send_json({
+                    "error": "Missing source code",
+                    "code": "MISSING_SOURCE_CODE",
+                    "detail": (
+                        "Provide 'source_code' containing the tool implementation. "
+                        "The Tool Factory performs a real AST security scan before registration; "
+                        "it will not certify an empty package."
+                    ),
+                    "required_fields": ["name", "source_code"],
+                }, status=400)
+                return
+            if risk_class not in ("LOW_RISK", "MEDIUM_RISK", "HIGH_RISK"):
+                self._send_json({
+                    "error": "Invalid risk class",
+                    "code": "INVALID_RISK_CLASS",
+                    "allowed": ["LOW_RISK", "MEDIUM_RISK", "HIGH_RISK"],
+                }, status=400)
+                return
 
-            custom_tools_file = os.path.join(BASE_DIR, "storage/custom_tools.json")
-            custom_tools = []
-            if os.path.exists(custom_tools_file):
-                try:
-                    with open(custom_tools_file, "r") as f:
-                        custom_tools = json.load(f)
-                except Exception:
-                    custom_tools = []
-            custom_tools.append(new_tool)
-            os.makedirs(os.path.dirname(custom_tools_file), exist_ok=True)
-            with open(custom_tools_file, "w") as f:
-                json.dump(custom_tools, f, indent=2)
+            scan_ok, scan_errors = tool_factory_v2.static_security_scan(source_code)
+            test_results = [{
+                "stage": "Static security scan",
+                "status": "Passed" if scan_ok else "Failed",
+                "detail": (
+                    "AST inspection found no disallowed imports, calls, or dynamic evaluation."
+                    if scan_ok else "; ".join(scan_errors)
+                ),
+            }]
+            if not scan_ok:
+                self._send_json({
+                    "error": "Tool rejected by the static security scan",
+                    "code": "TOOL_SECURITY_REJECTED",
+                    "test_results": test_results,
+                    "violations": scan_errors,
+                }, status=422)
+                return
+
+            try:
+                package = tool_factory_v2.create_governed_tool(
+                    tenant_id=tenant_id,
+                    name=tool_name,
+                    source_code=source_code,
+                    risk_class=risk_class,
+                    version=version,
+                )
+            except ToolSecurityViolation as exc:
+                self._send_json({
+                    "error": "Tool rejected by the sandbox policy",
+                    "code": "TOOL_SECURITY_REJECTED",
+                    "test_results": test_results,
+                    "violations": [str(exc)],
+                }, status=422)
+                return
+            except Exception as exc:
+                logger.error("Tool registration failed: %s", exc, exc_info=True)
+                self._send_json({
+                    "error": "Tool registration failed",
+                    "code": "TOOL_REGISTRATION_FAILED",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }, status=500)
+                return
+
+            profile = package.get("sandbox_profile", {})
+            test_results.extend([
+                {
+                    "stage": "Sandbox policy",
+                    "status": "Passed",
+                    "detail": (
+                        f"{profile.get('profile_type', 'ROOTLESS_CONTAINER')}, "
+                        f"privileged={profile.get('is_privileged', False)}, "
+                        f"network={profile.get('network_egress', 'BLOCK_ALL')}, "
+                        f"memory={profile.get('max_memory_mb')}MB, cpu={profile.get('max_cpu_percent')}%"
+                    ),
+                },
+                {
+                    "stage": "Code signature",
+                    "status": "Passed",
+                    "detail": f"SHA-256 package signature {package['signature']}.",
+                },
+                {
+                    "stage": "Registry write",
+                    "status": "Passed",
+                    "detail": f"Registered as {package['tool_id']} in the tenant tool registry.",
+                },
+                {
+                    "stage": "Runtime execution",
+                    "status": "NOT_RUN",
+                    "detail": (
+                        "Registration does not execute the tool. Run it under a governed "
+                        "ActionContract to produce execution evidence."
+                    ),
+                },
+            ])
 
             self._send_json({
                 "success": True,
-                "tool": new_tool,
-                "test_results": test_results
+                "tool": {
+                    "id": package["tool_id"],
+                    "name": package["name"],
+                    "version": package["version"],
+                    "category": req_data.get("category", "Custom Automation"),
+                    "source": "User Created",
+                    "availability": "Available",
+                    "permission": "AUDITED_TRANSACTIONAL",
+                    "risk_class": risk_class,
+                    "status": package["status"],
+                    "signature": package["signature"],
+                    "sandbox_profile": profile,
+                    "purpose": purpose,
+                    "created_at": time.time(),
+                },
+                "test_results": test_results,
+            })
+            return
+
+        elif path in ("/api/llm/test", "/api/v1/llm/test"):
+            from core.llm_runtime import llm_runtime
+            probe = req_data.get("prompt") or "Reply with the single word READY."
+            res = llm_runtime.chat(
+                tenant_id=tenant_id,
+                company_id=company_id,
+                system="You are a health probe. Reply concisely.",
+                messages=[{"role": "user", "content": probe}],
+                max_tokens=64,
+                temperature=0.0,
+                intent="health",
+            )
+            self._send_json({
+                "ok": not res.degraded and bool(res.content),
+                "provider": res.provider,
+                "model": res.model,
+                "degraded": res.degraded,
+                "latency_ms": round(res.latency_ms, 1),
+                "response": res.content[:500],
+                "error": res.error,
+                "attempts": res.attempts,
             })
             return
 
         elif path == "/api/settings":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             if isinstance(req_data, dict):
                 for k, v in req_data.items():
@@ -4640,7 +5604,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", req_data.get("company_id", "comp_primary"))
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             actor_role = self.headers.get("X-User-Role", "OWNER")
             reason = req_data.get("reason", "Batch category save")
@@ -4657,7 +5621,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/category/") and path.endswith("/reset") and len(path.split("/")) == 6:
             cat_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.reset_category_to_defaults(cat_id, tenant_id, company_id, actor=actor)
             status_code = 200 if res.get("success") else 400
@@ -4666,7 +5630,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/key/") and path.endswith("/reset") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.reset_single_setting_to_default(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -4675,7 +5639,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/key/") and path.endswith("/rotate") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.rotate_secret_token(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -4684,7 +5648,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/key/") and path.endswith("/revoke") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.revoke_secret_token(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -4693,7 +5657,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/action/") and len(path.split("/")) == 5:
             action_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.execute_button_action(action_id, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -4702,7 +5666,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "Host Administrator")
             actor_role = self.headers.get("X-User-Role", "OWNER")
             expected_ver = req_data.get("expected_version")
@@ -4719,7 +5683,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/settings/propose":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             s_id = req_data.get("setting_id", "")
             proposed_val = req_data.get("proposed_value")
             proposed_by = req_data.get("proposed_by", "AI CEO Executive Engine")
@@ -4742,13 +5706,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/test":
             target = req_data.get("target", "database")
-            res = settings_service.run_live_test(target, req_data)
+            res = settings_service.run_live_test(target, req_data, tenant_id, company_id)
             self._send_json(res)
             return
 
         elif path.startswith("/api/settings/test/") and len(path.split("/")) == 5:
             target = path.split("/")[4]
-            res = settings_service.run_live_test(target, req_data)
+            res = settings_service.run_live_test(target, req_data, tenant_id, company_id)
             self._send_json(res)
             return
 
@@ -4757,20 +5721,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/schedules/parse-nl":
             text = req_data.get("text", "")
-            cid = req_data.get("company_id", "comp_primary")
-            parsed_schedule = schedule_service.parse_natural_language(text, cid)
+            cid = company_id
+            parsed_schedule = get_runtime(tenant_id).schedule.parse_natural_language(text, cid)
             self._send_json(parsed_schedule)
             return
 
         elif path == "/api/schedules":
-            new_item = schedule_service.create_schedule(req_data)
+            new_item = get_runtime(tenant_id).schedule.create_schedule(req_data)
             self._send_json({"success": True, "schedule": new_item})
             return
 
         elif path.startswith("/api/schedules/") and path.endswith("/update"):
             parts = path.split("/")
             sched_id = parts[3]
-            updated = schedule_service.update_schedule(sched_id, req_data)
+            updated = get_runtime(tenant_id).schedule.update_schedule(sched_id, req_data)
             if updated:
                 self._send_json({"success": True, "schedule": updated})
             else:
@@ -4780,7 +5744,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/schedules/") and path.endswith("/delete"):
             parts = path.split("/")
             sched_id = parts[3]
-            ok = schedule_service.delete_schedule(sched_id)
+            ok = get_runtime(tenant_id).schedule.delete_schedule(sched_id)
             self._send_json({"success": ok})
             return
 
@@ -4790,7 +5754,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/meetings/") and path.endswith("/start"):
             parts = path.split("/")
             meeting_id = parts[3]
-            meeting = meeting_service.start_meeting(meeting_id)
+            meeting = get_runtime(tenant_id).meeting_service.start_meeting(meeting_id)
             self._send_json({"success": True, "meeting": meeting})
             return
 
@@ -4798,14 +5762,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             meeting_id = parts[3]
             summary = req_data.get("summary")
-            meeting = meeting_service.end_meeting(meeting_id, summary)
+            meeting = get_runtime(tenant_id).meeting_service.end_meeting(meeting_id, summary)
             self._send_json({"success": True, "meeting": meeting})
             return
 
         elif path.startswith("/api/meetings/") and path.endswith("/state"):
             parts = path.split("/")
             meeting_id = parts[3]
-            meeting = meeting_service.update_meeting_state(meeting_id, req_data)
+            meeting = get_runtime(tenant_id).meeting_service.update_meeting_state(meeting_id, req_data)
             self._send_json({"success": True, "meeting": meeting})
             return
 
@@ -4814,18 +5778,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             meeting_id = parts[3]
             msg = req_data.get("message", "")
             mode = req_data.get("mode", "TEXT")
-            res = meeting_service.send_host_message(meeting_id, msg, mode)
+            res = get_runtime(tenant_id).meeting_service.send_host_message(meeting_id, msg, mode)
             self._send_json({"success": True, **res})
             return
 
         elif path == "/api/meetings/decisions":
-            cid = req_data.get("company_id", "comp_primary")
+            cid = company_id
             title = req_data.get("title", "Executive Decision")
             desc = req_data.get("description", "")
             dtype = req_data.get("decision_type", "STRATEGIC")
             mid = req_data.get("meeting_id")
             cm = bool(req_data.get("create_mission", False))
-            dec = meeting_service.record_decision(cid, title, desc, dtype, mid, cm)
+            dec = get_runtime(tenant_id).meeting_service.record_decision(cid, title, desc, dtype, mid, cm)
             self._send_json({"success": True, "decision": dec})
             return
 
@@ -4836,7 +5800,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             prompt = req_data.get("prompt", "")
             cid = req_data.get("company_id")
             uid = req_data.get("user_id", "usr_owner")
-            chat_res = assistant_service.handle_ai_chat(prompt, cid, uid)
+            chat_res = get_runtime(tenant_id).assistant.handle_ai_chat(prompt, cid, uid)
             self._send_json(chat_res)
             return
 
@@ -4845,7 +5809,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             ws_mode = req_data.get("workspace_mode", "PERSONAL")
             cid = req_data.get("company_id")
             uid = req_data.get("user_id", "usr_owner")
-            task_res = assistant_service.create_coworker_task(prompt, ws_mode, cid, uid)
+            task_res = get_runtime(tenant_id).assistant.create_coworker_task(prompt, ws_mode, cid, uid)
             self._send_json(task_res)
             return
 
@@ -4853,7 +5817,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             task_id = parts[5] if len(parts) > 5 else ""
             approved = bool(req_data.get("approved", True))
-            updated_task = assistant_service.approve_coworker_task(task_id, approved)
+            updated_task = get_runtime(tenant_id).assistant.approve_coworker_task(task_id, approved)
             self._send_json({"success": True, "task": updated_task})
             return
 
@@ -4864,9 +5828,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             prompt = req_data.get("prompt", "")
             initiator = req_data.get("initiator", "ZONATA AI Assistant")
             auto_step = bool(req_data.get("auto_step", True))
-            m = coworker_engine.background_dispatcher.submit_background_prompt(prompt, initiator=initiator)
+            m = _cw(tenant_id, company_id).background_dispatcher.submit_background_prompt(prompt, initiator=initiator)
             if auto_step:
-                coworker_engine.background_dispatcher.execute_compound_mission_step(m.mission_id)
+                _cw(tenant_id, company_id).background_dispatcher.execute_compound_mission_step(m.mission_id)
             self._send_json({
                 "success": True,
                 "mission_id": m.mission_id,
@@ -4883,7 +5847,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/coworker/missions/") and path.endswith("/step"):
             mid = path.split("/")[4]
-            m = coworker_engine.background_dispatcher.execute_compound_mission_step(mid)
+            m = _cw(tenant_id, company_id).background_dispatcher.execute_compound_mission_step(mid)
             if m:
                 self._send_json({"success": True, "mission_id": m.mission_id, "status": m.status, "progress": m.progress_percent, "stage": m.current_stage, "deliverables": m.deliverables, "evidence_id": m.evidence_id})
             else:
@@ -4896,26 +5860,26 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             ok = False
             msg = ""
             if action == "PAUSE":
-                ok = coworker_engine.background_dispatcher.pause_mission(mid)
+                ok = _cw(tenant_id, company_id).background_dispatcher.pause_mission(mid)
                 msg = "Mission paused"
             elif action == "RESUME":
-                ok = coworker_engine.background_dispatcher.resume_mission(mid)
+                ok = _cw(tenant_id, company_id).background_dispatcher.resume_mission(mid)
                 msg = "Mission resumed"
             elif action in ["STOP", "CANCEL"]:
-                ok = coworker_engine.background_dispatcher.stop_mission(mid)
+                ok = _cw(tenant_id, company_id).background_dispatcher.stop_mission(mid)
                 msg = "Mission stopped"
             elif action == "TAKE_CONTROL":
-                ok = coworker_engine.background_dispatcher.take_control(mid)
+                ok = _cw(tenant_id, company_id).background_dispatcher.take_control(mid)
                 msg = "Human operator took control"
             elif action == "RETRY":
-                ret_m = coworker_engine.background_dispatcher.retry_mission(mid)
+                ret_m = _cw(tenant_id, company_id).background_dispatcher.retry_mission(mid)
                 ok = ret_m is not None
                 msg = "Mission retried"
             self._send_json({"success": ok, "action": action, "message": msg, "mission_id": mid})
             return
 
         elif path == "/api/coworker/terminal/execute" or path == "/api/terminal/execute":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             
             # Dynamic Runtime Enforcement (Gate G6, G2)
             em_stop = settings_service.get_effective_setting(tenant_id, company_id, "host_emergency_stop", False)
@@ -4951,15 +5915,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     command=command,
                     timeout_sec=effective_timeout
                 )
-                sess = universal_terminal._sessions.get(session_id)
+                sess = get_runtime(tenant_id).terminal._sessions.get(session_id)
                 if not sess:
-                    sess = universal_terminal.create_session(
+                    sess = get_runtime(tenant_id).terminal.create_session(
                         mission_id=req_data.get("mission_id", "msn_api"),
                         task_id=req_data.get("task_id", "tsk_api"),
                         environment_id=profile_id,
                         workspace=cwd
                     )
-                res = universal_terminal.execute(sess.session_id, plan)
+                res = get_runtime(tenant_id).terminal.execute(sess.session_id, plan)
                 self._send_json(res)
                 return
             else:
@@ -4975,14 +5939,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                         exec_payload[k] = params[k]
                     elif k in req_data:
                         exec_payload[k] = req_data[k]
-                res = terminal_runtime.run_foreground(session_id, exec_payload)
+                res = get_runtime(tenant_id).terminal_runtime.run_foreground(session_id, exec_payload)
                 self._send_json(res)
                 return
 
         elif path == "/api/terminal/select-runtime":
             objective = req_data.get("objective", "Linux development workload")
             force_gui = bool(req_data.get("force_gui", False))
-            decision = universal_terminal.select_runtime(objective, force_gui=force_gui)
+            decision = get_runtime(tenant_id).terminal.select_runtime(objective, force_gui=force_gui)
             self._send_json({
                 "selected_profile_id": decision.selected_profile_id,
                 "selected_adapter_id": decision.selected_adapter_id,
@@ -5006,7 +5970,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             explicit_cmd = req_data.get("command")
             cwd = req_data.get("cwd")
 
-            result = terminal_agent.process_objective(
+            result = get_runtime(tenant_id).terminal_agent.process_objective(
                 objective=objective,
                 mission_id=mission_id,
                 human_approved=human_approved,
@@ -5033,7 +5997,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/terminal/rollback":
             snap_id = req_data.get("snapshot_id", "")
-            ok = universal_terminal.execution_gateway.rollback(snap_id)
+            ok = get_runtime(tenant_id).terminal.execution_gateway.rollback(snap_id)
             self._send_json({"success": ok, "snapshot_id": snap_id})
             return
 
@@ -5049,12 +6013,12 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 security_classification=req_data.get("security_classification", "INTERNAL_AUTHORIZED"),
                 authorization_context=req_data.get("authorization_context", {"human_approved": True}),
                 success_criteria=req_data.get("success_criteria", []),
-                company_id=req_data.get("company_id", "comp_primary"),
+                company_id=company_id,
                 tenant_id=tenant,
                 mission_id=req_data.get("mission_id"),
                 task_id=req_data.get("task_id")
             )
-            result = universal_terminal.execute_ceo_directive(instruction)
+            result = get_runtime(tenant_id).terminal.execute_ceo_directive(instruction)
             self._send_json(result.to_dict())
             return
 
@@ -5063,7 +6027,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not checkpoint_id:
                 self._send_json({"status": "FAILED", "error": "Missing checkpoint_id"}, status=400)
                 return
-            res = universal_terminal.resume_checkpoint(checkpoint_id)
+            res = get_runtime(tenant_id).terminal.resume_checkpoint(checkpoint_id)
             self._send_json(res)
             return
 
@@ -5073,14 +6037,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not operation_id:
                 self._send_json({"error": "Missing operation_id"}, status=400)
                 return
-            dossier = universal_terminal.get_diagnostic_dossier(operation_id, error_detail=error_detail)
+            dossier = get_runtime(tenant_id).terminal.get_diagnostic_dossier(operation_id, error_detail=error_detail)
             self._send_json(dossier)
             return
 
 
         elif path == "/api/coworker/self-extension":
             req_prompt = req_data.get("prompt", "")
-            ext_res = coworker_engine.self_extend(req_prompt)
+            ext_res = _cw(tenant_id, company_id).self_extend(req_prompt)
             self._send_json({
                 "success": ext_res.success,
                 "action_taken": ext_res.action_taken,
@@ -5096,10 +6060,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             decision = req_data.get("decision", "APPROVE").upper()
             mid = app_id.replace("app_", "")
             if decision == "APPROVE":
-                coworker_engine.background_dispatcher.resume_mission(mid)
-                coworker_engine.background_dispatcher.execute_compound_mission_step(mid)
+                _cw(tenant_id, company_id).background_dispatcher.resume_mission(mid)
+                _cw(tenant_id, company_id).background_dispatcher.execute_compound_mission_step(mid)
             else:
-                coworker_engine.background_dispatcher.stop_mission(mid)
+                _cw(tenant_id, company_id).background_dispatcher.stop_mission(mid)
             self._send_json({"success": True, "approval_id": app_id, "decision": decision})
             return
 
@@ -5108,7 +6072,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 WorkerNodeRegistrationRequest, NodeType, NodePlatform, SecurityPosture
             )
             node_id = req_data.get("node_id", f"node_{uuid.uuid4().hex[:6]}")
-            tenant_scope = req_data.get("tenant_scope", "tnt_primary")
+            # A node can only ever be registered into the authenticated tenant.
+            requested_scope = str(req_data.get("tenant_scope") or "").strip()
+            if requested_scope and requested_scope != tenant_id:
+                self._send_json({
+                    "error": "Cross-tenant node registration is not permitted",
+                    "code": "TENANT_SCOPE_MISMATCH",
+                    "detail": f"This credential belongs to tenant '{tenant_id}'; it cannot register nodes for '{requested_scope}'.",
+                }, status=403)
+                return
+            tenant_scope = tenant_id
             platform_str = req_data.get("platform", "linux")
             try:
                 plat = NodePlatform(platform_str)
@@ -5135,9 +6108,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 display_availability=bool(req_data.get("display_availability", False)),
                 registration_secret=req_data.get("registration_secret", "")
             )
-            ok, auth_token, profile = coworker_engine.node_registry.register_node(reg_req)
+            ok, auth_token, profile = _cw(tenant_id, company_id).node_registry.register_node(reg_req)
             if ok:
-                coworker_engine.node_registry.authorize_node(node_id)
+                _cw(tenant_id, company_id).node_registry.authorize_node(node_id)
                 self._send_json({
                     "success": True,
                     "node_id": node_id,
@@ -5152,7 +6125,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/coworker/nodes/heartbeat":
             node_id = req_data.get("node_id", "")
             metrics = req_data.get("metrics", {})
-            ok = coworker_engine.node_registry.record_heartbeat(node_id, metrics)
+            ok = _cw(tenant_id, company_id).node_registry.record_heartbeat(node_id, metrics)
             self._send_json({"success": ok, "status": "ACKNOWLEDGED" if ok else "NODE_UNKNOWN"})
             return
 
@@ -5167,15 +6140,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 authority=req_data.get("authority", "AUTOMATIC_IDEMPOTENT"),
                 budget=float(req_data.get("budget", 50.0)),
                 tenant_id=tenant_id,
-                company_id=req_data.get("company_id", "comp_primary")
+                company_id=company_id
             )
-            ceo_resp = coworker_engine.execute_ceo_mission(req)
+            ceo_resp = _cw(tenant_id, company_id).execute_ceo_mission(req)
             self._send_json(ceo_resp.to_dict())
             return
 
         elif path == "/api/coworker/browser/extract":
             url = req_data.get("url", "")
-            res = coworker_engine.browser_controller.navigate_and_extract(url)
+            res = _cw(tenant_id, company_id).browser_controller.navigate_and_extract(url)
             self._send_json(res)
             return
 
@@ -5183,7 +6156,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             srv_id = req_data.get("server_id", "")
             tool = req_data.get("tool", "")
             args = req_data.get("arguments", {})
-            res = coworker_engine.mcp_controller.execute_tool(srv_id, tool, args)
+            res = _cw(tenant_id, company_id).mcp_controller.execute_tool(srv_id, tool, args)
             self._send_json(res)
             return
 
@@ -5191,14 +6164,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             agent_id = req_data.get("target_agent", "")
             mtype = req_data.get("message_type", "QUERY")
             payload = req_data.get("content", {})
-            res = coworker_engine.a2a_controller.send_agent_message(agent_id, mtype, payload)
+            res = _cw(tenant_id, company_id).a2a_controller.send_agent_message(agent_id, mtype, payload)
             self._send_json(res)
             return
 
         elif path == "/api/coworker/recovery/reconcile":
             event_id = req_data.get("event_id", "")
             resolution = req_data.get("resolution", "Approved manual progression")
-            ok = coworker_engine.recovery_controller.reconcile_uncertain_task(event_id, resolution)
+            ok = _cw(tenant_id, company_id).recovery_controller.reconcile_uncertain_task(event_id, resolution)
             self._send_json({"success": ok, "event_id": event_id, "status": "RECONCILED" if ok else "NOT_FOUND"})
             return
 
@@ -5209,7 +6182,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             plugin_id = parts[3]
             install = bool(req_data.get("install", True))
-            plg = plugins_service.toggle_plugin_install(plugin_id, install)
+            plg = get_runtime(tenant_id).plugins.toggle_plugin_install(plugin_id, install)
             self._send_json({"success": True, "plugin": plg})
             return
 
@@ -5217,27 +6190,36 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             plugin_id = parts[3]
             enable = bool(req_data.get("enable", True))
-            plg = plugins_service.toggle_plugin_enabled(plugin_id, enable)
+            plg = get_runtime(tenant_id).plugins.toggle_plugin_enabled(plugin_id, enable)
             self._send_json({"success": True, "plugin": plg})
             return
 
         elif path == "/api/connections":
-            conn = plugins_service.create_connection(req_data)
+            conn = get_runtime(tenant_id).plugins.create_connection(req_data)
             self._send_json({"success": True, "connection": conn})
             return
 
         elif path.startswith("/api/connections/") and path.endswith("/test"):
             parts = path.split("/")
             conn_id = parts[3]
-            res = plugins_service.test_connection(conn_id)
-            self._send_json({"success": True, **res})
+            try:
+                res = get_runtime(tenant_id).plugins.test_connection(conn_id)
+            except ValueError as exc:
+                self._send_json({"success": False, "error": str(exc), "code": "CONNECTION_NOT_FOUND"}, status=404)
+                return
+            self._send_json({"success": bool(res.get("reachable")), **res})
             return
 
         elif path.startswith("/api/connections/") and path.endswith("/sync"):
             parts = path.split("/")
             conn_id = parts[3]
-            res = plugins_service.sync_connection(conn_id)
-            self._send_json({"success": True, **res})
+            try:
+                res = get_runtime(tenant_id).plugins.sync_connection(conn_id)
+            except ValueError as exc:
+                self._send_json({"success": False, "error": str(exc), "code": "CONNECTION_NOT_FOUND"}, status=404)
+                return
+            status_code = 501 if res.get("status") == "NOT_IMPLEMENTED" else 200
+            self._send_json({"success": status_code == 200, **res}, status=status_code)
             return
 
         # =====================================================================
@@ -5274,7 +6256,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/agent-factory/synthesize":
             prompt = req_data.get("prompt", "General business operations agent")
-            comp_id = req_data.get("company_id", "comp_primary")
+            comp_id = company_id
             bp = agent_factory.synthesize_blueprint_from_prompt(prompt, comp_id)
             self._send_json({"success": True, "blueprint": bp})
             return
@@ -5443,7 +6425,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             meeting_id = parts[3]
             try:
-                res = meeting_service.sync_meeting_to_memory(meeting_id)
+                res = get_runtime(tenant_id).meeting_service.sync_meeting_to_memory(meeting_id)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=400)
@@ -5451,8 +6433,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/stateful/demo/scenarios":
             demo_type = req_data.get("demo_type", "SECTION_74")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             if demo_type == "SECTION_74":
                 res = stateful_agent_adapter.run_executive_continuity_demonstration(cid)
             elif demo_type == "SECTION_75":
@@ -5468,8 +6450,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/multimodal/voice-to-ceo":
             transcript = req_data.get("transcript", "")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             uid = req_data.get("user_id", "usr_owner")
             res = hal_multimodal_adapter.voice_to_ceo(transcript, company_id=cid, host_user_id=uid)
             self._send_json(res)
@@ -5489,8 +6471,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/multimodal/observe/screen":
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             wtitle = req_data.get("window_title", "Active Desktop Workspace")
             preview = req_data.get("content_preview", "Screen inspection showing enterprise metrics")
             sid = req_data.get("session_id")
@@ -5506,8 +6488,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/multimodal/coworker/execute":
             prompt = req_data.get("prompt", "")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             ws_mode = req_data.get("workspace_mode", "COMPANY")
             res = hal_multimodal_adapter.coworker_execute_report(prompt, company_id=cid, workspace_mode=ws_mode)
             self._send_json(res)
@@ -5515,8 +6497,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/multimodal/action/controlled":
             cmd = req_data.get("command", "")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             res = hal_multimodal_adapter.execute_controlled_action(cmd, company_id=cid)
             self._send_json(res)
             return
@@ -5524,16 +6506,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/multimodal/memory/sync":
             content = req_data.get("content", "")
             mtype = req_data.get("candidate_type", "OBSERVATION")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             res = hal_multimodal_adapter.sync_hal_candidate_memory_to_letta(content, candidate_type=mtype, company_id=cid)
             self._send_json(res)
             return
 
         elif path == "/api/multimodal/workforce/delegate":
             obj = req_data.get("objective", "Execute multimodal task")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             res = hal_multimodal_adapter.delegate_workforce_multimodal_task(obj, company_id=cid)
             self._send_json(res)
             return
@@ -5542,8 +6524,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             client_id = req_data.get("client_id", "claude_code")
             tool_name = req_data.get("tool_name", "")
             params = req_data.get("parameters", {})
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             res = hal_multimodal_adapter.invoke_mcp_capability(client_id, tool_name, params, company_id=cid)
             self._send_json(res)
             return
@@ -5551,20 +6533,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/multimodal/task/interrupt":
             sid = req_data.get("session_id", "")
             reason = req_data.get("reason", "Voice stop command")
-            res = execution_manager.trigger_killswitch(sid, reason=reason)
+            res = get_runtime(tenant_id).multimodal_execution.trigger_killswitch(sid, reason=reason)
             self._send_json({"success": True, "killswitch": res})
             return
 
         elif path == "/api/multimodal/task/takeover":
             sid = req_data.get("session_id", "")
             uid = req_data.get("user_id", "usr_owner")
-            res = execution_manager.trigger_host_takeover(sid, host_id=uid)
+            res = get_runtime(tenant_id).multimodal_execution.trigger_host_takeover(sid, host_id=uid)
             self._send_json({"success": True, "takeover": res})
             return
 
         elif path == "/api/multimodal/task/recover":
             sid = req_data.get("session_id", "")
-            res = execution_manager.recover_from_crash(sid)
+            res = get_runtime(tenant_id).multimodal_execution.recover_from_crash(sid)
             self._send_json({"success": True, "recovery": res})
             return
 
@@ -5572,16 +6554,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             title = req_data.get("title", "Generated Artifact")
             content = req_data.get("content", "")
             atype = req_data.get("artifact_type", "DOCUMENT")
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
             art = governed_artifacts.create_artifact(title, content, artifact_type=atype, company_id=cid)
             self._send_json({"success": True, "artifact": art})
             return
 
         elif path == "/api/multimodal/demo/scenarios":
             scenario = req_data.get("scenario", "SCENARIO_A").upper()
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
 
             if scenario in ("A", "SCENARIO_A", "TEST_A"):
                 res = hal_multimodal_adapter.voice_to_ceo(
@@ -5743,8 +6725,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/workflows/demo/scenarios":
             scenario = req_data.get("scenario", "A").upper()
-            companies = portfolio.list_companies()
-            cid = req_data.get("company_id") or (companies[0].company_id if companies else "comp_primary")
+            companies = get_portfolio(tenant_id).list_companies()
+            cid = company_id
 
             if scenario in ("A", "SCENARIO_A", "TEST_A"):
                 res = langgraph_adapter.run_simple_workflow(company_id=cid)
@@ -5785,7 +6767,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/automation/workflows":
             name = req_data.get("name", "New Workflow")
             spec = req_data.get("spec", {})
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             author = self.headers.get("X-User-Name", "employee")
             try:
                 draft = universal_automation_fabric.create_workflow_draft(name, spec, tenant_id, company_id, author=author)
@@ -5817,7 +6799,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = path.split("/")[4]
             inputs = req_data.get("inputs", {})
             context = req_data.get("context", {})
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             actor = self.headers.get("X-User-Name", "HostEmployee")
             try:
                 res = universal_automation_fabric.execute_workflow(
@@ -5836,7 +6818,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/automation/templates/") and path.endswith("/instantiate"):
             tmpl_id = path.split("/")[4]
             inputs = req_data.get("inputs", {})
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             try:
                 instance = template_catalog.instantiate_template(tmpl_id, inputs, tenant_id, company_id)
                 draft = universal_automation_fabric.create_workflow_draft(
@@ -5852,7 +6834,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/automation/agent/generate":
             prompt = req_data.get("prompt", "Automate routine data sync")
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             task = AgentDelegationTask(
                 task_id=f"gen_{uuid.uuid4().hex[:8]}",
                 tenant_id=tenant_id,
@@ -5883,7 +6865,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             objective = req_data.get("objective", "Execute task")
             scope = req_data.get("scope", "general")
             params = req_data.get("parameters", {})
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             task = AgentDelegationTask(
                 task_id=f"dt_{uuid.uuid4().hex[:8]}",
                 tenant_id=tenant_id,
@@ -5968,7 +6950,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path in ("/a2a/message:send", "/message:send"):
             try:
-                res = a2a_gateway.client_adapter.send_message(req_data)
+                res = _a2a(tenant_id, company_id).client_adapter.send_message(req_data)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -5978,7 +6960,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             task_id = parts[2].split(":")[0]
             try:
-                res = a2a_gateway.client_adapter.cancel_task(task_id)
+                res = _a2a(tenant_id, company_id).client_adapter.cancel_task(task_id)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -5988,7 +6970,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             card = req_data.get("agent_card") or req_data
             source = req_data.get("source", "MANUAL")
             allow_loopback = bool(req_data.get("allow_test_loopback", False))
-            ok, agent_id, errs = a2a_gateway.discover_agent(card, source=source, allow_test_loopback=allow_loopback)
+            ok, agent_id, errs = _a2a(tenant_id, company_id).discover_agent(card, source=source, allow_test_loopback=allow_loopback)
             if ok:
                 self._send_json({"success": True, "agent_id": agent_id, "message": "Agent registered"})
             else:
@@ -6000,7 +6982,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             agent_id = parts[4]
             trust_lvl = req_data.get("trust_level", AgentTrustLevel.DISCOVERED.value)
             try:
-                a2a_gateway.trust_service.set_agent_trust(agent_id, AgentTrustLevel(trust_lvl))
+                _a2a(tenant_id, company_id).trust_service.set_agent_trust(agent_id, AgentTrustLevel(trust_lvl))
                 self._send_json({"success": True, "agent_id": agent_id, "trust_level": trust_lvl})
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6009,21 +6991,65 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/a2a/agents/") and path.endswith("/block"):
             parts = path.split("/")
             agent_id = parts[4]
-            a2a_gateway.trust_service.set_agent_trust(agent_id, AgentTrustLevel.BLOCKED)
+            _a2a(tenant_id, company_id).trust_service.set_agent_trust(agent_id, AgentTrustLevel.BLOCKED)
             self._send_json({"success": True, "agent_id": agent_id, "status": "BLOCKED"})
             return
 
         elif path.startswith("/api/a2a/agents/") and path.endswith("/health"):
+            import socket
             parts = path.split("/")
             agent_id = parts[4]
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT endpoint_url, trust_level FROM a2a_agents WHERE agent_id = ? AND tenant_id = ?",
+                    (agent_id, tenant_id),
+                ).fetchone()
+            if not row:
+                self._send_json({
+                    "error": f"A2A agent '{agent_id}' is not registered for this tenant",
+                    "code": "AGENT_NOT_FOUND",
+                }, status=404)
+                return
+
+            endpoint = (row["endpoint_url"] or "").strip()
+            parsed = urllib.parse.urlparse(endpoint) if endpoint else None
+            host = parsed.hostname if parsed else None
+            port = (parsed.port if parsed else None) or (443 if (parsed and parsed.scheme == "https") else 80)
             now = time.time()
+            latency_ms = None
+            error = None
+            if not host:
+                new_status = "UNVERIFIED"
+                error = "Agent has no endpoint_url; reachability cannot be probed."
+            else:
+                began = time.time()
+                try:
+                    with socket.create_connection((host, port), timeout=3):
+                        pass
+                    latency_ms = round((time.time() - began) * 1000, 2)
+                    new_status = "ONLINE"
+                except Exception as exc:
+                    latency_ms = round((time.time() - began) * 1000, 2)
+                    new_status = "OFFLINE"
+                    error = f"{type(exc).__name__}: {exc}"
+
             with db.get_connection() as conn:
                 conn.execute(
-                    "UPDATE a2a_agents SET last_health_check = ?, status = 'ONLINE' WHERE agent_id = ? AND tenant_id = ?",
-                    (now, agent_id, tenant_id)
+                    "UPDATE a2a_agents SET last_health_check = ?, status = ? WHERE agent_id = ? AND tenant_id = ?",
+                    (now, new_status, agent_id, tenant_id),
                 )
                 conn.commit()
-            self._send_json({"success": True, "agent_id": agent_id, "status": "ONLINE", "timestamp": now})
+            self._send_json({
+                "success": True,
+                "agent_id": agent_id,
+                "status": new_status,
+                "endpoint": endpoint or None,
+                "latency_ms": latency_ms,
+                "error": error,
+                "trust_level": row["trust_level"],
+                "method": "TCP connect probe to endpoint_url",
+                "timestamp": now,
+            })
             return
 
         elif path == "/api/a2a/tasks/delegate":
@@ -6034,7 +7060,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             class_str = req_data.get("data_classification", "INTERNAL")
             classification = DataClassification(class_str) if class_str in DataClassification.__members__ else DataClassification.INTERNAL
             try:
-                res = a2a_gateway.delegate_task(
+                res = _a2a(tenant_id, company_id).delegate_task(
                     agent_id=agent_id,
                     skill_name=skill_name,
                     parameters=params,
@@ -6050,7 +7076,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             task_id = parts[4]
             try:
-                res = a2a_gateway.client_adapter.cancel_task(task_id)
+                res = _a2a(tenant_id, company_id).client_adapter.cancel_task(task_id)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6061,7 +7087,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             task_id = parts[4]
             verified_state = req_data.get("verified_state", A2ATaskState.TASK_STATE_COMPLETED.value)
             try:
-                res = a2a_gateway.client_adapter.reconcile_ambiguous_task(task_id, verified_external_state=verified_state)
+                res = _a2a(tenant_id, company_id).client_adapter.reconcile_ambiguous_task(task_id, verified_external_state=verified_state)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6072,7 +7098,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             task_id = parts[4]
             auth_token = self.headers.get("Authorization")
             try:
-                res = a2a_gateway.handle_push_notification(task_id, req_data, auth_token=auth_token)
+                res = _a2a(tenant_id, company_id).handle_push_notification(task_id, req_data, auth_token=auth_token)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6107,7 +7133,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/a2a/published":
-            pub_id = a2a_gateway.server_adapter.publish_agent(
+            pub_id = _a2a(tenant_id, company_id).server_adapter.publish_agent(
                 internal_agent_id=req_data.get("internal_agent_id", "agent_ceo"),
                 display_name=req_data.get("display_name", "Published Agent"),
                 description=req_data.get("description", "A2A Endpoint for ZONATA"),
@@ -6131,16 +7157,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/a2a/demo/scenarios":
             scenario = req_data.get("scenario", "A").upper()
             sc_map = {
-                "A": a2a_scenarios.scenario_a_discover_external_agent,
-                "B": a2a_scenarios.scenario_b_delegate_simple_task,
-                "C": a2a_scenarios.scenario_c_long_running_async_task,
-                "D": a2a_scenarios.scenario_d_sensitive_action_approval,
-                "E": a2a_scenarios.scenario_e_prompt_injection_defense,
-                "F": a2a_scenarios.scenario_f_malicious_agent_card_defense,
-                "G": a2a_scenarios.scenario_g_ambiguous_outcome_reconciliation,
-                "H": a2a_scenarios.scenario_h_tenant_isolation,
-                "I": a2a_scenarios.scenario_i_killswitch_override,
-                "J": a2a_scenarios.scenario_j_langgraph_a2a_workflow
+                "A": _a2a_scenarios(tenant_id, company_id).scenario_a_discover_external_agent,
+                "B": _a2a_scenarios(tenant_id, company_id).scenario_b_delegate_simple_task,
+                "C": _a2a_scenarios(tenant_id, company_id).scenario_c_long_running_async_task,
+                "D": _a2a_scenarios(tenant_id, company_id).scenario_d_sensitive_action_approval,
+                "E": _a2a_scenarios(tenant_id, company_id).scenario_e_prompt_injection_defense,
+                "F": _a2a_scenarios(tenant_id, company_id).scenario_f_malicious_agent_card_defense,
+                "G": _a2a_scenarios(tenant_id, company_id).scenario_g_ambiguous_outcome_reconciliation,
+                "H": _a2a_scenarios(tenant_id, company_id).scenario_h_tenant_isolation,
+                "I": _a2a_scenarios(tenant_id, company_id).scenario_i_killswitch_override,
+                "J": _a2a_scenarios(tenant_id, company_id).scenario_j_langgraph_a2a_workflow
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -6155,7 +7181,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path in ("/mcp", "/api/mcp/endpoint", "/api/mcp/server/endpoint"):
             try:
-                res = mcp_inbound_server.handle_jsonrpc(req_data, caller_identity=self.headers.get("X-Client-ID", "external_ai"))
+                res = _mcp_server(tenant_id, company_id).handle_jsonrpc(req_data, caller_identity=self.headers.get("X-Client-ID", "external_ai"))
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"jsonrpc": "2.0", "id": req_data.get("id"), "error": {"code": -32603, "message": str(e)}}, status=500)
@@ -6169,7 +7195,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             allow_loopback = bool(req_data.get("allow_test_loopback", False))
             token = req_data.get("auth_token")
 
-            ok, srv_id, errs = mcp_gateway.register_server(
+            ok, srv_id, errs = _mcp(tenant_id, company_id).register_server(
                 display_name=display_name,
                 endpoint=endpoint,
                 description=description,
@@ -6186,7 +7212,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/mcp/servers/") and path.endswith("/validate"):
             parts = path.split("/")
             server_id = parts[4]
-            ok, msg = mcp_gateway.validate_server(server_id)
+            ok, msg = _mcp(tenant_id, company_id).validate_server(server_id)
             self._send_json({"success": ok, "message": msg})
             return
 
@@ -6196,7 +7222,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             state_str = req_data.get("trust_state", "TRUSTED")
             reason = req_data.get("reason", "Admin state update")
             try:
-                mcp_gateway.set_server_trust(server_id, MCPTrustState(state_str), reason=reason)
+                _mcp(tenant_id, company_id).set_server_trust(server_id, MCPTrustState(state_str), reason=reason)
                 self._send_json({"success": True, "server_id": server_id, "trust_state": state_str})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=400)
@@ -6205,14 +7231,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/mcp/servers/") and path.endswith("/test"):
             parts = path.split("/")
             server_id = parts[4]
-            res = mcp_gateway.test_server_connection(server_id)
+            res = _mcp(tenant_id, company_id).test_server_connection(server_id)
             self._send_json(res)
             return
 
         elif path.startswith("/api/mcp/servers/") and path.endswith("/refresh"):
             parts = path.split("/")
             server_id = parts[4]
-            res = mcp_gateway.refresh_server_capabilities(server_id)
+            res = _mcp(tenant_id, company_id).refresh_server_capabilities(server_id)
             self._send_json(res)
             return
 
@@ -6220,7 +7246,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             server_id = parts[4]
             reason = req_data.get("reason", "Administrative suspension")
-            res = mcp_gateway.suspend_server(server_id, reason=reason)
+            res = _mcp(tenant_id, company_id).suspend_server(server_id, reason=reason)
             self._send_json(res)
             return
 
@@ -6228,7 +7254,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             server_id = parts[4]
             reason = req_data.get("reason", "Administrative quarantine block")
-            res = mcp_gateway.block_server(server_id, reason=reason)
+            res = _mcp(tenant_id, company_id).block_server(server_id, reason=reason)
             self._send_json(res)
             return
 
@@ -6236,14 +7262,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             server_id = parts[4]
             reason = req_data.get("reason", "Administrative reauthorization")
-            res = mcp_gateway.reauthorize_server(server_id, reason=reason)
+            res = _mcp(tenant_id, company_id).reauthorize_server(server_id, reason=reason)
             self._send_json(res)
             return
 
         elif path.startswith("/api/mcp/servers/") and path.endswith("/disconnect"):
             parts = path.split("/")
             server_id = parts[4]
-            ok = mcp_gateway.disconnect_server(server_id)
+            ok = _mcp(tenant_id, company_id).disconnect_server(server_id)
             self._send_json({"success": ok, "server_id": server_id})
             return
 
@@ -6257,7 +7283,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             appr = req_data.get("approval_requirement")
             idemp = bool(req_data.get("idempotency", True))
             try:
-                tid = mcp_gateway.register_tool(
+                tid = _mcp(tenant_id, company_id).register_tool(
                     server_id=server_id,
                     name=name,
                     description=desc,
@@ -6278,7 +7304,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             actor = req_data.get("actor", "admin")
             updates = req_data.get("updates") or req_data
             try:
-                updated_tool = mcp_gateway.override_tool(tool_id, updates, actor_id=actor)
+                updated_tool = _mcp(tenant_id, company_id).override_tool(tool_id, updates, actor_id=actor)
                 self._send_json({"success": True, "tool": updated_tool})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=400)
@@ -6290,7 +7316,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             arguments = req_data.get("arguments", {})
             context = req_data.get("context", {})
             try:
-                res = mcp_gateway.invoke_tool(
+                res = _mcp(tenant_id, company_id).invoke_tool(
                     server_id=server_id,
                     tool_name_or_id=tool_name,
                     arguments=arguments,
@@ -6307,7 +7333,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             resource_id = req_data.get("resource_id")
             context = req_data.get("context", {})
             try:
-                res = mcp_gateway.read_resource(resource_id, context=context)
+                res = _mcp(tenant_id, company_id).read_resource(resource_id, context=context)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=400)
@@ -6316,7 +7342,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/mcp/executions/") and path.endswith("/verify"):
             parts = path.split("/")
             exec_id = parts[4]
-            res = mcp_gateway.verify_execution(exec_id)
+            res = _mcp(tenant_id, company_id).verify_execution(exec_id)
             self._send_json(res)
             return
 
@@ -6324,7 +7350,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             exec_id = parts[4]
             reason = req_data.get("reason", "Cancelled by user")
-            res = mcp_gateway.cancel_execution(exec_id, reason=reason)
+            res = _mcp(tenant_id, company_id).cancel_execution(exec_id, reason=reason)
             self._send_json(res)
             return
 
@@ -6354,7 +7380,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             vis = req_data.get("visibility", "PRIVATE")
             rate = int(req_data.get("rate_limit_per_min", 60))
             appr = bool(req_data.get("approval_required", False))
-            pub_id = mcp_inbound_server.publish_capability(
+            pub_id = _mcp_server(tenant_id, company_id).publish_capability(
                 capability_id=cap_id,
                 name=name,
                 description=desc,
@@ -6369,18 +7395,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/mcp/demo/scenarios":
             scenario = req_data.get("scenario", "SECTION_73").upper()
             sc_map = {
-                "A": mcp_scenarios.scenario_a_server_discovery_and_trust,
-                "B": mcp_scenarios.scenario_b_governed_tool_execution,
-                "C": mcp_scenarios.scenario_c_mutation_human_approval,
-                "D": mcp_scenarios.scenario_d_financial_policy_threshold,
-                "E": mcp_scenarios.scenario_e_prompt_injection_firewall,
-                "F": mcp_scenarios.scenario_f_ssrf_blocking,
-                "G": mcp_scenarios.scenario_g_timeout_unknown_reconciliation,
-                "H": mcp_scenarios.scenario_h_tenant_and_company_isolation,
-                "I": mcp_scenarios.scenario_i_killswitch_override,
-                "J": mcp_scenarios.scenario_j_langgraph_durable_mcp_workflow,
-                "SECTION_73": mcp_scenarios.scenario_acceptance_pms_cancellation_recovery,
-                "73": mcp_scenarios.scenario_acceptance_pms_cancellation_recovery
+                "A": _mcp_scenarios(tenant_id, company_id).scenario_a_server_discovery_and_trust,
+                "B": _mcp_scenarios(tenant_id, company_id).scenario_b_governed_tool_execution,
+                "C": _mcp_scenarios(tenant_id, company_id).scenario_c_mutation_human_approval,
+                "D": _mcp_scenarios(tenant_id, company_id).scenario_d_financial_policy_threshold,
+                "E": _mcp_scenarios(tenant_id, company_id).scenario_e_prompt_injection_firewall,
+                "F": _mcp_scenarios(tenant_id, company_id).scenario_f_ssrf_blocking,
+                "G": _mcp_scenarios(tenant_id, company_id).scenario_g_timeout_unknown_reconciliation,
+                "H": _mcp_scenarios(tenant_id, company_id).scenario_h_tenant_and_company_isolation,
+                "I": _mcp_scenarios(tenant_id, company_id).scenario_i_killswitch_override,
+                "J": _mcp_scenarios(tenant_id, company_id).scenario_j_langgraph_durable_mcp_workflow,
+                "SECTION_73": _mcp_scenarios(tenant_id, company_id).scenario_acceptance_pms_cancellation_recovery,
+                "73": _mcp_scenarios(tenant_id, company_id).scenario_acceptance_pms_cancellation_recovery
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -6404,7 +7430,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             task_id = req_data.get("task_id")
             ctx = req_data.get("scoped_context", {})
             try:
-                ex = openhands_gateway.create_execution(
+                ex = _openhands(tenant_id, company_id).create_execution(
                     agent_id=agent_id,
                     task_prompt=prompt,
                     workspace_type=WorkspaceType(ws_type_str),
@@ -6425,7 +7451,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             command = req_data.get("command")
             timeout = int(req_data.get("timeout_seconds", 30))
             try:
-                res = openhands_gateway.run_command(exec_id, command, timeout_seconds=timeout)
+                res = _openhands(tenant_id, company_id).run_command(exec_id, command, timeout_seconds=timeout)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6438,7 +7464,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             test_cmd = req_data.get("expected_test_command")
             file_chk = req_data.get("expected_file_snippet")
             try:
-                res = openhands_gateway.complete_execution(
+                res = _openhands(tenant_id, company_id).complete_execution(
                     execution_id=exec_id,
                     result_summary=summary,
                     expected_test_command=test_cmd,
@@ -6452,14 +7478,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/openhands/executions/") and path.endswith("/pause"):
             parts = path.split("/")
             exec_id = parts[4]
-            ok = openhands_gateway.pause_execution(exec_id)
+            ok = _openhands(tenant_id, company_id).pause_execution(exec_id)
             self._send_json({"success": ok, "execution_id": exec_id})
             return
 
         elif path.startswith("/api/openhands/executions/") and path.endswith("/resume"):
             parts = path.split("/")
             exec_id = parts[4]
-            ok = openhands_gateway.resume_execution(exec_id)
+            ok = _openhands(tenant_id, company_id).resume_execution(exec_id)
             self._send_json({"success": ok, "execution_id": exec_id})
             return
 
@@ -6467,7 +7493,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             exec_id = parts[4]
             reason = req_data.get("reason", "Cancelled by user")
-            ok = openhands_gateway.cancel_execution(exec_id, reason=reason)
+            ok = _openhands(tenant_id, company_id).cancel_execution(exec_id, reason=reason)
             self._send_json({"success": ok, "execution_id": exec_id})
             return
 
@@ -6475,7 +7501,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             appr_id = parts[4]
             approver = req_data.get("approver", "Administrator")
-            ok = openhands_gateway.approve_operation(appr_id, approver_name=approver)
+            ok = _openhands(tenant_id, company_id).approve_operation(appr_id, approver_name=approver)
             self._send_json({"success": ok, "approval_id": appr_id})
             return
 
@@ -6483,7 +7509,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             appr_id = parts[4]
             approver = req_data.get("approver", "Administrator")
-            ok = openhands_gateway.reject_operation(appr_id, approver_name=approver)
+            ok = _openhands(tenant_id, company_id).reject_operation(appr_id, approver_name=approver)
             self._send_json({"success": ok, "approval_id": appr_id})
             return
 
@@ -6508,24 +7534,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/openhands/demo/scenarios":
             scenario = req_data.get("scenario", "SECTION_79").upper()
             sc_map = {
-                "TEST_01": openhands_scenarios.test_01_software_task,
-                "1": openhands_scenarios.test_01_software_task,
-                "TEST_02": openhands_scenarios.test_02_mcp_and_openhands,
-                "2": openhands_scenarios.test_02_mcp_and_openhands,
-                "TEST_03": openhands_scenarios.test_03_human_approval,
-                "3": openhands_scenarios.test_03_human_approval,
-                "TEST_04": openhands_scenarios.test_04_killswitch,
-                "4": openhands_scenarios.test_04_killswitch,
-                "TEST_05": openhands_scenarios.test_05_malicious_repository,
-                "5": openhands_scenarios.test_05_malicious_repository,
-                "TEST_06": openhands_scenarios.test_06_unknown_mutation_reconciliation,
-                "6": openhands_scenarios.test_06_unknown_mutation_reconciliation,
-                "TEST_07": openhands_scenarios.test_07_tenant_isolation,
-                "7": openhands_scenarios.test_07_tenant_isolation,
-                "TEST_08": openhands_scenarios.test_08_self_improvement,
-                "8": openhands_scenarios.test_08_self_improvement,
-                "SECTION_79": openhands_scenarios.section_79_acceptance_scenario,
-                "79": openhands_scenarios.section_79_acceptance_scenario
+                "TEST_01": _openhands_scenarios(tenant_id, company_id).test_01_software_task,
+                "1": _openhands_scenarios(tenant_id, company_id).test_01_software_task,
+                "TEST_02": _openhands_scenarios(tenant_id, company_id).test_02_mcp_and_openhands,
+                "2": _openhands_scenarios(tenant_id, company_id).test_02_mcp_and_openhands,
+                "TEST_03": _openhands_scenarios(tenant_id, company_id).test_03_human_approval,
+                "3": _openhands_scenarios(tenant_id, company_id).test_03_human_approval,
+                "TEST_04": _openhands_scenarios(tenant_id, company_id).test_04_killswitch,
+                "4": _openhands_scenarios(tenant_id, company_id).test_04_killswitch,
+                "TEST_05": _openhands_scenarios(tenant_id, company_id).test_05_malicious_repository,
+                "5": _openhands_scenarios(tenant_id, company_id).test_05_malicious_repository,
+                "TEST_06": _openhands_scenarios(tenant_id, company_id).test_06_unknown_mutation_reconciliation,
+                "6": _openhands_scenarios(tenant_id, company_id).test_06_unknown_mutation_reconciliation,
+                "TEST_07": _openhands_scenarios(tenant_id, company_id).test_07_tenant_isolation,
+                "7": _openhands_scenarios(tenant_id, company_id).test_07_tenant_isolation,
+                "TEST_08": _openhands_scenarios(tenant_id, company_id).test_08_self_improvement,
+                "8": _openhands_scenarios(tenant_id, company_id).test_08_self_improvement,
+                "SECTION_79": _openhands_scenarios(tenant_id, company_id).section_79_acceptance_scenario,
+                "79": _openhands_scenarios(tenant_id, company_id).section_79_acceptance_scenario
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -6544,7 +7570,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             allowed_domains = req_data.get("allowed_domains", [])
             blocked_domains = req_data.get("blocked_domains", [])
             agent_id = req_data.get("agent_id", "agent_browser_user")
-            sess = browser_gateway.create_session(
+            sess = _browser(tenant_id, company_id).create_session(
                 agent_id=agent_id,
                 profile_type=profile_type,
                 allowed_domains=allowed_domains
@@ -6554,7 +7580,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/browser/sessions/") and path.endswith("/close"):
             sess_id = path.split("/")[4]
-            ok = browser_gateway.close_session(sess_id)
+            ok = _browser(tenant_id, company_id).close_session(sess_id)
             self._send_json({"success": ok, "session_id": sess_id})
             return
 
@@ -6568,7 +7594,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             max_actions = int(req_data.get("max_actions", 25))
             timeout_seconds = int(req_data.get("timeout_seconds", 300))
             try:
-                ex = browser_gateway.create_execution(
+                ex = _browser(tenant_id, company_id).create_execution(
                     session_id=session_id,
                     mission_id=mission_id,
                     task_id=task_id,
@@ -6589,7 +7615,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             execution_id = req_data.get("execution_id")
             url = req_data.get("url")
             try:
-                res = browser_gateway.navigate(execution_id, url)
+                res = _browser(tenant_id, company_id).navigate(execution_id, url)
                 self._send_json(res)
             except BrowserSecurityException as bse:
                 self._send_json({"error": str(bse), "security_violation": True}, status=403)
@@ -6604,7 +7630,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parameters = req_data.get("parameters", {})
             human_intent = req_data.get("human_intent", "")
             try:
-                res = browser_gateway.execute_action(
+                res = _browser(tenant_id, company_id).execute_action(
                     execution_id=execution_id,
                     action_type=action_type,
                     selector=selector,
@@ -6623,7 +7649,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             outcome_summary = req_data.get("outcome_summary", "Completed successfully")
             verification_evidence = req_data.get("verification_evidence", {})
             try:
-                res = browser_gateway.complete_execution(
+                res = _browser(tenant_id, company_id).complete_execution(
                     execution_id=exec_id,
                     outcome_summary=outcome_summary,
                     verification_evidence=verification_evidence
@@ -6636,7 +7662,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/browser/executions/") and path.endswith("/cancel"):
             exec_id = path.split("/")[4]
             reason = req_data.get("reason", "User requested cancellation")
-            ok = browser_gateway.cancel_execution(exec_id, reason=reason)
+            ok = _browser(tenant_id, company_id).cancel_execution(exec_id, reason=reason)
             self._send_json({"success": ok, "execution_id": exec_id})
             return
 
@@ -6644,7 +7670,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             appr_id = path.split("/")[4]
             approver = req_data.get("approver", "usr_executive")
             try:
-                res = browser_gateway.approve_action(appr_id, approver_id=approver)
+                res = _browser(tenant_id, company_id).approve_action(appr_id, approver_id=approver)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6655,7 +7681,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             rejector = req_data.get("rejector", "usr_executive")
             reason = req_data.get("reason", "Security policy violation")
             try:
-                res = browser_gateway.reject_action(appr_id, rejector_id=rejector, reason=reason)
+                res = _browser(tenant_id, company_id).reject_action(appr_id, rejector_id=rejector, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6664,7 +7690,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/browser/killswitch":
             active = bool(req_data.get("active", True))
             scope = str(req_data.get("scope", "GLOBAL")).upper()
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             if active:
                 if scope == "GLOBAL":
                     BrowserKillSwitch.trip_global()
@@ -6695,28 +7721,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/browser/demo/scenarios":
             scenario = str(req_data.get("scenario", "SECTION_80")).upper()
             sc_map = {
-                "TEST_01": browser_scenarios.test_01_information_extraction,
-                "1": browser_scenarios.test_01_information_extraction,
-                "TEST_02": browser_scenarios.test_02_sensitive_mutation,
-                "2": browser_scenarios.test_02_sensitive_mutation,
-                "TEST_03": browser_scenarios.test_03_prompt_injection,
-                "3": browser_scenarios.test_03_prompt_injection,
-                "TEST_04": browser_scenarios.test_04_unknown_result_reconciliation,
-                "4": browser_scenarios.test_04_unknown_result_reconciliation,
-                "TEST_05": browser_scenarios.test_05_tenant_isolation,
-                "5": browser_scenarios.test_05_tenant_isolation,
-                "TEST_06": browser_scenarios.test_06_killswitch,
-                "6": browser_scenarios.test_06_killswitch,
-                "TEST_07": browser_scenarios.test_07_openhands_and_browser,
-                "7": browser_scenarios.test_07_openhands_and_browser,
-                "TEST_08": browser_scenarios.test_08_mcp_and_browser,
-                "8": browser_scenarios.test_08_mcp_and_browser,
-                "TEST_09": browser_scenarios.test_09_a2a_and_browser,
-                "9": browser_scenarios.test_09_a2a_and_browser,
-                "SECTION_80": browser_scenarios.test_10_complete_zonata_grand_acceptance,
-                "80": browser_scenarios.test_10_complete_zonata_grand_acceptance,
-                "TEST_10": browser_scenarios.test_10_complete_zonata_grand_acceptance,
-                "10": browser_scenarios.test_10_complete_zonata_grand_acceptance
+                "TEST_01": _browser_scenarios(tenant_id, company_id).test_01_information_extraction,
+                "1": _browser_scenarios(tenant_id, company_id).test_01_information_extraction,
+                "TEST_02": _browser_scenarios(tenant_id, company_id).test_02_sensitive_mutation,
+                "2": _browser_scenarios(tenant_id, company_id).test_02_sensitive_mutation,
+                "TEST_03": _browser_scenarios(tenant_id, company_id).test_03_prompt_injection,
+                "3": _browser_scenarios(tenant_id, company_id).test_03_prompt_injection,
+                "TEST_04": _browser_scenarios(tenant_id, company_id).test_04_unknown_result_reconciliation,
+                "4": _browser_scenarios(tenant_id, company_id).test_04_unknown_result_reconciliation,
+                "TEST_05": _browser_scenarios(tenant_id, company_id).test_05_tenant_isolation,
+                "5": _browser_scenarios(tenant_id, company_id).test_05_tenant_isolation,
+                "TEST_06": _browser_scenarios(tenant_id, company_id).test_06_killswitch,
+                "6": _browser_scenarios(tenant_id, company_id).test_06_killswitch,
+                "TEST_07": _browser_scenarios(tenant_id, company_id).test_07_openhands_and_browser,
+                "7": _browser_scenarios(tenant_id, company_id).test_07_openhands_and_browser,
+                "TEST_08": _browser_scenarios(tenant_id, company_id).test_08_mcp_and_browser,
+                "8": _browser_scenarios(tenant_id, company_id).test_08_mcp_and_browser,
+                "TEST_09": _browser_scenarios(tenant_id, company_id).test_09_a2a_and_browser,
+                "9": _browser_scenarios(tenant_id, company_id).test_09_a2a_and_browser,
+                "SECTION_80": _browser_scenarios(tenant_id, company_id).test_10_complete_zonata_grand_acceptance,
+                "80": _browser_scenarios(tenant_id, company_id).test_10_complete_zonata_grand_acceptance,
+                "TEST_10": _browser_scenarios(tenant_id, company_id).test_10_complete_zonata_grand_acceptance,
+                "10": _browser_scenarios(tenant_id, company_id).test_10_complete_zonata_grand_acceptance
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -6736,7 +7762,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             mission_id = req_data.get("mission_id")
             idempotency_key = req_data.get("idempotency_key")
             try:
-                wf = temporal_gateway.start_workflow(
+                wf = _temporal(tenant_id, company_id).start_workflow(
                     workflow_type=wf_type,
                     input_payload=input_payload,
                     task_queue=task_queue,
@@ -6753,7 +7779,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             sig_name = req_data.get("signal_name", "EXTERNAL_UPDATE")
             sig_payload = req_data.get("payload", {})
             try:
-                res = temporal_gateway.signal_workflow(wf_id, sig_name, sig_payload)
+                res = _temporal(tenant_id, company_id).signal_workflow(wf_id, sig_name, sig_payload)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6764,7 +7790,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             upd_name = req_data.get("update_name", "UPDATE_CONFIG")
             upd_payload = req_data.get("payload", {})
             try:
-                res = temporal_gateway.update_workflow(wf_id, upd_name, upd_payload)
+                res = _temporal(tenant_id, company_id).update_workflow(wf_id, upd_name, upd_payload)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6774,7 +7800,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = path.split("/")[4]
             q_name = req_data.get("query_name", "status")
             try:
-                res = temporal_gateway.query_workflow(wf_id, q_name)
+                res = _temporal(tenant_id, company_id).query_workflow(wf_id, q_name)
                 self._send_json({"result": res, "workflow_id": wf_id, "query": q_name})
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6784,7 +7810,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = path.split("/")[4]
             reason = req_data.get("reason", "Governor override")
             try:
-                res = temporal_gateway.pause_workflow(wf_id, reason=reason)
+                res = _temporal(tenant_id, company_id).pause_workflow(wf_id, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6793,7 +7819,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/temporal/workflows/") and path.endswith("/resume"):
             wf_id = path.split("/")[4]
             try:
-                res = temporal_gateway.resume_workflow(wf_id)
+                res = _temporal(tenant_id, company_id).resume_workflow(wf_id)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6803,7 +7829,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = path.split("/")[4]
             reason = req_data.get("reason", "User requested cancel")
             try:
-                res = temporal_gateway.cancel_workflow(wf_id, reason=reason)
+                res = _temporal(tenant_id, company_id).cancel_workflow(wf_id, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6813,7 +7839,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             wf_id = path.split("/")[4]
             reason = req_data.get("reason", "Administrative termination")
             try:
-                res = temporal_gateway.terminate_workflow(wf_id, reason=reason)
+                res = _temporal(tenant_id, company_id).terminate_workflow(wf_id, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6826,7 +7852,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             entity_type = req_data.get("entity_type", "GENERIC_MUTATION")
             obs_state = req_data.get("observed_state")
             try:
-                res = temporal_gateway.reconcile_workflow(
+                res = _temporal(tenant_id, company_id).reconcile_workflow(
                     workflow_id=wf_id,
                     activity_id=act_id,
                     external_ref=ext_ref,
@@ -6846,7 +7872,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             risk_class = getattr(ActivityRiskClass, risk_str, ActivityRiskClass.SAFE_RETRY)
             idemp_key = req_data.get("idempotency_key")
             try:
-                act = temporal_gateway.start_activity(
+                act = _temporal(tenant_id, company_id).start_activity(
                     workflow_id=wf_id,
                     activity_type=act_type,
                     input_payload=inp,
@@ -6862,7 +7888,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             act_id = path.split("/")[4]
             reason = req_data.get("reason", "Retry requested")
             try:
-                res = temporal_gateway.retry_activity(act_id, reason=reason)
+                res = _temporal(tenant_id, company_id).retry_activity(act_id, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6872,7 +7898,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             act_id = path.split("/")[4]
             res_payload = req_data.get("result", {})
             try:
-                res = temporal_gateway.complete_activity(act_id, res_payload)
+                res = _temporal(tenant_id, company_id).complete_activity(act_id, res_payload)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6884,7 +7910,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             caps = req_data.get("capability_scope", ["GENERAL"])
             acts = req_data.get("supported_activities", ["general_task"])
             try:
-                w = temporal_gateway.register_worker(w_id, queue, caps, acts)
+                w = _temporal(tenant_id, company_id).register_worker(w_id, queue, caps, acts)
                 self._send_json(w)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6892,7 +7918,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/temporal/workers/") and path.endswith("/heartbeat"):
             w_id = path.split("/")[4]
-            ok = temporal_gateway.heartbeat_worker(w_id)
+            ok = _temporal(tenant_id, company_id).heartbeat_worker(w_id)
             self._send_json({"success": ok, "worker_id": w_id})
             return
 
@@ -6902,7 +7928,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             decided_by = req_data.get("decided_by", "OWNER")
             reason = req_data.get("reason", "Approved by operator")
             try:
-                res = temporal_gateway.decide_approval(appr_id, approved=approved, decided_by=decided_by, reason=reason)
+                res = _temporal(tenant_id, company_id).decide_approval(appr_id, approved=approved, decided_by=decided_by, reason=reason)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=400)
@@ -6911,7 +7937,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/temporal/killswitch":
             active = bool(req_data.get("active", True))
             scope = str(req_data.get("scope", "GLOBAL")).upper()
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             if active:
                 if scope == "GLOBAL":
                     TemporalKillSwitch.trip_global()
@@ -6942,28 +7968,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/temporal/demo/scenarios":
             scenario = str(req_data.get("scenario", "SECTION_85")).upper()
             sc_map = {
-                "TEST_01": temporal_scenarios.test_01_durable_workflow_crash_recovery,
-                "1": temporal_scenarios.test_01_durable_workflow_crash_recovery,
-                "TEST_02": temporal_scenarios.test_02_retry_governance_and_non_idempotent_blocks,
-                "2": temporal_scenarios.test_02_retry_governance_and_non_idempotent_blocks,
-                "TEST_03": temporal_scenarios.test_03_first_class_unknown_outcome_reconciliation,
-                "3": temporal_scenarios.test_03_first_class_unknown_outcome_reconciliation,
-                "TEST_04": temporal_scenarios.test_04_multi_day_human_approval_wait,
-                "4": temporal_scenarios.test_04_multi_day_human_approval_wait,
-                "TEST_05": temporal_scenarios.test_05_multi_scope_killswitch_enforcement,
-                "5": temporal_scenarios.test_05_multi_scope_killswitch_enforcement,
-                "TEST_06": temporal_scenarios.test_06_zero_credential_leakage,
-                "6": temporal_scenarios.test_06_zero_credential_leakage,
-                "TEST_07": temporal_scenarios.test_07_strict_tenant_isolation,
-                "7": temporal_scenarios.test_07_strict_tenant_isolation,
-                "TEST_08": temporal_scenarios.test_08_langgraph_temporal_hybrid,
-                "8": temporal_scenarios.test_08_langgraph_temporal_hybrid,
-                "TEST_09": temporal_scenarios.test_09_multi_layer_integration,
-                "9": temporal_scenarios.test_09_multi_layer_integration,
-                "SECTION_85": temporal_scenarios.test_10_section_85_grand_acceptance_test,
-                "85": temporal_scenarios.test_10_section_85_grand_acceptance_test,
-                "TEST_10": temporal_scenarios.test_10_section_85_grand_acceptance_test,
-                "10": temporal_scenarios.test_10_section_85_grand_acceptance_test
+                "TEST_01": _temporal_scenarios(tenant_id, company_id).test_01_durable_workflow_crash_recovery,
+                "1": _temporal_scenarios(tenant_id, company_id).test_01_durable_workflow_crash_recovery,
+                "TEST_02": _temporal_scenarios(tenant_id, company_id).test_02_retry_governance_and_non_idempotent_blocks,
+                "2": _temporal_scenarios(tenant_id, company_id).test_02_retry_governance_and_non_idempotent_blocks,
+                "TEST_03": _temporal_scenarios(tenant_id, company_id).test_03_first_class_unknown_outcome_reconciliation,
+                "3": _temporal_scenarios(tenant_id, company_id).test_03_first_class_unknown_outcome_reconciliation,
+                "TEST_04": _temporal_scenarios(tenant_id, company_id).test_04_multi_day_human_approval_wait,
+                "4": _temporal_scenarios(tenant_id, company_id).test_04_multi_day_human_approval_wait,
+                "TEST_05": _temporal_scenarios(tenant_id, company_id).test_05_multi_scope_killswitch_enforcement,
+                "5": _temporal_scenarios(tenant_id, company_id).test_05_multi_scope_killswitch_enforcement,
+                "TEST_06": _temporal_scenarios(tenant_id, company_id).test_06_zero_credential_leakage,
+                "6": _temporal_scenarios(tenant_id, company_id).test_06_zero_credential_leakage,
+                "TEST_07": _temporal_scenarios(tenant_id, company_id).test_07_strict_tenant_isolation,
+                "7": _temporal_scenarios(tenant_id, company_id).test_07_strict_tenant_isolation,
+                "TEST_08": _temporal_scenarios(tenant_id, company_id).test_08_langgraph_temporal_hybrid,
+                "8": _temporal_scenarios(tenant_id, company_id).test_08_langgraph_temporal_hybrid,
+                "TEST_09": _temporal_scenarios(tenant_id, company_id).test_09_multi_layer_integration,
+                "9": _temporal_scenarios(tenant_id, company_id).test_09_multi_layer_integration,
+                "SECTION_85": _temporal_scenarios(tenant_id, company_id).test_10_section_85_grand_acceptance_test,
+                "85": _temporal_scenarios(tenant_id, company_id).test_10_section_85_grand_acceptance_test,
+                "TEST_10": _temporal_scenarios(tenant_id, company_id).test_10_section_85_grand_acceptance_test,
+                "10": _temporal_scenarios(tenant_id, company_id).test_10_section_85_grand_acceptance_test
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -6975,7 +8001,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # --- NANGO EXTERNAL INTEGRATION API (Project 10 POST) ---
         elif path == "/api/nango/connections":
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             prov_id = req_data.get("provider_id", "salesforce")
             conn_key = req_data.get("connection_key")
@@ -6988,7 +8014,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/nango/connections/") and path.endswith("/test"):
             conn_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             ok, msg = gw.test_connection(conn_id)
             self._send_json({"success": ok, "message": msg, "connection_id": conn_id})
@@ -6996,7 +8022,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/nango/connections/") and path.endswith("/sync"):
             conn_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             model = req_data.get("model", "contacts")
             limit = int(req_data.get("limit", 50))
             gw = ExternalIntegrationGateway(tenant_id, company_id)
@@ -7005,7 +8031,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/nango/execute":
-            company_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             conn_id = req_data.get("connection_id")
             action = req_data.get("action", "READ_CONTACT")
@@ -7034,7 +8060,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/nango/webhooks/"):
             prov_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             raw_body = json.dumps(req_data)
             headers_dict = {k: v for k, v in self.headers.items()}
@@ -7043,7 +8069,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/nango/reconcile":
-            company_id = self.headers.get("X-Company-ID", "comp_primary")
+            # company_id was resolved from the verified token (see _resolve_company_id)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             rec_id = req_data.get("reconciliation_id")
             obs_state = req_data.get("observed_state", {})
@@ -7075,28 +8101,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/nango/demo/scenarios":
             scenario = str(req_data.get("scenario", "SECTION_95")).upper()
             sc_map = {
-                "TEST_01": nango_scenarios.test_01_standard_connection_lifecycle_and_read,
-                "1": nango_scenarios.test_01_standard_connection_lifecycle_and_read,
-                "TEST_02": nango_scenarios.test_02_business_mutation_with_idempotency_key,
-                "2": nango_scenarios.test_02_business_mutation_with_idempotency_key,
-                "TEST_03": nango_scenarios.test_03_human_approval_escalation,
-                "3": nango_scenarios.test_03_human_approval_escalation,
-                "TEST_04": nango_scenarios.test_04_multi_scope_killswitch_enforcement,
-                "4": nango_scenarios.test_04_multi_scope_killswitch_enforcement,
-                "TEST_05": nango_scenarios.test_05_context_firewall_and_secret_scrubbing,
-                "5": nango_scenarios.test_05_context_firewall_and_secret_scrubbing,
-                "TEST_06": nango_scenarios.test_06_inbound_webhook_verification,
-                "6": nango_scenarios.test_06_inbound_webhook_verification,
-                "TEST_07": nango_scenarios.test_07_governed_data_synchronization,
-                "7": nango_scenarios.test_07_governed_data_synchronization,
-                "TEST_08": nango_scenarios.test_08_unknown_outcome_and_reconciliation,
-                "8": nango_scenarios.test_08_unknown_outcome_and_reconciliation,
-                "TEST_09": nango_scenarios.test_09_cross_tenant_isolation,
-                "9": nango_scenarios.test_09_cross_tenant_isolation,
-                "TEST_10": nango_scenarios.test_10_section_95_grand_acceptance_test,
-                "10": nango_scenarios.test_10_section_95_grand_acceptance_test,
-                "SECTION_95": nango_scenarios.test_10_section_95_grand_acceptance_test,
-                "95": nango_scenarios.test_10_section_95_grand_acceptance_test
+                "TEST_01": _nango_scenarios(tenant_id, company_id).test_01_standard_connection_lifecycle_and_read,
+                "1": _nango_scenarios(tenant_id, company_id).test_01_standard_connection_lifecycle_and_read,
+                "TEST_02": _nango_scenarios(tenant_id, company_id).test_02_business_mutation_with_idempotency_key,
+                "2": _nango_scenarios(tenant_id, company_id).test_02_business_mutation_with_idempotency_key,
+                "TEST_03": _nango_scenarios(tenant_id, company_id).test_03_human_approval_escalation,
+                "3": _nango_scenarios(tenant_id, company_id).test_03_human_approval_escalation,
+                "TEST_04": _nango_scenarios(tenant_id, company_id).test_04_multi_scope_killswitch_enforcement,
+                "4": _nango_scenarios(tenant_id, company_id).test_04_multi_scope_killswitch_enforcement,
+                "TEST_05": _nango_scenarios(tenant_id, company_id).test_05_context_firewall_and_secret_scrubbing,
+                "5": _nango_scenarios(tenant_id, company_id).test_05_context_firewall_and_secret_scrubbing,
+                "TEST_06": _nango_scenarios(tenant_id, company_id).test_06_inbound_webhook_verification,
+                "6": _nango_scenarios(tenant_id, company_id).test_06_inbound_webhook_verification,
+                "TEST_07": _nango_scenarios(tenant_id, company_id).test_07_governed_data_synchronization,
+                "7": _nango_scenarios(tenant_id, company_id).test_07_governed_data_synchronization,
+                "TEST_08": _nango_scenarios(tenant_id, company_id).test_08_unknown_outcome_and_reconciliation,
+                "8": _nango_scenarios(tenant_id, company_id).test_08_unknown_outcome_and_reconciliation,
+                "TEST_09": _nango_scenarios(tenant_id, company_id).test_09_cross_tenant_isolation,
+                "9": _nango_scenarios(tenant_id, company_id).test_09_cross_tenant_isolation,
+                "TEST_10": _nango_scenarios(tenant_id, company_id).test_10_section_95_grand_acceptance_test,
+                "10": _nango_scenarios(tenant_id, company_id).test_10_section_95_grand_acceptance_test,
+                "SECTION_95": _nango_scenarios(tenant_id, company_id).test_10_section_95_grand_acceptance_test,
+                "95": _nango_scenarios(tenant_id, company_id).test_10_section_95_grand_acceptance_test
             }
             fn = sc_map.get(scenario)
             if fn:
@@ -7110,7 +8136,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/api/v8/"):
             from core.v8_api_handler import V8ApiHandler
             t_id = tenant_id
-            c_id = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            c_id = self.headers.get("X-Company-ID") or company_id
             v8_res = V8ApiHandler.handle_post(path, req_data, t_id, c_id)
             if v8_res:
                 data, code = v8_res
@@ -7121,7 +8147,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/telemetry/trace":
             name = req_data.get("name", "span_operation")
             tenant = tenant_id
-            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            company = self.headers.get("X-Company-ID") or company_id
             span = opentelemetry_engine.start_trace(
                 span_name=name,
                 tenant_id=tenant,
@@ -7142,7 +8168,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Langfuse LLM Generation Endpoint
         elif path == "/api/langfuse/generations":
             tenant = tenant_id
-            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            company = self.headers.get("X-Company-ID") or company_id
             gen = langfuse_engine.record_generation(
                 name=req_data.get("name", "llm_completion"),
                 model=req_data.get("model", "gpt-4o"),
@@ -7223,7 +8249,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # NATS JetStream Event Publish
         elif path == "/api/events/publish":
             tenant = tenant_id
-            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            company = self.headers.get("X-Company-ID") or company_id
             subject = req_data.get("subject", "zonata.events.general")
             data = req_data.get("data", {})
             msg = jetstream_engine.publish(subject=subject, data=data, tenant_id=tenant, company_id=company)
@@ -7300,39 +8326,94 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path in ("/api/billing/checkout", "/api/v1/billing/checkout"):
-            provider = req_data.get("provider", "stripe").lower()
-            target_tier_str = req_data.get("tier", "pro").upper()
+            provider = (req_data.get("provider") or "stripe").lower()
+            target_tier_str = (req_data.get("tier") or "PRO").upper()
             try:
                 tier = SubscriptionTier[target_tier_str]
             except KeyError:
-                tier = SubscriptionTier.PRO
+                self._send_json({
+                    "error": "Bad Request",
+                    "code": "UNKNOWN_TIER",
+                    "detail": f"Unknown tier '{target_tier_str}'.",
+                    "allowed": [t.value for t in SubscriptionTier],
+                }, status=400)
+                return
             plan = TIER_ENTITLEMENTS.get(tier, TIER_ENTITLEMENTS[SubscriptionTier.PRO])
+            host = self.headers.get("Host") or "localhost"
+            scheme = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+            base = f"{scheme}://{host}"
+            success_url = req_data.get("success_url") or f"{base}/?billing=success"
+            cancel_url = req_data.get("cancel_url") or f"{base}/?billing=cancelled"
 
             if provider == "stripe":
-                cust = saas_billing_engine.stripe.create_customer(tenant_id=tenant_id, email=req_data.get("email", f"{tenant_id}@zonata.io"))
+                cust = saas_billing_engine.stripe.create_customer(
+                    tenant_id=tenant_id,
+                    email=req_data.get("email") or f"{tenant_id}@example.com",
+                    company_name=req_data.get("company_name") or "Enterprise",
+                )
+                if not cust.get("success"):
+                    self._send_json({
+                        "error": "Stripe is not available",
+                        "code": cust.get("code", "PROVIDER_ERROR"),
+                        "provider": "stripe",
+                        "detail": cust.get("detail"),
+                        "required_env": cust.get("required_env", []),
+                    }, status=503)
+                    return
+                session = saas_billing_engine.stripe.create_checkout_session(
+                    tenant_id=tenant_id,
+                    customer_id=cust.get("stripe_customer_id"),
+                    amount_usd=plan.monthly_price_usd,
+                    tier=tier.value,
+                    success_url=success_url,
+                    cancel_url=cancel_url,
+                )
+                if not session.get("success"):
+                    self._send_json({
+                        "error": "Stripe checkout could not be created",
+                        "code": session.get("code", "PROVIDER_ERROR"),
+                        "provider": "stripe",
+                        "detail": session.get("detail"),
+                        "required_env": session.get("required_env", []),
+                    }, status=503)
+                    return
                 self._send_json({
                     "success": True,
-                    "checkout_session_id": f"cs_live_{uuid.uuid4().hex[:16]}",
+                    "checkout_session_id": session["checkout_session_id"],
                     "customer_id": cust.get("stripe_customer_id"),
                     "tier": tier.value,
                     "amount_usd": plan.monthly_price_usd,
-                    "url": f"https://checkout.stripe.com/pay/{uuid.uuid4().hex[:12]}"
+                    "url": session["url"],
+                    "provider": "stripe",
                 })
+
             elif provider == "razorpay":
                 order = saas_billing_engine.razorpay.create_order(
                     amount_inr=plan.monthly_price_usd * 85.0,
                     tenant_id=tenant_id,
-                    receipt=f"rcpt_{tenant_id}"
+                    receipt=f"rcpt_{tenant_id}"[:40],
                 )
+                if not order.get("success"):
+                    self._send_json({
+                        "error": "Razorpay is not available",
+                        "code": order.get("code", "PROVIDER_ERROR"),
+                        "provider": "razorpay",
+                        "detail": order.get("detail"),
+                        "required_env": order.get("required_env", []),
+                    }, status=503)
+                    return
                 self._send_json({
                     "success": True,
                     "order_id": order.get("order_id"),
                     "tier": tier.value,
                     "amount_inr": plan.monthly_price_usd * 85.0,
-                    "currency": "INR"
+                    "currency": "INR",
+                    "provider": "razorpay",
                 })
             else:
-                self._send_json({"error": "Bad Request", "detail": f"Unsupported provider: {provider}"}, status=400)
+                self._send_json({"error": "Bad Request", "code": "UNSUPPORTED_PROVIDER",
+                                 "detail": f"Unsupported provider: {provider}",
+                                 "supported": ["stripe", "razorpay"]}, status=400)
             return
 
         elif path in ("/api/billing/settlement/reconcile", "/api/v1/billing/settlement/reconcile"):
@@ -7351,7 +8432,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # PostHog Product Analytics Capture
         elif path == "/api/analytics/posthog/capture":
             tenant = tenant_id
-            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            company = self.headers.get("X-Company-ID") or company_id
             distinct_id = req_data.get("distinct_id", "usr_anon")
             event_name = req_data.get("event_name", "page_view")
             properties = req_data.get("properties", {})
@@ -7368,7 +8449,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Object Storage Artifact Upload / Store
         elif path == "/api/storage/artifacts/upload":
             tenant = tenant_id
-            company = self.headers.get("X-Company-ID") or req_data.get("company_id", "comp_primary")
+            company = self.headers.get("X-Company-ID") or company_id
             name = req_data.get("name", "artifact.bin")
             content = req_data.get("content", "").encode("utf-8")
             cat = req_data.get("category", "documents")
@@ -7412,7 +8493,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         if not self._enforce_tenant_fairness(path, "PUT", auth_context=auth_ctx):
             return
 
-        company_id = auth_ctx.get("company_id") or self.headers.get("X-Company-ID", "comp_primary")
+        company_id = self._resolve_company_id(auth_ctx)
         actor = auth_ctx.get("user_id", "usr_unknown")
         actor_role = auth_ctx.get("role", UserRole.OPERATOR)
 
@@ -7472,7 +8553,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID", req_data.get("company_id", "comp_primary"))
+            # company_id was resolved from the verified token (see _resolve_company_id)
             reason = req_data.get("reason", "Batch category save via PUT")
             if "settings" in req_data and isinstance(req_data["settings"], dict):
                 values = req_data["settings"]
@@ -7516,6 +8597,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not tenant_id:
                 self._send_json({"error": "Unauthorized", "detail": "Missing tenant identity in token"}, status=401)
                 return
+            company_id = self._resolve_company_id(auth_ctx)
         except AuthExceptions.AuthenticationError as e:
             self._send_json({"error": "Unauthorized", "detail": str(e)}, status=401)
             return
@@ -7539,17 +8621,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path.startswith("/api/mcp/servers/") and len(path.split("/")) == 5:
             server_id = path.split("/")[4]
-            ok = mcp_gateway.disconnect_server(server_id)
+            ok = _mcp(tenant_id, company_id).disconnect_server(server_id)
             self._send_json({"success": ok, "server_id": server_id})
             return
         elif path.startswith("/api/browser/sessions/") and len(path.split("/")) == 5:
             sess_id = path.split("/")[4]
-            ok = browser_gateway.close_session(sess_id)
+            ok = _browser(tenant_id, company_id).close_session(sess_id)
             self._send_json({"success": ok, "session_id": sess_id})
             return
         elif path.startswith("/api/nango/connections/") and len(path.split("/")) == 5:
             conn_id = path.split("/")[4]
-            company_id = self.headers.get("X-Company-ID") or auth_ctx.get("company_id", "comp_primary")
+            company_id = self._resolve_company_id(auth_ctx)
             gw = ExternalIntegrationGateway(tenant_id, company_id)
             ok = gw.disconnect_connection(conn_id)
             self._send_json({"success": ok, "connection_id": conn_id})

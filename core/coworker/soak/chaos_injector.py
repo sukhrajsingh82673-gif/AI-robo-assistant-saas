@@ -35,8 +35,13 @@ class FailureInjectionEngine:
 
     def inject_network_outage(self, duration_sec: float = 0.5) -> Dict[str, Any]:
         """Simulates external network outage during API or web operation."""
-        fault = {"type": "NETWORK_OUTAGE", "timestamp": time.time(), "recovered": True}
-        # In a real socket call, simulate connection timeout
+        fault = {
+            "type": "NETWORK_OUTAGE",
+            "timestamp": time.time(),
+            "injected": True,
+            "recovered": None,
+            "note": "Fault injected only; recovery is measured by the endurance harness.",
+        }
         time.sleep(duration_sec)
         self.fault_log.append(fault)
         return fault
@@ -48,7 +53,7 @@ class FailureInjectionEngine:
             return False, f"Provider {provider_id} not registered"
         # Quarantine provider in registry
         self.fault_log.append({"type": "PROVIDER_CRASH", "provider_id": provider_id, "time": time.time()})
-        return True, f"Simulated crash for {provider_id}: recovered by FallbackManager"
+        return True, f"Crash injected for {provider_id}. Recovery has not been verified by this call."
 
     def inject_stale_lease_and_worker_hang(self, worker_id: str) -> Tuple[bool, str]:
         """Simulates worker freezing without emitting heartbeats beyond TTL."""

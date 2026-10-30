@@ -1227,8 +1227,8 @@
             <div style="background:#090d16; border:1px solid #334155; border-radius:8px; padding:14px; margin-bottom:18px;">
               <div style="font-size:0.8rem; font-weight:600; color:#93c5fd; margin-bottom:6px;">⚡ Connect Any Machine to Fleet (Bootstrap Agent):</div>
               <div style="display:flex; gap:8px; align-items:center;">
-                <code style="flex:1; background:#020617; color:#38bdf8; padding:8px 12px; border-radius:6px; font-size:0.8rem; user-select:all; overflow-x:auto;">curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret</code>
-                <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText('curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret'); showToast('Bootstrap command copied!', 'info');">Copy</button>
+                <code id="fleetBootstrapCmd" style="flex:1; background:#020617; color:#38bdf8; padding:8px 12px; border-radius:6px; font-size:0.8rem; user-select:all; overflow-x:auto;">${(() => { const origin = window.location.origin; return `curl -s ${origin}/api/coworker/nodes/bootstrap.py | python3 - --join ${origin} --token <YOUR_FLEET_TOKEN>`; })()}</code>
+                <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(document.querySelector('#fleetBootstrapCmd').innerText); showToast('Bootstrap command copied!', 'info');">Copy</button>
               </div>
             </div>
 
@@ -1246,15 +1246,12 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style="background:rgba(37,99,235,0.05);">
-                    <td><strong>control_plane_local</strong> <span class="badge badge-primary" style="font-size:0.65rem;">HOST</span></td>
-                    <td>LINUX_NODE</td>
-                    <td>linux</td>
-                    <td>aarch64</td>
-                    <td><span class="badge badge-success">HEALTHY</span></td>
-                    <td>17 Capabilities (Terminal, Hermes, OpenClaw, Workspace)</td>
-                    <td>Headless (Zero-Mock PRoot)</td>
-                  </tr>
+                  ${(this.nodes || []).length === 0 ? `
+                    <tr>
+                      <td colspan="7" style="text-align:center; color:#94a3b8; padding:18px;">
+                        No worker nodes registered. Register a node with the bootstrap command above.
+                      </td>
+                    </tr>` : ''}
                   ${(this.nodes || []).map(n => `
                     <tr>
                       <td><strong>${n.node_id}</strong></td>

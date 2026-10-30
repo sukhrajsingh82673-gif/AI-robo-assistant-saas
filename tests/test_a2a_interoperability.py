@@ -234,7 +234,13 @@ class TestA2AInteroperability(unittest.TestCase):
             data_classification=DataClassification.INTERNAL
         )
         self.assertIn("status", res)
-        self.assertIn(res["status"]["state"], (A2ATaskState.TASK_STATE_COMPLETED.value, A2ATaskState.TASK_STATE_WORKING.value))
+        self.assertIn(
+            res["status"]["state"],
+            (A2ATaskState.TASK_STATE_COMPLETED.value, A2ATaskState.TASK_STATE_WORKING.value,
+             A2ATaskState.TASK_STATE_FAILED.value),
+        )
+        if res["status"]["state"] == A2ATaskState.TASK_STATE_FAILED.value:
+            self.assertEqual(res.get("code"), "REMOTE_AGENT_UNREACHABLE")
 
     def test_12_policy_deny_blocked_agent(self):
         """Req 12: Blocked agent delegation is rejected by policy."""
@@ -304,8 +310,12 @@ class TestA2AInteroperability(unittest.TestCase):
             "agent_id": agent_id,
             "message": {"parts": [{"text": "Hello"}]}
         })
-        self.assertEqual(res["status"]["state"], A2ATaskState.TASK_STATE_COMPLETED.value)
-        self.assertTrue(len(res["history"]) > 0)
+        # No injected response and no real A2A server at that endpoint: the
+        # platform must report a genuine transport failure, never a fake reply.
+        self.assertEqual(res["status"]["state"], A2ATaskState.TASK_STATE_FAILED.value)
+        self.assertEqual(res.get("code"), "REMOTE_AGENT_UNREACHABLE")
+        self.assertEqual(res["artifacts"], [])
+        self.assertTrue(res.get("error"))
 
     def test_17_asynchronous_task_lifecycle(self):
         """Req 17: Asynchronous task persists in WORKING state and can be retrieved."""

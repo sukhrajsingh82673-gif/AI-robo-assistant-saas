@@ -22,6 +22,32 @@ class BusinessCausalityEngine:
         self.tenant_id = tenant_id
         self.company_id = company_id or "comp_primary"
 
+    def _ensure_scope(self) -> None:
+        """Guarantee the FK targets (tenant, company) exist before attribution.
+
+        The chain rows reference tenants/companies; a runtime that is asked to
+        attribute an outcome to a scope must not fail on a missing parent row.
+        Existing rows are never modified.
+        """
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at)
+                VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?)
+                """,
+                (self.tenant_id, f"Tenant {self.tenant_id}", time.time()),
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO companies (
+                    company_id, tenant_id, name, country, industry,
+                    company_type, status, created_at
+                ) VALUES (?, ?, ?, 'IN', 'TECHNOLOGY', 'EXISTING', 'OPERATIONAL', ?)
+                """,
+                (self.company_id, self.tenant_id, f"Company {self.company_id}", time.time()),
+            )
+            conn.commit()
+
     def record_causal_link(
         self,
         strategy_goal: str,
@@ -38,6 +64,7 @@ class BusinessCausalityEngine:
         """
         chain_id = f"csl_{uuid.uuid4().hex[:8]}"
         now = time.time()
+        self._ensure_scope()
 
         with db.get_connection() as conn:
             conn.execute(

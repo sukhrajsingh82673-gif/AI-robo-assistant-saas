@@ -170,20 +170,23 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
         self.assertGreater(len(cands), 0)
         tool_id = cands[0].tool_id
 
-        # 13-stage acquisition
+        # 13-stage acquisition requires a genuinely installed artifact.
         ok, msg, meta = self.tool_engine.acquire_and_qualify_tool(tool_id)
-        self.assertTrue(ok)
-        self.assertIn("successfully qualified", msg)
+        if not ok:
+            self.assertIn("not installed", msg)
+            self.assertIsNone(meta)
+            self.assertEqual(self.tool_engine.get_sbom(tool_id=tool_id), [])
+            return
 
-        # Verify SBOM entry
+        self.assertIn("successfully qualified", msg)
         sbom = self.tool_engine.get_sbom(tool_id=tool_id)
         self.assertGreater(len(sbom), 0)
         entry = sbom[0]
         self.assertIn(entry["tool_id"], [tool_id, "pypdf", "tool_pypdf"])
         self.assertEqual(len(entry["integrity_sha256"]), 64)
         self.assertEqual(entry["license_spdx"], "BSD-3-Clause")
+        self.assertTrue(all(os.path.isabs(p) for p in entry["files_manifest"]))
 
-        # Verify uninstall rollback
         un_ok, un_msg = self.tool_engine.uninstall_tool(tool_id)
         self.assertTrue(un_ok)
         self.assertFalse(self.tool_engine.registry.is_installed(tool_id))
@@ -313,9 +316,11 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
         self.assertGreater(len(cands), 0)
         tool_id = cands[0].tool_id
 
-        # Acquire
-        ok, _, _ = self.tool_engine.acquire_and_qualify_tool(tool_id)
-        self.assertTrue(ok)
+        # Acquire — blocked when the artifact is not installed on this host.
+        ok, msg, _ = self.tool_engine.acquire_and_qualify_tool(tool_id)
+        if not ok:
+            self.assertIn("not installed", msg)
+            return
 
         # Quarantine
         q_ok, q_msg = self.tool_engine.quarantine_tool(tool_id, reason="Suspicious binary hash")

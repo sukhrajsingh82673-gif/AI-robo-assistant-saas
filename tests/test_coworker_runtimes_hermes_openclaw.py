@@ -22,6 +22,32 @@ import time
 import os
 import json
 import hashlib
+from unittest.mock import patch
+
+from core.llm_runtime import LLMResult
+
+
+def _deterministic_chat(self, tenant_id, company_id, messages, system=None,
+                        max_tokens=None, temperature=None, intent="general"):
+    """In-process LLM double: deterministic text, no network, no fabrication."""
+    objective = ""
+    for m in (messages or []):
+        if m.get("role") == "user":
+            objective = str(m.get("content", ""))[:400]
+            break
+    return LLMResult(
+        content=(
+            "## Execution Plan\n"
+            "- Review the stated objective and available tenant data.\n"
+            "- Identify missing data sources explicitly.\n\n"
+            "## Deliverable\n"
+            f"Objective: {objective}\n\n"
+            "## Data gaps\n"
+            "- Deterministic test double; no external sources were queried."
+        ),
+        provider="test_stub", model="deterministic-test", degraded=False,
+        latency_ms=0.5,
+    )
 
 from core.coworker import (
     UniversalCoworkerEngine, CapabilityRegistry,
@@ -38,7 +64,15 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
 
     def setUp(self):
         self.tenant_id = f"tnt_test_{int(time.time()*1000)}"
+        self._llm_patcher = patch("core.llm_runtime.LLMRuntime.chat", _deterministic_chat)
+        self._llm_patcher.start()
         self.engine = UniversalCoworkerEngine(self.tenant_id)
+
+    def tearDown(self):
+        try:
+            self._llm_patcher.stop()
+        except Exception:
+            pass
 
     # 1. Multi-Runtime Router Intelligent Selection
     def test_01_runtime_router_specialized_selection(self):

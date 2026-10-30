@@ -595,36 +595,44 @@ class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
         self.assertEqual(record["execution_classification"], "SIMULATED")
 
     def test_02_pms_connector_provenance(self):
-        """PMS connector returns explicit is_mock=True, SIMULATED mode, and verified=False."""
+        """Unconfigured PMS connector reports NOT_CONFIGURED and never fabricates folios."""
         connector = HospitalityPMSConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_night_audit_records()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
         self.assertFalse(res.get("ledger_verified"))
+        self.assertEqual(res.get("folios"), [])
+        self.assertEqual(res.get("records_count"), 0)
 
     def test_03_accounting_connector_provenance(self):
-        """Accounting connector returns is_mock=True and ledger_verified=False."""
+        """Unconfigured accounting connector reports NOT_CONFIGURED with no ledger fixture."""
         connector = AccountingConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_general_ledger()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
+        self.assertEqual(res.get("entries"), [])
+        self.assertEqual(res.get("accounts_reconciled"), 0)
 
     def test_04_payment_connector_provenance(self):
-        """Payment gateway connector returns is_mock=True and payout_verified=False."""
+        """Unconfigured payment connector reports NOT_CONFIGURED with no settlement fixture."""
         connector = PaymentGatewayConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_settlement_batch()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
         self.assertFalse(res.get("payout_verified"))
+        self.assertEqual(res.get("settlements"), [])
 
     def test_05_desktop_robot_simulated_provenance(self):
-        """Desktop robot screen capture stamps simulated=True, verified=False, and SIMULATED mode."""
+        """Screen capture without a display must fail closed — never fake pixels."""
         host = UniversalHostAgent(host_id="test_host", tenant_id="tnt_test")
         robot = UniversalDesktopRobot(host, ledger=self.ledger)
         contract = ActionContract(
@@ -641,18 +649,18 @@ class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
             verification_requirements=["screen_state"]
         )
         res = robot.execute_action(contract, {})
-        self.assertTrue(res.get("success"))
-        self.assertTrue(res.get("simulated"))
+        self.assertFalse(res.get("success"))
+        self.assertEqual(res.get("code"), "DISPLAY_NOT_AVAILABLE")
         self.assertFalse(res.get("verified"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertIsNone(res.get("evidence_id"))
 
     def test_06_browser_robot_simulated_provenance(self):
-        """Browser robot actions stamp execution_mode='SIMULATED' and verified=False."""
+        """Browser robot never stamps synthetic provenance; it reports live outcomes."""
         browser = BrowserExecutionFabric(session_id="test_browser_sess")
         res = browser.navigate("https://example.com/checkout")
-        self.assertTrue(res.get("simulated"))
-        self.assertFalse(res.get("verified"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("simulated"))
+        self.assertEqual(res.get("execution_mode"), "LIVE_HTTP")
+        self.assertEqual(res.get("provenance"), "REAL_HTTP_GET")
 
     def test_07_simulated_evidence_with_successful_verifications_cannot_promote_to_verified(self):
         """Even with passing physical verifications, simulated metadata strictly forces SIMULATED status."""

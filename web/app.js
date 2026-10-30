@@ -2153,10 +2153,11 @@ window.openHireAgentModal = function() {
       <div class="form-group">
         <label class="form-label">Underlying Model</label>
         <select class="form-input" id="agentModel">
-          <option>Gemini 3.8 Flash (High)</option>
-          <option>Gemini Pro</option>
-          <option>Claude 3.5 Sonnet</option>
-          <option>Local Llama 3 (Ollama)</option>
+          <option value="">Platform default (Settings → Models)</option>
+          <option value="qwen2.5:1.5b">Local Ollama — qwen2.5:1.5b</option>
+          <option value="openai-fast">Embedded Free — gpt-oss-20b</option>
+          <option value="gemini-2.0-flash">Google AI Studio — gemini-2.0-flash</option>
+          <option value="llama-3.3-70b-versatile">Groq — llama-3.3-70b</option>
         </select>
       </div>
       <div class="form-group">

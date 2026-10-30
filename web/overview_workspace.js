@@ -393,7 +393,7 @@
         value: `${wf.total_workforce}`,
         change: `${wf.ai_workforce} AI • ${wf.human_workforce} Human`,
         changeDir: 'up',
-        meta: `${wf.workforce_utilization_pct || 80}% utilization`,
+        meta: wf.workforce_utilization_pct != null ? `${wf.workforce_utilization_pct}% utilization` : 'Utilization not measured',
         source: wf.source,
         updated: wf.last_updated,
         action: 'window.navigateTo("/workforce")'
@@ -1067,13 +1067,13 @@
             </div>
             <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Workforce Utilization">
               <span class="fin-stat-lbl">Capacity Utilization</span>
-              <span class="fin-stat-val text-emerald">${wf.workforce_utilization_pct || 80}%</span>
+              <span class="fin-stat-val text-emerald">${wf.workforce_utilization_pct != null ? wf.workforce_utilization_pct + '%' : 'n/a'}</span>
               <span class="fin-stat-meta text-secondary">${wf.active_workers} Active • ${wf.idle_workers} Idle</span>
             </div>
             <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Capability Gaps">
               <span class="fin-stat-lbl">Capability Coverage</span>
-              <span class="fin-stat-val">${wf.capability_coverage ? wf.capability_coverage.coverage_pct : 75}%</span>
-              <span class="fin-stat-meta">Open Gaps: ${wf.capability_coverage ? wf.capability_coverage.open_gaps.length : 0}</span>
+              <span class="fin-stat-val">${wf.capability_coverage && wf.capability_coverage.coverage_pct != null ? wf.capability_coverage.coverage_pct + '%' : 'n/a'}</span>
+              <span class="fin-stat-meta">Open Gaps: ${wf.capability_coverage && wf.capability_coverage.open_gaps ? wf.capability_coverage.open_gaps.length : 0}</span>
             </div>
           </div>
 

@@ -528,14 +528,13 @@
           };
           rec.start();
         } else {
-          setTimeout(async () => {
-            if (this.isListening) {
-              await this.processTranscript("Analyze recent system performance and desktop tasks");
-              this.isListening = false;
-              if (btn) btn.innerText = '🎙️ Mic Input';
-              if (wf) wf.innerHTML = this.renderWaveformBarsHtml();
-            }
-          }, 2500);
+          // No speech engine in this browser: stop listening and say so
+          // instead of inventing a transcript the user never spoke.
+          this.isListening = false;
+          this.currentExecutionState = 'IDLE';
+          if (btn) btn.innerText = '🎙️ Mic Input';
+          if (wf) wf.innerHTML = this.renderWaveformBarsHtml();
+          alert('Speech recognition is not available in this browser. Type your request instead.');
         }
       } else {
         this.currentExecutionState = 'IDLE';

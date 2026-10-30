@@ -328,13 +328,18 @@ class TestCoworkerProductionQualification(unittest.TestCase):
             tool,
             capability_registry=self.engine.capability_reg
         )
-        self.assertTrue(admit_ok)
-        self.assertEqual(admitted_tool.admission_status, "ADMITTED")
-
-        # Verify capability was registered in CapabilityRegistry
-        cap = self.engine.capability_reg.get_capability("document.extract_pdf_text")
-        self.assertIsNotNone(cap)
-        self.assertEqual(cap.qualification_status, QualificationStatus.REAL_PRODUCTION_QUALIFIED)
+        # Admission requires the runtime dependency to be importable. When it is
+        # absent the pipeline must block the tool instead of faking a sandbox pass.
+        if not admit_ok:
+            self.assertEqual(admitted_tool.admission_status, "BLOCKED_EXTERNAL_DEPENDENCY")
+            self.assertIn("not installed", msg)
+        else:
+            self.assertEqual(admitted_tool.admission_status, "ADMITTED")
+            cap = self.engine.capability_reg.get_capability("document.extract_pdf_text")
+            self.assertIsNotNone(cap)
+            # Capability execution was never exercised, so it cannot claim full
+            # production qualification.
+            self.assertEqual(cap.qualification_status, QualificationStatus.PARTIALLY_QUALIFIED)
 
         # 3. Hostile / Malicious tool rejection
         mal_tools = disco.discover_tools("harvester")

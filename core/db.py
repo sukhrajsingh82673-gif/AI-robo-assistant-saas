@@ -935,6 +935,31 @@ CREATE TABLE IF NOT EXISTS coworker_tasks (
 CREATE INDEX IF NOT EXISTS idx_coworker_tasks_user ON coworker_tasks(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_coworker_tasks_status ON coworker_tasks(status);
 
+-- 42b. Durable Coworker Background Missions (searchable, tenant-scoped)
+CREATE TABLE IF NOT EXISTS coworker_background_missions (
+    mission_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    initiator TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    status TEXT NOT NULL,
+    progress_percent REAL NOT NULL DEFAULT 0,
+    current_stage TEXT NOT NULL DEFAULT 'INITIATED',
+    subworkers_json TEXT NOT NULL DEFAULT '[]',
+    runtimes_json TEXT NOT NULL DEFAULT '[]',
+    deliverables_json TEXT NOT NULL DEFAULT '[]',
+    evidence_id TEXT,
+    notification_message TEXT,
+    timeline_json TEXT NOT NULL DEFAULT '[]',
+    human_control INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bg_missions_tenant ON coworker_background_missions(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_bg_missions_company ON coworker_background_missions(company_id);
+
 -- 43. System Plugins Catalog & State
 CREATE TABLE IF NOT EXISTS system_plugins (
     plugin_id TEXT PRIMARY KEY,
@@ -4560,8 +4585,9 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     except Exception:
         pass
     try:
-        from tests.conftest import init_all_subsystem_schemas
+        from tests.schema_bootstrap import init_all_subsystem_schemas, seed_baseline_tenant_scope
         init_all_subsystem_schemas()
+        seed_baseline_tenant_scope()
     except Exception:
         pass
     return custom_path

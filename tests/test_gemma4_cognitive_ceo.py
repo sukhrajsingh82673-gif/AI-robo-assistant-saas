@@ -177,11 +177,23 @@ class TestGemma4CognitiveCEOIntegration(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test_09_layered_executive_memory(self):
         mem = LayeredExecutiveMemory(self.tenant_id, self.company_id)
-        # Verify Level 5 & 8 seeded
+        # Demo seeds are disabled outside explicit demo mode: store real records.
+        mem.store_memory(
+            level=MemoryTierLevel.LEVEL_5_ORGANIZATIONAL,
+            content="Operating doctrine recorded by the owner for this tenant.",
+            epistemic_category="FACT",
+            source="OWNER_DIRECTIVE",
+        )
+        mem.store_memory(
+            level=MemoryTierLevel.LEVEL_8_EVIDENCE_FACT,
+            content="Ledger root verified by the physical truth engine.",
+            epistemic_category="FACT",
+            source="PHYSICAL_TRUTH_ENGINE",
+        )
         L5 = mem.query_memories(levels=[MemoryTierLevel.LEVEL_5_ORGANIZATIONAL])
-        self.assertTrue(len(L5) >= 1)
+        self.assertGreaterEqual(len(L5), 1)
         L8 = mem.query_memories(levels=[MemoryTierLevel.LEVEL_8_EVIDENCE_FACT])
-        self.assertTrue(len(L8) >= 1)
+        self.assertGreaterEqual(len(L8), 1)
 
         # Invariant: Unverified inference cannot be forced into Level 8
         rec = mem.store_memory(
@@ -195,8 +207,18 @@ class TestGemma4CognitiveCEOIntegration(unittest.TestCase):
     # 10. DELEGATION & COWORKER LIFECYCLE
     # -------------------------------------------------------------------------
     def test_10_coworker_delegation_lifecycle(self):
-        cws = self.engine.coworker_registry.list_coworkers()
-        self.assertTrue(len(cws) >= 2)
+        registry = self.engine.coworker_registry
+        # Demo coworkers are not seeded outside explicit demo mode: hire real ones.
+        registry.create_coworker(
+            role="Revenue Analyst", department="Revenue Management",
+            capabilities=["pms_rate_read"], tool_access=["tool_pms_yield_optimizer"],
+        )
+        registry.create_coworker(
+            role="Guest Ops Coordinator", department="Hospitality",
+            capabilities=["pms_booking_read"], tool_access=["tool_guest_checkin_flow"],
+        )
+        cws = registry.list_coworkers()
+        self.assertGreaterEqual(len(cws), 2)
         first_cw = cws[0]
 
         # Pause and resume

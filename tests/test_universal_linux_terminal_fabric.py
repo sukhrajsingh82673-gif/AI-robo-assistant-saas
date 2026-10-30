@@ -276,9 +276,13 @@ class TestUniversalLinuxTerminalFabric(unittest.TestCase):
         cands = tool_engine.discover_tools_for_objective("pdf")
         self.assertGreater(len(cands), 0)
         ok, msg, meta = tool_engine.acquire_and_qualify_tool(cands[0].tool_id)
-        self.assertTrue(ok)
-        self.assertIn("successfully qualified", msg)
-        self.assertEqual(meta["license"], "BSD-3-Clause")
+        if ok:
+            self.assertIn("successfully qualified", msg)
+            self.assertEqual(meta["license"], "BSD-3-Clause")
+        else:
+            # Admission is blocked when the runtime artifact is not installed.
+            self.assertIn("not installed", msg)
+            self.assertIsNone(meta)
 
     def test_16_terminal_health_service_diagnostic_pipeline(self):
         diag = TerminalHealthService.run_diagnostics(tenant_id=self.tenant_id)

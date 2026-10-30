@@ -395,8 +395,44 @@ SETTINGS_DEFINITIONS = [
     # --- 7. AI Models & Providers ---
     {
         "id": "ai_primary_provider", "category": "ai_providers", "name": "Primary Inference Provider", "type": "select",
-        "default": "Google Vertex AI / Gemini", "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM",
-        "options": ["Google Vertex AI / Gemini", "Anthropic Claude", "OpenAI GPT", "Local Self-Hosted (vLLM / Ollama)"]
+        "default": "Embedded Free (zero-config)", "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM",
+        "options": ["Embedded Free (zero-config)", "Local Self-Hosted (Ollama / vLLM)", "Google AI Studio (free tier)", "Groq (free tier)", "OpenRouter (free models)", "Custom OpenAI-compatible endpoint"]
+    },
+    {
+        "id": "llm_provider", "category": "ai_providers", "name": "LLM Runtime Provider", "type": "select",
+        "default": "embedded_free", "scope": "Host", "editable_by": "OWNER", "risk": "MEDIUM",
+        "options": ["embedded_free", "ollama", "gemini_free", "groq_free", "openrouter_free", "openai_compatible", "deterministic"],
+        "desc": "embedded_free = local Ollama if available, otherwise a keyless free inference service. Choose ollama for fully local/private inference."
+    },
+    {
+        "id": "llm_model", "category": "ai_providers", "name": "LLM Model Identifier", "type": "text",
+        "default": "", "scope": "Host", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "e.g. qwen2.5:1.5b (Ollama), gemini-2.0-flash, llama-3.3-70b-versatile, meta-llama/llama-3.3-70b-instruct:free. Leave blank for provider default."
+    },
+    {
+        "id": "llm_base_url", "category": "ai_providers", "name": "LLM Base URL", "type": "text",
+        "default": "", "scope": "Host", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "Only for local/self-hosted or custom OpenAI-compatible endpoints (e.g. http://127.0.0.1:11434 or http://127.0.0.1:1234/v1)."
+    },
+    {
+        "id": "llm_api_key", "category": "ai_providers", "name": "LLM API Key", "type": "token",
+        "default": "", "scope": "Host", "editable_by": "OWNER", "risk": "HIGH", "secret": True,
+        "desc": "Optional. Required only for keyed free tiers (Google AI Studio, Groq, OpenRouter). Stored encrypted at rest; never logged."
+    },
+    {
+        "id": "llm_temperature", "category": "ai_providers", "name": "LLM Temperature", "type": "number",
+        "default": 0.3, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 0.0, "max": 2.0,
+        "desc": "Lower = more deterministic executive reasoning; higher = more creative drafting."
+    },
+    {
+        "id": "llm_max_tokens", "category": "ai_providers", "name": "LLM Max Output Tokens", "type": "number",
+        "default": 1200, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 64, "max": 8192,
+        "desc": "Upper bound on generated tokens per inference turn."
+    },
+    {
+        "id": "llm_timeout_seconds", "category": "ai_providers", "name": "LLM Request Timeout (Seconds)", "type": "number",
+        "default": 45, "scope": "Host", "editable_by": "OWNER", "risk": "LOW", "min": 5, "max": 300,
+        "desc": "Hard socket timeout for inference calls; the runtime degrades gracefully on timeout."
     },
     {
         "id": "ai_gemini_api_token", "category": "ai_providers", "name": "Gemini API Token", "type": "token",
@@ -572,8 +608,8 @@ SETTINGS_DEFINITIONS = [
     # --- Communication & Dispatch (Domain 17) ---
     {
         "id": "comm_smtp_server", "category": "communication", "name": "Corporate SMTP Server", "type": "text",
-        "default": "smtp.sendgrid.net", "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
-        "desc": "Primary outbound SMTP mail transfer gateway."
+        "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "Primary outbound SMTP mail transfer gateway. Empty means no email channel is configured; outbound mail stays disabled until the owner supplies a reachable host."
     },
     {
         "id": "comm_smtp_port", "category": "communication", "name": "SMTP Gateway Port", "type": "number",
@@ -2494,65 +2530,261 @@ class EnterpriseSettingsService:
         )
         return res
 
-    def run_live_test(self, target: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Executes actual subsystem diagnostic test with latency and evidence hashing."""
-        start = time.time()
-        status = "PASSED"
-        detail = "Operational verification passed."
-        target_lower = (target or "").lower()
+    def run_live_test(
+        self,
+        target: str,
+        params: Optional[Dict[str, Any]] = None,
+        tenant_id: str = "tnt_primary",
+        company_id: str = "comp_primary",
+    ) -> Dict[str, Any]:
+        """Executes a real diagnostic against the named subsystem.
 
-        if target_lower in ["api_token", "ai_provider", "gemini", "claude", "openai"]:
-            detail = "Inference endpoint ping returned HTTP 200. Token cryptographic signature and rate envelope verified."
-        elif target_lower in ["browser", "browser_automation"]:
-            detail = "Headless Chromium sandbox initialization verified. DOM security filter and egress whitelist active."
-        elif target_lower in ["terminal", "governed_terminal"]:
-            term_enabled = self.get_effective_setting("tnt_primary", "comp_primary", "term_execution_enabled", True)
-            if term_enabled:
-                detail = "Governed execution lease, Linux cgroup limits, and process namespace isolation checked: exit 0."
+        Only genuinely verified checks return ``PASSED``.  Subsystems that
+        cannot be probed in this deployment return ``NOT_IMPLEMENTED`` — never a
+        fabricated success message.
+        """
+        start = time.time()
+        target_lower = (target or "").strip().lower()
+        status = "PASSED"
+        detail = ""
+        evidence: Dict[str, Any] = {}
+
+        if target_lower in ("llm", "ai_provider", "ai", "gemini", "gemini_free",
+                            "claude", "openai", "groq", "groq_free", "ollama",
+                            "openrouter", "embedded_free"):
+            from core.llm_runtime import llm_runtime
+            probe = (params or {}).get("prompt") or "Reply with the single word READY."
+            res = llm_runtime.chat(
+                tenant_id=tenant_id,
+                company_id=company_id,
+                system="You are a health probe. Reply concisely.",
+                messages=[{"role": "user", "content": probe}],
+                max_tokens=64,
+                temperature=0.0,
+                intent="health",
+            )
+            evidence = {
+                "provider": res.provider,
+                "model": res.model,
+                "degraded": res.degraded,
+                "response": res.content[:300],
+                "attempts": res.attempts,
+            }
+            if res.degraded or not res.content.strip():
+                status = "FAILED"
+                detail = (
+                    "No language model provider answered. Configure a provider under "
+                    "Models & AI Providers, run scripts/install_embedded_llm.sh, or add a "
+                    f"free API key. Last error: {res.error or 'unknown'}."
+                )
             else:
-                detail = "Governed execution lease policy verified: command execution currently quarantined per host security policy."
-        elif target_lower in ["backup", "disaster_recovery"]:
-            db_path = get_default_db_path()
-            if os.path.exists(db_path):
-                sz_mb = round(os.path.getsize(db_path) / (1024 * 1024), 2)
-                detail = f"SQLite WAL check and hot snapshot drill completed successfully ({sz_mb} MB). Integrity check: OK."
-            else:
-                detail = "SQLite WAL check and hot snapshot drill completed successfully. Integrity check: OK."
-        elif target_lower in ["webhook", "webhooks"]:
-            detail = "HMAC-SHA256 signature calculated and verified against simulated receiver. Egress latency: 14ms."
-        elif target_lower in ["mcp", "mcp_servers"]:
-            detail = "Model Context Protocol JSON-RPC handshake verified. 8 tool capabilities registered with least-privilege."
-        elif target_lower in ["a2a", "agent_network"]:
-            detail = "A2A mutual TLS token verification succeeded. Broker latency: 9ms."
-        elif target_lower in ["integrations", "connectors"]:
-            detail = "Business connector sync pipeline healthy. OAuth token refreshed with valid scopes."
-        elif target_lower in ["communication", "email", "smtp"]:
-            detail = "SMTP gateway handshake and STARTTLS cipher negotiation completed. Outbound relay verified."
-        elif target_lower in ["notifications", "sms", "alerting"]:
-            detail = "Emergency SMS gateway routing verified with carrier relay. Delivery pipeline active."
-        elif target_lower in ["evidence", "audit_ledger"]:
-            detail = "Merkle root integrity check passed. Cryptographic SHA-256 chain unbroken across 100% of receipts."
-        elif target_lower in ["database", "sqlite"]:
+                detail = (
+                    f"Live inference succeeded via {res.provider}/{res.model} "
+                    f"in {int(res.latency_ms)} ms. Response: {res.content.strip()[:120]}"
+                )
+
+        elif target_lower in ("database", "sqlite", "diagnostics"):
             try:
                 with db.get_connection() as conn:
                     row = conn.execute("PRAGMA quick_check;").fetchone()
-                    chk = row[0] if row else "ok"
-                    detail = f"SQLite WAL database healthy ({chk}). Schema version 10 verified with foreign keys enabled."
-            except Exception as e:
-                detail = f"SQLite WAL database check completed: {e}"
-        else:
-            detail = f"Diagnostic test for '{target}' executed cleanly. Subsystem responding within SLA."
+                    chk = (row[0] if row else "unknown")
+                    wal = conn.execute("PRAGMA journal_mode;").fetchone()
+                    fk = conn.execute("PRAGMA foreign_keys;").fetchone()
+                evidence = {
+                    "quick_check": chk,
+                    "journal_mode": wal[0] if wal else None,
+                    "foreign_keys": bool(fk[0]) if fk else None,
+                }
+                status = "PASSED" if str(chk).lower() == "ok" else "FAILED"
+                detail = (
+                    f"SQLite quick_check={chk}, journal_mode={evidence['journal_mode']}, "
+                    f"foreign_keys={'ON' if evidence['foreign_keys'] else 'OFF'}."
+                )
+            except Exception as exc:
+                status = "FAILED"
+                detail = f"Database probe failed: {type(exc).__name__}: {exc}"
 
-        latency_ms = round((time.time() - start) * 1000 + 14.8, 2)
-        evidence_hash = hashlib.sha256(f"{target}:{status}:{latency_ms}:{time.time()}".encode("utf-8")).hexdigest()
+        elif target_lower in ("evidence", "audit_ledger"):
+            try:
+                from core.tenancy import get_ledger
+                ledger = get_ledger(tenant_id)
+                audit = ledger.verify_full_chain_integrity()
+                evidence = {
+                    "records": len(ledger.chain),
+                    "merkle_root": ledger.get_merkle_root(),
+                    "valid": audit.get("valid"),
+                    "epochs": audit.get("epochs_count"),
+                }
+                status = "PASSED" if audit.get("valid") else "FAILED"
+                detail = (
+                    f"Tenant evidence chain contains {evidence['records']} record(s); "
+                    f"integrity {'verified' if audit.get('valid') else 'BROKEN'}."
+                )
+            except Exception as exc:
+                status = "FAILED"
+                detail = f"Evidence ledger probe failed: {type(exc).__name__}: {exc}"
+
+        elif target_lower in ("backup", "disaster_recovery", "recovery"):
+            db_path = get_default_db_path()
+            if os.path.exists(db_path):
+                size_mb = round(os.path.getsize(db_path) / (1024 * 1024), 2)
+                wal_path = db_path + "-wal"
+                evidence = {
+                    "db_path": db_path,
+                    "size_mb": size_mb,
+                    "wal_present": os.path.exists(wal_path),
+                }
+                status = "PASSED"
+                detail = (
+                    f"Database file present at {db_path} ({size_mb} MB); "
+                    f"WAL file {'present' if evidence['wal_present'] else 'absent'}."
+                )
+            else:
+                status = "FAILED"
+                detail = f"Database file not found at {db_path}; backups cannot be verified."
+
+        elif target_lower in ("terminal", "governed_terminal"):
+            import shutil
+            import subprocess
+            bash = shutil.which("bash") or shutil.which("sh")
+            evidence = {"shell": bash, "cwd": os.getcwd(), "cwd_writable": os.access(os.getcwd(), os.W_OK)}
+            if not bash:
+                status = "FAILED"
+                detail = "No POSIX shell (bash/sh) found on the host."
+            else:
+                try:
+                    proc = subprocess.run(
+                        [bash, "-lc", "printf zonata-ok"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    ok = proc.returncode == 0 and "zonata-ok" in proc.stdout
+                    status = "PASSED" if ok else "FAILED"
+                    detail = (
+                        f"Governed shell probe via {bash} returned exit {proc.returncode}."
+                        if ok else f"Shell probe failed (exit {proc.returncode}): {proc.stderr[:200]}"
+                    )
+                    evidence["returncode"] = proc.returncode
+                except Exception as exc:
+                    status = "FAILED"
+                    detail = f"Shell probe failed: {type(exc).__name__}: {exc}"
+
+        elif target_lower in ("browser", "browser_automation"):
+            import shutil
+            chromium = (
+                shutil.which("chromium") or shutil.which("chromium-browser")
+                or shutil.which("google-chrome") or shutil.which("chrome")
+            )
+            playwright = False
+            try:
+                import playwright  # noqa: F401
+                playwright = True
+            except Exception:
+                playwright = False
+            evidence = {"chromium_binary": chromium, "playwright_installed": playwright}
+            if chromium or playwright:
+                status = "PASSED"
+                detail = (
+                    f"Browser runtime detected (binary={chromium or 'n/a'}, "
+                    f"playwright={playwright})."
+                )
+            else:
+                status = "FAILED"
+                detail = "No Chromium binary or Playwright package detected on this host."
+
+        elif target_lower in ("communication", "smtp", "email"):
+            import socket
+            host = str(self.get_effective_setting(tenant_id, company_id, "comm_smtp_server", "") or "").strip()
+            port = int(self.get_effective_setting(tenant_id, company_id, "comm_smtp_port", 587) or 587)
+            tls = bool(self.get_effective_setting(tenant_id, company_id, "comm_tls_enforced", True))
+            evidence = {"smtp_host": host, "smtp_port": port, "tls_enforced": tls}
+            if not host:
+                status = "NOT_CONFIGURED"
+                detail = "No SMTP server is configured; outbound email cannot be sent."
+            else:
+                began = time.time()
+                try:
+                    with socket.create_connection((host, port), timeout=3):
+                        pass
+                    evidence["tcp_connect_ms"] = round((time.time() - began) * 1000, 2)
+                    status = "PASSED"
+                    detail = (
+                        f"TCP connection to {host}:{port} succeeded in "
+                        f"{evidence['tcp_connect_ms']} ms. TLS enforcement is "
+                        f"{'ON' if tls else 'OFF'}; credentials were not exercised."
+                    )
+                except Exception as exc:
+                    evidence["tcp_error"] = f"{type(exc).__name__}: {exc}"
+                    status = "FAILED"
+                    detail = f"Could not connect to SMTP host {host}:{port} — {type(exc).__name__}: {exc}"
+
+        elif target_lower in ("notifications", "notification", "alerts"):
+            sms_enabled = bool(self.get_effective_setting(tenant_id, company_id, "notify_critical_sms", True))
+            toast_enabled = bool(self.get_effective_setting(tenant_id, company_id, "notify_in_app_toast", True))
+            sms_number = str(self.get_effective_setting(tenant_id, company_id, "notify_escalation_sms_number", "") or "").strip()
+            sms_provider = bool(
+                os.environ.get("TWILIO_ACCOUNT_SID")
+                or os.environ.get("SMS_PROVIDER_API_KEY")
+            )
+            evidence = {
+                "in_app_toast": toast_enabled,
+                "critical_sms_enabled": sms_enabled,
+                "sms_number_present": bool(sms_number),
+                "sms_provider_configured": sms_provider,
+            }
+            if toast_enabled:
+                status = "PASSED"
+                channels = ["in-app toast (no external dependency)"]
+                if sms_enabled and sms_provider and sms_number:
+                    channels.append("SMS via configured provider")
+                elif sms_enabled:
+                    channels.append("SMS requested but no provider is configured (TWILIO_ACCOUNT_SID / SMS_PROVIDER_API_KEY)")
+                detail = "Deliverable notification channels: " + "; ".join(channels) + "."
+            elif sms_enabled:
+                status = "NOT_CONFIGURED"
+                detail = "In-app toasts are disabled and no SMS provider is configured; no channel can deliver alerts."
+            else:
+                status = "NOT_CONFIGURED"
+                detail = "All notification channels are disabled."
+
+        elif target_lower in ("security",):
+            try:
+                with db.get_connection() as conn:
+                    row = conn.execute("PRAGMA foreign_keys;").fetchone()
+                evidence = {"foreign_keys_enforced": bool(row[0]) if row else None}
+                status = "PASSED" if evidence["foreign_keys_enforced"] else "FAILED"
+                detail = (
+                    "SQLite foreign-key enforcement is ON."
+                    if evidence["foreign_keys_enforced"]
+                    else "SQLite foreign-key enforcement is OFF — tenant isolation risk."
+                )
+            except Exception as exc:
+                status = "FAILED"
+                detail = f"Security probe failed: {type(exc).__name__}: {exc}"
+
+        else:
+            status = "NOT_IMPLEMENTED"
+            detail = (
+                f"No live probe is implemented for '{target}'. This deployment will not "
+                "report a fabricated success. Configure the integration and re-test."
+            )
+
+        latency_ms = round((time.time() - start) * 1000, 2)
+        evidence_hash = hashlib.sha256(
+            json.dumps(
+                {"target": target, "status": status, "detail": detail,
+                 "evidence": evidence, "ts": time.time()},
+                sort_keys=True, default=str,
+            ).encode("utf-8")
+        ).hexdigest()
 
         return {
             "target": target,
             "status": status,
             "detail": detail,
             "latency_ms": latency_ms,
+            "evidence": evidence,
             "evidence_hash": evidence_hash,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
     def execute_button_action(

@@ -559,15 +559,26 @@ class Test10_SaaSBillingAndEntitlements(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_04_payment_provider_adapters(self):
+        """Without provider credentials both adapters fail closed, never fabricate IDs."""
         stripe = StripeBillingAdapter()
         res_stripe = stripe.create_customer("tnt_stripe", "billing@enterprise.corp")
-        self.assertTrue(res_stripe["success"])
-        self.assertTrue(res_stripe["stripe_customer_id"].startswith("cus_"))
+        if stripe.is_configured():
+            self.assertTrue(res_stripe.get("stripe_customer_id", "").startswith("cus_"))
+        else:
+            self.assertFalse(res_stripe["success"])
+            self.assertEqual(res_stripe["code"], "NOT_CONFIGURED")
+            self.assertIn("STRIPE_SECRET_KEY", res_stripe["required_env"])
+            self.assertNotIn("stripe_customer_id", res_stripe)
 
         razorpay = RazorpayBillingAdapter()
         res_rzp = razorpay.create_customer("tnt_razorpay", "billing@enterprise.in")
-        self.assertTrue(res_rzp["success"])
-        self.assertTrue(res_rzp["razorpay_customer_id"].startswith("cust_"))
+        if razorpay.is_configured():
+            self.assertTrue(res_rzp.get("razorpay_customer_id", "").startswith("cust_"))
+        else:
+            self.assertFalse(res_rzp["success"])
+            self.assertEqual(res_rzp["code"], "NOT_CONFIGURED")
+            self.assertIn("RAZORPAY_KEY_ID", res_rzp["required_env"])
+            self.assertNotIn("razorpay_customer_id", res_rzp)
 
 
 class Test11_PostHogProductAnalytics(unittest.TestCase):

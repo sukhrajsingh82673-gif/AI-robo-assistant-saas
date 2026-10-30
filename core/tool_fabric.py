@@ -110,11 +110,20 @@ class ToolDiscoveryEngine:
                 "reason": "Capability requires host install, but operating ceiling is SANDBOXED_READ_ONLY. Human approval required."
             }
 
-        # Step 5: Sandboxed Provisioning
+        # Step 5: Sandboxed Provisioning — only for binaries that really exist.
+        # Automatic installation is not implemented; we never invent a path.
         p = shutil.which(tool_key)
         if not p:
-            # Check if command is installed or run simulated safe sandboxed install
-            p = f"/usr/bin/{tool_key}"
+            return {
+                "success": False,
+                "status": "NOT_AVAILABLE",
+                "tool": tool_key,
+                "reason": (
+                    f"Binary '{tool_key}' is not installed on this host. Automatic "
+                    "installation is not implemented, so nothing was provisioned."
+                ),
+                "authority_ceiling_respected": True,
+            }
 
         new_cap = ToolCapability(
             name=tool_key,

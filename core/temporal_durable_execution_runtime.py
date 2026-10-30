@@ -584,7 +584,8 @@ class TemporalDurableExecutionGateway:
     def __init__(self, tenant_id: str = "tnt_primary", company_id: str = "comp_primary"):
         self.tenant_id = tenant_id
         self.company_id = company_id
-        self.ledger = EvidenceLedger()
+        from core.tenancy import tenant_ledger_path
+        self.ledger = EvidenceLedger(tenant_ledger_path(tenant_id))
         self.verification_engine = TemporalVerificationEngine(tenant_id, company_id)
         self.saga_coordinator = SagaCompensationCoordinator(tenant_id, company_id)
         self._ensure_tenant_and_company()
