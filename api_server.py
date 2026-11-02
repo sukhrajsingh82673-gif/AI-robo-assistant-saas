@@ -52,7 +52,7 @@ from core.departments import DepartmentControlUnit
 from core.approvals import ApprovalPipeline
 from core.knowledge_graph import CompanyKnowledgeGraph as CoreKnowledgeGraph, TruthState
 from core.intelligence import OpportunityEngine, RiskEngine
-from core.memory import OrganizationalMemory, MemoryTier, MemoryType
+from core.memory import OrganizationalMemory, MemoryTier, MemoryType as OrganizationalMemoryType
 from core.financials import BudgetHierarchyEngine
 from core.billing import UsageMeteringEngine
 from core.digital_twin import DigitalTwinSimulator, SimulationState
@@ -121,11 +121,11 @@ from core.universal_terminal import (
 
 
 
-from core.enterprise_records import records_engine
-from core.enterprise_files import files_engine
+from core.enterprise_records import records_engine, EnterpriseRecordsEngine
+from core.enterprise_files import files_engine, EnterpriseFilesEngine
 from core.enterprise_reports import reports_engine, EnterpriseReportsEngine
 from core.enterprise_finance import finance_engine, EnterpriseFinanceEngine
-from core.enterprise_agent_factory import agent_factory
+from core.enterprise_agent_factory import agent_factory, EnterpriseAgentFactory
 from core.enterprise_integrations import integrations_registry
 from core.unified_search import unified_search
 
@@ -2529,13 +2529,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             sq = query_params.get("q", [None])[0]
             lim = int(query_params.get("limit", [100])[0])
             off = int(query_params.get("offset", [0])[0])
-            res = records_engine.list_records(company_id=comp_id, record_type=rtype, department=dept, date_range=drange, search_query=sq, limit=lim, offset=off)
+            res = EnterpriseRecordsEngine(tenant_id).list_records(company_id=comp_id or company_id, record_type=rtype, department=dept, date_range=drange, search_query=sq, limit=lim, offset=off)
             self._send_json(res)
             return
 
         elif path.startswith("/api/records/"):
             rec_id = path.split("/")[3]
-            rec = records_engine.get_record(rec_id)
+            rec = EnterpriseRecordsEngine(tenant_id).get_record(rec_id)
             if rec:
                 self._send_json(rec)
             else:
@@ -2550,13 +2550,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             dept = query_params.get("department", [None])[0]
             cat = query_params.get("category", [None])[0]
             sq = query_params.get("q", [None])[0]
-            res = files_engine.list_files(company_id=comp_id, department=dept, category=cat, search_query=sq)
+            res = EnterpriseFilesEngine(tenant_id).list_files(company_id=comp_id or company_id, department=dept, category=cat, search_query=sq)
             self._send_json(res)
             return
 
         elif path.startswith("/api/files/"):
             fid = path.split("/")[3]
-            f = files_engine.get_file(fid)
+            f = EnterpriseFilesEngine(tenant_id).get_file(fid)
             if f:
                 self._send_json(f)
             else:
@@ -2619,7 +2619,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/agent-factory/blueprints":
             comp_id = query_params.get("company_id", [None])[0]
             dept = query_params.get("department", [None])[0]
-            bps = agent_factory.list_blueprints(company_id=comp_id, department=dept)
+            bps = EnterpriseAgentFactory(tenant_id).list_blueprints(company_id=comp_id or company_id, department=dept)
             self._send_json({"blueprints": bps, "count": len(bps)})
             return
 
@@ -2784,14 +2784,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/workflows/runs":
             wf_id = query_params.get("workflow_id", [None])[0]
-            runs = governed_workflow_runtime.list_runs(workflow_id=wf_id)
+            runs = governed_workflow_runtime.list_runs(workflow_id=wf_id, tenant_id=tenant_id)
             self._send_json({"runs": runs, "count": len(runs)})
             return
 
         elif path.startswith("/api/workflows/runs/") and path.endswith("/state"):
             parts = path.split("/")
             run_id = parts[4]
-            state = governed_workflow_runtime.get_run_state(run_id)
+            state = governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id)
             if state:
                 self._send_json({"run_state": state})
             else:
@@ -2808,7 +2808,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/workflows/runs/") and path.endswith("/checkpoints"):
             parts = path.split("/")
             run_id = parts[4]
-            run_st = governed_workflow_runtime.get_run_state(run_id)
+            run_st = governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id)
             if run_st:
                 chks = governed_workflow_runtime.checkpointer.list_checkpoints(run_st["thread_id"])
                 self._send_json({"checkpoints": chks, "count": len(chks)})
@@ -4277,7 +4277,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 tenant_id=tenant_id,
                 company_id=comp.company_id,
                 memory_tier=MemoryTier.COMPANY,
-                memory_type=MemoryType.POLICY,
+                memory_type=OrganizationalMemoryType.POLICY,
                 content=f"Company '{comp.name}' onboarded into operating portfolio as {comp.company_type} entity."
             )
 
@@ -5825,6 +5825,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # ZONATA AI Assistant & Universal Co-Worker POST Handlers
         # =====================================================================
         elif path == "/api/coworker/mission":
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({
+                    "success": False,
+                    "error": "Global kill switch engaged: mission submission blocked",
+                    "blocked": True,
+                    "killswitch_active": True,
+                }, status=403)
+                return
             prompt = req_data.get("prompt", "")
             initiator = req_data.get("initiator", "ZONATA AI Assistant")
             auto_step = bool(req_data.get("auto_step", True))
@@ -5846,6 +5854,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/coworker/missions/") and path.endswith("/step"):
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({
+                    "success": False,
+                    "error": "Global kill switch engaged: mission execution blocked",
+                    "blocked": True,
+                    "killswitch_active": True,
+                }, status=403)
+                return
             mid = path.split("/")[4]
             m = _cw(tenant_id, company_id).background_dispatcher.execute_compound_mission_step(mid)
             if m:
@@ -5880,7 +5896,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/coworker/terminal/execute" or path == "/api/terminal/execute":
             # company_id was resolved from the verified token (see _resolve_company_id)
-            
+
+            # Authoritative global kill switch: halts every execution surface.
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({
+                    "error": "Global kill switch engaged: terminal execution halted",
+                    "blocked": True,
+                    "killswitch_active": True,
+                }, status=403)
+                return
+
             # Dynamic Runtime Enforcement (Gate G6, G2)
             em_stop = settings_service.get_effective_setting(tenant_id, company_id, "host_emergency_stop", False)
             if em_stop:
@@ -6226,12 +6251,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Enterprise Records, Files, Reports, Finance & Agent Factory (POST)
         # =====================================================================
         elif path == "/api/records":
-            rec = records_engine.create_record(req_data)
+            scoped_rec = dict(req_data)
+            scoped_rec["company_id"] = company_id
+            rec = EnterpriseRecordsEngine(tenant_id).create_record(scoped_rec)
             self._send_json({"success": True, "record": rec})
             return
 
         elif path == "/api/files":
-            fil = files_engine.register_file(req_data)
+            scoped_file = dict(req_data)
+            scoped_file["company_id"] = company_id
+            fil = EnterpriseFilesEngine(tenant_id).register_file(scoped_file)
             self._send_json({"success": True, "file": fil})
             return
 
@@ -6243,7 +6272,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/finance/expenses":
             engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
-            res = engine.create_expense(req_data)
+            scoped = dict(req_data)
+            scoped["company_id"] = company_id
+            res = engine.create_expense(scoped)
             self._send_json(res)
             return
 
@@ -6257,14 +6288,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/agent-factory/synthesize":
             prompt = req_data.get("prompt", "General business operations agent")
             comp_id = company_id
-            bp = agent_factory.synthesize_blueprint_from_prompt(prompt, comp_id)
+            bp = EnterpriseAgentFactory(tenant_id).synthesize_blueprint_from_prompt(prompt, comp_id or company_id)
             self._send_json({"success": True, "blueprint": bp})
             return
 
         elif path.startswith("/api/agent-factory/blueprints/") and path.endswith("/status"):
             b_id = path.split("/")[4]
             st = req_data.get("status", "ACTIVE")
-            res = agent_factory.update_blueprint_status(b_id, st)
+            res = EnterpriseAgentFactory(tenant_id).update_blueprint_status(b_id, st)
             self._send_json({"success": True, **res})
             return
 
@@ -6661,6 +6692,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             run_id = parts[4]
             reason = req_data.get("reason", "API request")
+            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+                self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
+                return
             res = governed_workflow_runtime.pause_workflow(run_id, reason)
             self._send_json(res)
             return
@@ -6672,6 +6706,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             cmd = None
             if cmd_data:
                 cmd = Command(resume=cmd_data.get("resume"), update=cmd_data.get("update"), goto=cmd_data.get("goto"))
+            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+                self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
+                return
             res = governed_workflow_runtime.resume_workflow(run_id, command=cmd)
             self._send_json(res)
             return
@@ -6680,6 +6717,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             run_id = parts[4]
             reason = req_data.get("reason", "API request")
+            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+                self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
+                return
             res = governed_workflow_runtime.cancel_workflow(run_id, reason)
             self._send_json(res)
             return
@@ -6687,6 +6727,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/workflows/runs/") and path.endswith("/recover"):
             parts = path.split("/")
             run_id = parts[4]
+            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+                self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
+                return
             res = governed_workflow_runtime.recover_workflow_run(run_id)
             self._send_json(res)
             return
@@ -7114,7 +7157,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 approver_user={"user_id": actor, "role": "OWNER"},
                 approved=True
             )
-            self._send_json({"success": True, "approval": res})
+            mcp_resume = None
+            if res.get("success") and res.get("status") == "APPROVED":
+                try:
+                    mcp_resume = _mcp(tenant_id, company_id).resume_approved_execution(appr_id)
+                except Exception as exc:
+                    mcp_resume = {"resumed": False, "error": str(exc)[:300]}
+            self._send_json({"success": True, "approval": res, "mcp_resume": mcp_resume})
             return
 
         elif path.startswith("/api/a2a/approvals/") and path.endswith("/reject"):
@@ -7129,6 +7178,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 approved=False,
                 rejection_reason=reason
             )
+            if res.get("success"):
+                try:
+                    with db.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE mcp_executions SET execution_status = 'REJECTED' "
+                            "WHERE approval_id = ? AND tenant_id = ? AND company_id = ? "
+                            "AND execution_status = 'APPROVAL_REQUIRED'",
+                            (appr_id, tenant_id, company_id),
+                        )
+                        conn.commit()
+                except Exception:
+                    pass
             self._send_json({"success": True, "approval": res})
             return
 
@@ -7200,7 +7261,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 endpoint=endpoint,
                 description=description,
                 transport=MCPTransportType(transport) if transport in [t.value for t in MCPTransportType] else MCPTransportType.STREAMABLE_HTTP,
-                auth_token=token,
+                auth_type="BEARER" if token else "NONE",
+                credential_ref=token or None,
                 allow_test_loopback=allow_loopback
             )
             if ok:
@@ -7565,6 +7627,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Governed Browser Use Execution Layer Endpoints (POST - Project 08)
         # =====================================================================
         elif path == "/api/browser/sessions":
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({"error": "Global kill switch engaged: browser halted", "blocked": True}, status=403)
+                return
             profile_type = req_data.get("profile_type", "EPHEMERAL")
             user_agent = req_data.get("user_agent", "ZonataGovernedBrowser/1.0")
             allowed_domains = req_data.get("allowed_domains", [])
@@ -7585,6 +7650,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/browser/executions":
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({"error": "Global kill switch engaged: browser halted", "blocked": True}, status=403)
+                return
             session_id = req_data.get("session_id")
             mission_id = req_data.get("mission_id", "mis_browser_direct")
             task_id = req_data.get("task_id")
@@ -7596,13 +7664,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 ex = _browser(tenant_id, company_id).create_execution(
                     session_id=session_id,
+                    agent_id=invoking_agent_id,
+                    task_prompt=req_data.get("task_prompt") or goal,
                     mission_id=mission_id,
-                    task_id=task_id,
-                    invoking_agent_id=invoking_agent_id,
-                    goal=goal,
-                    initial_url=initial_url,
-                    max_actions=max_actions,
-                    timeout_seconds=timeout_seconds
+                    workflow_id=req_data.get("workflow_id"),
                 )
                 self._send_json(ex)
             except BrowserSecurityException as bse:
@@ -7612,6 +7677,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/browser/navigate":
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({"error": "Global kill switch engaged: browser halted", "blocked": True}, status=403)
+                return
             execution_id = req_data.get("execution_id")
             url = req_data.get("url")
             try:
@@ -7624,6 +7692,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/browser/action":
+            if universal_automation_fabric.is_killswitch_active():
+                self._send_json({"error": "Global kill switch engaged: browser halted", "blocked": True}, status=403)
+                return
             execution_id = req_data.get("execution_id")
             action_type = req_data.get("action_type")
             selector = req_data.get("selector", "")
@@ -7635,7 +7706,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     action_type=action_type,
                     selector=selector,
                     parameters=parameters,
-                    human_intent=human_intent
                 )
                 self._send_json(res)
             except BrowserSecurityException as bse:

@@ -46,6 +46,17 @@ def build_company_context(tenant_id: str, company_id: str) -> Dict[str, Any]:
         "missions": 0,
         "pending_approvals": 0,
         "data_sources_connected": 0,
+        "operating_rules": [],
+        "baseline_profile": {},
+        "customers": [],
+        "pipeline": [],
+        "pending_expenses": [],
+        "products": [],
+        "projects": [],
+        "onboarding": [],
+        "objectives": [],
+        "finance": {},
+        "governance": {},
     }
     try:
         with db.get_connection() as conn:
@@ -57,6 +68,15 @@ def build_company_context(tenant_id: str, company_id: str) -> Dict[str, Any]:
                 for key in ("name", "industry", "status", "currency", "revenue", "cost"):
                     try:
                         ctx[key if key not in ("revenue", "cost") else f"{key}_booked"] = row[key]
+                    except Exception:
+                        pass
+                for key in ("operating_rules", "baseline_summary"):
+                    try:
+                        raw = row[key]
+                        if raw:
+                            ctx["operating_rules" if key == "operating_rules" else "baseline_profile"] = (
+                                json.loads(raw) if isinstance(raw, str) else raw
+                            )
                     except Exception:
                         pass
             ctx["employees"] = _table_count(conn, "employees", tenant_id, company_id)
@@ -75,6 +95,93 @@ def build_company_context(tenant_id: str, company_id: str) -> Dict[str, Any]:
                     (tenant_id, company_id),
                 ).fetchone()
                 ctx["data_sources_connected"] = int(row[0]) if row else 0
+            except Exception:
+                pass
+
+            # --- Grounded business records (tenant+company scoped, bounded rows) ---
+            def _rows(sql, params, keys):
+                try:
+                    return [
+                        {k: r[k] for k in keys if k in r.keys()}
+                        for r in conn.execute(sql, params).fetchall()
+                    ]
+                except Exception:
+                    return []
+
+            ctx["customers"] = _rows(
+                "SELECT customer_id, name, tier, status, health_score, arr, renewal_date, "
+                "assigned_agent, sla_level FROM crm_customers "
+                "WHERE tenant_id = ? AND company_id = ? ORDER BY customer_id LIMIT 25",
+                (tenant_id, company_id),
+                ["customer_id", "name", "tier", "status", "health_score", "arr",
+                 "renewal_date", "assigned_agent", "sla_level"],
+            )
+            ctx["pipeline"] = _rows(
+                "SELECT deal_id, title, stage, value, probability, closing_date, owner "
+                "FROM crm_deals WHERE tenant_id = ? AND company_id = ? "
+                "ORDER BY deal_id LIMIT 25",
+                (tenant_id, company_id),
+                ["deal_id", "title", "stage", "value", "probability", "closing_date", "owner"],
+            )
+            ctx["pending_expenses"] = _rows(
+                "SELECT expense_id, description, amount, category, department, status "
+                "FROM finance_expenses WHERE tenant_id = ? AND company_id = ? "
+                "AND status IN ('DRAFT','SUBMITTED','PENDING') ORDER BY created_at DESC LIMIT 25",
+                (tenant_id, company_id),
+                ["expense_id", "description", "amount", "category", "department", "status"],
+            )
+            biz_records = _rows(
+                "SELECT record_id, record_type, title, status, amount, attributes "
+                "FROM enterprise_records WHERE tenant_id = ? AND company_id = ? "
+                "ORDER BY created_at DESC LIMIT 60",
+                (tenant_id, company_id),
+                ["record_id", "record_type", "title", "status", "amount", "attributes"],
+            )
+            for r in biz_records:
+                rtype = (r.get("record_type") or "").upper()
+                try:
+                    attrs = json.loads(r["attributes"]) if isinstance(r.get("attributes"), str) else (r.get("attributes") or {})
+                except Exception:
+                    attrs = {}
+                item = {"record_id": r.get("record_id"), "title": r.get("title"),
+                        "status": r.get("status"), "amount": r.get("amount"), "attributes": attrs}
+                if rtype == "PRODUCT":
+                    ctx["products"].append(item)
+                elif rtype == "PROJECT":
+                    ctx["projects"].append(item)
+                elif rtype == "CUSTOMER_ONBOARDING":
+                    ctx["onboarding"].append(item)
+            ctx["objectives"] = _rows(
+                "SELECT objective_id, title, description, time_horizon, status "
+                "FROM corporate_objectives WHERE tenant_id = ? AND company_id = ? "
+                "ORDER BY created_at DESC LIMIT 10",
+                (tenant_id, company_id),
+                ["objective_id", "title", "description", "time_horizon", "status"],
+            )
+            try:
+                frow = conn.execute(
+                    "SELECT COALESCE(SUM(CASE WHEN category IN ('CASH','BANK') THEN balance END),0) AS cash, "
+                    "COALESCE(SUM(CASE WHEN category='AR' THEN balance END),0) AS ar, "
+                    "COALESCE(SUM(CASE WHEN account_type='REVENUE' THEN balance END),0) AS revenue, "
+                    "COALESCE(SUM(CASE WHEN account_type='EXPENSE' THEN balance END),0) AS expenses "
+                    "FROM finance_accounts WHERE tenant_id = ? AND company_id = ?",
+                    (tenant_id, company_id),
+                ).fetchone()
+                if frow:
+                    ctx["finance"] = {"cash": float(frow["cash"] or 0), "accounts_receivable": float(frow["ar"] or 0),
+                                      "revenue_posted": float(frow["revenue"] or 0), "expenses_posted": float(frow["expenses"] or 0)}
+            except Exception:
+                pass
+            try:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM crm_customers WHERE tenant_id = ? AND company_id = ?",
+                    (tenant_id, company_id),
+                ).fetchone()
+                ctx["governance"] = {
+                    "customer_records": int(row[0]) if row else 0,
+                    "data_classification": (ctx.get("baseline_profile") or {}).get("data_classification", "UNSPECIFIED"),
+                    "evidence_mode": "merkle evidence ledger, tenant-scoped",
+                }
             except Exception:
                 pass
     except Exception:
@@ -119,10 +226,14 @@ def ceo_chat(tenant_id: str, company_id: str, message: str) -> Dict[str, Any]:
         "operating system with human approval gates, an evidence ledger, and a real "
         "multi-tenant database.\n\n"
         "Rules:\n"
-        "- Ground every statement in the CONTEXT below.\n"
-        "- Never invent revenue, costs, customers, headcount, or sources. If data is "
-        "missing, say 'not available in the system'.\n"
-        "- Be direct and concise (max ~250 words).\n"
+        "- Ground every statement in the CONTEXT below. It contains this company's real "
+        "customers, pipeline deals, pending expenses, products, projects, onboarding "
+        "status and objectives.\n"
+        "- Compute from those records and show your arithmetic. Do not invent customers, "
+        "revenue, costs, headcount, or sources. If a value is absent, say it is not "
+        "available in the system.\n"
+        "- A pipeline deal is not revenue. Pending expenses are not posted costs.\n"
+        "- Be direct and concise (max ~350 words).\n"
         "- End with 1-3 concrete recommended actions, each labelled with its risk "
         "(LOW/MEDIUM/HIGH) and whether it needs owner approval.\n"
         "- You may propose a mission, but you cannot execute irreversible actions in chat."

@@ -896,71 +896,130 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
         session["current_url"] = url
         session["current_domain"] = domain
         session["tabs"][0]["url"] = url
-        session["tabs"][0]["title"] = f"Page: {domain}"
         session["history"].append({"url": url, "timestamp": start})
 
         dom_parser = SemanticDOMParser()
+        execution_mode = "PROVIDED_HTML"
+
         if html_content:
             try:
                 dom_parser.feed(html_content)
             except Exception:
                 pass
         else:
-            default_html = f"""
-            <html>
-                <head><title>Page: {domain}</title></head>
-                <body>
-                    <div id="status_badge" class="badge badge-success">Confirmed</div>
-                    <div id="order_ref">ORD-20261011</div>
-                    <div id="kpi_revenue">₹45,00,000</div>
-                    <form id="booking_form">
-                        <input id="guest_name" name="guest_name" type="text" value="Alice Smith" />
-                        <input id="room_type" name="room_type" type="text" value="Deluxe" />
-                        <input id="checkin_date" name="checkin_date" type="text" value="2026-10-15" />
-                        <input id="total_amount" name="total_amount" type="number" value="12500" />
-                        <button id="submit_btn" type="submit" role="button" aria-label="Submit Booking">Submit</button>
-                    </form>
-                    <button class="btn btn-primary" role="button">Confirm</button>
-                    <button class="btn btn-secondary" role="button">Cancel</button>
-                </body>
-            </html>
-            """
-            try:
-                dom_parser.feed(default_html)
-            except Exception:
-                pass
+            is_nonroutable_test_host = domain.endswith((".test", ".internal", ".local", ".invalid"))
+            in_test_mode = os.environ.get("ZONATA_TEST_MODE") == "1"
+
+            if is_nonroutable_test_host and in_test_mode:
+                # Test-only fixture. Never used outside the test suite.
+                execution_mode = "SIMULATED_TEST_FIXTURE"
+                default_html = f"""
+                <html>
+                    <head><title>Fixture: {domain}</title></head>
+                    <body>
+                        <div id="status_badge" class="badge badge-success">Confirmed</div>
+                        <div id="order_ref">ORD-TESTFIXTURE</div>
+                        <div id="kpi_revenue">TEST_FIXTURE_VALUE</div>
+                        <form id="booking_form">
+                            <input id="guest_name" name="guest_name" type="text" />
+                            <button id="submit_btn" type="submit" role="button" aria-label="Submit">Submit</button>
+                        </form>
+                        <button id="purchase_license_btn" type="button">Purchase</button>
+                    </body>
+                </html>
+                """
+                try:
+                    dom_parser.feed(default_html)
+                except Exception:
+                    pass
+            else:
+                # Real network fetch. If it fails, report the failure honestly:
+                # never invent page content for a URL we did not read.
+                execution_mode = "REAL_HTTP_FETCH"
+                try:
+                    req = urllib.request.Request(
+                        url,
+                        headers={
+                            "User-Agent": "ZonataGovernedBrowser/1.0 (+governed; contact=owner)",
+                            "Accept": "text/html,application/xhtml+xml",
+                        },
+                    )
+                    with urllib.request.urlopen(req, timeout=20.0) as resp:
+                        raw = resp.read(2_000_000)
+                        final_url = resp.geturl()
+                        status_code = getattr(resp, "status", None)
+                    charset = "utf-8"
+                    try:
+                        charset = resp.headers.get_content_charset() or "utf-8"
+                    except Exception:
+                        pass
+                    body = raw.decode(charset, errors="replace")
+                    try:
+                        dom_parser.feed(body)
+                    except Exception:
+                        pass
+                    session["current_url"] = final_url
+                    session["http_status"] = status_code
+                    session["content_bytes"] = len(raw)
+                except Exception as exc:
+                    session["tabs"][0]["title"] = f"Navigation failed: {domain}"
+                    session["dom_elements"] = {}
+                    session["error_banners"] = []
+                    return {
+                        "success": False,
+                        "url": url,
+                        "domain": domain,
+                        "execution_mode": "REAL_HTTP_FETCH",
+                        "error": f"NAVIGATION_FAILED: {type(exc).__name__}: {str(exc)[:200]}",
+                        "duration_ms": round((time.time() - start) * 1000, 2),
+                        "tabs_count": len(session["tabs"]),
+                    }
 
         session["dom_parser"] = dom_parser
+        session["execution_mode"] = execution_mode
         session["error_banners"] = dom_parser.error_banners
         session["has_captcha_challenge"] = dom_parser.has_captcha_challenge
         session["has_mfa_challenge"] = dom_parser.has_mfa_challenge
+        session["tabs"][0]["title"] = dom_parser.title or f"Page: {domain}"
 
+        # Derive the DOM summary from what was actually parsed, not from a template.
+        forms = []
+        buttons = []
+        elements = []
+        for elem in dom_parser.elements:
+            tag = (elem.tag or "").lower()
+            eid = elem.elem_id or ""
+            selector = f"#{eid}" if eid else (f"[name='{elem.name}']" if elem.name else tag)
+            if tag == "form":
+                forms.append({"id": eid or elem.name or "form", "selector": selector})
+            elif tag == "button" or (tag == "input" and (elem.elem_type or "").lower() in ("submit", "button")):
+                label = (elem.text or elem.value or elem.aria_label or "").strip()
+                if label:
+                    buttons.append(label)
+            if eid:
+                elements.append({"selector": f"#{eid}", "text": (elem.text or "")[:120], "type": tag})
         dom = {
             "title": dom_parser.title or f"Page: {domain}",
-            "forms": [
-                {"id": "booking_form", "fields": ["guest_name", "room_type", "checkin_date", "total_amount"]},
-                {"id": "search_form", "fields": ["query", "filter_category"]}
-            ],
-            "buttons": ["Submit", "Search", "Confirm", "Cancel", "Delete"],
-            "elements": [
-                {"selector": "#status_badge", "text": "Confirmed", "type": "badge"},
-                {"selector": "#order_ref", "text": f"ORD-{uuid.uuid4().hex[:6].upper()}", "type": "text"},
-                {"selector": "#kpi_revenue", "text": "₹45,00,000", "type": "metric"}
-            ]
+            "forms": forms,
+            "buttons": buttons[:40],
+            "elements": elements[:100],
         }
         session["dom_elements"] = dom
         duration_ms = round((time.time() - start) * 1000, 2)
 
         return {
             "success": True,
-            "url": url,
+            "url": session.get("current_url", url),
             "domain": domain,
             "title": dom["title"],
+            "execution_mode": execution_mode,
+            "http_status": session.get("http_status"),
+            "content_bytes": session.get("content_bytes"),
             "duration_ms": duration_ms,
             "tabs_count": len(session["tabs"]),
             "error_banners": dom_parser.error_banners,
             "has_captcha_challenge": dom_parser.has_captcha_challenge,
-            "has_mfa_challenge": dom_parser.has_mfa_challenge
+            "has_mfa_challenge": dom_parser.has_mfa_challenge,
         }
 
     def execute_action(self, session_id: str, action_type: str, selector: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -976,6 +1035,31 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             raise SecurityException("Runaway navigation limit exceeded (max 35 actions per session)")
 
         parser: Optional[SemanticDOMParser] = session.get("dom_parser")
+
+        # Interaction that needs a real browser engine (click/type/submit) is
+        # not implemented. Outside the test fixture we refuse rather than
+        # fabricate a successful interaction.
+        simulation_allowed = (
+            os.environ.get("ZONATA_TEST_MODE") == "1"
+            or session.get("execution_mode") == "SIMULATED_TEST_FIXTURE"
+        )
+        if action_type in (
+            BrowserActionType.CLICK.value, BrowserActionType.CLICK,
+            BrowserActionType.TYPE.value, BrowserActionType.TYPE,
+            BrowserActionType.SUBMIT_FORM.value, BrowserActionType.SUBMIT_FORM,
+        ) and not simulation_allowed:
+            return {
+                "success": False,
+                "action": action_type,
+                "selector": selector,
+                "error_classification": "ACTION_NOT_IMPLEMENTED",
+                "error": (
+                    "No real browser engine is installed, so this interaction was not "
+                    "performed. Only navigation and DOM reading are supported in this build."
+                ),
+                "execution_mode": session.get("execution_mode"),
+                "duration_ms": round((time.time() - start) * 1000, 2),
+            }
 
         if params.get("simulate_failure") or (selector and "non_existent" in selector):
             duration_ms = round((time.time() - start) * 1000, 2)
@@ -1053,26 +1137,39 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                 }
             tx_ref = params.get("transaction_id") or params.get("confirmation_id")
             expected_text = params.get("expected_text")
-            require_tx = params.get("require_transaction_id", False if expected_text else True)
-            if require_tx and not tx_ref:
+            observed_text = ""
+            if parser is not None:
+                observed_text = " ".join(
+                    (elem.text or "") for elem in parser.elements
+                )[:20000]
+            if expected_text:
+                matched = expected_text in observed_text
                 return {
-                    "success": False,
-                    "verified": False,
+                    "success": bool(matched),
+                    "verified": bool(matched),
                     "action": "VERIFY_POSTCONDITION",
-                    "error_classification": BrowserErrorCategory.OUTCOME_UNCERTAIN.value,
-                    "reconciliation_required": True,
-                    "error": "Postcondition uncertain: application accepted action but returned no verifiable confirmation token or transaction reference",
-                    "duration_ms": duration_ms
+                    "expected_text": expected_text,
+                    "error_classification": None if matched else BrowserErrorCategory.OUTCOME_UNCERTAIN.value,
+                    "reconciliation_required": not matched,
+                    "details": (
+                        "Expected text was found in the parsed page."
+                        if matched else
+                        "Expected text was NOT found in the parsed page; outcome is unverified."
+                    ),
+                    "duration_ms": duration_ms,
                 }
-            tx_final = tx_ref or f"TX-{uuid.uuid4().hex[:8].upper()}"
             return {
-                "success": True,
-                "verified": True,
+                "success": False,
+                "verified": False,
                 "action": "VERIFY_POSTCONDITION",
-                "confirmation_id": tx_final,
-                "transaction_id": tx_final,
-                "details": f"Postcondition verified: {expected_text if expected_text else 'confirmation state and transaction reference sealed'}",
-                "duration_ms": duration_ms
+                "error_classification": BrowserErrorCategory.OUTCOME_UNCERTAIN.value,
+                "reconciliation_required": True,
+                "error": (
+                    "Postcondition cannot be verified: no expected_text was supplied and this "
+                    "runtime cannot independently confirm a transaction reference."
+                ),
+                "provided_reference": tx_ref,
+                "duration_ms": duration_ms,
             }
 
         elif action_type in (BrowserActionType.HANDLE_POPUP.value, BrowserActionType.HANDLE_POPUP):
@@ -1100,21 +1197,37 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             }
 
         elif action_type in (BrowserActionType.EXTRACT.value, BrowserActionType.EXTRACT):
+            # Extraction returns only what was actually present in the parsed
+            # page. Selector extraction is used when a selector is supplied.
+            parsed_elems = parser.elements if parser is not None else []
+            matched = parser.find_all_elements(selector) if (parser is not None and selector) else []
+            page_text = " ".join((e.text or "") for e in parsed_elems).strip()
             data = {
-                "current_url": session["current_url"],
-                "domain": session["current_domain"],
-                "records": [
-                    {"id": "REC-01", "name": "Direct Booking Rate", "rate": "₹8,500", "status": "AVAILABLE"},
-                    {"id": "REC-02", "name": "OTA Distribution Rate", "rate": "₹10,500", "status": "OCCUPIED"}
+                "current_url": session.get("current_url"),
+                "domain": session.get("current_domain"),
+                "http_status": session.get("http_status"),
+                "title": (session.get("dom_elements") or {}).get("title"),
+                "selector": selector or None,
+                "matches": [
+                    {"tag": e.tag, "text": (e.text or "")[:500], "id": e.elem_id, "name": e.name}
+                    for e in matched[:50]
                 ],
-                "kpi_total": "₹45,00,000"
+                "text_excerpt": page_text[:2000],
             }
-            duration_ms = round((time.time() - start) * 1000, 2)
+            if selector and not matched:
+                return {
+                    "success": False,
+                    "action": "EXTRACT",
+                    "selector": selector,
+                    "error_classification": BrowserErrorCategory.ELEMENT_NOT_FOUND.value,
+                    "error": f"No element matched selector '{selector}' in the parsed page.",
+                    "duration_ms": round((time.time() - start) * 1000, 2),
+                }
             return {
                 "success": True,
                 "action": "EXTRACT",
                 "data": data,
-                "duration_ms": duration_ms
+                "duration_ms": round((time.time() - start) * 1000, 2),
             }
 
         elif action_type in (BrowserActionType.OPEN_TAB.value, BrowserActionType.OPEN_TAB):
@@ -1167,7 +1280,13 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             }
 
         duration_ms = round((time.time() - start) * 1000, 2)
-        return {"success": True, "action": action_type, "duration_ms": duration_ms}
+        return {
+            "success": False,
+            "action": action_type,
+            "error_classification": "ACTION_NOT_IMPLEMENTED",
+            "error": f"Action '{action_type}' is not implemented by this runtime.",
+            "duration_ms": duration_ms,
+        }
 
     def observe_page(self, session_id: str) -> Dict[str, Any]:
         session = self._active_sessions.get(session_id)

@@ -1028,9 +1028,13 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             )
             conn.commit()
 
-    def get_run_state(self, run_id: str) -> Optional[Dict[str, Any]]:
+    def get_run_state(self, run_id: str, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        scope_tenant = tenant_id or self.tenant_id
         with db.get_connection() as conn:
-            row = conn.execute("SELECT * FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM workflow_runs WHERE run_id = ? AND tenant_id = ?",
+                (run_id, scope_tenant),
+            ).fetchone()
             if not row:
                 return None
             chk = self.checkpointer.get_latest_checkpoint(row["thread_id"])
@@ -1068,12 +1072,19 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
                 for r in rows
             ]
 
-    def list_runs(self, workflow_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_runs(self, workflow_id: Optional[str] = None, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        scope_tenant = tenant_id or self.tenant_id
         with db.get_connection() as conn:
             if workflow_id:
-                rows = conn.execute("SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY created_at DESC", (workflow_id,)).fetchall()
+                rows = conn.execute(
+                    "SELECT * FROM workflow_runs WHERE workflow_id = ? AND tenant_id = ? ORDER BY created_at DESC",
+                    (workflow_id, scope_tenant),
+                ).fetchall()
             else:
-                rows = conn.execute("SELECT * FROM workflow_runs ORDER BY created_at DESC").fetchall()
+                rows = conn.execute(
+                    "SELECT * FROM workflow_runs WHERE tenant_id = ? ORDER BY created_at DESC",
+                    (scope_tenant,),
+                ).fetchall()
             return [
                 {
                     "run_id": r["run_id"],

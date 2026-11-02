@@ -322,6 +322,13 @@ class BackgroundMissionDispatcher:
             )
 
             from core.llm_runtime import llm_runtime
+            from core.ceo_chat import build_company_context
+            try:
+                company_ctx = build_company_context(mission.tenant_id, mission.company_id)
+            except Exception:
+                company_ctx = {}
+            mission._company_context = company_ctx
+            ctx_json = json.dumps(company_ctx, default=str)[:12000]
             plan = llm_runtime.chat(
                 tenant_id=mission.tenant_id,
                 company_id=mission.company_id,
@@ -334,8 +341,10 @@ class BackgroundMissionDispatcher:
                     "role": "user",
                     "content": (
                         f"Objective: {mission.prompt}\n\n"
-                        "Return a short execution plan (max 6 bullets) and list any data you would "
-                        "need from the company's connected systems."
+                        f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n{ctx_json}\n\n"
+                        "Return a short execution plan (max 6 bullets), grounded in the context "
+                        "above, and list any data you would need from the company's connected "
+                        "systems. Quote real record ids and numbers; do not invent data."
                     ),
                 }],
                 max_tokens=500,
@@ -388,8 +397,12 @@ class BackgroundMissionDispatcher:
                     "role": "user",
                     "content": (
                         f"Objective: {mission.prompt}\n\n"
+                        f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n"
+                        f"{json.dumps(getattr(mission, '_company_context', {}), default=str)[:12000]}\n\n"
                         f"Approved plan:\n{getattr(mission, '_plan', '')}\n\n"
-                        "Now produce the complete deliverable."
+                        "Now produce the complete deliverable. Use the real record ids and numbers "
+                        "from the context, show calculations, and mark anything not in the context "
+                        "as a data gap."
                     ),
                 }],
                 max_tokens=1800,
@@ -423,8 +436,11 @@ class BackgroundMissionDispatcher:
                 f"- Generated: {time.strftime('%Y-%m-%d %H:%M:%SZ', time.gmtime(now))}\n\n"
                 f"---\n\n"
             )
+            truncated = getattr(draft, "finish_reason", None) == "length"
             with open(deliverable_path, "w", encoding="utf-8") as f:
                 f.write(header + draft.content + "\n")
+                if truncated:
+                    f.write("\n<!-- DELIVERABLE_TRUNCATED: model hit max_tokens; content incomplete -->\n")
 
             with open(deliverable_path, "rb") as f:
                 post_sha = hashlib.sha256(f.read()).hexdigest()
@@ -434,6 +450,13 @@ class BackgroundMissionDispatcher:
                 "DELIVERABLE_WRITTEN",
                 f"Saved to {deliverable_path} (SHA-256: {post_sha[:16]}...)"
             )
+            if truncated:
+                mission.add_timeline_event(
+                    "DELIVERABLE_TRUNCATED",
+                    "Model stopped at max_tokens (finish_reason=length). The deliverable is "
+                    "incomplete and will not be sealed as verified.",
+                    "WARNING",
+                )
 
         # Stage 3: Verification & Tamper-Evident Evidence Ledger Recording
         else:
@@ -446,6 +469,32 @@ class BackgroundMissionDispatcher:
                 if not os.path.exists(d):
                     all_verified = False
                     break
+
+            truncated_marker = b"DELIVERABLE_TRUNCATED"
+            deliverable_truncated = False
+            if mission.deliverables:
+                try:
+                    with open(mission.deliverables[-1], "rb") as f:
+                        deliverable_truncated = truncated_marker in f.read()
+                except OSError:
+                    deliverable_truncated = False
+
+            if all_verified and mission.deliverables and deliverable_truncated:
+                mission.status = MissionState.UNCERTAIN.value
+                mission.progress_percent = 90.0
+                mission.current_stage = (
+                    "UNCERTAIN — deliverable was truncated at the model token limit; "
+                    "content is incomplete and was NOT sealed as verified"
+                )
+                mission.updated_at = time.time()
+                mission.add_timeline_event(
+                    "VERIFICATION_REFUSED",
+                    "Integrity hash would match an incomplete document, so verification was "
+                    "refused. Re-run with a larger output budget or split the objective.",
+                    "WARNING",
+                )
+                self._persist_mission(mission)
+                return mission
 
             if all_verified and mission.deliverables:
                 with open(mission.deliverables[-1], "rb") as f:

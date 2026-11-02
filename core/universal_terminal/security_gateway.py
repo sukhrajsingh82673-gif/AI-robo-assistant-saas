@@ -40,8 +40,38 @@ class TerminalSecurityGateway:
         re.compile(r'ghp_[a-zA-Z0-9]{36}'),
         re.compile(r'github_pat_[a-zA-Z0-9_]{82}'),
         re.compile(r'sk-[a-zA-Z0-9]{32,}'),
-        re.compile(r'Bearer\s+[a-zA-Z0-9\-_\.]{20,}')
+        re.compile(r'Bearer\s+[a-zA-Z0-9\-_\.]{20,}'),
+        re.compile(r'(?i)(postgres(ql)?|mysql|mongodb(\+srv)?|redis)://[^\s:@/]+:[^\s@/]+@'),
+        re.compile(r'(?i)\b(DATABASE_URL|DIRECT_URL|API_KEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET)\b\s*=\s*\S+'),
     ]
+
+
+    # Credential-bearing paths that a general-purpose agent must never read or copy.
+    SENSITIVE_PATH_PATTERNS = [
+        re.compile(r'(^|[\s/\'"=:(])\.env(\.[\w.-]+)?\b'),
+        re.compile(r'(?i)(^|[\s/])id_(rsa|dsa|ecdsa|ed25519)\b'),
+        re.compile(r'(?i)\.(pem|p12|pfx|key)\b'),
+        re.compile(r'(?i)\.git-credentials\b'),
+        re.compile(r'(?i)\.netrc\b'),
+        re.compile(r'(?i)\.aws/credentials\b'),
+        re.compile(r'(?i)\.npmrc\b'),
+        re.compile(r'(?i)(credentials|secrets?|service[_-]account)[\w.-]*\.json\b'),
+        re.compile(r'(?i)enterprise_settings\.json\b'),
+        re.compile(r'(?i)/etc/(shadow|gshadow|sudoers)\b'),
+        re.compile(r'(?i)vault[_-]?token\b'),
+    ]
+
+    SENSITIVE_PATH_MESSAGE = (
+        "Credential access blocked: the command references a secret-bearing path. "
+        "Secrets are never exposed to agents or terminals; use the credential broker instead."
+    )
+
+    @classmethod
+    def check_sensitive_paths(cls, command: str) -> Tuple[bool, Optional[str]]:
+        for pat in cls.SENSITIVE_PATH_PATTERNS:
+            if pat.search(command):
+                return False, cls.SENSITIVE_PATH_MESSAGE
+        return True, None
 
     # Prompt injection patterns in external command output / untrusted README data
     PROMPT_INJECTION_PATTERNS = [
@@ -99,6 +129,9 @@ class TerminalSecurityGateway:
 
     @classmethod
     def check_forbidden(cls, command: str) -> Tuple[bool, Optional[str]]:
+        sensitive_ok, sensitive_err = cls.check_sensitive_paths(command)
+        if not sensitive_ok:
+            return False, sensitive_err
         norm = " ".join(command.lower().split())
         for pat in cls.FORBIDDEN_COMMAND_PATTERNS:
             pat_norm = " ".join(pat.lower().split())

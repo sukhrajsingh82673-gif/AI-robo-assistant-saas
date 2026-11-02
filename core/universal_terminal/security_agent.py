@@ -94,6 +94,7 @@ class SecurityGovernanceAgent:
                 "reason": reason,
                 "risk_tier": TerminalCommandRisk.SYSTEM_MUTATION.value,
                 "reversibility": ReversibilityClassification.UNKNOWN.value,
+                "requires_approval": False,
                 "killswitch_engaged": True
             }
 
@@ -108,6 +109,7 @@ class SecurityGovernanceAgent:
                 "reason": sec_err,
                 "risk_tier": TerminalCommandRisk.DATA_DELETION.value,
                 "reversibility": ReversibilityClassification.IRREVERSIBLE.value,
+                "requires_approval": False,
                 "killswitch_engaged": False
             }
 
@@ -125,6 +127,7 @@ class SecurityGovernanceAgent:
                 "reason": reason,
                 "risk_tier": TerminalCommandRisk.SYSTEM_MUTATION.value,
                 "reversibility": ReversibilityClassification.UNKNOWN.value,
+                "requires_approval": False,
                 "killswitch_engaged": False
             }
 

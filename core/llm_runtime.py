@@ -67,6 +67,7 @@ class LLMResult:
     latency_ms: float = 0.0
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    finish_reason: Optional[str] = None
     attempts: List[Dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
@@ -79,6 +80,7 @@ class LLMResult:
             "latency_ms": round(self.latency_ms, 1),
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
+            "finish_reason": self.finish_reason,
             "attempts": self.attempts,
         }
 
@@ -366,6 +368,7 @@ class LLMRuntime:
         return str(content).strip(), {
             "prompt_tokens": int(usage.get("prompt_tokens", 0) or 0),
             "completion_tokens": int(usage.get("completion_tokens", 0) or 0),
+            "finish_reason": choices[0].get("finish_reason"),
         }
 
     def _call_gemini(self, api_key: str, model: str, msgs: List[Dict[str, str]],
@@ -476,12 +479,28 @@ class LLMRuntime:
                     with self._free_lock:
                         wait = self._free_cooldown - (time.time() - self._last_free_call)
                         if wait > 0:
-                            raise RuntimeError(f"FREE_TIER_COOLDOWN_{int(wait)}s")
+                            # Respect the free-tier cadence instead of silently degrading.
+                            time.sleep(min(wait, 35.0))
                         self._last_free_call = time.time()
-                    content, usage = self._call_openai_compatible(
-                        DEFAULT_FREE_BASE, "", DEFAULT_FREE_MODEL, msgs,
-                        max_tokens, temperature, min(cfg["timeout"], 60.0),
-                    )
+                    last_exc = None
+                    content, usage = "", {}
+                    for attempt in range(3):
+                        try:
+                            content, usage = self._call_openai_compatible(
+                                DEFAULT_FREE_BASE, "", DEFAULT_FREE_MODEL, msgs,
+                                max_tokens, temperature, min(cfg["timeout"], 60.0),
+                            )
+                            if content:
+                                break
+                            last_exc = RuntimeError("EMPTY_RESPONSE")
+                        except Exception as exc:  # transient free-tier failures
+                            last_exc = exc
+                        if attempt < 2:
+                            time.sleep(4.0 * (attempt + 1))
+                            with self._free_lock:
+                                self._last_free_call = time.time()
+                    if not content:
+                        raise last_exc or RuntimeError("EMPTY_RESPONSE")
                 elif provider == "gemini_free":
                     if not _is_real_secret(cfg["api_key"]):
                         raise RuntimeError("GEMINI_KEY_MISSING")
@@ -523,6 +542,7 @@ class LLMRuntime:
                     latency_ms=(time.perf_counter() - started) * 1000,
                     prompt_tokens=usage.get("prompt_tokens", 0),
                     completion_tokens=usage.get("completion_tokens", 0),
+                    finish_reason=usage.get("finish_reason"),
                     attempts=attempts_meta,
                 )
                 self._cache_put(cache_key, result)

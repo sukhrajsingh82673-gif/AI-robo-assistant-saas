@@ -71,32 +71,57 @@ class LangGraphWorkflowAdapter:
         builder = StateGraph()
 
         def parse_objective(state: Dict[str, Any]) -> Dict[str, Any]:
-            objective = state.get("objective", "Default task")
+            nested = state.get("inputs") if isinstance(state.get("inputs"), dict) else {}
+            objective = (
+                state.get("objective")
+                or state.get("task")
+                or state.get("prompt")
+                or nested.get("objective")
+                or nested.get("task")
+                or "Default task"
+            )
             return {
                 "parsed_task": f"Executing validated objective: {objective}",
+                "objective_source": "input",
                 "timestamp": time.time()
             }
 
         def execute_sandboxed_action(state: Dict[str, Any]) -> Dict[str, Any]:
             task = state.get("parsed_task")
-            # Deterministic sandboxed transformation
+            # This canonical workflow performs no external action. It only
+            # advances durable state and produces a deterministic digest so the
+            # checkpoint/evidence machinery can be exercised. The digest is
+            # state integrity, NOT proof that a business action happened.
             action_hash = hashlib.sha256(task.encode("utf-8")).hexdigest()
             return {
-                "action_result": f"Action complete for '{task}'",
+                "action_result": (
+                    "Workflow state advanced. No external or business action was executed "
+                    "by this node; this run validates orchestration, checkpointing and "
+                    "evidence sealing only."
+                ),
+                "action_scope": "STATE_ONLY",
                 "action_hash": action_hash,
+                "state_integrity_verified": True,
+                "business_outcome_verified": False,
                 "verified": True
             }
 
         def generate_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
-            # Physical verification sealing
+            # Seals state integrity only. The expected and actual digests both
+            # originate from this run, so this is a self-consistency check and
+            # must never be presented as independent business verification.
             action_hash = state.get("action_hash", "none")
             verif = PhysicalVerification(
                 check_type="sha256_match",
-                target_path="virtual://workflow/action",
+                target_path="virtual://workflow/state",
                 expected_val=action_hash,
                 actual_val=action_hash,
                 verified=True,
-                details="Action output cryptographic digest verified"
+                details=(
+                    "Workflow STATE-INTEGRITY digest is self-consistent. "
+                    "No external resource was inspected and no business outcome "
+                    "was verified."
+                )
             )
             pkg = self.ledger.seal_evidence(
                 action_id=f"act_wf_{uuid.uuid4().hex[:6]}",
@@ -107,6 +132,8 @@ class LangGraphWorkflowAdapter:
             return {
                 "evidence_id": pkg.evidence_id,
                 "merkle_root": self.ledger.get_merkle_root(),
+                "verification_scope": "STATE_INTEGRITY_ONLY",
+                "business_outcome_verified": False,
                 "completed": True
             }
 
@@ -171,13 +198,21 @@ class LangGraphWorkflowAdapter:
             }
 
         def execute_privileged(state: Dict[str, Any]) -> Dict[str, Any]:
-            # This node requires_approval = True
+            # This node requires_approval = True. It exercises the approval
+            # gate only: this canonical workflow holds no payment integration,
+            # so it must not claim that money moved.
             amount = state.get("amount", 1000)
             return {
-                "disbursed": True,
+                "disbursed": False,
+                "disbursement_executed": False,
                 "amount": amount,
-                "recipient": state.get("recipient", "supplier_acct_01"),
-                "executed_at": time.time()
+                "intended_recipient": state.get("recipient", "supplier_acct_01"),
+                "approval_gate_passed_at": time.time(),
+                "note": (
+                    "Approval gate cleared. No funds were transferred: this workflow "
+                    "has no payment connector, so the business outcome is NOT verified."
+                ),
+                "business_outcome_verified": False,
             }
 
         builder.add_node("assess_risk", assess_risk, node_type=NodeType.TRANSFORM)
@@ -301,11 +336,15 @@ class LangGraphWorkflowAdapter:
                 mission_objective=state.get("directive", "Analyze margins")
             )
             result = AgentWorkforceAdapter.execute_workforce(plan["workforce_id"])
+            # Report the workforce's own outcome. Never substitute a canned
+            # business result for what the squad actually produced.
             return {
                 "squad_name": squad_name,
                 "workforce_id": plan["workforce_id"],
-                "squad_completed": result.task_success if hasattr(result, "task_success") else True,
-                "summary": "Financial variance analyzed: margins stabilized at 38.4%"
+                "squad_completed": bool(getattr(result, "task_success", False)),
+                "workforce_status": getattr(result, "status", None),
+                "summary": getattr(result, "summary", None) or "Workforce returned no summary.",
+                "business_outcome_verified": bool(getattr(result, "business_outcome_verified", False)),
             }
 
         builder.add_node("ceo_decompose", ceo_decompose, node_type=NodeType.AGENT)

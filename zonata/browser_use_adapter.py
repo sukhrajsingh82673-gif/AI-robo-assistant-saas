@@ -91,7 +91,9 @@ class BrowserUseCeoBridge:
             result_summary=f"CEO Mission {mission_id} completed navigation and data extraction",
             expected_url=target_url,
             extracted_data=extract_res.get("data", {}),
-            expected_keys=extract_keys or ["current_url", "records"]
+            # Keys reflect what the runtime actually extracts from the parsed
+            # DOM. Fabricated business fields are never expected or invented.
+            expected_keys=extract_keys or ["current_url", "title"]
         )
 
         # 6. Seal Business Causality Link
@@ -678,7 +680,7 @@ class BrowserUseCanonicalScenarios:
             result_summary="Section 80 Enterprise PMS workflow verified and sealed",
             expected_url=target_url,
             extracted_data=extract_res.get("data", {}),
-            expected_keys=["current_url", "records", "kpi_total"],
+            expected_keys=["current_url", "title", "text_excerpt"],
             confirmation_id="CBEDS-RES-AUDIT-2026"
         )
 

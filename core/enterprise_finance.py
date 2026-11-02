@@ -81,7 +81,51 @@ class EnterpriseFinanceEngine:
             """)
             conn.commit()
 
+    def _ensure_company_coa(self, company_id: str, conn=None) -> None:
+        """Provision the statutory chart of accounts for a specific company.
+
+        Account ids are namespaced per company so multiple companies inside one
+        tenant each get an independent, reconcilable ledger.
+        """
+        if not company_id:
+            return
+        now = time.time()
+        coa = [
+            ("1010", "Petty Cash & Cash on Hand", "ASSET", "CASH"),
+            ("1020", "Operating Bank Account", "ASSET", "BANK"),
+            ("1030", "Payment Gateway Escrow", "ASSET", "BANK"),
+            ("1100", "Accounts Receivable (Trade Debtors)", "ASSET", "AR"),
+            ("2010", "Accounts Payable (Trade Creditors)", "LIABILITY", "AP"),
+            ("2020", "Statutory Tax Payable (GST / TDS)", "LIABILITY", "AP"),
+            ("3010", "Owner Equity & Retained Earnings", "EQUITY", "EQUITY"),
+            ("4010", "Enterprise Operations & SaaS Revenue", "REVENUE", "SALES"),
+            ("5010", "Cost of Goods Sold & Direct Material", "EXPENSE", "COGS"),
+            ("6010", "Workforce Salaries & Contractor Payroll", "EXPENSE", "OPEX"),
+            ("6020", "Cloud Compute & AI Model Infrastructure", "EXPENSE", "OPEX"),
+            ("6030", "General Admin & Facilities Operations", "EXPENSE", "OPEX"),
+        ]
+        if conn is not None:
+            self._insert_coa_rows(conn, company_id, coa, now)
+            return
+        with db.get_connection() as own_conn:
+            self._insert_coa_rows(own_conn, company_id, coa, now)
+            own_conn.commit()
+
+    def _insert_coa_rows(self, conn, company_id: str, coa, now: float) -> None:
+        for code, name, acc_type, cat in coa:
+            acc_id = f"acc_{code}" if company_id == "comp_primary" else f"{company_id}_acc_{code}"
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO finance_accounts (
+                    account_id, tenant_id, company_id, code, name, account_type,
+                    category, balance, currency, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0.0, '₹', ?, ?)
+                """,
+                (acc_id, self.tenant_id, company_id, code, name, acc_type, cat, now, now),
+            )
+
     def get_financial_summary(self, company_id: str = "comp_primary") -> Dict[str, Any]:
+        self._ensure_company_coa(company_id)
         with db.get_connection() as conn:
             accounts = conn.execute(
                 "SELECT * FROM finance_accounts WHERE tenant_id = ? AND company_id = ?",
@@ -171,6 +215,7 @@ class EnterpriseFinanceEngine:
         company_id = data.get("company_id", "comp_primary")
         category = data.get("category", "OFFICE")
         amount = float(data.get("amount", 0.0))
+        self._ensure_company_coa(company_id)
 
         with db.get_connection() as conn:
             conn.execute("""
@@ -219,17 +264,23 @@ class EnterpriseFinanceEngine:
     def _post_expense_to_gl(self, conn, expense_id: str, company_id: str, category: str, amount: float, timestamp: float):
         """Map expense category to GL Account code and post ledger entry."""
         cat_map = {
-            "SOFTWARE": "acc_6020",
-            "CLOUD": "acc_6020",
-            "PROCUREMENT": "acc_5010",
-            "SALARIES": "acc_6010",
-            "PAYROLL": "acc_6010",
-            "OFFICE": "acc_6030",
-            "TRAVEL": "acc_6030",
-            "MARKETING": "acc_6030",
-            "UTILITIES": "acc_6030"
+            "SOFTWARE": "6020",
+            "CLOUD": "6020",
+            "PROCUREMENT": "5010",
+            "SALARIES": "6010",
+            "PAYROLL": "6010",
+            "OFFICE": "6030",
+            "TRAVEL": "6030",
+            "MARKETING": "6030",
+            "UTILITIES": "6030"
         }
-        acc_id = cat_map.get(category.upper(), "acc_6030")
+        code = cat_map.get(category.upper(), "6030")
+        self._ensure_company_coa(company_id, conn=conn)
+        row = conn.execute(
+            "SELECT account_id FROM finance_accounts WHERE tenant_id = ? AND company_id = ? AND code = ?",
+            (self.tenant_id, company_id, code),
+        ).fetchone()
+        acc_id = row["account_id"] if row else f"acc_{code}"
         conn.execute(
             "UPDATE finance_accounts SET balance = balance + ?, updated_at = ? WHERE account_id = ? AND tenant_id = ? AND company_id = ?",
             (amount, timestamp, acc_id, self.tenant_id, company_id)

@@ -884,9 +884,50 @@ class MCPGateway:
         }
 
     def refresh_server_capabilities(self, server_id: str) -> Dict[str, Any]:
+        """Queries the live MCP server for its advertised tools and registers them.
+
+        Discovery is only attempted for trusted servers. Failures are reported
+        as failures; local row counts are never presented as discovery results.
+        """
         server = self.get_server(server_id)
         if not server:
             return {"success": False, "error": f"Server {server_id} not found"}
+
+        trust = str(server.get("trust_state", "DISCOVERED"))
+        discovery = "SKIPPED_UNTRUSTED"
+        discovery_error = None
+        discovered = 0
+
+        if trust in (MCPTrustState.VALIDATED.value, MCPTrustState.TRUSTED.value, "TRUSTED"):
+            transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+            endpoint = server.get("endpoint", "")
+            try:
+                if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                    transport = StreamableHTTPTransport(endpoint)
+                else:
+                    command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                    transport = StdioTransport(command)
+                rpc = {"jsonrpc": JSONRPC_VERSION, "id": f"disc_{uuid.uuid4().hex[:8]}",
+                       "method": "tools/list", "params": {}}
+                response = transport.send_request(rpc, timeout=15.0)
+                if response.get("error"):
+                    raise RuntimeError(str(response["error"])[:200])
+                advertised = ((response.get("result") or {}).get("tools") or [])
+                for t in advertised:
+                    if not isinstance(t, dict) or not t.get("name"):
+                        continue
+                    self.register_tool(
+                        server_id=server_id,
+                        name=t["name"],
+                        description=t.get("description", "") or "",
+                        input_schema=t.get("inputSchema") or t.get("input_schema") or {},
+                    )
+                    discovered += 1
+                discovery = "LIVE_TOOLS_LIST"
+            except Exception as exc:
+                discovery = "FAILED"
+                discovery_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+
         with db.get_connection() as conn:
             tools = conn.execute("SELECT COUNT(*) as c FROM mcp_tools WHERE server_id = ?", (server_id,)).fetchone()["c"]
             resources = conn.execute("SELECT COUNT(*) as c FROM mcp_resources WHERE server_id = ?", (server_id,)).fetchone()["c"]
@@ -896,8 +937,11 @@ class MCPGateway:
             "success": True,
             "server_id": server_id,
             "refreshed_at": time.time(),
+            "discovery": discovery,
+            "discovery_error": discovery_error,
+            "newly_discovered_tools": discovered,
             "tools_count": tools,
-            "resources_count": resources
+            "resources_count": resources,
         }
 
     # -------------------------------------------------------------------------
@@ -1317,7 +1361,37 @@ class MCPGateway:
             )
 
         # 5. Human Approval Interception
-        if approval_req and not ctx.get("pre_approved_id"):
+        # A caller-supplied approval id is never trusted on its own: it must
+        # resolve to an APPROVED request for this tenant and company, and it
+        # must be the approval recorded for this suspended execution.
+        pre_approved_id = ctx.get("pre_approved_id")
+        pre_approved_valid = False
+        if approval_req and pre_approved_id:
+            with db.get_connection() as conn:
+                appr_row = conn.execute(
+                    "SELECT status, company_id FROM approvals WHERE request_id = ? AND tenant_id = ?",
+                    (pre_approved_id, self.tenant_id),
+                ).fetchone()
+            pre_approved_valid = bool(
+                appr_row
+                and appr_row["status"] == "APPROVED"
+                and str(appr_row["company_id"]) == str(self.company_id)
+            )
+            if not pre_approved_valid:
+                return self._record_execution(
+                    exec_id=exec_id, server_id=server_id, tool_id=tool_id, tool_name=tool_name,
+                    arguments=arguments, sanitized_args={}, policy="DENY",
+                    authority="DENIED", status=MCPExecutionStatus.POLICY_DENIED.value,
+                    response=None,
+                    error=(
+                        "Approval bypass rejected: the supplied approval id is missing, not "
+                        "APPROVED, or belongs to another company."
+                    ),
+                    latency_ms=round((time.time() - start_time) * 1000, 2),
+                    context=ctx, approval_id=pre_approved_id,
+                )
+
+        if approval_req and not pre_approved_valid:
             appr_res = ApprovalPipeline.create_request(
                 tenant_id=self.tenant_id,
                 company_id=self.company_id,
@@ -1608,6 +1682,45 @@ class MCPGateway:
                             pass
                 execs.append(d)
             return execs
+
+    def resume_approved_execution(self, approval_id: str) -> Dict[str, Any]:
+        """Re-invokes a suspended MCP operation after its approval is granted.
+
+        Without this, an APPROVED approval silently leaves the operation
+        unexecuted. The resumed call still passes through every gate
+        (policy, authority, data minimization, transport, verification).
+        """
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM mcp_executions WHERE approval_id = ? AND tenant_id = ? "
+                "AND company_id = ? AND execution_status = 'APPROVAL_REQUIRED' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (approval_id, self.tenant_id, self.company_id),
+            ).fetchone()
+        if not row:
+            return {"resumed": False, "reason": "No suspended MCP execution matches this approval."}
+        args = row["arguments"]
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
+        result = self.invoke_tool(
+            row["server_id"],
+            row["tool_name"],
+            args or {},
+            context={
+                "pre_approved_id": approval_id,
+                "agent_id": row["agent_id"],
+                "mission_id": row["mission_id"],
+                "resume_of": row["execution_id"],
+            },
+        )
+        return {
+            "resumed": True,
+            "original_execution_id": row["execution_id"],
+            "result": result,
+        }
 
     def get_execution(self, execution_id: str) -> Optional[Dict[str, Any]]:
         with db.get_connection() as conn:

@@ -314,7 +314,10 @@ class TestBrowserUseExecution(unittest.TestCase):
     def test_scenario_01_information_extraction(self):
         res = self.scenarios.test_01_information_extraction()
         self.assertTrue(res["verified"])
-        self.assertIn("records", res["extracted_data"])
+        # Extraction returns what was actually parsed from the page, not a
+        # canned record set.
+        self.assertIn("text_excerpt", res["extracted_data"])
+        self.assertTrue(res["extracted_data"]["text_excerpt"].strip())
 
     def test_scenario_02_sensitive_mutation(self):
         res = self.scenarios.test_02_sensitive_mutation()
