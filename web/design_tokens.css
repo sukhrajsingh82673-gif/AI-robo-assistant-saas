@@ -1,0 +1,306 @@
+/* ==========================================================================
+   URA / ZONATA — Apple-Grade Design Tokens & Foundations
+   Clarity • Deference • Depth
+   ========================================================================== */
+
+:root {
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Gurmukhi", sans-serif;
+  --font-mono: "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Surfaces (Light) */
+  --bg:            #F5F5F7;   /* app background */
+  --surface:       #FFFFFF;   /* cards & standard panels */
+  --surface-2:     #FAFAFC;   /* nested surface / inputs */
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --separator:     rgba(60, 60, 67, 0.12);
+
+  /* Text & Labels (Light) */
+  --label:         #1D1D1F;
+  --label-2:       rgba(60, 60, 67, 0.68);
+  --label-3:       rgba(60, 60, 67, 0.45);
+
+  /* Accent and System Colors (Light) */
+  --accent:        #0071E3;
+  --accent-press:  #0062C4;
+  --accent-tint:   rgba(0, 113, 227, 0.12);
+  --green:         #34C759;
+  --green-tint:    rgba(52, 199, 89, 0.12);
+  --orange:        #FF9500;
+  --orange-tint:   rgba(255, 149, 0, 0.12);
+  --red:           #FF3B30;
+  --red-tint:      rgba(255, 59, 48, 0.12);
+  --yellow:        #FFCC00;
+  --yellow-tint:   rgba(255, 204, 0, 0.12);
+  --purple:        #AF52DE;
+  --purple-tint:   rgba(175, 82, 222, 0.12);
+  --teal:          #30B0C7;
+  --teal-tint:     rgba(48, 176, 199, 0.12);
+  --pink:          #FF2D55;
+  --pink-tint:     rgba(255, 45, 85, 0.12);
+
+  /* 4-pt Spacing Grid */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* Concentric Rounded Corners */
+  --r-sm:   8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  22px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* Soft Layered Elevation Shadows */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-4: 0 24px 64px rgba(0, 0, 0, 0.16), 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+
+  /* Legacy Bridge Mappings (ensures existing screens inherit Apple theme) */
+  --bg-app: var(--bg);
+  --bg-canvas: var(--bg);
+  --bg-sidebar: var(--surface);
+  --bg-surface: var(--surface);
+  --bg-surface-elevated: var(--surface-2);
+  --bg-surface-hover: var(--surface-2);
+  --bg-card: var(--surface);
+  --bg-input: var(--surface-2);
+  --bg-modal: var(--surface);
+  --border-color: var(--separator);
+  --border-subtle: var(--separator);
+  --text-primary: var(--label);
+  --text-secondary: var(--label-2);
+  --text-muted: var(--label-3);
+  --accent-blue: var(--accent);
+  --accent-blue-hover: var(--accent-press);
+  --accent-emerald: var(--green);
+  --accent-amber: var(--orange);
+  --accent-rose: var(--red);
+  --status-operational: var(--green);
+  --status-attention: var(--orange);
+  --status-alert: var(--red);
+}
+
+:root[data-theme='dark'] {
+  /* Surfaces (Dark) */
+  --bg:            #000000;
+  --surface:       #1C1C1E;
+  --surface-2:     #2C2C2E;
+  --surface-glass: rgba(28, 28, 30, 0.72);
+  --separator:     rgba(235, 235, 245, 0.14);
+
+  /* Text & Labels (Dark) */
+  --label:         #F5F5F7;
+  --label-2:       rgba(235, 235, 245, 0.64);
+  --label-3:       rgba(235, 235, 245, 0.38);
+
+  /* Accent and System Colors (Dark) */
+  --accent:        #0A84FF;
+  --accent-press:  #409CFF;
+  --accent-tint:   rgba(10, 132, 255, 0.15);
+  --green:         #30D158;
+  --green-tint:    rgba(48, 209, 88, 0.15);
+  --orange:        #FF9F0A;
+  --orange-tint:   rgba(255, 159, 10, 0.15);
+  --red:           #FF453A;
+  --red-tint:      rgba(255, 69, 58, 0.15);
+  --yellow:        #FFD60A;
+  --yellow-tint:   rgba(255, 214, 10, 0.15);
+  --purple:        #BF5AF2;
+  --purple-tint:   rgba(191, 90, 242, 0.15);
+  --teal:          #40C8E0;
+  --teal-tint:     rgba(64, 200, 224, 0.15);
+  --pink:          #FF375F;
+  --pink-tint:     rgba(255, 55, 95, 0.15);
+
+  /* Dark Elevation (Steps & Subdued Glows) */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.38);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.50);
+  --shadow-4: 0 24px 64px rgba(0, 0, 0, 0.68);
+}
+
+/* ==========================================================================
+   Typography Classes & Scale
+   ========================================================================== */
+
+.t-display {
+  font-family: var(--font-sans);
+  font-size: 48px;
+  line-height: 52px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  color: var(--label);
+}
+
+.t-large-title {
+  font-family: var(--font-sans);
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.019em;
+  color: var(--label);
+}
+
+.t-title-1 {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  color: var(--label);
+}
+
+.t-title-2 {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.013em;
+  color: var(--label);
+}
+
+.t-title-3 {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  color: var(--label);
+}
+
+.t-headline {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--label);
+}
+
+.t-body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: -0.003em;
+  color: var(--label);
+}
+
+@media (max-width: 768px) {
+  .t-body {
+    font-size: 17px;
+    line-height: 24px;
+  }
+}
+
+.t-callout {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: -0.002em;
+  color: var(--label-2);
+}
+
+.t-footnote {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--label-2);
+}
+
+.t-caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--label-3);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ==========================================================================
+   Materials & Chrome
+   ========================================================================== */
+
+.glass {
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 0.5px solid var(--separator);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: var(--surface);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--surface) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* ==========================================================================
+   Interactive Motion Primitives
+   ========================================================================== */
+
+.spring-press {
+  transform: translateZ(0) scale(1);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.spring-press:active {
+  transform: scale(0.97);
+}
+
+.hover-lift {
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+}
+
+@media (hover: hover) {
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-3);
+  }
+}
+
+/* Accessibility Focus Ring */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

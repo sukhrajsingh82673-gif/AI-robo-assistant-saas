@@ -741,6 +741,7 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
   else if (cleanPath.startsWith('/tools')) navKey = 'tools';
+  else if (cleanPath.startsWith('/design')) navKey = 'design';
   else {
     // Unrecognized route: Do NOT fallback to Home. Explicitly render 404 Route Not Found
     navKey = '404';
@@ -851,6 +852,8 @@ function handleRoute(path) {
       window.TrustGraphWorkspace.render('view-trustgraph');
     } else if (navKey === 'tools' && window.ToolsFactory) {
       window.ToolsFactory.render(cleanPath);
+    } else if (navKey === 'design' && window.DesignPreviewWorkspace) {
+      window.DesignPreviewWorkspace.render('view-design');
     } else if (navKey === 'settings') {
       const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
       if (es && es.render) {
