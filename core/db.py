@@ -288,6 +288,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     signed_grant_hash TEXT,
     requested_at REAL NOT NULL,
     decided_at REAL,
+    decision_reason TEXT,
     FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
@@ -4541,6 +4542,14 @@ class Database:
             self.verify_readiness()
         with self.get_connection() as conn:
             conn.executescript(SCHEMA_SQL)
+            # Additive, idempotent column migrations for existing databases.
+            for stmt in (
+                "ALTER TABLE approvals ADD COLUMN decision_reason TEXT",
+            ):
+                try:
+                    conn.execute(stmt)
+                except Exception:
+                    pass
             conn.commit()
 
 # Global Singleton Database Instance

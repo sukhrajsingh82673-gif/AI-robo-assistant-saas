@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 
 from core.db import db
 from core.llm_runtime import llm_runtime
+from core.company_metrics import compute_company_metrics, metric_brief
 
 
 def _table_count(conn, table: str, tenant_id: str, company_id: Optional[str] = None) -> int:
@@ -219,6 +220,17 @@ def ceo_chat(tenant_id: str, company_id: str, message: str) -> Dict[str, Any]:
         }
 
     ctx = build_company_context(tenant_id, company_id)
+
+    # Deterministic metrics are authoritative. The model narrates them; it does
+    # not perform the arithmetic and may not contradict these values.
+    try:
+        computed = compute_company_metrics(tenant_id, company_id)
+        ctx["computed_metrics"] = computed
+        ctx["metric_brief"] = metric_brief(computed)
+    except Exception as exc:  # never block executive chat on a metrics bug
+        computed = None
+        ctx["computed_metrics_error"] = str(exc)
+
     company_name = ctx.get("name") or "the company"
 
     system = (
@@ -233,6 +245,10 @@ def ceo_chat(tenant_id: str, company_id: str, message: str) -> Dict[str, Any]:
         "revenue, costs, headcount, or sources. If a value is absent, say it is not "
         "available in the system.\n"
         "- A pipeline deal is not revenue. Pending expenses are not posted costs.\n"
+        "- CONTEXT.computed_metrics is authoritative and was calculated in code from "
+        "tenant-scoped rows. Quote its numbers exactly (ARR, MRR, weighted pipeline, "
+        "posted revenue, pending expenses). Never recompute or restate them from a "
+        "different base. CONTEXT.metric_brief gives the approved phrasing.\n"
         "- Be direct and concise (max ~350 words).\n"
         "- End with 1-3 concrete recommended actions, each labelled with its risk "
         "(LOW/MEDIUM/HIGH) and whether it needs owner approval.\n"
@@ -267,6 +283,8 @@ def ceo_chat(tenant_id: str, company_id: str, message: str) -> Dict[str, Any]:
             "model": res.model,
             "degraded": True,
             "attempts": res.attempts,
+            "computed_metrics": computed,
+            "metric_brief": ctx.get("metric_brief"),
             "company_context": ctx,
             "timestamp": time.time(),
         }
@@ -278,6 +296,8 @@ def ceo_chat(tenant_id: str, company_id: str, message: str) -> Dict[str, Any]:
         "provider": res.provider,
         "model": res.model,
         "degraded": False,
+        "computed_metrics": computed,
+        "metric_brief": ctx.get("metric_brief"),
         "latency_ms": round(res.latency_ms, 1),
         "usage": {
             "prompt_tokens": res.prompt_tokens,

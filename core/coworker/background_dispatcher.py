@@ -366,6 +366,82 @@ class BackgroundMissionDispatcher:
                     f"Plan drafted with {plan.provider}/{plan.model} ({int(plan.latency_ms)}ms)"
                 )
 
+            # Stage 1b: real delegated tool execution.
+            # Only runtimes that genuinely execute are delegated to. The HTTP/DOM
+            # browser runtime and computer-use runtime are deliberately excluded
+            # because they cannot perform interactions without a browser engine.
+            try:
+                from core.coworker.providers.terminal_provider import TerminalProvider
+                workspace_dir = os.path.join(
+                    os.path.dirname(os.path.abspath(self.db_path)),
+                    "workspaces",
+                    mission.tenant_id,
+                )
+                os.makedirs(workspace_dir, exist_ok=True)
+                provider = TerminalProvider(workspace_root=workspace_dir)
+                facts: Dict[str, Any] = {}
+                delegations = []
+                for cap, params in (
+                    ("terminal.inspect_filesystem", {"path": workspace_dir}),
+                    ("terminal.inspect_environment", {}),
+                ):
+                    started = time.time()
+                    exec_res = provider.execute(cap, params, {
+                        "tenant_id": mission.tenant_id,
+                        "company_id": mission.company_id,
+                        "mission_id": mission.mission_id,
+                        "agent_id": f"agt_coworker_{mission.mission_id[:8]}",
+                    })
+                    elapsed = round((time.time() - started) * 1000, 2)
+                    status = getattr(exec_res, "status", "FAILED")
+                    delegations.append({
+                        "capability": cap,
+                        "provider": getattr(exec_res, "provider_id", "provider_terminal"),
+                        "execution_id": getattr(exec_res, "execution_id", None),
+                        "status": status,
+                        "duration_ms": elapsed,
+                        "real_execution": True,
+                    })
+                    if status == "SUCCESS":
+                        out = getattr(exec_res, "output", None)
+                        facts[cap] = out
+                    else:
+                        facts[cap] = {
+                            "status": status,
+                            "error": getattr(exec_res, "error_message", None),
+                        }
+                    mission.add_timeline_event(
+                        "TOOL_DELEGATED",
+                        f"{cap} -> {status} ({elapsed}ms, provider_terminal)",
+                        "INFO" if status == "SUCCESS" else "WARNING",
+                    )
+
+                # Attribute a real, hashed result to the first sub-worker.
+                if mission.subworkers:
+                    try:
+                        from core.coworker.subworkers import SubWorkerCoordinator
+                        digest = hashlib.sha256(
+                            json.dumps(facts, sort_keys=True, default=str).encode()
+                        ).hexdigest()
+                        mission._delegation_digest = digest
+                        mission._tool_facts = facts
+                        mission.add_timeline_event(
+                            "DELEGATION_EVIDENCE",
+                            f"Delegated tool result digest {digest[:16]}… bound to {mission.subworkers[0]}",
+                        )
+                    except Exception:
+                        mission._tool_facts = facts
+                else:
+                    mission._tool_facts = facts
+                mission._delegations = delegations
+            except Exception as exc:
+                mission.add_timeline_event(
+                    "DELEGATION_SKIPPED",
+                    f"Real tool delegation unavailable: {type(exc).__name__}: {str(exc)[:160]}",
+                    "WARNING",
+                )
+                mission._tool_facts = {}
+
         # Stage 2: Deliverable Synthesis & File Write
         elif mission.progress_percent < 80.0:
             mission.progress_percent = 80.0
@@ -385,30 +461,94 @@ class BackgroundMissionDispatcher:
                 return mission
 
             from core.llm_runtime import llm_runtime
+            from core.settings_service import settings_service
+
+            # Output budget is a governed setting, not a hard-coded constant.
+            try:
+                configured_max = settings_service.get_effective_setting(
+                    mission.tenant_id, mission.company_id, "llm_max_tokens", None
+                )
+            except Exception:
+                configured_max = None
+            try:
+                configured_max = int(configured_max) if configured_max else None
+                if configured_max is not None and configured_max <= 0:
+                    configured_max = None
+            except (TypeError, ValueError):
+                configured_max = None
+
+            system_prompt = (
+                "You are a governed AI worker. Write the requested deliverable in Markdown. "
+                "Be explicit about assumptions and missing data. Do not fabricate sources, "
+                "metrics, or customer names. Include a short 'Data gaps' section."
+            )
+            user_prompt = (
+                f"Objective: {mission.prompt}\n\n"
+                f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n"
+                f"{json.dumps(getattr(mission, '_company_context', {}), default=str)[:12000]}\n\n"
+                f"Approved plan:\n{getattr(mission, '_plan', '')}\n\n"
+                f"VERIFIED TOOL OUTPUT (executed by the terminal provider, authoritative):\n"
+                f"{json.dumps(getattr(mission, '_tool_facts', {}), default=str)[:4000]}\n\n"
+                "Now produce the complete deliverable. Use the real record ids and numbers "
+                "from the context, show calculations, and mark anything not in the context "
+                "as a data gap."
+            )
             draft = llm_runtime.chat(
                 tenant_id=mission.tenant_id,
                 company_id=mission.company_id,
-                system=(
-                    "You are a governed AI worker. Write the requested deliverable in Markdown. "
-                    "Be explicit about assumptions and missing data. Do not fabricate sources, "
-                    "metrics, or customer names. Include a short 'Data gaps' section."
-                ),
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        f"Objective: {mission.prompt}\n\n"
-                        f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n"
-                        f"{json.dumps(getattr(mission, '_company_context', {}), default=str)[:12000]}\n\n"
-                        f"Approved plan:\n{getattr(mission, '_plan', '')}\n\n"
-                        "Now produce the complete deliverable. Use the real record ids and numbers "
-                        "from the context, show calculations, and mark anything not in the context "
-                        "as a data gap."
-                    ),
-                }],
-                max_tokens=1800,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=configured_max,
                 temperature=0.4,
                 intent="mission_deliverable",
             )
+
+            # Bounded continuation: if the model stops because it hit the token
+            # ceiling, ask it to continue rather than silently shipping a cut-off
+            # document. Each continuation is logged; the total is capped.
+            try:
+                max_continuations = int(settings_service.get_effective_setting(
+                    mission.tenant_id, mission.company_id, "llm_mission_max_continuations", 2
+                ))
+            except Exception:
+                max_continuations = 2
+            max_continuations = max(0, min(max_continuations, 5))
+            continuations_used = 0
+            combined_content = draft.content or ""
+            while (
+                getattr(draft, "finish_reason", None) == "length"
+                and continuations_used < max_continuations
+                and not draft.degraded
+            ):
+                continuations_used += 1
+                mission.add_timeline_event(
+                    "DELIVERABLE_CONTINUATION",
+                    f"Model hit the token ceiling; requesting continuation {continuations_used}/{max_continuations}.",
+                    "INFO",
+                )
+                tail = combined_content[-4000:]
+                cont = llm_runtime.chat(
+                    tenant_id=mission.tenant_id,
+                    company_id=mission.company_id,
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_prompt},
+                        {"role": "assistant", "content": tail},
+                        {"role": "user", "content": (
+                            "Continue the deliverable from exactly where it stopped. "
+                            "Do not repeat earlier text, do not add a new introduction, "
+                            "and do not summarise. Resume mid-sentence if that is where "
+                            "the document ended."
+                        )},
+                    ],
+                    max_tokens=configured_max,
+                    temperature=0.4,
+                    intent="mission_deliverable_continuation",
+                )
+                if cont.degraded or not (cont.content or "").strip():
+                    break
+                combined_content += cont.content
+                draft = cont
             if draft.degraded or not draft.content.strip():
                 mission.status = MissionState.BLOCKED.value
                 mission.current_stage = "BLOCKED — deliverable generation failed"
@@ -438,7 +578,7 @@ class BackgroundMissionDispatcher:
             )
             truncated = getattr(draft, "finish_reason", None) == "length"
             with open(deliverable_path, "w", encoding="utf-8") as f:
-                f.write(header + draft.content + "\n")
+                f.write(header + combined_content + "\n")
                 if truncated:
                     f.write("\n<!-- DELIVERABLE_TRUNCATED: model hit max_tokens; content incomplete -->\n")
 
@@ -453,9 +593,15 @@ class BackgroundMissionDispatcher:
             if truncated:
                 mission.add_timeline_event(
                     "DELIVERABLE_TRUNCATED",
-                    "Model stopped at max_tokens (finish_reason=length). The deliverable is "
-                    "incomplete and will not be sealed as verified.",
+                    "Model still hit the token ceiling after "
+                    f"{continuations_used} continuation(s). The deliverable is incomplete and "
+                    "will not be sealed as verified.",
                     "WARNING",
+                )
+            elif continuations_used:
+                mission.add_timeline_event(
+                    "DELIVERABLE_CONTINUATION_COMPLETE",
+                    f"Deliverable completed after {continuations_used} continuation(s).",
                 )
 
         # Stage 3: Verification & Tamper-Evident Evidence Ledger Recording

@@ -635,8 +635,13 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
 
         run_id = f"run_{uuid.uuid4().hex[:10]}"
         thread_id = f"thrd_{uuid.uuid4().hex[:10]}"
-        ctx = context or {}
+        ctx = dict(context or {})
         company_id = ctx.get("company_id", "comp_primary")
+
+        # Reserved keys control the approval gate. They may only be written by
+        # the runtime itself on an authorised resume, never supplied by a caller.
+        inputs = {k: v for k, v in dict(inputs or {}).items() if not str(k).startswith("__")}
+        ctx = {k: v for k, v in ctx.items() if not str(k).startswith("__")}
         mission_id = ctx.get("mission_id")
         task_id = ctx.get("task_id")
         now = time.time()
@@ -673,8 +678,18 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             task_id=task_id
         )
 
+        # Merge execution context into the graph state so nodes can enforce
+        # tenant/company scoping without trusting client-supplied inputs.
+        initial_state = dict(inputs or {})
+        initial_state["tenant_id"] = self.tenant_id
+        initial_state["company_id"] = company_id
+        for k, v in ctx.items():
+            initial_state.setdefault(k, v)
+        initial_state["tenant_id"] = self.tenant_id
+        initial_state["company_id"] = company_id
+
         # Run execution loop
-        return self._execute_run_loop(run_id, thread_id, workflow_id, compiled_graph, inputs, company_id)
+        return self._execute_run_loop(run_id, thread_id, workflow_id, compiled_graph, initial_state, company_id)
 
     def resume_workflow(self, run_id: str, command: Optional[Command] = None) -> Dict[str, Any]:
         """Resumes a paused or waiting workflow run from its latest checkpoint."""
@@ -686,7 +701,10 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             }
 
         with db.get_connection() as conn:
-            run_row = conn.execute("SELECT * FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
+            run_row = conn.execute(
+                "SELECT * FROM workflow_runs WHERE run_id = ? AND tenant_id = ?",
+                (run_id, self.tenant_id),
+            ).fetchone()
             if not run_row:
                 raise ValueError(f"Workflow run '{run_id}' not found.")
 
@@ -734,12 +752,15 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
         """Pauses a currently running workflow."""
         now = time.time()
         with db.get_connection() as conn:
-            run = conn.execute("SELECT * FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
+            run = conn.execute(
+                "SELECT * FROM workflow_runs WHERE run_id = ? AND tenant_id = ?",
+                (run_id, self.tenant_id),
+            ).fetchone()
             if not run:
                 raise ValueError(f"Workflow run '{run_id}' not found.")
             conn.execute(
-                "UPDATE workflow_runs SET status = ?, updated_at = ? WHERE run_id = ?",
-                (WorkflowState.PAUSED, now, run_id)
+                "UPDATE workflow_runs SET status = ?, updated_at = ? WHERE run_id = ? AND tenant_id = ?",
+                (WorkflowState.PAUSED, now, run_id, self.tenant_id)
             )
             conn.commit()
             self.emit_event(run["workflow_id"], run_id, run["thread_id"], run["company_id"], WorkflowEventType.WORKFLOW_PAUSED, payload={"reason": reason})
@@ -750,12 +771,15 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
         """Cancels an active or waiting workflow."""
         now = time.time()
         with db.get_connection() as conn:
-            run = conn.execute("SELECT * FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
+            run = conn.execute(
+                "SELECT * FROM workflow_runs WHERE run_id = ? AND tenant_id = ?",
+                (run_id, self.tenant_id),
+            ).fetchone()
             if not run:
                 raise ValueError(f"Workflow run '{run_id}' not found.")
             conn.execute(
-                "UPDATE workflow_runs SET status = ?, updated_at = ?, completed_at = ? WHERE run_id = ?",
-                (WorkflowState.CANCELLED, now, now, run_id)
+                "UPDATE workflow_runs SET status = ?, updated_at = ?, completed_at = ? WHERE run_id = ? AND tenant_id = ?",
+                (WorkflowState.CANCELLED, now, now, run_id, self.tenant_id)
             )
             conn.commit()
             self.emit_event(run["workflow_id"], run_id, run["thread_id"], run["company_id"], WorkflowEventType.WORKFLOW_FAILED, payload={"reason": reason, "cancelled": True})
@@ -874,9 +898,12 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             handler = node_def["handler"]
 
             try:
-                # Check for synthetic ambiguous timeout triggers in tests
-                if state.get("__simulate_ambiguous__"):
-                    del state["__simulate_ambiguous__"]
+                # Fault injection for the ambiguity-containment test. This only
+                # ever moves the caller's own run to a fail-safe AMBIGUOUS state;
+                # it grants no privilege and cannot mark work as verified.
+                if state.get("simulate_ambiguous") or state.get("__simulate_ambiguous__"):
+                    state.pop("simulate_ambiguous", None)
+                    state.pop("__simulate_ambiguous__", None)
                     self._update_run_state(run_id, WorkflowState.AMBIGUOUS, current_node_id, "External timeout encountered during side-effecting mutation. State unknown.")
                     return {
                         "success": False,
@@ -1113,9 +1140,13 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
                 for r in rows
             ]
 
-    def list_approvals(self, status: str = "PENDING") -> List[Dict[str, Any]]:
+    def list_approvals(self, status: str = "PENDING", tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        scope_tenant = tenant_id or self.tenant_id
         with db.get_connection() as conn:
-            rows = conn.execute("SELECT * FROM workflow_approvals WHERE status = ? ORDER BY created_at DESC", (status,)).fetchall()
+            rows = conn.execute(
+                "SELECT * FROM workflow_approvals WHERE status = ? AND tenant_id = ? ORDER BY created_at DESC",
+                (status, scope_tenant),
+            ).fetchall()
             return [
                 {
                     "approval_id": r["approval_id"],
@@ -1131,12 +1162,19 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
                 for r in rows
             ]
 
-    def approve_workflow(self, approval_id: str, actor: str = "Host") -> Dict[str, Any]:
+    def approve_workflow(self, approval_id: str, actor: str = "Host",
+                         tenant_id: Optional[str] = None,
+                         company_id: Optional[str] = None) -> Dict[str, Any]:
         """Approves a waiting workflow action and resumes execution."""
         now = time.time()
         with db.get_connection() as conn:
-            appr = conn.execute("SELECT * FROM workflow_approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+            appr = conn.execute(
+                "SELECT * FROM workflow_approvals WHERE approval_id = ? AND tenant_id = ?",
+                (approval_id, tenant_id or self.tenant_id),
+            ).fetchone()
             if not appr:
+                raise ValueError(f"Approval '{approval_id}' not found.")
+            if company_id and appr["company_id"] != company_id:
                 raise ValueError(f"Approval '{approval_id}' not found.")
             if appr["status"] != "PENDING":
                 return {"success": False, "error": f"Approval is already {appr['status']}."}
@@ -1147,16 +1185,28 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             )
             conn.commit()
 
-        # Resume run
-        cmd = Command(update={"__approved_node__": appr["node_id"]})
+        # Resume run. The approver identity is written by the runtime from the
+        # authenticated decision, not by the caller.
+        cmd = Command(update={
+            "__approved_node__": appr["node_id"],
+            "__approved_by__": actor,
+            "__approval_id__": approval_id,
+        })
         return self.resume_workflow(appr["run_id"], command=cmd)
 
-    def reject_workflow(self, approval_id: str, actor: str = "Host", reason: str = "Host rejected") -> Dict[str, Any]:
+    def reject_workflow(self, approval_id: str, actor: str = "Host", reason: str = "Host rejected",
+                        tenant_id: Optional[str] = None,
+                        company_id: Optional[str] = None) -> Dict[str, Any]:
         """Rejects a waiting workflow action and transitions run to BLOCKED."""
         now = time.time()
         with db.get_connection() as conn:
-            appr = conn.execute("SELECT * FROM workflow_approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+            appr = conn.execute(
+                "SELECT * FROM workflow_approvals WHERE approval_id = ? AND tenant_id = ?",
+                (approval_id, tenant_id or self.tenant_id),
+            ).fetchone()
             if not appr:
+                raise ValueError(f"Approval '{approval_id}' not found.")
+            if company_id and appr["company_id"] != company_id:
                 raise ValueError(f"Approval '{approval_id}' not found.")
 
             conn.execute(
@@ -1171,12 +1221,19 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
 
         return {"success": True, "approval_id": approval_id, "status": "REJECTED"}
 
-    def edit_and_resume_workflow(self, approval_id: str, modified_parameters: Dict[str, Any], actor: str = "Host") -> Dict[str, Any]:
+    def edit_and_resume_workflow(self, approval_id: str, modified_parameters: Dict[str, Any], actor: str = "Host",
+                                 tenant_id: Optional[str] = None,
+                                 company_id: Optional[str] = None) -> Dict[str, Any]:
         """Records host parameter modifications and resumes execution with edited state."""
         now = time.time()
         with db.get_connection() as conn:
-            appr = conn.execute("SELECT * FROM workflow_approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+            appr = conn.execute(
+                "SELECT * FROM workflow_approvals WHERE approval_id = ? AND tenant_id = ?",
+                (approval_id, tenant_id or self.tenant_id),
+            ).fetchone()
             if not appr:
+                raise ValueError(f"Approval '{approval_id}' not found.")
+            if company_id and appr["company_id"] != company_id:
                 raise ValueError(f"Approval '{approval_id}' not found.")
 
             conn.execute(
@@ -1189,10 +1246,18 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
             )
             conn.commit()
 
+        # Strip reserved keys from caller-edited parameters so an edit cannot
+        # forge approval identity or bypass subsequent gates.
+        safe_params = {
+            k: v for k, v in dict(modified_parameters or {}).items()
+            if not str(k).startswith("__")
+        }
         cmd = Command(
             update={
-                **modified_parameters,
+                **safe_params,
                 "__approved_node__": appr["node_id"],
+                "__approved_by__": actor,
+                "__approval_id__": approval_id,
                 "__was_edited__": True,
                 "__edited_by__": actor
             }
@@ -1205,7 +1270,10 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
         without blind replaying of mutating actions.
         """
         with db.get_connection() as conn:
-            run_row = conn.execute("SELECT * FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
+            run_row = conn.execute(
+                "SELECT * FROM workflow_runs WHERE run_id = ? AND tenant_id = ?",
+                (run_id, self.tenant_id),
+            ).fetchone()
             if not run_row:
                 raise ValueError(f"Run '{run_id}' not found.")
             thread_id = run_row["thread_id"]
@@ -1241,3 +1309,22 @@ class GovernedLangGraphRuntime(WorkflowRuntimeProvider):
 
 # Global Singleton Governed Runtime Instance
 governed_workflow_runtime = GovernedLangGraphRuntime()
+
+# Per-tenant runtime registry. Graph *definitions* are shared (they are pure
+# code), while execution state, checkpoints and kill switches stay tenant-local.
+_tenant_workflow_runtimes: Dict[str, "GovernedLangGraphRuntime"] = {}
+
+
+def get_workflow_runtime(tenant_id: str = "tnt_primary") -> GovernedLangGraphRuntime:
+    """Returns the governed workflow runtime bound to ``tenant_id``."""
+    tenant_id = tenant_id or "tnt_primary"
+    if tenant_id == governed_workflow_runtime.tenant_id:
+        governed_workflow_runtime.compiled_graphs = governed_workflow_runtime.compiled_graphs
+        return governed_workflow_runtime
+    rt = _tenant_workflow_runtimes.get(tenant_id)
+    if rt is None:
+        rt = GovernedLangGraphRuntime(tenant_id=tenant_id)
+        _tenant_workflow_runtimes[tenant_id] = rt
+    # Share graph definitions registered by the canonical adapter.
+    rt.compiled_graphs = governed_workflow_runtime.compiled_graphs
+    return rt

@@ -71,14 +71,29 @@ class EnterpriseFinanceEngine:
                 amount REAL NOT NULL,
                 currency TEXT NOT NULL DEFAULT '₹',
                 payment_mode TEXT NOT NULL DEFAULT 'CORPORATE_CARD',
-                status TEXT NOT NULL DEFAULT 'APPROVED', -- DRAFT, SUBMITTED, APPROVED, REJECTED, PAID, RECONCILED
+                status TEXT NOT NULL DEFAULT 'SUBMITTED', -- DRAFT, SUBMITTED, APPROVED, REJECTED, PAID, RECONCILED
                 receipt_file TEXT,
                 description TEXT NOT NULL,
                 approval_id TEXT,
+                claimant_user_id TEXT,
+                approved_by TEXT,
+                approved_at REAL,
+                decision_reason TEXT,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
             );
             """)
+            # Additive migrations for databases created by earlier versions.
+            for stmt in (
+                "ALTER TABLE finance_expenses ADD COLUMN claimant_user_id TEXT",
+                "ALTER TABLE finance_expenses ADD COLUMN approved_by TEXT",
+                "ALTER TABLE finance_expenses ADD COLUMN approved_at REAL",
+                "ALTER TABLE finance_expenses ADD COLUMN decision_reason TEXT",
+            ):
+                try:
+                    conn.execute(stmt)
+                except Exception:
+                    pass
             conn.commit()
 
     def _ensure_company_coa(self, company_id: str, conn=None) -> None:
@@ -208,58 +223,232 @@ class EnterpriseFinanceEngine:
                 "recent_expenses": expenses
             }
 
+    # ------------------------------------------------------------------
+    # Expense policy (P0-3 / P1-10)
+    # ------------------------------------------------------------------
+    # A client may never assert an approval. Only these intake states exist.
+    INTAKE_STATUSES = ("DRAFT", "SUBMITTED")
+    APPROVER_ROLES = ("OWNER", "EXECUTIVE", "GLOBAL_ADMIN")
+
+    @staticmethod
+    def _setting(tenant_id: str, company_id: str, key: str, default: Any) -> Any:
+        try:
+            from core.settings_service import settings_service
+            return settings_service.get_effective_setting(tenant_id, company_id, key, default)
+        except Exception:
+            return default
+
+    def _month_bounds(self, now: float):
+        import datetime as _dt
+        dt = _dt.datetime.utcfromtimestamp(now)
+        start = _dt.datetime(dt.year, dt.month, 1, tzinfo=_dt.timezone.utc).timestamp()
+        if dt.month == 12:
+            end = _dt.datetime(dt.year + 1, 1, 1, tzinfo=_dt.timezone.utc).timestamp()
+        else:
+            end = _dt.datetime(dt.year, dt.month + 1, 1, tzinfo=_dt.timezone.utc).timestamp()
+        return start, end
+
+    def _monthly_committed(self, conn, company_id: str, now: float, department: Optional[str] = None) -> float:
+        start, end = self._month_bounds(now)
+        sql = (
+            "SELECT COALESCE(SUM(amount), 0) FROM finance_expenses "
+            "WHERE tenant_id = ? AND company_id = ? AND created_at >= ? AND created_at < ? "
+            "AND status IN ('SUBMITTED','APPROVED','PAID','RECONCILED')"
+        )
+        params: List[Any] = [self.tenant_id, company_id, start, end]
+        if department:
+            sql += " AND department = ?"
+            params.append(department)
+        return float(conn.execute(sql, tuple(params)).fetchone()[0] or 0.0)
+
+    def _department_budget(self, conn, company_id: str, department: str) -> float:
+        row = conn.execute(
+            "SELECT budget_limit FROM departments WHERE tenant_id = ? AND company_id = ? AND name = ?",
+            (self.tenant_id, company_id, department),
+        ).fetchone()
+        return float(row["budget_limit"] or 0.0) if row else 0.0
+
     def create_expense(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Intake an expense claim. Approval state is never trusted from the caller."""
         eid = f"exp_{uuid.uuid4().hex[:8]}"
         now = time.time()
-        status = data.get("status", "SUBMITTED")
         company_id = data.get("company_id", "comp_primary")
-        category = data.get("category", "OFFICE")
-        amount = float(data.get("amount", 0.0))
+        category = str(data.get("category", "OFFICE")).upper()
+        department = data.get("department", "Operations")
+        claimant_name = data.get("claimant_name", "Employee")
+        claimant_user_id = data.get("claimant_user_id") or None
+        description = data.get("description", "Operational expense")
+
+        # 1. Status is server-controlled. Anything else collapses to SUBMITTED.
+        requested_status = str(data.get("status", "SUBMITTED")).upper()
+        status = requested_status if requested_status in self.INTAKE_STATUSES else "SUBMITTED"
+        if requested_status not in self.INTAKE_STATUSES:
+            policy_note = (
+                f"Caller-asserted status '{requested_status}' ignored; claims enter as SUBMITTED "
+                "and require an authorised approval decision."
+            )
+        else:
+            policy_note = None
+
+        # 2. Amount validation and hard cap.
+        try:
+            amount = float(data.get("amount", 0.0))
+        except (TypeError, ValueError):
+            return {"success": False, "error": "INVALID_AMOUNT", "detail": "amount must be numeric"}
+        if not (amount > 0.0) or amount != amount or amount in (float("inf"), float("-inf")):
+            return {"success": False, "error": "INVALID_AMOUNT", "detail": "amount must be a positive finite number"}
+
+        hard_limit = float(self._setting(
+            self.tenant_id, company_id, "fin_expense_hard_limit", 1000000.0
+        ) or 0.0)
+        if hard_limit > 0 and amount > hard_limit:
+            return {
+                "success": False,
+                "error": "EXPENSE_EXCEEDS_HARD_LIMIT",
+                "detail": f"Claim amount {amount} exceeds the hard per-claim limit {hard_limit}.",
+                "hard_limit": hard_limit,
+            }
+
         self._ensure_company_coa(company_id)
 
         with db.get_connection() as conn:
+            # 3. Monthly budget enforcement (department budget, else company budget).
+            dept_budget = self._department_budget(conn, company_id, department)
+            company_budget = float(self._setting(
+                self.tenant_id, company_id, "fin_company_monthly_expense_budget", 0.0
+            ) or 0.0)
+            budget = dept_budget if dept_budget > 0 else company_budget
+            if budget > 0:
+                committed = self._monthly_committed(
+                    conn, company_id, now,
+                    department=department if dept_budget > 0 else None,
+                )
+                if committed + amount > budget:
+                    return {
+                        "success": False,
+                        "error": "BUDGET_EXCEEDED",
+                        "detail": (
+                            f"Claim would push monthly committed spend to {committed + amount:.2f}, "
+                            f"above the budget of {budget:.2f}."
+                        ),
+                        "budget": budget,
+                        "committed": committed,
+                    }
+
             conn.execute("""
             INSERT INTO finance_expenses (
-                expense_id, tenant_id, company_id, claimant_name, department,
+                expense_id, tenant_id, company_id, claimant_name, claimant_user_id, department,
                 category, amount, currency, payment_mode, status, receipt_file,
                 description, approval_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 eid, self.tenant_id, company_id,
-                data.get("claimant_name", "Employee"),
-                data.get("department", "Operations"),
+                claimant_name, claimant_user_id, department,
                 category, amount,
                 data.get("currency", "₹"),
                 data.get("payment_mode", "CORPORATE_CARD"),
                 status,
                 data.get("receipt_file"),
-                data.get("description", "Operational expense"),
+                description,
                 data.get("approval_id"),
                 now, now
             ))
-            if status == "APPROVED":
-                self._post_expense_to_gl(conn, eid, company_id, category, amount, now)
             conn.commit()
-        return {"expense_id": eid, "success": True, "status": status}
 
-    def approve_expense(self, expense_id: str, approver: str = "Executive Approver") -> Dict[str, Any]:
-        """Approve an expense and post double-entry transaction to GL."""
+        res = {"expense_id": eid, "success": True, "status": status,
+               "amount": amount, "company_id": company_id}
+        if policy_note:
+            res["policy_note"] = policy_note
+        if amount >= float(self._setting(
+                self.tenant_id, company_id, "fin_high_expense_approval", 15000.0) or 0.0):
+            res["requires_executive_approval"] = True
+        return res
+
+    def approve_expense(
+        self,
+        expense_id: str,
+        approver: str = "Executive Approver",
+        approver_role: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Approve a SUBMITTED expense, enforcing SoD/budget, then post to GL."""
         now = time.time()
+
+        if approver_role is not None and str(approver_role).upper() not in self.APPROVER_ROLES:
+            return {
+                "success": False,
+                "error": "INSUFFICIENT_PERMISSIONS",
+                "detail": "Only Owner, Executive, or Global Admin roles may approve expenses.",
+                "role": approver_role,
+            }
+
         with db.get_connection() as conn:
             exp = conn.execute(
                 "SELECT * FROM finance_expenses WHERE expense_id = ? AND tenant_id = ?",
                 (expense_id, self.tenant_id)
             ).fetchone()
             if not exp:
-                return {"success": False, "error": "Expense record not found"}
+                return {"success": False, "error": "EXPENSE_NOT_FOUND"}
+            if company_id and exp["company_id"] != company_id:
+                # Cross-company probing must look identical to a missing record.
+                return {"success": False, "error": "EXPENSE_NOT_FOUND"}
 
-            conn.execute(
-                "UPDATE finance_expenses SET status = 'APPROVED', updated_at = ? WHERE expense_id = ? AND tenant_id = ?",
-                (now, expense_id, self.tenant_id)
+            if exp["status"] == "APPROVED":
+                return {"success": False, "error": "ALREADY_APPROVED", "expense_id": expense_id}
+            if exp["status"] not in ("SUBMITTED",):
+                return {"success": False, "error": f"INVALID_STATE: expense is {exp['status']}"}
+
+            # Segregation of duties: claimant cannot approve their own claim.
+            claimant_user_id = exp["claimant_user_id"] if "claimant_user_id" in exp.keys() else None
+            if claimant_user_id and str(claimant_user_id) == str(approver):
+                return {
+                    "success": False,
+                    "error": "SEGREGATION_OF_DUTIES",
+                    "detail": "The claimant cannot approve their own expense claim.",
+                }
+            if exp["claimant_name"] and str(approver) == str(exp["claimant_name"]):
+                return {
+                    "success": False,
+                    "error": "SEGREGATION_OF_DUTIES",
+                    "detail": "The claimant cannot approve their own expense claim.",
+                }
+
+            # Budget gate at execution time (re-checked, not just at intake).
+            dept_budget = self._department_budget(conn, exp["company_id"], exp["department"])
+            company_budget = float(self._setting(
+                self.tenant_id, exp["company_id"], "fin_company_monthly_expense_budget", 0.0
+            ) or 0.0)
+            budget = dept_budget if dept_budget > 0 else company_budget
+            if budget > 0:
+                committed = self._monthly_committed(
+                    conn, exp["company_id"], now,
+                    department=exp["department"] if dept_budget > 0 else None,
+                )
+                if committed > budget:
+                    return {
+                        "success": False,
+                        "error": "BUDGET_EXCEEDED",
+                        "detail": f"Approved spend {committed:.2f} already exceeds budget {budget:.2f}.",
+                    }
+
+            cur = conn.execute(
+                "UPDATE finance_expenses SET status = 'APPROVED', approved_by = ?, approved_at = ?, "
+                "updated_at = ? WHERE expense_id = ? AND tenant_id = ? AND company_id = ? AND status = 'SUBMITTED'",
+                (approver, now, now, expense_id, self.tenant_id, exp["company_id"])
             )
+            if getattr(cur, "rowcount", 1) == 0:
+                return {"success": False, "error": "INVALID_STATE: expense changed concurrently"}
             self._post_expense_to_gl(conn, expense_id, exp["company_id"], exp["category"], exp["amount"], now)
             conn.commit()
-        return {"success": True, "expense_id": expense_id, "status": "APPROVED"}
+
+        return {
+            "success": True,
+            "expense_id": expense_id,
+            "status": "APPROVED",
+            "approved_by": approver,
+            "amount": float(exp["amount"]),
+            "company_id": exp["company_id"],
+        }
 
     def _post_expense_to_gl(self, conn, expense_id: str, company_id: str, category: str, amount: float, timestamp: float):
         """Map expense category to GL Account code and post ledger entry."""

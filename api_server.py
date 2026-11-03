@@ -174,6 +174,7 @@ from core.multimodal_capability_runtime import (
 from zonata.hal_multimodal_adapter import hal_multimodal_adapter
 from core.durable_workflow_runtime import (
     governed_workflow_runtime,
+    get_workflow_runtime,
     WorkflowState,
     Command,
     NodeType,
@@ -585,6 +586,28 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     return False
 
         return True
+
+    def _blocked_by_global_killswitch(self, surface: str) -> bool:
+        """Single authoritative gate for every execution surface."""
+        if universal_automation_fabric.is_killswitch_active():
+            self._send_json({
+                "error": f"Global kill switch engaged: {surface} blocked",
+                "blocked": True,
+                "killswitch_active": True,
+            }, status=403)
+            return True
+        return False
+
+    def _approver_denied(self, auth_context: Dict[str, Any]) -> bool:
+        role = str((auth_context or {}).get("role") or "")
+        if role not in (UserRole.OWNER, UserRole.EXECUTIVE, UserRole.GLOBAL_ADMIN):
+            self._send_json({
+                "success": False,
+                "error": "INSUFFICIENT_PERMISSIONS: Only Owner or Executive roles can decide approvals.",
+                "role": role,
+            }, status=403)
+            return True
+        return False
 
     def _get_auth_context(self) -> Dict[str, Any]:
         """
@@ -1415,6 +1438,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             records = [
                 r for r in tenant_ledger.chain
                 if (r.get("metadata") or {}).get("tenant_id") in (None, tenant_id)
+                and (r.get("metadata") or {}).get("company_id") in (None, company_id)
             ]
             root = tenant_ledger.get_merkle_root()
             ledger_audit = tenant_ledger.verify_full_chain_integrity()
@@ -1429,6 +1453,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "status": "INTEGRITY_VERIFIED" if ledger_audit["valid"] else ("ACTIVE_EPOCH_VERIFIED_HISTORICAL_FORKS_RECORDED" if ledger_audit.get("active_epoch_valid") else "INTEGRITY_FAILED"),
                 "records": records[-10:] if records else []
             })
+            return
+
+        elif path.startswith("/api/evidence/") and path.endswith("/verify"):
+            evidence_id = path.split("/")[3]
+            res = _ledger_for(tenant_id).verify_evidence_artifacts(
+                evidence_id, tenant_id=tenant_id, company_id=company_id
+            )
+            self._send_json(res, status=200 if res.get("success") else 404)
             return
 
         elif path == "/api/hosts":
@@ -1454,10 +1486,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/departments":
-            companies = get_portfolio(tenant_id).list_companies()
-            cid = companies[0].company_id if companies else ""
-            depts = DepartmentControlUnit.list_departments(tenant_id, cid)
-            self._send_json({"departments": depts})
+            depts = DepartmentControlUnit.list_departments(tenant_id, company_id)
+            self._send_json({"departments": depts, "company_id": company_id})
             return
 
         elif path == "/api/approvals":
@@ -2772,26 +2802,26 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/workflows":
             cid = query_params.get("company_id", [None])[0]
-            wfs = governed_workflow_runtime.list_workflows(company_id=cid)
+            wfs = get_workflow_runtime(tenant_id).list_workflows(company_id=cid)
             self._send_json({"workflows": wfs, "count": len(wfs)})
             return
 
         elif path == "/api/workflows/approvals":
             st = query_params.get("status", ["PENDING"])[0]
-            apprs = governed_workflow_runtime.list_approvals(status=st)
+            apprs = get_workflow_runtime(tenant_id).list_approvals(status=st, tenant_id=tenant_id)
             self._send_json({"approvals": apprs, "count": len(apprs)})
             return
 
         elif path == "/api/workflows/runs":
             wf_id = query_params.get("workflow_id", [None])[0]
-            runs = governed_workflow_runtime.list_runs(workflow_id=wf_id, tenant_id=tenant_id)
+            runs = get_workflow_runtime(tenant_id).list_runs(workflow_id=wf_id, tenant_id=tenant_id)
             self._send_json({"runs": runs, "count": len(runs)})
             return
 
         elif path.startswith("/api/workflows/runs/") and path.endswith("/state"):
             parts = path.split("/")
             run_id = parts[4]
-            state = governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id)
+            state = get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id)
             if state:
                 self._send_json({"run_state": state})
             else:
@@ -2801,16 +2831,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/workflows/runs/") and path.endswith("/events"):
             parts = path.split("/")
             run_id = parts[4]
-            evts = governed_workflow_runtime.list_events(run_id)
+            evts = get_workflow_runtime(tenant_id).list_events(run_id)
             self._send_json({"events": evts, "count": len(evts)})
             return
 
         elif path.startswith("/api/workflows/runs/") and path.endswith("/checkpoints"):
             parts = path.split("/")
             run_id = parts[4]
-            run_st = governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id)
+            run_st = get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id)
             if run_st:
-                chks = governed_workflow_runtime.checkpointer.list_checkpoints(run_st["thread_id"])
+                chks = get_workflow_runtime(tenant_id).checkpointer.list_checkpoints(run_st["thread_id"])
                 self._send_json({"checkpoints": chks, "count": len(chks)})
             else:
                 self._send_json({"error": "Run not found"}, status=404)
@@ -2819,7 +2849,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/workflows/"):
             parts = path.split("/")
             wf_id = parts[3]
-            compiled = governed_workflow_runtime.compiled_graphs.get(wf_id)
+            compiled = get_workflow_runtime(tenant_id).compiled_graphs.get(wf_id)
             with db.get_connection() as conn:
                 wf_row = conn.execute("SELECT * FROM workflows WHERE workflow_id = ?", (wf_id,)).fetchone()
             if wf_row:
@@ -3138,6 +3168,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/mcp/killswitch":
+            if self._approver_denied(auth_context):
+                return
             self._send_json({
                 "killswitch_active": MCPKillSwitch.is_active(tenant_id),
                 "tenant_id": tenant_id,
@@ -3207,6 +3239,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/openhands/killswitch":
+            if self._approver_denied(auth_context):
+                return
             self._send_json({
                 "killswitch_active": OpenHandsKillSwitch.is_active(tenant_id),
                 "tenant_id": tenant_id,
@@ -3231,6 +3265,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(session)
             else:
                 self._send_json({"error": f"Session '{sess_id}' not found"}, status=404)
+            return
+
+        elif path == "/api/browser/capabilities":
+            self._send_json(_browser(tenant_id, company_id).capabilities())
             return
 
         elif path == "/api/browser/executions":
@@ -3284,6 +3322,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/browser/killswitch":
+            if self._approver_denied(auth_context):
+                return
             # company_id was resolved from the verified token (see _resolve_company_id)
             killed, reason = BrowserKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
             self._send_json({
@@ -3387,6 +3427,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/temporal/killswitch":
+            if self._approver_denied(auth_context):
+                return
             # company_id was resolved from the verified token (see _resolve_company_id)
             killed, reason = TemporalKillSwitch.is_killed(tenant_id=tenant_id, company_id=company_id)
             self._send_json({
@@ -3488,6 +3530,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/nango/killswitch":
+            if self._approver_denied(auth_context):
+                return
             # company_id was resolved from the verified token (see _resolve_company_id)
             prov_id = query_params.get("provider_id", ["salesforce"])[0]
             halted, reason = IntegrationKillSwitch.is_halted(tenant_id=tenant_id, company_id=company_id, provider_id=prov_id)
@@ -4370,6 +4414,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 }, status=409)
                 return
 
+            if self._blocked_by_global_killswitch("workload execution"):
+                return
             requested_cid = company_id
             cid = next((c.company_id for c in companies if c.company_id == requested_cid), companies[0].company_id)
             dispatcher = _cw(tenant_id, cid).background_dispatcher
@@ -6264,6 +6310,37 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"success": True, "file": fil})
             return
 
+        elif path == "/api/departments":
+            if self._approver_denied(auth_context):
+                return
+            name = str(req_data.get("name") or "").strip()
+            if not name:
+                self._send_json({"error": "Department name is required", "code": "MISSING_NAME"}, status=400)
+                return
+            try:
+                budget_limit = float(req_data.get("budget_limit", 0.0) or 0.0)
+                spending_limit = float(req_data.get("spending_limit", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                self._send_json({"error": "budget_limit and spending_limit must be numeric"}, status=400)
+                return
+            if budget_limit < 0 or spending_limit < 0:
+                self._send_json({"error": "limits must be non-negative"}, status=400)
+                return
+            existing = DepartmentControlUnit.list_departments(tenant_id, company_id)
+            if any(str(d.get("name", "")).lower() == name.lower() for d in existing):
+                self._send_json({"error": "Department already exists", "code": "DUPLICATE_DEPARTMENT"}, status=409)
+                return
+            dept = DepartmentControlUnit.create_department(
+                tenant_id=tenant_id,
+                company_id=company_id,
+                name=name,
+                manager_agent_id=req_data.get("manager_agent_id"),
+                budget_limit=budget_limit,
+                spending_limit=spending_limit,
+            )
+            self._send_json({"success": True, "department": dept}, status=201)
+            return
+
         elif path == "/api/reports":
             engine = EnterpriseReportsEngine(tenant_id=tenant_id)
             rep = engine.generate_report(req_data)
@@ -6271,17 +6348,32 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/finance/expenses":
+            if self._blocked_by_global_killswitch("finance expense mutation"):
+                return
             engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
             scoped = dict(req_data)
+            # Identity and tenant scope come from the verified token, never the body.
             scoped["company_id"] = company_id
+            scoped["claimant_user_id"] = (auth_context or {}).get("user_id")
+            if not scoped.get("claimant_name"):
+                scoped["claimant_name"] = (auth_context or {}).get("email") or (auth_context or {}).get("user_id") or "Employee"
             res = engine.create_expense(scoped)
-            self._send_json(res)
+            self._send_json(res, status=200 if res.get("success") else 400)
             return
 
         elif path == "/api/finance/expenses/approve" or (path.startswith("/api/finance/expenses/") and path.endswith("/approve")):
+            if self._blocked_by_global_killswitch("finance approval mutation"):
+                return
+            if self._approver_denied(auth_context):
+                return
             expense_id = req_data.get("expense_id") or path.split("/")[4]
             engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
-            res = engine.approve_expense(expense_id, approver=auth_context.get("email", "Executive Approver") if auth_context else "Executive Approver")
+            res = engine.approve_expense(
+                expense_id,
+                approver=str(auth_context.get("user_id") or auth_context.get("email") or "Executive Approver"),
+                approver_role=str(auth_context.get("role") or ""),
+                company_id=company_id,
+            )
             self._send_json(res, status=200 if res.get("success") else 400)
             return
 
@@ -6304,7 +6396,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/workforces/plan":
             objective = req_data.get("objective", "General Business Investigation")
-            company_id = req_data.get("company_id", "cmp_primary")
+            # company_id resolved from the verified token; never trusted from the body.
             budget_usd = float(req_data.get("budget_usd", 100.0))
             plan = AgentWorkforceAdapter.create_mission_workforce(
                 tenant_id=tenant_id,
@@ -6316,6 +6408,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/workforces/") and path.endswith("/execute"):
+            if self._blocked_by_global_killswitch("workforce execution"):
+                return
             parts = path.split("/")
             workforce_id = parts[3]
             try:
@@ -6334,7 +6428,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/workforces/demo/sales-bottlenecks":
-            company_id = req_data.get("company_id", "cmp_demo")
             demo_res = AgentWorkforceAdapter.run_sales_bottleneck_demonstration(
                 tenant_id=tenant_id,
                 company_id=company_id
@@ -6652,10 +6745,18 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/workflows/") and path.endswith("/run"):
+            if self._blocked_by_global_killswitch("workflow execution"):
+                return
             parts = path.split("/")
             wf_id = parts[3]
-            inputs = req_data.get("inputs", {})
-            ctx = req_data.get("context", {})
+            if wf_id == "__never__":
+                return
+            inputs = dict(req_data.get("inputs") or {})
+            # Tenant/company scope is derived from the authenticated token, never
+            # from the request body. Reserved "__" keys are rejected by the runtime.
+            ctx = dict(req_data.get("context") or {})
+            ctx["tenant_id"] = tenant_id
+            ctx["company_id"] = company_id
             max_leases = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
             from core.tenant_fairness import tenant_fairness_engine
             acq_ok, lease_id, retry_after = tenant_fairness_engine.concurrency_manager.acquire_lease(
@@ -6679,7 +6780,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
                 return
             try:
-                res = governed_workflow_runtime.start_workflow(wf_id, inputs, ctx)
+                res = get_workflow_runtime(tenant_id).start_workflow(wf_id, inputs, ctx)
                 if isinstance(res, dict):
                     res["lease_id"] = lease_id
                 self._send_json(res)
@@ -6692,24 +6793,26 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             run_id = parts[4]
             reason = req_data.get("reason", "API request")
-            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+            if not get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id):
                 self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
                 return
-            res = governed_workflow_runtime.pause_workflow(run_id, reason)
+            res = get_workflow_runtime(tenant_id).pause_workflow(run_id, reason)
             self._send_json(res)
             return
 
         elif path.startswith("/api/workflows/runs/") and path.endswith("/resume"):
+            if self._blocked_by_global_killswitch("workflow resume"):
+                return
             parts = path.split("/")
             run_id = parts[4]
             cmd_data = req_data.get("command")
             cmd = None
             if cmd_data:
                 cmd = Command(resume=cmd_data.get("resume"), update=cmd_data.get("update"), goto=cmd_data.get("goto"))
-            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+            if not get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id):
                 self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
                 return
-            res = governed_workflow_runtime.resume_workflow(run_id, command=cmd)
+            res = get_workflow_runtime(tenant_id).resume_workflow(run_id, command=cmd)
             self._send_json(res)
             return
 
@@ -6717,52 +6820,75 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             run_id = parts[4]
             reason = req_data.get("reason", "API request")
-            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+            if not get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id):
                 self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
                 return
-            res = governed_workflow_runtime.cancel_workflow(run_id, reason)
+            res = get_workflow_runtime(tenant_id).cancel_workflow(run_id, reason)
             self._send_json(res)
             return
 
         elif path.startswith("/api/workflows/runs/") and path.endswith("/recover"):
+            if self._blocked_by_global_killswitch("workflow recovery"):
+                return
             parts = path.split("/")
             run_id = parts[4]
-            if not governed_workflow_runtime.get_run_state(run_id, tenant_id=tenant_id):
+            if not get_workflow_runtime(tenant_id).get_run_state(run_id, tenant_id=tenant_id):
                 self._send_json({"error": f"Run '{run_id}' not found"}, status=404)
                 return
-            res = governed_workflow_runtime.recover_workflow_run(run_id)
+            res = get_workflow_runtime(tenant_id).recover_workflow_run(run_id)
             self._send_json(res)
             return
 
         elif path.startswith("/api/workflows/approvals/") and path.endswith("/approve"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            actor = req_data.get("actor", "Host")
-            res = governed_workflow_runtime.approve_workflow(appr_id, actor=actor)
-            self._send_json(res)
+            actor = str(auth_context.get("user_id") or "Host")
+            try:
+                res = get_workflow_runtime(tenant_id).approve_workflow(
+                    appr_id, actor=actor, tenant_id=tenant_id, company_id=company_id
+                )
+                self._send_json(res)
+            except ValueError as exc:
+                self._send_json({"success": False, "error": str(exc)}, status=404)
             return
 
         elif path.startswith("/api/workflows/approvals/") and path.endswith("/reject"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            actor = req_data.get("actor", "Host")
+            actor = str(auth_context.get("user_id") or "Host")
             reason = req_data.get("reason", "Rejected via API")
-            res = governed_workflow_runtime.reject_workflow(appr_id, actor=actor, reason=reason)
-            self._send_json(res)
+            try:
+                res = get_workflow_runtime(tenant_id).reject_workflow(
+                    appr_id, actor=actor, reason=reason,
+                    tenant_id=tenant_id, company_id=company_id
+                )
+                self._send_json(res)
+            except ValueError as exc:
+                self._send_json({"success": False, "error": str(exc)}, status=404)
             return
 
         elif path.startswith("/api/workflows/approvals/") and path.endswith("/edit"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            actor = req_data.get("actor", "Host")
+            actor = str(auth_context.get("user_id") or "Host")
             params = req_data.get("parameters", {})
-            res = governed_workflow_runtime.edit_and_resume_workflow(appr_id, params, actor=actor)
+            res = get_workflow_runtime(tenant_id).edit_and_resume_workflow(
+                appr_id, params, actor=actor, tenant_id=tenant_id, company_id=company_id
+            )
             self._send_json(res)
             return
 
         elif path == "/api/workflows/killswitch":
+            if self._approver_denied(auth_context):
+                return
             active = bool(req_data.get("active", True))
-            governed_workflow_runtime.set_killswitch(active)
+            get_workflow_runtime(tenant_id).set_killswitch(active)
             self._send_json({"killswitch_active": active, "status": "KILLSWITCH_ENGAGED" if active else "KILLSWITCH_DISENGAGED"})
             return
 
@@ -6983,6 +7109,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/automation/killswitch":
+            if self._approver_denied(auth_context):
+                return
             active = bool(req_data.get("active", True))
             universal_automation_fabric.set_killswitch(active)
             self._send_json({"killswitch_active": active, "status": "KILLSWITCH_ENGAGED" if active else "KILLSWITCH_DISENGAGED"})
@@ -7096,6 +7224,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/a2a/tasks/delegate":
+            if self._blocked_by_global_killswitch("A2A delegation"):
+                return
             agent_id = req_data.get("agent_id")
             skill_name = req_data.get("skill_name", "General Task")
             params = req_data.get("parameters", {})
@@ -7148,14 +7278,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/a2a/approvals/") and path.endswith("/approve"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            actor = req_data.get("actor", "Owner")
+            actor = str(auth_context.get("user_id") or "Owner")
             res = ApprovalPipeline.decide_request(
                 tenant_id=tenant_id,
                 request_id=appr_id,
-                approver_user={"user_id": actor, "role": "OWNER"},
-                approved=True
+                approver_user={"user_id": actor, "role": auth_context.get("role", "")},
+                approved=True,
+                company_id=company_id,
             )
             mcp_resume = None
             if res.get("success") and res.get("status") == "APPROVED":
@@ -7167,16 +7300,19 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/a2a/approvals/") and path.endswith("/reject"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            actor = req_data.get("actor", "Owner")
+            actor = str(auth_context.get("user_id") or "Owner")
             reason = req_data.get("reason", "Rejected by policy")
             res = ApprovalPipeline.decide_request(
                 tenant_id=tenant_id,
                 request_id=appr_id,
-                approver_user={"user_id": actor, "role": "OWNER"},
+                approver_user={"user_id": actor, "role": auth_context.get("role", "")},
                 approved=False,
-                rejection_reason=reason
+                rejection_reason=reason,
+                company_id=company_id,
             )
             if res.get("success"):
                 try:
@@ -7207,6 +7343,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/a2a/killswitch":
+            if self._approver_denied(auth_context):
+                return
             active = bool(req_data.get("active", True))
             if active:
                 A2AKillSwitch.activate(tenant_id)
@@ -7373,6 +7511,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/mcp/tools/invoke":
+            if self._blocked_by_global_killswitch("MCP tool execution"):
+                return
             server_id = req_data.get("server_id")
             tool_name = req_data.get("tool_name") or req_data.get("tool_id")
             arguments = req_data.get("arguments", {})
@@ -7482,6 +7622,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Governed OpenHands Execution Runtime Endpoints (POST - Project 07)
         # =====================================================================
         elif path == "/api/openhands/executions":
+            if self._blocked_by_global_killswitch("OpenHands execution"):
+                return
             agent_id = req_data.get("agent_id", "agt_developer")
             prompt = req_data.get("task_prompt", "Inspect and execute task")
             ws_type_str = req_data.get("workspace_type", "EPHEMERAL")
@@ -7509,6 +7651,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/openhands/executions/command":
+            if self._blocked_by_global_killswitch("OpenHands command execution"):
+                return
             exec_id = req_data.get("execution_id")
             command = req_data.get("command")
             timeout = int(req_data.get("timeout_seconds", 30))
@@ -7560,17 +7704,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/openhands/approvals/") and path.endswith("/approve"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            approver = req_data.get("approver", "Administrator")
+            approver = str(auth_context.get("user_id") or "Administrator")
             ok = _openhands(tenant_id, company_id).approve_operation(appr_id, approver_name=approver)
             self._send_json({"success": ok, "approval_id": appr_id})
             return
 
         elif path.startswith("/api/openhands/approvals/") and path.endswith("/reject"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.split("/")
             appr_id = parts[4]
-            approver = req_data.get("approver", "Administrator")
+            approver = str(auth_context.get("user_id") or "Administrator")
             ok = _openhands(tenant_id, company_id).reject_operation(appr_id, approver_name=approver)
             self._send_json({"success": ok, "approval_id": appr_id})
             return
@@ -7737,8 +7885,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/browser/approvals/") and path.endswith("/approve"):
+            if self._approver_denied(auth_context):
+                return
             appr_id = path.split("/")[4]
-            approver = req_data.get("approver", "usr_executive")
+            approver = str(auth_context.get("user_id") or "usr_executive")
             try:
                 res = _browser(tenant_id, company_id).approve_action(appr_id, approver_id=approver)
                 self._send_json(res)
@@ -7747,8 +7897,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/browser/approvals/") and path.endswith("/reject"):
+            if self._approver_denied(auth_context):
+                return
             appr_id = path.split("/")[4]
-            rejector = req_data.get("rejector", "usr_executive")
+            rejector = str(auth_context.get("user_id") or "usr_executive")
             reason = req_data.get("reason", "Security policy violation")
             try:
                 res = _browser(tenant_id, company_id).reject_action(appr_id, rejector_id=rejector, reason=reason)

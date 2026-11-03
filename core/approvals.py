@@ -56,7 +56,8 @@ class ApprovalPipeline:
         request_id: str,
         approver_user: Dict[str, Any],
         approved: bool,
-        rejection_reason: Optional[str] = None
+        rejection_reason: Optional[str] = None,
+        company_id: Optional[str] = None
     ) -> Dict[str, Any]:
         if not AuthorizationEnforcer.can_approve(approver_user.get("role", "")):
             return {
@@ -72,13 +73,32 @@ class ApprovalPipeline:
             grant_hash = f"GRANT_{hashlib.sha256(raw_grant.encode('utf-8')).hexdigest()[:24]}"
 
         with db.get_connection() as conn:
+            # Additive, idempotent schema migration for databases created
+            # before decision_reason was introduced.
+            try:
+                conn.execute("ALTER TABLE approvals ADD COLUMN decision_reason TEXT")
+                conn.commit()
+            except Exception:
+                pass
+            row = conn.execute(
+                "SELECT company_id, status FROM approvals WHERE tenant_id = ? AND request_id = ?",
+                (tenant_id, request_id)
+            ).fetchone()
+            if not row:
+                return {"success": False, "error": f"Approval request '{request_id}' not found."}
+            if company_id and row["company_id"] != company_id:
+                return {"success": False, "error": f"Approval request '{request_id}' not found."}
+            if row["status"] != "PENDING":
+                return {"success": False, "error": f"Approval request is already {row['status']}."}
             conn.execute(
                 """
                 UPDATE approvals
-                SET status = ?, approver_user_id = ?, signed_grant_hash = ?, decided_at = ?
-                WHERE tenant_id = ? AND request_id = ?
+                SET status = ?, approver_user_id = ?, signed_grant_hash = ?, decided_at = ?,
+                    decision_reason = ?
+                WHERE tenant_id = ? AND company_id = ? AND request_id = ?
                 """,
-                (status, approver_user["user_id"], grant_hash, now, tenant_id, request_id)
+                (status, approver_user["user_id"], grant_hash, now,
+                 rejection_reason, tenant_id, row["company_id"], request_id)
             )
             conn.commit()
 

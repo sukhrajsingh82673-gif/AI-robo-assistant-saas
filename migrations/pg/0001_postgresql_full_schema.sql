@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     signed_grant_hash TEXT,
     requested_at REAL NOT NULL,
     decided_at REAL,
+    decision_reason TEXT,
     FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );

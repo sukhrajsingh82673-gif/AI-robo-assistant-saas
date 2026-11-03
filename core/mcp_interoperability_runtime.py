@@ -527,10 +527,17 @@ class StreamableHTTPTransport(MCPTransport):
         if self.endpoint_url in self._mock_endpoints:
             return self._mock_endpoints[self.endpoint_url](request_payload)
 
-        # Check for RFC 2606 / 6761 reserved test domains
+        # RFC 2606 / 6761 reserved test domains may be simulated, but ONLY in
+        # explicit test/dev mode. Production always performs a real HTTP call so
+        # a missing server surfaces as a verifiable failure, never fake success.
         parsed = urllib.parse.urlparse(self.endpoint_url)
         hostname = (parsed.hostname or "").lower()
-        if any(hostname.endswith(sfx) for sfx in [".test", ".internal", ".example", ".invalid", ".localhost"]):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        simulation_enabled = (
+            os.environ.get("ZONATA_MCP_SIMULATE_TEST_DOMAINS", "1") != "0"
+            and (os.environ.get("ZONATA_TEST_MODE") == "1" or app_env in ("development", "dev", "test"))
+        )
+        if simulation_enabled and any(hostname.endswith(sfx) for sfx in [".test", ".internal", ".example", ".invalid", ".localhost"]):
             params = request_payload.get("params", {})
             return {
                 "jsonrpc": JSONRPC_VERSION,
@@ -539,7 +546,8 @@ class StreamableHTTPTransport(MCPTransport):
                     "tool": params.get("name", "tool"),
                     "status": "success",
                     "data": params.get("arguments", {}),
-                    "message": f"Simulated governed MCP response from {self.endpoint_url}"
+                    "message": f"Simulated governed MCP response from {self.endpoint_url}",
+                    "_zonata_simulated": True,
                 }
             }
 
@@ -868,6 +876,48 @@ class MCPGateway:
         is_safe, err_msg = MCPSecurityInspector.validate_endpoint(endpoint, allow_test_loopback=True)
         if not is_safe:
             return {"success": False, "error": f"Endpoint validation failed: {err_msg}"}
+
+        transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+        try:
+            if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                transport = StreamableHTTPTransport(endpoint)
+            else:
+                command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                transport = StdioTransport(command)
+            started = time.time()
+            response = transport.send_request(
+                {"jsonrpc": JSONRPC_VERSION, "id": f"ping_{uuid.uuid4().hex[:8]}",
+                 "method": "initialize",
+                 "params": {
+                     "protocolVersion": server.get("protocol_version", MCP_PROTOCOL_VERSION),
+                     "capabilities": {},
+                     "clientInfo": {"name": "zonata-governance-probe", "version": "1.0.0"},
+                 }},
+                timeout=10.0,
+            )
+            latency_ms = round((time.time() - started) * 1000, 2)
+            if response.get("error"):
+                raise RuntimeError(str(response["error"])[:200])
+            result = response.get("result") or {}
+            simulated = bool(result.get("_zonata_simulated"))
+        except Exception as exc:
+            now = time.time()
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE mcp_servers SET last_seen = ?, health_status = 'UNREACHABLE' WHERE server_id = ?",
+                    (now, server_id),
+                )
+                conn.commit()
+            return {
+                "success": False,
+                "server_id": server_id,
+                "endpoint": endpoint,
+                "health_status": "UNREACHABLE",
+                "error": f"{type(exc).__name__}: {str(exc)[:200]}",
+                "latency_ms": None,
+                "timestamp": now,
+            }
+
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("UPDATE mcp_servers SET last_seen = ?, health_status = 'HEALTHY' WHERE server_id = ?", (now, server_id))
@@ -876,10 +926,13 @@ class MCPGateway:
             "success": True,
             "server_id": server_id,
             "endpoint": endpoint,
-            "protocol_version": server.get("protocol_version", MCP_PROTOCOL_VERSION),
-            "transport": server.get("transport", "streamable_http"),
+            "protocol_version": result.get("protocolVersion") or server.get("protocol_version", MCP_PROTOCOL_VERSION),
+            "server_info": result.get("serverInfo"),
+            "transport": transport_type,
             "health_status": "HEALTHY",
-            "latency_ms": 12.4,
+            "latency_ms": latency_ms,
+            "measured": not simulated,
+            "execution_mode": "SIMULATED_TEST_FIXTURE" if simulated else "LIVE_TRANSPORT",
             "timestamp": now
         }
 
@@ -897,6 +950,8 @@ class MCPGateway:
         discovery = "SKIPPED_UNTRUSTED"
         discovery_error = None
         discovered = 0
+        resources_discovered = 0
+        resources_discovery = "SKIPPED"
 
         if trust in (MCPTrustState.VALIDATED.value, MCPTrustState.TRUSTED.value, "TRUSTED"):
             transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
@@ -928,6 +983,36 @@ class MCPGateway:
                 discovery = "FAILED"
                 discovery_error = f"{type(exc).__name__}: {str(exc)[:200]}"
 
+            # Live resource + prompt discovery on the same session endpoint.
+            if discovery == "LIVE_TOOLS_LIST":
+                try:
+                    rrpc = {"jsonrpc": JSONRPC_VERSION, "id": f"res_{uuid.uuid4().hex[:8]}",
+                            "method": "resources/list", "params": {}}
+                    rresp = transport.send_request(rrpc, timeout=10.0)
+                    if rresp.get("error"):
+                        raise RuntimeError(str(rresp["error"])[:200])
+                    resources = ((rresp.get("result") or {}).get("resources") or [])
+                    for r in resources:
+                        if not isinstance(r, dict) or not r.get("uri"):
+                            continue
+                        self.register_resource(
+                            server_id=server_id,
+                            uri=r["uri"],
+                            name=r.get("name") or r["uri"],
+                            description=r.get("description", "") or "",
+                            mime_type=r.get("mimeType", "application/json"),
+                            resource_id=f"res_{server_id}_{hashlib.sha256(r['uri'].encode()).hexdigest()[:12]}",
+                        )
+                    resources_discovered = len(resources)
+                    resources_discovery = "LIVE_RESOURCES_LIST"
+                except Exception as exc:
+                    resources_discovered = 0
+                    resources_discovery = "FAILED"
+                    discovery_error = (discovery_error or "") + f" resources: {type(exc).__name__}: {str(exc)[:150]}"
+            else:
+                resources_discovered = 0
+                resources_discovery = "SKIPPED"
+
         with db.get_connection() as conn:
             tools = conn.execute("SELECT COUNT(*) as c FROM mcp_tools WHERE server_id = ?", (server_id,)).fetchone()["c"]
             resources = conn.execute("SELECT COUNT(*) as c FROM mcp_resources WHERE server_id = ?", (server_id,)).fetchone()["c"]
@@ -938,8 +1023,10 @@ class MCPGateway:
             "server_id": server_id,
             "refreshed_at": time.time(),
             "discovery": discovery,
+            "resources_discovery": resources_discovery,
             "discovery_error": discovery_error,
             "newly_discovered_tools": discovered,
+            "newly_discovered_resources": resources_discovered,
             "tools_count": tools,
             "resources_count": resources,
         }
@@ -1153,9 +1240,10 @@ class MCPGateway:
         description: str = "",
         mime_type: str = "application/json",
         data_classification: MCPDataClassification = MCPDataClassification.INTERNAL,
-        approval_required: bool = False
+        approval_required: bool = False,
+        resource_id: Optional[str] = None,
     ) -> str:
-        res_id = f"res_{server_id}_{uuid.uuid4().hex[:8]}"
+        res_id = resource_id or f"res_{server_id}_{uuid.uuid4().hex[:8]}"
         now = time.time()
         with db.get_connection() as conn:
             conn.execute(
@@ -1205,9 +1293,39 @@ class MCPGateway:
             if MCPKillSwitch.is_active(self.tenant_id, server_id=server_id):
                 return {"success": False, "status": MCPExecutionStatus.CANCELLED.value, "error": "KillSwitch active"}
 
-            # Simulated resource payload or transport retrieval
-            raw_content = {"uri": r["uri"], "name": r["name"], "data": f"Enterprise Resource Content for {r['name']}"}
-            clean_ok, sanitized, warns = ExternalContentFirewall.sanitize_output(raw_content)
+            server = self.get_server(server_id)
+            if not server:
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value, "error": "Server not found"}
+            trust = str(server.get("trust_state", "DISCOVERED"))
+            if trust not in (MCPTrustState.VALIDATED.value, MCPTrustState.TRUSTED.value, "TRUSTED"):
+                return {"success": False, "status": MCPExecutionStatus.POLICY_DENIED.value,
+                        "error": f"Server trust state '{trust}' does not permit resource reads"}
+
+            endpoint = server.get("endpoint", "")
+            transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+            try:
+                if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                    transport = StreamableHTTPTransport(endpoint)
+                else:
+                    command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                    transport = StdioTransport(command)
+                started = time.time()
+                response = transport.send_request(
+                    {"jsonrpc": JSONRPC_VERSION, "id": f"read_{uuid.uuid4().hex[:8]}",
+                     "method": "resources/read", "params": {"uri": r["uri"]}},
+                    timeout=15.0,
+                )
+                latency_ms = round((time.time() - started) * 1000, 2)
+            except Exception as exc:
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value,
+                        "error": f"Resource transport failed: {type(exc).__name__}: {str(exc)[:200]}",
+                        "read_verified": False}
+            if response.get("error"):
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value,
+                        "error": f"Server error: {str(response['error'])[:200]}", "read_verified": False}
+
+            result = response.get("result") or {}
+            clean_ok, sanitized, warns = ExternalContentFirewall.sanitize_output(result)
             if not clean_ok:
                 self._record_security_event(
                     MCPSecurityEventType.MALICIOUS_RESOURCE,
@@ -1216,7 +1334,17 @@ class MCPGateway:
                 )
                 return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value, "error": "Malicious content detected in resource"}
 
-            return {"success": True, "resource": sanitized, "content": sanitized.get("data"), "warnings": warns}
+            contents = sanitized.get("contents") if isinstance(sanitized, dict) else None
+            return {
+                "success": True,
+                "resource": sanitized,
+                "content": contents if contents is not None else sanitized,
+                "warnings": warns,
+                "latency_ms": latency_ms,
+                "read_verified": True,
+                "source": "LIVE_RESOURCES_READ",
+                "uri": r["uri"],
+            }
 
     # -------------------------------------------------------------------------
     # GOVERNED INVOCATION PIPELINE (The 15-Stage Enterprise Standard)

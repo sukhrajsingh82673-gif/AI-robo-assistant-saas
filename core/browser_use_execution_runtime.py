@@ -841,6 +841,9 @@ class BrowserExecutionProvider(ABC):
         pass
 
     @abstractmethod
+    def capabilities(self) -> Dict[str, Any]:
+        pass
+
     def execute_action(self, session_id: str, action_type: str, selector: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
@@ -1022,6 +1025,24 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             "has_mfa_challenge": dom_parser.has_mfa_challenge,
         }
 
+    def capabilities(self) -> Dict[str, Any]:
+        """Honest inventory of what this runtime can and cannot actually do."""
+        supported = ["NAVIGATE", "EXTRACT", "VERIFY_POSTCONDITION", "WAIT", "OBSERVE"]
+        unsupported = ["CLICK", "TYPE", "SUBMIT_FORM", "UPLOAD", "DOWNLOAD",
+                       "HANDLE_POPUP", "OPEN_TAB", "SWITCH_TAB", "CLOSE_TAB"]
+        return {
+            "engine": "HTTP_FETCH_DOM_PARSER",
+            "engine_installed": False,
+            "supported_actions": supported,
+            "unsupported_actions": unsupported,
+            "reason": (
+                "No headless browser engine (Playwright/Chromium) is installed. "
+                "Navigation, DOM parsing, extraction and postcondition checks are real; "
+                "interactions are refused rather than simulated."
+            ),
+            "simulation_override_env": "ZONATA_TEST_MODE=1 (test fixtures only)",
+        }
+
     def execute_action(self, session_id: str, action_type: str, selector: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         session = self._active_sessions.get(session_id)
         if not session:
@@ -1043,11 +1064,18 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             os.environ.get("ZONATA_TEST_MODE") == "1"
             or session.get("execution_mode") == "SIMULATED_TEST_FIXTURE"
         )
-        if action_type in (
+        engine_dependent = (
             BrowserActionType.CLICK.value, BrowserActionType.CLICK,
             BrowserActionType.TYPE.value, BrowserActionType.TYPE,
             BrowserActionType.SUBMIT_FORM.value, BrowserActionType.SUBMIT_FORM,
-        ) and not simulation_allowed:
+            BrowserActionType.UPLOAD.value, BrowserActionType.UPLOAD,
+            BrowserActionType.DOWNLOAD.value, BrowserActionType.DOWNLOAD,
+            BrowserActionType.HANDLE_POPUP.value, BrowserActionType.HANDLE_POPUP,
+            BrowserActionType.OPEN_TAB.value, BrowserActionType.OPEN_TAB,
+            BrowserActionType.SWITCH_TAB.value, BrowserActionType.SWITCH_TAB,
+            BrowserActionType.CLOSE_TAB.value, BrowserActionType.CLOSE_TAB,
+        )
+        if action_type in engine_dependent and not simulation_allowed:
             return {
                 "success": False,
                 "action": action_type,
@@ -1081,7 +1109,9 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                 "action": "CLICK",
                 "selector": selector,
                 "duration_ms": duration_ms,
-                "result": desc
+                "result": desc,
+                "execution_mode": "SIMULATED_TEST_FIXTURE",
+                "business_outcome_verified": False,
             }
             if session.get("error_banners"):
                 res["warning"] = f"Page contains error banner: {session['error_banners'][0]}"
@@ -1098,7 +1128,9 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                 "action": "TYPE",
                 "selector": selector,
                 "value": WebContentSecurityBoundary.scrub_data(text_entered),
-                "duration_ms": duration_ms
+                "duration_ms": duration_ms,
+                "execution_mode": "SIMULATED_TEST_FIXTURE",
+                "business_outcome_verified": False,
             }
 
         elif action_type in (BrowserActionType.SUBMIT_FORM.value, BrowserActionType.SUBMIT_FORM):
@@ -1120,7 +1152,9 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                 "form_selector": selector,
                 "confirmation_id": conf_ref,
                 "fields": WebContentSecurityBoundary.scrub_data(fields),
-                "duration_ms": duration_ms
+                "duration_ms": duration_ms,
+                "execution_mode": "SIMULATED_TEST_FIXTURE",
+                "business_outcome_verified": False,
             }
 
         elif action_type in (BrowserActionType.VERIFY_POSTCONDITION.value, BrowserActionType.VERIFY_POSTCONDITION):
@@ -1184,16 +1218,22 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             }
 
         elif action_type in (BrowserActionType.WAIT.value, BrowserActionType.WAIT):
-            duration_ms = round((time.time() - start) * 1000, 2)
             wait_sel = selector or params.get("selector", "")
-            elem_found = bool(parser.find_element(wait_sel)) if parser and wait_sel else True
+            wait_sec = float(params.get("timeout_sec", 1.0) or 0.0)
+            wait_sec = max(0.0, min(wait_sec, 10.0))
+            if wait_sec:
+                time.sleep(wait_sec)
+            elem_found = bool(parser.find_element(wait_sel)) if parser and wait_sel else None
+            duration_ms = round((time.time() - start) * 1000, 2)
             return {
                 "success": True,
                 "action": "WAIT",
                 "selector": wait_sel,
                 "element_present": elem_found,
-                "waited_sec": params.get("timeout_sec", 1.0),
-                "duration_ms": duration_ms
+                "waited_sec": wait_sec,
+                "elapsed_ms": duration_ms,
+                "note": "No live DOM re-poll is possible without a browser engine; "
+                        "element_present reflects the DOM captured at last navigation.",
             }
 
         elif action_type in (BrowserActionType.EXTRACT.value, BrowserActionType.EXTRACT):
@@ -1365,6 +1405,10 @@ class BrowserExecutionGateway:
         self.causality_engine = BusinessCausalityEngine(tenant_id, company_id)
         self.artifact_registry = BrowserArtifactRegistry()
         self.provider = BrowserUseExecutionProvider(self.artifact_registry)
+
+    def capabilities(self) -> Dict[str, Any]:
+        """Forwards the provider's honest capability inventory."""
+        return self.provider.capabilities()
 
     # -------------------------------------------------------------------------
     # Session Management
