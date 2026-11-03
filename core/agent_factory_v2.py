@@ -225,3 +225,125 @@ class AgentFactoryV2:
 
 # Global agent factory v2 instance
 agent_factory_v2 = AgentFactoryV2()
+
+class LeaseConcurrencyConflictError(RuntimeError):
+    """Raised when an agent instance is already leased by another employee."""
+    pass
+
+class AgentLeaseManager:
+    """
+    Guarantees that an ephemeral execution worker (agent_instance) is strictly leased
+    by at most ONE corporate employee at a time.
+    """
+    DEFAULT_LEASE_TTL_SEC = 300.0
+
+    @classmethod
+    def acquire_lease(
+        cls,
+        tenant_id: str,
+        company_id: str,
+        instance_id: str,
+        employee_id: str,
+        mission_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        ttl_seconds: float = DEFAULT_LEASE_TTL_SEC
+    ) -> Dict[str, Any]:
+        from core.db import db
+        now = time.time()
+        expires_at = now + ttl_seconds
+        lease_id = f"lease_{uuid.uuid4().hex[:12]}"
+
+        # Sweep expired leases first
+        cls.sweep_expired_leases()
+
+        with db.get_connection() as conn:
+            # Atomic Mutex Lock scoped to tenant and company
+            cur = conn.execute("""
+            UPDATE agent_instances
+            SET lifecycle_state = 'LEASED', current_lease_id = ?, bound_employee_id = ?
+            WHERE instance_id = ? AND lifecycle_state = 'IDLE' AND tenant_id = ? AND company_id = ?
+            """, (lease_id, employee_id, instance_id, tenant_id, company_id))
+
+            if cur.rowcount == 0:
+                # Check instance state for diagnostic
+                row = conn.execute(
+                    "SELECT lifecycle_state, bound_employee_id, current_lease_id FROM agent_instances WHERE instance_id = ? AND tenant_id = ? AND company_id = ?",
+                    (instance_id, tenant_id, company_id)
+                ).fetchone()
+                if not row:
+                    raise ValueError(f"Agent instance '{instance_id}' not found for tenant '{tenant_id}'.")
+                raise LeaseConcurrencyConflictError(
+                    f"CONCURRENCY_CONFLICT: Agent instance '{instance_id}' is currently '{row['lifecycle_state']}' "
+                    f"(Lease: {row['current_lease_id']}, Bound: {row['bound_employee_id']}). Concurrent lease blocked."
+                )
+
+            # Insert Lease Record
+            conn.execute("""
+            INSERT INTO agent_leases (
+                lease_id, tenant_id, company_id, instance_id, leased_by_employee_id,
+                mission_id, task_id, lease_state, acquired_at, expires_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
+            """, (lease_id, tenant_id, company_id, instance_id, employee_id, mission_id, task_id, now, expires_at))
+            conn.commit()
+
+        return {
+            "lease_id": lease_id,
+            "instance_id": instance_id,
+            "leased_by": employee_id,
+            "acquired_at": now,
+            "expires_at": expires_at,
+            "ttl_seconds": ttl_seconds,
+            "status": "ACTIVE"
+        }
+
+    @classmethod
+    def release_lease(cls, lease_id: str, employee_id: Optional[str] = None) -> bool:
+        from core.db import db
+        now = time.time()
+        with db.get_connection() as conn:
+            lease = conn.execute("SELECT * FROM agent_leases WHERE lease_id = ?", (lease_id,)).fetchone()
+            if not lease:
+                return False
+
+            instance_id = lease["instance_id"]
+            tenant_id = lease["tenant_id"]
+            company_id = lease["company_id"]
+            conn.execute("""
+            UPDATE agent_leases
+            SET lease_state = 'COMPLETED', released_at = ?
+            WHERE lease_id = ?
+            """, (now, lease_id))
+
+            conn.execute("""
+            UPDATE agent_instances
+            SET lifecycle_state = 'IDLE', current_lease_id = NULL, bound_employee_id = NULL
+            WHERE instance_id = ? AND current_lease_id = ? AND tenant_id = ? AND company_id = ?
+            """, (instance_id, lease_id, tenant_id, company_id))
+            conn.commit()
+        return True
+
+    @classmethod
+    def sweep_expired_leases(cls) -> int:
+        from core.db import db
+        now = time.time()
+        swept = 0
+        with db.get_connection() as conn:
+            expired = conn.execute("""
+            SELECT lease_id, instance_id FROM agent_leases
+            WHERE lease_state = 'ACTIVE' AND expires_at < ?
+            """, (now,)).fetchall()
+
+            for exp in expired:
+                conn.execute("""
+                UPDATE agent_leases SET lease_state = 'EXPIRED', released_at = ? WHERE lease_id = ?
+                """, (now, exp["lease_id"]))
+                conn.execute("""
+                UPDATE agent_instances
+                SET lifecycle_state = 'IDLE', current_lease_id = NULL, bound_employee_id = NULL
+                WHERE instance_id = ? AND current_lease_id = ?
+                """, (exp["instance_id"], exp["lease_id"]))
+                swept += 1
+            if swept > 0:
+                conn.commit()
+        return swept
+

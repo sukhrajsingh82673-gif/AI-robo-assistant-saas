@@ -3526,6 +3526,539 @@ CREATE TABLE IF NOT EXISTS crm_deals (
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_crm_deals ON crm_deals(tenant_id, company_id);
+
+-- ============================================================================
+-- 11. URA / ZONATA Enterprise AI Corporate Workforce Architecture (25 Tables)
+-- ============================================================================
+
+-- 1. Organizations (Enterprise Root Entity)
+CREATE TABLE IF NOT EXISTS organizations (
+    org_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    parent_org_id TEXT,
+    legal_name TEXT NOT NULL,
+    trade_name TEXT NOT NULL,
+    jurisdiction TEXT NOT NULL DEFAULT 'US-DE',
+    tax_identifier TEXT,
+    incorporation_date REAL,
+    fiscal_year_start_month INTEGER NOT NULL DEFAULT 1,
+    base_currency TEXT NOT NULL DEFAULT 'USD',
+    governance_model TEXT NOT NULL DEFAULT 'AUTONOMOUS_EXECUTIVE_HYBRID',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    metadata JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_org_id) REFERENCES organizations(org_id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_org_tenant ON organizations(tenant_id);
+
+-- 2. Corporate Departments (Control Units / Cost Centers)
+CREATE TABLE IF NOT EXISTS corporate_departments (
+    department_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    parent_department_id TEXT,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    cost_center_code TEXT NOT NULL,
+    head_position_id TEXT,
+    operating_budget_usd REAL NOT NULL DEFAULT 0.0,
+    headcount_ceiling INTEGER NOT NULL DEFAULT 10,
+    current_headcount INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_department_id) REFERENCES corporate_departments(department_id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dept_code ON corporate_departments(company_id, code);
+
+-- 3. Corporate Positions (Organizational Roles)
+CREATE TABLE IF NOT EXISTS corporate_positions (
+    position_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    reports_to_position_id TEXT,
+    position_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    hierarchy_level TEXT NOT NULL,
+    job_family TEXT NOT NULL,
+    headcount_limit INTEGER NOT NULL DEFAULT 1,
+    current_filled_count INTEGER NOT NULL DEFAULT 0,
+    default_authority_profile_id TEXT,
+    is_executive INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE,
+    FOREIGN KEY (reports_to_position_id) REFERENCES corporate_positions(position_id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_code ON corporate_positions(company_id, position_code);
+
+-- 4. Corporate Employees (AI, Human, and Hybrid Fleet)
+CREATE TABLE IF NOT EXISTS corporate_employees (
+    employee_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    identity_type TEXT NOT NULL DEFAULT 'AI_EMPLOYEE',
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    work_email TEXT NOT NULL,
+    lifecycle_state TEXT NOT NULL DEFAULT 'PROPOSED',
+    authority_profile_id TEXT,
+    knowledge_profile_id TEXT,
+    performance_rating REAL NOT NULL DEFAULT 100.0,
+    total_tokens_used INTEGER NOT NULL DEFAULT 0,
+    total_cost_usd REAL NOT NULL DEFAULT 0.0,
+    allocated_monthly_budget_usd REAL NOT NULL DEFAULT 500.0,
+    spent_monthly_budget_usd REAL NOT NULL DEFAULT 0.0,
+    emergency_killswitch INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (position_id) REFERENCES corporate_positions(position_id) ON DELETE RESTRICT,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_emp_pos ON corporate_employees(position_id);
+CREATE INDEX IF NOT EXISTS idx_emp_state ON corporate_employees(lifecycle_state);
+
+-- 5. Employee Reporting Relationships (Explicit Multi-Type Hierarchy DAG)
+CREATE TABLE IF NOT EXISTS employee_reporting_relationships (
+    relationship_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    manager_employee_id TEXT NOT NULL,
+    relationship_type TEXT NOT NULL DEFAULT 'SOLID_LINE',
+    effective_from REAL NOT NULL,
+    effective_to REAL,
+    delegation_scope JSON,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (manager_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_rep_rel ON employee_reporting_relationships(employee_id, manager_employee_id);
+
+-- 6. Employee Authority Profiles (Machine-Enforceable Delegation of Authority DoA)
+CREATE TABLE IF NOT EXISTS employee_authority_profiles (
+    profile_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    max_spend_single_usd REAL NOT NULL DEFAULT 0.0,
+    max_spend_monthly_usd REAL NOT NULL DEFAULT 0.0,
+    max_risk_level TEXT NOT NULL DEFAULT 'LOW',
+    can_hire INTEGER NOT NULL DEFAULT 0,
+    can_fire INTEGER NOT NULL DEFAULT 0,
+    can_enter_contracts INTEGER NOT NULL DEFAULT 0,
+    can_delegate INTEGER NOT NULL DEFAULT 0,
+    can_modify_sops INTEGER NOT NULL DEFAULT 0,
+    dual_approval_required INTEGER NOT NULL DEFAULT 0,
+    allowed_data_classifications JSON NOT NULL,
+    forbidden_tool_patterns JSON NOT NULL,
+    approved_tools JSON NOT NULL,
+    signature_hash TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+
+-- 7. Employee Knowledge Profiles (Clearance & Data Boundaries)
+CREATE TABLE IF NOT EXISTS employee_knowledge_profiles (
+    profile_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    clearance_level TEXT NOT NULL DEFAULT 'INTERNAL',
+    permitted_domains JSON NOT NULL,
+    permitted_systems JSON NOT NULL,
+    forbidden_topics JSON NOT NULL,
+    max_retrieval_tokens INTEGER NOT NULL DEFAULT 8192,
+    data_residency_jurisdictions JSON NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+
+-- 8. SOP Definitions (Standard Operating Procedure Registry)
+CREATE TABLE IF NOT EXISTS sop_definitions (
+    sop_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    sop_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    cadence TEXT NOT NULL DEFAULT 'EVENT_DRIVEN',
+    risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+    objective TEXT NOT NULL,
+    trigger_conditions JSON NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_code ON sop_definitions(company_id, sop_code);
+
+-- 9. SOP Versions (Immutable Version History & Executable Steps)
+CREATE TABLE IF NOT EXISTS sop_versions (
+    version_id TEXT PRIMARY KEY,
+    sop_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    version_semver TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    steps_definition JSON NOT NULL,
+    input_schema JSON NOT NULL,
+    output_schema JSON NOT NULL,
+    anti_gaming_rules JSON NOT NULL,
+    required_authority_level TEXT NOT NULL DEFAULT 'DELEGATED',
+    evidence_requirements JSON NOT NULL,
+    author_employee_id TEXT NOT NULL,
+    approved_by_role TEXT,
+    approved_at REAL,
+    sha256_hash TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (sop_id) REFERENCES sop_definitions(sop_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_ver ON sop_versions(sop_id, version_semver);
+
+-- 10. Employee SOP Assignments (Contractual Assignment of Executable Playbooks)
+CREATE TABLE IF NOT EXISTS employee_sop_assignments (
+    assignment_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    sop_version_id TEXT NOT NULL,
+    assignment_status TEXT NOT NULL DEFAULT 'ACTIVE',
+    compliance_score REAL NOT NULL DEFAULT 100.0,
+    total_executions INTEGER NOT NULL DEFAULT 0,
+    failed_executions INTEGER NOT NULL DEFAULT 0,
+    last_executed_at REAL,
+    assigned_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (sop_version_id) REFERENCES sop_versions(version_id) ON DELETE RESTRICT
+);
+
+-- 11. Employee KRAs (Key Result Areas)
+CREATE TABLE IF NOT EXISTS employee_kras (
+    kra_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    strategic_objective_id TEXT,
+    name TEXT NOT NULL,
+    weight_percentage REAL NOT NULL DEFAULT 25.0,
+    accountability_statement TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+
+-- 12. KPI Definitions (Anti-Gaming Paired Metrics Catalog)
+CREATE TABLE IF NOT EXISTS kpi_definitions (
+    kpi_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    kra_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    definition TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    polarity TEXT NOT NULL DEFAULT 'HIGHER_IS_BETTER',
+    target_value REAL NOT NULL,
+    threshold_warning REAL NOT NULL,
+    threshold_critical REAL NOT NULL,
+    paired_counter_metric_id TEXT,
+    counter_metric_weight REAL NOT NULL DEFAULT 0.5,
+    data_source_feed TEXT NOT NULL,
+    verification_method TEXT NOT NULL DEFAULT 'TRANSACTION_RECONCILIATION',
+    measurement_frequency TEXT NOT NULL DEFAULT 'DAILY',
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (kra_id) REFERENCES employee_kras(kra_id) ON DELETE CASCADE,
+    FOREIGN KEY (paired_counter_metric_id) REFERENCES kpi_definitions(kpi_id) ON DELETE SET NULL
+);
+
+-- 13. KPI Measurements (Evidence-Sealed Real Measurements)
+CREATE TABLE IF NOT EXISTS kpi_measurements (
+    measurement_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    kpi_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    mission_id TEXT,
+    measured_value REAL NOT NULL,
+    counter_metric_value REAL,
+    anti_gaming_passed INTEGER NOT NULL DEFAULT 1,
+    variance_percentage REAL NOT NULL DEFAULT 0.0,
+    score_contribution REAL NOT NULL DEFAULT 100.0,
+    raw_evidence_json JSON NOT NULL,
+    evidence_sha256 TEXT NOT NULL,
+    measured_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (kpi_id) REFERENCES kpi_definitions(kpi_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_kpi_meas ON kpi_measurements(kpi_id, employee_id, measured_at);
+
+-- 14. Employee Performance Reviews (Explainable 4-Factor Evaluations)
+CREATE TABLE IF NOT EXISTS employee_performance_reviews (
+    review_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    review_period_start REAL NOT NULL,
+    review_period_end REAL NOT NULL,
+    kpi_achievement_score REAL NOT NULL,
+    sop_compliance_score REAL NOT NULL,
+    anti_gaming_compliance_score REAL NOT NULL,
+    collaboration_sla_score REAL NOT NULL,
+    composite_performance_score REAL NOT NULL,
+    evaluator_role TEXT NOT NULL DEFAULT 'EXEC_CHRO',
+    recommendation TEXT NOT NULL DEFAULT 'RETAIN',
+    mathematical_proof_json JSON NOT NULL,
+    is_sealed INTEGER NOT NULL DEFAULT 1,
+    sealed_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+
+-- 15. Workforce Requisitions (CHRO Workforce Intelligence Pipeline)
+CREATE TABLE IF NOT EXISTS workforce_requisitions (
+    requisition_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    requested_position_title TEXT NOT NULL,
+    requesting_executive_role TEXT NOT NULL,
+    justification TEXT NOT NULL,
+    gap_analysis_evidence JSON NOT NULL,
+    proposed_monthly_budget_usd REAL NOT NULL DEFAULT 200.0,
+    target_agent_template_id TEXT,
+    status TEXT NOT NULL DEFAULT 'PROPOSED',
+    chro_decision_notes TEXT,
+    approved_position_id TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE
+);
+
+-- 16. Agent Capabilities (Atomic Execution Registry)
+CREATE TABLE IF NOT EXISTS agent_capabilities (
+    capability_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    input_schema JSON NOT NULL,
+    output_schema JSON NOT NULL,
+    risk_class TEXT NOT NULL DEFAULT 'READ_ONLY',
+    cost_per_call_usd REAL NOT NULL DEFAULT 0.001,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cap_code ON agent_capabilities(tenant_id, code);
+
+-- 17. Agent Templates (Reusable Capability Packages)
+CREATE TABLE IF NOT EXISTS agent_templates (
+    template_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    description TEXT NOT NULL,
+    role_category TEXT NOT NULL,
+    default_capabilities JSON NOT NULL,
+    default_toolset JSON NOT NULL,
+    sandbox_requirements JSON NOT NULL,
+    created_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tpl_slug ON agent_templates(tenant_id, slug);
+
+-- 18. Agent Template Versions (Cryptographically Signed Blueprints)
+CREATE TABLE IF NOT EXISTS agent_template_versions (
+    version_id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    semver TEXT NOT NULL,
+    system_prompt_scaffold TEXT NOT NULL,
+    capability_manifest JSON NOT NULL,
+    tool_manifest JSON NOT NULL,
+    resource_limits JSON NOT NULL,
+    sbom_hash TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    FOREIGN KEY (template_id) REFERENCES agent_templates(template_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tpl_ver ON agent_template_versions(template_id, semver);
+
+-- 19. Agent Instances (Running Ephemeral or Persistent Execution Workers)
+CREATE TABLE IF NOT EXISTS agent_instances (
+    instance_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    template_version_id TEXT NOT NULL,
+    bound_employee_id TEXT,
+    host_runtime_id TEXT NOT NULL,
+    lifecycle_state TEXT NOT NULL DEFAULT 'IDLE',
+    current_lease_id TEXT,
+    allocated_tokens INTEGER NOT NULL DEFAULT 100000,
+    used_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_incurred_usd REAL NOT NULL DEFAULT 0.0,
+    last_heartbeat REAL NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (template_version_id) REFERENCES agent_template_versions(version_id) ON DELETE RESTRICT
+);
+
+-- 20. Agent Leases (Concurrency Control & Mutex Locks)
+CREATE TABLE IF NOT EXISTS agent_leases (
+    lease_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    leased_by_employee_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    lease_state TEXT NOT NULL DEFAULT 'ACTIVE',
+    acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    released_at REAL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES agent_instances(instance_id) ON DELETE CASCADE,
+    FOREIGN KEY (leased_by_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_lease_lookup ON agent_leases(instance_id, lease_state, expires_at);
+
+-- 21. Agent Execution Sessions (Zero-Leakage Execution Sandboxes)
+CREATE TABLE IF NOT EXISTS agent_execution_sessions (
+    session_id TEXT PRIMARY KEY,
+    lease_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    session_token_hash TEXT NOT NULL,
+    memory_scope_id TEXT NOT NULL,
+    isolation_tier TEXT NOT NULL DEFAULT 'EPHEMERAL_CONTAINER',
+    credential_handle_ids JSON NOT NULL,
+    execution_status TEXT NOT NULL DEFAULT 'RUNNING',
+    tokens_consumed INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0.0,
+    started_at REAL NOT NULL,
+    ended_at REAL,
+    FOREIGN KEY (lease_id) REFERENCES agent_leases(lease_id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES agent_instances(instance_id) ON DELETE CASCADE
+);
+
+-- 22. Corporate Missions (Cross-Functional Strategic Initiatives)
+CREATE TABLE IF NOT EXISTS corporate_missions (
+    mission_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    objective_statement TEXT NOT NULL,
+    lead_employee_id TEXT NOT NULL,
+    sponsor_executive_role TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PLANNING',
+    priority_level TEXT NOT NULL DEFAULT 'P1',
+    budget_limit_usd REAL NOT NULL DEFAULT 1000.0,
+    spent_budget_usd REAL NOT NULL DEFAULT 0.0,
+    progress_percentage REAL NOT NULL DEFAULT 0.0,
+    target_delivery_timestamp REAL NOT NULL,
+    completed_at REAL,
+    outcome_evidence_hash TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE RESTRICT
+);
+
+-- 23. Employee Tasks (Atomic Delegated Units of Work)
+CREATE TABLE IF NOT EXISTS employee_tasks (
+    task_id TEXT PRIMARY KEY,
+    mission_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    assigned_employee_id TEXT NOT NULL,
+    delegator_employee_id TEXT NOT NULL,
+    parent_task_id TEXT,
+    sop_version_id TEXT,
+    task_order INTEGER NOT NULL DEFAULT 1,
+    dependency_task_ids JSON NOT NULL,
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    risk_level TEXT NOT NULL DEFAULT 'LOW',
+    evidence_receipt_id TEXT,
+    started_at REAL,
+    completed_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (mission_id) REFERENCES corporate_missions(mission_id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE RESTRICT,
+    FOREIGN KEY (parent_task_id) REFERENCES employee_tasks(task_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_task_mission ON employee_tasks(mission_id, status);
+
+-- 24. Cross-Department Collaborations (Formal Multi-Department SLAs)
+CREATE TABLE IF NOT EXISTS cross_department_collaborations (
+    collab_id TEXT PRIMARY KEY,
+    mission_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    initiator_dept_id TEXT NOT NULL,
+    target_dept_id TEXT NOT NULL,
+    deliverable_description TEXT NOT NULL,
+    sla_turnaround_hours REAL NOT NULL DEFAULT 24.0,
+    shared_budget_usd REAL NOT NULL DEFAULT 0.0,
+    escalation_owner_role TEXT NOT NULL DEFAULT 'EXEC_COO',
+    status TEXT NOT NULL DEFAULT 'REQUESTED',
+    accepted_at REAL,
+    fulfilled_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (mission_id) REFERENCES corporate_missions(mission_id) ON DELETE CASCADE,
+    FOREIGN KEY (initiator_dept_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT,
+    FOREIGN KEY (target_dept_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT
+);
+
+-- 25. Corporate Knowledge Assets (6-Tier Data Vault)
+CREATE TABLE IF NOT EXISTS corporate_knowledge_assets (
+    asset_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT,
+    title TEXT NOT NULL,
+    classification_level TEXT NOT NULL DEFAULT 'INTERNAL',
+    dlp_inspection_status TEXT NOT NULL DEFAULT 'CLEAN',
+    allowed_roles JSON NOT NULL,
+    content_hash TEXT NOT NULL,
+    storage_uri TEXT NOT NULL,
+    is_customer_safe INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asset_class ON corporate_knowledge_assets(tenant_id, classification_level);
 """
 
 class DatabaseDialect:
@@ -3767,6 +4300,31 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "async_command_queue": ("command_id",),
     "crm_customers": ("customer_id",),
     "crm_deals": ("deal_id",),
+    "organizations": ("org_id",),
+    "corporate_departments": ("department_id",),
+    "corporate_positions": ("position_id",),
+    "corporate_employees": ("employee_id",),
+    "employee_reporting_relationships": ("relationship_id",),
+    "employee_authority_profiles": ("profile_id",),
+    "employee_knowledge_profiles": ("profile_id",),
+    "sop_definitions": ("sop_id",),
+    "sop_versions": ("version_id",),
+    "employee_sop_assignments": ("assignment_id",),
+    "employee_kras": ("kra_id",),
+    "kpi_definitions": ("kpi_id",),
+    "kpi_measurements": ("measurement_id",),
+    "employee_performance_reviews": ("review_id",),
+    "workforce_requisitions": ("requisition_id",),
+    "agent_capabilities": ("capability_id",),
+    "agent_templates": ("template_id",),
+    "agent_template_versions": ("version_id",),
+    "agent_instances": ("instance_id",),
+    "agent_leases": ("lease_id",),
+    "agent_execution_sessions": ("session_id",),
+    "corporate_missions": ("mission_id",),
+    "employee_tasks": ("task_id",),
+    "cross_department_collaborations": ("collab_id",),
+    "corporate_knowledge_assets": ("asset_id",),
 }
 
 
@@ -4588,10 +5146,7 @@ class Database:
 
     def _init_db(self):
         if self.dialect == DatabaseDialect.SQLITE:
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-            protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
-            if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
-                return
+            pass
         elif self.dialect == DatabaseDialect.POSTGRESQL and not self._is_ready:
             self.verify_readiness()
         with self.get_connection() as conn:

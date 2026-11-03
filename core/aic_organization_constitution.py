@@ -586,7 +586,249 @@ class ExecutiveRoleRegistry:
                 escalation_conditions=["Material unmitigated risk > $100k", "Regulatory sanction threat"],
                 replacement_failover_role="GENERAL_COUNSEL_OR_CEO",
                 combinable_with=["EXEC_CLO"]
-            )
+            ),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CDO",
+    role_name="Chief Data & Digital Officer (CDO)",
+    purpose="Enterprise data governance, analytical data warehouse modeling, and single source of analytical truth.",
+    when_required="Data-heavy enterprises, analytics SaaS, and business intelligence operations.",
+    when_optional="Early startups with simple single-database models.",
+    authority_scope="Enterprise data warehouse, analytical pipeline schemas, data lineage, BI reporting.",
+    responsibilities=["Data warehouse governance", "BI dashboard accuracy", "Master data management"],
+    kra=["Data Quality & Integrity", "Analytics Query Latency", "Data Warehouse Completeness"],
+    kpi=["Data Freshness SLA %", "Pipeline Error Rate %", "Data Governance Coverage %"],
+    sop_ids=["SOP-DATA-01-PipelineReconciliation", "SOP-DATA-02-SchemaMigrationReview"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Data Engineering", "Business Intelligence", "Data Governance"],
+    decision_rights=["Master Data Schema Approvals", "Warehouse Model Signoff"],
+    budget_authority_usd=40000.0,
+    risk_authority="MEDIUM",
+    required_data=["DATA_WAREHOUSE", "SCHEMA_REGISTRY", "ETL_LOGS"],
+    required_tools=["PostgresDatabaseEngine", "NeonAnalytics", "DbtPipelineEngine"],
+    escalation_conditions=["Critical analytical divergence > 10%", "ETL pipeline failure > 4h"],
+    replacement_failover_role="HEAD_OF_DATA_OR_CTO",
+    combinable_with=["EXEC_CIO", "EXEC_CAIO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CAIO",
+    role_name="Chief Artificial Intelligence Officer (CAIO)",
+    purpose="AI alignment, token budgeting, prompt safety, model routing, and agent workforce evaluation.",
+    when_required="Autonomous AI workforce enterprises, multi-agent deployments, and AI-first startups.",
+    when_optional="Companies with zero AI adoption.",
+    authority_scope="AI models, agent evaluation benchmarks, token budgets, prompt injection defenses.",
+    responsibilities=["Agent model benchmark evaluation", "Token spend monitoring", "Prompt injection containment"],
+    kra=["Agent Alignment & Safety", "Token Cost Efficiency", "Model Inference Quality"],
+    kpi=["Agent Hallucination Rate %", "Token Budget Variance %", "Evaluation Benchmark Score %"],
+    sop_ids=["SOP-AI-01-ModelEvaluation", "SOP-AI-02-TokenBudgetQuarantine"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["AI Alignment", "Agent Engineering", "Model Optimization"],
+    decision_rights=["Agent Quota Enforcement", "Model Routing Policy Veto"],
+    budget_authority_usd=60000.0,
+    risk_authority="HIGH",
+    required_data=["AGENT_EVAL_RUNS", "TOKEN_USAGE_LEDGER", "PROMPT_LOGS"],
+    required_tools=["AgentFactoryV2", "EvaluationEngine", "NeonAIGateway"],
+    escalation_conditions=["Severe prompt injection breakout", "Token budget exhaustion"],
+    replacement_failover_role="AI_ARCHITECT_OR_CTO",
+    combinable_with=["EXEC_CTO", "EXEC_CDO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CCO_COMPLIANCE",
+    role_name="Chief Compliance Officer (CCO-Compliance)",
+    purpose="Statutory regulatory compliance (ISO 37301), ethics hotlines, and anti-fraud oversight.",
+    when_required="Regulated industries, public companies, and multi-jurisdictional commerce.",
+    when_optional="Unregulated micro businesses.",
+    authority_scope="Statutory regulatory compliance, whistleblower reports, anti-money laundering (AML).",
+    responsibilities=["Compliance audits", "Regulatory filings", "Anti-fraud monitoring"],
+    kra=["Statutory Compliance", "Regulatory Audit Pass Rate", "Zero Sanction Penalties"],
+    kpi=["Compliance Audit Score %", "Overdue Regulatory Action Items", "Zero Statutory Breaches"],
+    sop_ids=["SOP-COMP-01-RegulatoryAudit", "SOP-COMP-02-WhistleblowerInvestigation"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Regulatory Compliance", "Ethics & Anti-Fraud", "Internal Audit"],
+    decision_rights=["Regulatory Filing Approval", "Fraud Quarantine Veto"],
+    budget_authority_usd=45000.0,
+    risk_authority="CRITICAL",
+    required_data=["STATUTORY_REGISTERS", "AUDIT_RECEIPTS", "FRAUD_ALERTS"],
+    required_tools=["AuditVerificationEngine", "EvidenceLedger", "RegulatoryMonitor"],
+    escalation_conditions=["Regulatory subpoena received", "Material fraud detected"],
+    replacement_failover_role="LEGAL_COUNSEL_OR_CEO",
+    combinable_with=["EXEC_CLO", "EXEC_CRO_RISK"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CSO_SUSTAINABILITY",
+    role_name="Chief Sustainability Officer (CSO-Sustainability)",
+    purpose="ESG compliance, carbon accounting, environmental impact, and energy efficiency.",
+    when_required="Enterprise, energy-intensive industrial, and public disclosure organizations.",
+    when_optional="Early startups.",
+    authority_scope="ESG disclosures, carbon offsets, energy efficiency guidelines.",
+    responsibilities=["Carbon footprint accounting", "ESG regulatory reporting", "Green supplier auditing"],
+    kra=["ESG Audit Compliance", "Energy Efficiency Optimization", "Carbon Offset Fulfillment"],
+    kpi=["Carbon Emissions Intensity", "ESG Disclosure Score %", "Renewable Energy Ratio %"],
+    sop_ids=["SOP-ESG-01-CarbonAudit", "SOP-ESG-02-SustainableProcurement"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Sustainability", "ESG Reporting", "Energy Operations"],
+    decision_rights=["ESG Report Approval", "Green Supplier Certification"],
+    budget_authority_usd=30000.0,
+    risk_authority="LOW",
+    required_data=["UTILITY_FEEDS", "SUPPLIER_ESG_REPORTS", "EMISSION_LEDGERS"],
+    required_tools=["ESGAnalyticsAPI", "EvidenceLedger"],
+    escalation_conditions=["Material ESG reporting misstatement", "Environmental sanction"],
+    replacement_failover_role="HEAD_OF_FACILITIES_OR_COO",
+    combinable_with=["EXEC_CAO", "EXEC_CSCO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CQO",
+    role_name="Chief Quality Officer (CQO)",
+    purpose="Six Sigma quality control, defect triage, ISO 9001 compliance, and process quality engineering.",
+    when_required="Manufacturing, pharma, industrial hardware, and mission-critical engineering.",
+    when_optional="Pure software development.",
+    authority_scope="Quality control standards, shipment stop-work authority, defect tracking.",
+    responsibilities=["Quality management system (ISO 9001)", "Defect analysis", "Supplier quality audits"],
+    kra=["Defect Rate Minimization", "ISO 9001 Audit Pass Rate", "First Pass Yield"],
+    kpi=["Defect Parts Per Million (PPM)", "Customer Return Rate %", "First Pass Yield %"],
+    sop_ids=["SOP-QA-01-StopWorkOrder", "SOP-QA-02-RootCauseAnalysis"],
+    reporting_line="EXEC_COO",
+    subordinate_functions=["Quality Assurance", "Metrology", "Process Engineering"],
+    decision_rights=["Stop-Shipment Authority", "Quality Rejection Veto"],
+    budget_authority_usd=40000.0,
+    risk_authority="HIGH",
+    required_data=["INSPECTION_LOGS", "DEFECT_TRACKER", "CALIBRATION_RECORDS"],
+    required_tools=["QualityTracker", "EvidenceLedger"],
+    escalation_conditions=["Batch defect rate > 2%", "Regulatory recall trigger"],
+    replacement_failover_role="HEAD_OF_QA_OR_COO",
+    combinable_with=["EXEC_COO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CGO",
+    role_name="Chief Growth Officer (CGO)",
+    purpose="Growth loops, viral acquisition, funnel conversion optimization, and product-led growth (PLG).",
+    when_required="High-velocity consumer tech, PLG SaaS, and e-commerce scaleups.",
+    when_optional="Slow-cycle enterprise contracts.",
+    authority_scope="Conversion rate experiments, onboarding loops, referral systems.",
+    responsibilities=["Viral loop optimization", "Growth experimentation backlog", "Activation rate audits"],
+    kra=["User Activation Velocity", "Conversion Rate (CRO)", "Referral Factor"],
+    kpi=["Free-to-Paid Conversion %", "30-Day Cohort Retention %", "Viral K-Factor"],
+    sop_ids=["SOP-GRO-01-A_B_TestDeployment", "SOP-GRO-02-FunnelAudit"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Growth Engineering", "Conversion Optimization", "Lifecycle Marketing"],
+    decision_rights=["Experiment Rollout Approval", "Growth Incentive Budgets"],
+    budget_authority_usd=45000.0,
+    risk_authority="LOW",
+    required_data=["PRODUCT_ANALYTICS", "CONVERSION_FUNNELS", "ATTRIBUTION_DATA"],
+    required_tools=["PostHogConnector", "MixpanelAPI", "AdCampaignManager"],
+    escalation_conditions=["Core funnel conversion drop > 25%", "Churn spike > 10%"],
+    replacement_failover_role="GROWTH_LEAD_OR_CMO",
+    combinable_with=["EXEC_CMO", "EXEC_CRO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CPCO",
+    role_name="Chief Privacy Officer (CPCO)",
+    purpose="GDPR, CCPA, HIPAA data privacy compliance, consent graphs, and data minimization.",
+    when_required="Consumer apps, healthcare, European/California users, and sensitive data processing.",
+    when_optional="Internal B2B tools with zero personal data.",
+    authority_scope="Data privacy policies, DSAR automation, consent audits, third-party vendor privacy.",
+    responsibilities=["GDPR/CCPA statutory compliance", "DSAR fulfillment within SLA", "Privacy impact assessments"],
+    kra=["Zero Privacy Breaches", "DSAR Turnaround SLA", "Consent Graph Accuracy"],
+    kpi=["DSAR Average Resolution Hours", "Privacy Assessment Coverage %", "Zero Privacy Injunctions"],
+    sop_ids=["SOP-PRIV-01-DSARProcessing", "SOP-PRIV-02-PrivacyImpactAssessment"],
+    reporting_line="EXEC_CLO",
+    subordinate_functions=["Data Privacy Office", "Consent Operations", "Vendor Privacy Review"],
+    decision_rights=["Data Processing Veto", "DSAR Approval"],
+    budget_authority_usd=35000.0,
+    risk_authority="HIGH",
+    required_data=["CONSENT_REGISTRY", "DSAR_QUEUE", "VENDOR_DPA_ARCHIVE"],
+    required_tools=["PrivacyEngine", "EvidenceLedger", "DlpEngine"],
+    escalation_conditions=["Unauthorized PII disclosure", "Regulatory privacy inquiry"],
+    replacement_failover_role="PRIVACY_COUNSEL_OR_CISO",
+    combinable_with=["EXEC_CLO", "EXEC_CISO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CBO",
+    role_name="Chief Business Officer (CBO)",
+    purpose="Strategic joint ventures, channel alliances, OEM licensing, and cross-enterprise partnerships.",
+    when_required="High partnership volume, distribution ecosystems, and enterprise channel ecosystems.",
+    when_optional="Direct self-serve products.",
+    authority_scope="Partner contracts, channel revenue share agreements, ecosystem distribution.",
+    responsibilities=["Strategic channel alliances", "Joint venture structuring", "Partner revenue governance"],
+    kra=["Partner Channel Revenue", "Ecosystem Expansion", "Alliance Retention"],
+    kpi=["Channel ARR USD", "Active Certified Partners", "Partner Net Retention %"],
+    sop_ids=["SOP-BUS-01-PartnerOnboarding", "SOP-BUS-02-RevenueShareAudit"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Strategic Alliances", "Channel Operations", "OEM Licensing"],
+    decision_rights=["Channel Agreement Terms", "Co-Marketing Budgets"],
+    budget_authority_usd=50000.0,
+    risk_authority="MEDIUM",
+    required_data=["PARTNER_PORTAL", "CHANNEL_PIPELINE", "REVENUE_SHARE_LEDGERS"],
+    required_tools=["SalesforceConnector", "HubSpotConnector"],
+    escalation_conditions=["Key alliance termination", "Partner revenue breach > 30%"],
+    replacement_failover_role="VP_BUSDEV_OR_CRO",
+    combinable_with=["EXEC_CRO", "EXEC_CSO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CAO",
+    role_name="Chief Administrative Officer (CAO)",
+    purpose="Corporate governance administration, multi-office facilities, corporate records, and internal policies.",
+    when_required="Holding companies, multi-entity conglomerates, and large corporate campuses.",
+    when_optional="Single-entity digital startups.",
+    authority_scope="Corporate records, facilities leases, board minutes, administrative operating policies.",
+    responsibilities=["Corporate records governance", "Real estate facility administration", "Internal board administration"],
+    kra=["Administrative Operational Continuity", "Corporate Record Hygiene", "Facility Uptime"],
+    kpi=["Administrative SLA Fulfillment %", "Audit Record Completeness %", "Facility Operational Index"],
+    sop_ids=["SOP-ADM-01-BoardRecordFiling", "SOP-ADM-02-FacilityLeaseReview"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Corporate Administration", "Facilities Management", "Board Relations"],
+    decision_rights=["Facility Lease Authorizations", "Administrative Policy Signoff"],
+    budget_authority_usd=40000.0,
+    risk_authority="LOW",
+    required_data=["CORPORATE_RECORDS", "FACILITY_MANAGEMENT_DB", "LEASE_CONTRACTS"],
+    required_tools=["DocumentValidator", "EvidenceLedger"],
+    escalation_conditions=["Facility shutdown", "Board governance failure"],
+    replacement_failover_role="OPERATIONS_MANAGER_OR_COO",
+    combinable_with=["EXEC_COO", "EXEC_CHRO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CSE",
+    role_name="Chief Safety & Environmental Officer (CSE)",
+    purpose="OSHA workplace physical safety, zero-hazard compliance, and chemical/environmental hazard control.",
+    when_required="Heavy industry, chemical plants, manufacturing, construction, and freight logistics.",
+    when_optional="Remote digital software companies.",
+    authority_scope="Physical workplace safety, OSHA compliance, hazardous material management.",
+    responsibilities=["Workplace hazard assessments", "OSHA recordkeeping", "Emergency containment protocols"],
+    kra=["Zero Lost-Time Incidents", "OSHA Audit Compliance", "Safety Training Completion"],
+    kpi=["Total Recordable Incident Rate (TRIR)", "Near-Miss Reporting Volume", "Safety Audit Score %"],
+    sop_ids=["SOP-SAFE-01-WorkplaceIncidentResponse", "SOP-SAFE-02-HazardAssessment"],
+    reporting_line="EXEC_COO",
+    subordinate_functions=["Environmental Health & Safety (EHS)", "Physical Security", "Hazardous Material Operations"],
+    decision_rights=["Immediate Safety Stop-Work Order", "Facility Evacuation"],
+    budget_authority_usd=40000.0,
+    risk_authority="CRITICAL",
+    required_data=["EHS_INCIDENT_LOGS", "OSHA_300_LOGS", "SAFETY_INSPECTION_FEED"],
+    required_tools=["EvidenceLedger", "SafetyTracker"],
+    escalation_conditions=["Workplace injury incident", "Environmental spill threshold breach"],
+    replacement_failover_role="EHS_DIRECTOR_OR_COO",
+    combinable_with=["EXEC_COO", "EXEC_CQO"]
+),
+ExecutiveRoleDefinition(
+    role_id="EXEC_CMO_MEDICAL",
+    role_name="Chief Medical Officer (CMO-Medical)",
+    purpose="Clinical governance, clinical trial ethics, patient medical safety, and HIPAA healthcare compliance.",
+    when_required="Hospitals, healthcare clinics, biotech, pharmaceutical, and healthtech platforms.",
+    when_optional="Non-healthcare companies.",
+    authority_scope="Clinical protocols, medical review boards, patient safety standards, clinical trials.",
+    responsibilities=["Clinical governance framework", "Physician protocol oversight", "Medical trial safety audits"],
+    kra=["Clinical Quality & Safety", "Zero Medical Protocol Deviations", "Clinical Compliance"],
+    kpi=["Patient Safety Index", "Clinical Protocol Adherence %", "Zero Malpractice Findings"],
+    sop_ids=["SOP-MED-01-ClinicalProtocolReview", "SOP-MED-02-AdverseEventReporting"],
+    reporting_line="EXEC_CEO",
+    subordinate_functions=["Clinical Affairs", "Medical Review Board", "Patient Safety"],
+    decision_rights=["Clinical Protocol Approval", "Medical Treatment Review Veto"],
+    budget_authority_usd=70000.0,
+    risk_authority="CRITICAL",
+    required_data=["ELECTRONIC_HEALTH_RECORDS", "CLINICAL_TRIAL_DATA", "ADVERSE_EVENT_LOGS"],
+    required_tools=["ClinicalVerificationEngine", "EvidenceLedger"],
+    escalation_conditions=["Adverse patient event", "Clinical trial regulatory halt"],
+    replacement_failover_role="MEDICAL_DIRECTOR_OR_CEO",
+    combinable_with=[]
+)
         ]
 
         for r in roles_data:
@@ -663,7 +905,7 @@ class OrganizationGapAnalyzer:
         if scale in [CompanyScaleStage.SMALL_COMPANY, CompanyScaleStage.GROWING_COMPANY, CompanyScaleStage.MIDSIZE_COMPANY, CompanyScaleStage.ENTERPRISE]:
             required_execs.extend(["EXEC_CFO", "EXEC_COO"])
         
-        if "SAAS" in ind or "TECH" in ind:
+        if ("SAAS" in ind or "TECH" in ind) and "FINTECH" not in ind and "BIOTECH" not in ind:
             required_execs.extend(["EXEC_CTO", "EXEC_CRO"])
             if scale in [CompanyScaleStage.GROWING_COMPANY, CompanyScaleStage.MIDSIZE_COMPANY, CompanyScaleStage.ENTERPRISE]:
                 required_execs.append("EXEC_CPO")
@@ -890,7 +1132,7 @@ class DynamicOrganizationDesignEngine:
             "purpose": "Operational service delivery, quality, and SLA tracking."
         })
 
-        if "SAAS" in ind or "TECH" in ind:
+        if ("SAAS" in ind or "TECH" in ind) and "FINTECH" not in ind and "BIOTECH" not in ind:
             exec_list.append({
                 "role_id": "EXEC_CTO",
                 "role_name": "Chief Technology Officer (CTO)",
@@ -985,26 +1227,119 @@ class DynamicOrganizationDesignEngine:
                 "reporting_to": "EXEC_CEO",
                 "purpose": "Automation systems, CNC telemetry, and predictive maintenance."
             })
-        elif "HEALTHCARE" in ind:
+        elif "HEALTHCARE" in ind or "BIOTECH" in ind or "CLINICAL" in ind or "PHARMA" in ind:
+            exec_list.append({
+                "role_id": "EXEC_CMO_MEDICAL",
+                "role_name": "Chief Medical Officer (CMO-Medical)",
+                "persona_name": "Clinical Governance & Medical Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 70000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "Clinical trial protocols, clinical governance, and patient safety."
+            })
             exec_list.append({
                 "role_id": "EXEC_CRO_RISK",
                 "role_name": "Chief Risk & Compliance Officer",
-                "persona_name": "Clinical Governance Chief",
+                "persona_name": "Healthcare Risk Chief",
                 "requirement_status": RoleRequirementStatus.REQUIRED.value,
                 "workforce_type": WorkforceType.AI_AGENT.value,
                 "budget_limit_usd": 65000.0,
                 "reporting_to": "EXEC_CEO",
-                "purpose": "Statutory healthcare compliance, patient privacy, and clinical risk."
+                "purpose": "Statutory healthcare compliance, clinical risk, and regulatory audits."
             })
             exec_list.append({
-                "role_id": "EXEC_CCO_CUSTOMER",
-                "role_name": "Chief Patient Experience Officer",
-                "persona_name": "Patient Experience Chief",
+                "role_id": "EXEC_CPCO",
+                "role_name": "Chief Privacy Officer (CPCO)",
+                "persona_name": "Data Privacy Chief",
                 "requirement_status": RoleRequirementStatus.REQUIRED.value,
                 "workforce_type": WorkforceType.AI_AGENT.value,
-                "budget_limit_usd": 40000.0,
+                "budget_limit_usd": 50000.0,
                 "reporting_to": "EXEC_CEO",
-                "purpose": "Patient satisfaction, care coordination, and feedback audits."
+                "purpose": "HIPAA compliance, patient data privacy, and consent management."
+            })
+        elif "FINTECH" in ind or "FINANCIAL" in ind or "BANKING" in ind:
+            exec_list.append({
+                "role_id": "EXEC_CRO_RISK",
+                "role_name": "Chief Risk Officer (CRO-Risk)",
+                "persona_name": "Financial Risk & Capital Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 75000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "Capital adequacy, credit risk, market volatility, and liquidity modeling."
+            })
+            exec_list.append({
+                "role_id": "EXEC_CISO",
+                "role_name": "Chief Information Security Officer (CISO)",
+                "persona_name": "Cyber Defense Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 70000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "SOC2, PCI-DSS, zero-trust infrastructure, and anti-tamper controls."
+            })
+            exec_list.append({
+                "role_id": "EXEC_CCO_COMPLIANCE",
+                "role_name": "Chief Compliance Officer (CCO-Compliance)",
+                "persona_name": "Regulatory & AML Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 65000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "FinCEN, SEC, KYC/AML, and statutory regulatory filings."
+            })
+        elif "RETAIL" in ind or "ECOMMERCE" in ind:
+            exec_list.append({
+                "role_id": "EXEC_CMO",
+                "role_name": "Chief Marketing Officer (CMO)",
+                "persona_name": "Brand & Acquisition Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 60000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "Omnichannel customer acquisition, performance ad spend, and brand equity."
+            })
+            exec_list.append({
+                "role_id": "EXEC_CSCO",
+                "role_name": "Chief Supply Chain Officer (CSCO)",
+                "persona_name": "Fulfillment & SCM Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 55000.0,
+                "reporting_to": "EXEC_COO",
+                "purpose": "Warehousing, inventory replenishment, and 3PL shipping logistics."
+            })
+            exec_list.append({
+                "role_id": "EXEC_CGO",
+                "role_name": "Chief Growth Officer (CGO)",
+                "persona_name": "Commerce Growth Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 50000.0,
+                "reporting_to": "EXEC_CEO",
+                "purpose": "Conversion rate optimization, referral loops, and marketplace expansion."
+            })
+        elif "LOGISTICS" in ind or "FREIGHT" in ind or "SUPPLY_CHAIN" in ind:
+            exec_list.append({
+                "role_id": "EXEC_CSCO",
+                "role_name": "Chief Supply Chain Officer (CSCO)",
+                "persona_name": "Freight & Logistics Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 80000.0,
+                "reporting_to": "EXEC_COO",
+                "purpose": "Carrier network, freight dispatch, route optimization, and cross-docking."
+            })
+            exec_list.append({
+                "role_id": "EXEC_CSE",
+                "role_name": "Chief Safety & Environmental Officer (CSE)",
+                "persona_name": "Fleet Safety & OSHA Chief",
+                "requirement_status": RoleRequirementStatus.REQUIRED.value,
+                "workforce_type": WorkforceType.AI_AGENT.value,
+                "budget_limit_usd": 50000.0,
+                "reporting_to": "EXEC_COO",
+                "purpose": "Fleet safety compliance, DOT regulations, and driver incident prevention."
             })
         elif "TRAVEL" in ind or "TOURISM" in ind:
             exec_list.append({
@@ -1069,7 +1404,7 @@ class DynamicOrganizationDesignEngine:
                 {"dept_id": "dept_finance", "name": "Finance & Accounting", "lead_role": "EXEC_CFO", "purpose": "Hotel night audit, vendor payouts, and guest billing."},
                 {"dept_id": "dept_maintenance", "name": "Engineering & Facilities", "lead_role": "EXEC_COO", "purpose": "HVAC, physical security, asset maintenance, and utilities."}
             ]
-        elif "SAAS" in ind or "TECH" in ind:
+        elif ("SAAS" in ind or "TECH" in ind) and "FINTECH" not in ind and "BIOTECH" not in ind:
             depts = [
                 {"dept_id": "dept_eng", "name": "Software Engineering", "lead_role": "EXEC_CTO", "purpose": "Core platform code, APIs, database architecture, and release cycles."},
                 {"dept_id": "dept_prod", "name": "Product & Design", "lead_role": "EXEC_CPO" if any(e["role_id"]=="EXEC_CPO" for e in executives) else "EXEC_CTO", "purpose": "Roadmap prioritization, UX/UI, and feature specification."},
@@ -1084,12 +1419,37 @@ class DynamicOrganizationDesignEngine:
                 {"dept_id": "dept_scm", "name": "Procurement & Supply Chain", "lead_role": "EXEC_CSCO", "purpose": "Raw material procurement, supplier audits, and shipping logistics."},
                 {"dept_id": "dept_fin", "name": "Cost Accounting & Finance", "lead_role": "EXEC_CFO", "purpose": "COGS optimization, asset depreciation, and bill of materials (BOM)."}
             ]
-        elif "HEALTHCARE" in ind:
+        elif "HEALTHCARE" in ind or "BIOTECH" in ind or "CLINICAL" in ind or "PHARMA" in ind:
             depts = [
-                {"dept_id": "dept_clinical", "name": "Clinical Operations", "lead_role": "EXEC_COO", "purpose": "Patient care delivery, clinical scheduling, and service execution."},
-                {"dept_id": "dept_compliance", "name": "Regulatory & Risk Compliance", "lead_role": "EXEC_CRO_RISK", "purpose": "HIPAA compliance, medical licensing, and patient safety audits."},
-                {"dept_id": "dept_patient_exp", "name": "Patient Relations & Care Coordination", "lead_role": "EXEC_CCO_CUSTOMER", "purpose": "Patient intake, follow-ups, and satisfaction metrics."},
+                {"dept_id": "dept_clinical", "name": "Clinical Affairs & Patient Care", "lead_role": "EXEC_CMO_MEDICAL", "purpose": "Patient care delivery, clinical scheduling, and clinical trial oversight."},
+                {"dept_id": "dept_compliance", "name": "Regulatory & Medical Compliance", "lead_role": "EXEC_CRO_RISK", "purpose": "HIPAA compliance, FDA/EMA filing protocols, and patient safety audits."},
+                {"dept_id": "dept_privacy", "name": "Data Privacy & Patient Records", "lead_role": "EXEC_CPCO", "purpose": "EHR privacy governance, patient consent records, and access security."},
+                {"dept_id": "dept_lab", "name": "Research & Lab Operations", "lead_role": "EXEC_COO", "purpose": "Laboratory workflows, assay validation, and specimen logistics."},
                 {"dept_id": "dept_fin", "name": "Medical Billing & Finance", "lead_role": "EXEC_CFO", "purpose": "Insurance claims, patient invoicing, and provider payouts."}
+            ]
+        elif "FINTECH" in ind or "FINANCIAL" in ind or "BANKING" in ind:
+            depts = [
+                {"dept_id": "dept_treasury", "name": "Treasury & Capital Markets", "lead_role": "EXEC_CFO", "purpose": "Capital adequacy, liquidity buffers, and yield optimization."},
+                {"dept_id": "dept_risk", "name": "Risk Management & Solvency", "lead_role": "EXEC_CRO_RISK", "purpose": "Credit risk evaluation, market volatility stress testing, and counterparty exposure."},
+                {"dept_id": "dept_compliance", "name": "Regulatory Compliance & AML", "lead_role": "EXEC_CCO_COMPLIANCE", "purpose": "FinCEN/SEC statutory audits, KYC/AML surveillance, and anti-fraud filters."},
+                {"dept_id": "dept_secops", "name": "SecOps & Financial Engineering", "lead_role": "EXEC_CISO", "purpose": "PCI-DSS certified infrastructure, transactional cryptography, and pen-testing."},
+                {"dept_id": "dept_audit", "name": "Internal Audit & Controls", "lead_role": "EXEC_CFO", "purpose": "Ledger reconciliation, dual-signoff enforcement, and external auditor defense."}
+            ]
+        elif "RETAIL" in ind or "ECOMMERCE" in ind:
+            depts = [
+                {"dept_id": "dept_store", "name": "E-Commerce & Digital Storefront", "lead_role": "EXEC_COO", "purpose": "Online catalog, checkout funnel, payment gateway, and cart conversion."},
+                {"dept_id": "dept_fulfillment", "name": "Fulfillment & Warehousing", "lead_role": "EXEC_CSCO", "purpose": "Pick-pack-ship SLAs, warehouse stock turns, and carrier tracking."},
+                {"dept_id": "dept_merch", "name": "Merchandising & SCM", "lead_role": "EXEC_CSCO", "purpose": "SKU catalog management, supplier replenishment, and margin optimization."},
+                {"dept_id": "dept_mkt", "name": "Performance Marketing & Acquisition", "lead_role": "EXEC_CMO", "purpose": "ROAS ad spend, influencer campaigns, SEO cataloging, and promotions."},
+                {"dept_id": "dept_support", "name": "Customer Support & Returns", "lead_role": "EXEC_COO", "purpose": "RMA returns, ticket SLAs, live chat assistance, and CSAT."}
+            ]
+        elif "LOGISTICS" in ind or "FREIGHT" in ind or "SUPPLY_CHAIN" in ind:
+            depts = [
+                {"dept_id": "dept_freight", "name": "Fleet & Freight Logistics", "lead_role": "EXEC_CSCO", "purpose": "Intermodal freight routing, load balancing, and carrier contract execution."},
+                {"dept_id": "dept_dispatch", "name": "Dispatch & Route Operations", "lead_role": "EXEC_COO", "purpose": "Real-time fleet tracking, dynamic dispatch, and on-time delivery (OTD)."},
+                {"dept_id": "dept_procurement", "name": "Procurement & Carrier Network", "lead_role": "EXEC_CSCO", "purpose": "Fuel hedging, spot rate bidding, and third-party logistics agreements."},
+                {"dept_id": "dept_safety", "name": "Safety & Fleet Maintenance", "lead_role": "EXEC_CSE", "purpose": "DOT inspections, driver hours-of-service, and preventative vehicle upkeep."},
+                {"dept_id": "dept_fin", "name": "Logistics Finance & Billing", "lead_role": "EXEC_CFO", "purpose": "Freight bill auditing, accessorial billing, and working capital DSO."}
             ]
         elif "TRAVEL" in ind or "TOURISM" in ind:
             depts = [

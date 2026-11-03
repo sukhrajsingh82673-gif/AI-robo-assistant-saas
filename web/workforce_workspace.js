@@ -42,13 +42,28 @@
     async loadWorkforce(companyId) {
       this.loading = true;
       try {
-        const [resWf, resSq] = await Promise.all([
+        const [resWf, resSq, resV8] = await Promise.all([
           fetch(`/api/companies/${companyId}/workforce`),
-          fetch(`/api/workforces?company_id=${companyId}`)
+          fetch(`/api/workforces?company_id=${companyId}`),
+          fetch(`/api/v8/workforce/employees?company_id=${companyId}`)
         ]);
         if (resWf.ok) {
           const data = await resWf.json();
           this.workforce = Array.isArray(data.workforce) ? data.workforce : [];
+        }
+        if (resV8 && resV8.ok) {
+          const v8Data = await resV8.json();
+          if (Array.isArray(v8Data.employees) && v8Data.employees.length > 0) {
+            const v8Mapped = v8Data.employees.map(e => ({
+              id: e.employee_id,
+              name: `${e.first_name} ${e.last_name}`,
+              role: e.position_id,
+              department: e.department_id,
+              status: e.lifecycle_state,
+              triad_type: e.identity_type || 'AI_EMPLOYEE'
+            }));
+            this.workforce = [...this.workforce, ...v8Mapped];
+          }
         }
         if (resSq.ok) {
           const sqData = await resSq.json();

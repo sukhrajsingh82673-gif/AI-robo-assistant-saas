@@ -625,6 +625,55 @@ class V8ApiHandler:
 
         elif path == "/api/v8/gemma/missions":
             msns = ceo.conversation_engine.mission_manager.list_missions()
+            return {"success": True, "missions": [m.to_dict() for m in msns]}, 200
+
+        # Enterprise AI Corporate Workforce GET Endpoints
+        elif path == "/api/v8/organization/roles":
+            from core.aic_organization_constitution import ExecutiveRoleRegistry
+            from dataclasses import asdict
+            roles = ExecutiveRoleRegistry.list_roles()
+            return {"success": True, "count": len(roles), "roles": [asdict(r) for r in roles]}, 200
+
+        elif path == "/api/v8/organization/departments":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_departments WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "departments": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/organization/positions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_positions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "positions": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/employees":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_employees WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "employees": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/requisitions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM workforce_requisitions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "requisitions": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/reviews":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM employee_performance_reviews WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "reviews": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/sop/definitions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM sop_definitions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "sops": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/agent-factory/capabilities":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM agent_capabilities WHERE tenant_id = ? AND is_active = 1", (tenant_id,)).fetchall()
+            return {"success": True, "capabilities": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/missions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_missions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "missions": [dict(r) for r in rows]}, 200
+
         return None
 
     @classmethod
@@ -1477,5 +1526,67 @@ class V8ApiHandler:
             goal = body.get("goal", "Optimize revenue and operations")
             tick = ceo.conversation_engine.supervision_loop.advance_stage(owner_goal=goal)
             return {"success": True, "tick": tick.to_dict()}, 200
+
+        # Enterprise AI Corporate Workforce POST Endpoints
+        elif path == "/api/v8/kpi/anti-gaming/check":
+            from core.kpi_kra_engine import AntiGamingEngine
+            p_code = body.get("primary_code", "KPI_PRIMARY")
+            p_act = float(body.get("primary_actual", 100.0))
+            p_tgt = float(body.get("primary_target", 100.0))
+            c_code = body.get("counter_code", "KPI_COUNTER")
+            c_act = float(body.get("counter_actual", 100.0))
+            c_warn = float(body.get("counter_warning", 80.0))
+            weight = float(body.get("counter_weight", 0.5))
+
+            passed, score, reason = AntiGamingEngine.evaluate_pair(p_code, p_act, p_tgt, c_code, c_act, c_warn, weight)
+            return {"success": True, "anti_gaming_passed": passed, "anti_gaming_score": score, "reason": reason}, 200
+
+        elif path == "/api/v8/agent-factory/leases":
+            from core.agent_factory_v2 import AgentLeaseManager
+            action = body.get("action", "acquire")
+            if action == "acquire":
+                inst_id = body.get("instance_id")
+                emp_id = body.get("employee_id")
+                ttl = float(body.get("ttl_seconds", 300.0))
+                try:
+                    res = AgentLeaseManager.acquire_lease(tenant_id, company_id, inst_id, emp_id, ttl_seconds=ttl)
+                    return {"success": True, "lease": res}, 201
+                except Exception as exc:
+                    return {"success": False, "error": str(exc)}, 409
+            elif action == "release":
+                l_id = body.get("lease_id")
+                res = AgentLeaseManager.release_lease(l_id)
+                return {"success": True, "released": res}, 200
+            return {"error": f"Unknown lease action: {action}"}, 400
+
+        elif path == "/api/v8/security/dlp/inspect":
+            from core.dlp_engine import DataLossPreventionEngine, DLPViolationBlockedError
+            text = body.get("content", "")
+            dest = body.get("destination_classification", "CUSTOMER_SHAREABLE")
+            source = body.get("source_classification", "INTERNAL")
+            try:
+                res = DataLossPreventionEngine.inspect_and_filter(text, destination_classification=dest, source_classification=source)
+                return {"success": True, "dlp_result": res}, 200
+            except (DLPViolationBlockedError, PermissionError) as pe:
+                return {"success": False, "blocked": True, "error": str(pe)}, 403
+
+        elif path == "/api/v8/missions/collaborations":
+            now = time.time()
+            import uuid
+            collab_id = f"collab_{uuid.uuid4().hex[:10]}"
+            m_id = body.get("mission_id", f"msn_{uuid.uuid4().hex[:8]}")
+            init_dept = body.get("initiator_dept_id", "dept_ops")
+            tgt_dept = body.get("target_dept_id", "dept_fin")
+            deliv = body.get("deliverable", "Financial audit review")
+            with db.get_connection() as conn:
+                conn.execute("""
+                INSERT INTO cross_department_collaborations (
+                    collab_id, mission_id, tenant_id, company_id,
+                    initiator_dept_id, target_dept_id, deliverable_description,
+                    sla_turnaround_hours, shared_budget_usd, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 24.0, 0.0, 'REQUESTED', ?)
+                """, (collab_id, m_id, tenant_id, company_id, init_dept, tgt_dept, deliv, now))
+                conn.commit()
+            return {"success": True, "collab_id": collab_id, "status": "REQUESTED"}, 201
 
         return None

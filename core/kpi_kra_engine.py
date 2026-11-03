@@ -12,6 +12,7 @@ Constitutional Invariants:
 import time
 import json
 import uuid
+import hashlib
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field, asdict
@@ -317,3 +318,142 @@ class KPIKRAEngine:
         }
 
 kpi_kra_engine = KPIKRAEngine()
+
+@dataclass
+class SOPDefinition:
+    sop_id: str
+    tenant_id: str
+    company_id: str
+    department_id: str
+    sop_code: str
+    title: str
+    category: str
+    cadence: str = "EVENT_DRIVEN"
+    risk_level: str = "MEDIUM"
+    objective: str = ""
+    trigger_conditions: Dict[str, Any] = field(default_factory=dict)
+    is_active: bool = True
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+
+@dataclass
+class SOPVersion:
+    version_id: str
+    sop_id: str
+    tenant_id: str
+    version_semver: str  # e.g., '1.0.0'
+    status: str          # DRAFT, REVIEW, APPROVED, ACTIVE, SUPERSEDED, RETIRED
+    steps_definition: List[Dict[str, Any]]
+    input_schema: Dict[str, Any]
+    output_schema: Dict[str, Any]
+    anti_gaming_rules: Dict[str, Any]
+    required_authority_level: str = "DELEGATED"
+    evidence_requirements: List[str] = field(default_factory=list)
+    author_employee_id: str = ""
+    approved_by_role: Optional[str] = None
+    approved_at: Optional[float] = None
+    sha256_hash: str = ""
+    created_at: float = field(default_factory=time.time)
+
+    def calculate_hash(self) -> str:
+        payload = json.dumps({
+            "sop_id": self.sop_id,
+            "version_semver": self.version_semver,
+            "steps": self.steps_definition,
+            "inputs": self.input_schema,
+            "outputs": self.output_schema,
+            "rules": self.anti_gaming_rules
+        }, sort_keys=True)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+class AntiGamingEngine:
+    """
+    Evaluates primary performance metrics against paired adversarial counter-metrics.
+    Constitutional Invariant: No metric exists in isolation.
+    """
+    @classmethod
+    def evaluate_pair(
+        cls,
+        primary_code: str,
+        primary_actual: float,
+        primary_target: float,
+        counter_code: str,
+        counter_actual: float,
+        counter_warning: float,
+        weight: float = 0.5
+    ) -> Tuple[bool, float, str]:
+        """
+        Anti-Gaming Formula:
+        If primary metric exceeds target (>100%) but counter-metric breaches warning threshold,
+        a divergence penalty is applied.
+        Returns: (anti_gaming_passed, anti_gaming_score, audit_reason)
+        """
+        primary_ratio = primary_actual / primary_target if primary_target != 0 else 1.0
+        is_lower_better = any(term in counter_code.lower() for term in ["cac", "cost", "error", "churn", "defect"])
+
+        if is_lower_better:
+            counter_healthy = counter_actual <= counter_warning
+            gap = (counter_actual - counter_warning) / counter_warning if counter_warning != 0 else 0.5
+        else:
+            counter_healthy = counter_actual >= counter_warning
+            gap = (counter_warning - counter_actual) / counter_warning if counter_warning != 0 else 0.5
+
+        if primary_ratio > 1.0 and not counter_healthy:
+            penalty = round(min(100.0, abs(gap) * 100.0 * (1.0 + weight)), 2)
+            score = max(0.0, 100.0 - penalty)
+            reason = (
+                f"ANTI_GAMING_ALERT: Primary '{primary_code}' reached {primary_ratio*100:.1f}% "
+                f"while paired counter-metric '{counter_code}' collapsed to {counter_actual} "
+                f"(warning threshold: {counter_warning}). Penalty applied: -{penalty} pts."
+            )
+            return False, score, reason
+
+        return True, 100.0, "ANTI_GAMING_PASSED: Paired metrics in healthy alignment."
+
+    @classmethod
+    def compute_4_factor_review(
+        cls,
+        kpi_achievement_score: float,     # Factor 1 (40% Weight)
+        sop_compliance_score: float,      # Factor 2 (30% Weight)
+        anti_gaming_compliance_score: float, # Factor 3 (20% Weight)
+        collaboration_sla_score: float    # Factor 4 (10% Weight)
+    ) -> Tuple[float, str, Dict[str, Any]]:
+        """
+        ISO 37000 Explainable 4-Factor Performance Scoring:
+        Composite = 0.40 * S_KPI + 0.30 * S_SOP + 0.20 * S_AG + 0.10 * S_SLA
+        """
+        comp = (
+            0.40 * kpi_achievement_score +
+            0.30 * sop_compliance_score +
+            0.20 * anti_gaming_compliance_score +
+            0.10 * collaboration_sla_score
+        )
+        comp = round(comp, 2)
+
+        if comp >= 90.0:
+            rec = "PROMOTE"
+        elif comp >= 75.0:
+            rec = "RETAIN"
+        elif comp >= 60.0:
+            rec = "RETRAIN"
+        elif comp >= 40.0:
+            rec = "SUSPEND"
+        else:
+            rec = "TERMINATE"
+
+        proof = {
+            "formula": "0.40*S_KPI + 0.30*S_SOP + 0.20*S_AG + 0.10*S_SLA",
+            "weights": {"kpi": 0.40, "sop": 0.30, "anti_gaming": 0.20, "collaboration_sla": 0.10},
+            "scores": {
+                "S_KPI": kpi_achievement_score,
+                "S_SOP": sop_compliance_score,
+                "S_AG": anti_gaming_compliance_score,
+                "S_SLA": collaboration_sla_score
+            },
+            "composite": comp,
+            "recommendation": rec
+        }
+        return comp, rec, proof
+
+anti_gaming_engine = AntiGamingEngine()
+
