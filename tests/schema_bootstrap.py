@@ -45,6 +45,7 @@ AUXILIARY_SCHEMA_TARGETS = [
     ("core.enterprise_files", "files_engine", "_init_db"),
     ("core.enterprise_reports", "reports_engine", "_init_db"),
     ("core.enterprise_finance", "finance_engine", "_init_db"),
+    ("core.skill_arena", "SkillArena", "_init_db"),
     ("core.ai_employee_os", "ai_employee_registry", "_init_db"),
     ("core.employee_template", "employee_template_registry", "_init_db"),
     ("core.employee_health_manager", "employee_health_manager", "_init_db"),

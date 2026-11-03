@@ -416,6 +416,60 @@ CREATE TABLE IF NOT EXISTS executive_council_debates (
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
 
+-- 14b. Enterprise Skill Arena Decisions
+CREATE TABLE IF NOT EXISTS arena_decisions (
+    decision_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    requester_id TEXT NOT NULL,
+    requester_role TEXT NOT NULL,
+    question TEXT NOT NULL,
+    options_json TEXT NOT NULL,
+    judges_json TEXT NOT NULL,
+    scores_json TEXT NOT NULL,
+    winner_option_id TEXT,
+    winner_title TEXT,
+    consensus_outcome TEXT NOT NULL,
+    status TEXT NOT NULL,
+    agreement REAL NOT NULL DEFAULT 0.0,
+    confidence REAL NOT NULL DEFAULT 0.0,
+    risk_level TEXT NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
+    required_authority TEXT NOT NULL, -- EMPLOYEE, MANAGER, EXECUTIVE, OWNER
+    requester_authority TEXT NOT NULL,
+    authority_granted INTEGER NOT NULL DEFAULT 0,
+    policy_decision TEXT NOT NULL,
+    approval_id TEXT,
+    evidence_id TEXT,
+    evidence_status TEXT,
+    notes TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_decisions_scope ON arena_decisions(tenant_id, company_id, created_at);
+
+-- 14c. Executable Skill Contract Runs
+CREATE TABLE IF NOT EXISTS skill_runs (
+    run_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    skill_id TEXT NOT NULL,
+    requester_id TEXT NOT NULL,
+    requester_role TEXT NOT NULL,
+    status TEXT NOT NULL, -- SATISFIED, ESCALATED, CONTRACT_FAILED
+    required_authority TEXT NOT NULL,
+    inputs_json TEXT NOT NULL,
+    checks_json TEXT NOT NULL,
+    result_json TEXT,
+    evidence_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_runs_scope ON skill_runs(tenant_id, company_id, created_at);
+
 -- 15. Chief of Staff Decision & Coordination Queue
 CREATE TABLE IF NOT EXISTS chief_of_staff_items (
     item_id TEXT PRIMARY KEY,

@@ -44,6 +44,7 @@ storage/backups/
 storage/*.bak
 storage/*.bak*
 storage/evidence/test_*
+storage/evidence/tenants/
 storage/evidence/*test*
 storage/evidence/debug_*
 storage/reports/

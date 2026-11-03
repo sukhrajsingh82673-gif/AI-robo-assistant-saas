@@ -1,8 +1,8 @@
 # Stage 1 — Internal Simulation: Northstar Business Systems
 ## Evidence-based capability and gap report
 
-**Date:** 2026-11-03 (post-enterprise multi-company revision)
-**Repo:** `/root/roboassistant` @ `e2d04c7` (`hardening/real-llm-tenant-isolation`) + uncommitted enterprise fixes listed below
+**Date:** 2026-11-03 (post-enterprise multi-company + skill-arena revision)
+**Repo:** `/root/roboassistant` @ `ed059eb` (`hardening/real-llm-tenant-isolation`) + uncommitted skill/arena batch listed below
 **Instance:** SQLite `ZONATA_DB_PATH=/tmp/opencode/ns1/storage/ns1.db`, server on `127.0.0.1:8101`, `APP_ENV=development`
 **Company:** Northstar Business Systems (`comp_994fc2`) inside tenant `tnt_primary`
 **Control tenant:** `tnt_beta` / `comp_beta` (isolation probes)
@@ -27,6 +27,8 @@ Three product claims that were **false at first measurement are now fixed and re
 One **release-blocking security defect was found and fixed**: the terminal agent could read live `DATABASE_URL` credentials out of `.env.local` (and would have read private keys). Two **cross-tenant leaks were found and fixed**. The **global kill switch is now authoritative on every execution surface**: terminal, missions, browser, MCP, workflows, workloads, A2A, OpenHands, finance and workforce all return `403` while engaged (15/15 probes).
 
 The enterprise multi-company batch closed the largest functional gaps: a real expense-approval workflow with a posted-and-re-read GL outcome, role-gated approvals, per-claim/department/company budgets with segregation of duties, deterministic CEO metrics, live MCP resources, per-tenant workflow runtimes, and company-scoped evidence verification.
+
+The skill-arena batch adds a governed decision layer rather than a pretend one: 12 skills are executable contracts, and corporate decisions are scored by four independent deterministic lenses with explicit `CONSENSUS` / `MAJORITY` / `CONTESTED` / `INSUFFICIENT_EVIDENCE` outcomes, authority tiers, real approvals and sealed evidence. Disagreement is never averaged away and missing evidence is never answered confidently.
 
 The product is still **not** a fully operating AI company: there is no real browser interaction engine, mission delegation is limited to terminal filesystem/environment facts, blueprint/employee budgets are not enforced at execution time, and onboarding/billing/partner capability pages are missing.
 
@@ -94,6 +96,10 @@ Legend: **VERIFIED** = ran end-to-end with retained evidence · **PARTIAL** = so
 | 41 | Evidence isolation | VERIFIED | New records carry `tenant_id`/`company_id`; another company or tenant gets `404 EVIDENCE_NOT_FOUND`; `GET /api/evidence` filters both. Legacy records lack company metadata and remain readable within the tenant | `p1_live_api_evidence_scope.json` |
 | 42 | Deterministic company metrics | VERIFIED | ARR/MRR/weighted pipeline/expenses/finance computed in code from tenant+company rows with CI-safe divisions; injected into CEO context and returned on degradation | `p1_live_api_ceo_metrics.json` |
 | 43 | Multi-company controls regression | VERIFIED | 16-test suite covers tenant/company isolation, finance policy, budgets, approval roles, workflow scoping, metrics, evidence | `tests/test_enterprise_multi_company_controls.py` |
+| 44 | Executable skill contracts | VERIFIED | 12 skills, each an enforced contract: minimum authority tier, risk class, required inputs, checks, hard limits and protocol source. A run evaluates the contract, persists it in `skill_runs`, seals evidence, and the run history is readable company-scoped at `GET /api/arena/skill-runs`. Live: owner `verified-delivery` → `SATISFIED`, `EV-A940E802`; operator `board-reporting` → `ESCALATED` (requires `EXECUTIVE`) | `p2_skill_arena_live.json`, `tests/test_skill_arena.py` |
+| 45 | Multi-judge decision arena | VERIFIED (deterministic) | 2–8 options scored by 4 independent lenses (FINANCE/RISK/OPERATIONS/COMPLIANCE) with Borda + aggregate ranking. Disagreement surfaces as `CONTESTED`; missing evidence produces `NEEDS_EVIDENCE`; policy denial produces `DENIED`; high-risk/contested/low-authority outcomes create a real approval. Live low-risk: `DECIDED`/`CONSENSUS`, winner `vendor_a`, `EV-14D45C00`; live high-risk as MANAGER: `ESCALATED`, approval `apr_fa15d6e1` | `p2_skill_arena_live.json`, `tests/test_skill_arena.py` |
+| 46 | Decision authority tiers + isolation | VERIFIED | Role→tier mapping (EMPLOYEE/MANAGER/EXECUTIVE/OWNER); risk and policy can only raise the required tier. Decision retrieval is company-scoped: beta token → `404`, decision list not shared. Kill switch blocks both arena evaluation and skill execution (`403`) | `p2_skill_arena_live.json` |
+| 47 | Arena approval decision identity | VERIFIED (after fix) | `POST /api/approvals/<id>/decide` previously decided as a hardcoded OWNER. It now derives user/role from the token and enforces company scope: OBSERVER `403`, OWNER `200 APPROVED` with signed grant hash | `p2_skill_arena_live.json` |
 
 ---
 
@@ -144,17 +150,14 @@ Session rows persist in the DB, but the provider's session/DOM state does not. A
 
 ## 5. Test suite results (after fixes)
 
-Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on 2026-11-03 (after the enterprise multi-company batch):
+Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on 2026-11-03 (after the enterprise multi-company and skill-arena batches):
 
 | Suite | Result |
 |---|---|
-| `tests/test_browser_use_execution.py` + `tests/test_mission_truncation_guard.py` | 28 passed |
-| `tests/test_mcp_interoperability.py` | 38 passed |
-| `tests/test_durable_workflow.py` | 55 passed |
-| `tests/test_enterprise_multi_company_controls.py` (new) | 16 passed |
-| `tests/test_public_ga_integrity_and_finance.py` + `test_phase_16_tenant_fairness.py` + `test_direct_object_access_and_tenant_security.py` + `test_governed_terminal_runtime.py` | 37 passed |
-| `tests/test_step2_operational_validation.py` | 10 passed |
-| `tests/test_crm_persistence.py` | 4 passed |
+| `tests/test_skill_arena.py` (new) + `tests/test_enterprise_multi_company_controls.py` | 30 passed |
+| `tests/test_durable_workflow.py` + `tests/test_mcp_interoperability.py` + `tests/test_browser_use_execution.py` + `tests/test_mission_truncation_guard.py` | 121 passed |
+| `tests/test_public_ga_integrity_and_finance.py` + `test_phase_16_tenant_fairness.py` + `test_direct_object_access_and_tenant_security.py` + `test_tenant_concurrency_and_instance_persistence.py` | 33 passed |
+| `tests/test_governed_terminal_runtime.py` + `test_universal_linux_terminal_fabric.py` + `tests/test_step2_operational_validation.py` | 47 passed |
 
 **Caveat:** browser tests exercise the deterministic test fixture under `ZONATA_TEST_MODE=1`; they prove governance and parsing logic, not a real browser engine. Real-network behaviour is evidenced separately (`browser_after_fix.json`). Green tests are not treated as proof of end-to-end capability.
 
@@ -185,6 +188,7 @@ Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on
 14. Valid GitHub credentials so the hardening branch and these fixes can be pushed and reviewed. **Blocked:** the pasted PAT is compromised and must be revoked by the owner before a fresh token is issued.
 15. ~~Convert module-level singletons to tenant-scoped factories everywhere.~~ **Done for workflow/finance/departments/browser/CEO metrics:** per-tenant workflow runtimes, tenant/company-scoped finance and evidence, token-derived company on department and workflow APIs. Remaining singletons still need an audit.
 16. ~~Tenant/company isolation for evidence verification.~~ **Done:** new evidence records carry `tenant_id`/`company_id`; another company or tenant receives `EVIDENCE_NOT_FOUND` (verified live). Legacy records without metadata remain readable inside the same tenant and are recorded as a gap.
+17. ~~Governed corporate decisions instead of single-model answers.~~ **Done:** `POST /api/arena/evaluate` scores ≥2 options through 4 deterministic lenses, refuses to hide disagreement (`CONTESTED`), refuses to answer without evidence (`NEEDS_EVIDENCE`), routes high-risk/contested outcomes to a real approval, and enforces authority tiers. `POST /api/skills/<id>/run` enforces 12 executable SOP contracts; `GET /api/arena/skill-runs` exposes company-scoped run history. 14 regressions + live API proof. **Residual:** judges are deterministic scoring functions, not independent LLM agents; that is deliberate and is stated as such.
 
 ---
 
@@ -222,6 +226,12 @@ Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on
 | `core/mcp_interoperability_runtime.py` | Measured `initialize` latency, live `resources/list` + `resources/read`, gated simulation |
 | `core/browser_use_execution_runtime.py` | Capability inventory; all engine-dependent interactions refuse with `ACTION_NOT_IMPLEMENTED` outside test mode |
 | `tests/test_enterprise_multi_company_controls.py` (new) | 16 control/isolation regressions |
+| `core/operating_skills.py` | 12 skills rewritten as executable contracts (authority floor, risk class, required inputs, checks, limits, protocol source) instead of prose |
+| `core/skill_arena.py` (new) | Governed skill execution + 4-lens multi-judge arena, Borda/aggregate ranking, consensus/contested/insufficient-evidence taxonomy, PolicyEngine routing, approval creation, evidence sealing, tenant/company persistence |
+| `core/db.py` | `arena_decisions` and `skill_runs` tables + scope indexes (SQLite schema parity) |
+| `migrations/pg/0003_skill_arena.sql` (new) | PostgreSQL DDL parity for both tables |
+| `api_server.py` (skill/arena batch) | `GET /api/skills`, `GET /api/skills/<id>`, `POST /api/skills/<id>/run`, `POST /api/arena/evaluate`, `GET /api/arena/decisions[/<id>]`, `GET /api/arena/skill-runs`; kill-switch gates; token identity for approval decisions |
+| `tests/test_skill_arena.py` (new) | 14 contract/arena regressions (authority, evidence, denial, budget, decision+run isolation, reproducibility) |
 | `storage/evidence/audit_ledger.jsonl` | Ledger entries written by the real runs |
 
 ---
@@ -232,7 +242,7 @@ Stage 2 (design-partner pilot) may start only when:
 - the owner has revoked the embedded GitHub PAT and rotated the Neon `DATABASE_URL` (P0-6) — **still open, owner action**;
 - **P1-7 is closed** (expense threshold/SoD + department API). **P1-11 is partially done:** real terminal delegation exists; specialist routing beyond the terminal provider remains limited;
 - the capability matrix contains no `NOT IMPLEMENTED` or `FAILED` entry that a partner would touch — browser click/type/submit must either work with a real engine or be hidden from the partner UI (**still open: no engine**);
-- tenant isolation has an automated regression test for every engine that is still a singleton (**new 16-test control suite covers workflow/finance/departments/evidence; a remaining-singleton audit is still required**);
+- tenant isolation has an automated regression test for every engine that is still a singleton (**new 16-test control suite covers workflow/finance/departments/evidence; a new 14-test arena suite covers decision/skill isolation; a remaining-singleton audit is still required**);
 - a partner-facing page lists capabilities with the same statuses used here.
 
 ### Post-fix evidence index (retained raw responses)
@@ -247,12 +257,16 @@ Stage 2 (design-partner pilot) may start only when:
 | `p1_live_api_killswitch.json` / `p1_live_api_killswitch2.json` | 15/15 execution surfaces `403` while engaged; non-governance toggle `403`; disengage restores real terminal run |
 | `p1_live_api_ceo_metrics.json` | `computed_metrics` MRR ₹41,995 / ARR ₹503,940 / weighted ₹31,897.2; `comp_beta` scoped zeros |
 | `p1_live_api_mcp.json` | Live `initialize` latency 11.4 ms; `LIVE_RESOURCES_LIST`; `LIVE_RESOURCES_READ` with `read_verified: true` |
+| `p2_skill_arena_live.json` | 12 skills listed; owner `verified-delivery` → `SATISFIED` (`EV-A940E802`); operator `board-reporting` → `ESCALATED` requiring `EXECUTIVE`; low-risk arena → `DECIDED`/`CONSENSUS` (`vendor_a`, `EV-14D45C00`); cross-company decision `404`; high-risk arena as MANAGER → `ESCALATED` with approval `apr_fa15d6e1`; OBSERVER decide `403`; OWNER decide `APPROVED`; kill switch blocks arena and skill runs; `GET /api/arena/skill-runs` returns 2 owner-company runs and 0 for the beta tenant |
 | `tests/test_mission_truncation_guard.py` | Truncated deliverable → `UNCERTAIN`, `VERIFICATION_REFUSED`, no evidence id, marker retained on disk |
 
 ### Known remaining gaps (do not hide these in a demo)
 
 - Browser click/type/submit have no execution engine (`ACTION_NOT_IMPLEMENTED`); screenshots are `NOT_CAPTURED`.
 - Browser provider session/DOM state is in-memory; it is lost on restart (F11).
+- Arena judges are deterministic scoring functions, not independent language models. Ranking is reproducible and auditable, but it cannot read free-text rationale; an LLM may add advisory commentary elsewhere without changing the authoritative ranking.
+- The arena requires caller-supplied option metadata (risk, reversibility, cost, evidence refs, confidence). It does not extract those values from documents yet.
+- Skill contracts validate declared inputs and checks; they do not execute the underlying business action (e.g. `finance-control` enforces limits but the GL post still goes through the finance workflow).
 - Canonical demo workflows remain state-transition-only; `business_outcome_verified` is `true` only for `wf_company_expense_approval`, which posts and independently re-reads the GL.
 - Mission delegation is real but limited to `TerminalProvider` filesystem/environment inspection; specialist-agent routing and broader scoped tool calls are still missing.
 - Blueprint/employee budgets are not yet enforced at execution time (department/company expense budgets are).

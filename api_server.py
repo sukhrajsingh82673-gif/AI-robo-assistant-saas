@@ -70,6 +70,7 @@ from core.kpis import DynamicKpiEngine, KpiVerificationState
 from core.handover import HandoverManager, CompanyLifecycleState
 from core.team_catalog import EnterpriseTeamCatalog, BUNDLED_TEAMS
 from core.operating_skills import OperatingSkillRegistry, SKILLS_CATALOG
+from core.skill_arena import SkillArena
 from src.services.agent_engine import config_manager
 # Heartbeat/delegation state is tenant-scoped; see _heartbeat()/_delegation().
 from core.settings_service import settings_service, GROUPS, CATEGORIES_CATALOG
@@ -1373,6 +1374,53 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/agent-engine/skills":
             skills = OperatingSkillRegistry.list_skills()
             self._send_json({"skills": skills})
+            return
+
+        elif path == "/api/skills":
+            arena = SkillArena(tenant_id, company_id)
+            skills = arena.list_skills(role=(auth_context or {}).get("role"))
+            self._send_json({"skills": skills, "count": len(skills)})
+            return
+
+        elif path.startswith("/api/skills/") and len(path.split("/")) == 4:
+            skill_id = path.split("/")[3]
+            skill = OperatingSkillRegistry.get_skill(skill_id)
+            if not skill:
+                self._send_json({"error": f"Skill '{skill_id}' not found"}, status=404)
+                return
+            from core.skill_arena import role_to_authority, AUTHORITY_RANK
+            authority = role_to_authority((auth_context or {}).get("role"))
+            floor = str(skill.get("authority_floor", "EMPLOYEE"))
+            self._send_json({
+                "skill": skill,
+                "requester_authority": authority,
+                "available_to_requester": (
+                    AUTHORITY_RANK.get(authority, 0) >= AUTHORITY_RANK.get(floor, 0)
+                ),
+            })
+            return
+
+        elif path == "/api/arena/skill-runs":
+            limit = int(query_params.get("limit", ["50"])[0])
+            arena = SkillArena(tenant_id, company_id)
+            runs = arena.list_skill_runs(limit=limit)
+            self._send_json({"runs": runs, "count": len(runs)})
+            return
+
+        elif path == "/api/arena/decisions":
+            limit = int(query_params.get("limit", ["50"])[0])
+            arena = SkillArena(tenant_id, company_id)
+            decisions = arena.list_decisions(limit=limit)
+            self._send_json({"decisions": decisions, "count": len(decisions)})
+            return
+
+        elif path.startswith("/api/arena/decisions/") and len(path.split("/")) == 5:
+            decision_id = path.split("/")[4]
+            decision = SkillArena(tenant_id, company_id).get_decision(decision_id)
+            if not decision:
+                self._send_json({"error": "Decision not found"}, status=404)
+                return
+            self._send_json(decision)
             return
 
         elif path == "/api/agent-engine/plans":
@@ -4528,17 +4576,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/approvals/") and path.endswith("/decide"):
+            if self._approver_denied(auth_context):
+                return
             parts = path.strip("/").split("/")
             req_id = parts[2]
             approved = req_data.get("approved", True)
-            user = {"user_id": "usr_executive_owner", "role": UserRole.OWNER}
+            user = {
+                "user_id": (auth_context or {}).get("user_id"),
+                "role": (auth_context or {}).get("role"),
+            }
             res = ApprovalPipeline.decide_request(
                 tenant_id=tenant_id,
                 request_id=req_id,
                 approver_user=user,
-                approved=approved
+                approved=approved,
+                rejection_reason=req_data.get("reason"),
+                company_id=company_id,
             )
-            self._send_json(res)
+            self._send_json(res, status=200 if res.get("success") else 403)
             return
 
         # Company OS 2.0 POST Endpoints
@@ -4573,6 +4628,56 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             cid = req_data.get("company_id", companies[0].company_id if companies else "")
             review = ExecutiveCouncil(tenant_id, cid).review_proposal(topic, proposal, data)
             self._send_json(review)
+            return
+
+        # --- ENTERPRISE SKILLS & MULTI-JUDGE DECISION ARENA ---
+        elif path.startswith("/api/skills/") and path.endswith("/run"):
+            if self._blocked_by_global_killswitch("skill execution"):
+                return
+            if not AuthorizationEnforcer.can_execute_missions((auth_context or {}).get("role")):
+                self._send_json({
+                    "success": False,
+                    "error": "INSUFFICIENT_PERMISSIONS: This role cannot execute skill contracts.",
+                    "role": (auth_context or {}).get("role"),
+                }, status=403)
+                return
+            skill_id = path.split("/")[3]
+            requester = {
+                "user_id": (auth_context or {}).get("user_id"),
+                "role": (auth_context or {}).get("role"),
+                "departments": [(auth_context or {}).get("department")] if (auth_context or {}).get("department") else [],
+            }
+            try:
+                res = SkillArena(tenant_id, company_id).run_skill(
+                    skill_id, req_data.get("inputs") or {}, requester
+                )
+                self._send_json(res, status=200 if res.get("success") else 400)
+            except Exception as exc:
+                self._send_json({"success": False, "error": str(exc)}, status=400)
+            return
+
+        elif path == "/api/arena/evaluate":
+            if self._blocked_by_global_killswitch("decision arena"):
+                return
+            if not AuthorizationEnforcer.can_execute_missions((auth_context or {}).get("role")):
+                self._send_json({
+                    "success": False,
+                    "error": "INSUFFICIENT_PERMISSIONS: This role cannot request an arena decision.",
+                    "role": (auth_context or {}).get("role"),
+                }, status=403)
+                return
+            requester = {
+                "user_id": (auth_context or {}).get("user_id"),
+                "role": (auth_context or {}).get("role"),
+                "departments": [(auth_context or {}).get("department")] if (auth_context or {}).get("department") else [],
+            }
+            try:
+                res = SkillArena(tenant_id, company_id).evaluate(req_data, requester)
+                self._send_json(res)
+            except ValueError as exc:
+                self._send_json({"success": False, "error": str(exc)}, status=400)
+            except Exception as exc:
+                self._send_json({"success": False, "error": str(exc)}, status=400)
             return
 
         # --- PHASE 11 GOVERNANCE & ECONOMIC COMMAND ENDPOINTS (POST) ---
