@@ -244,7 +244,9 @@ const CompanyWorkspace = (function() {
     if (route === '/company' || route === '/company/') {
       renderCompanyManagementList(container);
     } else if (route === '/company/new' || route.includes('/onboarding')) {
-      if (!currentOnboarding.modeChosen) {
+      if (window.EntryFlows && window.EntryFlows.renderWelcome) {
+        window.EntryFlows.renderWelcome(container);
+      } else if (!currentOnboarding.modeChosen) {
         renderModeSelection(container);
       } else {
         renderOnboardingWorkspace(container);
