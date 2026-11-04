@@ -251,6 +251,55 @@
             </div>
           </section>
 
+          <!-- 11. 5-Part Action Cards & Approvals (Phase 5) -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">11. 5-Part Action & Approval Cards</h2>
+              <p class="t-footnote" style="margin-top:2px;">Intent • Reason • Progress • Result • Control + On-demand 'Why?' explainability.</p>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              ${window.ActionCard ? window.ActionCard({
+                intent: 'Scaled search advertising bid to capture surge',
+                reason: 'Competitor luxury bookings reached capacity in target region.',
+                state: 'done',
+                result: 'Captured 14 high-intent bookings. +₹1,45,000 revenue.',
+                actorEntity: 'cmo',
+                actorName: 'CMO Growth Engine',
+                timestamp: '5m ago',
+                undoSeconds: 30
+              }) : ''}
+
+              ${window.ApprovalCard ? window.ApprovalCard({
+                id: 'demo_app_1',
+                title: 'Authorize Strategic Inventory Re-allocation',
+                actorEntity: 'coo',
+                actorName: 'Operations Director',
+                riskLevel: 'Medium',
+                reason: 'Rebalance fulfillment inventory across North hubs to prevent stockout.',
+                worstCase: 'Minor regional shipping delay (approx 12 hrs).',
+                alternative: 'Pay expedite courier surcharge (₹18,000).'
+              }) : ''}
+            </div>
+          </section>
+
+          <!-- 12. Department Workspace Previews -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">12. Executive Department Workspaces</h2>
+              <p class="t-footnote" style="margin-top:2px;">Single unified department template with department-specific tints, KPIs, and workforce teams.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px;">
+              ${['coo', 'cmo', 'cto', 'cfo', 'chro', 'security'].map(dept => `
+                <button class="btn-apple btn-apple-secondary spring-press"
+                        onclick="DepartmentWorkspace.open('${dept}')">
+                  Open ${dept.toUpperCase()} Workspace →
+                </button>
+              `).join('')}
+            </div>
+          </section>
+
         </div>
       `;
     }

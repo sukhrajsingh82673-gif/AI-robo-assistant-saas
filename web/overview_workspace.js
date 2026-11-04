@@ -145,73 +145,108 @@
 
       container.innerHTML = `
         <div class="overview-production-page">
-          <!-- 1. EXECUTIVE HEADER -->
-          ${this.renderHeaderHtml(snap, isPortfolio)}
+          <!-- 0. APPLE-GRADE CEO COMMAND CENTER COCKPIT -->
+          <div id="ceo-command-center-slot" style="margin-bottom:36px;"></div>
 
-          <!-- 2. EXECUTIVE KPI STRIP -->
-          ${this.renderKpiStripHtml(snap)}
+          <!-- COLLAPSIBLE DETAILED ANALYTICAL INTELLIGENCE -->
+          <div style="border-top:1px solid var(--separator); padding-top:24px; margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h3 class="t-headline" style="color:var(--label); margin:0;">Deep Analytical Ledger & Subsystems</h3>
+                <p class="t-caption" style="color:var(--label-2); margin-top:2px;">Audit trail, risk matrices, telemetry, and raw subsystem status</p>
+              </div>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      id="toggleDetailedAnalyticsBtn"
+                      onclick="OverviewWorkspace.toggleDetailedAnalytics()"
+                      style="font-size:13px; padding:6px 14px;">
+                Show Deep Analytics ↓
+              </button>
+            </div>
 
-          <!-- 3. PRIMARY EXECUTIVE PERFORMANCE VISUALIZATION -->
-          ${this.renderPrimaryChartHtml(snap)}
+            <div id="detailedAnalyticsContent" style="display:none;">
+              <!-- 1. EXECUTIVE HEADER -->
+              ${this.renderHeaderHtml(snap, isPortfolio)}
 
-          <!-- 4. EXECUTIVE ATTENTION CENTER -->
-          ${this.renderAttentionCenterHtml(snap)}
+              <!-- 2. EXECUTIVE KPI STRIP -->
+              ${this.renderKpiStripHtml(snap)}
 
-          <!-- 5. FINANCIAL & SALES INTELLIGENCE (Level 3) -->
-          <div class="overview-grid-2col">
-            ${this.renderFinancialPositionHtml(snap)}
-            ${this.renderSalesIntelligenceHtml(snap)}
+              <!-- 3. PRIMARY EXECUTIVE PERFORMANCE VISUALIZATION -->
+              ${this.renderPrimaryChartHtml(snap)}
+
+              <!-- 4. EXECUTIVE ATTENTION CENTER -->
+              ${this.renderAttentionCenterHtml(snap)}
+
+              <!-- 5. FINANCIAL & SALES INTELLIGENCE (Level 3) -->
+              <div class="overview-grid-2col">
+                ${this.renderFinancialPositionHtml(snap)}
+                ${this.renderSalesIntelligenceHtml(snap)}
+              </div>
+
+              <!-- 6. CUSTOMER & MARKETING ANALYTICS -->
+              <div class="overview-grid-2col">
+                ${this.renderCustomerAnalyticsHtml(snap)}
+                ${this.renderMarketingAnalyticsHtml(snap)}
+              </div>
+
+              <!-- 7. OPERATIONS & WORKFORCE INTELLIGENCE (Level 4) -->
+              <div class="overview-grid-2col">
+                ${this.renderOperationsIntelligenceHtml(snap)}
+                ${this.renderWorkforceIntelligenceHtml(snap)}
+              </div>
+
+              <!-- 8. MISSION CAUSALITY & RISK EXPOSURE -->
+              <div class="overview-grid-2col">
+                ${this.renderMissionIntelligenceHtml(snap)}
+                ${this.renderRiskExposureHtml(snap)}
+              </div>
+
+              <!-- 9. TECHNOLOGY & DATA QUALITY TRUST INDICATOR -->
+              <div class="overview-grid-2col">
+                ${this.renderTechnologyInfrastructureHtml(snap)}
+                ${this.renderDataQualityHtml(snap)}
+              </div>
+
+              <!-- 9b. GOVERNED INTEROPERABILITY (MCP - Section 48) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderMcpLayerHtml(snap)}
+              </div>
+
+              <!-- 9c. GOVERNED AGENT EXECUTION (OpenHands - Section 49) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderOpenHandsLayerHtml(snap)}
+              </div>
+
+              <!-- 9d. GOVERNED BROWSER EXECUTION (Browser Use - Section 80) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderBrowserLayerHtml(snap)}
+              </div>
+
+              <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
+              <div class="overview-grid-2col">
+                ${this.renderExecutiveInsightsHtml(snap)}
+                ${this.renderAnomaliesHtml(snap)}
+              </div>
+
+              <!-- 11. PORTFOLIO PERFORMANCE & COMPARISON (Portfolio Mode Only) -->
+              ${isPortfolio ? this.renderPortfolioSectionHtml(snap) : ''}
+            </div>
           </div>
-
-          <!-- 6. CUSTOMER & MARKETING ANALYTICS -->
-          <div class="overview-grid-2col">
-            ${this.renderCustomerAnalyticsHtml(snap)}
-            ${this.renderMarketingAnalyticsHtml(snap)}
-          </div>
-
-          <!-- 7. OPERATIONS & WORKFORCE INTELLIGENCE (Level 4) -->
-          <div class="overview-grid-2col">
-            ${this.renderOperationsIntelligenceHtml(snap)}
-            ${this.renderWorkforceIntelligenceHtml(snap)}
-          </div>
-
-          <!-- 8. MISSION CAUSALITY & RISK EXPOSURE -->
-          <div class="overview-grid-2col">
-            ${this.renderMissionIntelligenceHtml(snap)}
-            ${this.renderRiskExposureHtml(snap)}
-          </div>
-
-          <!-- 9. TECHNOLOGY & DATA QUALITY TRUST INDICATOR -->
-          <div class="overview-grid-2col">
-            ${this.renderTechnologyInfrastructureHtml(snap)}
-            ${this.renderDataQualityHtml(snap)}
-          </div>
-
-          <!-- 9b. GOVERNED INTEROPERABILITY (MCP - Section 48) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderMcpLayerHtml(snap)}
-          </div>
-
-          <!-- 9c. GOVERNED AGENT EXECUTION (OpenHands - Section 49) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderOpenHandsLayerHtml(snap)}
-          </div>
-
-          <!-- 9d. GOVERNED BROWSER EXECUTION (Browser Use - Section 80) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderBrowserLayerHtml(snap)}
-          </div>
-
-          <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
-          <div class="overview-grid-2col">
-            ${this.renderExecutiveInsightsHtml(snap)}
-            ${this.renderAnomaliesHtml(snap)}
-          </div>
-
-          <!-- 11. PORTFOLIO PERFORMANCE & COMPARISON (Portfolio Mode Only) -->
-          ${isPortfolio ? this.renderPortfolioSectionHtml(snap) : ''}
         </div>
       `;
+
+      const ceoSlot = document.getElementById('ceo-command-center-slot');
+      if (ceoSlot && window.CeoCommandCenter) {
+        window.CeoCommandCenter.render(ceoSlot, snap);
+      }
+    }
+
+    toggleDetailedAnalytics() {
+      const content = document.getElementById('detailedAnalyticsContent');
+      const btn = document.getElementById('toggleDetailedAnalyticsBtn');
+      if (!content || !btn) return;
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      btn.textContent = isHidden ? 'Hide Deep Analytics ↑' : 'Show Deep Analytics ↓';
     }
 
     // =========================================================================
