@@ -16,6 +16,11 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
+      if (window.AppleSecurityCenter) {
+        window.AppleSecurityCenter.render(container);
+        return;
+      }
+
       container.innerHTML = `
         <div class="governance-workspace-layout" style="display:flex; flex-direction:column; gap:20px; max-width:1440px; margin:0 auto; padding-bottom:60px;">
           

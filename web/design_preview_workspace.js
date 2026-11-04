@@ -323,6 +323,29 @@
             </div>
           </section>
 
+          <!-- 14. Phase 7: Terminal, Security Center & Co-Worker Assistant -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">14. Governed Terminal, Security & Co-Worker</h2>
+              <p class="t-footnote" style="margin-top:2px;">Fixed permission bar, kill switch, 13 concentric defense rings, and Personal vs. Company mode switch.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px;">
+              <button class="btn-apple btn-apple-primary spring-press"
+                      onclick="window.navigateTo('/terminal')">
+                Open Governed Terminal (/terminal) →
+              </button>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      onclick="window.navigateTo('/governance')">
+                Open Security Center (/governance) →
+              </button>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      onclick="window.navigateTo('/assistant')">
+                Open Co-Worker Assistant (/assistant) →
+              </button>
+            </div>
+          </section>
+
         </div>
       `;
     }

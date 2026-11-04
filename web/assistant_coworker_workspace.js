@@ -90,6 +90,10 @@
     // 1. ASSISTANT VIEW (Natural Language Front Door)
     // =========================================================================
     async renderAssistant(containerId) {
+      if (window.AppleCoworkerAssistant) {
+        window.AppleCoworkerAssistant.render(containerId, 'company');
+        return;
+      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
@@ -315,6 +319,10 @@
     // 2. CO-WORKER VIEW (Execution Pipeline & Single-Product Workspace)
     // =========================================================================
     async renderCoworker(containerId) {
+      if (window.AppleCoworkerAssistant) {
+        window.AppleCoworkerAssistant.render(containerId, 'personal');
+        return;
+      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
@@ -778,6 +786,10 @@
     // 5. UNIVERSAL LINUX TERMINAL VIEW (Section 35 Governed Execution Fabric)
     // =========================================================================
     async renderTerminal(containerId) {
+      if (window.AppleGovernedTerminal) {
+        window.AppleGovernedTerminal.render(containerId);
+        return;
+      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
