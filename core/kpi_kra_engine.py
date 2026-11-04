@@ -166,13 +166,28 @@ class KPIKRAEngine:
 
     def register_kra(self, kra: StructuredKRA) -> StructuredKRA:
         """Register a formal KRA specification for an employee."""
+        # The canonical corporate_employees schema is authoritative; resolve the
+        # employee's position when it exists so both schemas stay compatible.
+        position_id = ""
+        try:
+            with engine.transaction(workload=WorkloadType.READ) as conn:
+                row = conn.execute(
+                    "SELECT position_id FROM corporate_employees WHERE employee_id = ?",
+                    (kra.employee_id,),
+                ).fetchone()
+                if row:
+                    position_id = row["position_id"] or ""
+        except Exception:
+            position_id = ""
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
             INSERT INTO employee_kras (
-                kra_id, tenant_id, company_id, employee_id, name, responsibility,
+                kra_id, tenant_id, company_id, employee_id, position_id, name,
+                weight_percentage, accountability_statement, responsibility,
                 associated_workflows, associated_kpi_ids, allowed_tools,
-                authority_scope, escalation_rules, expected_outcomes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                authority_scope, escalation_rules, expected_outcomes,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (kra_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
                 company_id = EXCLUDED.company_id,
@@ -187,10 +202,11 @@ class KPIKRAEngine:
                 expected_outcomes = EXCLUDED.expected_outcomes
             """, (
                 kra.kra_id, kra.tenant_id, kra.company_id, kra.employee_id,
-                kra.name, kra.responsibility, json.dumps(kra.associated_workflows),
+                position_id, kra.name, 25.0, kra.responsibility, kra.responsibility,
+                json.dumps(kra.associated_workflows),
                 json.dumps(kra.associated_kpi_ids), json.dumps(kra.allowed_tools),
                 json.dumps(kra.authority_scope), json.dumps(kra.escalation_rules),
-                json.dumps(kra.expected_outcomes), kra.created_at
+                json.dumps(kra.expected_outcomes), kra.created_at, kra.created_at
             ))
         return kra
 

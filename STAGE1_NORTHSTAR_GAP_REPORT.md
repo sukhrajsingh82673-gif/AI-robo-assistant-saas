@@ -30,7 +30,9 @@ The enterprise multi-company batch closed the largest functional gaps: a real ex
 
 The skill-arena batch adds a governed decision layer rather than a pretend one: 12 skills are executable contracts, and corporate decisions are scored by four independent deterministic lenses with explicit `CONSENSUS` / `MAJORITY` / `CONTESTED` / `INSUFFICIENT_EVIDENCE` outcomes, authority tiers, real approvals and sealed evidence. Disagreement is never averaged away and missing evidence is never answered confidently.
 
-The product is still **not** a fully operating AI company: there is no real browser interaction engine, mission delegation is limited to terminal filesystem/environment facts, blueprint/employee budgets are not enforced at execution time, and onboarding/billing/partner capability pages are missing.
+The workforce batch turns the previously empty 25-table corporate schema into a working company: an organization is provisioned from an industry blueprint (15 industries), with 13 C-suite executives, multi-level reporting, configurable departments and positions, authority profiles, SOP versioning, KRA/KPI with anti-gaming, explainable performance reviews, a shared agent-capability factory with isolated per-employee instances, and governed cross-department collaboration. Live proof: 17 departments, 13 executives, cycle rejection, quota rejection, cross-employee isolation, a refused unevidenced measurement and a `109.8/EXCEEDING` explainable review — all over authenticated HTTP with retained evidence. Building it also exposed and closed two real defects: `organizations` had no `company_id` (a same-tenant cross-company read leak) and a company could be provisioned twice.
+
+The product is still **not** a fully operating AI company: there is no real browser interaction engine, mission delegation is limited to terminal filesystem/environment facts, blueprint/employee budgets are not enforced at execution time, SOP versions are not yet executed by the agent runtime, and onboarding/billing/partner capability pages are missing.
 
 Recommendation: **do not start Stage 2 (design-partner pilot)** until the owner revokes the compromised PAT, rotates the Neon credential, and the browser/delegation/partner-page gaps in §6 are resolved or hidden from partner UI. Paid infrastructure is not justified by the current evidence.
 
@@ -100,6 +102,20 @@ Legend: **VERIFIED** = ran end-to-end with retained evidence · **PARTIAL** = so
 | 45 | Multi-judge decision arena | VERIFIED (deterministic) | 2–8 options scored by 4 independent lenses (FINANCE/RISK/OPERATIONS/COMPLIANCE) with Borda + aggregate ranking. Disagreement surfaces as `CONTESTED`; missing evidence produces `NEEDS_EVIDENCE`; policy denial produces `DENIED`; high-risk/contested/low-authority outcomes create a real approval. Live low-risk: `DECIDED`/`CONSENSUS`, winner `vendor_a`, `EV-14D45C00`; live high-risk as MANAGER: `ESCALATED`, approval `apr_fa15d6e1` | `p2_skill_arena_live.json`, `tests/test_skill_arena.py` |
 | 46 | Decision authority tiers + isolation | VERIFIED | Role→tier mapping (EMPLOYEE/MANAGER/EXECUTIVE/OWNER); risk and policy can only raise the required tier. Decision retrieval is company-scoped: beta token → `404`, decision list not shared. Kill switch blocks both arena evaluation and skill execution (`403`) | `p2_skill_arena_live.json` |
 | 47 | Arena approval decision identity | VERIFIED (after fix) | `POST /api/approvals/<id>/decide` previously decided as a hardcoded OWNER. It now derives user/role from the token and enforces company scope: OBSERVER `403`, OWNER `200 APPROVED` with signed grant hash | `p2_skill_arena_live.json` |
+| 48 | Organization + department + position provisioning | VERIFIED | `POST /api/workforce/organization` builds a whole company from a data-driven industry blueprint. Live: 17 departments, 13 executives, 40+ employees, every mutation sealed (`EV-5537CD9C`). Departments, positions and hires are separately addressable endpoints | `p3_workforce_live.json` |
+| 49 | Dynamic multi-level hierarchy | VERIFIED | Executive → director → manager → specialist chains are created and stored in `employee_reporting_relationships`; `reporting_chain()` walks real rows. Live CEO chain returned through the API; a G8 specialist sits ≥3 levels below the CEO | `p3_workforce_live.json`, `tests/test_workforce_architecture.py` |
+| 50 | Reporting-cycle and grade guards | VERIFIED | Making the CEO report to the COO is rejected (`400`, "cycle"); self-management is rejected; a senior position cannot report to a junior one; cross-company managers are refused | `p3_workforce_live.json` |
+| 51 | One enterprise root per company | VERIFIED (after fix) | A second `POST /api/workforce/organization` for the same company is rejected instead of colliding on department codes. `organizations` now carries `company_id`, closing a same-tenant cross-company read leak found while testing | `p3_workforce_live.json` |
+| 52 | Industry coverage of the C-suite | VERIFIED | 15 industry blueprints. Marketing/Sales/Product/Customer-Success are base departments, so **every** industry provisions all 13 chiefs; sector blueprints override them with specialised roles. Live financial services: 13/13 executives | `p3_workforce_live.json`, `tests/test_workforce_architecture.py` |
+| 53 | Authority profiles and spend limits | VERIFIED (mapped, not enforced at execution) | G1–G9 map to OWNER/EXECUTIVE/MANAGER/EMPLOYEE tiers with single/monthly spend limits, hire/delegate/SOP rights, data classifications and a signature hash. These are **stored and returned**, not yet consulted by the finance or agent runtimes | `tests/test_workforce_architecture.py` |
+| 54 | Employee identity and lifecycle | VERIFIED | Employees get a code, internal `.test` work email, position, department, authority profile, knowledge clearance. Deactivation requires OWNER authority, sets the kill switch, releases the seat and keeps history (no hard delete) | `tests/test_workforce_architecture.py` |
+| 55 | SOP definition and immutable versioning | VERIFIED | `POST /api/workforce/sops` + `/versions`. Versions are content-hashed; republishing the same semver is refused; only `APPROVED` versions can be assigned; assignment supersedes the previous one | `tests/test_workforce_architecture.py` |
+| 56 | KRA/KPI with anti-gaming | VERIFIED | KRA weights capped at 100%. KPI definitions support polarity, thresholds, paired counter-metrics. A measurement without an evidence reference is refused; a paired counter-metric is mandatory when defined | `p3_workforce_live.json` |
+| 57 | Explainable performance evaluation | VERIFIED | 4-factor composite (KPI 0.55, SOP 0.20, anti-gaming 0.10, collaboration 0.15) with the formula and per-KPI weights stored. Refuses to score without measurements (`409 INSUFFICIENT_MEASUREMENTS`) or without KRAs (`400`); blocked external KPIs are excluded and named, never penalised. Live: `109.8` / `EXCEEDING` with `EV-D2F9320F` | `p3_workforce_live.json` |
+| 58 | Shared agent capabilities, isolated instances | VERIFIED | Capabilities and signed templates are shared per tenant; each provisioning creates its own instance, lease, execution session, memory scope and session token. Quota default 4/employee; live third instance → `400`; another employee cannot terminate the instance (`400`); unregistered capability refused | `p3_workforce_live.json` |
+| 59 | Governed cross-department collaboration | VERIFIED | Requires a real mission, two distinct departments, an accountable deliverable, positive SLA and a valid escalation executive. Lifecycle `REQUESTED → ACCEPTED → FULFILLED` is enforced; fulfilling before acceptance → `400` | `p3_workforce_live.json` |
+| 60 | Workforce API authority gating | VERIFIED | Reads require report authority (OPERATOR/OBSERVER `403`); writes require OWNER/EXECUTIVE; deactivation requires OWNER. Company is resolved from the token and verified against the tenant. Every POST is behind the global kill switch | `p3_workforce_live.json`, `tests/test_workforce_api.py` |
+| 61 | Legacy-schema self-healing | VERIFIED (after fix) | A pilot DB whose `employee_kras` came from the V7 KPI engine lacked `weight_percentage`/`position_id`; the service now probes the exact columns it writes and runs the additive migrations once per database. `organizations.company_id` is added the same way | `p3_workforce_live.json` |
 
 ---
 
@@ -154,7 +170,10 @@ Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on
 
 | Suite | Result |
 |---|---|
-| `tests/test_skill_arena.py` (new) + `tests/test_enterprise_multi_company_controls.py` | 30 passed |
+| `tests/test_skill_arena.py` + `tests/test_enterprise_multi_company_controls.py` | 30 passed |
+| `tests/test_workforce_architecture.py` (new) | 45 passed |
+| `tests/test_workforce_api.py` (new) | 12 passed |
+| `tests/test_v7_employee_template_and_factory.py` + `tests/test_v7_ceo_workforce_and_collaboration.py` + `tests/test_enterprise_workforce.py` + `tests/test_workforce_orchestrator.py` + `tests/test_aic_organization_layer.py` | 55 passed |
 | `tests/test_durable_workflow.py` + `tests/test_mcp_interoperability.py` + `tests/test_browser_use_execution.py` + `tests/test_mission_truncation_guard.py` | 121 passed |
 | `tests/test_public_ga_integrity_and_finance.py` + `test_phase_16_tenant_fairness.py` + `test_direct_object_access_and_tenant_security.py` + `test_tenant_concurrency_and_instance_persistence.py` | 33 passed |
 | `tests/test_governed_terminal_runtime.py` + `test_universal_linux_terminal_fabric.py` + `tests/test_step2_operational_validation.py` | 47 passed |
@@ -189,6 +208,7 @@ Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on
 15. ~~Convert module-level singletons to tenant-scoped factories everywhere.~~ **Done for workflow/finance/departments/browser/CEO metrics:** per-tenant workflow runtimes, tenant/company-scoped finance and evidence, token-derived company on department and workflow APIs. Remaining singletons still need an audit.
 16. ~~Tenant/company isolation for evidence verification.~~ **Done:** new evidence records carry `tenant_id`/`company_id`; another company or tenant receives `EVIDENCE_NOT_FOUND` (verified live). Legacy records without metadata remain readable inside the same tenant and are recorded as a gap.
 17. ~~Governed corporate decisions instead of single-model answers.~~ **Done:** `POST /api/arena/evaluate` scores ≥2 options through 4 deterministic lenses, refuses to hide disagreement (`CONTESTED`), refuses to answer without evidence (`NEEDS_EVIDENCE`), routes high-risk/contested outcomes to a real approval, and enforces authority tiers. `POST /api/skills/<id>/run` enforces 12 executable SOP contracts; `GET /api/arena/skill-runs` exposes company-scoped run history. 14 regressions + live API proof. **Residual:** judges are deterministic scoring functions, not independent LLM agents; that is deliberate and is stated as such.
+18. **P1-18 (new) — wire workforce authority to enforcement.** G1–G9 profiles (spend limits, hire/delegate/SOP rights, data classifications) are stored and returned but not yet consulted by the finance runtime, agent provisioning or PolicyEngine. Until they are, "employee authority" is descriptive, not enforcing. Also outstanding: SOP execution by the agent runtime, task-assignment API, and a mission-creation API.
 
 ---
 
@@ -230,8 +250,16 @@ Run against an isolated pytest DB (`tests/conftest.py`), on the patched tree, on
 | `core/skill_arena.py` (new) | Governed skill execution + 4-lens multi-judge arena, Borda/aggregate ranking, consensus/contested/insufficient-evidence taxonomy, PolicyEngine routing, approval creation, evidence sealing, tenant/company persistence |
 | `core/db.py` | `arena_decisions` and `skill_runs` tables + scope indexes (SQLite schema parity) |
 | `migrations/pg/0003_skill_arena.sql` (new) | PostgreSQL DDL parity for both tables |
+| `migrations/pg/0005_workforce_architecture.sql` (new) | PostgreSQL parity for `organizations.company_id` and the shared `employee_kras` columns |
 | `api_server.py` (skill/arena batch) | `GET /api/skills`, `GET /api/skills/<id>`, `POST /api/skills/<id>/run`, `POST /api/arena/evaluate`, `GET /api/arena/decisions[/<id>]`, `GET /api/arena/skill-runs`; kill-switch gates; token identity for approval decisions |
 | `tests/test_skill_arena.py` (new) | 14 contract/arena regressions (authority, evidence, denial, budget, decision+run isolation, reproducibility) |
+| `core/workforce_architecture.py` (new) | Service/lifecycle layer over the canonical 25-table schema: 13-role executive catalog, 15 industry blueprints, G1–G9 authority, provisioning, cycle-safe reporting, employee lifecycle, immutable SOP versions, KRA/KPI with anti-gaming, explainable evaluation, capability registry + isolated agent instances with quota, governed cross-department collaboration, evidence sealing |
+| `core/workforce_api.py` (new) | Role-gated, company-scoped HTTP surface (`/api/workforce/*`): 15 read routes, 18 write routes, invariant errors mapped to 400/409, no silent success |
+| `api_server.py` (workforce batch) | Dispatches `GET`/`POST /api/workforce*` to the workforce handler; POST is behind the global kill switch |
+| `core/db.py` | `organizations.company_id`; `employee_kras` additive columns (`responsibility`, `position_id`, `weight_percentage`, `accountability_statement`, `updated_at`, associated/authority/escalation/outcome fields); idempotent migrations for drifted pilot DBs |
+| `core/kpi_kra_engine.py` | `register_kra` writes the canonical `employee_kras` shape (position, weight, accountability, `updated_at`) instead of a V7-only subset |
+| `tests/test_workforce_architecture.py` (new) | 45 regressions: catalogs, provisioning, multi-level chains, cycles, headcount, SOP immutability, KRA weights, evidence-backed measurement, refusal cases, agent isolation/quota/termination, collaboration lifecycle, tenant/company isolation, deactivation history, industry C-suite coverage |
+| `tests/test_workforce_api.py` (new) | 12 HTTP-surface regressions: authority gating, company scoping, honest unprovisioned state, duplicate organization, cycle surfacing, non-interception of other routes |
 | `storage/evidence/audit_ledger.jsonl` | Ledger entries written by the real runs |
 
 ---
@@ -243,7 +271,10 @@ Stage 2 (design-partner pilot) may start only when:
 - **P1-7 is closed** (expense threshold/SoD + department API). **P1-11 is partially done:** real terminal delegation exists; specialist routing beyond the terminal provider remains limited;
 - the capability matrix contains no `NOT IMPLEMENTED` or `FAILED` entry that a partner would touch — browser click/type/submit must either work with a real engine or be hidden from the partner UI (**still open: no engine**);
 - tenant isolation has an automated regression test for every engine that is still a singleton (**new 16-test control suite covers workflow/finance/departments/evidence; a new 14-test arena suite covers decision/skill isolation; a remaining-singleton audit is still required**);
-- a partner-facing page lists capabilities with the same statuses used here.
+- a partner-facing page lists capabilities with the same statuses used here;
+- the workforce layer's authority profiles are enforced (P1-18) or the product stops describing them as limits.
+
+The workforce layer may be shown to a design partner as an **organizational model and governance record** (hierarchy, roles, KPIs, review math, agent quotas), but not yet as a system where AI employees autonomously execute their SOPs within their authority.
 
 ### Post-fix evidence index (retained raw responses)
 
@@ -258,6 +289,7 @@ Stage 2 (design-partner pilot) may start only when:
 | `p1_live_api_ceo_metrics.json` | `computed_metrics` MRR ₹41,995 / ARR ₹503,940 / weighted ₹31,897.2; `comp_beta` scoped zeros |
 | `p1_live_api_mcp.json` | Live `initialize` latency 11.4 ms; `LIVE_RESOURCES_LIST`; `LIVE_RESOURCES_READ` with `read_verified: true` |
 | `p2_skill_arena_live.json` | 12 skills listed; owner `verified-delivery` → `SATISFIED` (`EV-A940E802`); operator `board-reporting` → `ESCALATED` requiring `EXECUTIVE`; low-risk arena → `DECIDED`/`CONSENSUS` (`vendor_a`, `EV-14D45C00`); cross-company decision `404`; high-risk arena as MANAGER → `ESCALATED` with approval `apr_fa15d6e1`; OBSERVER decide `403`; OWNER decide `APPROVED`; kill switch blocks arena and skill runs; `GET /api/arena/skill-runs` returns 2 owner-company runs and 0 for the beta tenant |
+| `p3_workforce_live.json` | 34/34 live workforce checks: 17-department/13-executive provisioning (`EV-5537CD9C`), operator/observer `403`, duplicate-org `400`, cycle `400`, agent quota `400`, cross-employee termination `400`, unevidenced measurement `400`, `109.8 EXCEEDING` review (`EV-D2F9320F`), `409` without measurement, collaboration `400→200→200`, same-tenant other company returns its own empty workforce |
 | `tests/test_mission_truncation_guard.py` | Truncated deliverable → `UNCERTAIN`, `VERIFICATION_REFUSED`, no evidence id, marker retained on disk |
 
 ### Known remaining gaps (do not hide these in a demo)
@@ -272,6 +304,13 @@ Stage 2 (design-partner pilot) may start only when:
 - Blueprint/employee budgets are not yet enforced at execution time (department/company expense budgets are).
 - Evidence records written before this batch have no `company_id` metadata, so same-tenant company filtering cannot retroactively scope them. New records are scoped; the legacy ledger is recorded, not hidden.
 - Organisation/company onboarding, billing and partner-facing capability pages are not yet built.
+- Workforce: SOP versions are defined, versioned and assigned but **not yet executed** by the agent runtime; execution telemetry therefore leaves SOP compliance at its default.
+- Workforce: G1–G9 authority/spend profiles are stored and returned but are **not consulted** by the finance runtime or agent provisioning — they are descriptive, not enforcing, until wired to PolicyEngine.
+- Workforce: agent instances are real rows with leases, sessions and isolation checks, but no model/tool call is dispatched through them yet; provisioning proves governance plumbing, not autonomous work.
+- Workforce: `corporate_missions` has no creation API, so the live collaboration proof seeded one synthetic mission row directly (documented in `p3_workforce_live.json`).
+- Workforce: `employee_sop_assignments` execution counters and `employee_tasks` delegation are schema-only; no task-assignment API exists yet.
+- Workforce: PostgreSQL parity for the new columns ships as `migrations/pg/0005_workforce_architecture.sql`, but no PostgreSQL server was available here, so it is **unexecuted** — treat PG parity as unverified until run against a real database.
+- Workforce: PostgreSQL parity for the new `organizations.company_id` and `employee_kras` columns has no migration file yet (SQLite was exercised; PG was not runnable here).
 - Free LLM tier is rate-limited and intermittently unavailable; missions correctly end `BLOCKED` instead of fabricating.
 - All evidence is SQLite; live Postgres, Playwright E2E and container suites remain unexecuted here.
 - The GitHub PAT pasted earlier is compromised and must be revoked; pushing these commits requires a fresh token.

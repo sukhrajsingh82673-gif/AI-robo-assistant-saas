@@ -3535,6 +3535,7 @@ CREATE INDEX IF NOT EXISTS idx_crm_deals ON crm_deals(tenant_id, company_id);
 CREATE TABLE IF NOT EXISTS organizations (
     org_id TEXT PRIMARY KEY,
     tenant_id TEXT NOT NULL,
+    company_id TEXT,
     parent_org_id TEXT,
     legal_name TEXT NOT NULL,
     trade_name TEXT NOT NULL,
@@ -3766,10 +3767,18 @@ CREATE TABLE IF NOT EXISTS employee_kras (
     name TEXT NOT NULL,
     weight_percentage REAL NOT NULL DEFAULT 25.0,
     accountability_statement TEXT NOT NULL,
+    responsibility TEXT,
+    associated_workflows JSON,
+    associated_kpi_ids JSON,
+    allowed_tools JSON,
+    authority_scope JSON,
+    escalation_rules JSON,
+    expected_outcomes JSON,
     created_at REAL NOT NULL,
-    updated_at REAL NOT NULL,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
-    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+    updated_at REAL NOT NULL
+    -- No FKs here: KRA rows are shared by the canonical corporate_employees
+    -- registry and the V7 ai_employees registry, which have independent
+    -- tenant/employee lifecycles. Referential checks are enforced in code.
 );
 
 -- 12. KPI Definitions (Anti-Gaming Paired Metrics Catalog)
@@ -5154,6 +5163,19 @@ class Database:
             # Additive, idempotent column migrations for existing databases.
             for stmt in (
                 "ALTER TABLE approvals ADD COLUMN decision_reason TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN responsibility TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN associated_workflows JSON",
+                "ALTER TABLE employee_kras ADD COLUMN associated_kpi_ids JSON",
+                "ALTER TABLE employee_kras ADD COLUMN allowed_tools JSON",
+                "ALTER TABLE employee_kras ADD COLUMN authority_scope JSON",
+                "ALTER TABLE employee_kras ADD COLUMN escalation_rules JSON",
+                "ALTER TABLE employee_kras ADD COLUMN expected_outcomes JSON",
+                "ALTER TABLE employee_kras ADD COLUMN position_id TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN strategic_objective_id TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN weight_percentage REAL DEFAULT 25.0",
+                "ALTER TABLE employee_kras ADD COLUMN accountability_statement TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN updated_at REAL",
+                "ALTER TABLE organizations ADD COLUMN company_id TEXT",
             ):
                 try:
                     conn.execute(stmt)

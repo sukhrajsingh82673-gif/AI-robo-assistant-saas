@@ -3593,6 +3593,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        # URA / ZONATA: Enterprise AI Corporate Workforce Architecture
+        if path.startswith("/api/workforce"):
+            from core.workforce_api import handle_get as workforce_get
+            wf_res = workforce_get(path, query_params, tenant_id, company_id, auth_context)
+            if wf_res:
+                data, code = wf_res
+                self._send_json(data, status=code)
+                return
+
 
 
         # ZONATA V8: AI CEO Executive Operating Layer Routes
@@ -8792,6 +8801,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             )
             self._send_json({"success": True, "artifact": ref.to_dict()})
             return
+
+        # URA / ZONATA: Enterprise AI Corporate Workforce Architecture
+        if path.startswith("/api/workforce"):
+            if self._blocked_by_global_killswitch("workforce mutation"):
+                return
+            from core.workforce_api import handle_post as workforce_post
+            wf_res = workforce_post(path, req_data, tenant_id, company_id, auth_context)
+            if wf_res:
+                data, code = wf_res
+                self._send_json(data, status=code)
+                return
 
         self._send_json({"error": "Endpoint not found"}, status=404)
 
