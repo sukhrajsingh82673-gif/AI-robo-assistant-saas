@@ -21,6 +21,11 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
+      if (window.AppleWorkforceBoard) {
+        window.AppleWorkforceBoard.render(container);
+        return;
+      }
+
       const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
       if (!companyId) {
         if (window.CurrentCompanyContext) {

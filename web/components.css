@@ -608,3 +608,90 @@
     transform: translateY(0);
   }
 }
+
+/* --------------------------------------------------------------------------
+   10. Apple-Grade Sales Kanban Board
+   -------------------------------------------------------------------------- */
+.apple-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(240px, 1fr));
+  gap: var(--s-4);
+  overflow-x: auto;
+  padding-bottom: var(--s-4);
+  scroll-snap-type: x mandatory;
+}
+
+.apple-kanban-column {
+  background: var(--surface-2);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-height: 480px;
+  scroll-snap-align: start;
+}
+
+.apple-deal-card {
+  background: var(--surface);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  cursor: pointer;
+  transform: translateZ(0);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.16s ease,
+              border-color 0.16s ease;
+}
+
+.apple-deal-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   11. Executive Document Canvas (PDF Preview)
+   -------------------------------------------------------------------------- */
+.apple-document-canvas {
+  background: var(--bg-canvas, #F5F5F7);
+  padding: 32px 20px 80px;
+  display: flex;
+  justify-content: center;
+  border-radius: var(--r-xl);
+}
+
+[data-theme="dark"] .apple-document-canvas {
+  background: #111113;
+}
+
+.apple-document-page {
+  background: var(--surface);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3);
+  max-width: 820px;
+  width: 100%;
+  padding: 56px 64px;
+  box-sizing: border-box;
+  color: var(--label);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .apple-document-page {
+    padding: 32px 20px;
+  }
+  .apple-kanban-board {
+    grid-template-columns: repeat(5, 260px);
+  }
+}
+

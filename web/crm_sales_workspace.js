@@ -318,6 +318,10 @@
     }
 
     renderPipelineTabHtml() {
+      if (window.AppleSalesBoard && window.AppleSalesBoard.renderHtml) {
+        return window.AppleSalesBoard.renderHtml();
+      }
+
       const stageConfigs = [
         { id: 'discovery', title: '1. New Discovery', matches: ['discovery'] },
         { id: 'proposal', title: '2. Proposal Submitted', matches: ['proposal', 'submitted'] },

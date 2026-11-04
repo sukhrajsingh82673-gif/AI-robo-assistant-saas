@@ -18,6 +18,11 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
+      if (window.AppleWorkforceBoard) {
+        window.AppleWorkforceBoard.render(container);
+        return;
+      }
+
       container.innerHTML = `
         <div style="padding:40px; text-align:center;">
           <div class="status-pulse-dot" style="margin:0 auto 12px; width:14px; height:14px;"></div>

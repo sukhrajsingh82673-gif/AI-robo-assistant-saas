@@ -300,6 +300,29 @@
             </div>
           </section>
 
+          <!-- 13. Phase 6: Workforce, Sales Board & Reports -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">13. Workforce, Sales Kanban & Document Reports</h2>
+              <p class="t-footnote" style="margin-top:2px;">Apple-grade employee directory, 5-stage commercial pipeline, and paper-canvas report layouts.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px;">
+              <button class="btn-apple btn-apple-primary spring-press"
+                      onclick="window.navigateTo('/workforce')">
+                View AI Workforce Directory (/workforce) →
+              </button>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      onclick="window.navigateTo('/customers')">
+                View Sales Pipeline Board (/customers) →
+              </button>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      onclick="window.navigateTo('/reports')">
+                View Reports & Statements (/reports) →
+              </button>
+            </div>
+          </section>
+
         </div>
       `;
     }
