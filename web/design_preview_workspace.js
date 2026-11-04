@@ -12,11 +12,15 @@
       this.orbState = 'idle';
       this.orbSize = 96;
       this.testNumber = 428500;
+      this.segmentedActive = 'overview';
+      this.toggleState = true;
     }
 
     render(containerId = 'view-design') {
       const container = document.getElementById(containerId);
       if (!container) return;
+
+      const UI = window.UI || {};
 
       container.innerHTML = `
         <div style="max-width:1120px; margin:0 auto; padding:32px 24px 80px; display:flex; flex-direction:column; gap:40px;">
@@ -25,13 +29,13 @@
           <header style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px; padding-bottom:24px; border-bottom:0.5px solid var(--separator);">
             <div>
               <div style="display:inline-flex; align-items:center; gap:8px; margin-bottom:8px;">
-                <span class="t-caption" style="text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); font-weight:700;">Design Foundations</span>
+                <span class="t-caption" style="text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); font-weight:700;">Design Foundations & Primitives</span>
                 <span style="font-size:12px; color:var(--label-3);">•</span>
-                <span class="t-caption" style="color:var(--label-3);">Phase 1 Verification</span>
+                <span class="t-caption" style="color:var(--label-3);">Phase 2 Verification</span>
               </div>
-              <h1 class="t-large-title">Apple-Grade Design System</h1>
+              <h1 class="t-large-title">Apple-Grade Component Library</h1>
               <p class="t-callout" style="max-width:640px; margin-top:6px;">
-                Single source of truth for design tokens, typography, materials, motion springs, and signature presence.
+                Calm, accessible, token-driven component primitives built with spring physics and progressive disclosure.
               </p>
             </div>
 
@@ -46,11 +50,163 @@
             </div>
           </header>
 
-          <!-- 1. Signature AI Presence (<AiOrb />) -->
+          <!-- 1. Interactive Buttons Showcase -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">1. Buttons & Interactive States</h2>
+              <p class="t-footnote" style="margin-top:2px;">One primary action per screen. Instant 80ms press scale (0.97) and visible focus rings.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+              ${UI.Button ? UI.Button({ label: 'Primary Action', variant: 'primary', icon: 'sparkles' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Secondary Action', variant: 'secondary' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Plain Text', variant: 'plain' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Destructive', variant: 'destructive', icon: 'trash' }) : ''}
+              ${UI.Button ? UI.Button({ variant: 'icon', icon: 'settings', ariaLabel: 'Settings' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Loading State', variant: 'primary', loading: true }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Disabled State', variant: 'secondary', disabled: true }) : ''}
+            </div>
+          </section>
+
+          <!-- 2. Text Fields & Inputs -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">2. Text Fields & Search Inputs</h2>
+              <p class="t-footnote" style="margin-top:2px;">Rounded inputs with accent focus rings, leading icons, error states, and helper messages.</p>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px;">
+              ${UI.Input ? UI.Input({ label: 'Company Name', placeholder: 'e.g. Acme Corporation', value: 'ZONATA Technologies' }) : ''}
+              ${UI.Input ? UI.Input({ label: 'Search Registry', placeholder: 'Search records, agents, files...', icon: 'search' }) : ''}
+              ${UI.Input ? UI.Input({ label: 'With Helper Text', placeholder: 'Enter API Key', helperText: 'Stored encrypted in SQLite vault.' }) : ''}
+              ${UI.Input ? UI.Input({ label: 'Error State', placeholder: 'Work Email', value: 'invalid-email', errorMessage: 'Please enter a valid business email address.' }) : ''}
+            </div>
+          </section>
+
+          <!-- 3. Status Chips & Badges -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">3. Status Chips & Filters</h2>
+              <p class="t-footnote" style="margin-top:2px;">Semantic 12% tint fills paired with full-strength text and icons.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+              ${UI.Chip ? UI.Chip({ label: 'Healthy / Done', tone: 'green', icon: 'check-circle' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'Needs You', tone: 'orange', icon: 'hand' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'Needs Attention', tone: 'red', icon: 'alert-triangle' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'Working Now', tone: 'accent', icon: 'zap' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'AI Strategy', tone: 'purple', icon: 'compass' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'Finance GL', tone: 'teal', icon: 'coins' }) : ''}
+              ${UI.Chip ? UI.Chip({ label: 'Removable Filter', tone: 'neutral', removable: true }) : ''}
+            </div>
+          </section>
+
+          <!-- 4. iOS-Style Toggles & Segmented Controls -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">4. Controls & Navigation Primitives</h2>
+              <p class="t-footnote" style="margin-top:2px;">Segmented control with sliding pill selection and iOS-style toggle switches.</p>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <div>
+                <span class="t-caption" style="display:block; margin-bottom:8px;">Segmented Control:</span>
+                ${UI.SegmentedControl ? UI.SegmentedControl({
+                  items: [
+                    { id: 'overview', label: 'Executive Overview' },
+                    { id: 'departments', label: 'Departments' },
+                    { id: 'workforce', label: 'Workforce Roster' },
+                    { id: 'reports', label: 'Financial Reports' }
+                  ],
+                  activeId: this.segmentedActive,
+                  onChange: 'DesignPreviewWorkspace.handleSegmentChange'
+                }) : ''}
+              </div>
+
+              <div>
+                <span class="t-caption" style="display:block; margin-bottom:8px;">Toggle Switch:</span>
+                ${UI.Toggle ? UI.Toggle({ id: 'demoToggle', label: 'Autonomous AI CEO Auto-Execution', checked: true }) : ''}
+              </div>
+            </div>
+          </section>
+
+          <!-- 5. Grouped List Rows -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">5. Grouped List Rows</h2>
+              <p class="t-footnote" style="margin-top:2px;">Clean Apple Settings-style list rows with AppTiles, titles, trailing metrics, and chevrons.</p>
+            </div>
+
+            <div class="grouped-list-apple">
+              ${UI.ListRow ? UI.ListRow({ title: 'AI CEO Strategy Engine', subtitle: 'Quarterly OKRs & corporate governance', tileEntity: 'ceo', trailingValue: 'Active' }) : ''}
+              ${UI.ListRow ? UI.ListRow({ title: 'Technology & Cloud Systems', subtitle: 'Base website builds and integrations', tileEntity: 'cto', trailingValue: '99.98% SLA' }) : ''}
+              ${UI.ListRow ? UI.ListRow({ title: 'Financial Command Center', subtitle: 'Audited balance sheet and general ledger', tileEntity: 'cfo', trailingValue: '₹4.28L Profit' }) : ''}
+            </div>
+          </section>
+
+          <!-- 6. Shimmering Loading Skeletons -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">6. Shimmering Skeletons & Progress</h2>
+              <p class="t-footnote" style="margin-top:2px;">1.6s smooth shimmers matching content shapes; progress bars with smooth spring easing.</p>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:20px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                ${UI.Skeleton ? UI.Skeleton({ type: 'avatar', width: '48px', height: '48px' }) : ''}
+                <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+                  ${UI.Skeleton ? UI.Skeleton({ type: 'text', width: '60%', height: '16px' }) : ''}
+                  ${UI.Skeleton ? UI.Skeleton({ type: 'text', width: '40%', height: '12px' }) : ''}
+                </div>
+              </div>
+
+              <div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                  <span class="t-caption">Company Build Progress</span>
+                  <span class="t-caption tabular-nums">78%</span>
+                </div>
+                ${UI.ProgressBar ? UI.ProgressBar({ progress: 78 }) : ''}
+              </div>
+            </div>
+          </section>
+
+          <!-- 7. Interactive Modals & Toasts -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">7. Modals, Sheets & Toast Alerts</h2>
+              <p class="t-footnote" style="margin-top:2px;">Trigger accessible dialogs with blurred backdrops and floating toast notifications.</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px;">
+              ${UI.Button ? UI.Button({ label: 'Open Modal Dialog', variant: 'primary', onClick: 'DesignPreviewWorkspace.openDemoModal()' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Show Success Toast', variant: 'secondary', onClick: 'UI.showToast("Report compiled and emailed successfully.", "success")' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Show Warning Toast', variant: 'secondary', onClick: 'UI.showToast("Unusual spike in customer acquisition cost detected.", "warning")' }) : ''}
+              ${UI.Button ? UI.Button({ label: 'Show Error Toast', variant: 'secondary', onClick: 'UI.showToast("Unable to reach external payment provider gateway.", "error")' }) : ''}
+            </div>
+          </section>
+
+          <!-- 8. Empty State View -->
+          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
+            <div style="margin-bottom:20px;">
+              <h2 class="t-title-2">8. Calm Empty State</h2>
+              <p class="t-footnote" style="margin-top:2px;">Clear, friendly empty state with 32px icon, one sentence, and one verb action button.</p>
+            </div>
+
+            <div style="background:var(--bg); border-radius:var(--r-lg); border:0.5px solid var(--separator);">
+              ${UI.EmptyState ? UI.EmptyState({
+                icon: 'briefcase',
+                title: 'No Active Missions Yet',
+                description: 'Your AI CEO will launch strategic company missions once your business brief is confirmed.',
+                actionButton: UI.Button ? UI.Button({ label: 'Launch First Mission', variant: 'primary', icon: 'plus' }) : ''
+              }) : ''}
+            </div>
+          </section>
+
+          <!-- 9. Signature AI Presence (<AiOrb />) -->
           <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
               <div>
-                <h2 class="t-title-2">Signature AI Presence</h2>
+                <h2 class="t-title-2">9. Signature AI Presence</h2>
                 <p class="t-footnote" style="margin-top:2px;">Physical states: Breathing idle, rotating thinking, pulsing speech, warming needs-you.</p>
               </div>
 
@@ -67,7 +223,7 @@
             </div>
 
             <!-- Live Orb Stage -->
-            <div style="min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; background:var(--bg); border-radius:var(--r-lg); padding:40px; border:0.5px solid var(--separator);">
+            <div style="min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; background:var(--bg); border-radius:var(--r-lg); padding:32px; border:0.5px solid var(--separator);">
               <div id="designOrbContainer">
                 ${window.AiOrb ? window.AiOrb({ state: this.orbState, size: this.orbSize }) : ''}
               </div>
@@ -80,68 +236,9 @@
             </div>
           </section>
 
-          <!-- 2. Typography Scale -->
+          <!-- 10. AppTile Department Squircle Collection -->
           <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <h2 class="t-title-2" style="margin-bottom:6px;">Typography Scale</h2>
-            <p class="t-footnote" style="margin-bottom:24px;">Inter font stack with tabular numbers for data alignment.</p>
-
-            <div style="display:flex; flex-direction:column; gap:24px;">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-display (48/52)</span>
-                <span class="t-display tabular-nums">₹4,28,500</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-large-title (34/41)</span>
-                <span class="t-large-title">Autonomous Company</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-title-1 (28/34)</span>
-                <span class="t-title-1">Executive Department Strategy</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-title-2 (22/28)</span>
-                <span class="t-title-2">Sales Pipeline & Commercial Operations</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-headline (17/22)</span>
-                <span class="t-headline">Q4 Revenue Target Achieved</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:0.5px solid var(--separator); padding-bottom:12px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-body (15/22)</span>
-                <span class="t-body">Every employee owns assigned Key Result Areas and Standard Operating Procedures.</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:baseline; padding-bottom:6px;">
-                <span class="t-caption" style="min-width:140px; color:var(--label-3);">--t-caption (12/16)</span>
-                <span class="t-caption">VERIFIED PROVENANCE • SHA-256 HASH CHAIN</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- 3. Dynamic Number Count-Up & Springs -->
-          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-              <div>
-                <h2 class="t-title-2">Spring Motion & Number Animation</h2>
-                <p class="t-footnote" style="margin-top:2px;">600ms tabular count-up without layout jumps.</p>
-              </div>
-              <button class="spring-press"
-                      style="padding:8px 18px; border-radius:var(--r-pill); border:none; background:var(--accent); color:#FFFFFF; font-size:14px; font-weight:600; cursor:pointer;"
-                      onclick="DesignPreviewWorkspace.triggerCountUp()">
-                Trigger Count-Up
-              </button>
-            </div>
-
-            <div style="background:var(--bg); padding:32px; border-radius:var(--r-lg); border:0.5px solid var(--separator); display:flex; flex-direction:column; align-items:center; gap:8px;">
-              <span class="t-caption" style="text-transform:uppercase; letter-spacing:0.04em;">Today's Verified Profit</span>
-              <div id="testCountUpDisplay" class="t-display tabular-nums" style="color:var(--green);">
-                ₹4,28,500
-              </div>
-            </div>
-          </section>
-
-          <!-- 4. AppTile Department Squircle Collection -->
-          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <h2 class="t-title-2" style="margin-bottom:6px;">AppTile Squircles</h2>
+            <h2 class="t-title-2" style="margin-bottom:6px;">10. AppTile Squircles</h2>
             <p class="t-footnote" style="margin-bottom:24px;">Concentric radii (~22%), subtle gradients, and white glyphs across all 9 core entities.</p>
 
             <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:20px; text-align:center;">
@@ -149,89 +246,6 @@
                 <div class="hover-lift" style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 8px; background:var(--surface-2); border-radius:var(--r-lg); border:0.5px solid var(--separator);">
                   ${window.AppTile ? window.AppTile({ entity: ent, size: 56 }) : ''}
                   <span class="t-caption" style="font-weight:600; text-transform:uppercase;">${ent}</span>
-                </div>
-              `).join('')}
-            </div>
-
-            <!-- Size Comparison -->
-            <div style="margin-top:28px; padding-top:20px; border-top:0.5px solid var(--separator); display:flex; align-items:center; justify-content:center; gap:28px; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                ${window.AppTile ? window.AppTile({ entity: 'ceo', size: 28 }) : ''}
-                <span class="t-caption">28px (Sidebar)</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                ${window.AppTile ? window.AppTile({ entity: 'ceo', size: 40 }) : ''}
-                <span class="t-caption">40px (List rows)</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                ${window.AppTile ? window.AppTile({ entity: 'ceo', size: 64 }) : ''}
-                <span class="t-caption">64px (Cards)</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                ${window.AppTile ? window.AppTile({ entity: 'ceo', size: 96 }) : ''}
-                <span class="t-caption">96px (Hero headers)</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- 5. Material & Glass Chrome -->
-          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <h2 class="t-title-2" style="margin-bottom:6px;">Materials & Elevation</h2>
-            <p class="t-footnote" style="margin-bottom:24px;">Translucent glass used for chrome that floats above content; solid cards below.</p>
-
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
-              <div style="padding:24px; border-radius:var(--r-lg); background:var(--surface); border:0.5px solid var(--separator); box-shadow:var(--shadow-1);">
-                <div class="t-headline">Shadow 1</div>
-                <div class="t-caption" style="margin-top:4px;">Resting card baseline</div>
-              </div>
-              <div style="padding:24px; border-radius:var(--r-lg); background:var(--surface); border:0.5px solid var(--separator); box-shadow:var(--shadow-2);">
-                <div class="t-headline">Shadow 2</div>
-                <div class="t-caption" style="margin-top:4px;">Elevated panel / popover</div>
-              </div>
-              <div style="padding:24px; border-radius:var(--r-lg); background:var(--surface); border:0.5px solid var(--separator); box-shadow:var(--shadow-3);">
-                <div class="t-headline">Shadow 3</div>
-                <div class="t-caption" style="margin-top:4px;">Hover lift / sheet</div>
-              </div>
-              <div class="glass" style="padding:24px; border-radius:var(--r-lg); box-shadow:var(--shadow-4);">
-                <div class="t-headline">Glass Material</div>
-                <div class="t-caption" style="margin-top:4px;">Translucent floating chrome</div>
-              </div>
-            </div>
-          </section>
-
-          <!-- 6. Color Tokens & Semantic Indicators -->
-          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <h2 class="t-title-2" style="margin-bottom:6px;">Semantic Palette & Contrast</h2>
-            <p class="t-footnote" style="margin-bottom:24px;">Pairing color with symbols and words for WCAG 2.2 AA conformance.</p>
-
-            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:16px;">
-              ${[
-                { name: 'Accent', token: 'var(--accent)', tint: 'var(--accent-tint)' },
-                { name: 'Green (Success)', token: 'var(--green)', tint: 'var(--green-tint)' },
-                { name: 'Orange (Attention)', token: 'var(--orange)', tint: 'var(--orange-tint)' },
-                { name: 'Red (Critical)', token: 'var(--red)', tint: 'var(--red-tint)' },
-                { name: 'Purple (Strategy)', token: 'var(--purple)', tint: 'var(--purple-tint)' },
-                { name: 'Teal (Finance)', token: 'var(--teal)', tint: 'var(--teal-tint)' }
-              ].map(c => `
-                <div style="padding:16px; border-radius:var(--r-lg); background:${c.tint}; border:0.5px solid var(--separator); display:flex; flex-direction:column; gap:8px;">
-                  <div style="width:24px; height:24px; border-radius:50%; background:${c.token}; box-shadow:var(--shadow-1);"></div>
-                  <div class="t-headline" style="color:${c.token}; font-size:14px;">${c.name}</div>
-                  <div class="t-caption" style="color:var(--label-2);">12% Tint BG</div>
-                </div>
-              `).join('')}
-            </div>
-          </section>
-
-          <!-- 7. Icon Library Sample -->
-          <section style="background:var(--surface); border:0.5px solid var(--separator); border-radius:var(--r-xl); padding:32px; box-shadow:var(--shadow-1);">
-            <h2 class="t-title-2" style="margin-bottom:6px;">Icon System Sample (1.75px Stroke)</h2>
-            <p class="t-footnote" style="margin-bottom:24px;">Precision glyphs vertically aligned to cap height.</p>
-
-            <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
-              ${['home', 'compass', 'trend', 'chip', 'coins', 'people', 'shield', 'sparkles', 'bell', 'search', 'settings', 'lock', 'play', 'check', 'x', 'arrow-right'].map(ic => `
-                <div style="padding:12px; background:var(--surface-2); border-radius:var(--r-md); border:0.5px solid var(--separator); display:flex; align-items:center; gap:8px;">
-                  ${window.Icon ? window.Icon({ name: ic, size: 20, tone: 'default' }) : ''}
-                  <span class="t-caption">${ic}</span>
                 </div>
               `).join('')}
             </div>
@@ -266,14 +280,30 @@
       }
     }
 
-    triggerCountUp() {
-      const el = document.getElementById('testCountUpDisplay');
-      if (!el || !window.Motion) return;
-      this.testNumber += Math.floor(Math.random() * 25000) + 5000;
-      window.Motion.animateCountUp(el, this.testNumber, {
-        duration: 600,
-        formatter: (val) => `₹${Math.round(val).toLocaleString('en-IN')}`
-      });
+    handleSegmentChange(segmentId) {
+      if (window.UI && window.UI.showToast) {
+        window.UI.showToast(`Switched segment to: ${segmentId}`, 'info');
+      }
+    }
+
+    openDemoModal() {
+      if (!window.UI || !window.UI.openModal) return;
+      window.UI.openModal(
+        'Executive Decision Approval',
+        `
+          <p class="t-body" style="color:var(--label-2); margin-bottom:20px;">
+            The AI CMO recommends approving the Q4 DACH demand generation campaign with a budget of ₹2,50,000.
+          </p>
+          <div style="background:var(--surface-2); padding:16px; border-radius:var(--r-md); border:0.5px solid var(--separator); margin-bottom:24px;">
+            <div class="t-caption" style="color:var(--label-3); margin-bottom:4px;">Expected Outcome:</div>
+            <div class="t-headline" style="color:var(--green);">+₹12,40,000 Incremental Pipeline</div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <button class="btn-apple btn-apple-secondary" onclick="UI.closeModal()">Not Now</button>
+            <button class="btn-apple btn-apple-primary" onclick="UI.showToast('Campaign approved successfully.', 'success'); UI.closeModal();">Approve Campaign</button>
+          </div>
+        `
+      );
     }
   }
 
