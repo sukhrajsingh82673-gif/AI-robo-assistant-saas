@@ -12,6 +12,7 @@ import uuid
 import json
 import base64
 import subprocess
+import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Any
@@ -209,12 +210,38 @@ class ComputerUseEngine:
 
     def observe(self) -> GUIObservation:
         """Primitive 1: Capture state, active window, and visible UI elements."""
+        active_win = self.active_window
+        open_wins = list(self.open_windows)
+        display = os.environ.get("DISPLAY")
+        if display:
+            if shutil.which("xdotool"):
+                try:
+                    w_id = subprocess.check_output(["xdotool", "getactivewindow"], text=True, timeout=2).strip()
+                    if w_id:
+                        w_title = subprocess.check_output(["xdotool", "getwindowname", w_id], text=True, timeout=2).strip()
+                        if w_title:
+                            active_win = w_title
+                except Exception:
+                    pass
+            if shutil.which("wmctrl"):
+                try:
+                    out = subprocess.check_output(["wmctrl", "-l"], text=True, timeout=2)
+                    parsed = []
+                    for line in out.strip().splitlines():
+                        parts = line.split(None, 3)
+                        if len(parts) >= 4:
+                            parsed.append(parts[3])
+                    if parsed:
+                        open_wins = parsed
+                except Exception:
+                    pass
+
         obs = GUIObservation(
             timestamp=time.time(),
             screen_width=self.width,
             screen_height=self.height,
-            active_window=self.active_window,
-            open_windows=list(self.open_windows),
+            active_window=active_win,
+            open_windows=open_wins,
             elements=self.perception.detect_elements(),
             screenshot_base64=None,
             cursor_position=(self.cursor_x, self.cursor_y)
@@ -226,6 +253,13 @@ class ComputerUseEngine:
         """Primitive 2: Move cursor and send mouse click."""
         self.cursor_x = max(0, min(x, self.width))
         self.cursor_y = max(0, min(y, self.height))
+        display = os.environ.get("DISPLAY")
+        if display and shutil.which("xdotool"):
+            try:
+                btn_num = "1" if button == "left" else ("3" if button == "right" else "2")
+                subprocess.run(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y), "click", btn_num], check=False, timeout=3)
+            except Exception:
+                pass
         return self._record("click", {"x": self.cursor_x, "y": self.cursor_y, "button": button})
 
     def double_click(self, x: int, y: int) -> Dict[str, Any]:
@@ -258,6 +292,12 @@ class ComputerUseEngine:
 
     def type_text(self, text: str, delay_ms: int = 10) -> Dict[str, Any]:
         """Primitive 8: Type text string into focused input field."""
+        display = os.environ.get("DISPLAY")
+        if display and shutil.which("xdotool") and text:
+            try:
+                subprocess.run(["xdotool", "type", "--delay", str(delay_ms), text], check=False, timeout=5)
+            except Exception:
+                pass
         return self._record("type", {"text": text, "delay_ms": delay_ms})
 
     def press_key(self, key_name: str) -> Dict[str, Any]:
@@ -295,6 +335,18 @@ class ComputerUseEngine:
     def screenshot(self, region: Optional[Tuple[int, int, int, int]] = None) -> bytes:
         """Primitive 14: Capture screenshot bytes."""
         self._record("screenshot", {"region": region})
+        display = os.environ.get("DISPLAY")
+        if display and shutil.which("scrot"):
+            tmp_f = f"/tmp/cu_shot_{uuid.uuid4().hex[:8]}.png"
+            try:
+                subprocess.run(["scrot", tmp_f], check=True, timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if os.path.exists(tmp_f) and os.path.getsize(tmp_f) > 0:
+                    with open(tmp_f, "rb") as f:
+                        data = f.read()
+                    os.remove(tmp_f)
+                    return data
+            except Exception:
+                pass
         # Synthetic PNG header buffer for headless environments
         synthetic_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
         return synthetic_png

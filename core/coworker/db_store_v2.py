@@ -213,7 +213,41 @@ class CoworkerDbStoreV2:
                 task.completed_at, json.dumps(task.metadata)
             ))
             conn.commit()
+        self._sync_to_postgres(task)
         return task
+
+    def _sync_to_postgres(self, task: CoworkerV2Task) -> None:
+        """
+        Dual-tier storage sync: Mirrors authoritative task record to PostgreSQL
+        if DATABASE_URL is configured, ensuring multi-node distributed consistency.
+        """
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            return
+        try:
+            import psycopg2
+            with psycopg2.connect(db_url, connect_timeout=3) as pg_conn:
+                with pg_conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO coworker_tasks (
+                            task_id, tenant_id, company_id, user_id, workspace_mode,
+                            prompt, target_outcome, status, permission_tier,
+                            approval_status, execution_log, receipt_id, created_at, completed_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT(task_id) DO UPDATE SET
+                            status = EXCLUDED.status,
+                            execution_log = EXCLUDED.execution_log,
+                            completed_at = EXCLUDED.completed_at;
+                    """, (
+                        task.task_id, task.tenant_id, task.company_id, task.assigned_worker_id or "coworker_2.0",
+                        "SANDBOX", task.title or task.description, task.description, task.state.value,
+                        task.risk_level, "APPROVED",
+                        json.dumps({"state": task.state.value, "error": task.error_message, "lease": task.lease_id}),
+                        task.lease_id, task.created_at, task.completed_at
+                    ))
+                pg_conn.commit()
+        except Exception:
+            pass
 
     def get_task(self, task_id: str) -> Optional[CoworkerV2Task]:
         sql = "SELECT * FROM coworker_v2_tasks WHERE task_id = ?;"

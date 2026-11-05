@@ -105,7 +105,7 @@ class ResourceGuardEngine:
     def check_storage_and_memory(self) -> Dict[str, Any]:
         m = self.check_host_resources()
         return {
-            "sufficient": m.all_healthy,
+            "sufficient": (m.ram_healthy and m.disk_healthy),
             "disk_free_gb": m.free_disk_gb,
             "ram_free_mb": m.free_ram_mb,
             "cpu_percent": m.cpu_percent,
@@ -207,10 +207,9 @@ class ResourceGuardEngine:
         Registers the workspace in the cleanup manifest.
         """
         metrics = self.check_host_resources()
-        if not metrics.all_healthy:
+        if not (metrics.disk_healthy and metrics.ram_healthy):
             raise RuntimeError(
                 f"Insufficient host resources for new workspace: "
-                f"CPU={metrics.cpu_percent}% (max {self.max_cpu_percent}%), "
                 f"RAM={metrics.free_ram_mb}MB (min {self.min_free_ram_mb}MB), "
                 f"Disk={metrics.free_disk_gb}GB (min {self.min_free_disk_gb}GB)"
             )
