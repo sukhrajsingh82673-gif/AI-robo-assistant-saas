@@ -407,6 +407,9 @@ class V8ApiHandler:
                     "window_title": perception.window_title,
                     "resolution": perception.screen_resolution,
                     "elements_detected": len(perception.interactive_elements),
+                    # True means the element tree is seeded, not scraped from a display.
+                    "synthetic": perception.synthetic,
+                    "verified": not perception.synthetic,
                 }
             }, 200
 

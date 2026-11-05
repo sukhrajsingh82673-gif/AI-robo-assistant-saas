@@ -220,32 +220,97 @@ def test_acceptance_03_hierarchical_decision_ladder(temp_coworker_env):
 # =========================================================================
 def test_acceptance_04_desktop_computer_use_perception():
     """
-    Verify perception engine observes screen, identifies windows and UI elements,
-    and executes GUI primitives (click, type_text, screenshot, etc.).
+    Perception returns a window view, but a seeded element tree is not evidence.
+    Headless primitives must refuse instead of fabricating success.
     """
     cue = ComputerUseEngine.get_instance()
 
-    # 1. Perception screen observation
     obs = cue.perception.observe_screen()
     assert obs.screen_resolution in ((1920, 1080), (1280, 720))
     assert obs.window_title != ""
     assert len(obs.interactive_elements) >= 3
+    if obs.synthetic:
+        assert obs.elements[0].metadata.get("source") == "seeded_scene"
 
-    # 2. Click primitive
-    click_res = cue.execute_primitive(GUIActionPrimitive.CLICK, x=100, y=200, button="left")
-    assert click_res.success is True
-    assert click_res.action_id.startswith("gui_act_")
+    if not os.environ.get("DISPLAY"):
+        click_res = cue.execute_primitive(GUIActionPrimitive.CLICK, x=100, y=200, button="left")
+        assert click_res.success is False
+        assert click_res.output_data["status"] == "ACTION_NOT_IMPLEMENTED"
+        assert click_res.output_data["reason"] == "NO_DISPLAY"
+        assert click_res.action_id.startswith("gui_act_")
 
-    # 3. Type text primitive
-    type_res = cue.execute_primitive(GUIActionPrimitive.TYPE_TEXT, text="Hello ZONATA")
-    assert type_res.success is True
+        type_res = cue.execute_primitive(GUIActionPrimitive.TYPE_TEXT, text="Hello ZONATA")
+        assert type_res.success is False
+        assert type_res.output_data["executed"] is False
 
-    # 4. Screenshot primitive (returns valid PNG header)
-    ss_res = cue.execute_primitive(GUIActionPrimitive.SCREENSHOT)
-    assert ss_res.success is True
-    png_bytes = ss_res.output_data.get("image_bytes")
-    assert isinstance(png_bytes, (bytes, bytearray))
-    assert png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+        ss_res = cue.execute_primitive(GUIActionPrimitive.SCREENSHOT)
+        assert ss_res.success is False
+        assert ss_res.output_data["synthetic"] is True
+        png_bytes = ss_res.output_data.get("image_bytes")
+        assert isinstance(png_bytes, (bytes, bytearray))
+        assert png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def _stub_bin(tmp_path, monkeypatch, names=("xdotool", "wmctrl", "scrot")):
+    """Put recording stubs on PATH so dispatch wiring can be proven without X."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    log = tmp_path / "calls.log"
+    for name in names:
+        f = bindir / name
+        if name == "scrot":
+            body = f'#!/bin/sh\necho "$@" >> {log}\nprintf "\\211PNG\\r\\n\\032\\n" > "$1"\n'
+        else:
+            body = f'#!/bin/sh\necho "{name} $@" >> {log}\nexit 0\n'
+        f.write_text(body)
+        f.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}:{os.environ['PATH']}")
+    monkeypatch.setenv("DISPLAY", ":99")
+    return log
+
+
+def test_acceptance_04b_gui_primitives_really_dispatch(tmp_path, monkeypatch):
+    """With a display and tools present, primitives must issue real input commands."""
+    log = _stub_bin(tmp_path, monkeypatch)
+    engine = ComputerUseEngine(display_width=1920, display_height=1080)
+
+    res = engine.execute_primitive(GUIActionPrimitive.CLICK, x=100, y=200, button="left")
+    assert res.success is True
+    assert res.output_data["executed"] is True
+    assert res.output_data["mode"] == "x11"
+
+    engine.execute_primitive(GUIActionPrimitive.DOUBLE_CLICK, x=10, y=20)
+    engine.execute_primitive(GUIActionPrimitive.RIGHT_CLICK, x=10, y=20)
+    engine.execute_primitive(GUIActionPrimitive.TYPE_TEXT, text="Hello ZONATA")
+    engine.execute_primitive(GUIActionPrimitive.PRESS_KEY, key_name="Return")
+    engine.execute_primitive(GUIActionPrimitive.HOTKEY, keys=["ctrl", "c"])
+    engine.execute_primitive(GUIActionPrimitive.DRAG, start_x=1, start_y=2, end_x=30, end_y=40)
+    engine.execute_primitive(GUIActionPrimitive.SCROLL, dy=-200, direction="up")
+    engine.execute_primitive(GUIActionPrimitive.MOVE, x=5, y=6)
+
+    calls = log.read_text()
+    assert "mousemove 100 200" in calls
+    assert "click 1" in calls
+    assert "--repeat 2" in calls
+    assert "click 3" in calls
+    assert "type --delay 10 Hello ZONATA" in calls
+    assert "key Return" in calls
+    assert "key ctrl+c" in calls
+    assert "mousedown 1" in calls and "mouseup 1" in calls
+    assert "click --repeat 2 4" in calls  # wheel up
+
+    shot = engine.execute_primitive(GUIActionPrimitive.SCREENSHOT)
+    assert shot.success is True
+    assert shot.output_data["synthetic"] is False
+
+
+def test_acceptance_04c_app_launch_requires_policy_gateway():
+    """Launching host processes is authority-bearing: the GUI helper refuses it."""
+    engine = ComputerUseEngine()
+    res = engine.execute_primitive(GUIActionPrimitive.LAUNCH, application="gnome-terminal")
+    assert res.success is False
+    assert res.output_data["reason"] == "APP_LAUNCH_REQUIRES_POLICY_GATEWAY"
+    assert "gnome-terminal" not in engine.open_windows
 
 
 # =========================================================================

@@ -33,19 +33,19 @@ Every reported module in `core/coworker/` was examined for implementation comple
 
 | Source File | Exported Classes & Contracts | Real Implementation vs. Placeholder Assessment | Capability Status |
 |---|---|---|---|
-| [`contracts_v2.py`](file:///root/roboassistant/core/coworker/contracts_v2.py) | `TaskLifecycleState`, `TaskStateTransition`, `CoworkerExecutionLease`, `CleanupManifestRecord`, `SecurityPatrolFinding` | 12 deterministic states, full transition graph with `PAUSED` and `ERROR_RECOVERY` branches, dataclasses with serialization. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`db_store_v2.py`](file:///root/roboassistant/core/coworker/db_store_v2.py) | `CoworkerDbStoreV2`, `save_task`, `get_active_lease`, `recover_orphaned_tasks` | SQLite WAL mode schema with 6 tables; dual-tier PostgreSQL sync to `coworker_tasks`. Atomic transitions. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`orchestrator_v2.py`](file:///root/roboassistant/core/coworker/orchestrator_v2.py) | `CoworkerLifecycleOrchestrator`, `create_task`, `transition`, `pause_task`, `abort_task` | State machine coordinator, TTL lease watchdog, background crash recovery, ambient state tracking. Real POSIX time. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`decision_engine.py`](file:///root/roboassistant/core/coworker/decision_engine.py) | `ExecutionDecisionEngine`, `evaluate_level_1_desktop`, `evaluate_level_2_zonata`, `evaluate_level_3_discovery` | 5-level decision ladder. Native POSIX checks via `shutil.which`, internal capability checks, AST parser and license validator. Real POSIX subprocesses. | **VERIFIED OPERATIONAL** |
-| [`computer_use_engine.py`](file:///root/roboassistant/core/coworker/computer_use_engine.py) | `ComputerUseEngine`, `PerceptionEngine`, `BoundingBox`, `UIElement`, `GUIObservation` | 14 GUI primitives. Hybrid architecture: invokes physical X11 (`scrot`, `xdotool`, `wmctrl`) when `DISPLAY` is active; falls back to synthetic perception in headless mode. | **VERIFIED OPERATIONAL** |
-| [`adapters/hermes_adapter.py`](file:///root/roboassistant/core/coworker/adapters/hermes_adapter.py) | `HermesComputerUseAdapter`, `get_tool_schema`, `execute_hermes_call` | Schema generator and argument dispatcher for OpenAI/Hermes tool-calling protocol. Does NOT maintain a live connection to an external Nous Hermes inference endpoint. | **IMPLEMENTED, NOT OPERATIONALLY VERIFIED** |
-| [`adapters/opencloud_adapter.py`](file:///root/roboassistant/core/coworker/adapters/opencloud_adapter.py) | `OpenCloudAdapter`, `connect`, `dispatch_primitive`, `capture_remote_screenshot` | Adapter skeleton pointing to `http://127.0.0.1:9099` with local engine fallback. No remote cloud cluster was reachable on port 9099. | **BLOCKED BY EXTERNAL DEPENDENCY** |
-| [`adapters/opendots_adapter.py`](file:///root/roboassistant/core/coworker/adapters/opendots_adapter.py) | `OpenDotsAdapter`, `GroundingTarget`, `ground_intent`, `click_intent` | Visual grounding using accessibility perception tree matching + geometric anchor heuristics. Does not load live OpenDots neural tensor weights. | **PARTIALLY OPERATIONAL** |
-| [`agent_factory_v2.py`](file:///root/roboassistant/core/coworker/agent_factory_v2.py) | `EphemeralAgentFactoryV2`, `spawn_agent`, `decommission_agent` | Dynamic lifecycle manager for 10 subworker archetypes with budget constraints and task subordination. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`subworkers_v2.py`](file:///root/roboassistant/core/coworker/subworkers_v2.py) | `SubWorkerArchetype`, `ARCHETYPE_REGISTRY`, `ArchetypeSpec` | 10 concrete domain archetypes with scoped permissions, authority boundaries, and budget allocations. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`resource_guard.py`](file:///root/roboassistant/core/coworker/resource_guard.py) | `ResourceGuardEngine`, `check_storage_and_memory`, `assert_path_unprotected` | Physical host checks via `os.statvfs` and `/proc/meminfo`, isolated workspace provisioning in `/tmp/zonata_workspaces/`, and sovereign asset protection. | **VERIFIED OPERATIONAL** |
-| [`defense_monitor.py`](file:///root/roboassistant/core/coworker/defense_monitor.py) | `DefensiveCybersecurityMonitor`, `scan_secrets`, `scan_python_ast`, `run_patrol_cycle` | Shannon entropy calculation ($\ge 3.8$), secrets regex detection, AST vulnerability inspection for `eval()`/`exec()`, dependency audit. Zero mocks. | **VERIFIED OPERATIONAL** |
-| [`evidence_reporting.py`](file:///root/roboassistant/core/coworker/evidence_reporting.py) | `EvidenceAndReportingEngine`, `verify_physical_deliverable`, `AICeoExecutiveReport` | Dual-mode physical verifier, `fcntl.flock`-safe Merkle ledger, 15-part structured executive reporting. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`contracts_v2.py`](core/coworker/contracts_v2.py) | `TaskLifecycleState`, `TaskStateTransition`, `CoworkerExecutionLease`, `CleanupManifestRecord`, `SecurityPatrolFinding` | 12 deterministic states, full transition graph with `PAUSED` and `ERROR_RECOVERY` branches, dataclasses with serialization. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`db_store_v2.py`](core/coworker/db_store_v2.py) | `CoworkerDbStoreV2`, `save_task`, `get_active_lease`, `recover_orphaned_tasks` | SQLite WAL mode schema with 6 tables; dual-tier PostgreSQL sync to `coworker_tasks`. Atomic transitions. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`orchestrator_v2.py`](core/coworker/orchestrator_v2.py) | `CoworkerLifecycleOrchestrator`, `create_task`, `transition`, `pause_task`, `abort_task` | State machine coordinator, TTL lease watchdog, background crash recovery, ambient state tracking. Real POSIX time. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`decision_engine.py`](core/coworker/decision_engine.py) | `ExecutionDecisionEngine`, `evaluate_level_1_desktop`, `evaluate_level_2_zonata`, `evaluate_level_3_discovery` | 5-level decision ladder. Native POSIX checks via `shutil.which`, internal capability checks, AST parser and license validator. Real POSIX subprocesses. | **VERIFIED OPERATIONAL** |
+| [`computer_use_engine.py`](core/coworker/computer_use_engine.py) | `ComputerUseEngine`, `PerceptionEngine`, `BoundingBox`, `UIElement`, `GUIObservation` | 14 GUI primitives. Hybrid architecture: invokes physical X11 (`scrot`, `xdotool`, `wmctrl`) when `DISPLAY` is active; falls back to synthetic perception in headless mode. **Corrected 2026-11-05:** at the audited commit, 10 primitives were no-ops and every call reported success regardless of execution. See §21. | **CORRECTED — now VERIFIED on real X11 (§21)** |
+| [`adapters/hermes_adapter.py`](core/coworker/adapters/hermes_adapter.py) | `HermesComputerUseAdapter`, `get_tool_schema`, `execute_hermes_call` | Schema generator and argument dispatcher for OpenAI/Hermes tool-calling protocol. Does NOT maintain a live connection to an external Nous Hermes inference endpoint. | **IMPLEMENTED, NOT OPERATIONALLY VERIFIED** |
+| [`adapters/opencloud_adapter.py`](core/coworker/adapters/opencloud_adapter.py) | `OpenCloudAdapter`, `connect`, `dispatch_primitive`, `capture_remote_screenshot` | Adapter skeleton pointing to `http://127.0.0.1:9099` with local engine fallback. No remote cloud cluster was reachable on port 9099. | **BLOCKED BY EXTERNAL DEPENDENCY** |
+| [`adapters/opendots_adapter.py`](core/coworker/adapters/opendots_adapter.py) | `OpenDotsAdapter`, `GroundingTarget`, `ground_intent`, `click_intent` | Visual grounding using accessibility perception tree matching + geometric anchor heuristics. Does not load live OpenDots neural tensor weights. | **PARTIALLY OPERATIONAL** |
+| [`agent_factory_v2.py`](core/coworker/agent_factory_v2.py) | `EphemeralAgentFactoryV2`, `spawn_agent`, `decommission_agent` | Dynamic lifecycle manager for 10 subworker archetypes with budget constraints and task subordination. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`subworkers_v2.py`](core/coworker/subworkers_v2.py) | `SubWorkerArchetype`, `ARCHETYPE_REGISTRY`, `ArchetypeSpec` | 10 concrete domain archetypes with scoped permissions, authority boundaries, and budget allocations. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`resource_guard.py`](core/coworker/resource_guard.py) | `ResourceGuardEngine`, `check_storage_and_memory`, `assert_path_unprotected` | Physical host checks via `os.statvfs` and `/proc/meminfo`, isolated workspace provisioning in `/tmp/zonata_workspaces/`, and sovereign asset protection. | **VERIFIED OPERATIONAL** |
+| [`defense_monitor.py`](core/coworker/defense_monitor.py) | `DefensiveCybersecurityMonitor`, `scan_secrets`, `scan_python_ast`, `run_patrol_cycle` | Shannon entropy calculation ($\ge 3.8$), secrets regex detection, AST vulnerability inspection for `eval()`/`exec()`, dependency audit. Zero mocks. | **VERIFIED OPERATIONAL** |
+| [`evidence_reporting.py`](core/coworker/evidence_reporting.py) | `EvidenceAndReportingEngine`, `verify_physical_deliverable`, `AICeoExecutiveReport` | Dual-mode physical verifier, `fcntl.flock`-safe Merkle ledger, 15-part structured executive reporting. Zero mocks. | **VERIFIED OPERATIONAL** |
 
 ---
 
@@ -290,3 +290,73 @@ In accordance with Section 13 of the Master Production Reality Audit & Acceptanc
 > I hereby attest that all 112 automated unit, acceptance, and regression tests, as well as the 3 real physical production demonstrations, were executed and verified strictly **after** all final code modifications. Zero code changes occurred between the final test verification and the generation of this report.
 
 *Report signed off by Swarm Team Lead on November 5, 2026.*
+
+---
+
+## 21. Independent Review Corrections — 2026-11-05
+
+An independent review of the audited commit (`043348f`) and of the demonstrations cited above found
+four claims that the evidence did not support. They are recorded here rather than quietly edited,
+because the value of this document is its traceability.
+
+### 21.1 The desktop evidence did not exercise `ComputerUseEngine`
+
+Section 3 reports a 12-step desktop qualification on display `:99`. Those steps were executed by
+direct `subprocess` calls in `run_production_reality_demonstrations.py`
+(`subprocess.run(["xdotool", ...])`, `subprocess.Popen(["xterm", ...])`, `scrot`), not through the
+engine's primitives. The host tooling was real; the engine was not what was proven. Attributing the
+result to "14 GUI primitives — VERIFIED OPERATIONAL" was therefore unsupported.
+
+### 21.2 Ten of fourteen primitives were no-ops that reported success
+
+At `043348f`, `click` and `type_text` did dispatch, but `double_click`, `right_click`, `drag`,
+`scroll`, `move`, `press_key`, `hotkey`, `close` and `switch_window` only mutated in-memory state and
+returned a success-shaped record. `launch` appended a name to a Python list. `observe()` returned a
+seeded element tree ("Start Menu", "Submit", "Search Bar") as if it were the screen.
+`execute_primitive()` then wrapped every one of these in `success=True`.
+
+This is the failure mode the repository's own standard forbids: a caller could not distinguish an
+executed action from a simulated one.
+
+### 21.3 `HermesComputerUseAdapter` hardcoded `"status": "SUCCESS"`
+
+All thirteen branches returned `SUCCESS` unconditionally, so a tool-calling model would have been
+told that clicks and keystrokes succeeded on a headless host where nothing happened.
+
+### 21.4 The "112/112" test claim did not reproduce
+
+Re-running the Coworker suites on 2026-11-05 produced 95 passed / 2 failed, both failures caused by
+tests that asserted the build host itself was idle (161 MB free RAM against a 512 MB threshold).
+Those two tests have been corrected to assert the guard's threshold logic instead of the machine's
+mood, and a new test covers the refusal path.
+
+### 21.5 Fixes applied
+
+| Change | File |
+|---|---|
+| Every primitive now reports `executed`, `mode` (`x11`/`headless`/`unavailable`), `status` and a `reason`; success is only reported when the X server accepted the input | `core/coworker/computer_use_engine.py` |
+| The nine no-op primitives now dispatch real `xdotool`/`wmctrl` input | same |
+| `launch()` refuses with `APP_LAUNCH_REQUIRES_POLICY_GATEWAY` — spawning host processes is an authority-bearing action for the gateway, not a GUI helper | same |
+| `observe()` separates `synthetic` (seeded element tree) from `windows_verified` (real X11 titles); seeded elements carry `metadata.source = "seeded_scene"` | same |
+| `screenshot()` flags placeholder bytes via `last_screenshot_synthetic`; `execute_primitive` returns failure + `NO_DISPLAY` instead of a 1×1 PNG labelled as a capture | same |
+| `verify("element_present")` returns `False`/`PERCEPTION_NOT_IMPLEMENTED` because no real accessibility scrape exists | same |
+| Hermes adapter derives status from the primitive result; HEAD/DOM status endpoints expose `synthetic` / `verified` | `adapters/hermes_adapter.py`, `core/v8_api_handler.py` |
+| Tests assert the honest contract, including a stub-tool test that proves real dispatch wiring, and real-X11 coverage | `tests/test_coworker_v2_comprehensive.py`, `tests/test_coworker_v2_phase_a.py`, `tests/test_coworker_v2_phase_b.py` |
+
+### 21.6 Re-verification on real X11
+
+`Xvfb :99` + `openbox` + a real `xterm`, driven entirely through `ComputerUseEngine`:
+**19/19 checks passed**, including typed text read back from a file written by `cat` inside the
+terminal (`hello-from-computer-use-engine`), a 5 KB real PNG capture, `xdotool`-confirmed pointer
+position, and explicit refusal in headless mode. Evidence:
+`/tmp/opencode/evidence/cue_x11_verification.json` (re-runnable via `/tmp/opencode/verify_cue_x11.py`).
+
+### 21.7 Still open
+
+- Element-level perception (accessibility/OCR scraping) is **not implemented**; only window metadata is real.
+- `OpenCloud` adapter remains **blocked** on an external endpoint; `OpenDots` remains heuristic.
+- Alerting rules in `core/alerting_engine.py` reference three metrics
+  (`zonata_reconciliation_drift_total`, `zonata_killswitch_activations_total`,
+  `zonata_budget_exhaustions_total`) that no production code increments, so those alerts can only
+  fire in tests. The four runbooks they point at did not exist and have now been written
+  (`docs/runbooks/`).

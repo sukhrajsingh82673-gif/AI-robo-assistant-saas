@@ -96,6 +96,10 @@ class GUIObservation:
     elements: List[UIElement]
     screenshot_base64: Optional[str] = None
     cursor_position: Tuple[int, int] = (0, 0)
+    # True when the element tree is seeded rather than scraped from a display.
+    # Window titles, when present, may still be real; see windows_verified.
+    synthetic: bool = False
+    windows_verified: bool = False
 
     @property
     def active_app(self) -> str:
@@ -181,6 +185,7 @@ class ComputerUseEngine:
         self.action_history: List[Dict[str, Any]] = []
         self.perception = PerceptionEngine()
         self.is_headless = not bool(os.environ.get("DISPLAY"))
+        self.last_screenshot_synthetic = True
         self._init_default_scene()
 
     def _init_default_scene(self) -> None:
@@ -206,6 +211,51 @@ class ComputerUseEngine:
         self.action_history.append(entry)
         return entry
 
+    # --- Execution truth helpers -------------------------------------------------
+
+    def _dispatch(self, argv: List[str]) -> Tuple[bool, Optional[str]]:
+        """
+        Attempt a real input dispatch. Returns (executed, reason_if_not).
+
+        A primitive may only report success when the host actually accepted the
+        input event. Headless operation is not simulated: callers get
+        ACTION_NOT_IMPLEMENTED instead of a fabricated success.
+        """
+        if not os.environ.get("DISPLAY"):
+            return False, "NO_DISPLAY"
+        if not shutil.which(argv[0]):
+            return False, "TOOL_MISSING"
+        try:
+            proc = subprocess.run(argv, capture_output=True, timeout=5)
+        except subprocess.TimeoutExpired:
+            return False, "DISPATCH_TIMEOUT"
+        except Exception:
+            return False, "DISPATCH_FAILED"
+        if proc.returncode != 0:
+            return False, "DISPATCH_FAILED"
+        return True, None
+
+    def _mode(self, executed: bool) -> str:
+        if executed:
+            return "x11"
+        return "headless" if not os.environ.get("DISPLAY") else "unavailable"
+
+    def _action(self, name: str, params: Dict[str, Any], executed: bool,
+                reason: Optional[str], extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        rec = self._record(name, params)
+        rec.update({
+            "executed": executed,
+            "mode": self._mode(executed),
+            "status": "SUCCESS" if executed else "ACTION_NOT_IMPLEMENTED",
+            "reason": None if executed else (reason or "NOT_EXECUTED"),
+        })
+        if extra:
+            rec.update(extra)
+        return rec
+
+    def _clamp(self, x: int, y: int) -> Tuple[int, int]:
+        return (max(0, min(int(x), self.width)), max(0, min(int(y), self.height)))
+
     # --- 14 GUI Primitives ---
 
     def observe(self) -> GUIObservation:
@@ -213,28 +263,38 @@ class ComputerUseEngine:
         active_win = self.active_window
         open_wins = list(self.open_windows)
         display = os.environ.get("DISPLAY")
-        if display:
-            if shutil.which("xdotool"):
-                try:
-                    w_id = subprocess.check_output(["xdotool", "getactivewindow"], text=True, timeout=2).strip()
-                    if w_id:
-                        w_title = subprocess.check_output(["xdotool", "getwindowname", w_id], text=True, timeout=2).strip()
-                        if w_title:
-                            active_win = w_title
-                except Exception:
-                    pass
-            if shutil.which("wmctrl"):
-                try:
-                    out = subprocess.check_output(["wmctrl", "-l"], text=True, timeout=2)
-                    parsed = []
-                    for line in out.strip().splitlines():
-                        parts = line.split(None, 3)
-                        if len(parts) >= 4:
-                            parsed.append(parts[3])
-                    if parsed:
-                        open_wins = parsed
-                except Exception:
-                    pass
+        real_windows = False
+        if display and shutil.which("xdotool"):
+            try:
+                w_id = subprocess.check_output(["xdotool", "getactivewindow"], text=True, timeout=2,
+                                               stderr=subprocess.DEVNULL).strip()
+                if w_id:
+                    w_title = subprocess.check_output(["xdotool", "getwindowname", w_id], text=True,
+                                                      timeout=2, stderr=subprocess.DEVNULL).strip()
+                    if w_title:
+                        active_win = w_title
+                        real_windows = True
+            except Exception:
+                pass
+        if display and shutil.which("wmctrl"):
+            try:
+                out = subprocess.check_output(["wmctrl", "-l"], text=True, timeout=2,
+                                                stderr=subprocess.DEVNULL)
+                parsed = []
+                for line in out.strip().splitlines():
+                    parts = line.split(None, 3)
+                    if len(parts) >= 4:
+                        parsed.append(parts[3])
+                if parsed:
+                    open_wins = parsed
+                    real_windows = True
+            except Exception:
+                pass
+
+        elements = self.perception.detect_elements()
+        synthetic_elements = bool(elements)  # the element tree is seeded, never scraped
+        for el in elements:
+            el.metadata.setdefault("source", "seeded_scene")
 
         obs = GUIObservation(
             timestamp=time.time(),
@@ -242,131 +302,207 @@ class ComputerUseEngine:
             screen_height=self.height,
             active_window=active_win,
             open_windows=open_wins,
-            elements=self.perception.detect_elements(),
+            elements=elements,
             screenshot_base64=None,
-            cursor_position=(self.cursor_x, self.cursor_y)
+            cursor_position=(self.cursor_x, self.cursor_y),
+            synthetic=synthetic_elements,
+            windows_verified=real_windows,
         )
-        self._record("observe", {"element_count": len(obs.elements)})
+        self._record("observe", {"element_count": len(obs.elements),
+                                 "windows_from_x11": real_windows,
+                                 "elements_seeded": synthetic_elements})
         return obs
 
     def click(self, x: int, y: int, button: str = "left") -> Dict[str, Any]:
         """Primitive 2: Move cursor and send mouse click."""
-        self.cursor_x = max(0, min(x, self.width))
-        self.cursor_y = max(0, min(y, self.height))
-        display = os.environ.get("DISPLAY")
-        if display and shutil.which("xdotool"):
-            try:
-                btn_num = "1" if button == "left" else ("3" if button == "right" else "2")
-                subprocess.run(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y), "click", btn_num], check=False, timeout=3)
-            except Exception:
-                pass
-        return self._record("click", {"x": self.cursor_x, "y": self.cursor_y, "button": button})
+        self.cursor_x, self.cursor_y = self._clamp(x, y)
+        btn = {"left": "1", "middle": "2", "right": "3"}.get(button, "1")
+        ok, why = self._dispatch(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y)])
+        if ok:
+            ok, why = self._dispatch(["xdotool", "click", btn])
+        return self._action("click", {"x": self.cursor_x, "y": self.cursor_y, "button": button}, ok, why)
 
     def double_click(self, x: int, y: int) -> Dict[str, Any]:
         """Primitive 3: Send double click."""
-        self.cursor_x = max(0, min(x, self.width))
-        self.cursor_y = max(0, min(y, self.height))
-        return self._record("double_click", {"x": self.cursor_x, "y": self.cursor_y})
+        self.cursor_x, self.cursor_y = self._clamp(x, y)
+        ok, why = self._dispatch(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y)])
+        if ok:
+            ok, why = self._dispatch(["xdotool", "click", "--repeat", "2", "--delay", "100", "1"])
+        return self._action("double_click", {"x": self.cursor_x, "y": self.cursor_y}, ok, why)
 
     def right_click(self, x: int, y: int) -> Dict[str, Any]:
         """Primitive 4: Send right click."""
-        self.cursor_x = max(0, min(x, self.width))
-        self.cursor_y = max(0, min(y, self.height))
-        return self._record("right_click", {"x": self.cursor_x, "y": self.cursor_y})
+        self.cursor_x, self.cursor_y = self._clamp(x, y)
+        ok, why = self._dispatch(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y)])
+        if ok:
+            ok, why = self._dispatch(["xdotool", "click", "3"])
+        return self._action("right_click", {"x": self.cursor_x, "y": self.cursor_y}, ok, why)
 
     def drag(self, start_x: int, start_y: int, end_x: int, end_y: int) -> Dict[str, Any]:
         """Primitive 5: Drag and drop from start to end coordinates."""
-        self.cursor_x = max(0, min(end_x, self.width))
-        self.cursor_y = max(0, min(end_y, self.height))
-        return self._record("drag", {"start": (start_x, start_y), "end": (end_x, end_y)})
+        sx, sy = self._clamp(start_x, start_y)
+        ex, ey = self._clamp(end_x, end_y)
+        steps = [
+            ["xdotool", "mousemove", str(sx), str(sy)],
+            ["xdotool", "mousedown", "1"],
+            ["xdotool", "mousemove", str(ex), str(ey)],
+            ["xdotool", "mouseup", "1"],
+        ]
+        ok, why = True, None
+        for cmd in steps:
+            ok, why = self._dispatch(cmd)
+            if not ok:
+                break
+        if ok:
+            self.cursor_x, self.cursor_y = ex, ey
+        return self._action("drag", {"start": (sx, sy), "end": (ex, ey)}, ok, why)
 
     def scroll(self, dx: int = 0, dy: int = 0, direction: str = "down") -> Dict[str, Any]:
         """Primitive 6: Scroll viewport in specified direction."""
-        return self._record("scroll", {"dx": dx, "dy": dy, "direction": direction})
+        wheel = "4" if (direction == "up" or dy < 0) else "5"
+        repeats = max(1, min(10, abs(dy) // 100 or abs(dx) // 100 or 1))
+        ok, why = self._dispatch(["xdotool", "click", "--repeat", str(repeats), wheel])
+        return self._action("scroll", {"dx": dx, "dy": dy, "direction": direction, "wheel": wheel,
+                                       "repeats": repeats}, ok, why)
 
     def move(self, x: int, y: int) -> Dict[str, Any]:
         """Primitive 7: Move mouse cursor to coordinate without clicking."""
-        self.cursor_x = max(0, min(x, self.width))
-        self.cursor_y = max(0, min(y, self.height))
-        return self._record("move", {"x": self.cursor_x, "y": self.cursor_y})
+        self.cursor_x, self.cursor_y = self._clamp(x, y)
+        ok, why = self._dispatch(["xdotool", "mousemove", str(self.cursor_x), str(self.cursor_y)])
+        return self._action("move", {"x": self.cursor_x, "y": self.cursor_y}, ok, why)
 
     def type_text(self, text: str, delay_ms: int = 10) -> Dict[str, Any]:
         """Primitive 8: Type text string into focused input field."""
-        display = os.environ.get("DISPLAY")
-        if display and shutil.which("xdotool") and text:
-            try:
-                subprocess.run(["xdotool", "type", "--delay", str(delay_ms), text], check=False, timeout=5)
-            except Exception:
-                pass
-        return self._record("type", {"text": text, "delay_ms": delay_ms})
+        if not text:
+            return self._action("type", {"text": text}, False, "EMPTY_INPUT")
+        ok, why = self._dispatch(["xdotool", "type", "--delay", str(delay_ms), text])
+        return self._action("type", {"text": text, "delay_ms": delay_ms}, ok, why)
 
     def press_key(self, key_name: str) -> Dict[str, Any]:
         """Primitive 9: Press individual keyboard key."""
-        return self._record("key", {"key": key_name})
+        ok, why = self._dispatch(["xdotool", "key", key_name])
+        return self._action("key", {"key": key_name}, ok, why)
 
     def hotkey(self, keys: List[str]) -> Dict[str, Any]:
         """Primitive 10: Press combination of hotkeys (e.g. ['ctrl', 'c'])."""
-        return self._record("hotkey", {"keys": keys})
+        if not keys:
+            return self._action("hotkey", {"keys": keys}, False, "EMPTY_INPUT")
+        combo = "+".join(keys)
+        ok, why = self._dispatch(["xdotool", "key", combo])
+        return self._action("hotkey", {"keys": keys, "combo": combo}, ok, why)
 
     def launch(self, application: str, args: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Primitive 11: Launch target application window."""
+        """
+        Primitive 11: Launch target application window.
+
+        Deliberately not implemented here: spawning arbitrary host processes is an
+        authority-bearing action and must pass the policy/approval gateway, not a
+        GUI helper. The modelled state is only updated when a real launch is added.
+        """
         app_name = application.strip()
-        if app_name not in self.open_windows:
-            self.open_windows.append(app_name)
-        self.active_window = app_name
-        return self._record("launch", {"app": app_name, "args": args or []})
+        rec = self._record("launch", {"app": app_name, "args": args or []})
+        rec.update({
+            "executed": False,
+            "mode": self._mode(False),
+            "status": "ACTION_NOT_IMPLEMENTED",
+            "reason": "APP_LAUNCH_REQUIRES_POLICY_GATEWAY",
+        })
+        return rec
 
     def close(self, application_or_window: str) -> Dict[str, Any]:
         """Primitive 12: Close application or window."""
         target = application_or_window.strip()
-        if target in self.open_windows:
+        ok, why = self._dispatch(["wmctrl", "-c", target])
+        if ok and target in self.open_windows:
             self.open_windows.remove(target)
-        if self.active_window == target:
-            self.active_window = self.open_windows[0] if self.open_windows else "Desktop"
-        return self._record("close", {"target": target})
+            if self.active_window == target:
+                self.active_window = self.open_windows[0] if self.open_windows else "Desktop"
+        return self._action("close", {"target": target}, ok, why)
 
     def switch_window(self, window_title: str) -> Dict[str, Any]:
         """Primitive 13: Bring specified window to foreground."""
         target = window_title.strip()
-        if target in self.open_windows:
+        ok, why = self._dispatch(["wmctrl", "-a", target])
+        if ok:
             self.active_window = target
-        return self._record("switch_window", {"target": target})
+        return self._action("switch_window", {"target": target}, ok, why)
 
     def screenshot(self, region: Optional[Tuple[int, int, int, int]] = None) -> bytes:
-        """Primitive 14: Capture screenshot bytes."""
+        """
+        Primitive 14: Capture screenshot bytes.
+
+        Returns real PNG bytes when a display is available. In headless mode it
+        returns a 1x1 placeholder and records last_screenshot_synthetic=True so no
+        caller can mistake it for the host screen.
+        """
+        self.last_screenshot_synthetic = True
         self._record("screenshot", {"region": region})
         display = os.environ.get("DISPLAY")
         if display and shutil.which("scrot"):
             tmp_f = f"/tmp/cu_shot_{uuid.uuid4().hex[:8]}.png"
             try:
-                subprocess.run(["scrot", tmp_f], check=True, timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(tmp_f) and os.path.getsize(tmp_f) > 0:
+                subprocess.run(["scrot", tmp_f], check=True, timeout=5,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if os.path.exists(tmp_f):
                     with open(tmp_f, "rb") as f:
                         data = f.read()
                     os.remove(tmp_f)
-                    return data
+                    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+                        self.last_screenshot_synthetic = False
+                        return data
             except Exception:
                 pass
-        # Synthetic PNG header buffer for headless environments
-        synthetic_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
-        return synthetic_png
+        return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
 
     def verify(self, assertion_type: str, expected_value: Any) -> bool:
         """
-        Verification Primitive: Asserts condition on current desktop state.
-        Assertion types: 'window_active', 'element_present', 'cursor_at'
-        """
-        if assertion_type == "window_active":
-            passed = (self.active_window.lower() == str(expected_value).lower())
-        elif assertion_type == "element_present":
-            passed = self.perception.find_by_text(str(expected_value)) is not None
-        elif assertion_type == "cursor_at":
-            ex, ey = expected_value
-            passed = (abs(self.cursor_x - ex) <= 5 and abs(self.cursor_y - ey) <= 5)
-        else:
-            passed = True
+        Verification Primitive: asserts a condition on the *real* desktop state.
 
-        self._record("verify", {"assertion": assertion_type, "expected": expected_value, "passed": passed})
+        Only conditions confirmed against the X server can pass. The seeded
+        element tree is not evidence, so element assertions return False with
+        UNVERIFIABLE unless a real accessibility scrape exists.
+        """
+        display = os.environ.get("DISPLAY")
+        passed = False
+        reason = None
+
+        if assertion_type == "window_active":
+            if display and shutil.which("xdotool"):
+                try:
+                    w_id = subprocess.check_output(["xdotool", "getactivewindow"], text=True, timeout=2,
+                                                   stderr=subprocess.DEVNULL).strip()
+                    title = subprocess.check_output(["xdotool", "getwindowname", w_id], text=True,
+                                                    timeout=2, stderr=subprocess.DEVNULL).strip()
+                    passed = title.lower() == str(expected_value).lower()
+                    if not passed:
+                        reason = "WINDOW_MISMATCH"
+                except Exception:
+                    reason = "OBSERVATION_FAILED"
+            else:
+                reason = "NO_DISPLAY"
+        elif assertion_type == "cursor_at":
+            if display and shutil.which("xdotool"):
+                try:
+                    out = subprocess.check_output(["xdotool", "getmouselocation"], text=True, timeout=2,
+                                                  stderr=subprocess.DEVNULL)
+                    coords = dict(part.split(":") for part in out.split() if ":" in part)
+                    ex, ey = expected_value
+                    passed = abs(int(coords.get("x", -9999)) - ex) <= 5 and abs(int(coords.get("y", -9999)) - ey) <= 5
+                    if not passed:
+                        reason = "CURSOR_MISMATCH"
+                except Exception:
+                    reason = "OBSERVATION_FAILED"
+            else:
+                reason = "NO_DISPLAY"
+        elif assertion_type == "element_present":
+            # No real accessibility/OCR scrape is implemented, so the seeded tree
+            # cannot prove anything about the host screen.
+            reason = "PERCEPTION_NOT_IMPLEMENTED"
+        else:
+            reason = "UNKNOWN_ASSERTION"
+
+        self._record("verify", {"assertion": assertion_type, "expected": expected_value,
+                                "passed": passed, "reason": reason})
         return passed
 
     _instance: Optional[ComputerUseEngine] = None
@@ -384,11 +520,32 @@ class ComputerUseEngine:
             prim_name = primitive.value if isinstance(primitive, GUIActionPrimitive) else str(primitive).upper()
             if prim_name == "OBSERVE":
                 obs = self.observe()
+                if obs.synthetic:
+                    # Window/element data is not a real scrape: report it as such
+                    # rather than letting a caller believe the screen was read.
+                    return GUIExecutionResult(
+                        success=False,
+                        action_id=action_id,
+                        execution_time_ms=(time.time() - start_t) * 1000,
+                        output_data={
+                            "active_app": obs.active_window,
+                            "window_title": obs.active_window,
+                            "screen_resolution": (obs.screen_width, obs.screen_height),
+                            "interactive_elements": [e.to_dict() for e in obs.elements],
+                            "synthetic": True,
+                            "windows_verified": obs.windows_verified,
+                            "status": "PARTIAL",
+                            "reason": "PERCEPTION_NOT_IMPLEMENTED",
+                        },
+                        error="PERCEPTION_NOT_IMPLEMENTED",
+                    )
                 output = {
                     "active_app": obs.active_window,
                     "window_title": obs.active_window,
                     "screen_resolution": (obs.screen_width, obs.screen_height),
-                    "interactive_elements": [e.to_dict() for e in obs.elements]
+                    "interactive_elements": [e.to_dict() for e in obs.elements],
+                    "synthetic": False,
+                    "windows_verified": obs.windows_verified,
                 }
             elif prim_name == "CLICK":
                 rec = self.click(params.get("x", 0), params.get("y", 0), button=params.get("button", "left"))
@@ -417,10 +574,21 @@ class ComputerUseEngine:
                 output = self.switch_window(params.get("window_title", ""))
             elif prim_name == "SCREENSHOT":
                 b = self.screenshot(region=params.get("region"))
-                output = {"image_bytes": b, "size": len(b)}
+                synthetic = bool(getattr(self, "last_screenshot_synthetic", True))
+                if synthetic:
+                    return GUIExecutionResult(
+                        success=False,
+                        action_id=action_id,
+                        execution_time_ms=(time.time() - start_t) * 1000,
+                        output_data={"image_bytes": b, "size": len(b), "synthetic": True,
+                                     "status": "ACTION_NOT_IMPLEMENTED", "reason": "NO_DISPLAY"},
+                        error="NO_DISPLAY",
+                    )
+                output = {"image_bytes": b, "size": len(b), "synthetic": False}
             elif prim_name == "VERIFY":
                 passed = self.verify(params.get("assertion_type", ""), params.get("expected_value"))
-                output = {"passed": passed}
+                output = {"passed": passed,
+                          "status": "SUCCESS" if passed else "VERIFICATION_FAILED"}
             else:
                 return GUIExecutionResult(
                     success=False,
@@ -429,11 +597,15 @@ class ComputerUseEngine:
                     error=f"Unknown primitive: {prim_name}"
                 )
 
+            executed = output.get("executed", True)
+            if prim_name == "VERIFY":
+                executed = bool(output.get("passed"))
             return GUIExecutionResult(
-                success=True,
+                success=bool(executed),
                 action_id=action_id,
                 execution_time_ms=(time.time() - start_t) * 1000,
-                output_data=output
+                output_data=output,
+                error=None if executed else output.get("reason") or output.get("status"),
             )
         except Exception as e:
             return GUIExecutionResult(

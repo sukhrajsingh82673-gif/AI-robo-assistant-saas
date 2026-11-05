@@ -47,21 +47,36 @@ def temp_db():
 # =============================================================================
 
 def test_milestone_5_host_resource_preflight_checks(temp_db):
-    guard = ResourceGuardEngine(db_store=temp_db)
+    """
+    The guard must measure the host and derive its flags from the thresholds.
+    Asserting that this particular machine is idle would make the suite fail on a
+    busy CI box, so we assert the threshold logic instead.
+    """
+    guard = ResourceGuardEngine(db_store=temp_db, min_free_ram_mb=1.0, min_free_disk_gb=0.01)
     metrics = guard.check_host_resources()
 
     assert metrics.free_ram_mb > 0
     assert metrics.free_disk_gb > 0
-    assert metrics.cpu_percent >= 0
-    # Host should meet basic health thresholds
-    assert metrics.ram_healthy is True
-    assert metrics.disk_healthy is True
+    assert 0 <= metrics.cpu_percent <= 100
+
+    # Flags must be a pure function of the measured values and thresholds.
+    assert metrics.ram_healthy == (metrics.free_ram_mb >= guard.min_free_ram_mb)
+    assert metrics.disk_healthy == (metrics.free_disk_gb >= guard.min_free_disk_gb)
+    assert metrics.cpu_healthy == (metrics.cpu_percent < guard.max_cpu_percent)
+    assert metrics.all_healthy == (metrics.ram_healthy and metrics.disk_healthy and metrics.cpu_healthy)
+
+    # A deliberately impossible threshold must flip the flag, proving it is enforced.
+    strict = ResourceGuardEngine(db_store=temp_db, min_free_ram_mb=10 ** 9)
+    assert strict.check_host_resources().ram_healthy is False
 
 
 def test_milestone_5_workspace_provisioning_and_cleanup(temp_db):
     temp_dir = tempfile.mkdtemp(prefix="zonata_ws_test_")
     try:
-        guard = ResourceGuardEngine(db_store=temp_db, workspaces_root=temp_dir)
+        # Low thresholds keep this test about provisioning/cleanup mechanics
+        # rather than about how busy the build host happens to be.
+        guard = ResourceGuardEngine(db_store=temp_db, workspaces_root=temp_dir,
+                                    min_free_ram_mb=1.0, min_free_disk_gb=0.01)
         ws_path = guard.provision_mission_workspace("msn_res_01", "task_res_01")
         assert os.path.exists(ws_path)
         assert ws_path.startswith(temp_dir)
@@ -246,3 +261,18 @@ def test_milestone_7_executive_report_builder():
         assert report.verification_results["verified"] is True
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_milestone_5_provisioning_refuses_when_host_is_exhausted(temp_db):
+    """An exhausted host must refuse workspace creation with an explicit error."""
+    temp_dir = tempfile.mkdtemp(prefix="zonata_ws_refuse_")
+    try:
+        guard = ResourceGuardEngine(db_store=temp_db, workspaces_root=temp_dir,
+                                    min_free_ram_mb=10 ** 9)
+        with pytest.raises(RuntimeError) as exc:
+            guard.provision_mission_workspace("msn_res_02", "task_res_02")
+        assert "Insufficient host resources" in str(exc.value)
+        assert not os.path.exists(os.path.join(temp_dir, "msn_res_02"))
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)

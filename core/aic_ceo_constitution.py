@@ -28,6 +28,15 @@ logger = logging.getLogger("zonata.aic_ceo.constitution")
 # ==============================================================================
 
 class AuthorityLevel(str, Enum):
+    """
+    Actor hierarchy for a request: who is asking (owner → board → CEO → …
+    → tool system).
+
+    Naming hazard: `core.models.AuthorityLevel` is a *different* enum
+    (action-authority classification: sandboxed / automatic / ask-me / never).
+    This one answers "who is asking?", the other answers "may it run
+    unattended?". Never substitute one for the other.
+    """
     SOVEREIGN_OWNER = "SOVEREIGN_OWNER"
     GOVERNING_BOARD = "GOVERNING_BOARD"
     AIC_CEO_CONSTITUTION = "AIC_CEO_CONSTITUTION"

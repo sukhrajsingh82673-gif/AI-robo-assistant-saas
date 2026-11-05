@@ -59,9 +59,25 @@ class HermesComputerUseAdapter:
             }
         }
 
+    @staticmethod
+    def _wrap(res: Dict[str, Any]) -> Dict[str, Any]:
+        """Map a primitive result to a tool-call status without inventing success."""
+        executed = bool(res.get("executed", False))
+        out = {
+            "status": "SUCCESS" if executed else "ACTION_NOT_IMPLEMENTED",
+            "executed": executed,
+            "result": res,
+        }
+        if not executed:
+            out["reason"] = res.get("reason") or "NOT_EXECUTED"
+        return out
+
     def execute_hermes_call(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parses Hermes tool call arguments and invokes the corresponding GUI primitive.
+
+        Status reflects what actually happened on the host: a primitive that could
+        not be dispatched reports ACTION_NOT_IMPLEMENTED, never SUCCESS.
         """
         action = arguments.get("action")
         coord = arguments.get("coordinate") or [self.engine.cursor_x, self.engine.cursor_y]
@@ -70,61 +86,68 @@ class HermesComputerUseAdapter:
 
         if action == "observe":
             obs = self.engine.observe()
-            return {
-                "status": "SUCCESS",
+            # Window data can be real while the element tree is still seeded.
+            executed = obs.windows_verified and not obs.synthetic
+            out = {
+                "status": "SUCCESS" if executed else "PARTIAL",
+                "executed": executed,
+                "synthetic": obs.synthetic,
+                "windows_verified": obs.windows_verified,
                 "active_window": obs.active_window,
                 "cursor": obs.cursor_position,
                 "elements_detected": len(obs.elements),
-                "element_labels": [el.label for el in obs.elements]
+                "element_labels": [el.label for el in obs.elements],
             }
+            if not executed:
+                out["reason"] = "PERCEPTION_NOT_IMPLEMENTED"
+            return out
         elif action == "click":
-            res = self.engine.click(x, y, button=arguments.get("button", "left"))
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.click(x, y, button=arguments.get("button", "left")))
         elif action == "double_click":
-            res = self.engine.double_click(x, y)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.double_click(x, y))
         elif action == "right_click":
-            res = self.engine.right_click(x, y)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.right_click(x, y))
         elif action == "move":
-            res = self.engine.move(x, y)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.move(x, y))
         elif action == "drag":
             end_c = arguments.get("end_coordinate") or [x + 50, y + 50]
-            res = self.engine.drag(x, y, end_c[0], end_c[1])
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.drag(x, y, end_c[0], end_c[1]))
         elif action == "scroll":
-            res = self.engine.scroll(direction=arguments.get("direction", "down"))
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.scroll(direction=arguments.get("direction", "down")))
         elif action == "type":
-            text = arguments.get("text", "")
-            res = self.engine.type_text(text)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.type_text(arguments.get("text", "")))
         elif action == "key":
-            key_name = arguments.get("key", "Return")
-            res = self.engine.press_key(key_name)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.press_key(arguments.get("key", "Return")))
         elif action == "hotkey":
             keys = arguments.get("keys") or [arguments.get("key", "ctrl")]
-            res = self.engine.hotkey(keys)
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.hotkey(keys))
         elif action == "launch":
-            res = self.engine.launch(arguments.get("target", "Terminal"))
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.launch(arguments.get("target", "Terminal")))
         elif action == "close":
-            res = self.engine.close(arguments.get("target", ""))
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.close(arguments.get("target", "")))
         elif action == "switch_window":
-            res = self.engine.switch_window(arguments.get("target", ""))
-            return {"status": "SUCCESS", "result": res}
+            return self._wrap(self.engine.switch_window(arguments.get("target", "")))
         elif action == "screenshot":
             png_bytes = self.engine.screenshot()
-            return {"status": "SUCCESS", "size_bytes": len(png_bytes)}
+            synthetic = bool(getattr(self.engine, "last_screenshot_synthetic", True))
+            out = {
+                "status": "ACTION_NOT_IMPLEMENTED" if synthetic else "SUCCESS",
+                "executed": not synthetic,
+                "synthetic": synthetic,
+                "size_bytes": len(png_bytes),
+            }
+            if synthetic:
+                out["reason"] = "NO_DISPLAY"
+            return out
         elif action == "verify":
             passed = self.engine.verify(
                 arguments.get("assertion", "window_active"),
                 arguments.get("expected", self.engine.active_window)
             )
-            return {"status": "SUCCESS", "verified": passed}
+            return {
+                "status": "SUCCESS" if passed else "VERIFICATION_FAILED",
+                "executed": passed,
+                "verified": passed,
+            }
         else:
             return {"status": "ERROR", "error": f"Unknown GUI action: '{action}'"}

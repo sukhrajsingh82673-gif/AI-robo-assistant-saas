@@ -225,11 +225,18 @@ def test_milestone_3_computer_use_primitives():
     obs = engine.observe()
     assert obs.screen_width == 1920
     assert len(obs.elements) >= 4
+    # The element tree is seeded, so the observation must say so.
+    assert obs.synthetic is True
+    assert obs.elements[0].metadata["source"] == "seeded_scene"
 
-    # 2. click
+    # 2. click (cursor tracking is local; execution is reported honestly)
     res_click = engine.click(600, 450)
     assert engine.cursor_x == 600
     assert engine.cursor_y == 450
+    if not os.environ.get("DISPLAY"):
+        assert res_click["executed"] is False
+        assert res_click["status"] == "ACTION_NOT_IMPLEMENTED"
+        assert res_click["reason"] == "NO_DISPLAY"
 
     # 3. double_click
     engine.double_click(200, 100)
@@ -239,13 +246,16 @@ def test_milestone_3_computer_use_primitives():
     engine.type_text("Hello ZONATA")
     engine.press_key("Return")
 
-    # 5. verify
+    # 5. verify: the seeded scene cannot prove anything about the host screen
     passed = engine.verify("element_present", "Submit")
-    assert passed is True
+    assert passed is False
+    if not os.environ.get("DISPLAY"):
+        assert engine.verify("cursor_at", (200, 100)) is False
 
-    # 6. screenshot
+    # 6. screenshot (placeholder bytes in headless mode, and flagged as such)
     png = engine.screenshot()
     assert png.startswith(b"\x89PNG")
+    assert engine.last_screenshot_synthetic is (not bool(os.environ.get("DISPLAY")))
 
 
 def test_milestone_3_hermes_adapter():
@@ -254,15 +264,19 @@ def test_milestone_3_hermes_adapter():
     schema = adapter.get_tool_schema()
     assert schema["function"]["name"] == "computer_use"
 
-    # Call observe
+    # Call observe: headless perception is seeded, so it must not claim success
     call_obs = adapter.execute_hermes_call({"action": "observe"})
-    assert call_obs["status"] == "SUCCESS"
     assert "elements_detected" in call_obs
+    if not os.environ.get("DISPLAY"):
+        assert call_obs["status"] == "PARTIAL"
+        assert call_obs["reason"] == "PERCEPTION_NOT_IMPLEMENTED"
 
-    # Call click
+    # Call click: the tool status must mirror what the host actually did
     call_click = adapter.execute_hermes_call({"action": "click", "coordinate": [500, 300]})
-    assert call_click["status"] == "SUCCESS"
     assert engine.cursor_x == 500
+    if not os.environ.get("DISPLAY"):
+        assert call_click["status"] == "ACTION_NOT_IMPLEMENTED"
+        assert call_click["executed"] is False
 
 
 def test_milestone_3_opendots_grounding_adapter():
