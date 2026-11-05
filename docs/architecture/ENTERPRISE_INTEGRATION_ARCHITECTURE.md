@@ -24,12 +24,12 @@ The ZONATA Kernel remains the **sole authority** for execution authorization, po
 
 ## 2. Governed Integration Contract
 
-Every enterprise connector adheres to a unified specification implemented in [`core/automation_fabric/contracts.py`](file:///root/roboassistant/core/automation_fabric/contracts.py) and [`core/automation_fabric/enterprise_connectors.py`](file:///root/roboassistant/core/automation_fabric/enterprise_connectors.py):
+Every enterprise connector adheres to a unified specification implemented in [`core/automation_fabric/contracts.py`](../../core/automation_fabric/contracts.py) and [`core/automation_fabric/enterprise_connectors.py`](../../core/automation_fabric/enterprise_connectors.py):
 
 1. **Unique Connector ID & Version:** Pinned semantic version and unique identifier.
 2. **Capability Declarations:** Explicit list of supported operations.
 3. **Input & Output JSON Schemas:** Validated prior to external invocation.
-4. **Authentication Requirements:** Mediated exclusively via [`SecretManager`](file:///root/roboassistant/core/secrets.py) and HashiCorp Vault. Zero raw secrets in prompts or logs.
+4. **Authentication Requirements:** Mediated exclusively via [`SecretManager`](../../core/secrets.py) and HashiCorp Vault. Zero raw secrets in prompts or logs.
 5. **Multi-Tenant Isolation:** Mandatory `tenant_id` scoping on every call; cross-tenant operations fail closed with `403 TenantIsolationViolation`.
 6. **Risk Classification:**
    - `SAFE`: Read-only, idempotent query (e.g. document retrieval, KPI query).

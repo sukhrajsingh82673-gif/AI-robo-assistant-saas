@@ -319,10 +319,6 @@
     // 2. CO-WORKER VIEW (Execution Pipeline & Single-Product Workspace)
     // =========================================================================
     async renderCoworker(containerId) {
-      if (window.AppleCoworkerAssistant) {
-        window.AppleCoworkerAssistant.render(containerId, 'personal');
-        return;
-      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
@@ -332,10 +328,18 @@
       el.innerHTML = `
         <div class="workspace-page-header">
           <div>
-            <h1 class="page-title">ZONATA Co-Worker Workspace</h1>
-            <p class="page-subtitle">Governed multi-capability autonomous workforce operating on your sovereign behalf.</p>
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:3px 10px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:16px; font-size:0.75rem; color:#6ee7b7; font-weight:700; margin-bottom:8px;">
+              <span>🤖 COWORKER 2.0 DIGITAL EMPLOYEE</span>
+              <span style="opacity:0.4;">|</span>
+              <span>👑 CEO-DIRECTED EXECUTION</span>
+            </div>
+            <h1 class="page-title">ZONATA Autonomous Coworker 2.0</h1>
+            <p class="page-subtitle">Desktop computer-use intelligence, hierarchical tool discovery, ephemeral subworkers, and defensive cybersecurity operations.</p>
           </div>
           <div class="header-actions">
+            <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.triggerSecurityPatrol()" title="Run immediate cybersecurity patrol">
+              🛡️ Security Patrol
+            </button>
             ${activeMission ? `
               <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.stepMission('${activeMission.mission_id}')">
                 ⚡ Advance Step
@@ -1412,6 +1416,50 @@
 
     openScheduleModal() {
       window.navigateTo('/schedule');
+    }
+
+    async triggerSecurityPatrol() {
+      try {
+        const res = await fetch('/api/v2/coworker/security/patrol', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          alert(`Defensive Security Patrol executed successfully!\nTotal Findings: ${data.findings_count}\nClean Status: ${data.clean ? 'YES (All clear)' : 'NO (Review findings)'}`);
+          await this.refreshData();
+          this.renderCoworker('view-coworker');
+        } else {
+          alert('Failed to trigger security patrol');
+        }
+      } catch (e) {
+        alert('Error triggering security patrol: ' + e);
+      }
+    }
+
+    async dispatchCoworker2Mission(promptText) {
+      if (!promptText || !promptText.trim()) return;
+      try {
+        const res = await fetch('/api/v2/coworker/missions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            objective: promptText.trim(),
+            description: promptText.trim(),
+            risk_level: 'LOW',
+            auto_advance: true
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          alert(`Coworker 2.0 Mission created: ${data.task_id} (${data.status})`);
+          await this.refreshData();
+          this.renderCoworker('view-coworker');
+        }
+      } catch (e) {
+        console.error('Dispatch failed:', e);
+      }
     }
 
     // Helper functions

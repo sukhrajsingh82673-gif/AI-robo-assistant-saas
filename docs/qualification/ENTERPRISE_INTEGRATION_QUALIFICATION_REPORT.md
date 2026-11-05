@@ -17,7 +17,7 @@
 
 The enterprise capability expansion strictly adhered to the non-duplication invariant:
 1. **Existing Workflow Runtime Reused:** Did not add a second workflow engine; mapped Kestra flow tasks and UCK execution into existing runtime.
-2. **Existing SecretManager Reused:** Did not add a second secrets plane; mediated all active and rotated signing keys and credentials through [`SecretManager`](file:///root/roboassistant/core/secrets.py).
+2. **Existing SecretManager Reused:** Did not add a second secrets plane; mediated all active and rotated signing keys and credentials through [`SecretManager`](../../core/secrets.py).
 3. **Existing PolicyEngine & Identity Gateway Reused:** Did not add competing policy engines; all actions pass through `core/policy_engine_v2.py`.
 4. **Existing EvidenceLedger Reused:** All postconditions and Merkle roots bind to the sovereign evidence ledger.
 

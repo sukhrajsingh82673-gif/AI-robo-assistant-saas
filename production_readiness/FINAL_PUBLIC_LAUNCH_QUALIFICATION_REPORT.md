@@ -108,7 +108,7 @@ In the Infrastructure & Staging qualification suite (146 tests), exactly **13 te
 
 ## 5. Rate Limiting & Concurrency Leases Across Instances & Restarts
 
-A dedicated verification test suite ([`tests/test_tenant_concurrency_and_instance_persistence.py`](file:///root/roboassistant/tests/test_tenant_concurrency_and_instance_persistence.py)) was authored and executed (5/5 tests passed in 5.35s):
+A dedicated verification test suite ([`tests/test_tenant_concurrency_and_instance_persistence.py`](../tests/test_tenant_concurrency_and_instance_persistence.py)) was authored and executed (5/5 tests passed in 5.35s):
 
 1. **Multi-Instance Coordination via Shared Database:** Two independent `ConcurrencyLeaseManager` instances operating concurrently against the database successfully coordinated tenant capacity. When Instance A filled tenant capacity (2 leases), Instance B immediately observed capacity exhaustion and rejected further acquisition with positive `Retry-After`. When Instance A released a lease, Instance B immediately acquired the slot.
 2. **Persistence Across Process Crash / Restart:** A lease acquired by Process 1 was retained in the database after Process 1 was terminated. A newly instantiated Process 2 recognized the active lease and blocked overdraft. Releasing the lease via Process 2 functioned seamlessly.

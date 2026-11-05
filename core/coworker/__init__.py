@@ -63,6 +63,33 @@ from .controllers import (
     GovernedA2AController, GovernedArtifactManager, GovernedArtifact,
     UniversalRecoveryController, FailureState, FailureEvent
 )
+from .contracts_v2 import (
+    TaskLifecycleState, VALID_TRANSITIONS, TaskStateTransition,
+    CoworkerExecutionLease, CleanupManifestRecord, CleanupResourceType,
+    CleanupStatus, SecurityPatrolFinding, PatrolType, PatrolSeverity,
+    LeaseStatus, CoworkerV2Task, SubworkerV2Record
+)
+from .db_store_v2 import CoworkerDbStoreV2
+CoworkerV2Store = CoworkerDbStoreV2
+from .orchestrator_v2 import CoworkerLifecycleOrchestrator, InvalidStateTransitionError
+from .decision_engine import (
+    ExecutionDecisionEngine, ExecutionLadderLevel, DecisionEvaluationResult, ExecutionOutput
+)
+from .computer_use_engine import (
+    ComputerUseEngine, PerceptionEngine, BoundingBox, UIElement, GUIObservation,
+    GUIActionPrimitive, GUIExecutionResult
+)
+from .adapters.hermes_adapter import HermesComputerUseAdapter
+from .adapters.opencloud_adapter import OpenCloudAdapter
+from .adapters.opendots_adapter import OpenDotsAdapter, GroundingTarget
+from .subworkers_v2 import SubWorkerArchetype, ARCHETYPE_REGISTRY, ArchetypeSpec
+from .agent_factory_v2 import EphemeralAgentFactoryV2
+from .resource_guard import ResourceGuardEngine, HostResourceMetrics
+from .defense_monitor import DefensiveCybersecurityMonitor
+from .evidence_reporting import (
+    EvidenceAndReportingEngine, VerificationOutcome, PhysicalVerificationCheck,
+    ExecutiveDeliverable, AICeoExecutiveReport
+)
 
 __all__ = [
     "CapabilityCategory",
@@ -175,6 +202,51 @@ __all__ = [
     "GovernedArtifact",
     "UniversalRecoveryController",
     "FailureState",
-    "FailureEvent"
+    "FailureEvent",
+    # Coworker 2.0 Exports
+    "TaskLifecycleState",
+    "VALID_TRANSITIONS",
+    "TaskStateTransition",
+    "CoworkerExecutionLease",
+    "CleanupManifestRecord",
+    "CleanupResourceType",
+    "CleanupStatus",
+    "SecurityPatrolFinding",
+    "PatrolType",
+    "PatrolSeverity",
+    "LeaseStatus",
+    "CoworkerV2Task",
+    "SubworkerV2Record",
+    "CoworkerDbStoreV2",
+    "CoworkerV2Store",
+    "CoworkerLifecycleOrchestrator",
+    "InvalidStateTransitionError",
+    "ExecutionDecisionEngine",
+    "ExecutionLadderLevel",
+    "DecisionEvaluationResult",
+    "ExecutionOutput",
+    "ComputerUseEngine",
+    "PerceptionEngine",
+    "BoundingBox",
+    "UIElement",
+    "GUIObservation",
+    "GUIActionPrimitive",
+    "GUIExecutionResult",
+    "HermesComputerUseAdapter",
+    "OpenCloudAdapter",
+    "OpenDotsAdapter",
+    "GroundingTarget",
+    "SubWorkerArchetype",
+    "ARCHETYPE_REGISTRY",
+    "ArchetypeSpec",
+    "EphemeralAgentFactoryV2",
+    "ResourceGuardEngine",
+    "HostResourceMetrics",
+    "DefensiveCybersecurityMonitor",
+    "EvidenceAndReportingEngine",
+    "VerificationOutcome",
+    "PhysicalVerificationCheck",
+    "ExecutiveDeliverable",
+    "AICeoExecutiveReport"
 ]
 

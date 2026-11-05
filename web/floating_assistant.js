@@ -71,7 +71,8 @@
         <div class="assistant-floating-badge" id="assistantBadge" title="Open ZONATA Live Assistant" onclick="window.FloatingAssistant.toggleOpen(event)">
           <div class="assistant-pill-icon">✨</div>
           <span class="assistant-pill-label">ZONATA Assistant</span>
-          <span class="pulse-indicator" style="background:#10b981;"></span>
+          <span class="pulse-indicator" id="assistantBadgePulse" style="background:#10b981;"></span>
+          <span id="assistantBadgeState" style="font-size:10px; font-weight:700; color:#10b981; margin-left:4px; letter-spacing:0.5px;">${this.currentExecutionState}</span>
         </div>
 
         <!-- Flyout Window -->
@@ -267,22 +268,20 @@
       let initialLeft = 0, initialTop = 0;
       let dragged = false;
 
-      const onMouseDown = (e) => {
-        if (e.target.closest('#assistantFlyout')) return;
+      const onDragStart = (clientX, clientY) => {
         dragged = false;
-        startX = e.clientX;
-        startY = e.clientY;
+        startX = clientX;
+        startY = clientY;
         const rect = container.getBoundingClientRect();
         initialLeft = rect.left;
         initialTop = rect.top;
-
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+        container.style.transition = 'transform 0.1s ease, box-shadow 0.1s ease';
+        container.style.transform = 'scale(1.04)';
       };
 
-      const onMouseMove = (e) => {
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
+      const onDragMove = (clientX, clientY) => {
+        const dx = clientX - startX;
+        const dy = clientY - startY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragged = true;
 
         const newLeft = Math.min(window.innerWidth - 70, Math.max(10, initialLeft + dx));
@@ -294,16 +293,91 @@
         container.style.top = `${newTop}px`;
       };
 
-      const onMouseUp = (e) => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+      const onDragEnd = () => {
+        container.style.transform = 'scale(1)';
         if (dragged) {
           const rect = container.getBoundingClientRect();
           this.savePosition(rect.left, rect.top);
         }
       };
 
+      // Mouse events
+      const onMouseDown = (e) => {
+        if (e.target.closest('#assistantFlyout')) return;
+        onDragStart(e.clientX, e.clientY);
+        const onMouseMove = (ev) => onDragMove(ev.clientX, ev.clientY);
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          onDragEnd();
+        };
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      };
+
+      // Touch events
+      const onTouchStart = (e) => {
+        if (e.target.closest('#assistantFlyout')) return;
+        if (!e.touches || e.touches.length === 0) return;
+        const t = e.touches[0];
+        onDragStart(t.clientX, t.clientY);
+        const onTouchMove = (ev) => {
+          if (!ev.touches || ev.touches.length === 0) return;
+          onDragMove(ev.touches[0].clientX, ev.touches[0].clientY);
+        };
+        const onTouchEnd = () => {
+          document.removeEventListener('touchmove', onTouchMove);
+          document.removeEventListener('touchend', onTouchEnd);
+          onDragEnd();
+        };
+        document.addEventListener('touchmove', onTouchMove, { passive: true });
+        document.addEventListener('touchend', onTouchEnd);
+      };
+
       handle.addEventListener('mousedown', onMouseDown);
+      handle.addEventListener('touchstart', onTouchStart, { passive: true });
+
+      // Start periodic status sync
+      this.startStateSync();
+    }
+
+    startStateSync() {
+      if (this._syncTimer) clearInterval(this._syncTimer);
+      this._syncTimer = setInterval(() => this.syncCoworkerState(), 4000);
+      this.syncCoworkerState();
+    }
+
+    async syncCoworkerState() {
+      try {
+        const res = await fetch('/api/v2/coworker/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.lifecycle_state) {
+            this.currentExecutionState = data.lifecycle_state;
+            const stateEl = document.getElementById('assistantBadgeState');
+            const pulseEl = document.getElementById('assistantBadgePulse');
+            if (stateEl) {
+              stateEl.textContent = data.lifecycle_state;
+              const colorMap = {
+                IDLE: '#10b981',
+                TASK_ANALYSIS: '#3b82f6',
+                TOOL_DISCOVERY: '#8b5cf6',
+                EXECUTION: '#06b6d4',
+                VERIFICATION: '#f59e0b',
+                WAITING_FOR_APPROVAL: '#ef4444',
+                REPORTING_TO_CEO: '#10b981',
+                SECURITY_MONITORING: '#6366f1',
+                ERROR_RECOVERY: '#f97316',
+                PAUSED: '#eab308',
+                TERMINATED: '#6b7280'
+              };
+              const col = colorMap[data.lifecycle_state] || '#10b981';
+              stateEl.style.color = col;
+              if (pulseEl) pulseEl.style.background = col;
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     toggleOpen(e) {

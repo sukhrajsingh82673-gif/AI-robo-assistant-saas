@@ -118,8 +118,8 @@ Autonomous AI Enterprise Operating System providing multi-tenant portfolio manag
     ```
 - **Supply Chain Governance & Registries**:
   - Audited in [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md) (SPDX licenses, upstream commits, CVE history, sandbox confinement).
-  - 5-Level Qualification Standard documented in [`ZONATA_PROVIDER_REGISTRY.md`](./ZONATA_PROVIDER_REGISTRY.md).
-  - Authoritative 34-section qualification report in [`docs/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md`](./docs/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md).
+  - 5-Level Qualification Standard documented in [`docs/reports/ZONATA_PROVIDER_REGISTRY.md`](docs/reports/ZONATA_PROVIDER_REGISTRY.md).
+  - Authoritative 34-section qualification report in [`docs/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md`](docs/qualification/ZONATA_COWORKER_FINAL_UNIVERSAL_QUALIFICATION.md).
 
 
 ### 9. Governed Multi-Agent Workforce (Agency Swarm — Project 01)
@@ -423,7 +423,7 @@ python3 -m unittest discover tests
   - `UNLIMITED`: Unlimited (sovereign on-premise clusters)
 - **Resilience Validation:** Multi-process API horizontal concurrency, concurrent worker atomic queue dispatch with zero duplicate mutations, and active-passive HA supervisor leader failover proven in `tests/test_v3_multi_process_resilience.py`.
 
-Complete certification details: see [`ZONATA_V3_PRODUCTION_CERTIFICATION.md`](file:///root/roboassistant/ZONATA_V3_PRODUCTION_CERTIFICATION.md).
+Complete certification details: see [`docs/qualification/ZONATA_V3_PRODUCTION_CERTIFICATION.md`](docs/qualification/ZONATA_V3_PRODUCTION_CERTIFICATION.md).
 
 ---
 
@@ -448,7 +448,7 @@ Complete certification details: see [`ZONATA_V3_PRODUCTION_CERTIFICATION.md`](fi
   - **Cognitive Memory Tiering (`core/memory_governance.py`)**: Segregates Working Memory, Long-Term Semantic Memory, Corporate Knowledge, and Evidence.
   - **Emergency Fleet Killswitches (`core/enterprise_admin_gateway.py`)**: Distributed killswitches across AGENT, TENANT, and GLOBAL scopes.
 
-Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`](file:///root/roboassistant/ZONATA_V4_ENTERPRISE_CERTIFICATION.md) and [`openapi_v4.json`](file:///root/roboassistant/openapi_v4.json).
+Complete V4 certification details: see [`docs/qualification/ZONATA_V4_ENTERPRISE_CERTIFICATION.md`](docs/qualification/ZONATA_V4_ENTERPRISE_CERTIFICATION.md) and [`openapi_v4.json`](openapi_v4.json).
 
 ---
 
@@ -481,7 +481,7 @@ Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`]
   - **Autonomy Levels 0 to 5 Governor (`core/autonomy_governor.py`)**: Formal operational risk tiers (`MANUAL`, `ASSISTIVE`, `CONDITIONAL`, `BOUNDED`, `HIGH_AUTONOMY`, `FULL_AUTONOMY`) with strict delegation containment (`CHILD_AUTONOMY <= PARENT_AUTONOMY`).
   - **Sovereign Model Router V6 (`core/model_router_v6.py`)**: Dynamic policy-driven routing with forced sovereign air-gap residency for `RESTRICTED` data and automated circuit breaking on cloud provider outages.
   - **Air-Gapped Diagnostics Bundle Generator (`core/diagnostics_bundle.py`)**: Enterprise supportability snapshot compiler with 100% automated redaction of private keys, JWTs, AWS keys, SSNs, and customer PII.
-  - **Master V6 Deliverables**: 15 architectural and audit specifications in `docs/` and [`openapi_v6.json`](file:///root/roboassistant/openapi_v6.json).
+  - **Master V6 Deliverables**: 15 architectural and audit specifications in `docs/` and [`openapi_v6.json`](openapi_v6.json).
 
 ---
 
@@ -500,7 +500,7 @@ Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`]
   - **24-Stage Employee Factory (`core/employee_factory_v7.py`)**: Transforms templates into active, provisioned AI Employee instances through an observable 24-stage security and governance pipeline.
   - **CEO Workforce Controller (`core/ceo_workforce_controller.py`)**: Discovers existing workforce capacity before creating new employees to prevent uncontrolled proliferation, records structured `CEOWorkforceDecisionRecord` audit receipts, and executes natural language commands.
   - **Workforce Collaboration Hub (`core/workforce_collaboration_hub.py`)**: Unites Pre-built Specialists (Type A) and Template Employees (Type B/C) as colleagues under Chief Officer supervision, deterministic policy-driven conflict resolution (prohibits resolution by model confidence), and controlled succession ceremonies.
-  - **Master V7 Deliverables**: 16 architectural specifications in `docs/` and [`openapi_v7.json`](file:///root/roboassistant/openapi_v7.json).
+  - **Master V7 Deliverables**: 16 architectural specifications in `docs/` and [`openapi_v7.json`](openapi_v7.json).
 
 ---
 
@@ -528,7 +528,7 @@ Complete V4 certification details: see [`ZONATA_V4_ENTERPRISE_CERTIFICATION.md`]
   - **11-Stage Persistent Executive Control Loop (`core/executive_control_loop.py`)**: Resumable state machine (`OBSERVE -> ASSESS -> PRIORITIZE -> PLAN -> DELEGATE -> EXECUTE -> MONITOR -> VERIFY -> EVALUATE -> ADJUST -> REPORT`).
   - **Master AI CEO Orchestrator (`core/ai_ceo_v8.py`)**: Full end-to-end coordinator and natural language chat interface.
   - **CEO Executive Console (`web/ai_ceo_workspace.js`)**: Interactive 14-section Web UI console with decision rationale, approvals, and live telemetry.
-  - **Master V8 Deliverables**: [`ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md`](file:///root/roboassistant/ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md) and [`openapi_v8.json`](file:///root/roboassistant/openapi_v8.json).
+  - **Master V8 Deliverables**: [`docs/reports/ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md`](docs/reports/ZONATA_V8_EXECUTIVE_OPERATING_LAYER_REPORT.md) and [`openapi_v8.json`](openapi_v8.json).
 
 ---
 

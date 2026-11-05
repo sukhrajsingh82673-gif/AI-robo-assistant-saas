@@ -3,7 +3,7 @@
 **Document ID:** ZONATA-REL-RECONCILIATION-2026-FINAL  
 **Target Platform:** ZONATA Universal AI Company Operating System (SaaS 1.0.0-GA)  
 **Target Release Commit:** [`27279020fe8ebe6d475a228bcdd9d7f59df84ff2`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/27279020fe8ebe6d475a228bcdd9d7f59df84ff2)  
-**Active Git Branches:** [`engineering/production-readiness-gap-closure`](file:///root/roboassistant) (HEAD) | `main` (Synchronized with `origin`)  
+**Active Git Branches:** `engineering/production-readiness-gap-closure` (HEAD) | `main` (Synchronized with `origin`)  
 **Live Staging Endpoint:** `https://zonata-staging.onrender.com` (Render Web Service + Neon Serverless PostgreSQL 16)  
 **Evaluation Date:** October 20, 2026  
 **Auditor / Verification System:** Antigravity Autonomous Verification & Engineering Engine  
@@ -201,14 +201,14 @@ Public Homepage (GET /)         | Status: 200 | Min: 1070.9ms| Warm Avg: 1,275.5
 
 | Area | Verified Mechanism | Evidence & Test Source | Status |
 | :--- | :--- | :--- | :---: |
-| **Tenant Isolation** | Strict segregation across missions, tasks, and queries. | [`tests/test_independent_enterprise_pilot_e2e.py::test_03`](file:///root/roboassistant/tests/test_independent_enterprise_pilot_e2e.py#L70). Live Render staging blocked cross-tenant spoofing with HTTP 403 Forbidden. | **PASS** |
-| **RBAC & Privilege Escalation** | Permissions enforce least privilege; operator denied governance mutations. | [`tests/test_independent_enterprise_pilot_e2e.py::test_02`](file:///root/roboassistant/tests/test_independent_enterprise_pilot_e2e.py#L45). `OPERATOR` denied mutations; `OWNER` authorized. Live staging returns HTTP 401 on unauthenticated mutations. | **PASS** |
-| **AI Tool Permissions & Receipts** | Autonomous agent tools bounded by policy; approval gates require CEO cryptographic token. | [`tests/test_independent_enterprise_pilot_e2e.py::test_05`](file:///root/roboassistant/tests/test_independent_enterprise_pilot_e2e.py#L125). $15,000 procurement paused at approval gate; CEO token sealed approval receipt. | **PASS** |
-| **AI Data Loss Prevention (DLP)** | AWS keys, private keys, and high-entropy credentials intercepted. | [`tests/test_independent_enterprise_pilot_e2e.py::test_04`](file:///root/roboassistant/tests/test_independent_enterprise_pilot_e2e.py#L98). Intercepted with `SecurityResponseClass.CLASS_3_RESTRICT`. | **PASS** |
-| **External Egress & SSRF** | Blocking egress to cloud metadata (`169.254.169.254`) and loopback. | [`tests/test_a2a_interoperability.py::test_23`](file:///root/roboassistant/tests/test_a2a_interoperability.py). Blocks cloud metadata and internal ports. | **PASS** |
-| **Multi-Instance Lease Sync** | Multiple manager instances coordinate tenant capacity via database. | [`tests/test_tenant_concurrency_and_instance_persistence.py::test_01`](file:///root/roboassistant/tests/test_tenant_concurrency_and_instance_persistence.py#L56). Instance A fills quota; Instance B immediately throttled with `Retry-After`. | **PASS** |
-| **Crash / Restart Persistence** | Active leases survive process termination; stale leases auto-evicted. | [`tests/test_tenant_concurrency_and_instance_persistence.py::test_02`](file:///root/roboassistant/tests/test_tenant_concurrency_and_instance_persistence.py#L86) & `test_03`. Persists active leases and evicts expired leases after restart. | **PASS** |
-| **Supply Chain Security** | Zero critical/high CVEs; valid CycloneDX 1.5 SBOM; 100% permissive licenses. | [`docs/cyclonedx_sbom.json`](file:///root/roboassistant/docs/cyclonedx_sbom.json), [`production_readiness/phase_15_license_compliance_report.md`](file:///root/roboassistant/production_readiness/phase_15_license_compliance_report.md). | **PASS** |
+| **Tenant Isolation** | Strict segregation across missions, tasks, and queries. | [`tests/test_independent_enterprise_pilot_e2e.py::test_03`](../tests/test_independent_enterprise_pilot_e2e.py#L70). Live Render staging blocked cross-tenant spoofing with HTTP 403 Forbidden. | **PASS** |
+| **RBAC & Privilege Escalation** | Permissions enforce least privilege; operator denied governance mutations. | [`tests/test_independent_enterprise_pilot_e2e.py::test_02`](../tests/test_independent_enterprise_pilot_e2e.py#L45). `OPERATOR` denied mutations; `OWNER` authorized. Live staging returns HTTP 401 on unauthenticated mutations. | **PASS** |
+| **AI Tool Permissions & Receipts** | Autonomous agent tools bounded by policy; approval gates require CEO cryptographic token. | [`tests/test_independent_enterprise_pilot_e2e.py::test_05`](../tests/test_independent_enterprise_pilot_e2e.py#L125). $15,000 procurement paused at approval gate; CEO token sealed approval receipt. | **PASS** |
+| **AI Data Loss Prevention (DLP)** | AWS keys, private keys, and high-entropy credentials intercepted. | [`tests/test_independent_enterprise_pilot_e2e.py::test_04`](../tests/test_independent_enterprise_pilot_e2e.py#L98). Intercepted with `SecurityResponseClass.CLASS_3_RESTRICT`. | **PASS** |
+| **External Egress & SSRF** | Blocking egress to cloud metadata (`169.254.169.254`) and loopback. | [`tests/test_a2a_interoperability.py::test_23`](../tests/test_a2a_interoperability.py). Blocks cloud metadata and internal ports. | **PASS** |
+| **Multi-Instance Lease Sync** | Multiple manager instances coordinate tenant capacity via database. | [`tests/test_tenant_concurrency_and_instance_persistence.py::test_01`](../tests/test_tenant_concurrency_and_instance_persistence.py#L56). Instance A fills quota; Instance B immediately throttled with `Retry-After`. | **PASS** |
+| **Crash / Restart Persistence** | Active leases survive process termination; stale leases auto-evicted. | [`tests/test_tenant_concurrency_and_instance_persistence.py::test_02`](../tests/test_tenant_concurrency_and_instance_persistence.py#L86) & `test_03`. Persists active leases and evicts expired leases after restart. | **PASS** |
+| **Supply Chain Security** | Zero critical/high CVEs; valid CycloneDX 1.5 SBOM; 100% permissive licenses. | [`docs/cyclonedx_sbom.json`](../docs/cyclonedx_sbom.json), [`production_readiness/phase_15_license_compliance_report.md`](phase_15_license_compliance_report.md). | **PASS** |
 | **Secret Hygiene** | 0 hardcoded production secrets across 378 files; database URLs sanitized in logs. | Dynamic environment variable injection; URL passwords redacted in tracebacks via `sanitize_db_url()`. | **PASS** |
 
 ---
@@ -219,9 +219,9 @@ To eliminate any ambiguity between Git object hashes and raw file SHA-256 checks
 
 | Protected Asset | Canonical SHA-256 File Checksum | Verified SHA-256 on Disk | Canonical Git Object Blob | Verified Git Object Blob | Status |
 | :--- | :--- | :--- | :--- | :--- | :---: |
-| [`storage/roboassistant.db`](file:///root/roboassistant/storage/roboassistant.db) | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `f1a48845308e3891551da5af591c98a36ae7ee66` | `f1a48845308e3891551da5af591c98a36ae7ee66` | **BIT-FOR-BIT MATCH** |
-| [`storage/evidence/audit_ledger.jsonl`](file:///root/roboassistant/storage/evidence/audit_ledger.jsonl) | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `7557e33e5a7a366547eda582fcadddc5aff03847` | `7557e33e5a7a366547eda582fcadddc5aff03847` | **BIT-FOR-BIT MATCH** |
-| [`web/workflow_workspace.js`](file:///root/roboassistant/web/workflow_workspace.js) | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **BIT-FOR-BIT MATCH** |
+| [`storage/roboassistant.db`](../storage/roboassistant.db) | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4` | `f1a48845308e3891551da5af591c98a36ae7ee66` | `f1a48845308e3891551da5af591c98a36ae7ee66` | **BIT-FOR-BIT MATCH** |
+| [`storage/evidence/audit_ledger.jsonl`](../storage/evidence/audit_ledger.jsonl) | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996` | `7557e33e5a7a366547eda582fcadddc5aff03847` | `7557e33e5a7a366547eda582fcadddc5aff03847` | **BIT-FOR-BIT MATCH** |
+| [`web/workflow_workspace.js`](../web/workflow_workspace.js) | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `88888caf6abc92e7f6f3c2e3559e334b66087b16f29ed58f9b1c0c0449cbbe9b` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | `198d57ec6bda875cd2a6825fe2ef8929b7ba30bd` | **BIT-FOR-BIT MATCH** |
 
 ```bash
 $ sha256sum storage/roboassistant.db storage/evidence/audit_ledger.jsonl web/workflow_workspace.js

@@ -7,7 +7,7 @@ This document outlines procedures for database backups, disaster recovery, workf
 ## 1. Hot Database Backup & Recovery
 
 ### Automated Online SQLite Backup
-ZONATA utilizes SQLite's native online backup API, implemented in [`core/remote_disaster_recovery.py`](file:///root/roboassistant/core/remote_disaster_recovery.py):
+ZONATA utilizes SQLite's native online backup API, implemented in [`core/remote_disaster_recovery.py`](../../core/remote_disaster_recovery.py):
 
 ```python
 import sqlite3

@@ -3604,8 +3604,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 
-        # ZONATA V8: AI CEO Executive Operating Layer Routes
-        if path.startswith("/api/v8/"):
+        # ZONATA V8: AI CEO Executive Operating Layer & Coworker 2.0 Routes
+        if path.startswith("/api/v8/") or path.startswith("/api/v2/coworker"):
             from core.v8_api_handler import V8ApiHandler
             c_id = company_id
             v8_res = V8ApiHandler.handle_get(path, query_params, tenant_id, c_id)
@@ -8468,8 +8468,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": f"Unknown Nango scenario '{scenario}'"}, status=400)
             return
 
-        # ZONATA V8: AI CEO Executive Operating Layer Routes
-        if path.startswith("/api/v8/"):
+        # ZONATA V8: AI CEO Executive Operating Layer & Coworker 2.0 Routes
+        if path.startswith("/api/v8/") or path.startswith("/api/v2/coworker"):
             from core.v8_api_handler import V8ApiHandler
             t_id = tenant_id
             c_id = self.headers.get("X-Company-ID") or company_id

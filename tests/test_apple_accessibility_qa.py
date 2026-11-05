@@ -1,7 +1,7 @@
 """
-Tests for Phase 8: Apple-Grade Accessibility (WCAG 2.2 AA), Reduced Motion, DESIGN.md & Final QA
+Tests for Phase 8: Apple-Grade Accessibility (WCAG 2.2 AA), Reduced Motion, docs/architecture/DESIGN.md & Final QA
 Verifies:
-1. DESIGN.md comprehensive design system documentation.
+1. docs/architecture/DESIGN.md comprehensive design system documentation.
 2. Focus visible ring (:focus-visible) and --focus-ring token.
 3. Accessible ARIA attributes across primitive components (dialog, progressbar, tablist).
 4. Full prefers-reduced-motion rules across design_tokens.css, motion.js, and ai_orb.js.
@@ -16,7 +16,7 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 
 class TestAppleAccessibilityQA(unittest.TestCase):
     def setUp(self):
-        with open(os.path.join(BASE_DIR, "DESIGN.md"), "r", encoding="utf-8") as f:
+        with open(os.path.join(BASE_DIR, "docs/architecture/DESIGN.md"), "r", encoding="utf-8") as f:
             self.design_md = f.read()
         with open(os.path.join(WEB_DIR, "design_tokens.css"), "r", encoding="utf-8") as f:
             self.tokens_css = f.read()
@@ -32,7 +32,7 @@ class TestAppleAccessibilityQA(unittest.TestCase):
             self.index_html = f.read()
 
     def test_design_documentation_completeness(self):
-        # 10 core sections in DESIGN.md
+        # 10 core sections in docs/architecture/DESIGN.md
         required_sections = [
             "Design Vision & Philosophy",
             "Design Tokens & Foundations",
@@ -47,7 +47,7 @@ class TestAppleAccessibilityQA(unittest.TestCase):
             "Accessibility (WCAG 2.2 AA) Audit"
         ]
         for sec in required_sections:
-            self.assertIn(sec, self.design_md, f"Missing section in DESIGN.md: {sec}")
+            self.assertIn(sec, self.design_md, f"Missing section in docs/architecture/DESIGN.md: {sec}")
 
         # Non-negotiable principles
         self.assertIn("Obvious in 5 Seconds", self.design_md)

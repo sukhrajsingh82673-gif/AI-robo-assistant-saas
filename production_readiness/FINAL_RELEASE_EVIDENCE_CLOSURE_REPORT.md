@@ -5,7 +5,7 @@
 **Target Platform:** URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA (v1.0.0-RESTRICTED-PILOT)  
 **Authoritative Candidate Commit:** [`9dd97c8`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/9dd97c8)  
 **Parent Release Anchors:** [`caf0f2c`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/caf0f2c) | [`d86a504`](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/commit/d86a504)  
-**Synchronized Branches:** [`engineering/production-readiness-gap-closure`](file:///root/roboassistant) (HEAD) | `main` (Synchronized with origin)  
+**Synchronized Branches:** `engineering/production-readiness-gap-closure` (HEAD) | `main` (Synchronized with origin)  
 **Live Staging Host:** `https://zonata-staging.onrender.com` (Render Web Container + Neon Serverless PostgreSQL 16)  
 **Database Cluster:** Neon Serverless PostgreSQL 16.15 (`ep-broad-sky-b4jnm313-pooler.c-6.us-east-2.aws.neon.tech`)  
 **Operating Cost:** $0.00 / month (Strict Free-Tier Boundary Preserved)  

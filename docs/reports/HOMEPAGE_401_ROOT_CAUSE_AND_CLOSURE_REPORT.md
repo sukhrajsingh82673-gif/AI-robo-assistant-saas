@@ -32,13 +32,13 @@ A permanent, security-preserving fix was developed, committed, pushed to both `m
 Tracing the request from the browser through the frontend controllers, global fetch interceptor, and backend authentication middleware revealed five interrelated root causes:
 
 ### Root Cause 1: Decoupled Session Persistence & Missing Token Guard
-- In [web/app.js](file:///root/roboassistant/web/app.js), `saveSession(hostData, token)` stored the user object in `localStorage.getItem('zonata_host_session')` and the token in `localStorage.getItem('zonata_auth_token')`.
+- In [web/app.js](../../web/app.js), `saveSession(hostData, token)` stored the user object in `localStorage.getItem('zonata_host_session')` and the token in `localStorage.getItem('zonata_auth_token')`.
 - On page load, `loadStoredSession()` parsed `session` into `state.host`. If `storedToken` was missing or expired, `state.host` remained truthy because expiration validation only executed when `state.host.exp` was explicitly present. Older or simulated sessions lacked this field.
 - Because `state.host` was truthy, `renderApp()` assumed an active session, hid the authentication gate (`authContainer.style.display = 'none'`), revealed the shell (`appShell.style.display = 'flex'`), and navigated to `/overview`.
 
 ### Root Cause 2: Global Fetch Interceptor Header Omission on Missing Token
 - The global `fetch` interceptor extracted `token` from `localStorage` or `state.host.token`. When `token` was falsy, the interceptor omitted the `Authorization` header entirely.
-- The backend [api_server.py](file:///root/roboassistant/api_server.py) correctly failed closed under sovereign security invariants:
+- The backend [api_server.py](../../api_server.py) correctly failed closed under sovereign security invariants:
   ```python
   raise AuthExceptions.AuthenticationError(
       "Authentication Required: Missing, invalid, or expired Bearer token"
@@ -48,7 +48,7 @@ Tracing the request from the browser through the frontend controllers, global fe
 - The fetch interceptor did not catch 401 responses, leaving the application stranded in the broken dashboard state without recovery.
 
 ### Root Cause 3: Overview Workspace False "Offline" Classification
-- In [web/overview_workspace.js](file:///root/roboassistant/web/overview_workspace.js), `OverviewWorkspace.render()` caught the 401 response and threw an unhandled error, rendering the error card: `Intelligence Service Offline: HTTP 401: Failed to fetch executive overview snapshot`.
+- In [web/overview_workspace.js](../../web/overview_workspace.js), `OverviewWorkspace.render()` caught the 401 response and threw an unhandled error, rendering the error card: `Intelligence Service Offline: HTTP 401: Failed to fetch executive overview snapshot`.
 - It provided no re-authentication flow, masking an authentication defect as an infrastructure service failure.
 
 ### Root Cause 4: Floating-Point Timestamp Delimiter Bug in Token Parser
@@ -57,7 +57,7 @@ Tracing the request from the browser through the frontend controllers, global fe
 - This generated truncated, invalid JSON (`{"company_id":"comp_primary","exp":1793537089`), causing `JSON.parse` to throw `SyntaxError`, which silently invalidated sessions on refresh.
 
 ### Root Cause 5: Render Blueprint Deployment Branch Mismatch
-- The Render blueprint specification ([render.yaml](file:///root/roboassistant/render.yaml)) configured `autoDeploy: true` specifically on `branch: engineering/production-readiness-gap-closure`.
+- The Render blueprint specification ([render.yaml](../../render.yaml)) configured `autoDeploy: true` specifically on `branch: engineering/production-readiness-gap-closure`.
 - Fixes pushed solely to `main` were not automatically deployed by Render. Merging and pushing directly to `engineering/production-readiness-gap-closure` was necessary to trigger the live staging build.
 
 ---
@@ -93,21 +93,21 @@ flowchart TD
 
 ### Key Modifications:
 
-1. **[web/app.js](file:///root/roboassistant/web/app.js)**:
+1. **[web/app.js](../../web/app.js)**:
    - **Strict Session Invariant**: In `loadStoredSession()`, if `!state.host || !state.host.token`, `clearSession()` is called immediately. Unauthenticated users never enter `appShell`.
    - **Safe Token Expiration Extraction**: Uses `token.lastIndexOf('.')` to safely isolate the JSON payload from the signature without colliding with timestamp decimal points.
    - **Reactive 401 Interception**: Global `window.fetch` interceptor detects 401 status on protected API routes, automatically invalidating stale sessions, notifying the user via toast, and rendering the sign-in container.
    - **Pilot Quick Sign-In Accessibility**: Added `autofillPilotCredentials()` to the sign-in view for authorized evaluators (`zonata.qa.step2@example.com` / `Step2_Secure_QA_2026!`).
    - **Context Synchronization on Login**: Refreshes `CurrentCompanyContext` and triggers `syncWithBackend()` immediately upon authentication.
 
-2. **[web/overview_workspace.js](file:///root/roboassistant/web/overview_workspace.js)**:
+2. **[web/overview_workspace.js](../../web/overview_workspace.js)**:
    - Added token pre-check in `render()`: if no auth token is found, directs user to authentication instead of issuing an unauthenticated fetch.
    - On 401 status, cleanly invokes `clearSession()` and `renderApp()` without displaying "Intelligence Service Offline".
 
-3. **[web/company_context.js](file:///root/roboassistant/web/company_context.js)**:
+3. **[web/company_context.js](../../web/company_context.js)**:
    - Added guard in `refresh()`: returns early if no token is stored, preventing unauthenticated background requests to `/api/companies` on initial visit.
 
-4. **[api_server.py](file:///root/roboassistant/api_server.py)**:
+4. **[api_server.py](../../api_server.py)**:
    - Implemented RFC 7231 compliant `do_HEAD` handler for HTTP HEAD liveness probing.
 
 ---
