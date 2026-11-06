@@ -360,3 +360,113 @@ position, and explicit refusal in headless mode. Evidence:
   `zonata_budget_exhaustions_total`) that no production code increments, so those alerts can only
   fire in tests. The four runbooks they point at did not exist and have now been written
   (`docs/runbooks/`).
+
+## 22. Second Simulation Sweep — 2026-11-06
+
+Section 21 corrected the computer-use engine. A full read of the runtime, provider
+and adapter layers found that the same failure mode — plausible output returned as
+success without doing the work — still existed in twelve more places. All are now
+fixed and covered by tests.
+
+### 22.1 Simulated layers found
+
+| File | Fabrication |
+|---|---|
+| `providers/desktop_native_providers.py` | Returned a hardcoded accessibility tree, a claimed click and a canned text readback, always `SUCCESS` at confidence 0.99 |
+| `providers/playwright_provider.py` | Invented page titles for non-HTTP URLs, invented three supplier rows when no page was loaded, "clicked" and "typed" without a browser, always `SUCCESS` |
+| `providers/openclaw_provider.py` | Returned three invented suppliers for any search query |
+| `runtimes/openclaw_runtime.py` | Fabricated `ev_claw_ok` evidence and `completed: True` for unwired delegation |
+| `runtimes/openhands_runtime.py` | Reported "Simulated governed workspace clean state" for commands it never ran |
+| `runtimes/hermes_runtime.py` | Produced a plan without an LLM; bypassed the MCP registry |
+| `runtimes/browser_runtime.py` | Reported rendering for a static fetch; executed no JavaScript |
+| `runtimes/computer_use_runtime.py` | Derived success from a status string instead of real dispatch |
+| `runtimes/terminal_runtime.py` | See §21; already corrected |
+| `providers/computer_use_open_source.py` | Headless GUI actions "succeeded"; app launch bypassed the policy gateway |
+| `providers/openadapt_provider.py` | Claimed deterministic workflow execution with no `openadapt` installed |
+| `universal_worker_contract.py` | `SUCCESS` for workers that have no execution backend |
+| `providers/web_scraping_family.py` | Crawler invented a 200-status page when a fetch failed |
+| `adapters/opendots_adapter.py` | Advertised a `"OpenDots-Grounding-v1"` model as `REAL_PRODUCTION_QUALIFIED`; results were fixed geometric anchors |
+| `capability_registry.py` | `desktop.accessibility_tree` claimed `REAL_PRODUCTION_QUALIFIED` / `INSTALLED` / `RUNNABLE` |
+
+### 22.2 Corrections
+
+- Native desktop provider: Linux window, pointer and keyboard capabilities now
+  dispatch through `ComputerUseEngine` (`xdotool`/`wmctrl`) and report the
+  engine's `executed` flag. `accessibility_tree`, `read_text` and unverified
+  window enumeration return `FAILED` with `ACCESSIBILITY_TREE_NOT_AVAILABLE`,
+  `TEXT_READBACK_NOT_IMPLEMENTED` or `WINDOW_ENUMERATION_NOT_AVAILABLE`.
+- Playwright provider: real HTTP navigate only; non-HTTP schemes and fetch errors
+  are `FAILED`; DOM extraction without page content is `FAILED`
+  (`NO_PAGE_CONTENT`); click/type/screenshot/download refuse with
+  `BROWSER_ENGINE_NOT_AVAILABLE` because the `playwright` package is absent.
+  `rendered` and `engine` are reported so callers can tell HTTP-only from DOM.
+- OpenClaw: search refuses with `SEARCH_ENDPOINT_NOT_CONFIGURED` unless an
+  endpoint is supplied, in which case it performs a real fetch; agent delegation
+  refuses with `OPENCLAW_AGENT_RUNTIME_NOT_CONFIGURED`.
+- OpenHands: file writes land in the governed workspace and are verified on
+  disk; `run_command` returns the gateway's real refusal (container sandbox
+  required) instead of a clean-state message.
+- Hermes: MCP tools go through `MCPGateway.invoke_tool`; missing LLM reports
+  `LLM_UNAVAILABLE`.
+- Browser runtime: real `urllib` fetch with real status/byte count and
+  `rendered: False`; JS evaluation and screenshots refuse.
+- Computer-use runtime: delegates to `ComputerUseEngine` and mirrors its
+  `executed`/`reason`.
+- Open-source computer-use provider: headless dispatch is `FAILED` with
+  `READY_FOR_REMOTE_NODE`; `APPLICATION_LAUNCH` refuses with
+  `APP_LAUNCH_REQUIRES_POLICY_GATEWAY`.
+- OpenAdapt: `ADAPTER_ONLY` unless the package is importable.
+- Universal worker contract: `FAILED` + `NO_EXECUTION_BACKEND`.
+- Crawler: real fetch; per-URL `status: "FAILED"` on error.
+- OpenDots: `model_name: None`, `evaluation_status: NOT_A_MODEL`, results
+  labelled `PERCEPTION_TREE` or `HEURISTIC_ANCHOR`. Assessment:
+  `docs/architecture/OPENDOTS_INTEGRATION_ASSESSMENT.md`.
+- Capability registry: `desktop.accessibility_tree` downgraded to
+  `BLOCKED_EXTERNAL_DEPENDENCY` / `NOT_INSTALLED`; `desktop.click_element`
+  downgraded to `PARTIALLY_QUALIFIED` because targeting uses seeded perception.
+
+### 22.3 Alert metrics now driven by real events
+
+The three counters listed as unreachable in §21.7 are now incremented where the
+event actually occurs:
+
+- `KillSwitchMatrix.activate()` → `zonata_killswitch_activations_total`
+- `ExternalActionReconciliationEngine.reconcile_action()` on `DRIFTED` →
+  `zonata_reconciliation_drift_total`
+- `CostGovernor` on hard-limit breach → `zonata_budget_exhaustions_total`
+
+`test_10b_alert_metrics_wired_to_real_events` triggers each event and asserts
+that `ALT_KILLSWITCH_ENGAGED`, `ALT_RECONCILIATION_DRIFT` and
+`ALT_BUDGET_EXHAUSTED` fire.
+
+### 22.4 Idle patrol actually runs the defence sweep
+
+`CoworkerLifecycleOrchestrator.run_idle_security_patrol()` previously checked
+only stale `/tmp/zonata_workspaces` directories, so §9's defensive-monitoring
+requirement was not wired. It now runs
+`DefensiveCybersecurityMonitor.run_full_defensive_patrol()` while idle, throttled
+to one sweep per 900 seconds by default (`enable_defense_patrol`,
+`defense_patrol_interval_sec`).
+
+### 22.5 Verification
+
+- `tests/test_coworker_runtimes_hermes_openclaw.py` — 14 passed
+- `tests/test_final_gap_closure_and_opensource.py` — 18 passed
+- `tests/test_coworker_production_qualification.py` — 22 passed
+- `tests/test_v10_enterprise_production_unit.py` — 22 passed (includes the new
+  alert-wiring test)
+- Coworker v2 comprehensive / phase A / phase B — log at
+  `/tmp/opencode/run_coworker_v2.log`
+
+### 22.6 Still open after this sweep
+
+- Perception remains seeded (no AT-SPI/UIA/AX); window metadata is the only real
+  observation.
+- Browser DOM interaction, JS evaluation and screenshots require Playwright +
+  Chromium, absent on this host.
+- OpenHands command execution requires a container runtime.
+- No download or installation manifests, and no file-ownership records (§7).
+- Level 3 discovery is a curated catalogue, not live research (§3).
+- UI (§11) is unverified in a browser.
+- PostgreSQL migration `0005` is unexecuted.
+- Two `AuthorityLevel` enums remain; both carry collision docstrings.

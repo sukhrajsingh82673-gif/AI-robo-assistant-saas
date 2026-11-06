@@ -12,6 +12,7 @@ import hashlib
 import re
 import urllib.parse
 import urllib.request
+import importlib.util
 from ..provider_base import CapabilityProvider
 from ..contracts import (
     ProviderHealthStatus, ProviderEstimate, ExecutionResult,
@@ -34,7 +35,9 @@ class PlaywrightProvider(CapabilityProvider):
         self._repository = "microsoft/playwright-python"
         self._commit = "7b2c9d1"
         self._license = "Apache-2.0"
-        self._integration_status = "PARTIAL_INTEGRATION"
+        self._playwright_available = importlib.util.find_spec("playwright") is not None
+        self._integration_status = "REAL_INTEGRATION" if self._playwright_available else "HTTP_ONLY"
+        self._health = ProviderHealthStatus.AVAILABLE if self._playwright_available else ProviderHealthStatus.DEGRADED
         self._model_dependencies = []
         self._runtime_dependencies = ["playwright", "chromium", "urllib"]
 
@@ -117,15 +120,31 @@ class PlaywrightProvider(CapabilityProvider):
                         output["http_status"] = status_code
                         output["title"] = title
                         output["real_http"] = True
+                        output["engine"] = "playwright" if self._playwright_available else "urllib"
+                        output["rendered"] = self._playwright_available
                         self._active_pages[exec_id] = {"url": url, "title": title, "html": html_text}
                 except Exception as e:
-                    output["http_status"] = 500
-                    output["error"] = str(e)
-                    output["title"] = f"Error: {e}"
+                    return ExecutionResult(
+                        provider_id=self._id,
+                        capability_id=capability,
+                        execution_id=exec_id,
+                        status="FAILED",
+                        output=dict(output, executed=False, reason="NAVIGATION_FAILED", error=str(e)[:300]),
+                        error_message=f"NAVIGATION_FAILED: {e}",
+                        confidence=0.0,
+                        duration_ms=(time.time() - start_time) * 1000
+                    )
             else:
-                output["http_status"] = 200
-                output["title"] = f"Supplier Portal — {urllib.parse.urlparse(url).netloc}"
-                self._active_pages[exec_id] = {"url": url, "title": output["title"], "html": ""}
+                return ExecutionResult(
+                    provider_id=self._id,
+                    capability_id=capability,
+                    execution_id=exec_id,
+                    status="FAILED",
+                    output=dict(output, executed=False, reason="UNSUPPORTED_URL_SCHEME"),
+                    error_message="UNSUPPORTED_URL_SCHEME",
+                    confidence=0.0,
+                    duration_ms=(time.time() - start_time) * 1000
+                )
         elif capability == "browser.extract":
             query = params.get("query", "supplier_rates")
             latest_page = None
@@ -154,25 +173,50 @@ class PlaywrightProvider(CapabilityProvider):
                 output["extracted_data"] = params["mock_items"]
                 output["record_count"] = len(output["extracted_data"])
             else:
-                output["extracted_data"] = [
-                    {"supplier": "Supplier A", "rate": "$42.50", "lead_time": "2 days", "rating": 4.8},
-                    {"supplier": "Supplier B", "rate": "$39.00", "lead_time": "5 days", "rating": 4.5},
-                    {"supplier": "Supplier C", "rate": "$45.00", "lead_time": "1 day", "rating": 4.9}
-                ]
-                output["record_count"] = len(output["extracted_data"])
-        elif capability == "browser.click":
-            selector = params.get("selector", "button.submit")
-            output["clicked_selector"] = selector
-        elif capability == "browser.type":
-            selector = params.get("selector", "input.field")
-            text = params.get("text", "")
-            output["typed_target"] = selector
-            output["chars_typed"] = len(text)
-        elif capability == "browser.screenshot":
-            output["screenshot_hash"] = hashlib.sha256(f"page_shot_{time.time()}".encode()).hexdigest()
-            output["format"] = "png"
+                return ExecutionResult(
+                    provider_id=self._id,
+                    capability_id=capability,
+                    execution_id=exec_id,
+                    status="FAILED",
+                    output=dict(output, executed=False, reason="NO_PAGE_CONTENT", extracted_data=[], record_count=0),
+                    error_message="NO_PAGE_CONTENT",
+                    confidence=0.0,
+                    duration_ms=(time.time() - start_time) * 1000
+                )
+        elif capability in ("browser.click", "browser.type", "browser.screenshot",
+                            "browser.download", "browser.wait", "browser.verify", "browser.open"):
+            if not self._playwright_available:
+                return ExecutionResult(
+                    provider_id=self._id,
+                    capability_id=capability,
+                    execution_id=exec_id,
+                    status="FAILED",
+                    output=dict(output, executed=False, reason="BROWSER_ENGINE_NOT_AVAILABLE"),
+                    error_message="BROWSER_ENGINE_NOT_AVAILABLE",
+                    confidence=0.0,
+                    duration_ms=(time.time() - start_time) * 1000
+                )
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=exec_id,
+                status="FAILED",
+                output=dict(output, executed=False, reason="PLAYWRIGHT_BINDING_NOT_IMPLEMENTED"),
+                error_message="PLAYWRIGHT_BINDING_NOT_IMPLEMENTED",
+                confidence=0.0,
+                duration_ms=(time.time() - start_time) * 1000
+            )
         else:
-            output["status"] = "OK"
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=exec_id,
+                status="FAILED",
+                output=dict(output, executed=False, reason=f"UNKNOWN_CAPABILITY: {capability}"),
+                error_message=f"UNKNOWN_CAPABILITY: {capability}",
+                confidence=0.0,
+                duration_ms=(time.time() - start_time) * 1000
+            )
 
         evidence = [
             {
@@ -184,6 +228,8 @@ class PlaywrightProvider(CapabilityProvider):
             }
         ]
 
+        output["executed"] = True
+        output["engine"] = "playwright" if self._playwright_available else "urllib"
         self._history[exec_id] = {"capability": capability, "output": output, "status": "COMPLETED"}
 
         return ExecutionResult(
@@ -200,22 +246,33 @@ class PlaywrightProvider(CapabilityProvider):
         )
 
     def observe(self, capability: str, execution_id: str) -> Dict[str, Any]:
+        record = self._history.get(execution_id)
+        rendered = bool(self._playwright_available)
         return {
             "execution_id": execution_id,
             "browser": self._browser_type,
-            "dom_ready": True,
-            "page_state": "INTERACTIVE"
+            "executed": bool(record),
+            # Without Playwright there is no DOM tree and no JS execution;
+            # what exists is the raw HTTP response body.
+            "dom_ready": rendered,
+            "rendered": rendered,
+            "engine": "playwright" if rendered else "urllib",
+            "page_state": "HTTP_BODY_ONLY" if not rendered else "INTERACTIVE"
         }
 
     def verify(self, execution_id: str, expected_state: Dict[str, Any]) -> VerificationResult:
         record = self._history.get(execution_id)
         if not record:
             return VerificationResult(status=VerificationStatus.NOT_VERIFIED, verified_by=self._id)
+        out = record.get("output") or {}
+        if not out.get("executed"):
+            return VerificationResult(status=VerificationStatus.NOT_VERIFIED, verified_by=self._id,
+                                      confidence=0.0, evidence_details={"dom_output": out})
         return VerificationResult(
             status=VerificationStatus.VERIFIED,
             verified_by=self._id,
             confidence=0.98,
-            evidence_details={"dom_output": record.get("output")}
+            evidence_details={"dom_output": out}
         )
 
     def rollback(self, execution_id: str) -> bool:

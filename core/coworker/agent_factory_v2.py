@@ -59,15 +59,18 @@ class EphemeralAgentFactoryV2:
     ) -> SubworkerV2Record:
         parent_task = self.db.get_task(task_id)
         if not parent_task:
+            # An unknown task id must not become an authority grant. The
+            # placeholder parent is least-privilege, so a caller cannot obtain
+            # elevated scope by inventing a task id.
             parent_task = CoworkerV2Task(
                 task_id=task_id,
                 mission_id=f"msn_{uuid.uuid4().hex[:8]}",
                 tenant_id="tnt_primary",
                 company_id="cmp_primary",
                 title="Ephemeral Task",
-                description="Auto-generated parent task",
-                budget_allocated_usd=50.0,
-                authority_scope=["admin", "read_only"]
+                description="Auto-generated parent task (least privilege placeholder)",
+                budget_allocated_usd=5.0,
+                authority_scope=["read_only"]
             )
             self.db.save_task(parent_task)
         return self.spawn_subworker(
@@ -109,10 +112,24 @@ class EphemeralAgentFactoryV2:
         target_scope = requested_scope or spec.allowed_tools
         parent_scope = parent_task.authority_scope
 
+        def _covered(item: str) -> bool:
+            """True when the parent scope actually covers `item`.
+
+            Exact match, or the parent holds a namespace root ("browser" covers
+            "browser.open"). "admin"/"all" are whole-scope grants. Substring
+            matching is deliberately avoided: "read" must not cover "thread".
+            """
+            for perm in parent_scope:
+                if perm in ("admin", "all"):
+                    return True
+                if item == perm:
+                    return True
+                if item.startswith(perm + "."):
+                    return True
+            return False
+
         for item in target_scope:
-            if "admin" in parent_scope or "all" in parent_scope or item in parent_scope:
-                effective_scope.append(item)
-            elif any(parent_perm in item for parent_perm in parent_scope):
+            if _covered(item):
                 effective_scope.append(item)
 
         if not effective_scope:

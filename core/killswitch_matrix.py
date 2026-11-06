@@ -78,6 +78,11 @@ class KillSwitchMatrix:
                     is_active = 1
             """, (switch_id, level, target_id, reason, activated_by, now))
             conn.commit()
+            try:
+                from .observability_stack import sre_metrics
+                sre_metrics.inc_counter("zonata_killswitch_activations_total")
+            except Exception:
+                pass
             logger.warning(f"KILLSWITCH ENGAGED: Level={level}, Target={target_id}, Reason={reason}")
             return switch_id
 

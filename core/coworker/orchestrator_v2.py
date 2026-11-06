@@ -50,13 +50,21 @@ class CoworkerLifecycleOrchestrator:
         db_store: Optional[CoworkerDbStoreV2] = None,
         store: Optional[CoworkerDbStoreV2] = None,
         tenant_id: str = "tnt_primary",
-        default_lease_ttl: float = 300.0
+        default_lease_ttl: float = 300.0,
+        enable_defense_patrol: bool = True,
+        defense_patrol_interval_sec: float = 900.0
     ):
         self.db = store or db_store or CoworkerDbStoreV2.get_instance()
         self.store = self.db
         self.tenant_id = tenant_id
         self.default_lease_ttl = default_lease_ttl
         self._orchestrator_state = TaskLifecycleState.IDLE
+        # Idle patrols also run the defensive cybersecurity sweep, throttled so
+        # an idle loop cannot turn into a continuous repository scan.
+        self._defense_patrol_enabled = enable_defense_patrol
+        self._defense_patrol_interval_sec = float(defense_patrol_interval_sec)
+        self._last_defense_patrol = 0.0
+        self._defense_monitor = None
 
     def create_task(
         self,
@@ -274,7 +282,36 @@ class CoworkerLifecycleOrchestrator:
             )
             self.db.record_patrol_finding(finding)
 
+        # 2. Full defensive sweep (AST, secrets, dependencies, endpoints) via
+        # the cybersecurity monitor, rate-limited to one pass per interval.
+        finding = self._run_throttled_defense_patrol() or finding
+
         return finding
+
+    def _run_throttled_defense_patrol(self) -> Optional[SecurityPatrolFinding]:
+        """Runs the real DefenseMonitor sweep when due; returns its top finding."""
+        if not self._defense_patrol_enabled:
+            return None
+        now = time.time()
+        if (now - self._last_defense_patrol) < self._defense_patrol_interval_sec:
+            return None
+        self._last_defense_patrol = now
+        try:
+            if self._defense_monitor is None:
+                from .defense_monitor import DefensiveCybersecurityMonitor
+                self._defense_monitor = DefensiveCybersecurityMonitor.get_instance(db_store=self.db)
+            report = self._defense_monitor.run_full_defensive_patrol()
+        except Exception:
+            return None
+        if not (report.get("critical_count") or report.get("high_count")):
+            return None
+        severity_rank = {PatrolSeverity.CRITICAL: 3, PatrolSeverity.HIGH: 2,
+                         PatrolSeverity.MEDIUM: 1, PatrolSeverity.LOW: 0}
+        findings = [f for f in self._defense_monitor.findings_history
+                    if f.severity in (PatrolSeverity.CRITICAL, PatrolSeverity.HIGH)]
+        if not findings:
+            return None
+        return max(findings, key=lambda f: severity_rank.get(f.severity, 0))
 
     # --- Crash Recovery & Cleanup Manifest Execution ---
 

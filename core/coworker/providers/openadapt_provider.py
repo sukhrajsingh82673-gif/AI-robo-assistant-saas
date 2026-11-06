@@ -107,6 +107,12 @@ class OpenAdaptProvider(CapabilityProvider):
                 }
         return True
 
+    @staticmethod
+    def _runtime_available() -> bool:
+        """True only when the OpenAdapt package is actually importable."""
+        import importlib.util
+        return importlib.util.find_spec("openadapt") is not None
+
     def execute(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> ExecutionResult:
         start_time = time.time()
         exec_id = f"oa_exec_{uuid.uuid4().hex[:8]}"
@@ -124,76 +130,103 @@ class OpenAdaptProvider(CapabilityProvider):
         workflow_id = params.get("workflow_id", "workflow_export_financial_report")
         workflow = self._workflows.get(workflow_id, {
             "name": "Generic Desktop Workflow",
-            "steps": params.get("steps", ["focus_app", "execute_action"]),
+            "steps": params.get("steps", []),
             "compiled": True
         })
 
-        # Simulate deterministic workflow execution
-        executed_steps = []
-        for step in workflow.get("steps", []):
-            executed_steps.append({
-                "step": step,
-                "status": "COMPLETED",
-                "timestamp": time.time()
-            })
+        # Honest refusal: replaying a GUI workflow requires the OpenAdapt
+        # runtime. Emitting COMPLETED steps without it would be fabricated
+        # evidence.
+        if not self._runtime_available():
+            payload = {
+                "workflow_id": workflow_id,
+                "status": "ADAPTER_ONLY",
+                "reason": "The 'openadapt' package is not installed on this host. "
+                          "A workflow cannot be replayed; this adapter only compiles "
+                          "workflow definitions.",
+                "compiled_steps": list(workflow.get("steps", [])),
+            }
+            self._execution_history[exec_id] = {
+                "capability": capability,
+                "params": params,
+                "output": payload,
+                "timestamp": time.time(),
+                "status": "NOT_EXECUTED",
+                "executed": False,
+            }
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=exec_id,
+                status="FAILED",
+                output=payload,
+                confidence=0.0,
+                error_message="ADAPTER_ONLY: openadapt runtime not installed",
+                duration_ms=(time.time() - start_time) * 1000
+            )
 
-        evidence = [
-            {
+        # Real replay path. Kept minimal and explicit: it runs OpenAdapt's CLI
+        # against the compiled workflow and records the actual exit status.
+        try:
+            import subprocess
+            proc = subprocess.run(
+                ["python3", "-m", "openadapt", "replay", workflow_id],
+                capture_output=True, text=True, timeout=300,
+            )
+            executed = proc.returncode == 0
+            output_payload = {
+                "workflow_id": workflow_id,
+                "status": "WORKFLOW_COMPLETED" if executed else "WORKFLOW_FAILED",
+                "target_app": workflow.get("app"),
+                "stdout_tail": proc.stdout[-2000:],
+                "stderr_tail": proc.stderr[-2000:],
+            }
+            evidence = [{
                 "type": "openadapt_execution_trace",
                 "workflow_id": workflow_id,
-                "step_count": len(executed_steps),
-                "steps": executed_steps,
-                "hash": hashlib.sha256(json.dumps(executed_steps).encode()).hexdigest()
-            }
-        ]
-
-        # Generate output artifact if requested
-        output_payload = {
-            "workflow_id": workflow_id,
-            "status": "WORKFLOW_COMPLETED",
-            "executed_steps": executed_steps,
-            "target_app": workflow.get("app", "DesktopClient")
-        }
-
-        if "output_file" in params:
-            out_file = params["output_file"]
-            os.makedirs(os.path.dirname(os.path.abspath(out_file)), exist_ok=True)
-            with open(out_file, "w") as f:
-                f.write(f"OPENADAPT_EXPORT_DATA:{workflow_id}:{time.time()}\n")
-            output_payload["exported_file"] = out_file
-            with open(out_file, "rb") as f_read:
-                file_hash = hashlib.sha256(f_read.read()).hexdigest()
-            output_payload["exported_file_hash"] = file_hash
+                "returncode": proc.returncode,
+                "hash": hashlib.sha256((proc.stdout + proc.stderr).encode()).hexdigest(),
+            }]
+        except Exception as exc:
+            executed = False
+            output_payload = {"workflow_id": workflow_id, "status": "WORKFLOW_FAILED", "error": str(exc)}
+            evidence = [{"type": "openadapt_execution_trace", "workflow_id": workflow_id, "error": str(exc)}]
 
         self._execution_history[exec_id] = {
             "capability": capability,
             "params": params,
             "output": output_payload,
             "timestamp": time.time(),
-            "status": "COMPLETED"
+            "status": "COMPLETED" if executed else "FAILED",
+            "executed": executed,
         }
 
         return ExecutionResult(
             provider_id=self._id,
             capability_id=capability,
             execution_id=exec_id,
-            status="SUCCESS",
+            status="SUCCESS" if executed else "FAILED",
             output=output_payload,
-            confidence=0.98,
+            confidence=0.98 if executed else 0.0,
             evidence=evidence,
-            rollback_available=True,
-            rollback_data={"workflow_id": workflow_id, "prior_state": "BACKUP_AVAILABLE"},
+            rollback_available=executed,
+            rollback_data={"workflow_id": workflow_id} if executed else None,
             idempotency_key=params.get("idempotency_key"),
+            error_message=None if executed else "OpenAdapt replay failed",
             duration_ms=(time.time() - start_time) * 1000
         )
 
     def observe(self, capability: str, execution_id: str) -> Dict[str, Any]:
         record = self._execution_history.get(execution_id, {})
+        if not record:
+            return {"execution_id": execution_id, "observed_state": "NOT_FOUND"}
+        executed = bool(record.get("executed"))
         return {
             "execution_id": execution_id,
-            "observed_state": "DESKTOP_WORKFLOW_ACTIVE",
-            "active_window": record.get("output", {}).get("target_app", "DesktopClient"),
-            "last_step_status": "OK"
+            "observed_state": "DESKTOP_WORKFLOW_ACTIVE" if executed else "NOT_EXECUTED",
+            "active_window": record.get("output", {}).get("target_app"),
+            "last_step_status": record.get("status"),
+            "executed": executed,
         }
 
     def verify(self, execution_id: str, expected_state: Dict[str, Any]) -> VerificationResult:
@@ -204,6 +237,13 @@ class OpenAdaptProvider(CapabilityProvider):
                 verified_by=self._id,
                 confidence=0.0,
                 discrepancy_notes="Execution record not found in OpenAdapt history"
+            )
+        if not record.get("executed"):
+            return VerificationResult(
+                status=VerificationStatus.NOT_VERIFIED,
+                verified_by=self._id,
+                confidence=0.0,
+                discrepancy_notes="Workflow was not executed by OpenAdapt"
             )
         return VerificationResult(
             status=VerificationStatus.VERIFIED,

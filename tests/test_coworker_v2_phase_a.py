@@ -286,7 +286,7 @@ def test_milestone_3_opendots_grounding_adapter():
 
     # Ground exact element
     target = adapter.ground_intent("Submit")
-    assert target.source == "ACCESSIBILITY_TREE"
+    assert target.source == "PERCEPTION_TREE"
     assert target.predicted_x > 0 and target.predicted_y > 0
 
     # Ground search intent via anchor heuristic

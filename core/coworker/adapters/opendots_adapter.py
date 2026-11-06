@@ -1,9 +1,15 @@
 """
-ZONATA Autonomous Coworker 2.0 — OpenDots Coordinate Grounding Adapter
-Real evaluation and adapter for OpenDots visual grounding model:
-  - Official Specs: OpenDots open-source coordinate prediction framework
-  - Licensing: Apache-2.0 / MIT Compatible evaluation
-  - Integration Status: QUALIFIED (Heuristic + Model Grounding Pipeline)
+ZONATA Autonomous Coworker 2.0 — Coordinate Grounding Adapter
+
+Honest status: this module does NOT run an OpenDots model. No OpenDots package,
+weights, or public API could be verified on this host, so there is no model
+inference here. What it provides is a deterministic grounding shim:
+
+  1. Exact label lookup against the current perception tree.
+  2. Fixed geometric anchors for a small set of common intents.
+
+Both are useful for tests and for wiring the call sites, and both are labelled
+as such in every result. See docs/architecture/OPENDOTS_INTEGRATION_ASSESSMENT.md.
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ class GroundingTarget:
     predicted_x: int
     predicted_y: int
     confidence: float
-    source: str  # "OPENDOTS_MODEL", "ACCESSIBILITY_TREE", "HEURISTIC_ANCHOR"
+    source: str  # "PERCEPTION_TREE", "HEURISTIC_ANCHOR"
     latency_ms: float
 
     @property
@@ -40,11 +46,13 @@ class OpenDotsAdapter:
     """
 
     SPECIFICATION = {
-        "model_name": "OpenDots-Grounding-v1",
+        "model_name": None,
+        "implementation": "HEURISTIC_ANCHOR + PERCEPTION_TREE_LOOKUP",
         "license": "Apache-2.0",
-        "input": "Image Tensor / Base64 Screenshot + Text Query",
-        "output": "Normalized Coordinates (norm_x, norm_y) [0.0 - 1.0]",
-        "evaluation_status": "REAL_PRODUCTION_QUALIFIED"
+        "input": "Text query (screenshot bytes accepted but not used for inference)",
+        "output": "Pixel coordinates (x, y) plus a confidence and source label",
+        "evaluation_status": "NOT_A_MODEL",
+        "note": "No verified OpenDots artifact is installed; no inference is performed.",
     }
 
     def __init__(
@@ -78,7 +86,7 @@ class OpenDotsAdapter:
                 predicted_x=cx,
                 predicted_y=cy,
                 confidence=found.confidence,
-                source="ACCESSIBILITY_TREE",
+                source="PERCEPTION_TREE",
                 latency_ms=latency
             )
 
@@ -104,7 +112,7 @@ class OpenDotsAdapter:
             predicted_x=px,
             predicted_y=py,
             confidence=conf,
-            source="OPENDOTS_MODEL",
+            source="HEURISTIC_ANCHOR",
             latency_ms=latency
         )
 

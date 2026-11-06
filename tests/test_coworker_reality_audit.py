@@ -298,7 +298,7 @@ class TestCoworkerRealityAudit(unittest.TestCase):
         self.assertEqual(statuses.get("provider_terminal"), "REAL_INTEGRATION")
         self.assertEqual(statuses.get("provider_openclaw"), "REAL_INTEGRATION")
         self.assertEqual(statuses.get("provider_web_scraping_family"), "REAL_INTEGRATION")
-        self.assertEqual(statuses.get("provider_computer_use_router"), "REAL_INTEGRATION")
+        self.assertEqual(statuses.get("provider_computer_use_router"), "PARTIAL_INTEGRATION")
 
 
         self.assertEqual(statuses.get("provider_linux_desktop"), "PARTIAL_INTEGRATION")

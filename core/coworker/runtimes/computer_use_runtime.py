@@ -56,6 +56,7 @@ class ComputerUseWorkerRuntime(WorkerRuntime):
         self.sessions: Dict[str, RuntimeSession] = {}
         self.screen_states: Dict[str, DesktopScreenState] = {}
         self.workers: Dict[str, CoworkerProfile] = {}
+        self._cue = None
 
     def runtime_id(self) -> str:
         return "runtime_computer_use_unified"
@@ -88,7 +89,14 @@ class ComputerUseWorkerRuntime(WorkerRuntime):
         session.state = SessionState.ACTIVE
         session.runtime_version = self.version()
         session.provider_version = "cua-driver-mcp-v1"
-        self.screen_states[session.session_id] = DesktopScreenState(session_id=session.session_id)
+        initial = DesktopScreenState(session_id=session.session_id)
+        try:
+            from ..computer_use_engine import ComputerUseEngine
+            cue = ComputerUseEngine.get_instance()
+            initial.screen_resolution = (cue.width, cue.height)
+        except Exception:
+            pass
+        self.screen_states[session.session_id] = initial
         session.log(f"Initialized unified CUA desktop session {session.session_id} on node {session.node_id}")
         self.sessions[session.session_id] = session
         return True
@@ -102,7 +110,33 @@ class ComputerUseWorkerRuntime(WorkerRuntime):
         session.log(f"Accepted CUA desktop mission: {mission.get('objective', 'GUI Task')}")
         return mission_id
 
+    def _engine(self):
+        """Lazily obtain the real desktop engine (avoids an import cycle)."""
+        from ..computer_use_engine import ComputerUseEngine
+        if getattr(self, "_cue", None) is None:
+            self._cue = ComputerUseEngine.get_instance()
+        return self._cue
+
+    @staticmethod
+    def _status(result: Dict[str, Any]) -> str:
+        """Derive the runtime status from what the engine actually did."""
+        if result.get("executed"):
+            return "SUCCESS"
+        return result.get("status") or "ACTION_NOT_IMPLEMENTED"
+
+    def _sync_state(self, state: DesktopScreenState) -> None:
+        state.cursor_position = (self._engine().cursor_x, self._engine().cursor_y)
+        state.active_window = self._engine().active_window
+
     def run_foreground(self, session_id: str, task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a computer-use action on the host.
+
+        Delegates to ComputerUseEngine, which dispatches real X11 input and
+        reports `executed`/`mode`/`status`/`reason`. This runtime does not invent
+        success: when there is no display or the tool is missing, the caller gets
+        ACTION_NOT_IMPLEMENTED with a reason.
+        """
         session = self.sessions.get(session_id)
         if not session:
             return {"status": "ERROR", "error": f"Session {session_id} not found"}
@@ -110,97 +144,189 @@ class ComputerUseWorkerRuntime(WorkerRuntime):
         if session.control_mode == SupervisedControlMode.HUMAN_CONTROL:
             return {"status": "HUMAN_TAKEOVER_ACTIVE", "result": None}
 
-        state = self.screen_states.get(session_id, DesktopScreenState(session_id=session_id))
+        state = self.screen_states.get(session_id) or DesktopScreenState(session_id=session_id)
+        self.screen_states.setdefault(session_id, state)
         session.record_heartbeat()
 
         action = task.get("action", "observe")
         params = task.get("parameters", {})
+        engine = self._engine()
 
         # 1. Observation
         if action == "observe":
-            session.log("Observing desktop UI elements and accessibility tree")
+            session.log("Observing desktop windows and UI elements")
+            obs = engine.observe()
+            state.active_window = obs.active_window
+            state.cursor_position = obs.cursor_position
+            state.screen_resolution = (obs.screen_width, obs.screen_height)
+            state.visual_elements_detected = len(obs.elements)
+            state.accessibility_tree_available = False
+            status = "SUCCESS" if (obs.windows_verified and not obs.synthetic) else "PARTIAL"
             return {
-                "status": "SUCCESS",
+                "status": status,
                 "action": "computer.observe",
-                "active_window": state.active_window,
-                "elements_found": 14,
-                "accessibility_tree": {"root": "Desktop", "children": ["Taskbar", "ApplicationWindow"]},
-                "timestamp": time.time()
+                "executed": obs.windows_verified,
+                "active_window": obs.active_window,
+                "open_windows": obs.open_windows,
+                "elements_found": len(obs.elements),
+                "accessibility_tree": {
+                    "root": obs.active_window,
+                    "children": [e.label for e in obs.elements],
+                    "source": "seeded_scene",
+                },
+                # Window titles may be real while the element tree is seeded.
+                "windows_verified": obs.windows_verified,
+                "synthetic": obs.synthetic,
+                "reason": None if obs.synthetic is False else "PERCEPTION_NOT_IMPLEMENTED",
+                "timestamp": time.time(),
             }
 
         # 2. Click
         if action == "click":
-            x, y = params.get("coordinate", (100, 200))
+            x, y = params.get("coordinate", (engine.cursor_x, engine.cursor_y))
             button = params.get("button", "left")
-            state.cursor_position = (x, y)
-            session.log(f"Dispatched computer.click at ({x}, {y}) button={button}")
+            res = engine.click(int(x), int(y), button=button)
+            self._sync_state(state)
+            session.log(f"computer.click at ({x}, {y}) button={button}: {res['status']}")
             return {
-                "status": "SUCCESS",
+                "status": self._status(res),
                 "action": "computer.click",
-                "coordinate": (x, y),
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "coordinate": (int(x), int(y)),
                 "button": button,
-                "background_mode": True
+                "reason": res.get("reason"),
             }
 
         # 3. Type Text
         if action == "type":
             text = params.get("text", "")
-            session.log(f"Dispatched computer.type ({len(text)} chars)")
+            res = engine.type_text(text)
+            session.log(f"computer.type ({len(text)} chars): {res['status']}")
             return {
-                "status": "SUCCESS",
+                "status": self._status(res),
                 "action": "computer.type",
-                "chars_written": len(text)
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "chars_written": len(text),
+                "reason": res.get("reason"),
             }
 
         # 4. Keyboard Key
         if action == "key":
             key_name = params.get("key", "Return")
-            session.log(f"Dispatched computer.key: {key_name}")
+            res = engine.press_key(key_name)
+            session.log(f"computer.key {key_name}: {res['status']}")
             return {
-                "status": "SUCCESS",
+                "status": self._status(res),
                 "action": "computer.key",
-                "key": key_name
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "key": key_name,
+                "reason": res.get("reason"),
             }
 
-        # 5. Screenshot
+        # 5. Scroll
+        if action == "scroll":
+            direction = params.get("direction", "down")
+            res = engine.scroll(dx=params.get("dx", 0), dy=params.get("dy", 0), direction=direction)
+            return {
+                "status": self._status(res),
+                "action": "computer.scroll",
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "direction": direction,
+                "reason": res.get("reason"),
+            }
+
+        # 6. Drag
+        if action == "drag":
+            start = params.get("start", params.get("from", (0, 0)))
+            end = params.get("end", params.get("to", (100, 100)))
+            res = engine.drag(int(start[0]), int(start[1]), int(end[0]), int(end[1]))
+            self._sync_state(state)
+            return {
+                "status": self._status(res),
+                "action": "computer.drag",
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "start": tuple(start),
+                "end": tuple(end),
+                "reason": res.get("reason"),
+            }
+
+        # 7. Screenshot
         if action == "screenshot":
-            h = hashlib.sha256(f"cua_screen_{state.active_window}_{time.time()}".encode()).hexdigest()
-            state.last_screenshot_hash = h
-            session.log(f"Captured desktop screenshot digest: {h[:16]}")
+            png = engine.screenshot()
+            synthetic = bool(getattr(engine, "last_screenshot_synthetic", True))
+            digest = hashlib.sha256(png).hexdigest()
+            state.last_screenshot_hash = digest
+            state.screen_resolution = (engine.width, engine.height)
+            session.log(f"Desktop screenshot: {len(png)} bytes synthetic={synthetic} digest={digest[:16]}")
             return {
-                "status": "SUCCESS",
+                "status": "ACTION_NOT_IMPLEMENTED" if synthetic else "SUCCESS",
                 "action": "computer.screenshot",
-                "screenshot_hash": h,
-                "resolution": state.screen_resolution
+                "executed": not synthetic,
+                "mode": "headless" if synthetic else "x11",
+                "screenshot_hash": digest,
+                "size_bytes": len(png),
+                "resolution": state.screen_resolution,
+                "synthetic": synthetic,
+                "reason": "NO_DISPLAY" if synthetic else None,
             }
 
-        # 6. Window Selection
+        # 8. Window Selection
         if action == "window":
-            title = params.get("title", "Main Workspace")
-            state.active_window = title
-            session.log(f"Switched window context to: {title}")
+            title = params.get("title", "")
+            res = engine.switch_window(title)
+            if res["executed"]:
+                state.active_window = title
+            session.log(f"computer.window -> {title}: {res['status']}")
             return {
-                "status": "SUCCESS",
+                "status": self._status(res),
                 "action": "computer.window",
-                "active_window": title
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "active_window": state.active_window,
+                "reason": res.get("reason"),
             }
 
-        # 7. Verification
-        if action == "verify":
-            session.log("Executing physical desktop state verification")
+        # 9. Launch (authority-bearing: delegated to the policy gateway, not here)
+        if action == "launch":
+            res = engine.launch(params.get("application", ""), params.get("args"))
             return {
-                "status": "SUCCESS",
-                "action": "computer.verify",
-                "verified": True,
-                "target_matched": True
+                "status": self._status(res),
+                "action": "computer.launch",
+                "executed": res["executed"],
+                "mode": res["mode"],
+                "reason": res.get("reason") or "APP_LAUNCH_REQUIRES_POLICY_GATEWAY",
             }
 
-        # Default CUA action dispatch
+        # 10. Verification
+        if action == "verify":
+            assertion = params.get("assertion", "window_active")
+            expected = params.get("expected", params.get("title", state.active_window))
+            passed = engine.verify(assertion, expected)
+            session.log(f"computer.verify {assertion}={expected!r}: {passed}")
+            return {
+                "status": "SUCCESS" if passed else "VERIFICATION_FAILED",
+                "action": "computer.verify",
+                "executed": passed,
+                "verified": passed,
+                "target_matched": passed,
+                "assertion": assertion,
+                "expected": expected,
+                "reason": None if passed else "ASSERTION_NOT_CONFIRMED",
+            }
+
+        # Unknown action: refuse rather than claiming a completed task.
         return {
-            "status": "SUCCESS",
+            "status": "ACTION_NOT_IMPLEMENTED",
             "action": f"computer.{action}",
-            "completed": True,
-            "timestamp": time.time()
+            "executed": False,
+            "completed": False,
+            "reason": f"UNKNOWN_CUA_ACTION:{action}",
+            "timestamp": time.time(),
         }
 
     def run_background(self, session_id: str, task: Dict[str, Any]) -> str:
@@ -289,10 +415,16 @@ class ComputerUseWorkerRuntime(WorkerRuntime):
         return False
 
     def verify(self, session_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Seal a result. CONFIRMED requires positive proof of execution
+        (`executed` true or an explicit `verified` true), not merely a
+        success-shaped status string.
+        """
+        confirmed = bool(result.get("executed")) or result.get("verified") is True
         return {
             "session_id": session_id,
-            "verification_status": "CONFIRMED" if result.get("status") == "SUCCESS" else "UNCONFIRMED",
-            "digest": hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
+            "verification_status": "CONFIRMED" if confirmed else "UNCONFIRMED",
+            "digest": hashlib.sha256(json.dumps(result, sort_keys=True, default=str).encode()).hexdigest(),
             "timestamp": time.time()
         }
 

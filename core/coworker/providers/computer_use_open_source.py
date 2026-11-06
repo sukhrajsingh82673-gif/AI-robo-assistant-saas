@@ -72,6 +72,7 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
         self.control_mode = SupervisedControlMode.AI_CONTROL
         self.active_operator: Optional[str] = None
         self._history: Dict[str, Any] = {}
+        self._cue = None
 
         # Instantiate underlying open-source providers
         self.agent_s = AgentSProvider()
@@ -138,11 +139,18 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
                 confidence=0.0,
                 discrepancy_notes="Execution not recorded"
             )
+        if not data.get("executed"):
+            return VerificationResult(
+                status=VerificationStatus.FAILED,
+                verified_by="ComputerUseVerifier",
+                confidence=0.0,
+                discrepancy_notes=f"Action was not executed: {data.get('reason') or data.get('status')}"
+            )
         return VerificationResult(
             status=VerificationStatus.VERIFIED,
             verified_by="ComputerUseVerifier",
             confidence=0.98,
-            evidence_details={"operation": "gui_action_verified"}
+            evidence_details={"operation": "gui_action_executed"}
         )
 
     def rollback(self, execution_id: str) -> bool:
@@ -178,34 +186,44 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
         # Environment check: Headless Linux vs Physical Display vs Remote Node
         remote_node_id = params.get("remote_node_id") or context.get("target_node_id")
 
-        if not self.has_physical_display and not remote_node_id:
-            # Zero-Mock Rule: Truthfully report READY_FOR_REMOTE_NODE for physical interactions
-            if capability in ["MOUSE_CLICK", "MOUSE_DOUBLE_CLICK", "MOUSE_RIGHT_CLICK", "MOUSE_DRAG", "KEYBOARD_TYPE", "KEYBOARD_HOTKEY", "APPLICATION_LAUNCH"]:
-                output = {
-                    "capability": capability,
-                    "status": "READY_FOR_REMOTE_NODE",
-                    "reason": "Host Linux container lacks DISPLAY server; action compiled for remote desktop worker.",
-                    "action_intent": {
-                        "action": capability,
-                        "parameters": params,
-                        "required_platform": params.get("target_platform", "windows_or_macos_or_x11"),
-                        "timestamp": time.time()
-                    }
+        if not self.has_physical_display and not remote_node_id and capability in (
+            "MOUSE_CLICK", "MOUSE_DOUBLE_CLICK", "MOUSE_RIGHT_CLICK", "MOUSE_DRAG",
+            "MOUSE_MOVE", "KEYBOARD_TYPE", "KEYBOARD_HOTKEY",
+            "CAPTURE_SCREENSHOT", "ACTIVE_WINDOW_INSPECT",
+        ):
+            # A compiled dispatch spec is not an executed action. Report it as
+            # such: the caller must not believe the click happened.
+            intent = {
+                "capability": capability,
+                "status": "READY_FOR_REMOTE_NODE",
+                "reason": "Host Linux container lacks a DISPLAY server and no remote node was configured; action was not executed.",
+                "action_intent": {
+                    "action": capability,
+                    "parameters": params,
+                    "required_platform": params.get("target_platform", "windows_or_macos_or_x11"),
+                    "timestamp": time.time()
                 }
-                return ExecutionResult(
-                    provider_id=self._id,
-                    capability_id=capability,
-                    execution_id=exec_id,
-                    status="SUCCESS",
-                    output=output,
-                    confidence=0.98,
-                    evidence=[{"type": "remote_dispatch_spec", "sha256": hashlib.sha256(json.dumps(output).encode()).hexdigest()}],
-                    duration_ms=(time.time() - start_time) * 1000
-                )
+            }
+            self._history[exec_id] = {"executed": False, **intent}
+            return ExecutionResult(
+                provider_id=self._id,
+                capability_id=capability,
+                execution_id=exec_id,
+                status="FAILED",
+                output=intent,
+                confidence=0.0,
+                evidence=[{
+                    "type": "remote_dispatch_spec",
+                    "sha256": hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
+                }],
+                error_message="NOT_EXECUTED: no local display and no remote node configured",
+                duration_ms=(time.time() - start_time) * 1000
+            )
 
-        # Route to provider
+        # Route to the real provider / engine.
         output = self._route_gui_action(capability, params, context)
-        self._history[exec_id] = output
+        executed = bool(output.get("executed"))
+        self._history[exec_id] = {"executed": executed, **output}
 
         output_digest = hashlib.sha256(json.dumps(output, sort_keys=True, default=str).encode()).hexdigest()
 
@@ -213,87 +231,143 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
             provider_id=self._id,
             capability_id=capability,
             execution_id=exec_id,
-            status="SUCCESS",
+            status="SUCCESS" if executed else "FAILED",
             output=output,
-            confidence=0.96,
+            confidence=0.96 if executed else 0.0,
             evidence=[{
                 "type": "computer_use_evidence",
                 "capability": capability,
+                "executed": executed,
                 "digest": output_digest,
                 "timestamp": time.time()
             }],
+            error_message=None if executed else (output.get("reason") or "ACTION_NOT_IMPLEMENTED"),
             duration_ms=(time.time() - start_time) * 1000
         )
 
+    def _engine(self):
+        """Lazily obtain the real desktop engine (avoids an import cycle)."""
+        from ..computer_use_engine import ComputerUseEngine
+        if getattr(self, "_cue", None) is None:
+            self._cue = ComputerUseEngine.get_instance()
+        return self._cue
+
+    @staticmethod
+    def _wrap(name: str, res: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalise an engine primitive result into a router output record."""
+        return {
+            "engine": name,
+            "executed": bool(res.get("executed")),
+            "status": res.get("status", "ACTION_NOT_IMPLEMENTED"),
+            "mode": res.get("mode"),
+            "reason": res.get("reason"),
+        }
+
+    def _delegate(self, provider, capability: str, params: Dict[str, Any],
+                  context: Dict[str, Any], engine_name: str) -> Dict[str, Any]:
+        """Delegate to an open-source provider, reporting its real outcome."""
+        result = provider.execute(capability, params, context)
+        executed = result.status == "SUCCESS"
+        return {
+            "engine": engine_name,
+            "executed": executed,
+            "status": "SUCCESS" if executed else "ACTION_NOT_IMPLEMENTED",
+            "reason": None if executed else (result.error_message or "PROVIDER_UNAVAILABLE"),
+            "provider_status": result.status,
+            "provider_output": result.output,
+        }
+
     def _route_gui_action(self, capability: str, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Routes GUI action to appropriate open-source engine."""
+        """
+        Route a GUI action to the real execution path.
+
+        Every branch reports `executed`. Engines that are not configured return
+        ACTION_NOT_IMPLEMENTED with the provider's own reason; nothing here
+        fabricates a bounding box, a replay count, or a screenshot hash.
+        """
         preferred_engine = params.get("engine", "AUTO")
 
+        if capability == "HUMAN_TAKEOVER_TRANSFER":
+            self.control_mode = SupervisedControlMode.HUMAN_TAKEOVER
+            self.active_operator = params.get("operator_id")
+            return {"engine": "zonata-control-plane", "executed": True,
+                    "status": "SUCCESS", "operator_id": self.active_operator}
+
         if capability == "VISUAL_GROUNDING" or preferred_engine == "UI_TARS":
-            # Delegate to UI-TARS vision-language grounding
-            target_description = params.get("target_description", "Submit button")
-            grounding_result = {
-                "engine": "UI-TARS-VL",
-                "target_description": target_description,
-                "bbox": params.get("bbox", [150, 240, 220, 280]),
-                "point": [185, 260],
-                "grounding_confidence": 0.94,
-                "timestamp": time.time()
-            }
-            return grounding_result
+            return self._delegate(self.ui_tars, "VISUAL_GROUNDING", params, context, "UI-TARS-VL")
 
-        elif preferred_engine == "AGENT_S" or "subgoal" in params:
-            # Delegate to Agent-S hierarchical planning
-            return {
-                "engine": "Agent-S-OSWorld",
-                "subgoal": params.get("subgoal", f"Execute {capability}"),
-                "action": capability,
-                "parameters": params,
-                "confidence": 0.93,
-                "status": "COMPLETED"
-            }
+        if preferred_engine == "AGENT_S" or "subgoal" in params:
+            return self._delegate(self.agent_s, "AGENT_S_PLAN", params, context, "Agent-S-OSWorld")
 
-        elif capability == "GUI_MACRO_PLAYBACK" or preferred_engine == "OPENADAPT":
-            # Delegate to OpenAdapt replay
-            return {
-                "engine": "OpenAdapt-Playback",
-                "macro_id": params.get("macro_id", "recording_default"),
-                "events_replayed": params.get("event_count", 12),
-                "status": "REPLAYED",
-                "drift_offset_px": [0, 0]
-            }
+        if capability == "GUI_MACRO_PLAYBACK" or preferred_engine == "OPENADAPT":
+            return self._delegate(self.openadapt, "GUI_MACRO_PLAYBACK", params, context, "OpenAdapt-Playback")
 
-        elif capability == "CAPTURE_SCREENSHOT":
-            # Capture screenshot metadata
+        if capability == "APPLICATION_LAUNCH":
+            # Spawning host processes is an authority-bearing action; it belongs
+            # to the action gateway, not to a GUI provider.
+            return {"engine": "zonata-policy-gateway", "executed": False,
+                    "status": "ACTION_NOT_IMPLEMENTED",
+                    "reason": "APP_LAUNCH_REQUIRES_POLICY_GATEWAY"}
+
+        engine = self._engine()
+
+        if capability == "CAPTURE_SCREENSHOT":
+            png = engine.screenshot()
+            synthetic = bool(getattr(engine, "last_screenshot_synthetic", True))
             return {
                 "engine": "ZONATA-Screen-Capture",
+                "executed": not synthetic,
+                "status": "SUCCESS" if not synthetic else "ACTION_NOT_IMPLEMENTED",
+                "reason": None if not synthetic else "NO_DISPLAY",
                 "format": "PNG",
-                "resolution": [1920, 1080],
-                "virtual_surface": not self.has_physical_display,
-                "content_hash": hashlib.sha256(f"screen_{time.time()}".encode()).hexdigest(),
-                "timestamp": time.time()
+                "size_bytes": len(png),
+                "content_hash": hashlib.sha256(png).hexdigest(),
+                "synthetic": synthetic,
+                "timestamp": time.time(),
             }
 
-        elif capability == "ACTIVE_WINDOW_INSPECT":
+        if capability == "ACTIVE_WINDOW_INSPECT":
+            obs = engine.observe()
             return {
-                "engine": "Native-OS-Accessibility",
+                "engine": "X11-Window-Perception",
+                "executed": obs.windows_verified,
+                "status": "SUCCESS" if obs.windows_verified else "ACTION_NOT_IMPLEMENTED",
+                "reason": None if obs.windows_verified else "NO_DISPLAY",
                 "active_window": {
-                    "title": params.get("window_title", "ZONATA Co-Worker Workspace"),
-                    "process_name": "zonata_host",
-                    "rect": [0, 0, 1920, 1080],
-                    "focused": True
-                }
+                    "title": obs.active_window,
+                    "open_windows": obs.open_windows,
+                    "windows_verified": obs.windows_verified,
+                },
+                "elements_found": len(obs.elements),
+                "elements_synthetic": obs.synthetic,
             }
 
+        x_raw = params.get("x", params.get("coordinate", [None, None])[0])
+        y_raw = params.get("y", params.get("coordinate", [None, None])[1])
+
+        if capability == "MOUSE_CLICK":
+            res = engine.click(int(x_raw or 0), int(y_raw or 0), params.get("button", "left"))
+        elif capability == "MOUSE_DOUBLE_CLICK":
+            res = engine.double_click(int(x_raw or 0), int(y_raw or 0))
+        elif capability == "MOUSE_RIGHT_CLICK":
+            res = engine.right_click(int(x_raw or 0), int(y_raw or 0))
+        elif capability == "MOUSE_MOVE":
+            res = engine.move(int(x_raw or 0), int(y_raw or 0))
+        elif capability == "MOUSE_DRAG":
+            start = params.get("start", [x_raw or 0, y_raw or 0])
+            end = params.get("end", [0, 0])
+            res = engine.drag(int(start[0]), int(start[1]), int(end[0]), int(end[1]))
+        elif capability == "KEYBOARD_TYPE":
+            res = engine.type_text(params.get("text", ""))
+        elif capability == "KEYBOARD_HOTKEY":
+            keys = params.get("keys") or [params.get("key", "Return")]
+            res = engine.hotkey(keys)
         else:
-            # Standard mouse/keyboard action
-            return {
-                "engine": "Governed-Desktop-Native",
-                "capability": capability,
-                "parameters": params,
-                "dispatched_to_node": params.get("remote_node_id", "local_virtual"),
-                "status": "DISPATCHED"
-            }
+            return {"engine": "none", "executed": False,
+                    "status": "ACTION_NOT_IMPLEMENTED",
+                    "reason": f"UNSUPPORTED_CAPABILITY:{capability}"}
+
+        return self._wrap("Governed-Desktop-Native", res)
 
     # -------------------------------------------------------------------------
     # UniversalWorkerContract 14-Method Implementation
@@ -334,15 +408,22 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
         if not data:
             return VerificationResult(
                 status=VerificationStatus.FAILED,
+                verified_by="ComputerUseVerifier",
                 confidence=0.0,
-                verifier="ComputerUseVerifier",
-                notes="Execution not recorded"
+                discrepancy_notes="Execution not recorded"
+            )
+        if not data.get("executed"):
+            return VerificationResult(
+                status=VerificationStatus.FAILED,
+                verified_by="ComputerUseVerifier",
+                confidence=0.0,
+                discrepancy_notes=f"Action was not executed: {data.get('reason') or data.get('status')}"
             )
         return VerificationResult(
             status=VerificationStatus.PASSED,
+            verified_by="ComputerUseVerifier",
             confidence=0.98,
-            verifier="ComputerUseVerifier",
-            notes="GUI action executed and verified"
+            evidence_details={"operation": "gui_action_executed"}
         )
 
     def recover(self, task_id: str, failure_reason: str) -> Dict[str, Any]:
@@ -389,6 +470,9 @@ class ComputerUseOpenSourceRouter(CapabilityProvider, UniversalWorkerContract):
             "capabilities": self.capabilities(),
             "health": self.health().value,
             "security_status": "GOVERNED_BY_ZONATA",
-            "integration_status": "REAL_INTEGRATION"
+            # Only the native mouse/keyboard/screenshot path is a real
+            # integration; UI-TARS/Agent-S/OpenAdapt require configured
+            # endpoints and report UNAVAILABLE until then.
+            "integration_status": "PARTIAL_INTEGRATION"
         }
 

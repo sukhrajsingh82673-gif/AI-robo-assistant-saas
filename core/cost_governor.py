@@ -120,6 +120,11 @@ class CostGovernor:
                     WHERE tenant_id = ? AND company_id = ? AND scope_type = ? AND scope_id = ?
                 """, (now, self.tenant_id, company_id, scope_type, scope_id))
                 conn.commit()
+                try:
+                    from .observability_stack import sre_metrics
+                    sre_metrics.inc_counter("zonata_budget_exhaustions_total")
+                except Exception:
+                    pass
                 raise BudgetExhaustedException(
                     f"Hard budget limit of ₹{hard_limit:,.2f} exceeded for {scope_type}:{scope_id}. Requested spend ₹{cost_inr:,.2f} would bring total to ₹{new_spent:,.2f}."
                 )

@@ -80,6 +80,14 @@ class ExternalActionReconciliationEngine:
                     except Exception as comp_err:
                         logger.error(f"Compensating action failed for {action_id}: {comp_err}")
 
+        # Drift is a control failure: count it so the CRITICAL alert can fire.
+        if status == ReconciliationStatus.DRIFTED:
+            try:
+                from .observability_stack import sre_metrics
+                sre_metrics.inc_counter("zonata_reconciliation_drift_total")
+            except Exception:
+                pass
+
         # Compute tamper-evident SHA-256 digest of reconciliation
         evidence_payload = {
             "action_id": action_id,
