@@ -56,9 +56,12 @@ class PatrolType(str, Enum):
     SECRETS = "SECRETS"
     DEPENDENCIES = "DEPENDENCIES"
     ENDPOINT_AUTH = "ENDPOINT_AUTH"
+    PROMPT_INJECTION = "PROMPT_INJECTION"
+    TOOL_SCOPE = "TOOL_SCOPE"
 
 
 class PatrolSeverity(str, Enum):
+    INFORMATIONAL = "INFORMATIONAL"
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"

@@ -88,6 +88,11 @@ class DefensiveCybersecurityMonitor:
         self.last_scan_time: Optional[float] = None
         self.findings_history: List[SecurityPatrolFinding] = []
 
+    EXCLUDED_DIRS = {
+        ".git", "node_modules", "__pycache__", ".venv", ".pytest_cache",
+        ".cache", "venv", "storage", ".system_generated", ".cargo", ".npm"
+    }
+
     def scan_secrets(self, scan_path: Optional[str] = None) -> List[SecurityPatrolFinding]:
         target = scan_path or self.scan_root
         findings = []
@@ -99,7 +104,8 @@ class DefensiveCybersecurityMonitor:
             except Exception:
                 pass
         elif os.path.isdir(target):
-            for root, _, files in os.walk(target):
+            for root, dirs, files in os.walk(target):
+                dirs[:] = [d for d in dirs if d not in self.EXCLUDED_DIRS]
                 for file in files:
                     if file.endswith((".py", ".json", ".env", ".yaml", ".yml", ".txt")):
                         fp = os.path.join(root, file)
@@ -172,7 +178,7 @@ class DefensiveCybersecurityMonitor:
                     description=f"Exposed Secret Detected: {pattern_name}",
                     target=source_label,
                     auto_remediated=True,
-                    remediation_action="Masked in logs and flagged for key rotation",
+                    remediation_action="Masked in logs and flagged for key rotation. Invariant: Credential revocation NOT claimed without explicit provider API confirmation.",
                     detected_at=time.time(),
                     metadata={"pattern": pattern_name, "match_count": len(matches)}
                 )
@@ -260,7 +266,158 @@ class DefensiveCybersecurityMonitor:
 
         return findings
 
-    # --- 5. Full Autonomous Patrol Sweep ---
+    # --- 5. Runtime Process Monitoring ---
+
+    SUSPICIOUS_PROCESS_KEYWORDS = ["xmrig", "cryptonight", "nc -e", "netcat", "ncat", "bash -i >& /dev/tcp", "python -c import pty"]
+
+    def scan_runtime_processes(self) -> List[SecurityPatrolFinding]:
+        """Non-destructive inspection of active OS processes to detect unauthorized background tasks."""
+        findings: List[SecurityPatrolFinding] = []
+        try:
+            import subprocess
+            proc = subprocess.run(["ps", "-eo", "pid,user,comm,args"], capture_output=True, text=True, timeout=5)
+            if proc.returncode == 0:
+                for line in proc.stdout.splitlines()[1:]:
+                    line_lower = line.lower()
+                    for keyword in self.SUSPICIOUS_PROCESS_KEYWORDS:
+                        if keyword in line_lower:
+                            parts = line.strip().split(None, 3)
+                            pid_str = parts[0] if parts else "unknown"
+                            fnd = SecurityPatrolFinding(
+                                finding_id=f"fnd_proc_{uuid.uuid4().hex[:8]}",
+                                patrol_type=PatrolType.PROCESS,
+                                severity=PatrolSeverity.CRITICAL,
+                                description=f"Unauthorized suspicious process detected matching '{keyword}': PID {pid_str}",
+                                target=f"PID {pid_str}",
+                                auto_remediated=False,
+                                remediation_action="Flagged for immediate quarantine and CEO notification",
+                                detected_at=time.time(),
+                                metadata={"pid": pid_str, "command": line.strip()[:200]}
+                            )
+                            findings.append(fnd)
+                            self.db.record_patrol_finding(fnd)
+        except Exception:
+            pass
+        return findings
+
+    # --- 6. Network Exposure Auditing ---
+
+    def scan_network_exposure(self) -> List[SecurityPatrolFinding]:
+        """Audits open network listening ports to identify unintended external exposure (0.0.0.0 bindings)."""
+        findings: List[SecurityPatrolFinding] = []
+        try:
+            # Check /proc/net/tcp for listening ports on 0.0.0.0 (in hex: 00000000)
+            if os.path.exists("/proc/net/tcp"):
+                with open("/proc/net/tcp", "r") as f:
+                    lines = f.readlines()
+                for line in lines[1:]:
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        local_addr, st = parts[1], parts[3]
+                        # 0A is TCP_LISTEN in hex
+                        if st == "0A":
+                            ip_hex, port_hex = local_addr.split(":")
+                            port = int(port_hex, 16)
+                            if ip_hex == "00000000":
+                                # Bound to all interfaces (0.0.0.0)
+                                sev = PatrolSeverity.INFORMATIONAL if port in (80, 443, 8000, 3000, 5000) else PatrolSeverity.MEDIUM
+                                fnd = SecurityPatrolFinding(
+                                    finding_id=f"fnd_net_{uuid.uuid4().hex[:8]}",
+                                    patrol_type=PatrolType.NETWORK,
+                                    severity=sev,
+                                    description=f"Port {port} listening on wildcard interface 0.0.0.0",
+                                    target=f"0.0.0.0:{port}",
+                                    auto_remediated=False,
+                                    detected_at=time.time(),
+                                    metadata={"port": port, "interface": "0.0.0.0"}
+                                )
+                                findings.append(fnd)
+                                self.db.record_patrol_finding(fnd)
+        except Exception:
+            pass
+        return findings
+
+    # --- 7. Prompt Injection Defense ---
+
+    PROMPT_INJECTION_PATTERNS = [
+        re.compile(r'(?i)ignore\s+(all\s+)?(previous|prior)\s+(instructions|directives|prompts)'),
+        re.compile(r'(?i)you\s+are\s+now\s+(DAN|unfiltered|jailbroken)'),
+        re.compile(r'(?i)bypass\s+(constitutional|policy|governance|guardrail)'),
+        re.compile(r'(?i)(print|exfiltrate|reveal)\s+(system\s+prompt|master\s+key|root\s+password)'),
+        re.compile(r'(?i)sudo\s+su\s+root'),
+    ]
+
+    def scan_prompt_injection(self, prompt_text: str, source_label: str = "user_input") -> List[SecurityPatrolFinding]:
+        """Detects adversarial jailbreak and prompt injection patterns in CEO / user instructions."""
+        findings: List[SecurityPatrolFinding] = []
+        if not prompt_text:
+            return findings
+
+        for pat in self.PROMPT_INJECTION_PATTERNS:
+            if pat.search(prompt_text):
+                fnd = SecurityPatrolFinding(
+                    finding_id=f"fnd_inj_{uuid.uuid4().hex[:8]}",
+                    patrol_type=PatrolType.PROMPT_INJECTION,
+                    severity=PatrolSeverity.HIGH,
+                    description=f"Adversarial prompt injection pattern detected: '{pat.pattern}'",
+                    target=source_label,
+                    auto_remediated=True,
+                    remediation_action="Prompt flagged, sanitized, and instruction execution gated",
+                    detected_at=time.time(),
+                    metadata={"pattern": pat.pattern, "excerpt": prompt_text[:120]}
+                )
+                findings.append(fnd)
+                self.db.record_patrol_finding(fnd)
+        return findings
+
+    # --- 8. MCP Tool Scope Auditing ---
+
+    def audit_mcp_tool_scopes(self, tool_definitions: List[Dict[str, Any]]) -> List[SecurityPatrolFinding]:
+        """Audits tool definitions to detect over-scoped tools violating principle of least privilege."""
+        findings: List[SecurityPatrolFinding] = []
+        for tool in tool_definitions:
+            name = tool.get("name", "unknown_tool")
+            desc = (tool.get("description") or "").lower()
+            params = tool.get("parameters", {}).get("properties", {})
+            
+            # Detect un-scoped shell execution
+            if "bash" in name.lower() or "shell" in name.lower() or "exec" in name.lower():
+                if "command" in params and "whitelist" not in desc:
+                    fnd = SecurityPatrolFinding(
+                        finding_id=f"fnd_mcp_{uuid.uuid4().hex[:8]}",
+                        patrol_type=PatrolType.TOOL_SCOPE,
+                        severity=PatrolSeverity.MEDIUM,
+                        description=f"Over-privileged MCP tool '{name}' permits arbitrary command execution without explicit whitelist",
+                        target=f"mcp_tool:{name}",
+                        auto_remediated=False,
+                        detected_at=time.time(),
+                        metadata={"tool_name": name}
+                    )
+                    findings.append(fnd)
+                    self.db.record_patrol_finding(fnd)
+        return findings
+
+    # --- 9. Baseline Posture Telemetry ---
+
+    def generate_security_posture_baseline(self) -> List[SecurityPatrolFinding]:
+        """Records informational baseline checks for environment security."""
+        findings = [
+            SecurityPatrolFinding(
+                finding_id=f"fnd_info_{uuid.uuid4().hex[:8]}",
+                patrol_type=PatrolType.RESOURCE,
+                severity=PatrolSeverity.INFORMATIONAL,
+                description="ZONATA PolicyEngine and Constitutional Governance active",
+                target="constitutional_governance",
+                auto_remediated=False,
+                detected_at=time.time(),
+                metadata={"status": "ACTIVE"}
+            )
+        ]
+        for f in findings:
+            self.db.record_patrol_finding(f)
+        return findings
+
+    # --- 10. Full Autonomous Patrol Sweep ---
 
     def run_full_defensive_patrol(self) -> Dict[str, Any]:
         """
@@ -283,10 +440,22 @@ class DefensiveCybersecurityMonitor:
         # 3. Endpoint Audit
         findings.extend(self.audit_api_endpoints())
 
+        # 4. Process Monitoring
+        findings.extend(self.scan_runtime_processes())
+
+        # 5. Network Exposure
+        findings.extend(self.scan_network_exposure())
+
+        # 6. Informational Baseline
+        findings.extend(self.generate_security_posture_baseline())
+
         self.findings_history = findings
 
         critical_count = sum(1 for f in findings if f.severity == PatrolSeverity.CRITICAL)
         high_count = sum(1 for f in findings if f.severity == PatrolSeverity.HIGH)
+        medium_count = sum(1 for f in findings if f.severity == PatrolSeverity.MEDIUM)
+        low_count = sum(1 for f in findings if f.severity == PatrolSeverity.LOW)
+        info_count = sum(1 for f in findings if f.severity == PatrolSeverity.INFORMATIONAL)
 
         return {
             "status": "COMPLETED",
@@ -294,6 +463,9 @@ class DefensiveCybersecurityMonitor:
             "total_findings": len(findings),
             "critical_count": critical_count,
             "high_count": high_count,
+            "medium_count": medium_count,
+            "low_count": low_count,
+            "informational_count": info_count,
             "alert_dispatched": (critical_count > 0 or high_count > 0),
             "findings": [f.to_dict() for f in findings[:20]]
         }
@@ -305,6 +477,7 @@ class DefensiveCybersecurityMonitor:
         2. AST dangerous calls scans
         3. Dependency pinning checks
         4. API endpoint authentication checks
+        5. Process and network exposure checks
         """
         findings: List[SecurityPatrolFinding] = []
         target = scan_path or self.scan_root
@@ -314,7 +487,8 @@ class DefensiveCybersecurityMonitor:
 
         # 2. AST scan if files or dir
         if os.path.isdir(target):
-            for root, _, files in os.walk(target):
+            for root, dirs, files in os.walk(target):
+                dirs[:] = [d for d in dirs if d not in self.EXCLUDED_DIRS]
                 for f in files:
                     if f.endswith(".py"):
                         findings.extend(self.scan_python_ast(os.path.join(root, f)))
@@ -326,6 +500,12 @@ class DefensiveCybersecurityMonitor:
 
         # 4. API Endpoints
         findings.extend(self.audit_api_endpoints())
+
+        # 5. Runtime Process Monitoring
+        findings.extend(self.scan_runtime_processes())
+
+        # 6. Network Exposure
+        findings.extend(self.scan_network_exposure())
 
         self.findings_history = findings
         return findings

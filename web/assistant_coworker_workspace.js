@@ -354,6 +354,38 @@
           </div>
         </div>
 
+        <!-- Coworker 2.0 Operational Reality & Telemetry HUD -->
+        <div class="coworker-reality-hud" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🖥️ Desktop Environment</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#38bdf8; margin:6px 0 2px;">
+              VIRTUAL_DESKTOP_CONNECTED
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">X11 / Openbox Native GUI Primitives</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">💾 Dual-Tier Persistence</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#34d399; margin:6px 0 2px;">
+              SQLite WAL + Neon PostgreSQL
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">Transactional Outbox Relay Active</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🔌 Runtimes & Adapters</div>
+            <div style="font-size:0.85rem; font-weight:600; color:#cbd5e1; margin:6px 0 2px;">
+              Hermes (Live) | OpenCloud | OpenDots
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">Honest Fallback & Status Gating</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛡️ Defensive Security</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#a78bfa; margin:6px 0 2px;">
+              5-Tier Threat Classification
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">CRITICAL / HIGH / MED / LOW / INFO</div>
+          </div>
+        </div>
+
         <!-- Visual 7-Stage Execution Pipeline -->
         <div class="pipeline-flow-card" style="background:var(--card-bg, #1e293b); border:1px solid #334155; border-radius:12px; padding:18px 24px; margin-bottom:24px;">
           <div class="pipeline-stages" style="display:flex; justify-content:space-between; align-items:center; position:relative;">

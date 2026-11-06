@@ -4,8 +4,11 @@ Binds the 14 Computer-Use Engine primitives to Nous Hermes function-calling form
 """
 
 from __future__ import annotations
+import os
 import json
 import time
+import urllib.request
+import urllib.error
 from typing import Dict, List, Optional, Any
 from ..computer_use_engine import ComputerUseEngine
 
@@ -13,12 +16,100 @@ from ..computer_use_engine import ComputerUseEngine
 class HermesComputerUseAdapter:
     """
     Translates Hermes tool calling schemas and invocations into ComputerUseEngine actions.
+    Supports live model inference against Nous Hermes / OpenAI-compatible endpoints.
     """
 
     TOOL_NAME = "computer_use"
 
-    def __init__(self, engine: Optional[ComputerUseEngine] = None):
+    def __init__(
+        self,
+        engine: Optional[ComputerUseEngine] = None,
+        endpoint: Optional[str] = None,
+        api_key: Optional[str] = None
+    ):
         self.engine = engine or ComputerUseEngine()
+        self.endpoint = (endpoint or os.environ.get("HERMES_API_ENDPOINT") or os.environ.get("HERMES_ENDPOINT") or "").rstrip("/")
+        self.api_key = api_key or os.environ.get("HERMES_API_KEY") or ""
+
+    def check_connection(self, timeout: float = 2.0) -> Dict[str, Any]:
+        """Verifies if the configured Hermes inference endpoint is live and reachable."""
+        if not self.endpoint:
+            return {
+                "connected": False,
+                "status": "BLOCKED_BY_EXTERNAL_DEPENDENCY",
+                "endpoint": None,
+                "reason": "HERMES_API_ENDPOINT is not configured in environment"
+            }
+        try:
+            url = f"{self.endpoint}/v1/models"
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {self.api_key}"} if self.api_key else {})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+                return {"connected": True, "status": "ONLINE", "endpoint": self.endpoint, "models": data.get("data", [])}
+        except Exception as e:
+            return {
+                "connected": False,
+                "status": "BLOCKED_BY_EXTERNAL_DEPENDENCY",
+                "endpoint": self.endpoint,
+                "reason": f"Connection failed: {str(e)}"
+            }
+
+    def call_hermes_inference(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str = "hermes-3-llama-3.1-8b",
+        tools: Optional[List[Dict[str, Any]]] = None,
+        timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """
+        Invokes Hermes chat completions endpoint with optional computer_use function definition.
+        Returns the parsed message or honest dependency block if endpoint is offline.
+        """
+        conn = self.check_connection(timeout=min(timeout, 3.0))
+        if not conn["connected"]:
+            return {
+                "status": "BLOCKED_BY_EXTERNAL_DEPENDENCY",
+                "connected": False,
+                "endpoint": self.endpoint or "UNSET",
+                "reason": conn["reason"],
+                "content": None,
+                "tool_calls": []
+            }
+
+        url = f"{self.endpoint}/v1/chat/completions"
+        payload: Dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.2
+        }
+        if tools is not None:
+            payload["tools"] = tools
+        elif True:
+            payload["tools"] = [self.get_tool_schema()]
+
+        try:
+            req_data = json.dumps(payload).encode("utf-8")
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                resp_data = json.loads(resp.read().decode())
+                choice = resp_data.get("choices", [{}])[0].get("message", {})
+                return {
+                    "status": "SUCCESS",
+                    "connected": True,
+                    "content": choice.get("content"),
+                    "tool_calls": choice.get("tool_calls", []),
+                    "raw": resp_data
+                }
+        except Exception as e:
+            return {
+                "status": "ERROR",
+                "connected": True,
+                "reason": f"Inference call error: {str(e)}",
+                "tool_calls": []
+            }
 
     def get_tool_schema(self) -> Dict[str, Any]:
         """Returns JSON schema formatted for Hermes model prompt context."""

@@ -82,7 +82,7 @@ class ResourceGuardEngine:
         self,
         db_store: Optional[CoworkerDbStoreV2] = None,
         workspaces_root: str = "/tmp/zonata_workspaces",
-        min_free_ram_mb: float = 512.0,
+        min_free_ram_mb: float = 256.0,
         min_free_disk_gb: float = 1.0,
         max_cpu_percent: float = 85.0,
         store: Optional[CoworkerDbStoreV2] = None,

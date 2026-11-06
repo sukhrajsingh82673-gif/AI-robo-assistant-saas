@@ -37,6 +37,13 @@ class GUIActionPrimitive(str, Enum):
     VERIFY = "VERIFY"
 
 
+class DesktopEnvironmentType(str, Enum):
+    REAL_DESKTOP_CONNECTED = "REAL_DESKTOP_CONNECTED"
+    VIRTUAL_DESKTOP_CONNECTED = "VIRTUAL_DESKTOP_CONNECTED"
+    HEADLESS_EXECUTION_ONLY = "HEADLESS_EXECUTION_ONLY"
+    SIMULATED_PERCEPTION_ONLY = "SIMULATED_PERCEPTION_ONLY"
+
+
 @dataclass
 class GUIExecutionResult:
     success: bool
@@ -100,6 +107,8 @@ class GUIObservation:
     # Window titles, when present, may still be real; see windows_verified.
     synthetic: bool = False
     windows_verified: bool = False
+    environment_type: DesktopEnvironmentType = DesktopEnvironmentType.HEADLESS_EXECUTION_ONLY
+    perception_source: str = "IN_MEMORY_SYNTHETIC"
 
     @property
     def active_app(self) -> str:
@@ -256,6 +265,49 @@ class ComputerUseEngine:
     def _clamp(self, x: int, y: int) -> Tuple[int, int]:
         return (max(0, min(int(x), self.width)), max(0, min(int(y), self.height)))
 
+    @classmethod
+    def detect_desktop_environment(cls) -> DesktopEnvironmentType:
+        """
+        Inspects active host environment to determine display reality:
+        - REAL_DESKTOP_CONNECTED: Hardware X11 display (:0) or Wayland socket
+        - VIRTUAL_DESKTOP_CONNECTED: Virtual X11 server (Xvfb / Xvnc on :99)
+        - HEADLESS_EXECUTION_ONLY: Headless container, POSIX CLI only, no display
+        - SIMULATED_PERCEPTION_ONLY: Unit-test sandbox with mocked/seeded perceptions
+        """
+        wayland = os.environ.get("WAYLAND_DISPLAY")
+        if wayland:
+            return DesktopEnvironmentType.REAL_DESKTOP_CONNECTED
+
+        display = os.environ.get("DISPLAY")
+        if not display:
+            return DesktopEnvironmentType.HEADLESS_EXECUTION_ONLY
+
+        if shutil.which("xdpyinfo"):
+            try:
+                out = subprocess.check_output(["xdpyinfo"], stderr=subprocess.DEVNULL, text=True, timeout=2)
+                if "X.Org" in out or "vendor" in out.lower():
+                    try:
+                        ps = subprocess.check_output(["ps", "aux"], stderr=subprocess.DEVNULL, text=True)
+                        if "Xvfb" in ps or display.startswith(":99"):
+                            return DesktopEnvironmentType.VIRTUAL_DESKTOP_CONNECTED
+                    except Exception:
+                        pass
+                    if display in (":0", ":0.0"):
+                        return DesktopEnvironmentType.REAL_DESKTOP_CONNECTED
+                    return DesktopEnvironmentType.VIRTUAL_DESKTOP_CONNECTED
+            except Exception:
+                return DesktopEnvironmentType.HEADLESS_EXECUTION_ONLY
+
+        return DesktopEnvironmentType.HEADLESS_EXECUTION_ONLY
+
+    @property
+    def desktop_environment_type(self) -> DesktopEnvironmentType:
+        return self.detect_desktop_environment()
+
+    @property
+    def environment_type(self) -> DesktopEnvironmentType:
+        return self.detect_desktop_environment()
+
     # --- 14 GUI Primitives ---
 
     def observe(self) -> GUIObservation:
@@ -296,6 +348,9 @@ class ComputerUseEngine:
         for el in elements:
             el.metadata.setdefault("source", "seeded_scene")
 
+        env_type = self.detect_desktop_environment()
+        perception_src = "X11_PHYSICAL_BUFFER" if real_windows else "IN_MEMORY_SYNTHETIC"
+
         obs = GUIObservation(
             timestamp=time.time(),
             screen_width=self.width,
@@ -307,6 +362,8 @@ class ComputerUseEngine:
             cursor_position=(self.cursor_x, self.cursor_y),
             synthetic=synthetic_elements,
             windows_verified=real_windows,
+            environment_type=env_type,
+            perception_source=perception_src,
         )
         self._record("observe", {"element_count": len(obs.elements),
                                  "windows_from_x11": real_windows,

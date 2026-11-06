@@ -136,7 +136,7 @@ class KillSwitchMatrix:
                     SELECT 1 FROM enterprise_killswitch_matrix
                     WHERE level = ? AND is_active = 1
                 """, (level,)).fetchone()
-            return row is not None
+            return bool(row) and bool(row[0])
 
     def is_engaged(self, level: str, target_id: Optional[str] = None) -> bool:
         """Alias for is_activated."""

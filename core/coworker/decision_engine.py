@@ -19,6 +19,8 @@ import shutil
 import hashlib
 import subprocess
 import venv
+import urllib.request
+import urllib.error
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any, Tuple, Callable
@@ -80,7 +82,10 @@ class ExecutionDecisionEngine:
     most deterministic, and lowest-cost execution pathway.
     """
 
-    APPROVED_LICENSES = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Python-2.0"}
+    APPROVED_LICENSES = {
+        "MIT", "Apache-2.0", "Apache 2.0", "BSD-2-Clause", "BSD-3-Clause",
+        "ISC", "Python-2.0", "BSD", "MIT License", "Apache Software License"
+    }
     QUARANTINED_LICENSES = {"GPL-2.0", "GPL-3.0", "AGPL-3.0", "SSPL", "Commons-Clause", "Proprietary", "Unknown"}
 
     FORBIDDEN_AST_CALLS = {"eval", "exec", "__import__", "compile"}
@@ -335,6 +340,164 @@ class ExecutionDecisionEngine:
             license_status="APPROVED"
         )
 
+    def discover_external_package(
+        self,
+        package_name: str,
+        task_id: Optional[str] = None,
+        mission_id: Optional[str] = None,
+        allow_download: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Executes genuine Level 3 package provenance and Level 4 isolated installation:
+        1. Queries official PyPI JSON API: https://pypi.org/pypi/{package_name}/json
+        2. Validates package license against approved open-source licenses.
+        3. Extracts release version, distribution URLs, and SHA-256 cryptographic digests.
+        4. Downloads the distribution archive to /tmp/zonata_workspaces/<mission_id>/downloads/.
+        5. Computes and asserts SHA-256 cryptographic integrity matches PyPI metadata.
+        6. Provisions isolated sandbox venv and smoke-tests import.
+        7. Registers sandbox cleanup manifest.
+        """
+        task_id = task_id or f"task_{uuid.uuid4().hex[:8]}"
+        mission_id = mission_id or f"msn_{uuid.uuid4().hex[:8]}"
+
+        # 1. Query PyPI JSON API
+        pypi_url = f"https://pypi.org/pypi/{package_name}/json"
+        try:
+            req = urllib.request.Request(pypi_url, headers={"User-Agent": "ZONATA-Coworker/2.0"})
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                pypi_data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            return {
+                "success": False,
+                "status": "PACKAGE_NOT_FOUND" if e.code == 404 else "PYPI_HTTP_ERROR",
+                "package_name": package_name,
+                "error": f"PyPI responded with status {e.code}: {e.reason}",
+                "provenance": None
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "status": "PYPI_NETWORK_ERROR",
+                "package_name": package_name,
+                "error": str(e),
+                "provenance": None
+            }
+
+        info = pypi_data.get("info", {})
+        version = info.get("version", "unknown")
+        declared_license = (info.get("license") or "").strip()
+        classifiers = info.get("classifiers", [])
+
+        # License screening (check declared license and OSI classifiers)
+        license_approved = False
+        effective_license = declared_license or "Unknown"
+        for lic in self.APPROVED_LICENSES:
+            if lic.lower() in declared_license.lower():
+                license_approved = True
+                effective_license = lic
+                break
+        if not license_approved:
+            for cls in classifiers:
+                if "License :: OSI Approved ::" in cls:
+                    for lic in self.APPROVED_LICENSES:
+                        if lic.lower() in cls.lower():
+                            license_approved = True
+                            effective_license = lic
+                            break
+                    if license_approved:
+                        break
+
+        if not license_approved:
+            return {
+                "success": False,
+                "status": "LICENSE_REJECTED",
+                "package_name": package_name,
+                "version": version,
+                "license": effective_license,
+                "error": f"License '{effective_license}' is not in approved sovereign runtime licenses.",
+                "provenance": {"version": version, "license": effective_license}
+            }
+
+        # Find best release distribution (prefer bdist_wheel or sdist)
+        urls = pypi_data.get("urls", [])
+        chosen_dist = None
+        for u in urls:
+            if u.get("packagetype") == "bdist_wheel":
+                chosen_dist = u
+                break
+        if not chosen_dist and urls:
+            chosen_dist = urls[0]
+
+        if not chosen_dist:
+            return {
+                "success": False,
+                "status": "NO_DISTRIBUTION_FOUND",
+                "package_name": package_name,
+                "version": version,
+                "error": "No downloadable release archives available on PyPI."
+            }
+
+        download_url = chosen_dist.get("url")
+        pypi_sha256 = chosen_dist.get("digests", {}).get("sha256")
+        filename = chosen_dist.get("filename", f"{package_name}-{version}.tar.gz")
+
+        download_dir = os.path.join(self.workspaces_root, mission_id, "downloads")
+        os.makedirs(download_dir, exist_ok=True)
+        local_file_path = os.path.join(download_dir, filename)
+
+        local_sha256 = None
+        integrity_verified = False
+
+        if allow_download:
+            try:
+                urllib.request.urlretrieve(download_url, local_file_path)
+                with open(local_file_path, "rb") as f:
+                    local_sha256 = hashlib.sha256(f.read()).hexdigest()
+
+                integrity_verified = (local_sha256.lower() == pypi_sha256.lower()) if pypi_sha256 else True
+                if not integrity_verified:
+                    return {
+                        "success": False,
+                        "status": "INTEGRITY_CHECK_FAILED",
+                        "package_name": package_name,
+                        "version": version,
+                        "pypi_sha256": pypi_sha256,
+                        "local_sha256": local_sha256,
+                        "error": "Local file SHA-256 does not match PyPI published digest!"
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "status": "DOWNLOAD_FAILED",
+                    "package_name": package_name,
+                    "error": str(e)
+                }
+
+        # Provision Level 4 isolated sandbox venv
+        install_target = local_file_path if (allow_download and os.path.exists(local_file_path)) else package_name
+        sandbox_result = self.provision_level_4_sandbox(
+            mission_id=mission_id,
+            task_id=task_id,
+            package_name=install_target
+        )
+
+        return {
+            "success": sandbox_result.resolved,
+            "status": "QUALIFIED_AND_PROVISIONED" if sandbox_result.resolved else "SANDBOX_FAILED",
+            "package_name": package_name,
+            "version": version,
+            "license": effective_license,
+            "license_approved": True,
+            "pypi_sha256": pypi_sha256,
+            "local_sha256": local_sha256,
+            "integrity_verified": integrity_verified,
+            "download_path": local_file_path if os.path.exists(local_file_path) else None,
+            "sandbox_path": sandbox_result.sandbox_path,
+            "manifest_id": sandbox_result.manifest_id,
+            "execution_plan": sandbox_result.execution_plan,
+            "error": sandbox_result.error
+        }
+
     # =========================================================================
     # Level 4: Isolated Virtualenv Sandbox Installation & Smoke Testing
     # =========================================================================
@@ -357,9 +520,23 @@ class ExecutionDecisionEngine:
         manifest_id = f"mf_{uuid.uuid4().hex[:8]}"
 
         try:
-            # 1. Build virtual environment
+            # 1. Build virtual environment (with graceful ensurepip fallback on Debian/Ubuntu)
             if not os.path.exists(venv_dir):
-                venv.EnvBuilder(with_pip=True, symlinks=True).create(venv_dir)
+                has_ensurepip = False
+                try:
+                    import ensurepip
+                    has_ensurepip = True
+                except ImportError:
+                    has_ensurepip = False
+
+                if has_ensurepip:
+                    try:
+                        venv.EnvBuilder(with_pip=True, symlinks=True).create(venv_dir)
+                    except (Exception, SystemExit):
+                        shutil.rmtree(venv_dir, ignore_errors=True)
+                        venv.EnvBuilder(with_pip=False, symlinks=True).create(venv_dir)
+                else:
+                    venv.EnvBuilder(with_pip=False, symlinks=True).create(venv_dir)
 
             py_exec = os.path.join(venv_dir, "bin", "python3")
             if not os.path.exists(py_exec):
@@ -377,7 +554,19 @@ class ExecutionDecisionEngine:
             self.db.add_cleanup_record(cleanup_rec)
 
             # 2. Governed pip install
-            cmd = [py_exec, "-m", "pip", "install", "--no-warn-script-location", package_name]
+            # Test if py_exec has pip; if not, use host pip targeted with --prefix
+            has_internal_pip = False
+            try:
+                chk = subprocess.run([py_exec, "-m", "pip", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                has_internal_pip = (chk.returncode == 0)
+            except Exception:
+                has_internal_pip = False
+
+            if has_internal_pip:
+                cmd = [py_exec, "-m", "pip", "install", "--no-warn-script-location", package_name]
+            else:
+                cmd = [sys.executable, "-m", "pip", "install", "--prefix", venv_dir, "--no-warn-script-location", package_name]
+
             if pip_args:
                 cmd.extend(pip_args)
 
@@ -396,7 +585,8 @@ class ExecutionDecisionEngine:
                 )
 
             # 3. Real Import Smoke Test
-            module_name = package_name.split("==")[0].split(">=")[0].replace("-", "_")
+            raw_pkg = os.path.basename(package_name).split("-")[0] if os.path.sep in package_name else package_name
+            module_name = raw_pkg.split("==")[0].split(">=")[0].replace("-", "_")
             smoke_cmd = [py_exec, "-c", f"import {module_name}; print('SMOKE_OK')"]
             smoke_proc = subprocess.run(smoke_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
 

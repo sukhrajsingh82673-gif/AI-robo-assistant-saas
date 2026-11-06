@@ -338,7 +338,7 @@ class TestCoworkerDistributedFleet(unittest.TestCase):
         # 3. Market search
         srch_res = prov.execute(
             "browser.openclaw_search",
-            {"query": "cloud computing licenses"},
+            {"query": "cloud computing licenses", "search_endpoint": f"{self.server.base_url}/portal/suppliers"},
             {}
         )
         self.assertEqual(srch_res.status, "SUCCESS")
