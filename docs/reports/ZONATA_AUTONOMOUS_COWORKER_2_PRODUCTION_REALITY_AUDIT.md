@@ -470,3 +470,52 @@ to one sweep per 900 seconds by default (`enable_defense_patrol`,
 - UI (§11) is unverified in a browser.
 - PostgreSQL migration `0005` is unexecuted.
 - Two `AuthorityLevel` enums remain; both carry collision docstrings.
+
+## 23. §7 Records and Real Window Perception — 2026-11-07
+
+The gap report left two §-level items short: §7 had no download / installation
+manifests or ownership records, and §4 perception was entirely seeded. Both are
+now closed to the extent the host allows.
+
+### 23.1 §7 download and installation manifests
+
+New: `core/coworker/resource_manifests.py` (SQLite-backed, no new dependency).
+
+| Record | Fields | Written by |
+|---|---|---|
+| Download manifest | URL, local path, bytes, SHA-256, task, mission, timestamp | Level 4 download after the PyPI digest check |
+| Installation manifest | package, version, interpreter, venv, source, smoke result | Level 4 sandbox after a real `pip install` + import test |
+| File ownership | path, owning task, mission, manifest, kind, file hash | workspace provisioning / cleanup registration |
+
+`verify_download()` re-hashes the file on disk and returns `DIGEST_MATCH`,
+`DIGEST_MISMATCH` or `FILE_MISSING`. Ownership is enforced in
+`safe_reclaim_resource()` for directories, venvs and temp files; an unknown path
+is refused with `NO_OWNERSHIP_RECORD` and another task's path with
+`OWNED_BY_ANOTHER_TASK`.
+
+### 23.2 §4 real window perception
+
+`ComputerUseEngine.x11_window_tree()` parses `xwininfo -root -tree` into real
+windows with real geometry. Unnamed windows, 1x1 helpers and window-manager
+frames are excluded, and with no `DISPLAY` the list is empty — nothing is
+invented. `GUIObservation` now carries `window_elements` and
+`window_tree_available` alongside the existing `synthetic` flag, so a caller can
+tell a real window from a seeded widget.
+
+The Linux provider uses the tree for `desktop.list_windows` (adds geometry) and
+for `desktop.click_element` / `desktop.find_element_by_id` when the target is an
+`x11_…` id or a window title, reporting `target_source: x11_window_tree` and
+`synthetic_perception: false`.
+
+**Still seeded:** buttons and fields inside a window. `synthetic` stays true and
+each seeded element carries `source: seeded_scene`. No OCR, no AT-SPI.
+
+### 23.3 Verification
+
+- `tests/test_resource_manifests_and_window_tree.py` — 5 passed with `DISPLAY=:99`,
+  4 passed + 1 skipped headless.
+- `/tmp/opencode/verify_x11_windows.py` — **14/14** checks under Xvfb :99 +
+  openbox + two xterms; evidence
+  `/tmp/opencode/evidence/x11_window_tree_verification.json`. Includes a real
+  dispatched click at a real window's centre.
+- Regression suites re-run after these edits: see the commit message.

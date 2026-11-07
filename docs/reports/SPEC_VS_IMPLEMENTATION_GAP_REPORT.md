@@ -22,10 +22,10 @@ backs it. "Tests pass" alone is not treated as proof of real-world execution.
 | 1 | Primary objective (CEO-directed autonomous execution) | Partial | Pipeline exists end-to-end; full unattended autonomy not exercised |
 | 2 | Authority and command structure | Verified | Policy, approval, kill-switch and tenant gates enforced and tested |
 | 3 | Five-level decision engine | Partial | L1/L2/L4/L5 real; L3 discovery has no live web/GitHub research |
-| 4 | Advanced desktop computer-use | Partial | 14 primitives dispatch real X11 input; perception is seeded, no OCR/AT-SPI |
+| 4 | Advanced desktop computer-use | Partial | 14 primitives dispatch real X11 input; real window tree via `xwininfo`; interactive elements still seeded, no OCR/AT-SPI |
 | 5 | OpenDots integration | Not implemented | No verifiable OpenDots artefact; shim now labelled honestly |
 | 6 | Specialised agent factory | Verified | Ephemeral subworkers inherit scope, parallel execution, tests pass |
-| 7 | Storage and resource management | Partial | Workspace tracking, cleanup manifests, protected paths real; no download/install manifests or ownership records |
+| 7 | Storage and resource management | Verified | Workspace tracking, cleanup manifests, protected paths, download/installation manifests and an ownership gate are implemented and tested |
 | 8 | Autonomous cybersecurity defence | Partial | Real AST/secret/entropy scans; no exploit testing or automated response |
 | 9 | CEO task queue and idle management | Verified | 12 states enforced; idle now runs the real defence patrol (throttled) |
 | 10 | CEO reporting and evidence | Verified | All required report fields present; Merkle ledger sealed |
@@ -121,11 +121,22 @@ Xvfb :99 + openbox: **19/19 checks**, typed text read back from a file, 5.4 KB
 real PNG. Artefacts: `/tmp/opencode/evidence/cue_x11_verification.json`,
 script `/tmp/opencode/verify_cue_x11.py`.
 
+A second proof covers window perception: `xwininfo -root -tree` is parsed into
+real windows with real geometry, and the Linux provider dispatches a click at a
+real window's centre. **14/14 checks**, evidence
+`/tmp/opencode/evidence/x11_window_tree_verification.json`, script
+`/tmp/opencode/verify_x11_windows.py`.
+
 **Status:** Partial.
 
 - Input dispatch (click, type, key, hotkey, scroll, drag, window switch): verified.
-- Element perception: **seeded**, not scraped. `observe()` exposes
-  `synthetic` and `windows_verified` separately. No tesseract, no AT-SPI.
+- Window perception: **real** top-level windows scraped from the X server
+  (`observe().window_elements`, `perception_source` =
+  `X11_WINDOW_TREE+SEEDED_ELEMENTS`). Unnamed windows and WM internals are
+  excluded; no window is invented when there is no display.
+- Interactive element perception (buttons, fields inside a window): still
+  **seeded**. `synthetic` remains true and every seeded element carries
+  `source: seeded_scene`. No tesseract, no AT-SPI.
 - `launch()` deliberately refuses with `APP_LAUNCH_REQUIRES_POLICY_GATEWAY`.
 
 ---
@@ -171,15 +182,26 @@ delete records, evidence, credentials or unknown files.
 - `CoworkerDbStoreV2` cleanup manifest + `execute_cleanups`.
 - Protected-path rules block `/root`, `/tmp`, the repository tree, databases and
   evidence extensions.
+- `core/coworker/resource_manifests.py` adds the three §7 records that were
+  missing:
+  - **Download manifest** — URL, local path, byte count, SHA-256, task, mission,
+    timestamp. `verify_download()` re-hashes the file and reports
+    `DIGEST_MATCH` / `DIGEST_MISMATCH` / `FILE_MISSING`.
+  - **Installation manifest** — package, version, interpreter, venv path,
+    source, task, mission, smoke-test result. Written by the Level 4 provisioner
+    after a real `pip install` and import smoke test.
+  - **File ownership** — `register_ownership()` records the owning task for a
+    path (or directory); `can_reclaim()` refuses an unknown path
+    (`NO_OWNERSHIP_RECORD`) and refuses a path owned by a different task
+    (`OWNED_BY_ANOTHER_TASK`).
+- Cleanup enforces the ownership gate for `DIRECTORY`, `VENV` and `TEMP_FILE`
+  resources, so a task cannot delete another task's workspace.
 
-**Gaps (recorded, not fixed):**
+**Remaining limit:** installation is Python-only (`pip` + venv). There is no
+non-Python installer path and no container install path.
 
-- No download manifest (URL, hash, size, timestamp) for fetched software.
-- No installation manifest (package, version, source, interpreter).
-- No file-ownership metadata on cleaned resources — cleanup relies on the
-  manifest's creator fields only.
-
-**Status:** Partial.
+**Status:** Verified by `tests/test_resource_manifests_and_window_tree.py` and
+the Coworker v2 resource-guard suites.
 
 ---
 
@@ -336,15 +358,17 @@ prerequisites for a broader claim.
 
 ## Remaining gaps (ordered by risk)
 
-1. **Perception is seeded, not observed.** Any workflow that depends on finding
-   controls by appearance is unreliable. Needs AT-SPI on Linux, UIA on Windows,
-   AX on macOS.
+1. **Interactive perception is seeded, not observed.** Top-level windows are
+   real, but buttons and fields inside them are not. Any workflow that depends
+   on finding a control by appearance is unreliable. Needs AT-SPI on Linux, UIA
+   on Windows, AX on macOS.
 2. **Browser automation is HTTP-only here.** DOM interaction, JS execution and
    screenshots need Playwright + Chromium in the deployment image.
 3. **Level 3 discovery is a catalogue, not research.** Needs a governed search
    adapter with allow-lists and licence/CVE checks before it can be called
    intelligent discovery.
-4. **No download/installation manifests.** §7 is incomplete without them.
+4. **Installation is Python-only.** Level 4 supports `pip` + venv; there is no
+   non-Python installer or container install path.
 5. **OpenHands command execution requires a container runtime.** Without it the
    agent can write files but cannot run tests.
 6. **§11 UI unverified in a browser.**
