@@ -106,6 +106,48 @@ from .opencloud_engine import OpenCloudEngine, OpenCloudWorkerServer
 from .agent_cloud_registry import AgentCloudRegistry, SPECIALIST_ARCHETYPES_CATALOG
 from .opendots_engine import OpenDotsEngine
 from .escalation_router import ExecutiveEscalationRouter, AgentCommunicationBus, AgentBusMessage
+from .executive_operating_loop import (
+    OperatingPriority,
+    WorkItemStatus,
+    PriorityWorkItem,
+    ExecutiveOperatingLoop,
+)
+from .local_inference_adapter import (
+    HardwareBudget,
+    LocalInferenceStatus,
+    LocalInferenceAdapter,
+)
+from .dlp_engine import (
+    DLPCategory,
+    DLPChannel,
+    DLPRiskLevel,
+    DLPFinding,
+    DLPScanResult,
+    DLPEngine,
+)
+from .dlp_channel_monitor import DLPChannelMonitor
+from .dlp_response_ladder import DLPResponseLadder
+from .credential_masking_tracker import CredentialMaskingTracker
+from .employee_support_service import (
+    BlockerCategory,
+    SupportTicketStatus,
+    SupportTicket,
+    EmployeeSupportService,
+)
+from .archetype_contracts import (
+    SpecialistRole,
+    SpecialistArchetypeContract,
+    ARCHETYPE_CONTRACTS,
+)
+from .specialist_team_assembler import (
+    AssembledTeamMember,
+    AssembledTeam,
+    SpecialistTeamAssembler,
+)
+from .capability_registry_v3 import (
+    RegisteredCapabilityV3,
+    CapabilityRegistryV3,
+)
 
 
 __all__ = [
@@ -294,6 +336,35 @@ __all__ = [
     "OpenDotsEngine",
     "ExecutiveEscalationRouter",
     "AgentCommunicationBus",
-    "AgentBusMessage"
+    "AgentBusMessage",
+    # Executive Coworker Milestones 1–5 Exports
+    "OperatingPriority",
+    "WorkItemStatus",
+    "PriorityWorkItem",
+    "ExecutiveOperatingLoop",
+    "HardwareBudget",
+    "LocalInferenceStatus",
+    "LocalInferenceAdapter",
+    "DLPCategory",
+    "DLPChannel",
+    "DLPRiskLevel",
+    "DLPFinding",
+    "DLPScanResult",
+    "DLPEngine",
+    "DLPChannelMonitor",
+    "DLPResponseLadder",
+    "CredentialMaskingTracker",
+    "BlockerCategory",
+    "SupportTicketStatus",
+    "SupportTicket",
+    "EmployeeSupportService",
+    "SpecialistRole",
+    "SpecialistArchetypeContract",
+    "ARCHETYPE_CONTRACTS",
+    "AssembledTeamMember",
+    "AssembledTeam",
+    "SpecialistTeamAssembler",
+    "RegisteredCapabilityV3",
+    "CapabilityRegistryV3"
 ]
 

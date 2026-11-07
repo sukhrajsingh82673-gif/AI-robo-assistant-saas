@@ -157,18 +157,32 @@ class HermesInferenceGateway:
     """
 
     def __init__(self, endpoint: Optional[str] = None, api_key: Optional[str] = None):
+        from .local_inference_adapter import LocalInferenceAdapter, LocalInferenceStatus
+        self.local_adapter = LocalInferenceAdapter()
         self.endpoint = (endpoint or os.environ.get("HERMES_API_ENDPOINT") or os.environ.get("HERMES_ENDPOINT") or "").rstrip("/")
         self.api_key = api_key or os.environ.get("HERMES_API_KEY") or ""
         self.default_model = "hermes-3-llama-3.1-8b"
 
     def check_connection(self, timeout: float = 2.0) -> Dict[str, Any]:
-        """Pings the Hermes model registry endpoint."""
+        """Pings the Hermes model registry endpoint or queries local inference adapter."""
+        local_status = self.local_adapter.inspect_inference_health(timeout=timeout)
         if not self.endpoint:
+            if local_status.available and local_status.status == "ONLINE":
+                return {
+                    "connected": True,
+                    "inference_available": True,
+                    "status": "ONLINE",
+                    "local_inference_status": local_status.status,
+                    "endpoint": self.local_adapter.ollama_endpoint,
+                    "memory_budget": self.local_adapter.budget.get_memory_status()
+                }
             return {
                 "connected": False,
                 "inference_available": False,
                 "status": "NOT_CONFIGURED",
+                "local_inference_status": local_status.status,
                 "endpoint": None,
+                "memory_budget": self.local_adapter.budget.get_memory_status(),
                 "message": "No HERMES_API_ENDPOINT configured. Set HERMES_API_ENDPOINT and HERMES_API_KEY to enable inference."
             }
         try:
@@ -183,7 +197,8 @@ class HermesInferenceGateway:
                     "inference_available": True,
                     "status": "ONLINE",
                     "endpoint": self.endpoint,
-                    "models": [m.get("id") for m in data.get("data", [])]
+                    "models": [m.get("id") for m in data.get("data", [])],
+                    "memory_budget": self.local_adapter.budget.get_memory_status()
                 }
         except Exception as e:
             return {
@@ -191,7 +206,8 @@ class HermesInferenceGateway:
                 "inference_available": False,
                 "status": "CONNECTION_FAILED",
                 "endpoint": self.endpoint,
-                "error": str(e)
+                "error": str(e),
+                "memory_budget": self.local_adapter.budget.get_memory_status()
             }
 
     def generate_completion(
@@ -202,7 +218,7 @@ class HermesInferenceGateway:
         temperature: float = 0.2
     ) -> Dict[str, Any]:
         """
-        Executes a completion request against the configured Hermes endpoint.
+        Executes a completion request against the configured Hermes endpoint or local adapter.
 
         Returns `available: False` / `status: LLM_UNAVAILABLE` when no endpoint is
         configured or the request fails.
@@ -246,7 +262,27 @@ class HermesInferenceGateway:
                 # Endpoint configured but unreachable: report it below.
                 pass
 
-        # 2. No live model available. Do not fabricate reasoning or tool calls.
+        # 2. Local inference adapter if available (e.g. Ollama daemon on 127.0.0.1:11434)
+        health = self.local_adapter.inspect_inference_health(timeout=0.5)
+        if health.available and health.provider == "ollama_local":
+            local_res = self.local_adapter.dispatch_hermes_reasoning(
+                messages=messages,
+                tools=tools,
+                model=target_model,
+                temperature=temperature
+            )
+            if local_res.get("available"):
+                return {
+                    "content": local_res.get("content", ""),
+                    "tool_calls": local_res.get("tool_calls", []),
+                    "model": local_res.get("model", target_model),
+                    "source": "LOCAL_OLLAMA",
+                    "available": True,
+                    "status": "COMPLETED",
+                    "usage": local_res.get("usage", {})
+                }
+
+        # 3. No live model available. Do not fabricate reasoning or tool calls.
         reason = "NO_HERMES_ENDPOINT" if not self.endpoint else "HERMES_ENDPOINT_UNREACHABLE"
         return {
             "content": "",
