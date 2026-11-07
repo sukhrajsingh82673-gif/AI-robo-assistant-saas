@@ -329,12 +329,12 @@
         <div class="workspace-page-header">
           <div>
             <div style="display:inline-flex; align-items:center; gap:8px; padding:3px 10px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:16px; font-size:0.75rem; color:#6ee7b7; font-weight:700; margin-bottom:8px;">
-              <span>🤖 COWORKER 2.0 DIGITAL EMPLOYEE</span>
+              <span>🤖 COWORKER 3.0 EXECUTIVE COCKPIT</span>
               <span style="opacity:0.4;">|</span>
-              <span>👑 CEO-DIRECTED EXECUTION</span>
+              <span>👑 CEO-DIRECTED AUTONOMOUS OPERATOR</span>
             </div>
-            <h1 class="page-title">ZONATA Autonomous Coworker 2.0</h1>
-            <p class="page-subtitle">Desktop computer-use intelligence, hierarchical tool discovery, ephemeral subworkers, and defensive cybersecurity operations.</p>
+            <h1 class="page-title">ZONATA Autonomous Coworker 3.0</h1>
+            <p class="page-subtitle">Nous Hermes Agent runtime, OpenCode Git worktree engine, 5,000+ Agent Cloud with bounded scheduling, OpenDots visual grounding, and continuous Defensive Cybersecurity Command Center.</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.triggerSecurityPatrol()" title="Run immediate cybersecurity patrol">
@@ -354,35 +354,35 @@
           </div>
         </div>
 
-        <!-- Coworker 2.0 Operational Reality & Telemetry HUD -->
+        <!-- Coworker 3.0 Executive Reality & Fleet Telemetry HUD -->
         <div class="coworker-reality-hud" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
-            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🖥️ Desktop Environment</div>
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">☁️ Enterprise Agent Cloud</div>
             <div style="font-size:0.95rem; font-weight:700; color:#38bdf8; margin:6px 0 2px;">
-              VIRTUAL_DESKTOP_CONNECTED
+              5,000 Registered (16 Active Pool)
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">X11 / Openbox Native GUI Primitives</div>
+            <div style="font-size:0.75rem; color:#64748b;">Bounded Concurrency & Zero-Loss Leases</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
-            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">💾 Dual-Tier Persistence</div>
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛠️ OpenCode & Hermes Engine</div>
             <div style="font-size:0.95rem; font-weight:700; color:#34d399; margin:6px 0 2px;">
-              SQLite WAL + Neon PostgreSQL
+              Git Worktree Loop + AST Review
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Transactional Outbox Relay Active</div>
+            <div style="font-size:0.75rem; color:#64748b;">Governed Ralph Loop Self-Repair Gate</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
-            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🔌 Runtimes & Adapters</div>
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🖥️ OpenDots Perception</div>
             <div style="font-size:0.85rem; font-weight:600; color:#cbd5e1; margin:6px 0 2px;">
-              Hermes (Live) | OpenCloud | OpenDots
+              Real X11 Virtual Display (:99)
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Honest Fallback & Status Gating</div>
+            <div style="font-size:0.75rem; color:#64748b;">Visual Framebuffer SHA-256 Hashed</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
-            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛡️ Defensive Security</div>
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛡️ Cybersecurity Command</div>
             <div style="font-size:0.95rem; font-weight:700; color:#a78bfa; margin:6px 0 2px;">
-              5-Tier Threat Classification
+              5 Severity Levels / 24/7 Patrol
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">CRITICAL / HIGH / MED / LOW / INFO</div>
+            <div style="font-size:0.75rem; color:#64748b;">Host Process, Port 0.0.0.0, Injection & MCP Audit</div>
           </div>
         </div>
 

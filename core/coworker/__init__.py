@@ -90,6 +90,23 @@ from .evidence_reporting import (
     EvidenceAndReportingEngine, VerificationOutcome, PhysicalVerificationCheck,
     ExecutiveDeliverable, AICeoExecutiveReport
 )
+from .contracts_v3 import (
+    HermesSessionContext, OpenCodeMission, OpenCodeLoopPhase,
+    RemoteWorkerNode, RemoteWorkerState, AgentRegistrationStatus,
+    AgentIdentityRecord, VisualObservation, ScheduledTaskEntry,
+    EscalationStatus, EscalationTicket, CybersecuritySeverity,
+    DefensiveSecurityIncident, ExecutiveCockpitTelemetry
+)
+from .hermes_agent_v3 import (
+    HermesSessionStore, HermesInferenceGateway, HermesToolDispatcher,
+    HermesProcessManager
+)
+from .opencode_engine import OpenCodeEngine, ConstitutionalViolationError
+from .opencloud_engine import OpenCloudEngine, OpenCloudWorkerServer
+from .agent_cloud_registry import AgentCloudRegistry, SPECIALIST_ARCHETYPES_CATALOG
+from .opendots_engine import OpenDotsEngine
+from .escalation_router import ExecutiveEscalationRouter, AgentCommunicationBus, AgentBusMessage
+
 
 __all__ = [
     "CapabilityCategory",
@@ -247,6 +264,35 @@ __all__ = [
     "VerificationOutcome",
     "PhysicalVerificationCheck",
     "ExecutiveDeliverable",
-    "AICeoExecutiveReport"
+    "AICeoExecutiveReport",
+    # Coworker 3.0 Exports
+    "HermesSessionContext",
+    "OpenCodeMission",
+    "OpenCodeLoopPhase",
+    "RemoteWorkerNode",
+    "RemoteWorkerState",
+    "AgentRegistrationStatus",
+    "AgentIdentityRecord",
+    "VisualObservation",
+    "ScheduledTaskEntry",
+    "EscalationStatus",
+    "EscalationTicket",
+    "CybersecuritySeverity",
+    "DefensiveSecurityIncident",
+    "ExecutiveCockpitTelemetry",
+    "HermesSessionStore",
+    "HermesInferenceGateway",
+    "HermesToolDispatcher",
+    "HermesProcessManager",
+    "OpenCodeEngine",
+    "ConstitutionalViolationError",
+    "OpenCloudEngine",
+    "OpenCloudWorkerServer",
+    "AgentCloudRegistry",
+    "SPECIALIST_ARCHETYPES_CATALOG",
+    "OpenDotsEngine",
+    "ExecutiveEscalationRouter",
+    "AgentCommunicationBus",
+    "AgentBusMessage"
 ]
 
