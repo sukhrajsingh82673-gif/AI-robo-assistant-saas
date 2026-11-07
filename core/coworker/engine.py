@@ -56,6 +56,7 @@ from .memory_tier import GovernedMemoryManager, MemoryTier
 from .background_dispatcher import BackgroundMissionDispatcher, BackgroundMission
 from .dashboard import CoworkerDashboardService
 from .ceo_coworker_bridge import AICeoCoworkerBridge, AICeoMissionRequest, AICeoMissionResponse
+from .executive_operating_loop import ExecutiveOperatingLoop
 from .universal_worker_contract import UniversalWorkerContract, WorkerMetadata, UniversalWorkerAdapter
 from .controllers import (
     GovernedTerminalController, GovernedBrowserController,
@@ -162,7 +163,19 @@ class UniversalCoworkerEngine:
         # 16. AI CEO ↔ Co-Worker Strategic Execution Bridge
         self.ceo_bridge = AICeoCoworkerBridge(self)
 
-        # 17. Governed Execution Controllers
+        # 17. Continuous Executive Operating Loop (DoA-gated priority queue).
+        # Previously only exercised by tests; the autonomy supervisor now
+        # drains it on its own schedule.
+        self.executive_loop = ExecutiveOperatingLoop(
+            bridge=self.ceo_bridge, tenant_id=tenant_id
+        )
+
+        # 18. Autonomous runtime supervisor (started by the tenant runtime).
+        # Kept as an attribute so API/dashboard can report real status.
+        self.autonomy_supervisor = None
+        self.defense_monitor = None
+
+        # 19. Governed Execution Controllers
         self.terminal_controller = GovernedTerminalController(tenant_id)
         self.browser_controller = GovernedBrowserController(tenant_id)
         self.computer_controller = GovernedComputerController(tenant_id)
@@ -180,6 +193,29 @@ class UniversalCoworkerEngine:
     def execute_ceo_mission(self, req: AICeoMissionRequest) -> AICeoMissionResponse:
         """Executes a strategic mission dispatched by the AI CEO."""
         return self.ceo_bridge.execute_ceo_mission(req)
+
+    # ------------------------------------------------------------------
+    # Autonomous runtime (tenant-scoped scheduler)
+    # ------------------------------------------------------------------
+    def start_autonomy(self, manual: bool = True) -> Dict[str, Any]:
+        """Starts the always-on scheduler for this tenant/company."""
+        from .runtime_supervisor import ensure_supervisor
+        supervisor = ensure_supervisor(self, autostart=False)
+        self.autonomy_supervisor = supervisor
+        return supervisor.start(manual=manual)
+
+    def stop_autonomy(self, timeout: float = 5.0) -> Dict[str, Any]:
+        from .runtime_supervisor import get_supervisor
+        supervisor = get_supervisor(self) or self.autonomy_supervisor
+        if supervisor is None:
+            return {"status": "NOT_STARTED", "tenant_id": self.tenant_id}
+        return supervisor.stop(timeout=timeout)
+
+    def get_autonomy_status(self) -> Dict[str, Any]:
+        from .runtime_supervisor import ensure_supervisor
+        supervisor = ensure_supervisor(self, autostart=False)
+        self.autonomy_supervisor = supervisor
+        return supervisor.status()
 
 
     def create_coworker(self, role_or_prompt: str) -> CoworkerProfile:

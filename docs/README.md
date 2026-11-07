@@ -43,7 +43,7 @@ is the current production design series and is meant to be read in order.
 
 How the system is built, and the contracts it must honour.
 
-53 documents.
+54 documents.
 
 | Document | Contents |
 |---|---|
@@ -83,6 +83,7 @@ How the system is built, and the contracts it must honour.
 | [`AUTHORITY_MODEL.md`](architecture/AUTHORITY_MODEL.md) | ZONATA UNIVERSAL AI CO-WORKER FABRIC — AUTHORITY MODEL |
 | [`CANONICAL_ARCHITECTURE_SPEC.md`](architecture/CANONICAL_ARCHITECTURE_SPEC.md) | RoboAssistant 1.0.0-GA / ROBO-GA-1.0.0-PROD |
 | [`CAPABILITY_CONTRACT.md`](architecture/CAPABILITY_CONTRACT.md) | ZONATA CAPABILITY CONTRACT SPECIFICATION |
+| [`COWORKER_AUTONOMY_RUNTIME.md`](architecture/COWORKER_AUTONOMY_RUNTIME.md) | Coworker Autonomy Runtime |
 | [`DESIGN.md`](architecture/DESIGN.md) | URA / ZONATA — Apple-Grade Design System & Front-End Architecture |
 | [`ENTERPRISE_INTEGRATION_ARCHITECTURE.md`](architecture/ENTERPRISE_INTEGRATION_ARCHITECTURE.md) | ZONATA / URA — Enterprise Integration Architecture |
 | [`ENTERPRISE_SETTINGS_SPEC.md`](architecture/ENTERPRISE_SETTINGS_SPEC.md) | Enterprise Settings Spec |
@@ -472,10 +473,11 @@ Runtime, connector, model and programme-level reports.
 
 ### `runbooks/`
 
-4 documents.
+5 documents.
 
 | Document | Contents |
 |---|---|
+| [`runbooks/AUTONOMY_SUPERVISOR.md`](runbooks/AUTONOMY_SUPERVISOR.md) | Runbook — Coworker Autonomy Supervisor |
 | [`runbooks/BUDGET_EXHAUSTION.md`](runbooks/BUDGET_EXHAUSTION.md) | Runbook — Tenant Hard Budget Limit Reached |
 | [`runbooks/KILLSWITCH_ENGAGED.md`](runbooks/KILLSWITCH_ENGAGED.md) | Runbook — Kill Switch Barrier Active |
 | [`runbooks/OUTBOX_BACKLOG.md`](runbooks/OUTBOX_BACKLOG.md) | Runbook — Outbox Dispatch Backlog |

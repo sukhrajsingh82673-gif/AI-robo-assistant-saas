@@ -192,6 +192,8 @@ Known environment limits at the time of writing:
   deterministic rule router, not a model; it reports `RULE_ENGINE_ONLY`, `is_language_model: false`.
 - No OCR/AT-SPI tooling, so desktop perception is limited to real X11 windows plus a frame digest;
   interactive elements inside a window are seeded (`PARTIAL`).
+- The co-worker autonomy scheduler is verified on one host; its duplicate-run lock is host-local
+  `flock`, not a distributed lease (`PARTIAL` for multi-host deployments).
 
 ## 6. Documentation
 
@@ -201,6 +203,7 @@ Known environment limits at the time of writing:
 |---|---|
 | Honest capability and gap matrix | [`docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md`](docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md) |
 | Coworker §1–§16 spec status | [`docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`](docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md) |
+| Coworker autonomy runtime | [`docs/architecture/COWORKER_AUTONOMY_RUNTIME.md`](docs/architecture/COWORKER_AUTONOMY_RUNTIME.md), [`docs/runbooks/AUTONOMY_SUPERVISOR.md`](docs/runbooks/AUTONOMY_SUPERVISOR.md) |
 | Corrections to earlier coworker reports | [`docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`](docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md) |
 | Release gate status | [`docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md`](docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md) |
 | Architecture and contracts | [`docs/architecture/`](docs/architecture/) (the `01_`–`30_` series is in order) |

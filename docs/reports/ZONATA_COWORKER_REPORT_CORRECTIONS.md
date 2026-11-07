@@ -177,3 +177,60 @@ and `THIRD_PARTY_LICENSES.md`.
 `/ZONATA_COWORKER_*.md` is now ignored at the repository root so a regenerated
 copy cannot be committed by accident. If the parallel agent regenerates
 root-level reports, re-run this correction pass rather than trusting the files.
+
+---
+
+## 11. Autonomy runtime — scope of the word “automatic”
+
+The new `CoworkerAutonomySupervisor` removes the *request-driven* conditions:
+missions, the executive queue and security patrols are ticked by a tenant-scoped
+daemon instead of waiting for an HTTP call.
+
+It does **not** remove governance or infrastructure conditions. Specifically:
+
+* A `WAITING` / `AWAITING_APPROVAL` mission or a Delegation-of-Authority work
+  item stays held until a human decides. The supervisor only reports it.
+* A KillSwitch at GLOBAL / TENANT / COMPANY level stops work on the next tick,
+  and the mission dispatcher re-checks the matrix for direct step calls.
+* A mission that cannot produce a deliverable without an LLM is marked
+  `BLOCKED` with the reason; it is not completed or fabricated.
+* Browser/OCR/container capabilities remain blocked by missing host tooling.
+* Duplicate-run protection is a host-local `flock`; it is not a distributed
+  lease. Multi-host deployments still need PostgreSQL advisory locking.
+
+“Automatic” therefore means **automatically scheduled inside the existing
+gates**, not “ungoverned” or “independent of model availability”.
+
+---
+
+## 12. CEO mission `COMPLETED` means “plan record sealed”, not “objective achieved”
+
+The executive work-item pipeline exposed a pre-existing wording problem in
+`execute_ceo_mission()`. The bridge writes a `MISSION_PLAN_RECORD` JSON file,
+re-reads it, verifies its SHA-256 and seals it in the evidence ledger. It then
+returned:
+
+* `execution_status = "COMPLETED"`
+* `final_outcome.message = "Executive objective '…' fulfilled. Deliverable report sealed."`
+* evidence metadata `action = "CEO_MISSION_COMPLETED"`
+
+That reads as a business success even when no research, transaction or external
+action occurred. The record itself was already labelled `MISSION_PLAN_RECORD`
+and its summary said it was not proof of achievement, but the surrounding
+strings contradicted that.
+
+Corrected:
+
+* `final_outcome.message` now says the plan record was created and sealed and
+  explicitly that this is not proof the business objective was achieved.
+* `final_outcome.objective_achieved = false` is always present.
+* Evidence metadata action is `CEO_MISSION_PLAN_RECORD_SEALED` and carries
+  `objective_achieved: false`.
+* The autonomy supervisor copies `objective_achieved` into `queue_results`, so
+  an API caller sees the distinction without reading the deliverable.
+
+`execution_status` keeps the value `COMPLETED` because existing contract tests
+assert it; it denotes “the pipeline contract completed and a hash-verified plan
+record exists”. It must not be quoted as evidence that the objective was
+achieved.
+

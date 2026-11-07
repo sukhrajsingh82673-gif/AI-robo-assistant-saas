@@ -2350,6 +2350,39 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(snap)
             return
 
+        elif path == "/api/coworker/autonomy":
+            engine = _cw(tenant_id, company_id)
+            supervisor = getattr(engine, "autonomy_supervisor", None)
+            if supervisor is None:
+                from core.coworker.runtime_supervisor import ensure_supervisor
+                supervisor = ensure_supervisor(engine)
+                engine.autonomy_supervisor = supervisor
+            self._send_json(supervisor.status())
+            return
+
+        elif path == "/api/coworker/work-items":
+            engine = _cw(tenant_id, company_id)
+            loop = engine.executive_loop
+            pending = []
+            try:
+                for item in loop.get_pending_approvals():
+                    pending.append({
+                        "item_id": item.item_id,
+                        "title": item.title,
+                        "priority": item.priority.name,
+                        "cost_estimate_usd": item.cost_estimate_usd,
+                        "status": item.status.value,
+                        "approval_path": f"/api/coworker/approvals/{item.item_id}/decide",
+                    })
+            except Exception:
+                pass
+            self._send_json({
+                "telemetry": loop.get_telemetry(),
+                "pending_approvals": pending,
+                "count": len(pending),
+            })
+            return
+
         elif path == "/api/coworker/missions":
             raw_missions = _cw(tenant_id, company_id).background_dispatcher.list_missions()
             seen_prompts = set()
@@ -2472,9 +2505,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
         elif path == "/api/coworker/approvals":
+            engine = _cw(tenant_id, company_id)
             approvals = []
             seen_prompts = set()
-            for m in _cw(tenant_id, company_id).background_dispatcher.list_missions():
+            for m in engine.background_dispatcher.list_missions():
                 if m.status in ["AWAITING_APPROVAL", "WAITING"]:
                     norm_p = m.prompt.strip().lower()
                     if norm_p in seen_prompts:
@@ -2495,6 +2529,30 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "status": "PENDING",
                         "created_at": m.created_at
                     })
+            # Delegation-of-Authority holds from the executive operating loop.
+            # The supervisor surfaces these but never approves them.
+            loop = getattr(engine, "executive_loop", None)
+            if loop is not None and hasattr(loop, "get_pending_approvals"):
+                try:
+                    for item in loop.get_pending_approvals():
+                        approvals.append({
+                            "approval_id": item.item_id,
+                            "type": "DOA_APPROVAL",
+                            "what": item.title,
+                            "why": f"Delegation of Authority ceiling requires approval (${item.cost_estimate_usd:.2f})",
+                            "who": item.metadata.get("requested_by", "AI_CEO"),
+                            "worker": "executive_operating_loop",
+                            "node": platform.node(),
+                            "data": "Mission request metadata",
+                            "credentials": "None",
+                            "risk_level": "HIGH",
+                            "expected_result": item.description,
+                            "status": item.status.value if hasattr(item.status, "value") else str(item.status),
+                            "created_at": item.created_at,
+                            "cost_estimate_usd": item.cost_estimate_usd,
+                        })
+                except Exception:
+                    pass
             self._send_json({"approvals": approvals, "count": len(approvals)})
             return
 
@@ -5984,6 +6042,96 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         # ZONATA AI Assistant & Universal Co-Worker POST Handlers
         # =====================================================================
+        elif path == "/api/coworker/autonomy":
+            engine = _cw(tenant_id, company_id)
+            from core.coworker.runtime_supervisor import ensure_supervisor
+            supervisor = getattr(engine, "autonomy_supervisor", None) or ensure_supervisor(engine, autostart=False)
+            engine.autonomy_supervisor = supervisor
+            action = str(req_data.get("action", "STATUS")).upper()
+            if action in ("START", "STOP", "RESUME", "PAUSE") and self._approver_denied(auth_context):
+                return
+            if action in ("START", "RESUME"):
+                out = supervisor.start(manual=True)
+            elif action in ("STOP", "PAUSE"):
+                out = supervisor.stop()
+            elif action == "TICK":
+                out = supervisor.run_once(trigger="api")
+            elif action == "STATUS":
+                out = supervisor.status()
+            else:
+                self._send_json({
+                    "error": "Unsupported action",
+                    "detail": "action must be START, STOP, TICK or STATUS",
+                    "action": action,
+                }, status=400)
+                return
+            self._send_json(out)
+            return
+
+        elif path == "/api/coworker/work-items":
+            engine = _cw(tenant_id, company_id)
+            title = str(req_data.get("title") or "").strip()
+            objective = str(req_data.get("objective") or req_data.get("description") or "").strip()
+            if not title or not objective:
+                self._send_json({"error": "title and objective are required"}, status=400)
+                return
+            from core.coworker.ceo_coworker_bridge import AICeoMissionRequest
+            from core.coworker.executive_operating_loop import OperatingPriority
+            priority_name = str(req_data.get("priority") or "P3_CEO_DIRECTIVE").upper()
+            try:
+                priority = OperatingPriority[priority_name]
+            except KeyError:
+                self._send_json({
+                    "error": "Unknown priority",
+                    "allowed": [p.name for p in OperatingPriority],
+                }, status=400)
+                return
+            try:
+                budget = float(req_data.get("budget", 50.0) or 0.0)
+                cost_estimate = float(req_data.get("cost_estimate_usd", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                self._send_json({"error": "budget and cost_estimate_usd must be numeric"}, status=400)
+                return
+            if budget < 0 or cost_estimate < 0:
+                self._send_json({"error": "budget and cost_estimate_usd must be non-negative"}, status=400)
+                return
+            mission_request = AICeoMissionRequest(
+                objective=objective,
+                business_context=req_data.get("business_context") or {},
+                success_criteria=req_data.get("success_criteria") or [],
+                constraints=req_data.get("constraints") or [],
+                priority=priority_name,
+                budget=budget,
+                risk_policy=req_data.get("risk_policy") or {
+                    "max_risk": "MEDIUM",
+                    "require_human_approval_over_usd": 100.0,
+                },
+                company_id=company_id,
+                tenant_id=tenant_id,
+                initiator=str(auth_context.get("user_id") or "OWNER"),
+            )
+            item = engine.executive_loop.submit_work_item(
+                title=title,
+                description=objective,
+                priority=priority,
+                cost_estimate_usd=cost_estimate,
+                mission_request=mission_request,
+                metadata={"requested_by": str(auth_context.get("user_id") or "OWNER")},
+            )
+            self._send_json({
+                "success": True,
+                "item_id": item.item_id,
+                "status": item.status.value,
+                "requires_approval": item.requires_human_approval,
+                "approval_path": (
+                    f"/api/coworker/approvals/{item.item_id}/decide"
+                    if item.requires_human_approval else None
+                ),
+                "queue_depth": engine.executive_loop.get_queue_depth(),
+                "note": "The autonomy supervisor executes queued items on its next tick.",
+            })
+            return
+
         elif path == "/api/coworker/mission":
             if universal_automation_fabric.is_killswitch_active():
                 self._send_json({
@@ -6241,16 +6389,41 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path.startswith("/api/coworker/approvals/") and path.endswith("/decide"):
+            if self._approver_denied(auth_context):
+                return
             app_id = path.split("/")[4]
             decision = req_data.get("decision", "APPROVE").upper()
+            engine = _cw(tenant_id, company_id)
+
+            # Executive loop DoA holds use the work-item id (wi_...), not a
+            # mission id. Approval only re-queues the item; the autonomy
+            # supervisor executes it on the next tick under the same gates.
+            if app_id.startswith("wi_"):
+                loop = getattr(engine, "executive_loop", None)
+                if loop is None:
+                    self._send_json({"error": "Executive loop unavailable"}, status=503)
+                    return
+                if decision == "APPROVE":
+                    ok = loop.approve_work_item(app_id, approver_role=auth_context.get("role", "OWNER"))
+                else:
+                    ok = loop.reject_work_item(app_id, reason=req_data.get("reason", "Rejected by operator"))
+                self._send_json({
+                    "success": bool(ok),
+                    "approval_id": app_id,
+                    "decision": decision,
+                    "queued_for_next_tick": bool(ok and decision == "APPROVE"),
+                })
+                return
+
             mid = app_id.replace("app_", "")
             if decision == "APPROVE":
-                _cw(tenant_id, company_id).background_dispatcher.resume_mission(mid)
-                _cw(tenant_id, company_id).background_dispatcher.execute_compound_mission_step(mid)
+                engine.background_dispatcher.resume_mission(mid)
+                engine.background_dispatcher.execute_compound_mission_step(mid)
             else:
-                _cw(tenant_id, company_id).background_dispatcher.stop_mission(mid)
+                engine.background_dispatcher.stop_mission(mid)
             self._send_json({"success": True, "approval_id": app_id, "decision": decision})
             return
+
 
         elif path == "/api/coworker/nodes/register":
             from core.coworker.fleet.node_contracts import (
@@ -9055,6 +9228,15 @@ def run_server(port=8080):
     universal_automation_fabric.start_background_worker(poll_interval=0.5)
     print("[*] Universal Automation Fabric Background Worker ACTIVE", flush=True)
 
+    # Start tenant-scoped co-worker schedulers for companies that already
+    # exist. This is asynchronous and skipped in test mode.
+    try:
+        from core.coworker.runtime_supervisor import bootstrap_tenant_supervisors
+        if bootstrap_tenant_supervisors():
+            print("[*] Co-worker autonomy bootstrap scheduled (tenant-scoped)", flush=True)
+    except Exception as exc:
+        print(f"[!] Co-worker autonomy bootstrap unavailable: {type(exc).__name__}", flush=True)
+
     if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
         import threading
         from core.action_envelope import command_bus
@@ -9072,6 +9254,11 @@ def run_server(port=8080):
         print(f"\n[*] Received termination signal ({signum}). Initiating graceful shutdown...", flush=True)
         try:
             universal_automation_fabric.stop_background_worker()
+            try:
+                from core.coworker.runtime_supervisor import shutdown_all_supervisors
+                shutdown_all_supervisors(timeout=3.0)
+            except Exception:
+                pass
             if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
                 from core.action_envelope import command_bus
                 command_bus.stop()
@@ -9095,6 +9282,11 @@ def run_server(port=8080):
             httpd.serve_forever()
     finally:
         universal_automation_fabric.stop_background_worker()
+        try:
+            from core.coworker.runtime_supervisor import shutdown_all_supervisors
+            shutdown_all_supervisors(timeout=3.0)
+        except Exception:
+            pass
         if os.environ.get("ZONATA_EMBEDDED_WORKER", "0") == "1":
             try:
                 from core.action_envelope import command_bus

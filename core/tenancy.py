@@ -103,6 +103,15 @@ class TenantRuntime:
                 self._coworker = UniversalCoworkerEngine.get_instance(
                     tenant_id=self.tenant_id, company_id=self.company_id
                 )
+                # First access to a tenant's co-worker starts its always-on
+                # scheduler. The supervisor itself decides whether autonomy is
+                # enabled, whether it owns the host lock, and whether the
+                # KillSwitch currently permits work.
+                try:
+                    from core.coworker.runtime_supervisor import ensure_supervisor
+                    self._coworker.autonomy_supervisor = ensure_supervisor(self._coworker)
+                except Exception:
+                    pass
             return self._coworker
 
     # ------------------------------------------------------- tenant services
@@ -432,6 +441,15 @@ def get_coworker(tenant_id: str, company_id: Optional[str] = None):
 
 def invalidate(tenant_id: str) -> None:
     """Drop cached runtimes for a tenant (after onboarding/offboarding)."""
+    removed: list = []
     with _REGISTRY_LOCK:
         for key in [k for k in _REGISTRY if k.startswith(f"{tenant_id}::")]:
-            _REGISTRY.pop(key, None)
+            removed.append(_REGISTRY.pop(key))
+    for runtime in removed:
+        coworker = getattr(runtime, "_coworker", None)
+        supervisor = getattr(coworker, "autonomy_supervisor", None) if coworker else None
+        if supervisor is not None:
+            try:
+                supervisor.stop(timeout=2.0)
+            except Exception:
+                pass

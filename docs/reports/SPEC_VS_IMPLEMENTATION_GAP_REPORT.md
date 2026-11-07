@@ -63,6 +63,35 @@ The 3.0 qualification reports at
 `docs/qualification/ZONATA_AUTONOMOUS_COWORKER_{2,3}_FINAL_OPERATIONAL_QUALIFICATION.md`
 carry correction notes for the claims that did not survive review.
 
+### Autonomy runtime addendum (reviewed 2026-11-07)
+
+The earlier layers were request-driven. `core/coworker/runtime_supervisor.py`
+adds a tenant-scoped scheduler so the engines advance without a caller.
+
+| Subsystem | Status | Evidence / limit |
+|---|---|---|
+| Autonomy supervisor | **Verified (single host)** | Live server: a mission submitted with `auto_step=false` advanced `20% → 50% → 80%` with no `/step` call, then stopped at `BLOCKED — deliverable generation failed` with an explicit reason. 12 tests cover eligibility, holds, kill switch, DoA approval and the process lock. |
+| Tenant auto-start | **Verified** | First access to `TenantRuntime.coworker` starts the scheduler; `ZONATA_COWORKER_AUTONOMY=0` or test mode disables it. |
+| KillSwitch gate | **Verified** | Supervisor returns `KILLSWITCH_HOLD` and does no work; `BackgroundMissionDispatcher` re-checks the matrix for direct step calls. Evaluation errors fail closed. |
+| Executive queue drain | **Verified (live)** | `POST /api/coworker/work-items` queued items; the next tick processed them without an external `/step` call (`queue_processed=1`, `queue_results` returned the item id, outcome and `objective_achieved=false`). The queue drained to `queue_depth=0`. |
+| DoA approvals | **Verified (live)** | A $50,000 item returned `AWAITING_APPROVAL` and appeared in `GET /api/coworker/approvals` as `DOA_APPROVAL`; `POST .../decide` with `APPROVE` re-queued it. The supervisor never approves it on its own. |
+| Security patrol | **Verified** | The first tick ran a real patrol (`24 findings`, `0 critical`, `0 high`) and the dashboard reports the same timestamp. |
+| Distributed exclusivity | **Partial** | The lock is host-local `flock`. Two API processes on one host cannot duplicate work; multiple hosts still can. A PostgreSQL advisory lock/lease is required before claiming distributed exclusivity. |
+
+The scheduler adds no new authority: it does not auto-approve, does not raise
+autonomy levels, and does not fabricate mission success. A mission without a
+usable language model is reported `BLOCKED`, not completed.
+
+**CEO bridge semantics (corrected 2026-11-07).** `execute_ceo_mission()` marks
+`execution_status=COMPLETED` when it has written a `MISSION_PLAN_RECORD` file and
+independently verified its SHA-256. That is a verified *pipeline record*, not
+proof that the business objective was achieved. The response now carries
+`final_outcome.objective_achieved=false` and the evidence metadata action is
+`CEO_MISSION_PLAN_RECORD_SEALED`; the autonomy queue surfaces the same flag in
+`queue_results`. Several pre-existing tests assert `COMPLETED` for the pipeline
+contract, so the status name was kept, but the user-facing wording no longer
+claims the objective was fulfilled.
+
 ---
 
 ## §1 Primary objective

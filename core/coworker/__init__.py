@@ -112,6 +112,13 @@ from .executive_operating_loop import (
     PriorityWorkItem,
     ExecutiveOperatingLoop,
 )
+from .runtime_supervisor import (
+    CoworkerAutonomySupervisor,
+    ensure_supervisor,
+    get_supervisor,
+    shutdown_all_supervisors,
+    bootstrap_tenant_supervisors,
+)
 from .local_inference_adapter import (
     HardwareBudget,
     LocalInferenceStatus,
@@ -342,6 +349,11 @@ __all__ = [
     "WorkItemStatus",
     "PriorityWorkItem",
     "ExecutiveOperatingLoop",
+    "CoworkerAutonomySupervisor",
+    "ensure_supervisor",
+    "get_supervisor",
+    "shutdown_all_supervisors",
+    "bootstrap_tenant_supervisors",
     "HardwareBudget",
     "LocalInferenceStatus",
     "LocalInferenceAdapter",

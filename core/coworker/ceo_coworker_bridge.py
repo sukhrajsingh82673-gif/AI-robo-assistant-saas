@@ -258,7 +258,12 @@ class AICeoCoworkerBridge:
                 mission_id=mission_id,
                 agent_id="agt_ai_ceo_v8",
                 verifications=verifs,
-                metadata={"action": "CEO_MISSION_COMPLETED", "deliverable_sha256": file_sha}
+                metadata={
+                    "action": "CEO_MISSION_PLAN_RECORD_SEALED",
+                    "deliverable_sha256": file_sha,
+                    "record_type": "MISSION_PLAN_RECORD",
+                    "objective_achieved": False,
+                }
             )
             evidence_token = pkg.evidence_id
         except Exception:
@@ -292,7 +297,12 @@ class AICeoCoworkerBridge:
 
         final_outcome = {
             "status": "SUCCESS" if independent_verified else "FAILED",
-            "message": f"Executive objective '{req.objective}' fulfilled. Deliverable report sealed.",
+            "message": (
+                f"Plan record for '{req.objective}' created and sealed. "
+                "This confirms the pipeline ran and the record exists on disk; it is not "
+                "proof that the business objective was achieved."
+            ),
+            "objective_achieved": False,
             "deliverable_file": deliverable_filename,
             "evidence_token": evidence_token
         }

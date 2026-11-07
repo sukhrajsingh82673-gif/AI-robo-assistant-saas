@@ -117,7 +117,8 @@ class CoworkerDashboardService:
             "active_workers": active_workers,
             "fleet_nodes": fleet_nodes,
             "specialized_runtimes": runtimes_info,
-            "background_missions": missions_info
+            "background_missions": missions_info,
+            "autonomy": self._autonomy_snapshot()
         }
 
     # --- Live telemetry probes -------------------------------------------------
@@ -226,6 +227,26 @@ class CoworkerDashboardService:
             probes["mcp_registry"] = f"UNAVAILABLE: {type(exc).__name__}"
 
         return probes
+
+    def _autonomy_snapshot(self) -> Dict[str, Any]:
+        """Real scheduler state, or an explicit unavailability reason."""
+        supervisor = getattr(self.engine, "autonomy_supervisor", None)
+        if supervisor is None:
+            try:
+                from .runtime_supervisor import ensure_supervisor
+                supervisor = ensure_supervisor(self.engine, autostart=False)
+            except Exception as exc:
+                return {
+                    "mode": "UNAVAILABLE",
+                    "reason": f"{type(exc).__name__}: {str(exc)[:160]}",
+                }
+        try:
+            return supervisor.status()
+        except Exception as exc:
+            return {
+                "mode": "UNAVAILABLE",
+                "reason": f"{type(exc).__name__}: {str(exc)[:160]}",
+            }
 
     def _cybersecurity_snapshot(self) -> Dict[str, Any]:
         snapshot = {

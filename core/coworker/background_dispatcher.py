@@ -20,6 +20,7 @@ import uuid
 import json
 import sqlite3
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -97,6 +98,7 @@ class BackgroundMissionDispatcher:
         else:
             self.db_path = db_path
         self._missions: Dict[str, BackgroundMission] = {}
+        self._exec_lock = threading.RLock()
 
         self._init_db()
         self._load_persisted_missions()
@@ -293,6 +295,30 @@ class BackgroundMissionDispatcher:
 
     def execute_compound_mission_step(self, mission_id: str) -> Optional[BackgroundMission]:
         """
+        Serialized entry point for mission progression.
+
+        The autonomy supervisor and HTTP endpoints can ask for a step at the
+        same time; the RLock prevents two workers from advancing one mission
+        concurrently and double-writing deliverables/evidence.
+        """
+        with self._exec_lock:
+            return self._execute_compound_mission_step_unlocked(mission_id)
+
+    def _killswitch_blocks(self, mission: BackgroundMission) -> bool:
+        """Fail-closed governance gate evaluated before any mission work."""
+        try:
+            from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+            ks = KillSwitchMatrix(mission.tenant_id)
+            return bool(
+                ks.is_activated(KillSwitchLevel.GLOBAL)
+                or ks.is_activated(KillSwitchLevel.TENANT, mission.tenant_id)
+                or ks.is_activated(KillSwitchLevel.COMPANY, mission.company_id)
+            )
+        except Exception:
+            return True
+
+    def _execute_compound_mission_step_unlocked(self, mission_id: str) -> Optional[BackgroundMission]:
+        """
         Executes real progression of the compound mission with real artifacts and SHA-256 evidence.
         """
         mission = self._missions.get(mission_id)
@@ -308,6 +334,25 @@ class BackgroundMissionDispatcher:
 
         if mission.human_control:
             mission.add_timeline_event("PAUSED", "Execution paused under human operator takeover")
+            return mission
+
+        # KillSwitch gate: no mission work may start while a global, tenant or
+        # company switch is engaged. Status is left untouched so work resumes
+        # automatically after the switch is disengaged.
+        if self._killswitch_blocks(mission):
+            now = time.time()
+            recent = any(
+                event.get("type") == "KILLSWITCH_HOLD"
+                and (now - float(event.get("timestamp") or 0)) < 300.0
+                for event in mission.timeline[-10:]
+            )
+            if not recent:
+                mission.add_timeline_event(
+                    "KILLSWITCH_HOLD",
+                    "Mission progression paused: KillSwitch engaged (GLOBAL/TENANT/COMPANY)",
+                    "WARNING",
+                )
+                self._persist_mission(mission)
             return mission
 
         now = time.time()
