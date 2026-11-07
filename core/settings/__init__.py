@@ -1,7 +1,9 @@
 """Enterprise settings package.
 
 Phase 1 exposes the canonical definitions, typed registry, and schema helpers.
-The resolver, RBAC, secrets vault, and API live in later phases.
+Phase 2 adds the resolver, RBAC, secrets vault, audit writer, approvals, and
+the ``/api/settings/v2/*`` backend.  Importing this package stays side-effect
+free; database access is lazy.
 """
 
 from core.settings.definitions import (

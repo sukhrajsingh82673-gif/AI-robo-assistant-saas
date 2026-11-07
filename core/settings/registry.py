@@ -381,7 +381,13 @@ class SettingsRegistry:
                 }
                 for category in self._categories
             ],
-            "settings": [definition.to_public_dict() for definition in self._definitions],
+            # Hidden definitions are implementation details, not controls.  The
+            # per-section hidden_count still reports them for internal audits.
+            "settings": [
+                definition.to_public_dict()
+                for definition in self._definitions
+                if definition.status is not SettingStatus.HIDDEN
+            ],
             "counts": self.counts(),
         }
 

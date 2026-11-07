@@ -331,6 +331,7 @@ class ApprovalRequest:
     resolved_at: Optional[float] = None
     resolved_by: Optional[str] = None
     decision_reason: Optional[str] = None
+    company_id: Optional[str] = None
 
     def to_public_dict(self, sensitive: bool = False) -> Dict[str, Any]:
         return {
@@ -338,6 +339,7 @@ class ApprovalRequest:
             "key": self.key,
             "scope_type": self.scope_type.value,
             "scope_id": self.scope_id,
+            "company_id": self.company_id,
             "proposed_value": "••••••••" if sensitive else self.proposed_value,
             "proposed_by": self.proposed_by,
             "actor_type": self.actor_type.value,
