@@ -599,3 +599,155 @@ Approve the following before Phase 2 starts:
 After approval, Phase 2 starts with the resolver, RBAC, secrets vault, audit
 chain, approvals, and `/api/settings/v2/*`, then stops for a backend
 verification checkpoint before the UI shell.
+
+---
+
+## 15. Phase 2 backend implementation
+
+Phase 2 is backend only. No settings UI has been rewritten yet, and the legacy
+`/api/settings*` endpoints remain mounted behind their existing flags.
+
+### 15.1 Modules
+
+| Module | Responsibility |
+| --- | --- |
+| `core/settings/errors.py` | Typed errors and stable HTTP status codes. |
+| `core/settings/rbac.py` | Verified-token `Principal`, role matrix, company membership, scope rules, agent restrictions, AI-CEO self-limit keys. |
+| `core/settings/resolver.py` | Six-scope precedence, broadest-lock-first, legacy fallback during migration, environment defaults, revision-keyed cache. |
+| `core/settings/audit.py` | Append-only, per-tenant SHA-256 hash chain, company-scoped reads, revision bumps. |
+| `core/settings/secrets.py` | AES-GCM envelope encryption, environment/file key ring, write-only metadata, last4, rotation and revocation. |
+| `core/settings/approvals.py` | Proposal queue, self-approval denial, two-person rule for critical risk, expiry. |
+| `core/settings/service.py` | Write orchestration: validation, RBAC, concurrency, approvals, secrets, audit, bulk, actions, cache invalidation. |
+| `core/settings/api_v2.py` | Thin HTTP adapter for `/api/settings/v2/*`; maps typed errors to status codes and never returns secret values. |
+
+### 15.2 Endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/settings/v2/registry` | Registry catalog, optionally filtered by `section`. |
+| `GET` | `/api/settings/v2/effective` | One effective value with provenance. |
+| `GET` | `/api/settings/v2/values` | Effective values for a section or category. |
+| `GET` | `/api/settings/v2/secrets` | Secret metadata only (name, scope, last4, configured). |
+| `GET` | `/api/settings/v2/approvals` | Pending and resolved proposals. |
+| `GET` | `/api/settings/v2/audit` | Company-scoped audit events. |
+| `GET` | `/api/settings/v2/audit/verify` | Recompute and verify the audit chain. |
+| `GET` | `/api/settings/v2/diff` | Compare effective values between two companies. |
+| `GET` | `/api/settings/v2/revision` | Per-tenant settings revision. |
+| `POST` | `/api/settings/v2/values` | Write or queue a value; requires `expected_version`. |
+| `POST` | `/api/settings/v2/values/reset` | Remove a local override ("Reset to inherited"). |
+| `POST` | `/api/settings/v2/values/bulk` | Atomic bulk preview/apply. |
+| `POST` | `/api/settings/v2/lock` and `/unlock` | Lock or unlock a stored value. |
+| `POST` | `/api/settings/v2/secrets` | Create or update a secret (write-only). |
+| `POST` | `/api/settings/v2/secrets/rotate` | Rotate an existing secret. |
+| `POST` | `/api/settings/v2/secrets/revoke` | Revoke a secret. |
+| `POST` | `/api/settings/v2/approvals` | Propose a change (agents use this path). |
+| `POST` | `/api/settings/v2/approvals/{id}/decide` | Approve or reject. |
+| `POST` | `/api/settings/v2/actions/{action_id}` | Typed-confirmation danger-zone action. |
+
+### 15.3 Write policy
+
+- `X-User-Role`, `X-User-Name`, and `X-Company-ID` are not trusted by Settings
+  V2. Identity comes from the verified bearer token. The resolved company is
+  accepted only when it belongs to the token's tenant.
+- Privileged humans (`OWNER`, `GLOBAL_ADMIN`) apply approved-class changes
+  directly. Non-privileged humans and agents queue approvals.
+- A proposer can never decide their own proposal.
+- An approval applies the value it captured only if the target setting has not
+  changed since the proposal was created; otherwise it fails with a version
+  conflict and the proposal stays pending.
+- `CRITICAL` risk needs two distinct approvers.
+- An agent may not propose or apply a change to the AI CEO's own limits, and an
+  agent may never write a secret or execute a danger-zone action.
+- Secrets are write-only over HTTP. List and effective responses return
+  metadata and last4 only (last4 is withheld for secrets shorter than eight
+  characters); plaintext is available only through the runtime
+  `decrypt_for_runtime()` helper.
+- Secret writes fail closed in production when
+  `ZONATA_SETTINGS_MASTER_KEY` is absent. Development may generate a `0600`
+  key file.
+- Every write is audited in the same transaction as the value. Sensitive
+  values are redacted before hashing.
+- During the migration window the resolver reads the legacy table inside the
+  request tenant only. The old runtime's global `tnt_primary` fallback is
+  disabled by default because it leaks one tenant's configuration into every
+  other tenant; `ZONATA_SETTINGS_LEGACY_GLOBAL_FALLBACK=1` restores it for a
+  short parity window and must not be used in production.
+
+### 15.4 Tenant-scoped primary keys
+
+The Phase 1 `settings_values` primary key was
+`(scope_type, scope_id, setting_key)`. Department, agent and user ids are not
+guaranteed to be globally unique, so that key allowed two tenants using the
+same id to collide or read each other's value.
+
+Phase 2 adds `migrations/sqlite/0005_settings_v2_tenant_keys.sql` and
+`migrations/pg/0007_settings_v2_tenant_keys.sql`, and the primary key becomes
+`(tenant_id, scope_type, scope_id, setting_key)`. Secret uniqueness becomes
+`(tenant_id, scope_type, scope_id, name)`. All resolver and write queries now
+include `tenant_id`.
+
+### 15.5 Backup and rollback
+
+Before applying the new migrations in staging:
+
+```bash
+# SQLite
+sqlite3 storage/roboassistant.db ".backup 'storage/roboassistant.db.bak-$(date +%Y%m%d%H%M)'"
+
+# PostgreSQL
+pg_dump "$DATABASE_URL" --format=custom --file="settings-v2-$(date +%Y%m%d%H%M).dump"
+```
+
+Rollback:
+
+- `0005` (SQLite) rebuilds a table. Restore the file backup, or rebuild the
+  table again without `tenant_id` in the key. Restoring the backup is the
+  supported path.
+- `0007` (PostgreSQL) can be reversed with:
+  `ALTER TABLE settings_values DROP CONSTRAINT IF EXISTS settings_values_pkey;`
+  then re-adding the old key. Restore the dump if duplicate rows across
+  tenants would block the old key.
+- Do not edit an already-applied migration: the schema helper records
+  checksums and refuses to start when a file changes.
+
+### 15.6 Legacy surface status
+
+The legacy `/api/settings*` routes remain mounted and still write configuration
+to `enterprise_settings`. They now require verified-token permissions, no
+longer read `X-User-Role` or `X-User-Name` for authorization, require the
+definition's extra permission for secret keys, and mask secrets and sensitive
+values in search and audit output.
+
+They do not yet redirect secret writes into the encrypted vault. That switch
+belongs to the legacy flag flip in the UI phase. Until then, write secrets
+through `POST /api/settings/v2/secrets`; the legacy token field still stores
+its value in the legacy table.
+
+---
+
+## 16. Backend verification checkpoint
+
+Completed in this environment:
+
+- `tests/test_settings_v2_phase2.py`: 40 passed.
+- `tests/test_settings_registry_phase1.py`: 31 passed.
+- `tests/test_enterprise_settings_center.py`: 12 passed.
+- Manual SQLite smoke test: write, effective read, lock, reset, version
+  conflict, agent proposal + human approval, secret put/list/decrypt, audit
+  chain verification, cross-company denial, and no secret values in audit.
+- `python3 -m py_compile` passes for `api_server.py`, `core/settings/*.py`, and
+  `core/settings_service.py`.
+
+Not verified here:
+
+- PostgreSQL runtime execution. There is no PostgreSQL server in this
+  environment. The PG migration and query set are reviewed but must be run in
+  staging.
+- Browser/E2E behavior. No UI was built in Phase 2.
+- Load and concurrency behavior beyond the optimistic-version test. In
+  PostgreSQL, two concurrent audit writers for the same tenant could compute
+  the same timestamp; serialize them with a per-tenant advisory lock (or a
+  sequence column) before enabling multi-writer PG deployment. SQLite
+  serializes writers, so the current local path is safe.
+
+Phase 2 stops here. UI work starts only after this checkpoint is approved.
