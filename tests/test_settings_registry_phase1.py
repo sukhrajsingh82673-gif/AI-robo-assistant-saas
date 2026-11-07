@@ -229,13 +229,18 @@ class TestSettingsSchema(unittest.TestCase):
         self.assertEqual([name for name, _ in files], [
             "common/0003_settings_v2_schema.sql",
             "sqlite/0004_settings_v2_append_only.sql",
+            "sqlite/0005_settings_v2_tenant_keys.sql",
         ])
         pg_files = schema_files("postgresql")
-        self.assertEqual(pg_files[-1][0], "pg/0006_settings_v2_append_only.sql")
+        self.assertEqual([name for name, _ in pg_files], [
+            "common/0003_settings_v2_schema.sql",
+            "pg/0006_settings_v2_append_only.sql",
+            "pg/0007_settings_v2_tenant_keys.sql",
+        ])
 
     def test_ensure_schema_creates_and_verifies(self):
         result = ensure_schema(self.conn, "sqlite")
-        self.assertEqual(len(result["applied"]), 2)
+        self.assertEqual(len(result["applied"]), 3)
         verified = verify_schema(self.conn, "sqlite")
         self.assertTrue(verified["ok"], verified)
         self.assertEqual(set(REQUIRED_TABLES), set(verified["required"]))
@@ -249,7 +254,7 @@ class TestSettingsSchema(unittest.TestCase):
         ensure_schema(self.conn, "sqlite")
         second = ensure_schema(self.conn, "sqlite")
         self.assertEqual(second["applied"], [])
-        self.assertEqual(len(second["skipped"]), 2)
+        self.assertEqual(len(second["skipped"]), 3)
 
     def test_checksum_mismatch_is_rejected(self):
         ensure_schema(self.conn, "sqlite")

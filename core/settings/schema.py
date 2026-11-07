@@ -24,7 +24,9 @@ MIGRATIONS_ROOT = os.path.join(_REPO_ROOT, "migrations")
 
 COMMON_SCHEMA_FILE = os.path.join("common", "0003_settings_v2_schema.sql")
 SQLITE_APPEND_ONLY_FILE = os.path.join("sqlite", "0004_settings_v2_append_only.sql")
+SQLITE_TENANT_KEYS_FILE = os.path.join("sqlite", "0005_settings_v2_tenant_keys.sql")
 PG_APPEND_ONLY_FILE = os.path.join("pg", "0006_settings_v2_append_only.sql")
+PG_TENANT_KEYS_FILE = os.path.join("pg", "0007_settings_v2_tenant_keys.sql")
 
 SCHEMA_MIGRATIONS_TABLE = "settings_schema_migrations"
 
@@ -63,9 +65,11 @@ def schema_files(dialect: Optional[str] = "sqlite") -> List[Tuple[str, str]]:
     """Return ``(migration_id, absolute_path)`` pairs in apply order."""
     normalized = normalize_dialect(dialect)
     append_only = SQLITE_APPEND_ONLY_FILE if normalized == "sqlite" else PG_APPEND_ONLY_FILE
+    tenant_keys = SQLITE_TENANT_KEYS_FILE if normalized == "sqlite" else PG_TENANT_KEYS_FILE
     return [
         (COMMON_SCHEMA_FILE.replace(os.sep, "/"), os.path.join(MIGRATIONS_ROOT, COMMON_SCHEMA_FILE)),
         (append_only.replace(os.sep, "/"), os.path.join(MIGRATIONS_ROOT, append_only)),
+        (tenant_keys.replace(os.sep, "/"), os.path.join(MIGRATIONS_ROOT, tenant_keys)),
     ]
 
 
