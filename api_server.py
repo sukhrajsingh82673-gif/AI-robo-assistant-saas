@@ -683,6 +683,38 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Fail closed to the token's own company.
         return token_company or f"comp_{tenant_id}"
 
+    def _settings_principal(self, auth_context: Dict[str, Any]):
+        from core.settings.rbac import Principal
+        return Principal.from_auth_context(auth_context)
+
+    def _require_settings_permission(self, auth_context: Dict[str, Any], permission: str) -> bool:
+        """Verified-token permission gate for legacy settings routes."""
+        from core.settings.rbac import has_permission
+        principal = self._settings_principal(auth_context)
+        if has_permission(principal, permission):
+            return True
+        self._send_json(
+            {
+                "success": False,
+                "error": f"INSUFFICIENT_PERMISSIONS: '{permission}' is required.",
+                "required_permission": permission,
+                "role": principal.role,
+            },
+            status=403,
+        )
+        return False
+
+    def _legacy_secret_permission(self, setting_key: str) -> Optional[str]:
+        """Return the extra permission needed to write a secret key, if any."""
+        try:
+            from core.settings.registry import settings_registry
+            definition = settings_registry.get(setting_key)
+        except Exception:
+            return None
+        if definition is not None and definition.secret:
+            return definition.required_permission
+        return None
+
     def _send_json(self, data, status=200, headers=None):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
         try:
@@ -1203,6 +1235,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if not self._enforce_tenant_fairness(path, "GET", auth_context=auth_context):
+            return
+
+        # Settings V2 API (backend only; the legacy surface remains mounted).
+        if path == "/api/settings/v2" or path.startswith("/api/settings/v2/"):
+            from core.settings.api_v2 import settings_v2_api
+
+            status_code, payload = settings_v2_api.handle(
+                "GET", path, query_params, {}, auth_context, company_id
+            )
+            self._send_json(payload, status=status_code)
             return
 
         if path == "/api/auth/me":
@@ -2191,6 +2233,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             categories_cat = settings_service.get_categories_catalog(tenant_id, company_id)
             self._send_json({
                 "groups": GROUPS,
@@ -2203,6 +2247,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/search":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             q = query_params.get("q", [""])[0]
             results = settings_service.search_settings(q, tenant_id, company_id)
             self._send_json({
@@ -2216,12 +2262,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             detail = settings_service.get_category_detail(cat_id, tenant_id, company_id)
             self._send_json(detail)
             return
 
         elif path == "/api/settings/audit":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "audit.read"):
+                return
             cat = query_params.get("category", [None])[0]
             actor = query_params.get("actor", [None])[0]
             risk = query_params.get("risk", [None])[0]
@@ -2232,6 +2282,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/effective":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             enforcements = settings_service.get_all_effective_enforcements(tenant_id, company_id)
             self._send_json({
                 "tenant_id": tenant_id,
@@ -2243,6 +2295,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/drift":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             drift = settings_service.check_runtime_drift(tenant_id, company_id)
             self._send_json(drift)
             return
@@ -4087,6 +4141,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         if not self._enforce_tenant_fairness(path, "POST", auth_context=auth_context):
             return
 
+        # Settings V2 API (backend only; the legacy surface remains mounted).
+        if path == "/api/settings/v2" or path.startswith("/api/settings/v2/"):
+            from core.settings.api_v2 import settings_v2_api
+
+            status_code, payload = settings_v2_api.handle(
+                "POST", path, query_params, req_data, auth_context, company_id
+            )
+            self._send_json(payload, status=status_code)
+            return
+
         # Milestone J: Tenant Concurrency Lease Acquisition & Release
         if path == "/api/concurrency/lease/acquire":
             max_leases = int(os.environ.get("PILOT_MAX_CONCURRENCY", "4"))
@@ -5809,8 +5873,20 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             if isinstance(req_data, dict):
+                flattened = []
+                for k, v in req_data.items():
+                    if isinstance(v, dict):
+                        flattened.extend(v.keys())
+                    else:
+                        flattened.append(k)
+                for key in flattened:
+                    extra = self._legacy_secret_permission(key)
+                    if extra and not self._require_settings_permission(auth_context, extra):
+                        return
                 for k, v in req_data.items():
                     if isinstance(v, dict):
                         for sub_k, sub_v in v.items():
@@ -5823,8 +5899,10 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
-            actor_role = self.headers.get("X-User-Role", "OWNER")
+            actor_role = auth_context.get("role", UserRole.OPERATOR)
             reason = req_data.get("reason", "Batch category save")
             if "settings" in req_data and isinstance(req_data["settings"], dict):
                 values = req_data["settings"]
@@ -5840,6 +5918,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/category/") and path.endswith("/reset") and len(path.split("/")) == 6:
             cat_id = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.reset_category_to_defaults(cat_id, tenant_id, company_id, actor=actor)
             status_code = 200 if res.get("success") else 400
@@ -5849,6 +5929,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/key/") and path.endswith("/reset") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.reset_single_setting_to_default(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -5858,6 +5940,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/key/") and path.endswith("/rotate") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            extra = self._legacy_secret_permission(s_key) or "secrets.manage"
+            if not self._require_settings_permission(auth_context, extra):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.rotate_secret_token(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -5867,6 +5952,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/key/") and path.endswith("/revoke") and len(path.split("/")) == 6:
             s_key = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            extra = self._legacy_secret_permission(s_key) or "secrets.manage"
+            if not self._require_settings_permission(auth_context, extra):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.revoke_secret_token(s_key, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -5876,6 +5964,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/action/") and len(path.split("/")) == 5:
             action_id = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "danger.manage"):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
             res = settings_service.execute_button_action(action_id, tenant_id, company_id, actor=actor)
             status_code = res.get("status_code", (200 if res.get("success") else 400))
@@ -5885,8 +5975,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
+            extra = self._legacy_secret_permission(s_key)
+            if extra and not self._require_settings_permission(auth_context, extra):
+                return
             actor = self.headers.get("X-User-Name", "Host Administrator")
-            actor_role = self.headers.get("X-User-Role", "OWNER")
+            actor_role = auth_context.get("role", UserRole.OPERATOR)
             expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data
             reason = req_data.get("reason", "Direct setting update")
@@ -5902,6 +5997,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/settings/propose":
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_context, "settings.read"):
+                return
             s_id = req_data.get("setting_id", "")
             proposed_val = req_data.get("proposed_value")
             proposed_by = req_data.get("proposed_by", "AI CEO Executive Engine")
@@ -5915,6 +6012,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/proposal/") and path.endswith("/resolve"):
             parts = path.split("/")
             prop_id = parts[4]
+            if not self._require_settings_permission(auth_context, "settings.write"):
+                return
             decision = req_data.get("decision", "APPROVED")
             actor = self.headers.get("X-User-Name", "Host Administrator")
             reason = req_data.get("reason", "Administrative resolution")
@@ -9058,6 +9157,11 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path.startswith("/api/settings/key/") and len(path.split("/")) == 5:
             s_key = path.split("/")[4]
+            if not self._require_settings_permission(auth_ctx, "settings.write"):
+                return
+            extra = self._legacy_secret_permission(s_key)
+            if extra and not self._require_settings_permission(auth_ctx, extra):
+                return
             expected_ver = req_data.get("expected_version")
             new_val = req_data.get("value") if "value" in req_data else req_data
             reason = req_data.get("reason", "Direct REST PUT setting update")
@@ -9074,6 +9178,8 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/api/settings/category/") and len(path.split("/")) == 5:
             cat_id = path.split("/")[4]
             # company_id was resolved from the verified token (see _resolve_company_id)
+            if not self._require_settings_permission(auth_ctx, "settings.write"):
+                return
             reason = req_data.get("reason", "Batch category save via PUT")
             if "settings" in req_data and isinstance(req_data["settings"], dict):
                 values = req_data["settings"]

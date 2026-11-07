@@ -905,6 +905,11 @@ class EnterpriseSettingsService:
         """Queries immutable audit receipts with filters."""
         query = "SELECT event_id, setting_id, category, old_value, new_value, scope, actor, reason, approval_status, risk_level, evidence_hash, created_at FROM settings_audit_events WHERE tenant_id = ?"
         params: List[Any] = [tenant_id]
+        # Audit reads are company-scoped.  A Company A reader never sees
+        # Company B's events, even within the same tenant.
+        if company_id:
+            query += " AND company_id = ?"
+            params.append(company_id)
         if category:
             query += " AND category = ?"
             params.append(category)
@@ -985,6 +990,15 @@ class EnterpriseSettingsService:
                 scope = s_stored[1] if s_stored else s.get("scope", "Company")
                 inherited_from = s_stored[2] if s_stored else "Default"
                 effective_val, runtime_status = self._get_effective_runtime_value(s["id"], val)
+                # Secrets and sensitive text are never echoed by search.
+                if s.get("secret") or s.get("sensitive"):
+                    masked = "••••••••••••••••••••••••••••••••"
+                    configured = bool(val) and not str(val).lower().startswith(("revoked", "placeholder"))
+                    configured_value = masked if configured else ""
+                    effective_value = masked if configured else ""
+                else:
+                    configured_value = val
+                    effective_value = effective_val
 
                 results.append({
                     "id": s["id"],
@@ -995,8 +1009,8 @@ class EnterpriseSettingsService:
                     "scope": scope,
                     "risk": s.get("risk", "LOW"),
                     "editable_by": s.get("editable_by", "OWNER"),
-                    "configured_value": val,
-                    "effective_value": effective_val,
+                    "configured_value": configured_value,
+                    "effective_value": effective_value,
                     "inherited_from": inherited_from,
                     "runtime_status": runtime_status,
                     "score": score
