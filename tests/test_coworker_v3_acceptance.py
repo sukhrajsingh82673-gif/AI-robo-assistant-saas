@@ -49,56 +49,87 @@ from core.coworker.engine import UniversalCoworkerEngine
 
 def test_hermes_agent_real_execution_and_restart_recovery():
     """
-    Test A: Verifies Hermes process management, deterministic reasoning,
-    tool execution, persistent memory in SQLite, and crash restart recovery.
+    Test A: Verifies Hermes session lifecycle, honest inference status, real
+    tool execution, persistent memory in SQLite, and restart recovery.
     """
     test_db = f"/tmp/test_hermes_{uuid.uuid4().hex[:6]}.db"
     store = HermesSessionStore(db_path=test_db)
     pm = HermesProcessManager(session_store=store)
 
-    # 1. Start runtime
-    sess = pm.start_runtime()
-    assert sess is not None
-    assert pm.is_running is True
-    assert pm.pid is not None
-    session_id = sess.session_id
+    try:
+        # 1. Start the in-process runtime session
+        sess = pm.start_runtime()
+        assert sess is not None
+        assert pm.is_running is True
+        assert pm.process_mode == "IN_PROCESS"
+        session_id = sess.session_id
 
-    # 2. Execute turn with POSIX terminal execution
-    turn_1 = pm.execute_turn("Please run command in terminal to verify execution")
-    assert turn_1["session_id"] == session_id
-    assert turn_1["evidence_hash"] is not None
-    assert len(turn_1["evidence_hash"]) == 64
-    assert len(turn_1["tool_results"]) > 0
-    assert turn_1["tool_results"][0]["name"] == "terminal_exec"
+        # 2. No Hermes endpoint is configured, so no reasoning is fabricated.
+        turn_1 = pm.execute_turn("Please run command in terminal to verify execution")
+        assert turn_1["session_id"] == session_id
+        assert turn_1["available"] is False
+        assert turn_1["status"] == "LLM_UNAVAILABLE"
+        assert turn_1["response"] == ""
+        assert turn_1["tool_results"] == []
+        assert len(turn_1["evidence_hash"]) == 64
 
-    # 3. Verify memory stored in SQLite
-    loaded = store.load_session(session_id)
-    assert loaded is not None
-    history = loaded.memory_store.get("history", [])
-    assert len(history) == 2 # 1 user prompt, 1 assistant response
+        # 3. Tools execute for real when invoked directly, under governance.
+        ok = pm.dispatcher.dispatch("terminal_exec", json.dumps({"command": "echo hermes-tool-ok"}))
+        assert ok["success"] is True
+        assert ok["result"]["executed"] is True
+        assert ok["result"]["stdout"] == "hermes-tool-ok"
 
-    # 4. Controlled restart simulation
-    restarted = pm.restart_runtime()
-    assert restarted.session_id == session_id
-    assert restarted.restart_count == 1
-    assert pm.restarts_count == 1
-    assert pm.is_running is True
+        blocked = pm.dispatcher.dispatch("terminal_exec", json.dumps({"command": "rm -rf /"}))
+        assert blocked["success"] is False
+        assert blocked["result"]["status"] == "BLOCKED_BY_POLICY"
+        assert blocked["result"]["executed"] is False
 
-    # 5. Subsequent turn preserves episodic memory
-    turn_2 = pm.execute_turn("Delegate a subtask to Software Installation Specialist")
-    assert turn_2["restart_count"] == 1
-    loaded_after = store.load_session(session_id)
-    assert len(loaded_after.memory_store.get("history", [])) == 4
+        # A shell metacharacter must not be interpreted: no shell=True.
+        injection = pm.dispatcher.dispatch(
+            "terminal_exec", json.dumps({"command": "echo safe; touch /tmp/hermes_should_not_exist"})
+        )
+        assert injection["result"].get("executed") is True
+        assert "safe; touch" in injection["result"]["stdout"]
+        assert not os.path.exists("/tmp/hermes_should_not_exist")
 
-    # 6. Verify health status
-    health = pm.get_health_status()
-    assert health["is_running"] is True
-    assert health["restarts_count"] == 1
-    assert health["active_session_id"] == session_id
+        # Delegation is not wired to a subagent runtime and must say so.
+        delegation = pm.dispatcher.dispatch(
+            "subagent_delegate",
+            json.dumps({"archetype": "Software Installation Specialist", "objective": "Verify package provenance"}),
+        )
+        assert delegation["success"] is False
+        assert delegation["result"]["status"] == "ACTION_NOT_IMPLEMENTED"
+        assert delegation["result"]["reason"] == "SUBAGENT_RUNTIME_NOT_CONFIGURED"
 
-    pm.stop_runtime()
-    if os.path.exists(test_db):
-        os.remove(test_db)
+        # 4. Memory stored in SQLite: one user prompt, one assistant turn.
+        loaded = store.load_session(session_id)
+        history = loaded.memory_store.get("history", [])
+        assert len(history) == 2
+
+        # 5. Controlled restart preserves the session id and history.
+        restarted = pm.restart_runtime()
+        assert restarted.session_id == session_id
+        assert restarted.restart_count == 1
+        assert pm.restarts_count == 1
+
+        turn_2 = pm.execute_turn("Summarise the session")
+        assert turn_2["restart_count"] == 1
+        assert turn_2["status"] == "LLM_UNAVAILABLE"
+        loaded_after = store.load_session(session_id)
+        assert len(loaded_after.memory_store.get("history", [])) == 4
+
+        # 6. Health reports the real mode and inference state.
+        health = pm.get_health_status()
+        assert health["is_running"] is True
+        assert health["process_mode"] == "IN_PROCESS"
+        assert health["restarts_count"] == 1
+        assert health["active_session_id"] == session_id
+        assert health["gateway_status"]["inference_available"] is False
+        assert health["gateway_status"]["status"] == "NOT_CONFIGURED"
+    finally:
+        pm.stop_runtime()
+        if os.path.exists(test_db):
+            os.remove(test_db)
 
 
 # =============================================================================
@@ -107,49 +138,73 @@ def test_hermes_agent_real_execution_and_restart_recovery():
 
 def test_opencode_software_engineering_worktree_loop():
     """
-    Test B: Verifies OpenCode 7-stage autonomous loop, isolated worktree,
-    automated test-fix repair (Ralph Loop), and cryptographic diff hash.
+    Test B: Verifies the OpenCode 7-stage loop, isolated worktree, a real
+    Ralph-Loop repair, and the cryptographic diff hash.
+
+    The repair must change the *implementation*. Rewriting the test assertion
+    would be test tampering, so this test also proves the engine refuses to
+    "repair" anything without a supplied repair function.
     """
     engine = OpenCodeEngine(repo_root="/root/roboassistant")
 
     # 1. Inspect and Plan
-    target_files = ["tests/scratch_opencode_target.py"]
+    target_files = ["calc.py", "tests/test_calc.py"]
     plan, mission = engine.inspect_and_plan(
-        objective="Implement math helper function and pass unit assertions",
+        objective="Implement an add() helper that satisfies its unit test",
         target_files=target_files
     )
     assert mission.phase == OpenCodeLoopPhase.PLAN
     assert len(plan) == 5
     assert os.path.exists(mission.worktree_path)
 
-    # 2. Implement with intentionally failing assertion to trigger Ralph Loop repair
-    mutations = {
-        "tests/scratch_opencode_target.py": "def test_feature():\n    assert False\n"
-    }
-    engine.implement_changes(mission, mutations)
-    assert mission.phase == OpenCodeLoopPhase.IMPLEMENT
-    assert mission.diff_hash is not None
+    try:
+        # 2. Implement a deliberately wrong implementation plus a real test.
+        mutations = {
+            "calc.py": "def add(a, b):\n    return a - b\n",
+            "tests/test_calc.py": (
+                "import sys\n"
+                "sys.path.insert(0, '.')\n"
+                "from calc import add\n\n"
+                "def test_add():\n"
+                "    assert add(2, 3) == 5\n"
+            ),
+        }
+        engine.implement_changes(mission, mutations)
+        assert mission.phase == OpenCodeLoopPhase.IMPLEMENT
+        assert mission.diff_hash
 
-    # 3. Review changes
-    approved, comments = engine.review_changes(mission)
-    assert mission.phase == OpenCodeLoopPhase.REVIEW
+        # 3. Test must fail on the wrong implementation.
+        assert engine.run_tests(mission, test_target="tests/test_calc.py") is False
 
-    # 4. Ralph Loop Autonomous Repair
-    repaired = engine.repair_cycle(mission, test_target="tests/scratch_opencode_target.py")
-    assert repaired is True
-    assert mission.repaired_iterations >= 1
+        # 4. Without a real repair backend the loop must refuse, not fake a fix.
+        assert engine.repair_cycle(mission, test_target="tests/test_calc.py") is False
+        assert mission.error_message == "AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED"
 
-    # 5. Submit verified mission
-    submitted = engine.submit_mission(mission)
-    assert submitted.phase == OpenCodeLoopPhase.SUBMITTED
-    assert submitted.test_passed is True
-    assert submitted.code_review_approved is True
-    assert submitted.evidence_hash is not None
-    assert len(submitted.evidence_hash) == 64
+        # 5. A real repair fixes the implementation and leaves the test intact.
+        def fix_implementation(m):
+            impl = os.path.join(m.worktree_path, "calc.py")
+            with open(impl, "w", encoding="utf-8") as fh:
+                fh.write("def add(a, b):\n    return a + b\n")
 
-    # Cleanup worktree
-    engine.cleanup_worktree(mission)
-    assert not os.path.exists(mission.worktree_path)
+        repaired = engine.repair_cycle(
+            mission, test_target="tests/test_calc.py", repair_fn=fix_implementation
+        )
+        assert repaired is True
+        assert mission.repaired_iterations >= 1
+        assert mission.test_passed is True
+
+        with open(os.path.join(mission.worktree_path, "tests/test_calc.py"), encoding="utf-8") as fh:
+            assert "assert add(2, 3) == 5" in fh.read()
+
+        # 6. Submit verified mission.
+        submitted = engine.submit_mission(mission)
+        assert submitted.phase == OpenCodeLoopPhase.SUBMITTED
+        assert submitted.test_passed is True
+        assert submitted.code_review_approved is True
+        assert len(submitted.evidence_hash) == 64
+    finally:
+        engine.cleanup_worktree(mission)
+        assert not os.path.exists(mission.worktree_path)
 
 
 # =============================================================================
@@ -341,12 +396,23 @@ def test_senior_defensive_cybersecurity_patrol_5_tiers():
         remediation_action="Process SIGKILL dispatched and isolated"
     )
     assert inc["severity"] == "CRITICAL"
-    assert inc["status"] == "CONTAINED"
-    assert inc["ceo_notified"] is True
+    # Recording is detection. Containment is only claimed after verification.
+    assert inc["status"] == "DETECTED"
+    assert inc["ceo_notified"] is False
+    assert inc["remediation_requested"] == "Process SIGKILL dispatched and isolated"
     assert len(inc["evidence_hash"]) == 64
 
-    # 5. Verify Remediation
-    rem_res = monitor.verify_remediation(inc["incident_id"], verification_check=True)
+    # 5. Verification requires a real host-state check, not a boolean.
+    assert monitor.verify_remediation(inc["incident_id"], True)["verified"] is False
+
+    marker = f"/tmp/incident_marker_{uuid.uuid4().hex[:6]}"
+    open(marker, "w").close()
+
+    def remediate_and_check():
+        os.remove(marker)
+        return not os.path.exists(marker)
+
+    rem_res = monitor.verify_remediation(inc["incident_id"], remediate_and_check)
     assert rem_res["verified"] is True
     assert rem_res["status"] == "REMEDIATED"
 
@@ -385,6 +451,9 @@ def test_employee_blocker_escalation_and_diagnostic_routing():
     )
     assert res_ticket.status == EscalationStatus.RETURNED_TO_EMPLOYEE
     assert len(res_ticket.evidence_hash) == 64
+    # A boolean inside resolution_data is not verification evidence.
+    assert res_ticket.verified is False
+    assert res_ticket.verification_notes == "NO_VERIFICATION_FUNCTION"
 
     # 4. Verify correlation trace on communication bus
     trace = bus.get_correlation_trace("corr_mission_888")
@@ -502,18 +571,46 @@ def test_frontend_executive_cockpit_and_single_floating_assistant():
     # Check no duplicate floating launchers exist
     assert html.count('class="floating-assistant-container"') == 1
 
-    # 2. Verify Coworker 3.0 telemetry in Dashboard snapshot
-    mock_engine = type("MockEngine", (), {"tenant_id": "tnt_test"})()
-    dash_service = CoworkerDashboardService(mock_engine)
+    # 2. Dashboard telemetry must reflect live state, never a fixed advert.
+    class _Engine:
+        tenant_id = "tnt_test"
+
+    dash_service = CoworkerDashboardService(_Engine())
     snapshot = dash_service.get_dashboard_snapshot()
 
     assert "ZONATA Universal AI Co-Worker" in snapshot["product"]
     assert snapshot.get("version") == "3.0"
     assert "agent_cloud" in snapshot
-    cloud_telemetry = snapshot["agent_cloud"]
-    assert cloud_telemetry["total_registered_agents"] >= 5000
-    assert cloud_telemetry["max_bounded_workers"] == 16
-    assert cloud_telemetry["verified_integrations"]["hermes_runtime"] == "VERIFIED_OPERATIONAL"
-    assert cloud_telemetry["verified_integrations"]["opencode_engine"] == "VERIFIED_OPERATIONAL"
-    assert cloud_telemetry["verified_integrations"]["opencloud_remote_workers"] == "VERIFIED_OPERATIONAL"
-    assert cloud_telemetry["verified_integrations"]["opendots_computer_use"] == "VERIFIED_OPERATIONAL"
+
+    # Without an attached registry the snapshot must say so.
+    cloud = snapshot["agent_cloud"]
+    assert cloud["catalog_status"] == "NOT_INITIALIZED"
+    assert cloud["total_registered_agents"] == 0
+    assert snapshot["metrics"]["agent_cloud_capacity"] == 0
+
+    integ = cloud["verified_integrations"]
+    assert integ["hermes_runtime"] in ("LLM_UNAVAILABLE", "ENDPOINT_ONLINE")
+    assert integ["opencode_engine"] == "IMPLEMENTED_UNQUALIFIED"
+    assert integ["opencloud_remote_workers"] == "NO_NODES_CONFIGURED"
+    assert integ["opendots_computer_use"] in (
+        "X11_READY", "NO_DISPLAY", "CAPTURE_TOOLING_MISSING"
+    )
+    assert cloud["cybersecurity"]["patrol_status"] in ("NOT_RUN", "COMPLETED")
+
+    # With a real registry the numbers come from that registry.
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        registry = AgentCloudRegistry(db_path=tmp.name, max_active_workers=16)
+        try:
+            registry.bulk_register_capacity(target_capacity=5000)
+
+            class _EngineWithCloud:
+                tenant_id = "tnt_test"
+                agent_cloud = registry
+
+            live = CoworkerDashboardService(_EngineWithCloud()).get_dashboard_snapshot()
+            assert live["agent_cloud"]["catalog_status"] == "ONLINE"
+            assert live["agent_cloud"]["total_registered_agents"] >= 5000
+            assert live["agent_cloud"]["max_bounded_workers"] == 16
+            assert live["metrics"]["agent_cloud_capacity"] >= 5000
+        finally:
+            registry._executor.shutdown(wait=False)

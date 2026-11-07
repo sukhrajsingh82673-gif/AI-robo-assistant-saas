@@ -305,10 +305,13 @@ def test_escalation_router_and_correlation_bus():
     resolved_ticket = router.resolve_and_return(
         ticket=ticket,
         resolution_data={"installed_package": "duckdb", "version": "1.0.0", "smoke_test": "PASSED"},
-        correlation_id=corr_id
+        correlation_id=corr_id,
+        verification_fn=lambda data: data.get("smoke_test") == "PASSED",
     )
     assert resolved_ticket.status == EscalationStatus.RETURNED_TO_EMPLOYEE
     assert len(resolved_ticket.evidence_hash) == 64
+    assert resolved_ticket.verified is True
+    assert resolved_ticket.verification_notes == "INDEPENDENTLY_VERIFIED"
 
     # 4. Correlation trace across bus
     trace = bus.get_correlation_trace(corr_id)

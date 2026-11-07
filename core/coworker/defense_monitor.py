@@ -530,17 +530,20 @@ class DefensiveCybersecurityMonitor:
         raw_token = f"{inc_id}:{severity.value}:{category}:{target}:{description}:{now}"
         evidence_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
+        # Recording an incident is detection, not containment. A remediation is
+        # only marked effective after verify_remediation() independently checks
+        # the host state, and no CEO notification is claimed unless one is sent.
         incident = {
             "incident_id": inc_id,
             "severity": severity.value,
             "category": category,
             "target": target,
             "description": description,
-            "remediation_action": remediation_action,
-            "status": "CONTAINED" if remediation_action else "DETECTED",
+            "remediation_requested": remediation_action,
+            "status": "DETECTED",
             "evidence_hash": evidence_hash,
             "timestamp": now,
-            "ceo_notified": severity in (PatrolSeverity.CRITICAL, PatrolSeverity.HIGH)
+            "ceo_notified": False,
         }
 
         # Record in database finding log as well
@@ -550,7 +553,7 @@ class DefensiveCybersecurityMonitor:
             severity=severity,
             description=description,
             target=target,
-            auto_remediated=bool(remediation_action),
+            auto_remediated=False,
             remediation_action=remediation_action,
             detected_at=now,
             metadata={"evidence_hash": evidence_hash, "incident_id": inc_id}
@@ -558,11 +561,30 @@ class DefensiveCybersecurityMonitor:
         self.db.record_patrol_finding(finding)
         return incident
 
-    def verify_remediation(self, incident_id: str, verification_check: bool) -> Dict[str, Any]:
-        """Verifies that a remediation has taken effect without breaking system invariants."""
+    def verify_remediation(self, incident_id: str, check_fn) -> Dict[str, Any]:
+        """
+        Verifies a remediation by running a caller-supplied host-state check.
+
+        A bare boolean is not accepted: the check must actually inspect the
+        system, otherwise "REMEDIATED" would only reflect the caller's claim.
+        """
+        if not callable(check_fn):
+            return {
+                "incident_id": incident_id,
+                "verified": False,
+                "status": "VERIFICATION_REQUIRES_CHECK_FUNCTION",
+                "verified_at": time.time(),
+            }
+        try:
+            verified = bool(check_fn())
+            error = None
+        except Exception as exc:
+            verified = False
+            error = str(exc)
         return {
             "incident_id": incident_id,
-            "verified": verification_check,
-            "status": "REMEDIATED" if verification_check else "REMEDIATION_FAILED",
-            "verified_at": time.time()
+            "verified": verified,
+            "status": "REMEDIATED" if verified else "REMEDIATION_FAILED",
+            "error": error,
+            "verified_at": time.time(),
         }

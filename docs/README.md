@@ -43,7 +43,7 @@ is the current production design series and is meant to be read in order.
 
 How the system is built, and the contracts it must honour.
 
-52 documents.
+53 documents.
 
 | Document | Contents |
 |---|---|
@@ -87,6 +87,7 @@ How the system is built, and the contracts it must honour.
 | [`ENTERPRISE_INTEGRATION_ARCHITECTURE.md`](architecture/ENTERPRISE_INTEGRATION_ARCHITECTURE.md) | ZONATA / URA — Enterprise Integration Architecture |
 | [`ENTERPRISE_SETTINGS_SPEC.md`](architecture/ENTERPRISE_SETTINGS_SPEC.md) | Enterprise Settings Spec |
 | [`GEMMA4_COGNITIVE_CEO_ARCHITECTURE.md`](architecture/GEMMA4_COGNITIVE_CEO_ARCHITECTURE.md) | Google Gemma 4 Cognitive Executive Integration Architecture |
+| [`OPENDOTS_INTEGRATION_ASSESSMENT.md`](architecture/OPENDOTS_INTEGRATION_ASSESSMENT.md) | OpenDots Integration Assessment |
 | [`PRE_CHANGE_ARCHITECTURE_BASELINE_SNAPSHOT.md`](architecture/PRE_CHANGE_ARCHITECTURE_BASELINE_SNAPSHOT.md) | ZONATA / URA Universal AI Company Operating System |
 | [`PROJECT_10_NANGO_ARCHITECTURE.md`](architecture/PROJECT_10_NANGO_ARCHITECTURE.md) | Project 10: Nango — Governed External System Connectivity & Integration Architecture |
 | [`RECOVERY_MODEL.md`](architecture/RECOVERY_MODEL.md) | ZONATA UNIVERSAL AI CO-WORKER FABRIC — RECOVERY MODEL |
@@ -228,7 +229,7 @@ Installation, staging, CI/CD and rollback.
 
 What was tested, how, and what the result was. Includes version-series evidence.
 
-80 documents.
+82 documents.
 
 | Document | Contents |
 |---|---|
@@ -285,6 +286,8 @@ What was tested, how, and what the result was. Includes version-series evidence.
 | [`ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_ACCEPTANCE.md`](qualification/ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_ACCEPTANCE.md) | ZONATA / URA — AI CEO Intelligence Enhancement Governed Acceptance Report |
 | [`ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_FINAL_AUDIT.md`](qualification/ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_FINAL_AUDIT.md) | ZONATA / URA — AI CEO Intelligence Enhancement |
 | [`ZONATA_AI_CEO_OPERATIONAL_EFFECTIVENESS_QUALIFICATION.md`](qualification/ZONATA_AI_CEO_OPERATIONAL_EFFECTIVENESS_QUALIFICATION.md) | ZONATA / URA — AI CEO Operational Effectiveness Qualification Report |
+| [`ZONATA_AUTONOMOUS_COWORKER_2_FINAL_OPERATIONAL_QUALIFICATION.md`](qualification/ZONATA_AUTONOMOUS_COWORKER_2_FINAL_OPERATIONAL_QUALIFICATION.md) | URA / ZONATA Autonomous Coworker 2.0 — Final Operational Qualification Report |
+| [`ZONATA_AUTONOMOUS_COWORKER_3_FINAL_OPERATIONAL_QUALIFICATION.md`](qualification/ZONATA_AUTONOMOUS_COWORKER_3_FINAL_OPERATIONAL_QUALIFICATION.md) | ZONATA Autonomous Coworker 3.0: Final Operational Qualification Report |
 | [`ZONATA_CONNECTOR_LIVE_QUALIFICATION_MATRIX.md`](qualification/ZONATA_CONNECTOR_LIVE_QUALIFICATION_MATRIX.md) | ZONATA / URA Universal Automation Fabric |
 | [`ZONATA_COWORKER_FINAL_GAP_AUDIT.md`](qualification/ZONATA_COWORKER_FINAL_GAP_AUDIT.md) | ZONATA Universal AI Co-Worker — Reality Gap Audit |
 | [`ZONATA_COWORKER_FINAL_PRODUCTION_QUALIFICATION_REPORT.md`](qualification/ZONATA_COWORKER_FINAL_PRODUCTION_QUALIFICATION_REPORT.md) | ZONATA UNIVERSAL AI CO-WORKER FABRIC |
@@ -317,7 +320,7 @@ What was tested, how, and what the result was. Includes version-series evidence.
 
 Runtime, connector, model and programme-level reports.
 
-112 documents.
+115 documents.
 
 | Document | Contents |
 |---|---|
@@ -337,6 +340,7 @@ Runtime, connector, model and programme-level reports.
 | [`remediation_4a_production_readiness_gap_report.md`](reports/remediation_4a_production_readiness_gap_report.md) | URA / ZONATA — Remediation 4A: Final Production Readiness Gap Audit Report |
 | [`SBOM.md`](reports/SBOM.md) | SOFTWARE BILL OF MATERIALS (SBOM) |
 | [`SINGLE_POINTS_OF_FAILURE.md`](reports/SINGLE_POINTS_OF_FAILURE.md) | SINGLE POINTS OF FAILURE (SPOF) ARCHITECTURAL AUDIT |
+| [`SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`](reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md) | Coworker 2.0 — Spec vs Implementation Gap Report |
 | [`STAGE1_NORTHSTAR_GAP_REPORT.md`](reports/STAGE1_NORTHSTAR_GAP_REPORT.md) | Stage 1 — Internal Simulation: Northstar Business Systems |
 | [`STEP_2_FULL_SAAS_OPERATIONAL_VALIDATION_REPORT.md`](reports/STEP_2_FULL_SAAS_OPERATIONAL_VALIDATION_REPORT.md) | URA / ZONATA — STEP 2 FULL SAAS OPERATIONAL VALIDATION & EVIDENCE CLOSURE REPORT |
 | [`V3_A2A_EXTERNAL_VALIDATION.md`](reports/V3_A2A_EXTERNAL_VALIDATION.md) | ZONATA V3 — Agent-to-Agent (A2A) Interoperability Validation |
@@ -407,6 +411,8 @@ Runtime, connector, model and programme-level reports.
 | [`V7_SOP_COMPILER.md`](reports/V7_SOP_COMPILER.md) | ZONATA V7 — SOP Ingestion & Operational Policy Compiler |
 | [`V7_WORKFORCE_HIERARCHY.md`](reports/V7_WORKFORCE_HIERARCHY.md) | ZONATA V7 — Workforce Hierarchy & Supervision |
 | [`ZONATA_AI_CEO_END_TO_END_MISSION_REPORT.md`](reports/ZONATA_AI_CEO_END_TO_END_MISSION_REPORT.md) | ZONATA / URA Universal AI Company Operating System |
+| [`ZONATA_AUTONOMOUS_COWORKER_2_ACCEPTANCE_REPORT.md`](reports/ZONATA_AUTONOMOUS_COWORKER_2_ACCEPTANCE_REPORT.md) | ZONATA Autonomous Coworker 2.0 Acceptance Report |
+| [`ZONATA_AUTONOMOUS_COWORKER_2_PRODUCTION_REALITY_AUDIT.md`](reports/ZONATA_AUTONOMOUS_COWORKER_2_PRODUCTION_REALITY_AUDIT.md) | ZONATA Autonomous Coworker 2.0 Production Reality Audit & Acceptance Gate |
 | [`ZONATA_COWORKER_24H_SOAK.md`](reports/ZONATA_COWORKER_24H_SOAK.md) | ZONATA UNIVERSAL AI CO-WORKER: 24-HOUR SOAK & ENDURANCE TESTING FRAMEWORK |
 | [`ZONATA_COWORKER_DISTRIBUTED_RUNTIME_FINAL_REPORT.md`](reports/ZONATA_COWORKER_DISTRIBUTED_RUNTIME_FINAL_REPORT.md) | ZONATA UNIVERSAL AI CO-WORKER FABRIC |
 | [`ZONATA_COWORKER_FLEET.md`](reports/ZONATA_COWORKER_FLEET.md) | ZONATA UNIVERSAL AI CO-WORKER: DISTRIBUTED WORKER FLEET TOPOLOGY |

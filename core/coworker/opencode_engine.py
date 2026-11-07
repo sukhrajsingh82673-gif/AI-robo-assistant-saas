@@ -17,7 +17,7 @@ import json
 import shutil
 import hashlib
 import subprocess
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Callable
 from dataclasses import dataclass, field
 
 from .contracts_v3 import OpenCodeMission, OpenCodeLoopPhase
@@ -210,22 +210,34 @@ class OpenCodeEngine:
     def repair_cycle(
         self,
         mission: OpenCodeMission,
-        test_target: Optional[str] = None
+        test_target: Optional[str] = None,
+        repair_fn: Optional[Callable[[OpenCodeMission], None]] = None
     ) -> bool:
-        """Stage 6: REPAIR autonomously via the Ralph Loop."""
+        """
+        Stage 6: REPAIR through the Ralph Loop.
+
+        A repair must be a real code change supplied by the caller, or produced
+        by an upstream model through `repair_fn`. This method never edits tests
+        to make them pass — rewriting assertions is test tampering and would
+        turn a failed build into a false success.
+        """
         if mission.repaired_iterations >= mission.max_repair_iterations:
             return False
 
         mission.phase = OpenCodeLoopPhase.REPAIR
         mission.repaired_iterations += 1
 
-        for f_rel in mission.modified_files:
-            f_full = os.path.join(mission.worktree_path, f_rel)
-            if os.path.exists(f_full):
-                with open(f_full, "r", encoding="utf-8") as f_in:
-                    content = f_in.read()
-                with open(f_full, "w", encoding="utf-8") as f_out:
-                    f_out.write(content.replace("assert False", "assert True"))
+        if repair_fn is None:
+            mission.phase = OpenCodeLoopPhase.FAILED
+            mission.error_message = "AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED"
+            return False
+
+        try:
+            repair_fn(mission)
+        except Exception as exc:
+            mission.phase = OpenCodeLoopPhase.FAILED
+            mission.error_message = f"REPAIR_FAILED: {exc}"
+            return False
 
         passed = self.run_tests(mission, test_target)
         approved, _ = self.review_changes(mission)
@@ -247,7 +259,8 @@ class OpenCodeEngine:
         objective: str,
         target_files: List[str],
         mutations: Dict[str, str],
-        test_target: Optional[str] = None
+        test_target: Optional[str] = None,
+        repair_fn: Optional[Callable[[OpenCodeMission], None]] = None
     ) -> OpenCodeMission:
         """
         Executes the full 7-stage autonomous engineering loop with Ralph Loop recovery.
@@ -266,7 +279,7 @@ class OpenCodeEngine:
 
         # 6. Repair Loop
         while (not passed or not approved) and mission.repaired_iterations < mission.max_repair_iterations:
-            resolved = self.repair_cycle(mission, test_target)
+            resolved = self.repair_cycle(mission, test_target, repair_fn)
             if resolved:
                 break
 

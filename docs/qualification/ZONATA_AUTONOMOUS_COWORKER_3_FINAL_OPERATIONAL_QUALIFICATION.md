@@ -1,5 +1,33 @@
 # ZONATA Autonomous Coworker 3.0: Final Operational Qualification Report
 
+> **Correction — 2026-11-07 (independent review).** The following claims were
+> overstated and have been corrected in code and/or test:
+>
+> - **"Hermes ... full subprocess lifecycle management"** — the manager runs
+>   in-process (`process_mode = IN_PROCESS`); `pid` is the host process id. No
+>   separate agent binary is spawned.
+> - **"Hermes ... deterministic reasoning fallback"** — removed. Without
+>   `HERMES_API_ENDPOINT` the gateway returns `LLM_UNAVAILABLE` with empty content
+>   and no tool calls. Tool dispatch is explicit, not keyword-triggered.
+> - **"OpenCode ... Ralph Loop autonomous test-fix cycles"** — the cycle used to
+>   rewrite `assert False` to `assert True` inside the tests, which is test
+>   tampering. It now requires a real `repair_fn` that changes the
+>   implementation, and refuses with `AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED`
+>   otherwise.
+> - **"Escalation router ... returns verified deliverables"** — verification now
+>   requires an independent `verification_fn`; a `verified: True` field inside the
+>   caller's payload is not accepted as evidence.
+> - **"Incident recording ... CONTAINED"** — recording an incident is detection.
+>   `verify_remediation()` now requires a callable host-state check; a boolean is
+>   rejected.
+> - **"149 tests ... 100% passing"** — measured for the v3 suites at that commit
+>   (18 tests in `test_coworker_v3_acceptance.py` + `test_coworker_v3_comprehensive.py`
+>   on 2026-11-07). It is not a full-repository proof.
+> - **"Web Cockpit UX ... delivering"** — no browser engine on this host; the UI
+>   is **Implemented-unverified**.
+> - **Release status** — **restricted production pilot**, not GA.
+
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Target Milestone:** Autonomous Coworker 3.0 Upgrade  

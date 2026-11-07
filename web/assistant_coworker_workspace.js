@@ -324,6 +324,16 @@
       if (!el) return;
 
       const activeMission = this.missions.find(m => m.mission_id === this.currentMissionId) || this.missions[0];
+      // HUD values come from the live dashboard snapshot; unknown stays unknown.
+      const ac = (this.dashboard && this.dashboard.agent_cloud) || {};
+      const integ = ac.verified_integrations || {};
+      const cyber = ac.cybersecurity || {};
+      const cloudLabel = ac.catalog_status === 'ONLINE'
+        ? `${ac.total_registered_agents || 0} Registered (${ac.busy_agents || 0} Busy / ${ac.max_bounded_workers || 0} Pool)`
+        : 'Not initialized';
+      const cloudSub = ac.catalog_status === 'ONLINE'
+        ? `Queue depth ${ac.queue_depth || 0}`
+        : (ac.catalog_status || 'No agent cloud attached');
 
       el.innerHTML = `
         <div class="workspace-page-header">
@@ -334,7 +344,7 @@
               <span>👑 CEO-DIRECTED AUTONOMOUS OPERATOR</span>
             </div>
             <h1 class="page-title">ZONATA Autonomous Coworker 3.0</h1>
-            <p class="page-subtitle">Nous Hermes Agent runtime, OpenCode Git worktree engine, 5,000+ Agent Cloud with bounded scheduling, OpenDots visual grounding, and continuous Defensive Cybersecurity Command Center.</p>
+            <p class="page-subtitle">Hermes session runtime, OpenCode Git worktree engine, catalogued Agent Cloud with bounded scheduling, X11 visual perception, and defensive cybersecurity patrols. Status values below are read live from the backend.</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.triggerSecurityPatrol()" title="Run immediate cybersecurity patrol">
@@ -359,30 +369,30 @@
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
             <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">☁️ Enterprise Agent Cloud</div>
             <div style="font-size:0.95rem; font-weight:700; color:#38bdf8; margin:6px 0 2px;">
-              5,000 Registered (16 Active Pool)
+              ${cloudLabel}
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Bounded Concurrency & Zero-Loss Leases</div>
+            <div style="font-size:0.75rem; color:#64748b;">${cloudSub}</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
             <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛠️ OpenCode & Hermes Engine</div>
             <div style="font-size:0.95rem; font-weight:700; color:#34d399; margin:6px 0 2px;">
-              Git Worktree Loop + AST Review
+              Hermes: ${integ.hermes_runtime || 'UNKNOWN'}
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Governed Ralph Loop Self-Repair Gate</div>
+            <div style="font-size:0.75rem; color:#64748b;">OpenCode: ${integ.opencode_engine || 'UNKNOWN'}</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
             <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🖥️ OpenDots Perception</div>
             <div style="font-size:0.85rem; font-weight:600; color:#cbd5e1; margin:6px 0 2px;">
-              Real X11 Virtual Display (:99)
+              ${integ.opendots_computer_use || 'UNKNOWN'}
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Visual Framebuffer SHA-256 Hashed</div>
+            <div style="font-size:0.75rem; color:#64748b;">Terminal: ${integ.terminal_sandboxed || 'UNKNOWN'}</div>
           </div>
           <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
             <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛡️ Cybersecurity Command</div>
             <div style="font-size:0.95rem; font-weight:700; color:#a78bfa; margin:6px 0 2px;">
-              5 Severity Levels / 24/7 Patrol
+              ${cyber.threat_level || 'UNKNOWN'} · ${cyber.patrol_status || 'NOT_RUN'}
             </div>
-            <div style="font-size:0.75rem; color:#64748b;">Host Process, Port 0.0.0.0, Injection & MCP Audit</div>
+            <div style="font-size:0.75rem; color:#64748b;">Critical ${cyber.critical_findings || 0} · High ${cyber.high_findings || 0}</div>
           </div>
         </div>
 

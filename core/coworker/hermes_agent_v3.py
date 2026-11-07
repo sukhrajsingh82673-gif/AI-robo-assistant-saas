@@ -148,9 +148,12 @@ class HermesSessionStore:
 
 class HermesInferenceGateway:
     """
-    Connects to live Nous Hermes endpoints or OpenAI-compatible inference servers.
-    When unconfigured, provides a deterministic local reasoning fallback to guarantee
-    zero unapproved cloud billing while enabling comprehensive testing.
+    Connects to a live Nous Hermes / OpenAI-compatible endpoint.
+
+    There is no local model. When no endpoint is configured, or the endpoint is
+    unreachable, the gateway reports `LLM_UNAVAILABLE` and returns no content and
+    no tool calls. It never synthesises a "plan" or auto-selects a tool from
+    keyword matching, because that would present a template as reasoning.
     """
 
     def __init__(self, endpoint: Optional[str] = None, api_key: Optional[str] = None):
@@ -163,9 +166,10 @@ class HermesInferenceGateway:
         if not self.endpoint:
             return {
                 "connected": False,
-                "status": "LOCAL_FALLBACK_ACTIVE",
+                "inference_available": False,
+                "status": "NOT_CONFIGURED",
                 "endpoint": None,
-                "message": "No HERMES_API_ENDPOINT configured. Local deterministic inference engine active."
+                "message": "No HERMES_API_ENDPOINT configured. Set HERMES_API_ENDPOINT and HERMES_API_KEY to enable inference."
             }
         try:
             req = urllib.request.Request(
@@ -176,6 +180,7 @@ class HermesInferenceGateway:
                 data = json.loads(resp.read().decode())
                 return {
                     "connected": True,
+                    "inference_available": True,
                     "status": "ONLINE",
                     "endpoint": self.endpoint,
                     "models": [m.get("id") for m in data.get("data", [])]
@@ -183,6 +188,7 @@ class HermesInferenceGateway:
         except Exception as e:
             return {
                 "connected": False,
+                "inference_available": False,
                 "status": "CONNECTION_FAILED",
                 "endpoint": self.endpoint,
                 "error": str(e)
@@ -196,7 +202,10 @@ class HermesInferenceGateway:
         temperature: float = 0.2
     ) -> Dict[str, Any]:
         """
-        Executes a completion request against Hermes inference or local reasoning fallback.
+        Executes a completion request against the configured Hermes endpoint.
+
+        Returns `available: False` / `status: LLM_UNAVAILABLE` when no endpoint is
+        configured or the request fails.
         """
         target_model = model or self.default_model
 
@@ -229,65 +238,25 @@ class HermesInferenceGateway:
                         "tool_calls": choice.get("tool_calls", []),
                         "model": target_model,
                         "source": "LIVE_HERMES_ENDPOINT",
+                        "available": True,
+                        "status": "COMPLETED",
                         "usage": res.get("usage", {})
                     }
             except Exception:
-                # Fall back to local engine if live connection drops
+                # Endpoint configured but unreachable: report it below.
                 pass
 
-        # 2. Local Deterministic Inference Fallback
-        last_user_msg = ""
-        for m in reversed(messages):
-            if m.get("role") == "user":
-                last_user_msg = m.get("content", "")
-                break
-
-        # Check if user message triggers tool calling
-        tool_calls = []
-        if tools and ("terminal" in last_user_msg.lower() or "run command" in last_user_msg.lower()):
-            for t in tools:
-                t_name = t.get("function", {}).get("name", "")
-                if "terminal" in t_name or "exec" in t_name:
-                    tool_calls.append({
-                        "id": f"call_{uuid.uuid4().hex[:8]}",
-                        "type": "function",
-                        "function": {
-                            "name": t_name,
-                            "arguments": json.dumps({"command": "echo 'Hermes verified POSIX execution'"})
-                        }
-                    })
-                    break
-
-        elif tools and ("subagent" in last_user_msg.lower() or "delegate" in last_user_msg.lower()):
-            for t in tools:
-                t_name = t.get("function", {}).get("name", "")
-                if "delegate" in t_name or "subagent" in t_name:
-                    tool_calls.append({
-                        "id": f"call_{uuid.uuid4().hex[:8]}",
-                        "type": "function",
-                        "function": {
-                            "name": t_name,
-                            "arguments": json.dumps({
-                                "archetype": "Software Installation Specialist",
-                                "objective": "Verify package provenance"
-                            })
-                        }
-                    })
-                    break
-
-        content = (
-            f"Hermes Agent Reasoning Plan:\n"
-            f"1. Analyzed user objective: '{last_user_msg[:80]}...'\n"
-            f"2. Decomposed into atomic tasks.\n"
-            f"3. Governed tool calls dispatched through ZONATA security gateway."
-        )
-
+        # 2. No live model available. Do not fabricate reasoning or tool calls.
+        reason = "NO_HERMES_ENDPOINT" if not self.endpoint else "HERMES_ENDPOINT_UNREACHABLE"
         return {
-            "content": content,
-            "tool_calls": tool_calls,
-            "model": f"{target_model}-local-runtime",
-            "source": "LOCAL_DETERMINISTIC_RUNTIME",
-            "usage": {"prompt_tokens": len(last_user_msg.split()), "completion_tokens": len(content.split())}
+            "content": "",
+            "tool_calls": [],
+            "model": target_model,
+            "source": "LLM_UNAVAILABLE",
+            "available": False,
+            "status": "LLM_UNAVAILABLE",
+            "error": reason,
+            "usage": {},
         }
 
 
@@ -308,7 +277,7 @@ class HermesToolDispatcher:
     def _register_default_tools(self):
         self.register_tool(
             name="terminal_exec",
-            description="Executes a sandboxed POSIX terminal command.",
+            description="Runs a read-only or local-mutation POSIX command without a shell.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -359,8 +328,14 @@ class HermesToolDispatcher:
             args = json.loads(arguments_str) if isinstance(arguments_str, str) else arguments_str
             handler = self._handlers[tool_name]["handler"]
             res = handler(**args)
+            # A handler that refused or failed is not a successful tool call.
+            if isinstance(res, dict):
+                status = res.get("status")
+                success = status in (None, "COMPLETED") and res.get("executed", True)
+            else:
+                success = True
             return {
-                "success": True,
+                "success": success,
                 "tool_name": tool_name,
                 "result": res
             }
@@ -372,24 +347,56 @@ class HermesToolDispatcher:
             }
 
     def _handle_terminal(self, command: str) -> Dict[str, Any]:
-        # Disallow dangerous commands
-        forbidden = ["rm -rf /", ":(){ :|:& };:", "mkfs"]
-        if any(f in command for f in forbidden):
-            return {"status": "BLOCKED_BY_POLICY", "output": "Forbidden command pattern"}
-        proc = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10)
+        """Runs a command through the terminal security gateway, without a shell."""
+        import shlex
+        from ..universal_terminal.security_gateway import TerminalSecurityGateway
+        from ..universal_terminal.models import TerminalCommandRisk
+
+        is_safe, reason = TerminalSecurityGateway.check_forbidden(command)
+        if not is_safe:
+            return {
+                "status": "BLOCKED_BY_POLICY",
+                "executed": False,
+                "reason": reason,
+            }
+
+        risk = TerminalSecurityGateway.classify_risk(command)
+        if risk not in (TerminalCommandRisk.READ_ONLY, TerminalCommandRisk.LOCAL_MUTATION):
+            return {
+                "status": "AUTHORIZATION_REQUIRED",
+                "executed": False,
+                "risk": risk.value,
+                "reason": "HIGHER_RISK_COMMAND_REQUIRES_POLICY_GATEWAY",
+            }
+
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            return {"status": "FAILED", "executed": False, "reason": f"UNPARSEABLE_COMMAND: {exc}"}
+        if not argv:
+            return {"status": "FAILED", "executed": False, "reason": "EMPTY_COMMAND"}
+
+        proc = subprocess.run(argv, shell=False, capture_output=True, text=True, timeout=10)
         return {
+            "status": "COMPLETED" if proc.returncode == 0 else "FAILED",
+            "executed": True,
+            "risk": risk.value,
             "exit_code": proc.returncode,
             "stdout": proc.stdout.strip(),
-            "stderr": proc.stderr.strip()
+            "stderr": proc.stderr.strip(),
         }
 
     def _handle_delegate(self, archetype: str, objective: str) -> Dict[str, Any]:
+        # No subagent runtime is bound to this dispatcher. Returning COMPLETED
+        # here (with a hash of the request) would look like execution evidence
+        # for work that never ran.
         return {
-            "subagent_id": f"sub_{uuid.uuid4().hex[:8]}",
+            "delegation_id": f"sub_{uuid.uuid4().hex[:8]}",
             "archetype": archetype,
             "objective": objective,
-            "status": "COMPLETED",
-            "evidence_hash": hashlib.sha256(f"{archetype}:{objective}".encode()).hexdigest()
+            "status": "ACTION_NOT_IMPLEMENTED",
+            "executed": False,
+            "reason": "SUBAGENT_RUNTIME_NOT_CONFIGURED",
         }
 
 
@@ -491,9 +498,12 @@ class HermesSkillsRegistry:
 
 class HermesProcessManager:
     """
-    Manages the live background execution of the Hermes Agent runtime.
-    Monitors process health, detects unexpected terminations, and executes
-    seamless state recovery from HermesSessionStore.
+    Manages the Hermes agent *session* lifecycle inside the ZONATA process.
+
+    This is not a subprocess supervisor: no separate agent binary is spawned.
+    `process_mode` is reported as `IN_PROCESS` and `pid` is the host process id,
+    for correlation only. Session state is persisted to SQLite so a restart of
+    the manager restores the conversation.
     """
 
     def __init__(self, session_store: Optional[HermesSessionStore] = None):
@@ -506,6 +516,7 @@ class HermesProcessManager:
         self.pid: Optional[int] = None
         self.process_start_time: float = 0.0
         self.restarts_count: int = 0
+        self.process_mode: str = "IN_PROCESS"
 
     def start_runtime(self, session_id: Optional[str] = None) -> HermesSessionContext:
         """Starts or restores a managed Hermes runtime session."""
@@ -535,7 +546,7 @@ class HermesProcessManager:
         return True
 
     def restart_runtime(self) -> HermesSessionContext:
-        """Simulates a controlled or crash restart, verifying recovery."""
+        """Restarts the in-process session and reloads state from SQLite."""
         if not self.active_session:
             raise RuntimeError("Cannot restart: no active session")
         sid = self.active_session.session_id
@@ -590,6 +601,9 @@ class HermesProcessManager:
             "response": resp.get("content"),
             "tool_results": tool_results,
             "model": resp.get("model"),
+            "available": resp.get("available", False),
+            "status": resp.get("status", "COMPLETED"),
+            "reason": resp.get("error"),
             "evidence_hash": log_hash,
             "restart_count": self.active_session.restart_count
         }
@@ -598,6 +612,7 @@ class HermesProcessManager:
         """Returns live process health and uptime metrics."""
         return {
             "is_running": self.is_running,
+            "process_mode": self.process_mode,
             "pid": self.pid,
             "uptime_sec": round(time.time() - self.process_start_time, 2) if self.is_running else 0.0,
             "restarts_count": self.restarts_count,

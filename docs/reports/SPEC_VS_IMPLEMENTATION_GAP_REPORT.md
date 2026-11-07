@@ -38,6 +38,30 @@ backs it. "Tests pass" alone is not treated as proof of real-world execution.
 
 ---
 
+## Coworker 3.0 addendum (reviewed 2026-11-07)
+
+Commits `420de6a` and `0e34643` added a 3.0 layer on top of the 2.0 spec. It is
+not part of the original 16 sections, so it is assessed separately here.
+
+| Subsystem | File | Status | Evidence / limit |
+|---|---|---|---|
+| Hermes session runtime | `core/coworker/hermes_agent_v3.py` | Partial | Session lifecycle + SQLite memory verified; **in-process**, not a subprocess supervisor. No local model: without `HERMES_API_ENDPOINT` it reports `LLM_UNAVAILABLE`. |
+| Hermes tool dispatch | same | Verified | `terminal_exec` runs real commands under `TerminalSecurityGateway`, without a shell; higher-risk classes return `AUTHORIZATION_REQUIRED`; delegation returns `ACTION_NOT_IMPLEMENTED`. |
+| OpenCode engineering loop | `core/coworker/opencode_engine.py` | Partial | Real worktrees, file writes, `git diff`, pytest exit codes, AST review. Repair requires a supplied `repair_fn`; without one it refuses (`AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED`). |
+| OpenCloud remote workers | `core/coworker/opencloud_engine.py` | Implemented-unverified | Real authenticated HTTP `/dispatch` and failover; no remote node is registered on this host, so dispatch returns `BLOCKED_BY_EXTERNAL_DEPENDENCY`. |
+| Agent cloud registry | `core/coworker/agent_cloud_registry.py` | Verified (catalog) | 5,000 logical identities in SQLite and a 16-thread bounded pool verified. These are **identities**, not 5,000 processes. |
+| OpenDots engine | `core/coworker/opendots_engine.py` | Partial | Real `scrot` capture and `xdotool`/`wmctrl` queries when `DISPLAY` is set; labels `HEADLESS_SIMULATED` otherwise. Grounding remains heuristic. |
+| Escalation router | `core/coworker/escalation_router.py` | Partial | Keyword triage, not root-cause analysis. Resolution is only `verified` when an independent `verification_fn` confirms it. |
+| Defence incidents | `core/coworker/defense_monitor.py` | Partial | Real `/proc` process and port scans. Recording an incident is `DETECTED`; `REMEDIATED` requires a host-state check function. |
+| Dashboard telemetry | `core/coworker/dashboard.py` | Verified (honest) | Every field is derived; with no cloud attached it reports `NOT_INITIALIZED` / `0`, and integrations report `LLM_UNAVAILABLE`, `NO_NODES_CONFIGURED`, `NO_DISPLAY`, etc. |
+| Web cockpit HUD | `web/assistant_coworker_workspace.js` | Implemented-unverified | HUD binds to live snapshot values; no browser on this host to exercise it. |
+
+The 3.0 qualification reports at
+`docs/qualification/ZONATA_AUTONOMOUS_COWORKER_{2,3}_FINAL_OPERATIONAL_QUALIFICATION.md`
+carry correction notes for the claims that did not survive review.
+
+---
+
 ## §1 Primary objective
 
 **Requirement:** AI CEO assigns work; the Coworker executes, verifies, reports.

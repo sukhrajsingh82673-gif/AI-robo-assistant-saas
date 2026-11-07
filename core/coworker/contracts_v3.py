@@ -249,6 +249,8 @@ class EscalationTicket:
     assigned_specialist_id: Optional[str] = None
     status: EscalationStatus = EscalationStatus.PENDING
     resolution_artifact: Optional[str] = None
+    verified: bool = False
+    verification_notes: str = ""
     evidence_hash: str = ""
     created_at: float = field(default_factory=time.time)
     resolved_at: Optional[float] = None

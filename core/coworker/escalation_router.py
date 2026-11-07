@@ -13,7 +13,7 @@ import time
 import json
 import uuid
 import hashlib
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Callable, Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 
 from .contracts_v3 import EscalationStatus, EscalationTicket
@@ -152,7 +152,9 @@ class ExecutiveEscalationRouter:
 
     def diagnose_blocker(self, ticket: EscalationTicket) -> Tuple[str, str]:
         """
-        Classifies the root cause and selects the optimal specialist archetype.
+        Triage: keyword-based classification of the failure context and selection
+        of a specialist archetype. This is a heuristic routing decision, not a
+        verified root-cause analysis.
         """
         ticket.status = EscalationStatus.DIAGNOSING
         ctx = ticket.failure_context
@@ -183,12 +185,29 @@ class ExecutiveEscalationRouter:
         self,
         ticket: EscalationTicket,
         resolution_data: Dict[str, Any],
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        verification_fn: Optional[Callable[[Dict[str, Any]], bool]] = None
     ) -> EscalationTicket:
         """
-        Executes resolution and returns verified result to the original employee.
+        Returns a resolution to the original employee.
+
+        `verified` is only true when `verification_fn` independently confirms the
+        resolution. A caller-supplied boolean inside `resolution_data` is not
+        treated as verification.
         """
+        verified = False
+        notes = "NO_VERIFICATION_FUNCTION"
+        if verification_fn is not None:
+            try:
+                verified = bool(verification_fn(resolution_data))
+                notes = "INDEPENDENTLY_VERIFIED" if verified else "VERIFICATION_FAILED"
+            except Exception as exc:
+                verified = False
+                notes = f"VERIFICATION_ERROR: {exc}"
+
         ticket.status = EscalationStatus.RESOLVED
+        ticket.verified = verified
+        ticket.verification_notes = notes
         ticket.resolution_artifact = json.dumps(resolution_data)
         ticket.resolved_at = time.time()
         ticket.compute_evidence_hash()
@@ -202,6 +221,8 @@ class ExecutiveEscalationRouter:
                 "ticket_id": ticket.ticket_id,
                 "task_id": ticket.task_id,
                 "resolution": resolution_data,
+                "verified": verified,
+                "verification_notes": notes,
                 "evidence_hash": ticket.evidence_hash,
                 "diagnosis": ticket.diagnosis
             },
@@ -220,6 +241,8 @@ class ExecutiveEscalationRouter:
                 "task_id": t.task_id,
                 "diagnosis": t.diagnosis,
                 "specialist": t.specialist_archetype,
+                "verified": t.verified,
+                "verification_notes": t.verification_notes,
                 "status": t.status.value,
                 "evidence_hash": t.evidence_hash,
                 "created_at": t.created_at,

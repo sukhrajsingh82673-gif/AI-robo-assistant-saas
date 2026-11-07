@@ -1,5 +1,26 @@
 # URA / ZONATA Autonomous Coworker 2.0 — Final Operational Qualification Report
 
+> **Correction — 2026-11-07 (independent review).** This report was written before
+> the second simulation sweep. The following claims do not hold as stated:
+>
+> - **"131/131 tests"** is the count at this commit for the suites that were run;
+>   it is not a full-repository proof. Several suites are slow or environment
+>   dependent and were run separately.
+> - **Web Cockpit "VERIFIED"** — no browser engine exists on the qualification
+>   host. The UI is code-reviewed only; it is **Implemented-unverified**.
+> - **Neon PostgreSQL outbox sync** — the sync path is configured but no
+>   PostgreSQL server was available, so migration `0005` and live sync are
+>   **unexecuted**.
+> - **PyPI provenance** — metadata and wheel verification run only when the host
+>   can reach PyPI; the offline path reports the dependency as blocked.
+> - **Hermes "live inference"** — inference requires `HERMES_API_ENDPOINT`. With
+>   no endpoint the runtime reports `LLM_UNAVAILABLE`; it previously emitted a
+>   templated "reasoning plan" and a hardcoded tool call, which has been removed.
+> - **Release status** — the correct status is **restricted production pilot**,
+>   not "certified for production enterprise deployment". See
+>   `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+
+
 **Document ID:** `ZONATA-CW2-FINAL-QUAL-2026-11-06`  
 **Classification:** Enterprise Platform Architecture & Production Readiness  
 **Target:** Authorized AI CEO & Human Ownership Governance  
