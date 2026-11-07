@@ -161,6 +161,50 @@ def has_permission(principal: Principal, permission: str) -> bool:
     return permission in principal.permissions
 
 
+def writable_scopes(principal: Principal) -> list:
+    """Scopes the caller may reach.  Company membership is still checked per call."""
+    scopes = []
+    if principal.role == ROLE_GLOBAL_ADMIN:
+        scopes.append(ScopeType.PLATFORM.value)
+    if principal.is_privileged:
+        scopes.append(ScopeType.ORGANIZATION.value)
+    scopes.extend(
+        [
+            ScopeType.COMPANY.value,
+            ScopeType.DEPARTMENT.value,
+            ScopeType.AGENT.value,
+            ScopeType.USER.value,
+        ]
+    )
+    return scopes
+
+
+def capabilities(principal: Principal) -> Dict[str, Any]:
+    """Return what this caller may do, so the UI never renders dead controls.
+
+    This is a presentation hint derived from the same matrix the write path
+    uses.  It grants nothing: every mutation re-checks the permission and the
+    company membership on the server.
+    """
+    permissions = sorted(
+        permission for permission in ALL_PERMISSIONS if has_permission(principal, permission)
+    )
+    return {
+        "role": principal.role,
+        "actor_type": principal.actor_type.value,
+        "permissions": permissions,
+        "is_privileged": principal.is_privileged,
+        "is_approver": principal.is_approver,
+        "can_read": has_permission(principal, "settings.read"),
+        "can_write": has_permission(principal, "settings.write"),
+        "can_lock": has_permission(principal, "settings.lock"),
+        "can_manage_secrets": has_permission(principal, "secrets.manage"),
+        "can_read_audit": has_permission(principal, "audit.read"),
+        "can_execute_actions": has_permission(principal, "danger.manage"),
+        "writable_scopes": writable_scopes(principal),
+    }
+
+
 def require_permission(principal: Principal, permission: str) -> None:
     if not has_permission(principal, permission):
         raise PermissionDenied(

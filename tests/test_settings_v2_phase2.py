@@ -320,6 +320,38 @@ class TestRbac(SettingsV2TestBase):
         with self.assertRaises(PermissionDenied):
             self._set("wf_max_concurrent_agents", 20, principal=principal, expected=0)
 
+    def test_capabilities_match_the_write_path(self):
+        owner = rbac.capabilities(self.owner)
+        self.assertTrue(owner["can_write"])
+        self.assertTrue(owner["can_lock"])
+        self.assertTrue(owner["can_manage_secrets"])
+        self.assertTrue(owner["can_read_audit"])
+        self.assertIn("organization", owner["writable_scopes"])
+        self.assertNotIn("platform", owner["writable_scopes"])
+
+        global_admin = rbac.Principal(
+            user_id="u_ga", tenant_id="t1", company_id="c1", role="GLOBAL_ADMIN"
+        )
+        self.assertIn("platform", rbac.capabilities(global_admin)["writable_scopes"])
+
+        observer = rbac.capabilities(self.observer)
+        self.assertFalse(observer["can_write"])
+        self.assertFalse(observer["can_lock"])
+        self.assertFalse(observer["can_read_audit"])
+        self.assertEqual(observer["permissions"], ["settings.read"])
+
+        agent = rbac.capabilities(self.agent)
+        self.assertFalse(agent["can_write"])
+        self.assertFalse(agent["can_manage_secrets"])
+        self.assertFalse(agent["is_approver"])
+
+    def test_registry_exposes_capabilities_for_the_caller(self):
+        catalog = self.service.registry_catalog(self.observer)
+        self.assertEqual(catalog["capabilities"]["role"], "OBSERVER")
+        self.assertFalse(catalog["capabilities"]["can_write"])
+        owner_catalog = self.service.registry_catalog(self.owner)
+        self.assertTrue(owner_catalog["capabilities"]["can_write"])
+
 
 class TestApprovals(SettingsV2TestBase):
     def test_agent_proposes_and_owner_applies(self):
@@ -421,6 +453,18 @@ class TestSecrets(SettingsV2TestBase):
         self.assertTrue(events)
         self.assertNotIn(value, json.dumps(events))
         self.assertTrue(self.service.verify_audit(self.owner)["ok"])
+
+    def test_reader_without_secret_permission_does_not_see_last4(self):
+        value = "sk-live-REAL-VALUE-1234"
+        self.service.put_secret(
+            self.owner, "llm_api_key", value, scope_type=ScopeType.COMPANY, scope_id="c1"
+        )
+        effective = self.service.effective(self.observer, "llm_api_key", company_id="c1")
+        metadata = effective["secret_metadata"]
+        self.assertTrue(metadata["configured"])
+        self.assertEqual(metadata["last4"], "")
+        self.assertIsNone(metadata["created_by"])
+        self.assertNotIn("1234", json.dumps(effective))
 
     def test_short_secret_does_not_leak_through_last4(self):
         result = self.service.put_secret(

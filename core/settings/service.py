@@ -219,6 +219,7 @@ class SettingsV2Service:
     def registry_catalog(self, principal: rbac.Principal, section: Optional[str] = None) -> Dict[str, Any]:
         rbac.require_permission(principal, "settings.read")
         catalog = settings_registry.public_catalog()
+        catalog["capabilities"] = rbac.capabilities(principal)
         if section:
             definitions = [item for item in catalog["settings"] if item["section"] == section]
             catalog = {
@@ -381,14 +382,32 @@ class SettingsV2Service:
             "allowed_scopes": [scope.value for scope in definition.allowed_scopes],
             "sensitive": True,
             "secret": True,
-            "secret_metadata": metadata.to_public_dict() if metadata else {
-                "configured": False,
-                "last4": "",
-                "value": "",
-            },
+            "secret_metadata": self._secret_public_metadata(principal, metadata, definition),
             "revision": self.audit.current_revision(conn, principal.tenant_id),
         }
         return payload
+
+    @staticmethod
+    def _secret_public_metadata(
+        principal: rbac.Principal, metadata: Any, definition: SettingDefinition
+    ) -> Dict[str, Any]:
+        """Secret existence is visible to readers; the hint is not.
+
+        Only a caller with ``secrets.manage`` sees last4 or who created the
+        secret.  Everyone else sees whether the credential is configured and
+        nothing that narrows a guess.
+        """
+        if metadata is None:
+            return {"name": definition.key, "configured": False, "last4": "", "value": ""}
+        public = metadata.to_public_dict()
+        if not rbac.has_permission(principal, "secrets.manage"):
+            public = {
+                **public,
+                "last4": "",
+                "key_id": None,
+                "created_by": None,
+            }
+        return public
 
     def diff(
         self,
