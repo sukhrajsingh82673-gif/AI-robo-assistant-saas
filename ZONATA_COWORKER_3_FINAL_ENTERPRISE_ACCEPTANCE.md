@@ -1,5 +1,10 @@
 # URA / ZONATA Autonomous Coworker 3.0: Final Enterprise Acceptance Report
 
+> **Correction — 2026-11-07 (independent review).** “100% green” refers to the suites listed in this report passing in this container. It is not proof of production readiness: browser E2E, real LLM inference, PostgreSQL, OCR/AT-SPI and container execution are unavailable here and remain open gaps.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Classification:** Master Engineering Evaluation & Final Operational Acceptance  

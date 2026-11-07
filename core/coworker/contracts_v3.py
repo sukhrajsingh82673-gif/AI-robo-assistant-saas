@@ -208,6 +208,11 @@ class VisualObservation:
     active_window_title: str = ""
     detected_elements_count: int = 0
     perception_mode: str = "REAL_VIRTUAL_X11" # REAL_HOST_X11, REAL_VIRTUAL_X11, BROWSER_ONLY, HEADLESS_SIMULATED
+    # False when no frame was captured. `width`/`height` are the configured
+    # screen size; `capture_width`/`capture_height` are 0 without a frame.
+    capture_available: bool = False
+    capture_width: int = 0
+    capture_height: int = 0
     timestamp: float = field(default_factory=time.time)
 
 

@@ -1,5 +1,10 @@
 # ZONATA UNIVERSAL AI CO-WORKER: 24-HOUR SOAK & ENDURANCE TESTING FRAMEWORK
 
+> **Correction — 2026-11-07 (independent review).** No 24-hour soak was run in this container. Any endurance figures in this report are short local benchmarks or simulations, not a 24-hour soak.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Document Version:** 1.0.0-PROD  
 **Classification:** Operational Reliability, Memory Leak & Soak Testing Specification  
 **Status:** Protocol Implemented / Phase 1 Qualified / Phase 2 Test Harness Active  

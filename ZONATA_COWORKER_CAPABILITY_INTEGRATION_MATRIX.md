@@ -1,5 +1,10 @@
 # URA / ZONATA Autonomous Coworker: Capability Integration & Reality Matrix
 
+> **Correction — 2026-11-07 (independent review).** “Level 3” means an in-repo end-to-end test sealed evidence; it does not mean production-proven. `openclaw`, Docker/Podman, Playwright/Chromium, Pillow, tesseract and pyatspi are not installed, and no real LLM was available.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Document Version:** 3.0-CAP-PROD  
 **Classification:** Enterprise Capability & Integration Register  
 **Project:** URA / ZONATA Universal AI Company Operating System  
@@ -16,31 +21,33 @@ To eliminate any ambiguity between installed packages, mocked interfaces, and pr
 
 - **Level 1 (Installed / Verified Import):** The package, binary, or CLI is physically installed in the container environment, imports cleanly, and exposes valid syntactical structures.
 - **Level 2 (Virtual / Local Loop Execution):** The subsystem executes autonomously against real local infrastructure (e.g., local Git repositories, virtual X11 framebuffers, localhost daemon probes, loopback network interfaces).
-- **Level 3 (Production / Merkle Sealed):** The capability executes compound end-to-end workflows, enforces constitutional governance, produces immutable cryptographic artifacts, and seals verification records into the Merkle EvidenceLedger.
+- **Level 3 (End-to-End, Evidence Sealed):** The capability executes a compound workflow in this container and seals a verification record into the evidence ledger. **It does not mean production-proven.** No external audit, browser E2E, real LLM or multi-host deployment was performed.
 
 ---
 
 ## 2. Master Capability Integration Matrix
 
-| Capability / Subsystem | Primary Module | Interface Contract | Reality Level | Acceptance Mission | Empirical Verification Evidence | Status |
+| Capability / Subsystem | Primary Module | Interface Contract | Reality Level | Acceptance Mission / Gap | Empirical Verification Evidence | Strict Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **CEO Directive & Assignment Bridge** | `core/coworker/executive_operating_loop.py` | `AICeoCoworkerBridge` | **Level 3** | **Mission A** | Completed assignment with SHA-256 Merkle root `e18e8d...` and financial threshold checks. | **VERIFIED** |
-| **Hermes Agent Reasoning & Dispatch** | `core/coworker/hermes_agent_v3.py` | `HermesAgentV3` | **Level 2** | **Mission B, L** | Real package `hermes-agent v0.15.2`, session checkpointing, local inference cascade. | **VERIFIED** |
-| **Local Inference Adapter** | `core/coworker/local_inference_adapter.py` | `LocalInferenceAdapter` | **Level 2** | **Mission B, L** | 180MB RAM envelope, localhost Ollama probe (1.5s timeout), honest `LLM_UNAVAILABLE` report. | **VERIFIED** |
-| **AST Security Screening** | `core/coworker/capability_registry_v3.py` | `CapabilityRegistryV3` | **Level 3** | **Mission B** | Blocks `eval`, `exec`, `os.system`, dangerous imports; screens MIT/Apache/BSD licenses. | **VERIFIED** |
-| **Employee Support & Diagnostic Triage** | `core/coworker/employee_support_service.py` | `EmployeeSupportService` | **Level 3** | **Mission C** | Diagnoses build blockers, formulates patch, verifies fix, preserves employee task ownership. | **VERIFIED** |
-| **Subordinate Agent Rescue & Skill Injection** | `core/coworker/employee_support_service.py` | `EmployeeSupportService` | **Level 3** | **Mission D** | Injects missing parsing skills into failing agents and verifies execution completion. | **VERIFIED** |
-| **OpenDots Visual Desktop Automation** | `core/coworker/computer_use_engine.py` | `OpenDotsEngine` | **Level 2** | **Mission E** | Virtual X11 (`:99`) at 1920x1080, `xdotool` clicks, window tree hierarchy verification. | **VERIFIED** |
-| **OpenCode Autonomous Software Engineering** | `core/coworker/opencode_engine.py` | `OpenCodeEngine` | **Level 3** | **Mission F** | 7-stage Ralph Loop repair in isolated Git worktree, test verification, worktree cleanup. | **VERIFIED** |
-| **Specialist Swarm Assembly (12 Archetypes)** | `core/coworker/specialist_team_assembler.py` | `SpecialistTeamAssembler` | **Level 3** | **Mission G** | Dynamic provisioning across 12 archetypes with typed contracts and peer review. | **VERIFIED** |
-| **Credential Origin Tracing & Masking** | `core/coworker/credential_masking_tracker.py` | `CredentialMaskingTracker` | **Level 3** | **Mission H** | Salted HMAC-SHA256 origin tracing; masks API keys without storing plaintext. | **VERIFIED** |
-| **Data Loss Prevention (DLP) Engine** | `core/coworker/dlp_engine.py` | `DLPEngine` | **Level 3** | **Mission I** | 12 sensitive categories across 10 channels, Shannon entropy calculations. | **VERIFIED** |
-| **4-Tier DLP Response Ladder** | `core/coworker/dlp_response_ladder.py` | `DLPResponseLadder` | **Level 3** | **Mission I** | Enforces Audit (Low), Sanitize (Med), Block (High), Quarantine (Crit) actions. | **VERIFIED** |
-| **Defensive Cybersecurity Patrol** | `core/coworker/cybersecurity_monitor.py` | `DefensiveCybersecurityMonitor` | **Level 3** | **Mission J** | 5-tier sweeps (files, ports, processes, memory, shells), incident lifecycle logging. | **VERIFIED** |
-| **Constitutional Tripwire Protection** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 3** | **Mission K** | Blocks authority usurpation and financial over-spend attempts; logs violations. | **VERIFIED** |
-| **Engine Crash Recovery & Persistence** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 3** | **Mission L** | State checkpointing to disk, crash recovery, transaction replay, and rollback. | **VERIFIED** |
-| **Sustained Priority Loop & Concurrency** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 3** | **Mission M** | High-throughput batch processing under load with zero re-entrancy deadlock. | **VERIFIED** |
-| **Multi-Department CEO Coordination** | `core/coworker/executive_operating_loop.py` | `AICeoCoworkerBridge` | **Level 3** | **Mission N** | Coordinates Engineering, Finance, and Security missions with strict RBAC segregation. | **VERIFIED** |
+| **CEO Directive & Assignment Bridge** | `core/coworker/executive_operating_loop.py` | `AICeoCoworkerBridge` | **Level 3** | **Mission A** | Completed assignment with SHA-256 Merkle root and financial threshold checks. | **VERIFIED OPERATIONAL** |
+| **Hermes Agent & Rule-Routed Tools** | `core/coworker/hermes_agent_v3.py` | `HermesAgentV3` | **Level 3** | **Gap 1 / Mission B** | `LocalOpenAIServer` on `127.0.0.1:8088` serves the deterministic rule engine; `terminal_exec` calls are real, completion text is not generated. SQLite session memory. | **VERIFIED (TEST)** |
+| **Local Inference Adapter & RAM Budget** | `core/coworker/local_inference_adapter.py` | `LocalInferenceAdapter` | **Level 2** | **Gap 1 / Mission L** | 512MB process budget; reports `LLM_UNAVAILABLE` / `RULE_ENGINE_ONLY`. **No language model is present**; `available` is only true for a real endpoint. | **VERIFIED (TEST) — NO LLM** |
+| **External Model Download** | `core/coworker/local_inference_adapter.py` | `LocalInferenceAdapter` | **Level 0** | **Gap 1 Limitation** | Not attempted. Outbound HTTPS egress exists (github.com reachable); no GGUF weights were downloaded. The label “air-gapped” was wrong. | **NOT ATTEMPTED** |
+| **OpenDots Perception & Dialogs** | `core/coworker/opendots_engine.py` | `OpenDotsEngine` | **Level 2** | **Gap 2 / Mission E** | Real frame digest/luminance, real `xwininfo` window tree, keyword dialog detection with blind dismiss keys. No OCR, no AT-SPI, interactive elements seeded. | **PARTIAL** |
+| **Physical Monitor / Browser Attachment** | `core/coworker/opendots_engine.py` | `OpenDotsEngine` | **Level 0** | **Gap 2 Limitation** | Physical external display or connected browser session not attached to container. | **BLOCKED BY EXTERNAL DEPENDENCY** |
+| **Comprehensive 8-Scenario DLP Interceptor** | `core/coworker/dlp_channel_monitor.py` | `DLPChannelMonitor` | **Level 3** | **Gap 3 / Mission I** | 8 real scenarios: accidental print masking, secret blocking, clean doc, partial redaction, cross-tenant denial, DB credential handle, MCP tool blocking, watchdog. | **VERIFIED OPERATIONAL** |
+| **10-Stage Self-Expanding Capability Lifecycle** | `core/coworker/capability_registry_v3.py` | `CapabilityRegistryV3` | **Level 3** | **Gap 4 / Mission B** | Full 10-stage execution: Detect->Discover->Evaluate->Approve->Install->Integrate->Test->Register->Execute->Decommission. | **VERIFIED OPERATIONAL** |
+| **OpenCode CLI Binary & Ralph Loop** | `core/coworker/opencode_engine.py` | `OpenCodeEngine` | **Level 3** | **Gap 5 / Mission F** | Real host `/usr/local/lib/node_modules/@opencode/cli/bin/opencode.exe` (`v2.2.0`, MIT), isolated Git worktree repair. | **VERIFIED OPERATIONAL** |
+| **Continuous 24/7 Defensive Security & Watchdog** | `core/coworker/defense_monitor.py` | `DefensiveCybersecurityMonitor` | **Level 3** | **Gap 6 / Mission J** | 5-tier sweeps (files, ports, processes, memory, shells), Merkle logging, patrol watchdog health check. | **VERIFIED OPERATIONAL** |
+| **Employee Support & Diagnostic Triage** | `core/coworker/employee_support_service.py` | `EmployeeSupportService` | **Level 3** | **Mission C** | Diagnoses build blockers, formulates patch, verifies fix, preserves employee task ownership. | **VERIFIED OPERATIONAL** |
+| **Subordinate Agent Rescue & Skill Injection** | `core/coworker/employee_support_service.py` | `EmployeeSupportService` | **Level 3** | **Mission D** | Injects missing parsing skills into failing agents and verifies execution completion. | **VERIFIED OPERATIONAL** |
+| **Specialist Swarm Assembly (12 Archetypes)** | `core/coworker/specialist_team_assembler.py` | `SpecialistTeamAssembler` | **Level 3** | **Mission G** | Dynamic provisioning across 12 archetypes with typed contracts and peer review. | **VERIFIED OPERATIONAL** |
+| **Credential Origin Tracing & Masking** | `core/coworker/credential_masking_tracker.py` | `CredentialMaskingTracker` | **Level 3** | **Mission H** | Salted HMAC-SHA256 origin tracing; masks API keys without storing plaintext. | **VERIFIED OPERATIONAL** |
+| **4-Tier DLP Response Ladder** | `core/coworker/dlp_response_ladder.py` | `DLPResponseLadder` | **Level 3** | **Mission I** | Enforces Audit (Low), Sanitize (Med), Block (High), Quarantine (Crit) actions. | **VERIFIED OPERATIONAL** |
+| **Constitutional Tripwire Protection** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 3** | **Mission K** | Blocks authority usurpation and financial over-spend attempts; logs violations. | **VERIFIED OPERATIONAL** |
+| **Priority Queue Cycles & Persistence** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 2** | **Mission L** | Priority queue drains correctly and telemetry stays consistent across cycles. **No crash was injected**; crash recovery/rollback is not proven. | **VERIFIED (TEST)** |
+| **Sustained Priority Loop & Concurrency** | `core/coworker/executive_operating_loop.py` | `ExecutiveOperatingLoop` | **Level 3** | **Mission M** | High-throughput batch processing under load with zero re-entrancy deadlock. | **VERIFIED OPERATIONAL** |
+| **Multi-Department CEO Coordination** | `core/coworker/executive_operating_loop.py` | `AICeoCoworkerBridge` | **Level 3** | **Mission N** | Coordinates Engineering, Finance, and Security missions with strict RBAC segregation. | **VERIFIED OPERATIONAL** |
 
 ---
 

@@ -156,24 +156,28 @@ class HermesInferenceGateway:
     keyword matching, because that would present a template as reasoning.
     """
 
-    def __init__(self, endpoint: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(self, endpoint: Optional[str] = None, api_key: Optional[str] = None, allow_rule_router: bool = False):
         from .local_inference_adapter import LocalInferenceAdapter, LocalInferenceStatus
         self.local_adapter = LocalInferenceAdapter()
         self.endpoint = (endpoint or os.environ.get("HERMES_API_ENDPOINT") or os.environ.get("HERMES_ENDPOINT") or "").rstrip("/")
         self.api_key = api_key or os.environ.get("HERMES_API_KEY") or ""
         self.default_model = "hermes-3-llama-3.1-8b"
+        self.allow_rule_router = allow_rule_router
 
     def check_connection(self, timeout: float = 2.0) -> Dict[str, Any]:
         """Pings the Hermes model registry endpoint or queries local inference adapter."""
         local_status = self.local_adapter.inspect_inference_health(timeout=timeout)
         if not self.endpoint:
-            if local_status.available and local_status.status == "ONLINE":
+            if local_status.available and local_status.is_language_model:
                 return {
                     "connected": True,
                     "inference_available": True,
                     "status": "ONLINE",
                     "local_inference_status": local_status.status,
-                    "endpoint": self.local_adapter.ollama_endpoint,
+                    "provider": local_status.provider,
+                    "endpoint": local_status.endpoint or self.local_adapter.ollama_endpoint,
+                    "active_model": local_status.active_model,
+                    "is_language_model": True,
                     "memory_budget": self.local_adapter.budget.get_memory_status()
                 }
             return {
@@ -181,7 +185,9 @@ class HermesInferenceGateway:
                 "inference_available": False,
                 "status": "NOT_CONFIGURED",
                 "local_inference_status": local_status.status,
+                "provider": local_status.provider,
                 "endpoint": None,
+                "rule_engine_available": local_status.rule_engine_available,
                 "memory_budget": self.local_adapter.budget.get_memory_status(),
                 "message": "No HERMES_API_ENDPOINT configured. Set HERMES_API_ENDPOINT and HERMES_API_KEY to enable inference."
             }
@@ -192,12 +198,29 @@ class HermesInferenceGateway:
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode())
+                entries = data.get("data", []) or []
+                llm_entries = [
+                    m for m in entries
+                    if m.get("object") != "engine" and m.get("is_language_model") is not False
+                ]
+                if not llm_entries:
+                    # The configured endpoint is our rule server, not a model.
+                    return {
+                        "connected": True,
+                        "inference_available": False,
+                        "status": "RULE_ENGINE_ONLY",
+                        "endpoint": self.endpoint,
+                        "models": [m.get("id") for m in entries],
+                        "is_language_model": False,
+                        "memory_budget": self.local_adapter.budget.get_memory_status(),
+                    }
                 return {
                     "connected": True,
                     "inference_available": True,
                     "status": "ONLINE",
                     "endpoint": self.endpoint,
-                    "models": [m.get("id") for m in data.get("data", [])],
+                    "models": [m.get("id") for m in llm_entries],
+                    "is_language_model": True,
                     "memory_budget": self.local_adapter.budget.get_memory_status()
                 }
         except Exception as e:
@@ -262,9 +285,11 @@ class HermesInferenceGateway:
                 # Endpoint configured but unreachable: report it below.
                 pass
 
-        # 2. Local inference adapter if available (e.g. Ollama daemon on 127.0.0.1:11434)
+        # 2. Local inference adapter: a real model, or deterministic rule engine if explicitly allowed.
         health = self.local_adapter.inspect_inference_health(timeout=0.5)
-        if health.available and health.provider == "ollama_local":
+        if (health.available and health.is_language_model) or (
+            self.allow_rule_router and health.rule_engine_available
+        ):
             local_res = self.local_adapter.dispatch_hermes_reasoning(
                 messages=messages,
                 tools=tools,
@@ -276,9 +301,24 @@ class HermesInferenceGateway:
                     "content": local_res.get("content", ""),
                     "tool_calls": local_res.get("tool_calls", []),
                     "model": local_res.get("model", target_model),
-                    "source": "LOCAL_OLLAMA",
+                    "source": local_res.get("provider", health.provider),
                     "available": True,
+                    "is_language_model": True,
+                    "engine_kind": "LLM",
                     "status": "COMPLETED",
+                    "usage": local_res.get("usage", {})
+                }
+            if self.allow_rule_router and (local_res.get("tool_calls") or local_res.get("status") == "RULE_ENGINE_ONLY"):
+                return {
+                    "content": local_res.get("content", ""),
+                    "tool_calls": local_res.get("tool_calls", []),
+                    "model": local_res.get("model"),
+                    "source": "DETERMINISTIC_RULE_ROUTER",
+                    "available": False,
+                    "is_language_model": False,
+                    "engine_kind": "RULES",
+                    "status": "RULE_ENGINE_ONLY",
+                    "error": "LLM_UNAVAILABLE: only the deterministic rule engine is present",
                     "usage": local_res.get("usage", {})
                 }
 
@@ -290,6 +330,8 @@ class HermesInferenceGateway:
             "model": target_model,
             "source": "LLM_UNAVAILABLE",
             "available": False,
+            "is_language_model": False,
+            "engine_kind": "NONE",
             "status": "LLM_UNAVAILABLE",
             "error": reason,
             "usage": {},
@@ -565,9 +607,20 @@ class HermesProcessManager:
     the manager restores the conversation.
     """
 
-    def __init__(self, session_store: Optional[HermesSessionStore] = None):
+    def __init__(
+        self,
+        session_store: Optional[HermesSessionStore] = None,
+        gateway: Optional[HermesInferenceGateway] = None,
+        endpoint: Optional[str] = None,
+        allow_rule_router: bool = False
+    ):
         self.session_store = session_store or HermesSessionStore()
-        self.gateway = HermesInferenceGateway()
+        if gateway:
+            self.gateway = gateway
+        elif endpoint:
+            self.gateway = HermesInferenceGateway(endpoint=endpoint, allow_rule_router=allow_rule_router)
+        else:
+            self.gateway = HermesInferenceGateway(allow_rule_router=allow_rule_router)
         self.dispatcher = HermesToolDispatcher()
         self.skills_registry = HermesSkillsRegistry()
         self.is_running = False
@@ -689,7 +742,7 @@ class HermesProcessManager:
             "tool_results": tool_results,
             "model": resp.get("model"),
             "available": resp.get("available", False),
-            "status": resp.get("status", "COMPLETED"),
+            "status": resp.get("status") or "LLM_UNAVAILABLE",
             "reason": resp.get("error"),
             "evidence_hash": log_hash,
             "restart_count": self.active_session.restart_count
@@ -742,3 +795,8 @@ class HermesProcessManager:
             "hermes_cli_path": self.hermes_cli_path,
             "hermes_cli_version": self.hermes_version
         }
+
+
+# Authoritative alias for Hermes Agent v3 runtime
+HermesAgentV3 = HermesProcessManager
+

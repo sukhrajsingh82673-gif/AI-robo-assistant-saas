@@ -45,7 +45,8 @@ not part of the original 16 sections, so it is assessed separately here.
 
 | Subsystem | File | Status | Evidence / limit |
 |---|---|---|---|
-| Hermes session runtime | `core/coworker/hermes_agent_v3.py` | Partial | Session lifecycle + SQLite memory verified; **in-process**, not a subprocess supervisor. No local model: without `HERMES_API_ENDPOINT` it reports `LLM_UNAVAILABLE`. |
+| Hermes session runtime | `core/coworker/hermes_agent_v3.py` | Partial | Session lifecycle + SQLite memory verified; **in-process**, not a subprocess supervisor. Without `HERMES_API_ENDPOINT` it reports `LLM_UNAVAILABLE`; the deterministic rule engine may still route tool calls, labelled `RULE_ENGINE_ONLY`. |
+| Local inference | `core/coworker/local_inference_adapter.py` | Partial | No language model is present. `LocalModelEngine` is a keyword router (`is_language_model: False`, id `zonata-rules-v1`); `available` is only True for a real Ollama/OpenAI-compatible endpoint. A rule-only turn returns `RULE_ENGINE_ONLY`, `available=False` and a factual tool-result digest. |
 | Hermes tool dispatch | same | Verified | `terminal_exec` runs real commands under `TerminalSecurityGateway`, without a shell; higher-risk classes return `AUTHORIZATION_REQUIRED`; delegation returns `ACTION_NOT_IMPLEMENTED`. |
 | OpenCode engineering loop | `core/coworker/opencode_engine.py` | Partial | Real worktrees, file writes, `git diff`, pytest exit codes, AST review. Repair requires a supplied `repair_fn`; without one it refuses (`AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED`). |
 | OpenCloud remote workers | `core/coworker/opencloud_engine.py` | Implemented-unverified | Real authenticated HTTP `/dispatch` and failover; no remote node is registered on this host, so dispatch returns `BLOCKED_BY_EXTERNAL_DEPENDENCY`. |
@@ -55,6 +56,8 @@ not part of the original 16 sections, so it is assessed separately here.
 | Defence incidents | `core/coworker/defense_monitor.py` | Partial | Real `/proc` process and port scans. Recording an incident is `DETECTED`; `REMEDIATED` requires a host-state check function. |
 | Dashboard telemetry | `core/coworker/dashboard.py` | Verified (honest) | Every field is derived; with no cloud attached it reports `NOT_INITIALIZED` / `0`, and integrations report `LLM_UNAVAILABLE`, `NO_NODES_CONFIGURED`, `NO_DISPLAY`, etc. |
 | Web cockpit HUD | `web/assistant_coworker_workspace.js` | Implemented-unverified | HUD binds to live snapshot values; no browser on this host to exercise it. |
+| Capability lifecycle V3 | `core/coworker/capability_registry_v3.py` | Partial | 10 stages run: gap detection, catalogue lookup, AST/licence screen, sandbox write, subprocess test, register, subprocess execute, decommission. Unknown features return `NO_CANDIDATE_IN_CATALOG` instead of a generated stub, and untrusted source is never `exec`'d in-process. Approval is a security-score threshold, not a PolicyEngine decision. |
+| DLP credential broker | `core/coworker/dlp_channel_monitor.py` | Partial | Brokering refuses (`CREDENTIAL_BROKER_NOT_CONFIGURED`) unless a host-supplied authorization callback grants the request; the returned handle is an opaque reference. No real secret store is wired. |
 
 The 3.0 qualification reports at
 `docs/qualification/ZONATA_AUTONOMOUS_COWORKER_{2,3}_FINAL_OPERATIONAL_QUALIFICATION.md`

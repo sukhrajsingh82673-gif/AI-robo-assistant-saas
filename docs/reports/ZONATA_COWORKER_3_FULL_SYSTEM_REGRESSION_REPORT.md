@@ -1,5 +1,10 @@
 # ZONATA Coworker 3.0: Full System Regression & Evidence Integrity Report
 
+> **Correction — 2026-11-07 (independent review).** The pass counts cover the suites listed in this report at that commit. They are not a full-repository proof; some suites are slow or environment-dependent and were run separately.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Milestone:** Full Enterprise System Regression Qualification  

@@ -1,5 +1,10 @@
 # URA / ZONATA Autonomous Coworker 3.0: Final Gap-Closure Register
 
+> **Correction — 2026-11-07 (independent review).** Several entries marked `VERIFIED OPERATIONAL` were verified only by an in-repo unit test. Where `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md` says Partial or Blocked, that status wins.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Classification Standard:** Mandatory Engineering Directive (Parts 3 through 18)  

@@ -188,6 +188,10 @@ Known environment limits at the time of writing:
 - No Playwright/Chromium, so browser interaction E2E cannot run (`BLOCKED`).
 - No Docker daemon, so container suites cannot run (`BLOCKED`).
 - No PostgreSQL server, so live-PG qualification and migration `0005` remain unexecuted (`BLOCKED`).
+- No local language model (no Ollama daemon, no `HERMES_API_ENDPOINT`). The bundled engine is a
+  deterministic rule router, not a model; it reports `RULE_ENGINE_ONLY`, `is_language_model: false`.
+- No OCR/AT-SPI tooling, so desktop perception is limited to real X11 windows plus a frame digest;
+  interactive elements inside a window are seeded (`PARTIAL`).
 
 ## 6. Documentation
 
@@ -196,6 +200,8 @@ Known environment limits at the time of writing:
 | You need | Go to |
 |---|---|
 | Honest capability and gap matrix | [`docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md`](docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md) |
+| Coworker §1–§16 spec status | [`docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`](docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md) |
+| Corrections to earlier coworker reports | [`docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`](docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md) |
 | Release gate status | [`docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md`](docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md) |
 | Architecture and contracts | [`docs/architecture/`](docs/architecture/) (the `01_`–`30_` series is in order) |
 | Security model and audits | [`docs/architecture/SECURITY_MODEL.md`](docs/architecture/SECURITY_MODEL.md), [`docs/security/`](docs/security/) |

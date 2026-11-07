@@ -1,5 +1,10 @@
 # ZONATA Coworker 3.0: Real Integration Verification Report
 
+> **Correction — 2026-11-07 (independent review).** The OpenCloud “remote” nodes were local in-process HTTP servers. That is a genuine HTTP dispatch, but it is not a multi-host deployment and does not prove cross-machine execution.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Milestone:** Autonomous Coworker 3.0 Real-World Subsystem Qualification  

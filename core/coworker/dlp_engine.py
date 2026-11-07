@@ -81,7 +81,7 @@ class DLPEngine:
         (re.compile(r'\b(stripe_[a-zA-Z0-9_]{20,})\b'), DLPCategory.API_KEYS_AND_SECRETS, DLPRiskLevel.CRITICAL, "Stripe Secret"),
 
         # 2. Private Keys
-        (re.compile(r'-----BEGIN (?:RSA|OPENSSH|EC|PGP) PRIVATE KEY-----[\s\S]+?-----END (?:RSA|OPENSSH|EC|PGP) PRIVATE KEY-----'),
+        (re.compile(r'-----BEGIN (?:RSA|OPENSSH|EC|PGP) PRIVATE KEY-----(?:[\s\S]+?-----END (?:RSA|OPENSSH|EC|PGP) PRIVATE KEY-----)?'),
          DLPCategory.PRIVATE_KEYS_CERTIFICATES, DLPRiskLevel.CRITICAL, "Private Cryptographic Key"),
 
         # 3. Database Credentials

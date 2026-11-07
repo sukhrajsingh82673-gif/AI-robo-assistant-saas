@@ -274,11 +274,14 @@ def test_opendots_visual_computer_use_and_scheduled_tasks():
     # 1. Capture screen observation
     obs = engine.capture_screen_observation()
     assert obs.display == ":99"
-    assert obs.width == 1920
+    assert obs.width == 1920          # configured screen size
     assert obs.height == 1080
-    assert obs.screenshot_sha256 is not None
-    assert len(obs.screenshot_sha256) == 64
     assert obs.perception_mode in ("REAL_VIRTUAL_X11", "HEADLESS_SIMULATED")
+    if obs.capture_available:
+        assert len(obs.screenshot_sha256) == 64
+        assert obs.capture_width > 0 and obs.capture_height > 0
+    else:
+        assert obs.screenshot_sha256 == ""
 
     # 2. Multi-step workflow execution
     steps = [
@@ -288,7 +291,10 @@ def test_opendots_visual_computer_use_and_scheduled_tasks():
     ]
     wf_res = engine.execute_workflow(steps)
     assert len(wf_res) == 3
-    assert wf_res[0]["screenshot_hash"] is not None
+    if wf_res[0]["mode"] == "REAL_VIRTUAL_X11":
+        assert isinstance(wf_res[0]["screenshot_hash"], str) and len(wf_res[0]["screenshot_hash"]) == 64
+    else:
+        assert wf_res[0]["screenshot_hash"] == ""
     assert wf_res[2]["result"]["target"]["source"] in ("PERCEPTION_TREE", "HEURISTIC_ANCHOR")
     assert "click_executed" in wf_res[2]["result"]
 

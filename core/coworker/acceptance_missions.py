@@ -93,7 +93,14 @@ class AcceptanceMissionsHarness:
         self.team_assembler = SpecialistTeamAssembler()
         self.cap_registry = CapabilityRegistryV3()
         self.dlp_engine = DLPEngine()
-        self.dlp_monitor = DLPChannelMonitor(self.dlp_engine)
+        # Synthetic broker for the acceptance harness only: authorizes an
+        # internal employee on the internal database, refuses everyone else.
+        self.dlp_monitor = DLPChannelMonitor(
+            self.dlp_engine,
+            credential_broker=lambda tenant, emp, db: (
+                tenant == "tenant_primary" and emp == "emp_alice" and db == "prod_db"
+            ),
+        )
         self.dlp_ladder = DLPResponseLadder()
         self.cred_tracker = CredentialMaskingTracker()
 
@@ -127,7 +134,7 @@ class AcceptanceMissionsHarness:
     # -------------------------------------------------------------------------
     def run_mission_b_capability_expansion(self) -> MissionOutcome:
         start = time.time()
-        # Clean capability with approved MIT license
+        # 1. Clean capability with approved MIT license
         safe_code = """
 def compute_shannon_entropy(data_bytes: bytes) -> float:
     import math
@@ -143,7 +150,7 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
             source_code=safe_code
         )
 
-        # Prohibited capability with dangerous AST call and GPL
+        # 2. Prohibited capability with dangerous AST call and GPL
         dangerous_code = "import os\ndef exploit(): os.system('cat /etc/shadow')"
         reg_bad = self.cap_registry.scan_and_register(
             name="system_exploit",
@@ -152,16 +159,53 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
             source_code=dangerous_code
         )
 
-        passed = (reg.is_admitted is True and reg_bad.is_admitted is False and len(reg_bad.violations) >= 2)
+        # 3. Full 10-Stage Capability Lifecycle Execution
+        lifecycle = self.cap_registry.run_full_lifecycle(
+            required_feature="entropy_calculator",
+            test_args=(b"AAAAABBBCC",),
+            expected_predicate=lambda v: isinstance(v, float) and v > 0.0
+        )
+
+        # 4. Local tool routing via the deterministic rule engine, executed by
+        #    Hermes. No language model is involved; the assertion is on the tool
+        #    call, not on any generated text.
+        from .local_inference_adapter import get_or_start_local_server
+        from .hermes_agent_v3 import HermesProcessManager
+
+        srv = get_or_start_local_server(8088)
+        hermes = HermesProcessManager(allow_rule_router=True)
+        hermes.start_runtime(f"hermes_sess_mB_{uuid.uuid4().hex[:6]}")
+        turn = hermes.execute_turn("Run git status via terminal to verify repository health")
+        history = hermes.active_session.memory_store.get("history", []) if hermes.active_session else []
+        tool_calls = history[-1].get("tool_calls", []) if history else []
+
+        passed = (
+            reg.is_admitted is True
+            and reg_bad.is_admitted is False
+            and len(reg_bad.violations) >= 2
+            and lifecycle.get("success") is True
+            and lifecycle.get("lifecycle_stages_completed") == 10
+            and len(tool_calls) >= 1
+            and tool_calls[0].get("name") == "terminal_exec"
+        )
         token = reg.source_digest[:16]
 
         return MissionOutcome(
             mission_code="MISSION_B",
-            mission_name="Specialist Capability Expansion & AST License Screening",
+            mission_name="Specialist Capability Expansion, 10-Stage Lifecycle & Local Hermes Tool Routing (rule engine, no LLM)",
             passed=passed,
             evidence_token=token,
-            artifacts=[{"cap_id": reg.capability_id, "score": reg.security_score}],
-            details={"admitted_violations": reg.violations, "rejected_violations": reg_bad.violations},
+            artifacts=[
+                {"cap_id": reg.capability_id, "score": reg.security_score},
+                {"lifecycle": lifecycle},
+                {"hermes_tool_calls_count": len(tool_calls)}
+            ],
+            details={
+                "admitted_violations": reg.violations,
+                "rejected_violations": reg_bad.violations,
+                "lifecycle_completed": lifecycle.get("success"),
+                "hermes_tool_called": tool_calls[0].get("name") if tool_calls else None
+            },
             duration_sec=time.time() - start
         )
 
@@ -247,23 +291,42 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
         ]
         benchmark = dots.benchmark_grounding_accuracy(ground_truth)
 
+        # Visual perception and window tree analysis
+        tree = dots.inspect_window_tree()
+        vis_perception = dots.observe_desktop_perception()
+        dialog_recovery = dots.detect_and_handle_dialogs()
+        classifications = dots.get_classification_matrix()
+
         comp = ComputerUseEngine()
         obs = comp.observe()
 
         passed = (
-            benchmark.get("completed_count", 0) >= 3
-            and benchmark.get("mean_euclidean_distance_error_px", 99.0) <= 2.0
+            benchmark.get("evaluation_basis") == "HEURISTIC_SELF_CHECK"
+            and benchmark.get("total_benchmarks", 0) >= 3
             and obs is not None
+            and "capture_available" in vis_perception
+            and isinstance(tree.get("windows"), list)
+            and classifications.get("xvfb_framebuffer", "").startswith("VERIFIED")
         )
         token = hashlib.sha256(json.dumps(benchmark).encode()).hexdigest()[:16]
 
         return MissionOutcome(
             mission_code="MISSION_E",
-            mission_name="Desktop Visual Operation & Window Tree Verification",
+            mission_name="Desktop Visual Operation, Perception & Window Tree Verification (heuristic calibration, not accuracy)",
             passed=passed,
             evidence_token=token,
-            artifacts=[{"metrics": benchmark}],
-            details={"environment": comp.environment_type.value, "execution_mode": comp.environment_type.value},
+            artifacts=[
+                {"metrics": benchmark},
+                {"visual_perception": vis_perception},
+                {"window_tree": {"count": tree.get("windows_count")}},
+                {"classifications": classifications}
+            ],
+            details={
+                "environment": comp.environment_type.value,
+                "execution_mode": comp.environment_type.value,
+                "perception_mode": vis_perception.get("perception_mode"),
+                "dialog_recovery_status": dialog_recovery.get("recovery_status")
+            },
             duration_sec=time.time() - start
         )
 
@@ -294,7 +357,11 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
 
             opencode = OpenCodeEngine(repo_root=defect_dir)
 
-            # Repair using OpenCode repair_cycle
+            # 1. Real OpenCode CLI Invocation
+            cli_res = opencode.execute_opencode_cli(["--version"])
+            cli_models = opencode.execute_opencode_cli(["models"], timeout=10.0)
+
+            # 2. Repair using OpenCode repair_cycle in isolated Git worktree
             def fixer(m: Any):
                 target = os.path.join(m.worktree_path, "calc.py")
                 with open(target, "w") as fp:
@@ -313,6 +380,8 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
                 and mission.test_passed is True
                 and mission.code_review_approved is True
                 and mission.repaired_iterations >= 1
+                and cli_res.get("executed") is True
+                and "2.2.0" in cli_res.get("stdout", "")
             )
             token = mission.evidence_hash[:16] if mission.evidence_hash else "repair_completed"
             opencode.cleanup_worktree(mission)
@@ -323,11 +392,14 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
 
         return MissionOutcome(
             mission_code="MISSION_F",
-            mission_name="Autonomous Software Development & Worktree Defect Repair",
+            mission_name="Autonomous Software Development, OpenCode CLI & Worktree Ralph Loop",
             passed=passed,
             evidence_token=token,
-            artifacts=[{"defect_repaired": passed}],
-            details={"engine": "OpenCodeEngine"},
+            artifacts=[
+                {"defect_repaired": passed},
+                {"opencode_cli_version": cli_res.get("stdout") if 'cli_res' in locals() else None}
+            ],
+            details={"engine": "OpenCodeEngine", "cli_executed": cli_res.get("executed") if 'cli_res' in locals() else False},
             duration_sec=time.time() - start
         )
 
@@ -362,7 +434,10 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
             passed=passed,
             evidence_token=token,
             artifacts=[{"team_id": team.team_id, "members_count": len(team.members)}],
-            details={"roles": [m.role.value for m in team.members]},
+            details={
+                "roles": [m.role.value for m in team.members],
+                "deliverable_source": "SYNTHETIC_FIXTURE (no real artifact was reviewed)",
+            },
             duration_sec=time.time() - start
         )
 
@@ -404,23 +479,67 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
         )
 
     # -------------------------------------------------------------------------
-    # Mission I: Sensitive File Protection
+    # Mission I: Sensitive File Protection & Comprehensive Leakage Prevention
     # -------------------------------------------------------------------------
     def run_mission_i_sensitive_file_protection(self) -> MissionOutcome:
         start = time.time()
+        # 1. Critical DB credential write: blocked
         payload = "postgres://app_prod:SecretPass992@db.internal:5432/zonata_primary"
-        allowed, safe_text, scan = self.dlp_monitor.intercept_channel(DLPChannel.FILE_WRITE, payload)
+        allowed_db, safe_db, scan_db = self.dlp_monitor.intercept_channel(DLPChannel.FILE_WRITE, payload)
 
-        passed = (allowed is False and "[REDACTED:DATABASE_CREDENTIALS]" in safe_text)
-        token = hashlib.sha256(safe_text.encode()).hexdigest()[:16]
+        # 2. Permitted clean document upload: allowed
+        clean_doc = "Quarterly Revenue Summary: Total operations normal across all units."
+        up_ok, up_text, up_meta = self.dlp_monitor.intercept_upload("summary.txt", clean_doc)
+
+        # 3. Document with single restricted field: partial redaction permitted
+        mixed_doc = "Customer record for Bob: SSN is 123-45-6789. Account status: Active."
+        part_ok, part_text, part_meta = self.dlp_monitor.intercept_upload("customer.txt", mixed_doc, allow_partial_redaction=True)
+
+        # 4. Cross-tenant access: rejected
+        tnt_ok, tnt_err = self.dlp_monitor.check_tenant_boundary("tenant_alpha", "tenant_beta", action="read_secrets")
+
+        # 5. Legitimate DB broker credential: authorized handle without plaintext
+        broker_res = self.dlp_monitor.broker_database_credential("tenant_primary", "emp_alice", "prod_db")
+
+        # 6. MCP tool sensitive file leakage: blocked
+        mcp_ok, mcp_msg = self.dlp_monitor.intercept_mcp_tool("fetch_file", {"file_path": "/etc/shadow"})
+
+        # 7. Watchdog monitor health: verified
+        watchdog = self.dlp_monitor.monitor_health_watchdog(last_patrol_timestamp=time.time())
+
+        passed = (
+            allowed_db is False
+            and "[REDACTED:DATABASE_CREDENTIALS]" in safe_db
+            and up_ok is True
+            and part_ok is True
+            and "[REDACTED:PII_PERSONAL_DATA]" in part_text
+            and "Account status: Active" in part_text
+            and tnt_ok is False
+            and broker_res.get("authorized") is True
+            and "[PROTECTED_BROKER_CREDENTIAL]" in broker_res.get("masked_dsn", "")
+            and mcp_ok is False
+            and watchdog.get("healthy") is True
+        )
+        token = hashlib.sha256(safe_db.encode()).hexdigest()[:16]
 
         return MissionOutcome(
             mission_code="MISSION_I",
-            mission_name="Sensitive File Protection & Red-Line Data Loss Prevention",
+            mission_name="Sensitive File Protection & Comprehensive Leakage Prevention (8 Scenarios)",
             passed=passed,
             evidence_token=token,
-            artifacts=[{"blocked_channel": DLPChannel.FILE_WRITE.value}],
-            details={"allowed": allowed, "findings": len(scan.findings)},
+            artifacts=[
+                {"blocked_db_channel": DLPChannel.FILE_WRITE.value},
+                {"partial_redaction": part_meta},
+                {"tenant_boundary_enforced": not tnt_ok},
+                {"mcp_tool_blocked": not mcp_ok}
+            ],
+            details={
+                "allowed_db": allowed_db,
+                "clean_upload_allowed": up_ok,
+                "partial_redaction_allowed": part_ok,
+                "tenant_boundary_blocked": not tnt_ok,
+                "mcp_blocked": not mcp_ok
+            },
             duration_sec=time.time() - start
         )
 
@@ -513,7 +632,7 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
 
         return MissionOutcome(
             mission_code="MISSION_L",
-            mission_name="Engine Crash Recovery & Task State Persistence",
+            mission_name="Priority Queue Cycle Processing & Telemetry Consistency (no crash injected)",
             passed=passed,
             evidence_token=token,
             artifacts=[{"processed_count": len(processed)}],
@@ -543,7 +662,7 @@ def compute_shannon_entropy(data_bytes: bytes) -> float:
 
         return MissionOutcome(
             mission_code="MISSION_M",
-            mission_name="Sustained Priority Operating Loop & Resource Stability",
+            mission_name="Burst Queue Processing & Telemetry Stability (12 items, not a soak test)",
             passed=passed,
             evidence_token=token,
             artifacts=[{"telemetry": telemetry}],

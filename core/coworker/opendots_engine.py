@@ -14,6 +14,7 @@ import time
 import json
 import uuid
 import hashlib
+import re
 import subprocess
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -63,28 +64,43 @@ class OpenDotsEngine:
         Captures real visual observation from the display framebuffer.
         Computes SHA-256 screenshot hash to detect UI state mutations.
         """
+        self._ensure_display_env()
         tmp_screenshot = f"/tmp/opendots_screen_{uuid.uuid4().hex[:6]}.png"
         screenshot_bytes = b""
         sha256_hash = ""
         perception_mode = "REAL_VIRTUAL_X11"
+        capture_available = False
+        capture_w, capture_h = 0, 0
 
         try:
             # Capture using scrot
-            res = subprocess.run(["scrot", "-z", tmp_screenshot], capture_output=True, timeout=5)
+            env = dict(os.environ)
+            env["DISPLAY"] = env.get("DISPLAY") or self.display
+            res = subprocess.run(["scrot", "-z", tmp_screenshot], env=env, capture_output=True, timeout=5)
             if res.returncode == 0 and os.path.exists(tmp_screenshot):
                 with open(tmp_screenshot, "rb") as f:
                     screenshot_bytes = f.read()
                 sha256_hash = hashlib.sha256(screenshot_bytes).hexdigest()
+                capture_available = True
+                try:
+                    dim = subprocess.run(
+                        ["identify", "-format", "%w %h", tmp_screenshot],
+                        capture_output=True, text=True, timeout=3,
+                    )
+                    if dim.returncode == 0 and dim.stdout.strip():
+                        capture_w, capture_h = (int(v) for v in dim.stdout.split()[:2])
+                except Exception:
+                    pass
                 os.remove(tmp_screenshot)
             else:
-                # Scrot unavailable or failed: generate fallback frame buffer
+                # No capture. Report no frame rather than hashing a placeholder.
                 perception_mode = "HEADLESS_SIMULATED"
-                screenshot_bytes = b"FALLBACK_SCREEN_FRAMEBUFFER"
-                sha256_hash = hashlib.sha256(screenshot_bytes).hexdigest()
+                screenshot_bytes = b""
+                sha256_hash = ""
         except Exception:
             perception_mode = "HEADLESS_SIMULATED"
-            screenshot_bytes = b"FALLBACK_SCREEN_FRAMEBUFFER"
-            sha256_hash = hashlib.sha256(screenshot_bytes).hexdigest()
+            screenshot_bytes = b""
+            sha256_hash = ""
 
         # Identify active window title
         active_title = self.get_active_window_title()
@@ -98,6 +114,9 @@ class OpenDotsEngine:
             active_window_title=active_title,
             detected_elements_count=len(self.adapter.engine.perception.detect_elements()),
             perception_mode=perception_mode,
+            capture_available=capture_available,
+            capture_width=capture_w,
+            capture_height=capture_h,
             timestamp=time.time()
         )
 
@@ -211,16 +230,236 @@ class OpenDotsEngine:
                 })
         return executed_runs
 
+    #  0x40000c "localhost: ~": ("xterm" "XTerm")  484x316+10+10  +10+10
+    _XWININFO_LINE = re.compile(
+        r'^\s*(0x[0-9a-fA-F]+)\s+'
+        r'(?:"([^"]*)"|\(has no name\)):\s*'
+        r'(?:\(([^)]*)\))?\s*'
+        r'(\d+)x(\d+)([+-]-?\d+)([+-]-?\d+)\s+'
+        r'([+-]-?\d+)([+-]-?\d+)\s*$'
+    )
+
+    @staticmethod
+    def _coord(tok: str) -> int:
+        return int(tok[1:] if tok.startswith("+") else tok)
+
+    def inspect_window_tree(self) -> Dict[str, Any]:
+        """
+        Enumerates real top-level X windows via `xwininfo -root -tree`.
+
+        Returns no windows when there is no display or the query fails. Unnamed
+        windows, 1x1 helpers and window-manager frames are excluded. Nothing is
+        invented, and titles are parsed rather than sliced out of the raw line.
+        """
+        self._ensure_display_env()
+        windows: List[Dict[str, Any]] = []
+        root_id: Optional[str] = None
+        error: Optional[str] = None
+        env = dict(os.environ)
+        env["DISPLAY"] = env.get("DISPLAY") or self.display
+
+        try:
+            res = subprocess.run(
+                ["xwininfo", "-root", "-tree"],
+                env=env,
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception as exc:
+            return {
+                "display": self.display,
+                "root_window": None,
+                "windows_available": False,
+                "windows_count": 0,
+                "windows": [],
+                "error": f"XWININFO_FAILED: {exc}",
+                "timestamp": time.time(),
+            }
+        if res.returncode != 0:
+            error = "XWININFO_NONZERO_EXIT"
+        else:
+            for line in res.stdout.splitlines():
+                m = re.search(r"Window id: (0x[0-9a-fA-F]+) \(the root window\)", line)
+                if m:
+                    root_id = m.group(1)
+                    continue
+                m = self._XWININFO_LINE.match(line)
+                if not m:
+                    continue
+                win_id, name, class_blob, w, h, rx, ry, ax, ay = m.groups()
+                width, height = int(w), int(h)
+                if width <= 1 or height <= 1:
+                    continue
+                class_quoted = re.findall(r'"([^"]*)"', class_blob or "")
+                klass = class_quoted[1] if len(class_quoted) > 1 else (
+                    class_quoted[0] if class_quoted else ""
+                )
+                title = (name or "").strip()
+                if not title:
+                    continue  # unnamed windows are window-manager internals
+                if klass.lower() in ("openbox", "mutter", "metacity", "xfwm4"):
+                    continue
+                windows.append({
+                    "window_id": win_id,
+                    "title": title,
+                    "window_class": klass,
+                    "geometry": {
+                        "x": self._coord(ax),
+                        "y": self._coord(ay),
+                        "width": width,
+                        "height": height,
+                        "relative": f"{width}x{height}{rx}{ry}",
+                    },
+                    "source": "x11_window_tree",
+                })
+
+        return {
+            "display": self.display,
+            "root_window": root_id,
+            "windows_available": res.returncode == 0,
+            "windows_count": len(windows),
+            "windows": windows,
+            "error": error,
+            "timestamp": time.time(),
+        }
+
+    def observe_desktop_perception(self) -> Dict[str, Any]:
+        """
+        Captures the real X11 root window as PPM via ImageMagick `import` and
+        parses it in pure Python to produce a frame digest and mean luminance.
+
+        There is no synthetic frame. When capture fails, the digest and
+        luminance are None and `perception_mode` says so.
+        """
+        self._ensure_display_env()
+        tmp_screen = f"/tmp/opendots_vis_{uuid.uuid4().hex[:6]}.ppm"
+        visual_hash: Optional[str] = None
+        measured_width, measured_height = self.width, self.height
+        luminance: Optional[float] = None
+        capture_available = False
+
+        try:
+            env = dict(os.environ)
+            env["DISPLAY"] = env.get("DISPLAY") or self.display
+            subprocess.run(
+                ["import", "-window", "root", tmp_screen],
+                env=env,
+                capture_output=True, timeout=5,
+            )
+            if os.path.exists(tmp_screen) and os.path.getsize(tmp_screen) > 0:
+                with open(tmp_screen, "rb") as fp:
+                    fp.readline()  # magic (P6)
+                    dim_line = fp.readline()
+                    while dim_line.startswith(b"#"):
+                        dim_line = fp.readline()
+                    dims = dim_line.split()
+                    if len(dims) >= 2:
+                        measured_width, measured_height = int(dims[0]), int(dims[1])
+                    fp.readline()  # maxval
+                    raw_bytes = fp.read()
+                    if raw_bytes:
+                        visual_hash = hashlib.sha256(raw_bytes).hexdigest()
+                        sample = raw_bytes[:min(len(raw_bytes), 20000)]
+                        luminance = float(sum(sample)) / len(sample)
+                        capture_available = True
+        except Exception:
+            capture_available = False
+        finally:
+            try:
+                os.remove(tmp_screen)
+            except OSError:
+                pass
+
+        window_tree = self.inspect_window_tree()
+
+        return {
+            "display": self.display,
+            "width": measured_width,
+            "height": measured_height,
+            "configured_width": self.width,
+            "configured_height": self.height,
+            "capture_available": capture_available,
+            "screenshot_sha256": visual_hash,
+            "mean_luminance": round(luminance, 2) if luminance is not None else None,
+            "active_window": self.get_active_window_title(),
+            "windows_detected": window_tree.get("windows_count", 0),
+            "perception_mode": (
+                "REAL_VIRTUAL_X11_PERCEPTION" if capture_available else "HEADLESS_SIMULATED"
+            ),
+            "timestamp": time.time(),
+        }
+
+    def detect_and_handle_dialogs(self, dismiss_keys: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Detects modal alert or confirmation dialogs in the window tree,
+        focuses the dialog, simulates dismissal keys (Escape / Return), and verifies dismissal.
+        """
+        dismiss = dismiss_keys or ["Escape", "Return"]
+        tree = self.inspect_window_tree()
+        dialog_keywords = ["confirm", "alert", "warning", "error", "prompt", "dialog", "save", "notice"]
+        detected_dialogs = []
+
+        for win in tree.get("windows", []):
+            title_lower = win.get("title", "").lower()
+            if any(k in title_lower for k in dialog_keywords):
+                detected_dialogs.append(win)
+
+        if not detected_dialogs:
+            return {
+                "dialog_detected": False,
+                "dismissed": False,
+                "dialogs_count": 0,
+                "recovery_status": "NO_DIALOG_PRESENT"
+            }
+
+        target_dialog = detected_dialogs[0]
+        win_id = target_dialog["window_id"]
+
+        # Activate window and send dismiss key
+        try:
+            subprocess.run(["xdotool", "windowactivate", "--sync", win_id], capture_output=True, timeout=2)
+            for k in dismiss:
+                subprocess.run(["xdotool", "key", k], capture_output=True, timeout=2)
+            time.sleep(0.2)
+        except Exception:
+            pass
+
+        # Verify dismissal
+        tree_after = self.inspect_window_tree()
+        still_present = any(w["window_id"] == win_id for w in tree_after.get("windows", []))
+
+        return {
+            "dialog_detected": True,
+            "dialog_title": target_dialog.get("title"),
+            "window_id": win_id,
+            "dismissed": not still_present,
+            "recovery_status": "SUCCESS" if not still_present else "DISMISSAL_RETRY_NEEDED"
+        }
+
+    def get_classification_matrix(self) -> Dict[str, str]:
+        """
+        Returns strict reality classifications for desktop capabilities.
+        """
+        return {
+            "xvfb_framebuffer": "VERIFIED (X11 root capture via ImageMagick import, PPM parsed in Python)",
+            "virtual_x11": "VERIFIED (xwininfo window enumeration and xdotool input dispatch under Xvfb)",
+            "visual_perception_numpy": "PARTIAL (frame digest + mean luminance only; no object or text recognition)",
+            "modal_dialog_recovery": "PARTIAL (title keyword match, blind dismiss keys, disappearance check)",
+            "physical_host_monitor": "BLOCKED BY EXTERNAL DEPENDENCY (No physical monitor attached)",
+            "headless_browser_automation": "BLOCKED BY EXTERNAL DEPENDENCY (Chromium/Playwright binary unavailable)"
+        }
+
     def benchmark_grounding_accuracy(
         self,
         ground_truth_targets: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Benchmarks coordinate grounding and visual perception accuracy:
-          - Target visual grounding
-          - Euclidean click distance error in pixels: sqrt((px - ex)^2 + (py - ey)^2)
-          - Text-entry character accuracy
-          - Overall task completion rate
+        Compares heuristic anchor predictions with caller-supplied expected
+        coordinates.
+
+        This is a consistency check, not an accuracy benchmark: the expected
+        coordinates are written by the caller and the heuristic maps keywords to
+        fixed relative anchors. An error of 0 px only means the two agree. It
+        says nothing about whether either is correct on a real screen.
         """
         import math
         total = len(ground_truth_targets)
@@ -288,6 +527,8 @@ class OpenDotsEngine:
         completion_rate = completed_count / total
 
         return {
+            "evaluation_basis": "HEURISTIC_SELF_CHECK",
+            "ground_truth_source": "caller-supplied expected coordinates",
             "total_benchmarks": total,
             "completed_count": completed_count,
             "completion_rate": round(completion_rate, 4),

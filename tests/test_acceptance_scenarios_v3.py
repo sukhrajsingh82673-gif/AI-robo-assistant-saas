@@ -378,10 +378,15 @@ def test_scenario_6_opendots_quantitative_grounding_accuracy():
 
     # 1. Screen observation and state hashing
     obs = engine.capture_screen_observation()
-    assert obs.width == 1920
+    assert obs.width == 1920          # configured screen size
     assert obs.height == 1080
-    assert len(obs.screenshot_sha256) == 64
     assert obs.perception_mode in ("REAL_VIRTUAL_X11", "HEADLESS_SIMULATED")
+    if obs.capture_available:
+        assert len(obs.screenshot_sha256) == 64
+        assert obs.capture_width > 0 and obs.capture_height > 0
+    else:
+        # No display: there is no frame, and no hash is invented.
+        assert obs.screenshot_sha256 == ""
 
     # 2. Benchmark Grounding Accuracy on 4 representative UI targets
     ground_truth = [
@@ -392,9 +397,11 @@ def test_scenario_6_opendots_quantitative_grounding_accuracy():
     ]
 
     benchmark = engine.benchmark_grounding_accuracy(ground_truth)
+    # This compares the heuristic's fixed anchors with caller-supplied expected
+    # coordinates. Agreement is expected; it is not a grounding accuracy claim.
+    assert benchmark["evaluation_basis"] == "HEURISTIC_SELF_CHECK"
     assert benchmark["total_benchmarks"] == 4
     assert benchmark["completed_count"] == 4
-    assert benchmark["completion_rate"] == 1.0
     assert benchmark["character_accuracy"] >= 0.95
     assert benchmark["mean_euclidean_distance_error_px"] == 0.0
 
@@ -409,7 +416,11 @@ def test_scenario_6_opendots_quantitative_grounding_accuracy():
     wf_res = engine.execute_workflow(steps)
     assert len(wf_res) == 5
     assert wf_res[4]["action"] == "observe"
-    assert len(wf_res[4]["screenshot_hash"]) == 64
+    if wf_res[4]["mode"] == "REAL_VIRTUAL_X11":
+        assert len(wf_res[4]["screenshot_hash"]) == 64
+    else:
+        # Headless: no frame, no invented hash.
+        assert wf_res[4]["screenshot_hash"] == ""
 
 
 # =============================================================================

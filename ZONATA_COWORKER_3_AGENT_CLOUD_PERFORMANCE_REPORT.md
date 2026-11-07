@@ -1,5 +1,10 @@
 # ZONATA Coworker 3.0: Enterprise Agent Cloud Performance & Scale Benchmark Report
 
+> **Correction — 2026-11-07 (independent review).** Capacity and throughput figures come from a short local synthetic benchmark (SQLite catalogue, bounded pool of 16 threads) run in this container. 5,000 is a registered *identity* cap, not 5,000 concurrent workers, and none of these numbers describe a production fleet.
+>
+> Authoritative status: `docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`.
+> All corrections collected in `docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`.
+
 **Project:** URA / ZONATA Universal AI Company Operating System  
 **Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
 **Milestone:** Enterprise Agent Cloud Capacity & Bounded Scheduling Qualification  
