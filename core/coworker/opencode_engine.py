@@ -51,6 +51,19 @@ class OpenCodeEngine:
         self.repo_root = os.path.abspath(repo_root)
         self.worktree_base = "/tmp/zonata_opencode_worktrees"
         os.makedirs(self.worktree_base, exist_ok=True)
+        import shutil
+        self.opencode_cli_path: Optional[str] = shutil.which("opencode") or (
+            "/usr/local/bin/opencode" if os.path.exists("/usr/local/bin/opencode") else None
+        )
+        self.opencode_cli_available: bool = self.opencode_cli_path is not None
+        self.opencode_cli_version: Optional[str] = None
+        if self.opencode_cli_available:
+            try:
+                proc = subprocess.run([self.opencode_cli_path, "--version"], capture_output=True, text=True, timeout=5)
+                if proc.returncode == 0:
+                    self.opencode_cli_version = proc.stdout.strip()
+            except Exception:
+                pass
 
     def verify_boundaries(self, file_paths: List[str]) -> Tuple[bool, Optional[str]]:
         """
@@ -285,3 +298,38 @@ class OpenCodeEngine:
 
         # 7. Submit
         return self.submit_mission(mission)
+
+    def execute_opencode_cli(
+        self,
+        args: List[str],
+        cwd: Optional[str] = None,
+        timeout: float = 30.0
+    ) -> Dict[str, Any]:
+        """
+        Executes the host opencode CLI binary if available on system PATH.
+        """
+        if not self.opencode_cli_available or not self.opencode_cli_path:
+            return {
+                "success": False,
+                "executed": False,
+                "error": "OPENCODE_CLI_UNAVAILABLE",
+                "reason": "Host executable 'opencode' was not found in PATH (/usr/local/bin/opencode)."
+            }
+        cmd = [self.opencode_cli_path] + args
+        target_cwd = cwd or self.repo_root
+        try:
+            proc = subprocess.run(cmd, cwd=target_cwd, capture_output=True, text=True, timeout=timeout)
+            return {
+                "success": proc.returncode == 0,
+                "executed": True,
+                "returncode": proc.returncode,
+                "stdout": proc.stdout.strip(),
+                "stderr": proc.stderr.strip(),
+                "command": cmd
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "executed": False,
+                "error": str(e)
+            }

@@ -42,8 +42,12 @@ class OpenDotsEngine:
         self._ensure_display_env()
 
     def _ensure_display_env(self):
-        """Sets DISPLAY environment variable if not present."""
-        if "DISPLAY" not in os.environ:
+        """Sets DISPLAY environment variable only if X11 is reachable or already configured."""
+        if "DISPLAY" in os.environ:
+            return
+        disp_num = self.display.lstrip(":")
+        sock_path = f"/tmp/.X11-unix/X{disp_num}"
+        if os.path.exists(sock_path):
             os.environ["DISPLAY"] = self.display
 
     def check_x11_available(self) -> bool:
@@ -206,3 +210,90 @@ class OpenDotsEngine:
                     "results": wf_res
                 })
         return executed_runs
+
+    def benchmark_grounding_accuracy(
+        self,
+        ground_truth_targets: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Benchmarks coordinate grounding and visual perception accuracy:
+          - Target visual grounding
+          - Euclidean click distance error in pixels: sqrt((px - ex)^2 + (py - ey)^2)
+          - Text-entry character accuracy
+          - Overall task completion rate
+        """
+        import math
+        total = len(ground_truth_targets)
+        if total == 0:
+            return {
+                "total_benchmarks": 0,
+                "completed_count": 0,
+                "completion_rate": 0.0,
+                "mean_euclidean_distance_error_px": 0.0,
+                "max_euclidean_distance_error_px": 0.0,
+                "character_accuracy": 1.0,
+                "target_results": []
+            }
+
+        completed_count = 0
+        distance_errors = []
+        char_accuracies = []
+        target_results = []
+
+        for target_spec in ground_truth_targets:
+            query = target_spec.get("query", "")
+            expected_x = target_spec.get("expected_x", 0)
+            expected_y = target_spec.get("expected_y", 0)
+            expected_text = target_spec.get("expected_text")
+            typed_text = target_spec.get("typed_text")
+            tolerance_px = target_spec.get("tolerance_px", 50.0)
+
+            target: GroundingTarget = self.adapter.ground_intent(query)
+            px = target.predicted_x
+            py = target.predicted_y
+
+            dist_err = math.sqrt((px - expected_x) ** 2 + (py - expected_y) ** 2)
+            distance_errors.append(dist_err)
+
+            char_acc = 1.0
+            if expected_text is not None and typed_text is not None:
+                if not expected_text and not typed_text:
+                    char_acc = 1.0
+                elif not expected_text or not typed_text:
+                    char_acc = 0.0
+                else:
+                    matches = sum(1 for c1, c2 in zip(expected_text, typed_text) if c1 == c2)
+                    char_acc = matches / max(len(expected_text), len(typed_text))
+                char_accuracies.append(char_acc)
+
+            is_completed = (dist_err <= tolerance_px) and (char_acc >= 0.8)
+            if is_completed:
+                completed_count += 1
+
+            target_results.append({
+                "query": query,
+                "expected": (expected_x, expected_y),
+                "predicted": (px, py),
+                "distance_error_px": round(dist_err, 2),
+                "within_tolerance": dist_err <= tolerance_px,
+                "confidence": target.confidence,
+                "source": target.source,
+                "character_accuracy": round(char_acc, 2),
+                "task_completed": is_completed
+            })
+
+        mean_dist = sum(distance_errors) / len(distance_errors) if distance_errors else 0.0
+        max_dist = max(distance_errors) if distance_errors else 0.0
+        mean_char_acc = sum(char_accuracies) / len(char_accuracies) if char_accuracies else 1.0
+        completion_rate = completed_count / total
+
+        return {
+            "total_benchmarks": total,
+            "completed_count": completed_count,
+            "completion_rate": round(completion_rate, 4),
+            "mean_euclidean_distance_error_px": round(mean_dist, 2),
+            "max_euclidean_distance_error_px": round(max_dist, 2),
+            "character_accuracy": round(mean_char_acc, 4),
+            "target_results": target_results,
+            "benchmark_timestamp": time.time()
+        }

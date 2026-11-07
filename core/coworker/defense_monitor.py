@@ -588,3 +588,78 @@ class DefensiveCybersecurityMonitor:
             "error": error,
             "verified_at": time.time(),
         }
+
+
+# =============================================================================
+# 12. CONTINUOUS DEFENSIVE PATROL SCHEDULER (BACKGROUND DAEMON)
+# =============================================================================
+
+import threading
+
+class PatrolScheduler:
+    """
+    Background daemon thread scheduler for DefensiveCybersecurityMonitor.
+    Periodically executes full defensive cybersecurity sweeps, tracking
+    scan count, timestamps, and error history.
+    """
+
+    def __init__(
+        self,
+        monitor: Optional[DefensiveCybersecurityMonitor] = None,
+        interval_sec: float = 60.0,
+        daemon: bool = True
+    ):
+        self.monitor = monitor or DefensiveCybersecurityMonitor.get_instance()
+        self.interval_sec = interval_sec
+        self.daemon = daemon
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
+        self.scan_count: int = 0
+        self.last_run_timestamp: Optional[float] = None
+        self.errors: List[str] = []
+
+    def is_running(self) -> bool:
+        with self._lock:
+            return self._running
+
+    def run_once(self) -> Dict[str, Any]:
+        """Executes a single patrol cycle immediately."""
+        with self._lock:
+            self.scan_count += 1
+            self.last_run_timestamp = time.time()
+        try:
+            report = self.monitor.run_full_defensive_patrol()
+            return report
+        except Exception as e:
+            with self._lock:
+                self.errors.append(f"{time.time()}: {str(e)}")
+            return {"status": "ERROR", "error": str(e)}
+
+    def start(self) -> None:
+        """Starts the background patrol daemon loop."""
+        with self._lock:
+            if self._running:
+                return
+            self._running = True
+            self._thread = threading.Thread(target=self._loop, daemon=self.daemon, name="PatrolSchedulerDaemon")
+            self._thread.start()
+
+    def stop(self, timeout: float = 2.0) -> None:
+        """Stops the background patrol loop and waits for thread completion."""
+        with self._lock:
+            if not self._running:
+                return
+            self._running = False
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=timeout)
+
+    def _loop(self) -> None:
+        while self.is_running():
+            self.run_once()
+            steps = int(max(1, self.interval_sec * 10))
+            step_duration = self.interval_sec / steps
+            for _ in range(steps):
+                if not self.is_running():
+                    break
+                time.sleep(step_duration)

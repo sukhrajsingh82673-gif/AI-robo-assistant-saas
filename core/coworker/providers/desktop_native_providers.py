@@ -380,6 +380,9 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
                 "windows": list(obs.open_windows),
                 "synthetic": False,
             }
+            if getattr(obs, "window_tree_available", False):
+                payload["window_tree"] = [w.to_dict() for w in obs.window_elements]
+                payload["perception_source"] = obs.perception_source
             return self._gui_result(capability, exec_id, start_time, True, None, payload)
 
         if capability == "desktop.focus_window":
@@ -395,10 +398,24 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
             element = None
             element_id = params.get("element_id")
             label = params.get("label") or params.get("text")
+            target_source = "seeded_scene"
             if element_id:
                 element = engine.perception._registered_elements.get(element_id)
+                if element is None and element_id.startswith("x11_"):
+                    wid = element_id[4:]
+                    element = next(
+                        (w for w in engine.x11_window_tree() if w.metadata.get("window_id") == wid),
+                        None,
+                    )
+                    target_source = "x11_window_tree"
             if element is None and label:
                 element = engine.perception.find_by_text(label)
+                if element is not None:
+                    target_source = "seeded_scene"
+                else:
+                    element = engine.find_in_window_tree(label)
+                    if element is not None:
+                        target_source = "x11_window_tree"
             if element is None:
                 return self._gui_result(capability, exec_id, start_time, False,
                                         "ELEMENT_NOT_FOUND",
@@ -408,7 +425,8 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
             return self._gui_result(
                 capability, exec_id, start_time, bool(res.get("executed")), res.get("reason"),
                 {"platform": "linux", "element_id": element.element_id,
-                 "coordinates": [cx, cy], "synthetic_perception": True},
+                 "coordinates": [cx, cy], "target_source": target_source,
+                 "synthetic_perception": target_source != "x11_window_tree"},
             )
 
         if capability == "desktop.set_text":
@@ -421,12 +439,21 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
         if capability == "desktop.find_element_by_id":
             element_id = params.get("element_id")
             element = engine.perception._registered_elements.get(element_id) if element_id else None
+            source = "seeded_scene"
+            if element is None and element_id and element_id.startswith("x11_"):
+                wid = element_id[4:]
+                element = next(
+                    (w for w in engine.x11_window_tree() if w.metadata.get("window_id") == wid),
+                    None,
+                )
+                source = "x11_window_tree"
             if element is None:
                 return self._gui_result(capability, exec_id, start_time, False,
                                         "ELEMENT_NOT_FOUND", {"platform": "linux", "element_id": element_id})
             return self._gui_result(capability, exec_id, start_time, True, None,
                                     {"platform": "linux", "element": element.to_dict(),
-                                     "synthetic_perception": True})
+                                     "target_source": source,
+                                     "synthetic_perception": source != "x11_window_tree"})
 
         return self._gui_result(capability, exec_id, start_time, False,
                                 "CAPABILITY_NOT_IMPLEMENTED", {"platform": "linux"})

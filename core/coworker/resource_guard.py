@@ -95,6 +95,14 @@ class ResourceGuardEngine:
         self.max_cpu_percent = max_cpu_percent
         os.makedirs(self.workspaces_root, exist_ok=True)
 
+        # §7 records: download / installation manifests and file ownership.
+        from .resource_manifests import ResourceManifestStore
+        # Kept separate from the business database on purpose: manifest records
+        # must never be cleaned up with a task workspace.
+        self.manifests = ResourceManifestStore(
+            tenant_id=getattr(self.db, "tenant_id", "tnt_primary"),
+        )
+
     def is_path_protected(self, target_path: str) -> bool:
         return self.is_protected_path(target_path)
 
@@ -133,6 +141,18 @@ class ResourceGuardEngine:
             status=CleanupStatus.PENDING
         )
         self.db.add_cleanup_record(rec)
+        # Registering a resource for cleanup is also an ownership claim, unless
+        # another task already owns the path.
+        if resource_type in (CleanupResourceType.DIRECTORY, CleanupResourceType.VENV,
+                             CleanupResourceType.TEMP_FILE):
+            if self.manifests.get_owner(resource_path) is None:
+                self.manifests.register_ownership(
+                    resource_path,
+                    owner_task_id=task_id,
+                    mission_id=mission_id,
+                    manifest_id=rec.manifest_id,
+                    kind=resource_type.value if hasattr(resource_type, "value") else str(resource_type),
+                )
         return rec
 
     def execute_task_cleanup(self, task_id: str) -> Dict[str, Any]:
@@ -227,6 +247,10 @@ class ResourceGuardEngine:
             status=CleanupStatus.PENDING
         )
         self.db.add_cleanup_record(rec)
+        self.manifests.register_ownership(
+            ws_path, owner_task_id=task_id, mission_id=mission_id,
+            manifest_id=rec.manifest_id, kind="DIRECTORY",
+        )
         return ws_path
 
     def is_protected_path(self, target_path: str) -> bool:
@@ -266,6 +290,16 @@ class ResourceGuardEngine:
             err = f"BLOCKED: Attempted cleanup of sovereign protected asset: {target}"
             self.db.mark_cleaned(record.manifest_id, success=False, error=err)
             return False, err
+
+        # §7 file ownership check: a task may only delete what it owns.
+        if record.resource_type in (CleanupResourceType.DIRECTORY,
+                                    CleanupResourceType.VENV,
+                                    CleanupResourceType.TEMP_FILE):
+            allowed, why = self.manifests.can_reclaim(target, record.task_id)
+            if not allowed:
+                err = f"BLOCKED: ownership check refused cleanup of {target}: {why}"
+                self.db.mark_cleaned(record.manifest_id, success=False, error=err)
+                return False, err
 
         try:
             if record.resource_type in (CleanupResourceType.DIRECTORY, CleanupResourceType.VENV):

@@ -112,6 +112,13 @@ class ExecutionDecisionEngine:
         self.scan_root = scan_root or workspaces_root
         os.makedirs(self.workspaces_root, exist_ok=True)
 
+        from .resource_manifests import ResourceManifestStore
+        # Kept separate from the business database on purpose: manifest records
+        # must never be cleaned up with a task workspace.
+        self.manifests = ResourceManifestStore(
+            tenant_id=getattr(self.db, "tenant_id", "tnt_primary"),
+        )
+
     def evaluate_level_1_desktop(self, tool_command: str) -> DecisionEvaluationResult:
         res = self.evaluate_level_1_posix(tool_command)
         if res:
@@ -455,6 +462,15 @@ class ExecutionDecisionEngine:
                     local_sha256 = hashlib.sha256(f.read()).hexdigest()
 
                 integrity_verified = (local_sha256.lower() == pypi_sha256.lower()) if pypi_sha256 else True
+                if integrity_verified:
+                    self.manifests.record_download(
+                        url=download_url,
+                        target_path=local_file_path,
+                        content_type=chosen_dist.get("python_version"),
+                        task_id=task_id,
+                        mission_id=mission_id,
+                        requested_by="coworker/level4",
+                    )
                 if not integrity_verified:
                     return {
                         "success": False,
@@ -552,6 +568,10 @@ class ExecutionDecisionEngine:
                 status=CleanupStatus.PENDING
             )
             self.db.add_cleanup_record(cleanup_rec)
+            self.manifests.register_ownership(
+                workspace_dir, owner_task_id=task_id, mission_id=mission_id,
+                manifest_id=manifest_id, kind="VENV",
+            )
 
             # 2. Governed pip install
             # Test if py_exec has pip; if not, use host pip targeted with --prefix
@@ -591,6 +611,11 @@ class ExecutionDecisionEngine:
             smoke_proc = subprocess.run(smoke_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
 
             if smoke_proc.returncode != 0 or "SMOKE_OK" not in smoke_proc.stdout:
+                self.manifests.record_installation(
+                    package=package_name, version="unknown", interpreter=py_exec,
+                    venv_path=venv_dir, task_id=task_id, mission_id=mission_id,
+                    smoke_test_passed=False,
+                )
                 return DecisionEvaluationResult(
                     level=ExecutionLadderLevel.LEVEL_4_SANDBOX,
                     resolved=False,
@@ -603,6 +628,11 @@ class ExecutionDecisionEngine:
                     error=smoke_proc.stderr
                 )
 
+            self.manifests.record_installation(
+                package=package_name, version="unknown", interpreter=py_exec,
+                venv_path=venv_dir, task_id=task_id, mission_id=mission_id,
+                smoke_test_passed=True,
+            )
             return DecisionEvaluationResult(
                 level=ExecutionLadderLevel.LEVEL_4_SANDBOX,
                 resolved=True,

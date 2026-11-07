@@ -85,7 +85,7 @@ from .adapters.opendots_adapter import OpenDotsAdapter, GroundingTarget
 from .subworkers_v2 import SubWorkerArchetype, ARCHETYPE_REGISTRY, ArchetypeSpec
 from .agent_factory_v2 import EphemeralAgentFactoryV2
 from .resource_guard import ResourceGuardEngine, HostResourceMetrics
-from .defense_monitor import DefensiveCybersecurityMonitor
+from .defense_monitor import DefensiveCybersecurityMonitor, PatrolScheduler
 from .evidence_reporting import (
     EvidenceAndReportingEngine, VerificationOutcome, PhysicalVerificationCheck,
     ExecutiveDeliverable, AICeoExecutiveReport
@@ -260,6 +260,7 @@ __all__ = [
     "ResourceGuardEngine",
     "HostResourceMetrics",
     "DefensiveCybersecurityMonitor",
+    "PatrolScheduler",
     "EvidenceAndReportingEngine",
     "VerificationOutcome",
     "PhysicalVerificationCheck",

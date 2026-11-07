@@ -12,9 +12,25 @@ class CoworkerDashboardService:
     """
     Telemetry aggregator for the ZONATA Universal AI Co-Worker.
     """
+    _instance: Optional["CoworkerDashboardService"] = None
 
-    def __init__(self, engine: Any):
-        self.engine = engine
+    @classmethod
+    def get_instance(cls, engine: Optional[Any] = None) -> "CoworkerDashboardService":
+        if cls._instance is None:
+            cls._instance = cls(engine=engine)
+        elif engine is not None:
+            cls._instance.engine = engine
+        return cls._instance
+
+    def __init__(self, engine: Optional[Any] = None):
+        if engine is None:
+            from .engine import UniversalCoworkerEngine
+            try:
+                self.engine = UniversalCoworkerEngine()
+            except Exception:
+                self.engine = object()
+        else:
+            self.engine = engine
 
     def get_dashboard_snapshot(self) -> Dict[str, Any]:
         """

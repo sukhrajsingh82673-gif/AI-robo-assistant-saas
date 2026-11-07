@@ -244,50 +244,52 @@ class OpenCloudEngine:
 # LIVE HTTP WORKER SERVER FOR AUTHENTICATED TESTS
 # =============================================================================
 
-class _OpenCloudHttpHandler(BaseHTTPRequestHandler):
-    auth_token: str = "opencloud-sec-token-123"
+def _create_opencloud_http_handler(auth_token: str):
+    """Factory creating isolated HTTP request handlers with dedicated token scoping."""
+    class _DynamicOpenCloudHttpHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/health":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "OK", "timestamp": time.time()}).encode("utf-8"))
+            else:
+                self.send_response(404)
+                self.end_headers()
 
-    def do_GET(self):
-        if self.path == "/health":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "OK", "timestamp": time.time()}).encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
+        def do_POST(self):
+            auth = self.headers.get("Authorization", "")
+            if auth_token and auth != f"Bearer {auth_token}":
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(b"Unauthorized")
+                return
 
-    def do_POST(self):
-        auth = self.headers.get("Authorization", "")
-        if self.auth_token and auth != f"Bearer {self.auth_token}":
-            self.send_response(401)
-            self.end_headers()
-            self.wfile.write(b"Unauthorized")
-            return
+            if self.path == "/dispatch":
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length)
+                data = json.loads(body.decode("utf-8")) if body else {}
 
-        if self.path == "/dispatch":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
-            data = json.loads(body.decode("utf-8")) if body else {}
+                cmd = data.get("command_type", "echo")
+                params = data.get("parameters", {})
+                res = {
+                    "executed": True,
+                    "command": cmd,
+                    "output": f"Worker executed {cmd} with parameters: {params}",
+                    "execution_time_ms": 12.5
+                }
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "result": res}).encode("utf-8"))
+            else:
+                self.send_response(404)
+                self.end_headers()
 
-            cmd = data.get("command_type", "echo")
-            params = data.get("parameters", {})
-            res = {
-                "executed": True,
-                "command": cmd,
-                "output": f"Worker executed {cmd} with parameters: {params}",
-                "execution_time_ms": 12.5
-            }
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "result": res}).encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
+        def log_message(self, format, *args):
+            pass  # Silence server logs in test output
 
-    def log_message(self, format, *args):
-        pass # Silence server logs in test output
+    return _DynamicOpenCloudHttpHandler
 
 
 class OpenCloudWorkerServer:
@@ -297,8 +299,8 @@ class OpenCloudWorkerServer:
         self.host = host
         self.port = port
         self.auth_token = auth_token
-        _OpenCloudHttpHandler.auth_token = self.auth_token
-        self.server = HTTPServer((self.host, self.port), _OpenCloudHttpHandler)
+        handler_cls = _create_opencloud_http_handler(self.auth_token)
+        self.server = HTTPServer((self.host, self.port), handler_cls)
         self.thread: Optional[threading.Thread] = None
 
     def start(self):

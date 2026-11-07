@@ -11,6 +11,7 @@ import time
 import uuid
 import json
 import base64
+import re
 import subprocess
 import shutil
 from dataclasses import dataclass, field
@@ -107,6 +108,10 @@ class GUIObservation:
     # Window titles, when present, may still be real; see windows_verified.
     synthetic: bool = False
     windows_verified: bool = False
+    # Real top-level windows scraped from the X server (xwininfo). These are
+    # actual X windows with real geometry, unlike the seeded interactive tree.
+    window_elements: List[UIElement] = field(default_factory=list)
+    window_tree_available: bool = False
     environment_type: DesktopEnvironmentType = DesktopEnvironmentType.HEADLESS_EXECUTION_ONLY
     perception_source: str = "IN_MEMORY_SYNTHETIC"
 
@@ -308,6 +313,98 @@ class ComputerUseEngine:
     def environment_type(self) -> DesktopEnvironmentType:
         return self.detect_desktop_environment()
 
+    # --- Real X11 perception ---------------------------------------------------
+
+    # Matches lines such as:
+    #   0x40000c "localhost: ~": ("xterm" "XTerm")  484x316+10+10  +10+10
+    #   0x20011f "Openbox": ("" (none))  1x1+-100+-100  +-100+-100
+    #   0x200173 (has no name): ()  1x1+0+0  +0+0
+    _XWININFO_LINE = re.compile(
+        r'^\s*(0x[0-9a-fA-F]+)\s+'
+        r'(?:"([^"]*)"|\(has no name\)):\s*'
+        r'(?:\(([^)]*)\))?\s*'
+        r'(\d+)x(\d+)([+-]-?\d+)([+-]-?\d+)\s+'
+        r'([+-]-?\d+)([+-]-?\d+)\s*$'
+    )
+
+    @staticmethod
+    def _coord(tok: str) -> int:
+        # Negative offsets print as "+-100"; a leading '+' is only a separator.
+        return int(tok[1:] if tok.startswith("+") else tok)
+
+    def x11_window_tree(self) -> List[UIElement]:
+        """
+        Enumerates named top-level X windows via `xwininfo -root -tree`.
+
+        Only user-meaningful windows are returned: unnamed window-manager
+        internals and the WM's own frame windows are excluded. Returns an empty
+        list when there is no display, when xwininfo is missing, or when the
+        query fails. No window is ever invented.
+        """
+        if not os.environ.get("DISPLAY") or not shutil.which("xwininfo"):
+            return []
+        try:
+            out = subprocess.check_output(
+                ["xwininfo", "-root", "-tree"], text=True, timeout=3,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            return []
+
+        windows: List[UIElement] = []
+        seen = set()
+        for line in out.splitlines():
+            m = self._XWININFO_LINE.match(line)
+            if not m:
+                continue
+            win_id, name, class_blob, w, h, rx, ry, ax, ay = m.groups()
+            width, height = int(w), int(h)
+            if width <= 1 or height <= 1:
+                continue
+
+            class_quoted = re.findall(r'"([^"]*)"', class_blob or "")
+            klass = class_quoted[1] if len(class_quoted) > 1 else (
+                class_quoted[0] if class_quoted else ""
+            )
+            label = (name or "").strip()
+            if not label:
+                # Unnamed windows are WM internals; skipping keeps the tree useful.
+                continue
+            if klass.lower() in ("openbox", "mutter", "metacity", "xfwm4"):
+                continue
+
+            # Deduplicate by absolute geometry + label (frame/client pairs).
+            key = (label, int(ax) if False else self._coord(ax), self._coord(ay), width, height)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            windows.append(UIElement(
+                element_id=f"x11_{win_id}",
+                label=label,
+                box=BoundingBox(self._coord(ax), self._coord(ay), width, height),
+                confidence=1.0,
+                element_type="window",
+                is_interactive=True,
+                metadata={
+                    "source": "x11_window_tree",
+                    "window_id": win_id,
+                    "window_class": klass,
+                    "relative_geometry": f"{width}x{height}{rx}{ry}",
+                },
+            ))
+        return windows
+
+    def find_in_window_tree(self, text_query: str) -> Optional[UIElement]:
+        """Case-insensitive label match against real X windows."""
+        q = text_query.lower().strip()
+        if not q:
+            return None
+        for el in self.x11_window_tree():
+            if q in el.label.lower():
+                return el
+        return None
+
     # --- 14 GUI Primitives ---
 
     def observe(self) -> GUIObservation:
@@ -348,8 +445,17 @@ class ComputerUseEngine:
         for el in elements:
             el.metadata.setdefault("source", "seeded_scene")
 
+        # Real window tree, scraped from the X server when a display exists.
+        window_elements = self.x11_window_tree()
+        window_tree_available = bool(window_elements)
+
         env_type = self.detect_desktop_environment()
-        perception_src = "X11_PHYSICAL_BUFFER" if real_windows else "IN_MEMORY_SYNTHETIC"
+        if window_tree_available:
+            perception_src = "X11_WINDOW_TREE+SEEDED_ELEMENTS"
+        elif real_windows:
+            perception_src = "X11_WINDOW_METADATA+SEEDED_ELEMENTS"
+        else:
+            perception_src = "IN_MEMORY_SYNTHETIC"
 
         obs = GUIObservation(
             timestamp=time.time(),
@@ -362,10 +468,13 @@ class ComputerUseEngine:
             cursor_position=(self.cursor_x, self.cursor_y),
             synthetic=synthetic_elements,
             windows_verified=real_windows,
+            window_elements=window_elements,
+            window_tree_available=window_tree_available,
             environment_type=env_type,
             perception_source=perception_src,
         )
         self._record("observe", {"element_count": len(obs.elements),
+                                 "window_tree_count": len(window_elements),
                                  "windows_from_x11": real_windows,
                                  "elements_seeded": synthetic_elements})
         return obs

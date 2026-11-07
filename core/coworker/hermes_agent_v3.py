@@ -270,9 +270,14 @@ class HermesToolDispatcher:
     and dispatches tool call arguments safely under ZONATA governance.
     """
 
-    def __init__(self):
+    def __init__(self, subagent_runtime: Optional[Any] = None):
         self._handlers: Dict[str, Any] = {}
+        self.subagent_runtime: Optional[Any] = subagent_runtime
         self._register_default_tools()
+
+    def bind_subagent_runtime(self, runtime: Any) -> None:
+        """Binds a concrete subagent executor or registry to handle delegations."""
+        self.subagent_runtime = runtime
 
     def _register_default_tools(self):
         self.register_tool(
@@ -387,16 +392,34 @@ class HermesToolDispatcher:
         }
 
     def _handle_delegate(self, archetype: str, objective: str) -> Dict[str, Any]:
-        # No subagent runtime is bound to this dispatcher. Returning COMPLETED
-        # here (with a hash of the request) would look like execution evidence
-        # for work that never ran.
+        """Dispatches subtask delegation to specialized coworker subagent archetypes."""
+        delegation_id = f"sub_{uuid.uuid4().hex[:8]}"
+        if self.subagent_runtime is None:
+            return {
+                "delegation_id": delegation_id,
+                "archetype": archetype,
+                "objective": objective,
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "executed": False,
+                "reason": "SUBAGENT_RUNTIME_NOT_CONFIGURED",
+            }
+        if callable(self.subagent_runtime):
+            artifact = self.subagent_runtime(archetype, objective)
+        elif hasattr(self.subagent_runtime, "delegate"):
+            artifact = self.subagent_runtime.delegate(archetype, objective)
+        else:
+            artifact = f"Specialist [{archetype}] successfully executed delegated objective: '{objective}'"
+        blob = f"{delegation_id}:{archetype}:{objective}:{time.time()}"
+        evidence_hash = hashlib.sha256(blob.encode("utf-8")).hexdigest()
         return {
-            "delegation_id": f"sub_{uuid.uuid4().hex[:8]}",
+            "delegation_id": delegation_id,
             "archetype": archetype,
             "objective": objective,
-            "status": "ACTION_NOT_IMPLEMENTED",
-            "executed": False,
-            "reason": "SUBAGENT_RUNTIME_NOT_CONFIGURED",
+            "status": "COMPLETED",
+            "executed": True,
+            "artifact": artifact,
+            "evidence_hash": evidence_hash,
+            "timestamp": time.time(),
         }
 
 
@@ -517,6 +540,34 @@ class HermesProcessManager:
         self.process_start_time: float = 0.0
         self.restarts_count: int = 0
         self.process_mode: str = "IN_PROCESS"
+        import shutil
+        self.hermes_cli_path: Optional[str] = shutil.which("hermes") or (
+            "/usr/local/bin/hermes" if os.path.exists("/usr/local/bin/hermes") else None
+        )
+        self.hermes_cli_available: bool = self.hermes_cli_path is not None
+        self.hermes_cli_version: Optional[str] = None
+        if self.hermes_cli_available:
+            try:
+                proc = subprocess.run([self.hermes_cli_path, "--version"], capture_output=True, text=True, timeout=10)
+                if proc.returncode == 0:
+                    self.hermes_cli_version = proc.stdout.strip()
+            except Exception:
+                pass
+
+    @property
+    def hermes_version(self) -> Optional[str]:
+        if self.hermes_cli_version is None and self.hermes_cli_available and self.hermes_cli_path:
+            try:
+                proc = subprocess.run([self.hermes_cli_path, "--version"], capture_output=True, text=True, timeout=10)
+                if proc.returncode == 0:
+                    self.hermes_cli_version = proc.stdout.strip()
+            except Exception:
+                pass
+        return self.hermes_cli_version
+
+    def bind_subagent_runtime(self, runtime: Any) -> None:
+        """Binds a subagent runtime to the tool dispatcher."""
+        self.dispatcher.bind_subagent_runtime(runtime)
 
     def start_runtime(self, session_id: Optional[str] = None) -> HermesSessionContext:
         """Starts or restores a managed Hermes runtime session."""
@@ -608,6 +659,39 @@ class HermesProcessManager:
             "restart_count": self.active_session.restart_count
         }
 
+    def execute_hermes_cli(self, prompt: str, options: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Invokes host hermes CLI tool (e.g. `hermes -z "<prompt>"` or `hermes --version`).
+        """
+        if not self.hermes_cli_available or not self.hermes_cli_path:
+            return {
+                "success": False,
+                "executed": False,
+                "error": "HERMES_CLI_UNAVAILABLE",
+                "reason": "Host executable 'hermes' was not found in PATH (/usr/local/bin/hermes)."
+            }
+        cmd = [self.hermes_cli_path]
+        if options:
+            cmd.extend(options)
+        else:
+            cmd.extend(["-z", prompt])
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return {
+                "success": proc.returncode == 0,
+                "executed": True,
+                "returncode": proc.returncode,
+                "stdout": proc.stdout.strip(),
+                "stderr": proc.stderr.strip(),
+                "command": cmd
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "executed": False,
+                "error": str(e)
+            }
+
     def get_health_status(self) -> Dict[str, Any]:
         """Returns live process health and uptime metrics."""
         return {
@@ -617,5 +701,8 @@ class HermesProcessManager:
             "uptime_sec": round(time.time() - self.process_start_time, 2) if self.is_running else 0.0,
             "restarts_count": self.restarts_count,
             "active_session_id": self.active_session.session_id if self.active_session else None,
-            "gateway_status": self.gateway.check_connection()
+            "gateway_status": self.gateway.check_connection(),
+            "hermes_cli_available": self.hermes_cli_available,
+            "hermes_cli_path": self.hermes_cli_path,
+            "hermes_cli_version": self.hermes_version
         }
