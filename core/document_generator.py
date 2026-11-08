@@ -262,10 +262,10 @@ class DocumentGenerator:
                 rows_data.append(r)
         else:
             # Title row
-            rows_data.append(["ZONATA Universal AI OS", title])
-            rows_data.append(["Item #", "Description", "Value", "Status"])
+            rows_data.append(["ZONATA Document", title])
+            rows_data.append(["Item #", "Description"])
             for idx, line in enumerate(lines, 1):
-                rows_data.append([str(idx), line, "100%", "VERIFIED"])
+                rows_data.append([str(idx), line])
 
         # Construct sheet1.xml
         sheet_rows = []
@@ -582,6 +582,85 @@ class DocumentGenerator:
         }
 
     # =========================================================================
+    # UPLOAD REGISTRATION
+    # =========================================================================
+
+    def store_uploaded_bytes(
+        self,
+        filename: str,
+        data: bytes,
+        storage_boundary: Union[StorageBoundary, str],
+        user_id: str,
+        tenant_id: str = "tnt_primary",
+        company_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Persist an uploaded file in the correct boundary and index it.
+
+        The original filename is preserved in metadata; the on-disk name is
+        sanitised.  Personal uploads are written under the owner's directory and
+        are only findable by that owner.
+        """
+        boundary = str(storage_boundary).upper()
+        if boundary.startswith("STORAGEBOUNDARY."):
+            boundary = boundary.split(".")[-1]
+        if boundary not in ("PERSONAL", "COMPANY"):
+            boundary = "PERSONAL"
+        if boundary == "COMPANY" and not company_id:
+            raise ValueError("COMPANY_CONTEXT_REQUIRED")
+
+        original = os.path.basename(filename or "upload.bin")
+        ext = os.path.splitext(original)[1].lower().lstrip(".") or "bin"
+        doc_id = f"doc_{uuid.uuid4().hex[:10]}"
+        now = time.time()
+        sha256_hash = hashlib.sha256(data).hexdigest()
+        safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in os.path.splitext(original)[0].lower())[:40]
+        filename_on_disk = f"upload_{safe_name}_{doc_id[:6]}.{ext}"
+        target_dir = self._get_target_directory(boundary, user_id, company_id)
+        file_path = os.path.join(target_dir, filename_on_disk)
+        with open(file_path, "wb") as fh:
+            fh.write(data)
+
+        meta = dict(metadata or {})
+        meta.update({
+            "doc_id": doc_id,
+            "created_by": user_id,
+            "storage_boundary": boundary,
+            "original_filename": original,
+            "uploaded": True,
+        })
+
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO assistant_generated_documents (
+                    doc_id, tenant_id, company_id, user_id, storage_boundary,
+                    title, format, category, file_path, size_bytes, sha256,
+                    metadata, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    doc_id, tenant_id, company_id if boundary == "COMPANY" else None,
+                    user_id, boundary, original, ext.upper(), "UPLOAD",
+                    file_path, len(data), sha256_hash, json.dumps(meta), now,
+                )
+            )
+            conn.commit()
+
+        return {
+            "doc_id": doc_id,
+            "name": original,
+            "title": original,
+            "format": ext.upper(),
+            "storage_boundary": boundary,
+            "file_path": file_path,
+            "size_bytes": len(data),
+            "sha256": sha256_hash,
+            "download_url": f"/api/assistant/documents/{doc_id}/download",
+            "created_at": now,
+        }
+
+    # =========================================================================
     # INTELLIGENT RETRIEVAL
     # =========================================================================
 
@@ -602,17 +681,29 @@ class DocumentGenerator:
         sql = "SELECT * FROM assistant_generated_documents WHERE tenant_id = ?"
         params: List[Any] = [tenant_id]
 
-        if storage_boundary and storage_boundary != "ALL":
-            sql += " AND storage_boundary = ?"
-            params.append(storage_boundary.upper())
+        boundary = (storage_boundary or "").upper()
 
-        # If personal storage is searched, restrict strictly to the requesting user
-        if storage_boundary == "PERSONAL":
-            sql += " AND user_id = ?"
+        if boundary == "PERSONAL":
+            # Personal records are visible only to their owner.
+            sql += " AND storage_boundary = 'PERSONAL' AND user_id = ?"
             params.append(user_id)
-        elif storage_boundary == "COMPANY" and company_id:
-            sql += " AND (company_id = ? OR company_id IS NULL)"
+        elif boundary == "COMPANY":
+            if not company_id:
+                # Without a verified company context no company record is readable.
+                return []
+            sql += " AND storage_boundary = 'COMPANY' AND company_id = ?"
             params.append(company_id)
+        else:
+            # Unscoped search must not leak either boundary.
+            if company_id:
+                sql += (
+                    " AND ((storage_boundary = 'PERSONAL' AND user_id = ?)"
+                    " OR (storage_boundary = 'COMPANY' AND company_id = ?))"
+                )
+                params.extend([user_id, company_id])
+            else:
+                sql += " AND storage_boundary = 'PERSONAL' AND user_id = ?"
+                params.append(user_id)
 
         if format_type:
             sql += " AND format = ?"

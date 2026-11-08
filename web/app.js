@@ -710,7 +710,14 @@ function handleRoute(path) {
     navKey = 'schedule';
   } else if (cleanPath.startsWith('/workspace/missions') || cleanPath.startsWith('/workspace/work') || cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) {
     navKey = 'missions';
-  } else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  } else if (cleanPath.startsWith('/assistant')) {
+    // The assistant is a single floating surface, not a page.  Legacy links
+    // open the flyout and land on the overview without rendering a second UI.
+    navKey = 'overview';
+    if (window.FloatingAssistant && !window.FloatingAssistant.isOpen) {
+      window.FloatingAssistant.toggleOpen();
+    }
+  }
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
   else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
   else if (cleanPath.startsWith('/files')) navKey = 'files';
@@ -776,13 +783,6 @@ function handleRoute(path) {
         window.OverviewWorkspace.render('view-overview');
       } else {
         renderOverview();
-      }
-    } else if (navKey === 'assistant') {
-      if (window.FloatingAssistant && !window.FloatingAssistant.isOpen) {
-        window.FloatingAssistant.toggleOpen();
-      }
-      if (window.AssistantCoworkerWorkspace) {
-        window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
       }
     } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
       window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');

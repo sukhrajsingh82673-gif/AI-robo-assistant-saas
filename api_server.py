@@ -21,6 +21,7 @@ import time
 import uuid
 import hashlib
 import hmac
+import base64
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
 try:
     import cryptography
@@ -2400,14 +2401,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         elif path == "/api/assistant/coworker/tasks":
             ws_mode = query_params.get("workspace_mode", [None])[0]
-            tasks = get_runtime(tenant_id).assistant.list_coworker_tasks(ws_mode)
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            tasks = get_runtime(tenant_id).assistant.list_coworker_tasks(ws_mode, user_id=uid)
             self._send_json({"tasks": tasks, "count": len(tasks)})
             return
 
         elif path.startswith("/api/assistant/coworker/tasks/"):
             parts = path.split("/")
             task_id = parts[5] if len(parts) > 5 else ""
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
             task = get_runtime(tenant_id).assistant.get_coworker_task(task_id)
+            if task and task.get("workspace_mode") == "PERSONAL" and task.get("user_id") != uid:
+                task = None
             if task:
                 self._send_json(task)
             else:
@@ -2416,10 +2424,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/assistant/documents/search":
             q = query_params.get("q", [None])[0] or query_params.get("query", [None])[0]
-            boundary = query_params.get("boundary", [None])[0] or query_params.get("storage_boundary", [None])[0]
-            cid = query_params.get("company_id", [None])[0]
-            uid = query_params.get("user_id", ["usr_owner"])[0]
+            boundary = (query_params.get("boundary", [None])[0] or query_params.get("storage_boundary", [None])[0] or "PERSONAL").upper()
+            if boundary not in ("PERSONAL", "COMPANY"):
+                boundary = "PERSONAL"
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            cid = company_id if boundary == "COMPANY" else None
             fmt = query_params.get("format", [None])[0]
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
             from core.document_generator import document_generator
             docs = document_generator.search_documents(
                 tenant_id=tenant_id,
@@ -2429,7 +2442,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 company_id=cid,
                 format_type=fmt
             )
-            self._send_json({"documents": docs, "count": len(docs)})
+            self._send_json({"documents": docs, "count": len(docs), "boundary": boundary})
             return
 
         elif path.startswith("/api/assistant/documents/") and path.endswith("/download"):
@@ -2442,13 +2455,19 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": "Document not found on disk"}, status=404)
                 return
 
-            # [MED-01] Tenant/User Ownership Enforcement for Personal Documents
+            req_uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
             if doc.get("storage_boundary") == "PERSONAL":
-                req_uid = auth_context.get("user_id") if isinstance(auth_context, dict) else None
-                user_role = auth_context.get("role") if isinstance(auth_context, dict) else None
-                if req_uid and doc.get("user_id") != req_uid and user_role not in ("OWNER", "GLOBAL_ADMIN", "ADMIN"):
-                    self._send_json({"error": "Access denied to personal document of another user"}, status=403)
+                # Personal files are readable only by their owner, never via role.
+                if not req_uid or doc.get("user_id") != req_uid:
+                    self._send_json({"error": "Access denied to a personal document"}, status=403)
                     return
+            elif doc.get("storage_boundary") == "COMPANY":
+                if not company_id or doc.get("company_id") != company_id:
+                    self._send_json({"error": "Access denied to a company document outside your company"}, status=403)
+                    return
+            else:
+                self._send_json({"error": "Unknown storage boundary"}, status=403)
+                return
             file_path = doc["file_path"]
             filename = os.path.basename(file_path)
             fmt = doc.get("format", "").upper()
@@ -6191,16 +6210,23 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Prompt 03: Floating Live Assistant & Coworker POST Handlers
         # =====================================================================
         elif path == "/api/assistant/interact":
-            prompt = req_data.get("prompt", "")
-            ws_mode = req_data.get("workspace_mode", "AUTO")
-            cid = req_data.get("company_id")
-            uid = req_data.get("user_id", "usr_owner")
+            prompt = str(req_data.get("prompt", ""))
+            ws_mode = str(req_data.get("workspace_mode", "AUTO")).upper()
+            if ws_mode not in ("AUTO", "PERSONAL", "COMPANY"):
+                ws_mode = "AUTO"
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
             sess_id = req_data.get("session_id")
-            attachments = req_data.get("attachments")
+            attachments = req_data.get("attachments") or []
+            if ws_mode == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
             res = get_runtime(tenant_id).assistant.interact(
                 prompt=prompt,
                 workspace_mode=ws_mode,
-                company_id=cid,
+                company_id=company_id if ws_mode != "PERSONAL" else None,
                 user_id=uid,
                 session_id=sess_id,
                 attachments=attachments
@@ -6209,21 +6235,72 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/assistant/classify":
-            prompt = req_data.get("prompt", "")
+            prompt = str(req_data.get("prompt", ""))
             ws_mode = req_data.get("workspace_mode")
             from core.assistant_service import AssistantContextClassifier
             res = AssistantContextClassifier.classify(prompt=prompt, explicit_workspace=ws_mode)
             self._send_json(res)
             return
 
+        elif path == "/api/assistant/documents/upload":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            boundary = str(req_data.get("storage_boundary", "PERSONAL")).upper()
+            if boundary not in ("PERSONAL", "COMPANY"):
+                boundary = "PERSONAL"
+            if boundary == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            filename = str(req_data.get("filename") or "").strip()
+            raw_b64 = str(req_data.get("content_base64") or "")
+            if not filename or not raw_b64:
+                self._send_json({"error": "filename and content_base64 are required"}, status=400)
+                return
+            if "," in raw_b64 and raw_b64.split(",", 1)[0].startswith("data:"):
+                raw_b64 = raw_b64.split(",", 1)[1]
+            try:
+                data = base64.b64decode(raw_b64, validate=True)
+            except Exception:
+                self._send_json({"error": "Invalid base64 payload"}, status=400)
+                return
+            max_bytes = int(os.environ.get("ZONATA_MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))
+            if len(data) > max_bytes:
+                self._send_json({"error": "File exceeds upload limit", "limit_bytes": max_bytes}, status=413)
+                return
+            from core.document_generator import document_generator
+            try:
+                doc = document_generator.store_uploaded_bytes(
+                    filename=filename,
+                    data=data,
+                    storage_boundary=boundary,
+                    user_id=uid,
+                    tenant_id=tenant_id,
+                    company_id=company_id if boundary == "COMPANY" else None,
+                )
+            except Exception as exc:
+                logger.exception("Upload failed")
+                self._send_json({"error": "Upload failed", "detail": type(exc).__name__}, status=500)
+                return
+            self._send_json({"success": True, "document": doc})
+            return
+
         elif path == "/api/assistant/documents/generate":
-            title = req_data.get("title", "Generated Document")
-            fmt = req_data.get("format", "PDF")
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            title = str(req_data.get("title", "Generated Document"))
+            fmt = str(req_data.get("format", "PDF")).upper()
             cat = req_data.get("category", "Personal Documents")
-            content = req_data.get("content", "")
-            storage_boundary = req_data.get("storage_boundary", "PERSONAL")
-            uid = req_data.get("user_id", "usr_owner")
-            cid = req_data.get("company_id")
+            content = str(req_data.get("content", ""))
+            boundary = str(req_data.get("storage_boundary", "PERSONAL")).upper()
+            if boundary not in ("PERSONAL", "COMPANY"):
+                boundary = "PERSONAL"
+            if boundary == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
             meta = req_data.get("metadata", {})
             from core.document_generator import document_generator
             doc = document_generator.generate_document(
@@ -6232,48 +6309,83 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 category=cat,
                 content=content,
                 metadata=meta,
-                storage_boundary=storage_boundary,
+                storage_boundary=boundary,
                 user_id=uid,
                 tenant_id=tenant_id,
-                company_id=cid
+                company_id=company_id if boundary == "COMPANY" else None
             )
             self._send_json(doc)
             return
 
         elif path == "/api/assistant/meetings/schedule":
-            prompt = req_data.get("prompt", "")
-            cid = req_data.get("company_id")
-            uid = req_data.get("user_id", "usr_owner")
+            prompt = str(req_data.get("prompt", ""))
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
             start_time = req_data.get("start_time")
             duration = int(req_data.get("duration_minutes", 45))
-            platform = req_data.get("platform", "GOOGLE_MEET")
+            platform = str(req_data.get("platform", "GOOGLE_MEET"))
+            if not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
             from core.meeting_service import AiCeoMeetingService
             meeting_svc = AiCeoMeetingService(tenant_id=tenant_id)
             res = meeting_svc.schedule_meeting_autonomous(
                 prompt=prompt,
-                company_id=cid,
+                company_id=company_id,
                 user_id=uid,
                 start_time=start_time,
                 duration_minutes=duration,
                 platform=platform
             )
-            self._send_json(res)
+            self._send_json(res, status=200 if res.get("success") else 409)
             return
 
         elif path == "/api/assistant/chat":
-            prompt = req_data.get("prompt", "")
-            cid = req_data.get("company_id")
-            uid = req_data.get("user_id", "usr_owner")
-            chat_res = get_runtime(tenant_id).assistant.handle_ai_chat(prompt, cid, uid)
+            prompt = str(req_data.get("prompt", ""))
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            chat_res = get_runtime(tenant_id).assistant.handle_ai_chat(prompt, company_id, uid)
             self._send_json(chat_res)
             return
 
+        elif path == "/api/assistant/emergency-stop":
+            if self._approver_denied(auth_context):
+                return
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "usr_owner")
+            reason = str(req_data.get("reason") or "Emergency stop requested by the Owner")
+            target = company_id or tenant_id
+            level = "COMPANY" if company_id else "TENANT"
+            from core.killswitch_matrix import KillSwitchMatrix
+            matrix = KillSwitchMatrix(tenant_id=tenant_id)
+            switch_id = matrix.engage(level=level, target_id=target, reason=reason, engaged_by=uid)
+            self._send_json({
+                "success": True,
+                "switch_id": switch_id,
+                "level": level,
+                "target_id": target,
+                "state": "ENGAGED",
+                "reason": reason,
+                "engaged_by": uid,
+            })
+            return
+
         elif path == "/api/assistant/coworker/task":
-            prompt = req_data.get("prompt", "")
-            ws_mode = req_data.get("workspace_mode", "PERSONAL")
-            cid = req_data.get("company_id")
-            uid = req_data.get("user_id", "usr_owner")
-            task_res = get_runtime(tenant_id).assistant.create_coworker_task(prompt, ws_mode, cid, uid)
+            prompt = str(req_data.get("prompt", ""))
+            ws_mode = str(req_data.get("workspace_mode", "PERSONAL")).upper()
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            if ws_mode == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            task_res = get_runtime(tenant_id).assistant.create_coworker_task(
+                prompt, ws_mode, company_id if ws_mode == "COMPANY" else None, uid
+            )
             self._send_json(task_res)
             return
 
@@ -6281,6 +6393,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             parts = path.split("/")
             task_id = parts[5] if len(parts) > 5 else ""
             approved = bool(req_data.get("approved", True))
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            existing = get_runtime(tenant_id).assistant.get_coworker_task(task_id)
+            if not existing:
+                self._send_json({"error": "Task not found"}, status=404)
+                return
+            if existing.get("workspace_mode") == "PERSONAL" and existing.get("user_id") != uid:
+                self._send_json({"error": "Task not found"}, status=404)
+                return
             updated_task = get_runtime(tenant_id).assistant.approve_coworker_task(task_id, approved)
             self._send_json({"success": True, "task": updated_task})
             return

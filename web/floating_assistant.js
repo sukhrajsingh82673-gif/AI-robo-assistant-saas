@@ -40,6 +40,7 @@
         }
       ];
       this.pendingAttachments = [];
+      this.lastPrompt = '';
       this.isDragging = false;
       this.dragStartedAt = 0;
       this.dragThreshold = 5;
@@ -56,6 +57,10 @@
       this.render(container);
       this.applySavedCornerPosition(container);
       this.bindDragPhysics(container);
+      window.addEventListener('resize', () => {
+        const current = document.getElementById('floatingAssistantContainer');
+        if (current) this.snapToCorner(current, this.currentCorner, false);
+      });
       this.startStateSync();
     }
 
@@ -72,8 +77,14 @@
       this.currentCorner = cornerName;
       localStorage.setItem('zonata_assistant_corner', cornerName);
 
-      const padding = 20;
+      const isMobile = window.innerWidth <= 768;
+      const sidePadding = isMobile ? 12 : 20;
+      const topPadding = isMobile ? 12 : 20;
+      // Keep the FAB clear of the mobile bottom navigation bar.
+      const bottomPadding = isMobile ? 76 : 20;
       const flyout = document.getElementById('assistantFlyout');
+      const wasMinimized = !!(flyout && flyout.classList.contains('minimized'));
+      const extraClasses = (this.isOpen ? ' open' : '') + (wasMinimized ? ' minimized' : '');
       container.style.transition = animate ? 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)' : 'none';
 
       container.style.top = 'auto';
@@ -82,21 +93,21 @@
       container.style.right = 'auto';
 
       if (cornerName === 'bottom-left') {
-        container.style.bottom = `${padding}px`;
-        container.style.left = `${padding}px`;
-        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-left' + (this.isOpen ? ' open' : '');
+        container.style.bottom = `${bottomPadding}px`;
+        container.style.left = `${sidePadding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-left' + extraClasses;
       } else if (cornerName === 'bottom-right') {
-        container.style.bottom = `${padding}px`;
-        container.style.right = `${padding}px`;
-        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-right' + (this.isOpen ? ' open' : '');
+        container.style.bottom = `${bottomPadding}px`;
+        container.style.right = `${sidePadding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-right' + extraClasses;
       } else if (cornerName === 'top-left') {
-        container.style.top = `${padding}px`;
-        container.style.left = `${padding}px`;
-        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-left' + (this.isOpen ? ' open' : '');
+        container.style.top = `${topPadding}px`;
+        container.style.left = `${sidePadding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-left' + extraClasses;
       } else if (cornerName === 'top-right') {
-        container.style.top = `${padding}px`;
-        container.style.right = `${padding}px`;
-        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-right' + (this.isOpen ? ' open' : '');
+        container.style.top = `${topPadding}px`;
+        container.style.right = `${sidePadding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-right' + extraClasses;
       }
     }
 
@@ -242,8 +253,13 @@
                 <span id="workspacePillText">${this.workspaceMode}</span>
               </div>
 
+              <!-- Minimize Button -->
+              <button class="assistant-icon-btn" onclick="window.FloatingAssistant.toggleMinimize(event)" title="Minimize Assistant">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+
               <!-- Close Button -->
-              <button class="assistant-icon-btn" onclick="window.FloatingAssistant.toggleOpen(event)" title="Minimize Assistant">
+              <button class="assistant-icon-btn" onclick="window.FloatingAssistant.toggleOpen(event)" title="Close Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
@@ -333,7 +349,11 @@
                 <div class="bubble-citations">
                   ${m.citations.map(c => `
                     <span class="citation-badge ${c.source_type === 'INTERNAL' ? 'cit-internal' : 'cit-external'}">
-                      ${c.source_type === 'INTERNAL' ? '🏢 [INTERNAL]' : '🌐 [WEB RESEARCH]'} ${this.escape(c.label)}
+                      ${c.source_type === 'INTERNAL'
+                        ? '🏢 [INTERNAL]'
+                        : c.source_type === 'MODEL'
+                          ? '🤖 [MODEL]'
+                          : (c.status === 'UNAVAILABLE' ? '⚠️ [NO EXTERNAL SOURCE]' : '🌐 [EXTERNAL]')} ${this.escape(c.label)}
                     </span>
                   `).join('')}
                 </div>
@@ -372,10 +392,12 @@
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);">
-            <span class="hash-tag">SHA-256: ${this.escape((deliv.sha256 || '').substring(0, 12))}...</span>
-            <a href="${deliv.download_url}" target="_blank" class="btn-deliverable-download" download>
-              ⬇️ Download File
-            </a>
+            <span class="hash-tag">${deliv.sha256 ? `SHA-256: ${this.escape(deliv.sha256.substring(0, 12))}...` : 'No checksum issued'}</span>
+            ${deliv.download_url ? `
+              <a href="${this.escape(deliv.download_url)}" target="_blank" rel="noopener noreferrer" class="btn-deliverable-download" download>
+                ⬇️ Download File
+              </a>
+            ` : `<span style="font-size:11px; color:var(--text-muted);">No download available</span>`}
           </div>
         </div>
       `;
@@ -383,21 +405,30 @@
 
     renderActionCardHtml(action) {
       if (action.type === 'MEETING_INVITE') {
+        const isScheduled = action.status === 'SCHEDULED' && action.provider_status === 'CONFIRMED';
+        const badgeColor = isScheduled ? '#10b981' : '#ef4444';
         return `
           <div class="meeting-invite-card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
-              <span style="font-weight:700; color:#3b82f6;">📅 Google Meet Scheduled</span>
-              <span class="badge-emerald" style="font-size:10px; padding:2px 6px; border-radius:4px;">CONFIRMED</span>
+              <span style="font-weight:700; color:${isScheduled ? '#3b82f6' : '#ef4444'};">
+                📅 ${isScheduled ? 'Calendar Event Confirmed' : 'Meeting Not Scheduled'}
+              </span>
+              <span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${badgeColor}; color:#fff;">
+                ${this.escape(action.provider_status || 'UNKNOWN')}
+              </span>
             </div>
-            <div style="font-size:12px; font-weight:600; margin-bottom:4px;">${this.escape(action.title)}</div>
-            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">Time: <b>${action.scheduled_time}</b></div>
+            <div style="font-size:12px; font-weight:600; margin-bottom:4px;">${this.escape(action.title || 'Meeting request')}</div>
+            ${action.scheduled_time ? `<div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">Time: <b>${this.escape(action.scheduled_time)}</b></div>` : ''}
+            ${action.reason && !isScheduled ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">Reason: ${this.escape(action.reason)}</div>` : ''}
 
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <a href="${action.google_meet_url}" target="_blank" class="btn-meet-join">
-                📹 Join Google Meet
-              </a>
+              ${action.google_meet_url ? `
+                <a href="${this.escape(action.google_meet_url)}" target="_blank" rel="noopener noreferrer" class="btn-meet-join">
+                  📹 Join Google Meet
+                </a>
+              ` : ''}
               ${action.briefing_dossier_url ? `
-                <a href="${action.briefing_dossier_url}" target="_blank" class="btn-secondary" style="font-size:11px; padding:5px 8px;">
+                <a href="${this.escape(action.briefing_dossier_url)}" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="font-size:11px; padding:5px 8px;">
                   📄 Briefing Dossier
                 </a>
               ` : ''}
@@ -407,21 +438,25 @@
       }
 
       if (action.type === 'WORKFORCE_MISSION') {
+        const verified = action.verification_status === 'VERIFIED';
         return `
           <div class="action-status-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <span style="font-weight:700; color:#8b5cf6;">🏢 Workforce Mission Active</span>
-              <span class="badge-blue" style="font-size:10px;">${action.status}</span>
+              <span style="font-weight:700; color:#8b5cf6;">🏢 Workforce Delegation</span>
+              <span class="badge-blue" style="font-size:10px;">${this.escape(action.status || 'DELEGATED')}</span>
             </div>
-            <div style="font-size:11.5px; margin-bottom:4px;">Department: <b>${this.escape(action.department)}</b></div>
-            <div style="font-size:10.5px; color:var(--text-muted);">Mission ID: <code>${this.escape(action.mission_id)}</code></div>
+            <div style="font-size:11.5px; margin-bottom:4px;">Department: <b>${this.escape(action.department || 'Operations')}</b></div>
+            <div style="font-size:10.5px; color:var(--text-muted);">Mission ID: <code>${this.escape(action.mission_id || '')}</code></div>
+            <div style="font-size:10.5px; margin-top:4px; color:${verified ? '#10b981' : '#f59e0b'};">
+              Verification: <b>${this.escape(action.verification_status || 'UNVERIFIED')}</b>
+            </div>
 
             ${action.requires_approval ? `
               <div class="approval-banner" style="margin-top:8px;">
                 <div style="font-size:11px; font-weight:700; color:#ef4444; margin-bottom:4px;">⚠️ DoA Authorization Required</div>
                 <div style="display:flex; gap:6px;">
-                  <button class="btn-primary" style="font-size:11px; padding:3px 8px; background:#10b981;" onclick="window.FloatingAssistant.authorizeApproval('${action.approval_id}', true)">Authorize</button>
-                  <button class="btn-secondary" style="font-size:11px; padding:3px 8px; color:#ef4444;" onclick="window.FloatingAssistant.authorizeApproval('${action.approval_id}', false)">Deny</button>
+                  <button class="btn-primary" style="font-size:11px; padding:3px 8px; background:#10b981;" onclick="window.FloatingAssistant.authorizeApproval('${this.escape(action.approval_id)}', true)">Authorize</button>
+                  <button class="btn-secondary" style="font-size:11px; padding:3px 8px; color:#ef4444;" onclick="window.FloatingAssistant.authorizeApproval('${this.escape(action.approval_id)}', false)">Deny</button>
                 </div>
               </div>
             ` : ''}
@@ -476,6 +511,7 @@
       const flyout = document.getElementById('assistantFlyout');
       if (flyout) {
         if (this.isOpen) {
+          flyout.classList.remove('minimized');
           flyout.classList.add('open');
           setTimeout(() => {
             const inp = document.getElementById('assistantMainInput');
@@ -486,6 +522,13 @@
           flyout.classList.remove('open');
         }
       }
+    }
+
+    toggleMinimize(e) {
+      if (e) e.stopPropagation();
+      const flyout = document.getElementById('assistantFlyout');
+      if (!flyout) return;
+      flyout.classList.toggle('minimized');
     }
 
     cycleWorkspaceMode() {
@@ -513,12 +556,12 @@
       el.style.height = `${Math.min(100, el.scrollHeight)}px`;
     }
 
-    async submitPrompt(customText = null) {
+    async submitPrompt(customText = null, modeOverride = null) {
       const inp = document.getElementById('assistantMainInput');
-      const text = customText || (inp ? inp.value.trim() : '');
+      const text = customText !== null ? customText : (inp ? inp.value.trim() : '');
       if (!text && this.pendingAttachments.length === 0) return;
 
-      if (inp) {
+      if (inp && customText === null) {
         inp.value = '';
         inp.style.height = 'auto';
       }
@@ -527,6 +570,9 @@
       this.pendingAttachments = [];
       const tray = document.getElementById('assistantAttachmentTray');
       if (tray) tray.style.display = 'none';
+
+      this.lastPrompt = text;
+      const requestMode = modeOverride || this.workspaceMode;
 
       // Append user message to UI immediately
       this.messages.push({
@@ -537,7 +583,7 @@
       });
       this.refreshMessages();
 
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
+      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
 
       try {
         const res = await fetch('/api/assistant/interact', {
@@ -545,61 +591,126 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: text,
-            workspace_mode: this.workspaceMode,
+            workspace_mode: requestMode,
             company_id: companyId,
             session_id: this.sessionId,
             attachments: attachmentsToSend
           })
         });
 
-        if (res.ok) {
-          const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
           this.messages.push({
-            id: 'msg_' + Date.now(),
+            id: 'err_' + Date.now(),
             sender: 'assistant',
-            text: data.reply,
-            deliverable: data.deliverable_card,
-            actionCard: data.action_card,
-            choices: data.choices,
-            citations: data.citations || [],
-            timestamp: data.timestamp || (Date.now() / 1000)
+            text: data.error || `The assistant request failed (HTTP ${res.status}). Nothing was executed.`,
+            citations: [],
+            timestamp: Date.now() / 1000
           });
           this.refreshMessages();
+          return;
+        }
 
-          // If speech synthesis supported and user prompted via voice
-          if (this.isListening) {
-            this.speakText(data.reply);
-          }
+        this.messages.push({
+          id: 'msg_' + Date.now(),
+          sender: 'assistant',
+          text: data.reply,
+          deliverable: data.deliverable_card,
+          actionCard: data.action_card,
+          choices: data.choices,
+          citations: data.citations || [],
+          executionState: data.execution_state,
+          timestamp: data.timestamp || (Date.now() / 1000)
+        });
+        this.refreshMessages();
+
+        // If speech synthesis supported and user prompted via voice
+        if (this.isListening) {
+          this.speakText(data.reply);
         }
       } catch (err) {
         console.error('Interaction error:', err);
+        this.messages.push({
+          id: 'err_' + Date.now(),
+          sender: 'assistant',
+          text: 'I could not reach the ZONATA AI backend, so nothing was executed.',
+          citations: [],
+          timestamp: Date.now() / 1000
+        });
+        this.refreshMessages();
       }
     }
 
     selectClarification(selectedMode) {
+      if (!this.lastPrompt) return;
       this.workspaceMode = selectedMode;
-      this.cycleWorkspaceMode();
-      this.submitPrompt(`Proceed with this request as a ${selectedMode} task.`);
+      const pillText = document.getElementById('workspacePillText');
+      const pillIcon = document.getElementById('workspacePillIcon');
+      if (pillText) pillText.textContent = this.workspaceMode;
+      if (pillIcon) {
+        pillIcon.textContent = this.workspaceMode === 'PERSONAL' ? '👤' : this.workspaceMode === 'COMPANY' ? '🏢' : '⚡';
+      }
+      this.submitPrompt(this.lastPrompt, selectedMode);
     }
 
     async handleFileSelected(e) {
       const files = e.target.files;
       if (!files || files.length === 0) return;
+      const boundary = this.workspaceMode === 'COMPANY' ? 'COMPANY' : 'PERSONAL';
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        this.pendingAttachments.push({
-          name: file.name,
-          size: file.size,
-          type: file.type
-        });
+        try {
+          const dataUrl = await this.readFileAsDataUrl(file);
+          const res = await fetch('/api/assistant/documents/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              content_base64: dataUrl,
+              storage_boundary: boundary
+            })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.document) {
+            throw new Error(data.error || `upload failed (HTTP ${res.status})`);
+          }
+          this.pendingAttachments.push({
+            doc_id: data.document.doc_id,
+            name: data.document.name || file.name,
+            size: data.document.size_bytes || file.size,
+            type: file.type,
+            storage_boundary: data.document.storage_boundary,
+            sha256: data.document.sha256
+          });
+        } catch (err) {
+          console.error('Attachment upload failed:', err);
+          this.messages.push({
+            id: 'att_' + Date.now(),
+            sender: 'assistant',
+            text: `Attachment **${file.name}** was not uploaded, so it is not attached. Nothing was stored.`,
+            citations: [],
+            timestamp: Date.now() / 1000
+          });
+          this.refreshMessages();
+        }
       }
 
       const tray = document.getElementById('assistantAttachmentTray');
       if (tray) {
-        tray.style.display = 'flex';
+        tray.style.display = this.pendingAttachments.length ? 'flex' : 'none';
         tray.innerHTML = this.renderAttachmentTrayHtml();
       }
+      e.target.value = '';
+    }
+
+    readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('read failed'));
+        reader.readAsDataURL(file);
+      });
     }
 
     removeAttachment(idx) {
@@ -644,64 +755,89 @@
     }
 
     async observeScreen() {
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
-      try {
-        const res = await fetch('/api/multimodal/observe/screen', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company_id: companyId,
-            window_title: document.title || 'ZONATA Workspace',
-            content_preview: 'Screen telemetry scan for Host'
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          this.messages.push({
-            id: 'obs_' + Date.now(),
-            sender: 'assistant',
-            text: `🖥️ **Screen Observation Captured**\n\nActive Window: *${document.title}*\nTelemetry Hash: \`${(data.observation || {}).raw_hash || 'sha256:verified'}\`\nObservation sealed into audit evidence.`,
-            citations: [{ source_type: 'INTERNAL', label: 'HAL9000 Multimodal Screen Inspector', verified: true }],
-            timestamp: Date.now() / 1000
-          });
-          this.refreshMessages();
-        }
-      } catch (e) {}
+      // Browser pages cannot silently capture other applications.  Rather than
+      // recording a fabricated observation, state the real capability boundary.
+      this.messages.push({
+        id: 'obs_' + Date.now(),
+        sender: 'assistant',
+        text: '🖥️ **Screen observation is not connected in this build.** No screenshot was taken, nothing was sealed, and no company system was contacted. Connecting a host screen agent requires explicit device permission.',
+        citations: [{ source_type: 'INTERNAL', label: 'Multimodal capability boundary', verified: true }],
+        timestamp: Date.now() / 1000
+      });
+      this.refreshMessages();
     }
 
     async triggerEmergencyStop() {
-      if (!confirm('🛑 Engage Sovereign EMERGENCY STOP (KillSwitch)? This will immediately freeze all active workforce missions.')) return;
+      if (!confirm('🛑 Engage Sovereign EMERGENCY STOP (KillSwitch)? This will immediately freeze company missions at the configured level.')) return;
 
       try {
-        await fetch('/api/multimodal/task/interrupt', {
+        const res = await fetch('/api/assistant/emergency-stop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: this.sessionId,
-            reason: 'Emergency KillSwitch engaged by Host'
-          })
+          body: JSON.stringify({ reason: 'Emergency KillSwitch engaged by Host' })
         });
-
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          this.messages.push({
+            id: 'stop_' + Date.now(),
+            sender: 'assistant',
+            text: `🛑 **Emergency stop was not engaged.** ${data.error || `HTTP ${res.status}`}. No containment state was changed.`,
+            citations: [],
+            timestamp: Date.now() / 1000
+          });
+          this.refreshMessages();
+          return;
+        }
         this.messages.push({
           id: 'stop_' + Date.now(),
           sender: 'assistant',
-          text: '🛑 **EMERGENCY CONTAINMENT ACTIVATED**\n\nAll workforce missions and autonomous agents have been halted out-of-band by sovereign Owner order. Type "resume" or click resume to return to active state.',
+          text: `🛑 **KillSwitch engaged.**\n\nLevel: **${data.level}**\nTarget: \`${data.target_id}\`\nSwitch: \`${data.switch_id}\`\nReason: ${data.reason}\n\nThis is a real containment record from the KillSwitch Matrix. Release it from governance when the situation is contained.`,
           citations: [{ source_type: 'INTERNAL', label: 'ZONATA KillSwitch Matrix', verified: true }],
           timestamp: Date.now() / 1000
         });
         this.refreshMessages();
-      } catch (e) {}
+      } catch (e) {
+        this.messages.push({
+          id: 'stop_' + Date.now(),
+          sender: 'assistant',
+          text: 'The emergency-stop request could not reach the backend. Containment was NOT engaged.',
+          citations: [],
+          timestamp: Date.now() / 1000
+        });
+        this.refreshMessages();
+      }
     }
 
     async authorizeApproval(approvalId, approved) {
       try {
-        await fetch(`/api/approvals/${approvalId}/decision`, {
+        const res = await fetch(`/api/approvals/${approvalId}/decision`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ approved })
         });
-        this.submitPrompt(approved ? 'Authorized sensitive action.' : 'Denied authorization.');
-      } catch (e) {}
+        const data = await res.json().catch(() => ({}));
+        this.messages.push({
+          id: 'apr_' + Date.now(),
+          sender: 'assistant',
+          text: res.ok
+            ? (approved
+              ? `Approval \`${approvalId}\` recorded as **approved**. Execution continues under the approval workflow; completion still requires a verified result.`
+              : `Approval \`${approvalId}\` recorded as **denied**. The gated action will not run.`)
+            : `Approval decision failed: ${data.error || `HTTP ${res.status}`}. Nothing changed.`,
+          citations: [{ source_type: 'INTERNAL', label: 'Sovereign Approval Ledger', verified: res.ok }],
+          timestamp: Date.now() / 1000
+        });
+        this.refreshMessages();
+      } catch (e) {
+        this.messages.push({
+          id: 'apr_' + Date.now(),
+          sender: 'assistant',
+          text: 'The approval decision could not be submitted. Nothing changed.',
+          citations: [],
+          timestamp: Date.now() / 1000
+        });
+        this.refreshMessages();
+      }
     }
 
     speakText(text) {

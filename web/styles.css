@@ -4754,6 +4754,18 @@ html, body {
   display: flex;
 }
 
+.assistant-flyout-window.minimized {
+  height: auto;
+  min-height: 0;
+}
+
+.assistant-flyout-window.minimized .assistant-messages-container,
+.assistant-flyout-window.minimized .assistant-input-tray,
+.assistant-flyout-window.minimized .assistant-attachment-tray,
+.assistant-flyout-window.minimized .assistant-waveform-container {
+  display: none !important;
+}
+
 @keyframes flyoutFadeIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
@@ -5200,14 +5212,15 @@ html, body {
 
   .assistant-flyout-window {
     width: 94vw;
-    right: 3vw;
+    max-width: 94vw;
     height: 75vh;
+    max-height: 72vh;
   }
 
-  .floating-assistant-container {
-    bottom: 16px;
-    right: 16px;
-  }
+  .assistant-flyout-window.anchor-bottom-left { left: 0; bottom: 64px; }
+  .assistant-flyout-window.anchor-bottom-right { right: 0; bottom: 64px; }
+  .assistant-flyout-window.anchor-top-left { left: 0; top: 64px; }
+  .assistant-flyout-window.anchor-top-right { right: 0; top: 64px; }
 
   .workspace-inner {
     padding: 10px;
@@ -5230,9 +5243,9 @@ html, body {
 
   .assistant-flyout-window {
     width: 96vw;
-    height: 85vh;
-    right: 2vw;
-    bottom: 60px;
+    max-width: 96vw;
+    height: 82vh;
+    max-height: 78vh;
   }
 }
 

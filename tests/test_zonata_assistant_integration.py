@@ -1,14 +1,14 @@
 """
 ZONATA Universal AI Operating System — Assistant & AI CEO Gateway Integration Test Suite
 Verifies:
-1. Context Classification (Personal vs Company vs Ambiguous vs Document vs Meeting)
-2. Personal Request Isolation (Strict private boundary, zero company ledger contamination)
-3. Company Request AI CEO Delegation (Structured executive request, workforce missions, evidence hashes)
-4. Centralized Native Document Production (PDF, DOCX, XLSX, PPTX, CSV with SHA-256 verification)
-5. Intelligent File Search & Retrieval (Metadata search, permission boundaries, download links)
-6. Autonomous Meeting Management & Google Meet Integration (Valid URLs, briefing dossiers, statutory disclosure)
-7. REST API Endpoints & Contract Compliance
-8. Emergency KillSwitch Out-of-Band Containment
+1. Context Classification (Personal, Company, Mixed, Document, Meeting, Retrieval, Application Change, Ambiguity)
+2. Personal Request Isolation (strict private boundary, zero company ledger contamination)
+3. Company Request AI CEO Delegation (delegation is never reported as verified completion)
+4. Centralized Native Document Production (PDF, DOCX, XLSX, PPTX, CSV with real SHA-256)
+5. Intelligent File Search & Retrieval (strict per-user and per-company isolation)
+6. Meeting Scheduling (provider-confirmed only; no fabricated links or dial-ins)
+7. Conversation persistence and ambiguity arbitration
+8. Coworker lifecycle honesty (no auto-completion without an executor)
 """
 
 import unittest
@@ -31,6 +31,43 @@ from core.db import configure_isolated_test_db, db
 from core.assistant_service import FloatingAssistantService, AssistantContextClassifier, IntentCategory
 from core.document_generator import document_generator, DocumentFormat, StorageBoundary, DocumentCategory
 from core.meeting_service import AiCeoMeetingService
+from core.calendar_provider import CalendarProviderError
+
+
+class FakeCalendarProvider:
+    """Test double that behaves like a provider which really confirmed an event."""
+
+    name = "FAKE_CALENDAR"
+
+    def __init__(self, fail: bool = False, with_meet: bool = True):
+        self.fail = fail
+        self.with_meet = with_meet
+        self.calls = []
+
+    def is_configured(self) -> bool:
+        return True
+
+    def create_event(self, summary, description, start_ts, end_ts, attendees=None, request_id=None):
+        self.calls.append({
+            "summary": summary,
+            "description": description,
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+            "attendees": attendees,
+            "request_id": request_id,
+        })
+        if self.fail:
+            raise CalendarProviderError("PROVIDER_REJECTED")
+        return {
+            "confirmed": True,
+            "provider": self.name,
+            "event_id": "evt_provider_12345",
+            "html_link": "https://calendar.example.com/event/evt_provider_12345",
+            "meet_url": "https://meet.example.com/abc-defg-hij" if self.with_meet else "",
+            "dial_in": {"phone": "+1 555 0100", "pin": "2468"} if self.with_meet else {},
+            "status": "confirmed",
+            "raw": {},
+        }
 
 class TestZonataAssistantIntegration(unittest.TestCase):
 
@@ -106,6 +143,83 @@ class TestZonataAssistantIntegration(unittest.TestCase):
         self.assertIn("Personal", res["clarification"])
         self.assertIn("Company", res["clarification"])
 
+    def test_context_classification_mixed_and_specialised(self):
+        mixed = AssistantContextClassifier.classify(
+            "Use my personal budget notes to review company payroll expenses"
+        )
+        self.assertEqual(mixed["category"], IntentCategory.MIXED.value)
+        self.assertTrue(mixed["is_ambiguous"])
+
+        retrieval = AssistantContextClassifier.classify("find the document Financial Audit")
+        self.assertEqual(retrieval["category"], IntentCategory.INFORMATION_RETRIEVAL.value)
+
+        change = AssistantContextClassifier.classify("change the UI and deploy the app")
+        self.assertEqual(change["category"], IntentCategory.APPLICATION_CHANGE.value)
+        self.assertNotEqual(change["suggested_routing"], "AI_CEO")
+
+    def test_unclear_request_defaults_to_clarification_not_company(self):
+        res = AssistantContextClassifier.classify("handle it")
+        self.assertEqual(res["category"], IntentCategory.AMBIGUOUS.value)
+        self.assertTrue(res["is_ambiguous"])
+        self.assertEqual(res["suggested_routing"], "OWNER_CLARIFICATION")
+
+    def test_document_search_without_boundary_is_owner_scoped(self):
+        own = document_generator.generate_document(
+            title="Owner Only Unscoped Leak Check",
+            format_type=DocumentFormat.TXT,
+            category=DocumentCategory.PERSONAL_DOCUMENT,
+            content="private owner content",
+            storage_boundary=StorageBoundary.PERSONAL,
+            user_id="usr_unscoped_owner",
+            tenant_id=self.tenant_id,
+        )
+        other = document_generator.generate_document(
+            title="Other User Unscoped Leak Check",
+            format_type=DocumentFormat.TXT,
+            category=DocumentCategory.PERSONAL_DOCUMENT,
+            content="private other content",
+            storage_boundary=StorageBoundary.PERSONAL,
+            user_id="usr_unscoped_other",
+            tenant_id=self.tenant_id,
+        )
+        results = document_generator.search_documents(
+            tenant_id=self.tenant_id,
+            user_id="usr_unscoped_owner",
+            query="Unscoped Leak Check",
+        )
+        ids = {r["doc_id"] for r in results}
+        self.assertIn(own["doc_id"], ids)
+        self.assertNotIn(other["doc_id"], ids)
+
+    def test_company_search_requires_verified_company_without_null_leak(self):
+        orphan = document_generator.generate_document(
+            title="Legacy Orphan Company Record",
+            format_type=DocumentFormat.TXT,
+            category=DocumentCategory.COMPANY_DOCUMENT,
+            content="record without company id",
+            storage_boundary=StorageBoundary.COMPANY,
+            user_id=self.user_id,
+            tenant_id=self.tenant_id,
+            company_id=None,
+        )
+        results = document_generator.search_documents(
+            tenant_id=self.tenant_id,
+            user_id=self.user_id,
+            query="Legacy Orphan",
+            storage_boundary="COMPANY",
+            company_id=self.company_id,
+        )
+        self.assertFalse(any(r["doc_id"] == orphan["doc_id"] for r in results))
+
+        # No company context at all must return nothing company-scoped.
+        none_results = document_generator.search_documents(
+            tenant_id=self.tenant_id,
+            user_id=self.user_id,
+            storage_boundary="COMPANY",
+            company_id=None,
+        )
+        self.assertEqual(none_results, [])
+
     # =========================================================================
     # 2. PERSONAL WORKSPACE ISOLATION TESTS
     # =========================================================================
@@ -159,6 +273,13 @@ class TestZonataAssistantIntegration(unittest.TestCase):
         self.assertEqual(res["workspace_mode"], "COMPANY")
         self.assertEqual(res["routed_to"], "AI_CEO")
         self.assertIn("Royal Hotel Jaipur", res["reply"])
+
+        # A delegated mission is relayed as delegated and unverified.
+        action = res.get("action_card")
+        if action:
+            self.assertEqual(action["status"], "DELEGATED")
+            self.assertEqual(action["verification_status"], "UNVERIFIED")
+            self.assertIn(res["execution_state"], ("DELEGATED", "AWAITING_APPROVAL", "ACCEPTED"))
 
         # Check deliverable report was generated in company storage
         if res.get("deliverable_card"):
@@ -248,34 +369,88 @@ class TestZonataAssistantIntegration(unittest.TestCase):
     # 6. AUTONOMOUS MEETING ORCHESTRATION & GOOGLE MEET INTEGRATION
     # =========================================================================
 
-    def test_autonomous_meeting_scheduling_with_google_meet(self):
+    def test_meeting_scheduling_is_blocked_without_provider(self):
+        before = None
+        with db.get_connection() as conn:
+            before = conn.execute(
+                "SELECT COUNT(*) AS c FROM meeting_integrations WHERE tenant_id = ?",
+                (self.tenant_id,),
+            ).fetchone()["c"]
+
+        res = self.meeting_svc.schedule_meeting_autonomous(
+            prompt="Quarterly Executive Strategy Review with Regional Directors",
+            company_id=self.company_id,
+            user_id=self.user_id,
+            duration_minutes=60,
+            platform="GOOGLE_MEET",
+            ai_representative_enabled=True,
+        )
+
+        self.assertFalse(res["success"])
+        self.assertEqual(res["provider_status"], "BLOCKED")
+        self.assertFalse(res["scheduled"])
+        self.assertNotIn("google_meet_url", res)
+        self.assertNotIn("meeting_id", res)
+
+        with db.get_connection() as conn:
+            after = conn.execute(
+                "SELECT COUNT(*) AS c FROM meeting_integrations WHERE tenant_id = ?",
+                (self.tenant_id,),
+            ).fetchone()["c"]
+        self.assertEqual(before, after, "A blocked meeting must not create an integration row")
+
+    def test_meeting_scheduling_with_confirmed_provider(self):
+        provider = FakeCalendarProvider()
         meet_res = self.meeting_svc.schedule_meeting_autonomous(
             prompt="Quarterly Executive Strategy Review with Regional Directors",
             company_id=self.company_id,
             user_id=self.user_id,
             duration_minutes=60,
             platform="GOOGLE_MEET",
-            ai_representative_enabled=True
+            ai_representative_enabled=True,
+            calendar_provider=provider,
         )
 
         self.assertTrue(meet_res["success"])
-        self.assertIn("https://meet.google.com/", meet_res["google_meet_url"])
+        self.assertTrue(meet_res["scheduled"])
+        self.assertEqual(meet_res["provider_status"], "CONFIRMED")
+        self.assertEqual(meet_res["google_meet_url"], "https://meet.example.com/abc-defg-hij")
+        self.assertEqual(meet_res["calendar_event_id"], "evt_provider_12345")
         self.assertTrue(meet_res["ai_representative_enabled"])
-        self.assertIn("AI Representative", meet_res["statutory_disclosure"])
+        self.assertIn("AI representative", meet_res["statutory_disclosure"])
+        self.assertEqual(len(provider.calls), 1)
+        self.assertIn("Objective:", provider.calls[0]["description"])
 
-        # Check briefing dossier was generated
+        # Briefing dossier is a real file, not a fabricated URL.
         self.assertIsNotNone(meet_res["briefing_dossier_id"])
         self.assertTrue(meet_res["briefing_dossier_url"].startswith("/api/assistant/documents/"))
+        dossier = document_generator.get_document(meet_res["briefing_dossier_id"], self.tenant_id)
+        self.assertTrue(os.path.exists(dossier["file_path"]))
 
-        # Verify entry in meeting_integrations table
         with db.get_connection() as conn:
             row = conn.execute(
                 "SELECT * FROM meeting_integrations WHERE meeting_id = ?",
                 (meet_res["meeting_id"],)
             ).fetchone()
-            self.assertIsNotNone(row)
-            self.assertEqual(row["meet_url"], meet_res["google_meet_url"])
-            self.assertEqual(row["ai_representative_enabled"], 1)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["meet_url"], meet_res["google_meet_url"])
+        self.assertEqual(row["calendar_event_id"], "evt_provider_12345")
+        self.assertEqual(row["ai_representative_enabled"], 1)
+        # Disclosure is not attested merely because scheduling succeeded.
+        self.assertEqual(row["statutory_disclosure_signed"], 0)
+
+    def test_meeting_provider_failure_is_not_reported_as_success(self):
+        provider = FakeCalendarProvider(fail=True)
+        res = self.meeting_svc.schedule_meeting_autonomous(
+            prompt="Board risk review",
+            company_id=self.company_id,
+            user_id=self.user_id,
+            calendar_provider=provider,
+        )
+        self.assertFalse(res["success"])
+        self.assertEqual(res["provider_status"], "BLOCKED")
+        self.assertEqual(res["reason"], "CALENDAR_PROVIDER_FAILED")
+        self.assertNotIn("meeting_id", res)
 
     # =========================================================================
     # 7. CONVERSATION HISTORY BUFFER & AMBIGUITY ARBITRATION
@@ -335,11 +510,13 @@ class TestZonataAssistantIntegration(unittest.TestCase):
         self.assertTrue(any(r["doc_id"] == p_doc["doc_id"] for r in results_author))
 
     def test_post_meeting_records_and_minutes_pdf(self):
-        # Schedule meeting first
+        # Scheduling requires a confirmed provider in this build.
+        provider = FakeCalendarProvider()
         meet_res = self.meeting_svc.schedule_meeting_autonomous(
             prompt="Executive Alignment for Q4 Objectives",
             company_id=self.company_id,
-            user_id=self.user_id
+            user_id=self.user_id,
+            calendar_provider=provider,
         )
         mid = meet_res["meeting_id"]
 
@@ -356,27 +533,42 @@ class TestZonataAssistantIntegration(unittest.TestCase):
         rec_res = self.meeting_svc.generate_post_meeting_records(mid)
         self.assertTrue(rec_res["success"])
         self.assertIsNotNone(rec_res["minutes_doc_id"])
-        self.assertTrue(os.path.exists(document_generator.get_document(rec_res["minutes_doc_id"], self.tenant_id)["file_path"]))
+        doc = document_generator.get_document(rec_res["minutes_doc_id"], self.tenant_id)
+        self.assertTrue(os.path.exists(doc["file_path"]))
+        with open(doc["file_path"], "rb") as fh:
+            raw = fh.read()
+        self.assertIn(b"We project 18% QoQ expansion", raw)
+        self.assertIn(b"No decisions were recorded", raw)
 
     def test_legacy_backward_compatibility(self):
         # Test handle_ai_chat
         chat_res = self.assistant.handle_ai_chat("What is our hotel status?", company_id=self.company_id)
         self.assertIn("reply", chat_res)
+        self.assertIn("citations", chat_res)
 
-        # Test create_coworker_task
+        # Test create_coworker_task: queued, never auto-completed.
         task = self.assistant.create_coworker_task("Verify hotel PMS filesystem", workspace_mode="COMPANY", company_id=self.company_id)
-        self.assertEqual(task["status"], "COMPLETED")
+        self.assertIn(task["status"], ("PLANNING", "QUEUED"))
         self.assertEqual(task["permission_tier"], "SAFE_BROWSE")
+        self.assertIsNone(task["receipt_id"])
+        self.assertFalse(any(stage["stage"] == "COMPLETED" for stage in task["execution_log"]))
 
         # Test gated coworker task requiring approval
         gated = self.assistant.create_coworker_task("Pay vendor invoice of ₹150,000", workspace_mode="COMPANY", company_id=self.company_id)
         self.assertEqual(gated["status"], "AWAITING_APPROVAL")
         self.assertEqual(gated["permission_tier"], "FINANCIAL_ACTION")
 
-        # Approve gated task
+        # Approval authorises but does not claim execution.
         approved = self.assistant.approve_coworker_task(gated["task_id"], approved=True)
-        self.assertEqual(approved["status"], "COMPLETED")
+        self.assertEqual(approved["status"], "APPROVED")
         self.assertEqual(approved["approval_status"], "APPROVED")
+        self.assertIsNone(approved["receipt_id"])
+        self.assertIsNone(approved["completed_at"])
+
+        denied = self.assistant.create_coworker_task("Delete vault keys", workspace_mode="COMPANY", company_id=self.company_id)
+        denied = self.assistant.approve_coworker_task(denied["task_id"], approved=False)
+        self.assertEqual(denied["status"], "REVERTED")
+        self.assertEqual(denied["approval_status"], "DENIED")
 
 
 if __name__ == "__main__":
