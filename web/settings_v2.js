@@ -861,7 +861,7 @@
       '<div class="sz-sidebar-footer">' +
       '<span class="sz-role">' + esc((state.capabilities.role || 'UNKNOWN').replace(/_/g, ' ')) + '</span>' +
       '<span class="sz-actor">' + esc(state.capabilities.actor_type || 'human') + '</span>' +
-      '<a class="sz-legacy-link" href="#/settings" data-action="legacy">Legacy console</a>' +
+      '<a class="sz-legacy-link" href="#/settings-legacy" data-action="legacy">Legacy console</a>' +
       '</div>' +
       '</aside>'
     );
@@ -887,7 +887,7 @@
       (state.capabilities.can_read_audit
         ? '<button type="button" class="sz-btn" data-action="open-audit">Audit</button>'
         : '') +
-      '<a class="sz-btn sz-btn-ghost" href="#/settings" data-action="legacy">Open legacy</a>' +
+      '<a class="sz-btn sz-btn-ghost" href="#/settings-legacy" data-action="legacy">Open legacy</a>' +
       '</div></header>'
     );
   }
@@ -1148,7 +1148,7 @@
       '<p>Sections 1–6 are rebuilt on the Settings V2 API. This section has ' +
       definitions.length + ' definitions and is scheduled for the next migration pass.</p>' +
       '<p class="sz-hint">Showing a half-wired control here would be decorative. The link below opens the existing, working console.</p>' +
-      '<a class="sz-btn sz-btn-primary" href="#/settings" data-action="legacy">Open the legacy console</a>' +
+      '<a class="sz-btn sz-btn-primary" href="#/settings-legacy" data-action="legacy">Open the legacy console</a>' +
       '</div>'
     );
   }

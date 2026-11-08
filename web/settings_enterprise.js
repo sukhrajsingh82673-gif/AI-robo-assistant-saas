@@ -256,10 +256,12 @@ const EnterpriseSettings = (function() {
     await fetchEffectiveState();
     await Promise.all([fetchLiveSystemStatus(), fetchHubAuditEvents()]);
 
-    // Auto-render if currently on settings route or hash
+    // Auto-render only for legacy routes. The V2 console owns the default
+    // #/settings route, and legacy domain deep links stay legacy.
     const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
-    if (hash.startsWith('#/settings') || hash.startsWith('#settings')) {
-      const clean = hash.replace(/^#/, '');
+    const isConsole = /^#\/(workspace\/)?settings(\/)?$/.test(hash) || /^#\/(workspace\/)?settings-v2(\/|$)/.test(hash);
+    if (!isConsole && (hash.startsWith('#/settings') || hash.startsWith('#settings'))) {
+      const clean = hash.replace(/^#/, '').replace(/^\/(workspace\/)?settings-legacy/, '/settings');
       render(clean);
     }
   }
@@ -410,8 +412,8 @@ const EnterpriseSettings = (function() {
     }
 
     if (targetView === 'hub' || targetView === '/settings') {
-      if (window.location.hash !== '#/settings') {
-        window.location.hash = '#/settings';
+      if (window.location.hash !== '#/settings-legacy') {
+        window.location.hash = '#/settings-legacy';
       }
       activeView = 'hub';
       renderRoute();
@@ -492,7 +494,7 @@ const EnterpriseSettings = (function() {
               ${renderSearchBox()}
 
               <div class="meta-actions">
-                <a class="btn-subtle" href="#/settings-v2" title="Open the rebuilt Settings V2 console (preview)">
+                <a class="btn-subtle" href="#/settings" title="Open the rebuilt Settings V2 console">
                   ${SVG_ICONS.sliders}
                   <span>New console</span>
                 </a>
@@ -705,7 +707,7 @@ const EnterpriseSettings = (function() {
           <main class="settings-configuration-main">
             <!-- Breadcrumbs Bar -->
             <div class="settings-breadcrumbs-row">
-              <a href="#/settings" onclick="EnterpriseSettings.navigateTo('hub')">Settings Home</a>
+              <a href="#/settings-legacy" onclick="EnterpriseSettings.navigateTo('hub')">Settings Home</a>
               <span class="crumb-sep">/</span>
               <span class="crumb-pillar">${escapeHtml(pillar.title)}</span>
               <span class="crumb-sep">/</span>

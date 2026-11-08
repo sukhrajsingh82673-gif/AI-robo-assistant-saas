@@ -756,9 +756,11 @@ Phase 2 stops here. UI work starts only after this checkpoint is approved.
 
 ## 17. Console preview (Phase 3, sections 1–6)
 
-The V2 console is additive. The legacy console stays mounted at `#/settings`
-and the new one is reachable at `#/settings-v2` (also
-`#/workspace/settings-v2`) until all 16 sections reach parity.
+The V2 console is the default Settings experience at `#/settings` (alias
+`#/settings-v2`). The legacy console remains fully available at
+`#/settings-legacy` and for legacy deep links (`#/settings/<category>`) until
+all 16 sections reach parity. Every V2 surface links to the legacy console,
+and the legacy hub links back to the default console.
 
 ### 17.1 Files
 

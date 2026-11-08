@@ -855,13 +855,17 @@ function handleRoute(path) {
     } else if (navKey === 'design' && window.DesignPreviewWorkspace) {
       window.DesignPreviewWorkspace.render('view-design');
     } else if (navKey === 'settings') {
-      const v2Route = cleanPath.startsWith('/workspace/settings-v2') || cleanPath.startsWith('/settings-v2');
-      if (v2Route && window.SettingsV2) {
+      // The V2 console is the default Settings experience. The legacy console
+      // stays reachable at /settings-legacy and for legacy deep links such as
+      // /settings/ai_providers, which the V2 console does not own yet.
+      const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(cleanPath);
+      const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(cleanPath);
+      if (!legacyAlias && !legacyDomain && window.SettingsV2) {
         window.SettingsV2.render(cleanPath);
       } else {
         const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
         if (es && es.render) {
-          es.render(cleanPath);
+          es.render(legacyAlias ? '/settings' : cleanPath);
         } else {
           console.warn('[AppRouter] EnterpriseSettings not found');
         }
@@ -2473,14 +2477,16 @@ function renderSettingsSection() {
   if (!container) return;
 
   const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
-  if (route.startsWith('/settings-v2') && window.SettingsV2) {
+  const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(route);
+  const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(route);
+  if (!legacyAlias && !legacyDomain && window.SettingsV2) {
     window.SettingsV2.render(route);
     return;
   }
 
   const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
   if (es && es.render) {
-    es.render(route.startsWith('/settings') ? route : '/settings');
+    es.render(legacyAlias ? '/settings' : (route.startsWith('/settings') ? route : '/settings'));
   }
 }
 
@@ -2498,7 +2504,7 @@ window.returnToSettingsHub = function() {
   if (es && es.navigateTo) {
     es.navigateTo('hub');
   } else {
-    window.navigateTo('/settings');
+    window.navigateTo('/settings-legacy');
   }
 };
 

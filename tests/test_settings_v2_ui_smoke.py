@@ -171,6 +171,23 @@ class TestSettingsV2ConsoleSmoke(unittest.TestCase):
             "settings_v2.js must load after settings_enterprise.js",
         )
 
+    def test_default_settings_route_opens_the_v2_console(self):
+        with open(os.path.join(WEB_DIR, "app.js"), "r", encoding="utf-8") as handle:
+            app_js = handle.read()
+        with open(os.path.join(WEB_DIR, "settings_v2.js"), "r", encoding="utf-8") as handle:
+            console_js = handle.read()
+
+        # The router sends the default settings route to the console and keeps
+        # a real legacy escape hatch.
+        self.assertIn("window.SettingsV2.render(cleanPath)", app_js)
+        self.assertIn("/settings-legacy", app_js)
+        self.assertIn("legacyDomain", app_js)
+
+        # Every console link to the old UI targets the legacy alias, never the
+        # default route (which would loop back into the console).
+        self.assertIn("#/settings-legacy", console_js)
+        self.assertNotIn('href="#/settings"', console_js)
+
     def test_registry_exposes_capabilities_and_hides_hidden_definitions(self):
         payload, status = self._get(
             "/api/settings/v2/registry?section=ai_agents_employees"
