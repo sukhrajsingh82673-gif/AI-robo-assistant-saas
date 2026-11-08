@@ -855,11 +855,16 @@ function handleRoute(path) {
     } else if (navKey === 'design' && window.DesignPreviewWorkspace) {
       window.DesignPreviewWorkspace.render('view-design');
     } else if (navKey === 'settings') {
-      const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
-      if (es && es.render) {
-        es.render(cleanPath);
+      const v2Route = cleanPath.startsWith('/workspace/settings-v2') || cleanPath.startsWith('/settings-v2');
+      if (v2Route && window.SettingsV2) {
+        window.SettingsV2.render(cleanPath);
       } else {
-        console.warn('[AppRouter] EnterpriseSettings not found');
+        const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
+        if (es && es.render) {
+          es.render(cleanPath);
+        } else {
+          console.warn('[AppRouter] EnterpriseSettings not found');
+        }
       }
     } else {
       console.warn(`[AppRouter] No dedicated renderer registered for: ${navKey}`);
@@ -2467,9 +2472,14 @@ function renderSettingsSection() {
   const container = document.getElementById('view-settings');
   if (!container) return;
 
+  const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
+  if (route.startsWith('/settings-v2') && window.SettingsV2) {
+    window.SettingsV2.render(route);
+    return;
+  }
+
   const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
   if (es && es.render) {
-    const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
     es.render(route.startsWith('/settings') ? route : '/settings');
   }
 }

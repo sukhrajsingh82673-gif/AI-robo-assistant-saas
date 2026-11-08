@@ -492,6 +492,10 @@ const EnterpriseSettings = (function() {
               ${renderSearchBox()}
 
               <div class="meta-actions">
+                <a class="btn-subtle" href="#/settings-v2" title="Open the rebuilt Settings V2 console (preview)">
+                  ${SVG_ICONS.sliders}
+                  <span>New console</span>
+                </a>
                 <button class="btn-subtle" onclick="EnterpriseSettings.toggleAuditDrawer()" title="View Global Evidence Audit Ledger">
                   ${SVG_ICONS.checkCircle}
                   <span>Ledger</span>
