@@ -352,6 +352,15 @@ class TestRbac(SettingsV2TestBase):
         owner_catalog = self.service.registry_catalog(self.owner)
         self.assertTrue(owner_catalog["capabilities"]["can_write"])
 
+    def test_section_scoped_registry_keeps_capabilities(self):
+        # The console loads the full catalog, but a section filter must not
+        # silently drop the caller's capability hints.
+        catalog = self.service.registry_catalog(self.owner, section="ai_agents_employees")
+        self.assertEqual(catalog["counts"]["section"], "ai_agents_employees")
+        self.assertIn("capabilities", catalog)
+        self.assertTrue(catalog["capabilities"]["can_write"])
+        self.assertTrue(all(item["section"] == "ai_agents_employees" for item in catalog["settings"]))
+
 
 class TestApprovals(SettingsV2TestBase):
     def test_agent_proposes_and_owner_applies(self):
@@ -666,6 +675,10 @@ class TestApiLayer(SettingsV2TestBase):
         catalog_keys = {item["key"] for item in payload["registry"]["settings"]}
         self.assertEqual(len(catalog_keys), 198)
         self.assertNotIn("bill_plan_tier", catalog_keys)
+        capabilities = payload["registry"]["capabilities"]
+        self.assertTrue(capabilities["can_write"])
+        self.assertTrue(capabilities["can_lock"])
+        self.assertEqual(capabilities["role"], "OWNER")
 
         status, payload = api.handle(
             "POST",
@@ -688,6 +701,10 @@ class TestApiLayer(SettingsV2TestBase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(payload["setting"]["value"], 25)
+        self.assertEqual(payload["setting"]["overridden_here"], True)
+        self.assertIn("Overridden", payload["setting"]["provenance"])
+        self.assertEqual(payload["setting"]["version"], 1)
+        self.assertIn("company", payload["setting"]["allowed_scopes"])
 
     def test_missing_expected_version_is_rejected(self):
         api = SettingsV2API(self.service)

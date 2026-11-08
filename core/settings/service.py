@@ -228,6 +228,7 @@ class SettingsV2Service:
                     item for item in catalog["categories"] if item.get("section") == section
                 ],
                 "settings": definitions,
+                "capabilities": catalog["capabilities"],
                 "counts": {
                     "total": len(definitions),
                     "section": section,
