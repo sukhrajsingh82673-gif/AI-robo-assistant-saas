@@ -769,7 +769,7 @@ and the legacy hub links back to the default console.
 | `web/settings_v2.js` | Console module: router, scope switcher, section view, rows, drawers, toasts. |
 | `web/settings_v2.css` | All `.sz-*` styles, responsive, dark, and reduced-motion rules. |
 | `web/index.html` | Loads the console stylesheet and script after the legacy module. |
-| `web/app.js` | Routes `/settings-v2` to `SettingsV2.render` in both router branches. |
+| `web/app.js` | Routes the default `/settings` (and `/settings-v2`) to `SettingsV2.render`; keeps legacy deep links and `/settings-legacy` on the legacy console. |
 | `web/settings_enterprise.js` | Legacy hub links to the new console. |
 
 ### 17.2 Scope and state
@@ -805,16 +805,20 @@ and the legacy hub links back to the default console.
 - `tests/settings_v2_ui_test.js`: 23 passed. Covers the four state labels,
   the anti-decorative rule, real scope parameters, optimistic concurrency,
   row rendering, secret handling, and escaping.
-- `tests/test_settings_v2_ui_smoke.py`: 6 passed. Starts an in-process API
+- `tests/test_settings_v2_ui_smoke.py`: 7 passed. Starts an in-process API
   server on an isolated database and verifies the console's exact HTTP
-  contract: asset wiring, registry capabilities, provenance/version fields,
-  write → effective → reset round-trip, stale-version conflict, and
-  observer write denial.
-- Full settings suites: 93 passed
-  (`test_settings_registry_phase1.py` 31,
-  `test_settings_v2_phase2.py` 44, `test_settings_v2_ui_smoke.py` 6,
+  contract: asset wiring, default routing, registry capabilities,
+  provenance/version fields, write → effective → reset round-trip,
+  stale-version conflict, and observer write denial.
+- Full settings and navigation suites: 101 passed
+  (`test_frontend_navigation_audit.py` 8,
+  `test_settings_registry_phase1.py` 31,
+  `test_settings_v2_phase2.py` 44, `test_settings_v2_ui_smoke.py` 7,
   `test_enterprise_settings_center.py` 12).
 - Legacy qualification suite: 22 passed after the UI change.
+- Staging: `engineering/production-readiness-gap-closure` was fast-forwarded
+  to the feature tip and the deployed `settings_v2.js`, `settings_v2.css`,
+  and routing were verified live on `zonata-staging.onrender.com`.
 
 ### 17.5 Known limitations
 
