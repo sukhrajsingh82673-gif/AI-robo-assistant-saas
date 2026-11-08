@@ -777,8 +777,13 @@ function handleRoute(path) {
       } else {
         renderOverview();
       }
-    } else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
-      window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
+    } else if (navKey === 'assistant') {
+      if (window.FloatingAssistant && !window.FloatingAssistant.isOpen) {
+        window.FloatingAssistant.toggleOpen();
+      }
+      if (window.AssistantCoworkerWorkspace) {
+        window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
+      }
     } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
       window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
     } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {

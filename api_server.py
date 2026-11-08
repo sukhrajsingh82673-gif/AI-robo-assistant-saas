@@ -758,6 +758,24 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _send_file_bytes(self, file_bytes: bytes, filename: str, content_type: str = "application/octet-stream", status=200):
+        req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(file_bytes)))
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self._apply_cors_headers()
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Request-ID", req_id)
+            self.end_headers()
+            if getattr(self, "_head_only", False):
+                return
+            self.wfile.write(file_bytes)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def _enforce_tenant_fairness(self, path: str, method: str, auth_context: Optional[Dict[str, Any]] = None) -> bool:
         """
         Evaluates hierarchical rate limiting, tenant fairness, and endpoint abuse protection.
@@ -2394,6 +2412,65 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(task)
             else:
                 self._send_json({"error": "Task not found"}, status=404)
+            return
+
+        elif path == "/api/assistant/documents/search":
+            q = query_params.get("q", [None])[0] or query_params.get("query", [None])[0]
+            boundary = query_params.get("boundary", [None])[0] or query_params.get("storage_boundary", [None])[0]
+            cid = query_params.get("company_id", [None])[0]
+            uid = query_params.get("user_id", ["usr_owner"])[0]
+            fmt = query_params.get("format", [None])[0]
+            from core.document_generator import document_generator
+            docs = document_generator.search_documents(
+                tenant_id=tenant_id,
+                user_id=uid,
+                query=q,
+                storage_boundary=boundary,
+                company_id=cid,
+                format_type=fmt
+            )
+            self._send_json({"documents": docs, "count": len(docs)})
+            return
+
+        elif path.startswith("/api/assistant/documents/") and path.endswith("/download"):
+            parts = path.split("/")
+            # /api/assistant/documents/{doc_id}/download -> parts[4] is doc_id
+            doc_id = parts[4] if len(parts) > 4 else ""
+            from core.document_generator import document_generator
+            doc = document_generator.get_document(doc_id, tenant_id=tenant_id)
+            if not doc or not os.path.exists(doc.get("file_path", "")):
+                self._send_json({"error": "Document not found on disk"}, status=404)
+                return
+
+            # [MED-01] Tenant/User Ownership Enforcement for Personal Documents
+            if doc.get("storage_boundary") == "PERSONAL":
+                req_uid = auth_context.get("user_id") if isinstance(auth_context, dict) else None
+                user_role = auth_context.get("role") if isinstance(auth_context, dict) else None
+                if req_uid and doc.get("user_id") != req_uid and user_role not in ("OWNER", "GLOBAL_ADMIN", "ADMIN"):
+                    self._send_json({"error": "Access denied to personal document of another user"}, status=403)
+                    return
+            file_path = doc["file_path"]
+            filename = os.path.basename(file_path)
+            fmt = doc.get("format", "").upper()
+            mime_map = {
+                "PDF": "application/pdf",
+                "DOCX": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "XLSX": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "PPTX": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "CSV": "text/csv; charset=utf-8",
+                "JSON": "application/json",
+                "TXT": "text/plain; charset=utf-8"
+            }
+            content_type = mime_map.get(fmt, "application/octet-stream")
+            with open(file_path, "rb") as f:
+                content_bytes = f.read()
+            self._send_file_bytes(content_bytes, filename=filename, content_type=content_type)
+            return
+
+        elif path == "/api/assistant/history":
+            sess_id = query_params.get("session_id", ["default"])[0]
+            msgs = get_runtime(tenant_id).assistant.get_conversation_history(sess_id)
+            self._send_json({"session_id": sess_id, "messages": msgs, "count": len(msgs)})
             return
 
         # =====================================================================
@@ -6113,6 +6190,76 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         # Prompt 03: Floating Live Assistant & Coworker POST Handlers
         # =====================================================================
+        elif path == "/api/assistant/interact":
+            prompt = req_data.get("prompt", "")
+            ws_mode = req_data.get("workspace_mode", "AUTO")
+            cid = req_data.get("company_id")
+            uid = req_data.get("user_id", "usr_owner")
+            sess_id = req_data.get("session_id")
+            attachments = req_data.get("attachments")
+            res = get_runtime(tenant_id).assistant.interact(
+                prompt=prompt,
+                workspace_mode=ws_mode,
+                company_id=cid,
+                user_id=uid,
+                session_id=sess_id,
+                attachments=attachments
+            )
+            self._send_json(res)
+            return
+
+        elif path == "/api/assistant/classify":
+            prompt = req_data.get("prompt", "")
+            ws_mode = req_data.get("workspace_mode")
+            from core.assistant_service import AssistantContextClassifier
+            res = AssistantContextClassifier.classify(prompt=prompt, explicit_workspace=ws_mode)
+            self._send_json(res)
+            return
+
+        elif path == "/api/assistant/documents/generate":
+            title = req_data.get("title", "Generated Document")
+            fmt = req_data.get("format", "PDF")
+            cat = req_data.get("category", "Personal Documents")
+            content = req_data.get("content", "")
+            storage_boundary = req_data.get("storage_boundary", "PERSONAL")
+            uid = req_data.get("user_id", "usr_owner")
+            cid = req_data.get("company_id")
+            meta = req_data.get("metadata", {})
+            from core.document_generator import document_generator
+            doc = document_generator.generate_document(
+                title=title,
+                format_type=fmt,
+                category=cat,
+                content=content,
+                metadata=meta,
+                storage_boundary=storage_boundary,
+                user_id=uid,
+                tenant_id=tenant_id,
+                company_id=cid
+            )
+            self._send_json(doc)
+            return
+
+        elif path == "/api/assistant/meetings/schedule":
+            prompt = req_data.get("prompt", "")
+            cid = req_data.get("company_id")
+            uid = req_data.get("user_id", "usr_owner")
+            start_time = req_data.get("start_time")
+            duration = int(req_data.get("duration_minutes", 45))
+            platform = req_data.get("platform", "GOOGLE_MEET")
+            from core.meeting_service import AiCeoMeetingService
+            meeting_svc = AiCeoMeetingService(tenant_id=tenant_id)
+            res = meeting_svc.schedule_meeting_autonomous(
+                prompt=prompt,
+                company_id=cid,
+                user_id=uid,
+                start_time=start_time,
+                duration_minutes=duration,
+                platform=platform
+            )
+            self._send_json(res)
+            return
+
         elif path == "/api/assistant/chat":
             prompt = req_data.get("prompt", "")
             cid = req_data.get("company_id")

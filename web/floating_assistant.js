@@ -1,37 +1,48 @@
 /**
- * ZONATA — Floating Live Assistant & Universal Multimodal HUD (HAL AI Integration)
- * Draggable, collapsible, persistent floating assistant supporting:
- * 1. 💬 AI Chat (with clear internal/external citations)
- * 2. 🤖 Coworker (10-stage desktop executor)
- * 3. 👁️ Multimodal HUD (Live Waveform, Mic/Camera toggles, Screen Observation, Host Takeover, KillSwitch)
- * 4. 👑 AI CEO (Voice-to-CEO, Executive speech directives & TTS playback)
+ * ZONATA AI — Universal Owner Assistant & Floating Interface
+ * 
+ * Persistent, draggable floating assistant acting as the personal and organizational
+ * communication gateway between the Owner (Host) and the sovereign AI CEO.
+ * 
+ * Features:
+ * 1. Omnipresent Draggable Floating Action Button with 4-Corner Magnetic Snapping
+ * 2. Responsive viewport boundary containment (mobile touch + desktop mouse)
+ * 3. Position persistence across navigation in localStorage
+ * 4. Clean, compact Apple-grade flyout window (preserves compact dimensions)
+ * 5. Single unified conversational & multimodal surface (no fragmented navigation tabs)
+ * 6. Dual context support: Private Personal Workspace vs Governed Company Workspace
+ * 7. Deliverable cards for authentic document downloads (PDF, DOCX, XLSX, PPTX, CSV)
+ * 8. Autonomous Meeting scheduling cards with Google Meet links & statutory disclosure
+ * 9. One-click Host authorization gate banners & emergency killswitch containment
  */
 
 (function() {
   'use strict';
 
-  class FloatingAssistantManager {
+  class UniversalFloatingAssistant {
     constructor() {
       this.isOpen = false;
-      this.activeTab = 'chat'; // 'chat' | 'coworker' | 'multimodal' | 'ceo'
-      this.workspaceMode = 'PERSONAL'; // 'PERSONAL' | 'COMPANY'
+      this.workspaceMode = 'AUTO'; // 'AUTO' | 'PERSONAL' | 'COMPANY'
+      this.currentCorner = 'bottom-left'; // 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
       this.isListening = false;
       this.isSpeaking = false;
-      this.cameraActive = false;
-      this.hostTakeoverActive = false;
       this.currentExecutionState = 'IDLE';
-      this.activeSessionId = null;
-      this.multimodalObservations = [];
-      this.chatMessages = [
+      this.sessionId = 'asst_' + Date.now().toString(36);
+      this.messages = [
         {
+          id: 'welcome',
           sender: 'assistant',
-          text: 'Hello, Host. I am your ZONATA Live Assistant powered by the governed HAL Multimodal Layer. Talk to me, observe screens, or delegate desktop automation.',
-          citations: [{ source_type: 'INTERNAL', label: 'ZONATA Operational Core', verified: true }]
+          text: 'Hello, Host. I am ZONATA AI, your universal assistant and direct gateway to the AI CEO. Ask anything personal, delegate company objectives, request documents, or schedule meetings.',
+          citations: [{ source_type: 'INTERNAL', label: 'ZONATA Operational Core', verified: true }],
+          deliverable: null,
+          actionCard: null,
+          timestamp: Date.now() / 1000
         }
       ];
-      this.coworkerTasks = [];
+      this.pendingAttachments = [];
       this.isDragging = false;
-      this.dragOffset = { x: 0, y: 0 };
+      this.dragStartedAt = 0;
+      this.dragThreshold = 5;
     }
 
     init() {
@@ -42,342 +53,421 @@
         container.className = 'floating-assistant-container';
         document.body.appendChild(container);
       }
-      this.renderWidget(container);
-      this.loadSavedPosition(container);
-      this.loadCoworkerTasks();
-      this.loadMultimodalStatus();
+      this.render(container);
+      this.applySavedCornerPosition(container);
+      this.bindDragPhysics(container);
+      this.startStateSync();
     }
 
-    loadSavedPosition(container) {
-      const saved = localStorage.getItem('zonata_assistant_pos');
-      if (saved) {
-        try {
-          const pos = JSON.parse(saved);
-          container.style.right = 'auto';
-          container.style.bottom = 'auto';
-          container.style.left = `${Math.min(window.innerWidth - 70, Math.max(10, pos.x))}px`;
-          container.style.top = `${Math.min(window.innerHeight - 70, Math.max(10, pos.y))}px`;
-        } catch (e) {}
+    // =========================================================================
+    // 4-CORNER MAGNETIC SNAPPING & DRAG PHYSICS
+    // =========================================================================
+
+    applySavedCornerPosition(container) {
+      const savedCorner = localStorage.getItem('zonata_assistant_corner') || 'bottom-left';
+      this.snapToCorner(container, savedCorner, false);
+    }
+
+    snapToCorner(container, cornerName, animate = true) {
+      this.currentCorner = cornerName;
+      localStorage.setItem('zonata_assistant_corner', cornerName);
+
+      const padding = 20;
+      const flyout = document.getElementById('assistantFlyout');
+      container.style.transition = animate ? 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)' : 'none';
+
+      container.style.top = 'auto';
+      container.style.bottom = 'auto';
+      container.style.left = 'auto';
+      container.style.right = 'auto';
+
+      if (cornerName === 'bottom-left') {
+        container.style.bottom = `${padding}px`;
+        container.style.left = `${padding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-left' + (this.isOpen ? ' open' : '');
+      } else if (cornerName === 'bottom-right') {
+        container.style.bottom = `${padding}px`;
+        container.style.right = `${padding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-bottom-right' + (this.isOpen ? ' open' : '');
+      } else if (cornerName === 'top-left') {
+        container.style.top = `${padding}px`;
+        container.style.left = `${padding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-left' + (this.isOpen ? ' open' : '');
+      } else if (cornerName === 'top-right') {
+        container.style.top = `${padding}px`;
+        container.style.right = `${padding}px`;
+        if (flyout) flyout.className = 'assistant-flyout-window anchor-top-right' + (this.isOpen ? ' open' : '');
       }
     }
 
-    savePosition(x, y) {
-      localStorage.setItem('zonata_assistant_pos', JSON.stringify({ x, y }));
+    calculateNearestCorner(clientX, clientY) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isLeft = clientX < w / 2;
+      const isTop = clientY < h / 2;
+
+      if (isTop && isLeft) return 'top-left';
+      if (isTop && !isLeft) return 'top-right';
+      if (!isTop && isLeft) return 'bottom-left';
+      return 'bottom-right';
     }
 
-    renderWidget(container) {
-      container.innerHTML = `
-        <!-- Floating Launcher Pill/Button -->
-        <div class="assistant-floating-badge" id="assistantBadge" title="Open ZONATA Live Assistant" onclick="window.FloatingAssistant.toggleOpen(event)">
-          <div class="assistant-pill-icon">✨</div>
-          <span class="assistant-pill-label">ZONATA Assistant</span>
-          <span class="pulse-indicator" id="assistantBadgePulse" style="background:#10b981;"></span>
-          <span id="assistantBadgeState" style="font-size:10px; font-weight:700; color:#10b981; margin-left:4px; letter-spacing:0.5px;">${this.currentExecutionState}</span>
-        </div>
-
-        <!-- Flyout Window -->
-        <div class="assistant-flyout-window ${this.isOpen ? 'open' : ''}" id="assistantFlyout">
-          <!-- Window Header (Draggable Handle) -->
-          <div class="assistant-window-header" id="assistantHeaderHandle">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:16px;">✨</span>
-              <div>
-                <div style="font-size:13px; font-weight:700; color:var(--text-primary);">Live Assistant</div>
-                <div style="font-size:11px; color:var(--text-muted);">Multimodal Companion & Executive HUD</div>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <button class="assistant-btn-icon" onclick="window.FloatingAssistant.toggleOpen(event)" title="Collapse">
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <!-- Mode Tab Navigation (4 Modes) -->
-          <div class="assistant-nav-tabs">
-            <button class="assistant-tab-btn ${this.activeTab === 'chat' ? 'active' : ''}" onclick="window.FloatingAssistant.switchTab('chat')">
-              💬 Chat
-            </button>
-            <button class="assistant-tab-btn ${this.activeTab === 'coworker' ? 'active' : ''}" onclick="window.FloatingAssistant.switchTab('coworker')">
-              🤖 Coworker
-            </button>
-            <button class="assistant-tab-btn ${this.activeTab === 'multimodal' ? 'active' : ''}" onclick="window.FloatingAssistant.switchTab('multimodal')">
-              👁️ Multimodal
-            </button>
-            <button class="assistant-tab-btn ${this.activeTab === 'ceo' ? 'active' : ''}" onclick="window.FloatingAssistant.switchTab('ceo')">
-              👑 AI CEO
-            </button>
-          </div>
-
-          <!-- Tab 1: AI Chat Surface -->
-          <div class="assistant-tab-content ${this.activeTab === 'chat' ? 'active' : ''}" id="assistantChatTab">
-            <div class="assistant-chat-scroll" id="assistantChatScroll">
-              ${this.renderChatMessagesHtml()}
-            </div>
-            <div class="assistant-chat-input-bar">
-              <input type="text" id="assistantChatInput" class="assistant-input" placeholder="Ask anything about company truth or metrics..." onkeydown="if(event.key==='Enter') window.FloatingAssistant.sendChat()" />
-              <button class="assistant-send-btn" onclick="window.FloatingAssistant.sendChat()">Send</button>
-            </div>
-          </div>
-
-          <!-- Tab 2: Coworker Surface -->
-          <div class="assistant-tab-content ${this.activeTab === 'coworker' ? 'active' : ''}" id="assistantCoworkerTab">
-            <!-- Workspace Mode Switcher -->
-            <div class="assistant-workspace-bar">
-              <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Workspace:</span>
-              <div class="btn-group" style="display:flex; gap:4px;">
-                <button class="btn-workspace-pill ${this.workspaceMode === 'PERSONAL' ? 'active' : ''}" onclick="window.FloatingAssistant.setWorkspaceMode('PERSONAL')">
-                  👤 Personal
-                </button>
-                <button class="btn-workspace-pill ${this.workspaceMode === 'COMPANY' ? 'active' : ''}" onclick="window.FloatingAssistant.setWorkspaceMode('COMPANY')">
-                  🏢 Company
-                </button>
-              </div>
-            </div>
-
-            <!-- Task Trigger Input -->
-            <div style="padding:10px 14px; border-bottom:1px solid var(--border-color); background:var(--bg-surface-hover);">
-              <div style="font-size:11.5px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Assign Desktop / Robot Task:</div>
-              <div style="display:flex; gap:6px;">
-                <input type="text" id="coworkerTaskInput" class="assistant-input" placeholder="e.g. 'Read executive summary' or 'Verify filesystem report'..." onkeydown="if(event.key==='Enter') window.FloatingAssistant.dispatchCoworkerTask()" />
-                <button class="assistant-send-btn" onclick="window.FloatingAssistant.dispatchCoworkerTask()">Dispatch</button>
-              </div>
-            </div>
-
-            <!-- 10-Stage Task Lifecycle Feed -->
-            <div class="assistant-coworker-feed" id="coworkerFeed">
-              ${this.renderCoworkerTasksHtml()}
-            </div>
-          </div>
-
-          <!-- Tab 3: Multimodal HUD Surface -->
-          <div class="assistant-tab-content ${this.activeTab === 'multimodal' ? 'active' : ''}" id="assistantMultimodalTab">
-            <div class="multimodal-hud-container" id="multimodalHudScroll">
-              <!-- Live Status Banner -->
-              <div class="multimodal-status-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                  <span style="font-weight:700; color:var(--text-primary);">HAL9000 Multimodal Runtime</span>
-                  <span class="hud-state-badge hud-state-${this.currentExecutionState}">${this.currentExecutionState}</span>
-                </div>
-                <div style="font-size:11px; color:var(--text-secondary);">
-                  Governed Vision, Speech, Desktop Robot & MCP Gateway
-                </div>
-              </div>
-
-              <!-- Live Waveform Audio Visualizer -->
-              <div class="multimodal-waveform-canvas" id="hudWaveform">
-                ${this.renderWaveformBarsHtml()}
-              </div>
-
-              <!-- Action & Control Grid -->
-              <div class="multimodal-controls-grid">
-                <button class="btn-hud-action" id="btnHudMic" onclick="window.FloatingAssistant.toggleMic()">
-                  ${this.isListening ? '🔴 Stop Mic' : '🎙️ Mic Input'}
-                </button>
-                <button class="btn-hud-action" onclick="window.FloatingAssistant.captureScreenObservation()">
-                  🖥️ Observe Screen
-                </button>
-                <button class="btn-hud-action" onclick="window.FloatingAssistant.toggleCamera()">
-                  📷 ${this.cameraActive ? 'Stop Camera' : 'Face Track Cam'}
-                </button>
-                <button class="btn-hud-action btn-hud-takeover" onclick="window.FloatingAssistant.triggerHostTakeover()">
-                  ✋ Take Control
-                </button>
-              </div>
-
-              <!-- Emergency KillSwitch Button -->
-              <button class="btn-hud-action btn-hud-stop" style="width:100%;" onclick="window.FloatingAssistant.triggerEmergencyStop()">
-                🛑 Emergency STOP (KillSwitch)
-              </button>
-
-              <!-- Observations & Evidence Stream -->
-              <div style="margin-top:4px;">
-                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Recent Multimodal Observations:</div>
-                <div id="multimodalObservationsFeed" style="display:flex; flex-direction:column; gap:6px;">
-                  ${this.renderObservationsHtml()}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab 4: AI CEO Direct Multimodal Meeting Surface -->
-          <div class="assistant-tab-content ${this.activeTab === 'ceo' ? 'active' : ''}" id="assistantCeoTab">
-            <div style="padding:14px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;">
-              <div class="multimodal-status-card">
-                <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px;">👑 Executive Voice-to-CEO</div>
-                <div style="font-size:11px; color:var(--text-secondary);">
-                  Deliver verbal directives directly to the AI CEO with verified synthesis.
-                </div>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:8px;">
-                <textarea id="ceoDirectiveInput" class="assistant-input" rows="3" placeholder="Speak or type executive directive, e.g. 'Analyze our Q3 gross margins and draft an executive directive.'"></textarea>
-                <div style="display:flex; gap:8px;">
-                  <button class="assistant-send-btn" style="flex:1;" onclick="window.FloatingAssistant.dispatchVoiceToCeo()">Transmit Directive</button>
-                  <button class="btn-secondary" style="font-size:11px; padding:6px 12px;" onclick="window.FloatingAssistant.quickCeoPrompt()">Example</button>
-                </div>
-              </div>
-
-              <div id="ceoResponseBox" style="background:var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; font-size:12px; display:none;">
-                <div style="font-weight:700; color:#3b82f6; margin-bottom:4px;">AI CEO Response:</div>
-                <div id="ceoResponseText" style="color:var(--text-primary); margin-bottom:8px; line-height:1.4;"></div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:var(--text-muted);">
-                  <span id="ceoEvidenceHash">Hash: Verified</span>
-                  <button class="btn-secondary" style="font-size:10px; padding:2px 8px;" onclick="window.FloatingAssistant.playCeoAudio()">🔊 Play Speech</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      `;
-
-      this.bindDragEvents(container);
-    }
-
-    renderWaveformBarsHtml() {
-      const bars = [];
-      const count = 28;
-      for (let i = 0; i < count; i++) {
-        bars.push(`<div class="waveform-bar ${this.isListening || this.isSpeaking ? 'active' : ''}" style="animation-delay:${(i * 0.05).toFixed(2)}s"></div>`);
-      }
-      return bars.join('');
-    }
-
-    renderObservationsHtml() {
-      if (this.multimodalObservations.length === 0) {
-        return `<div style="text-align:center; padding:12px; font-size:11px; color:var(--text-muted);">No observations captured yet. Click 'Observe Screen' or 'Mic Input'.</div>`;
-      }
-      return this.multimodalObservations.slice(0, 5).map(o => `
-        <div style="background:var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:8px 10px; font-size:11px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
-            <span style="font-weight:700; color:#3b82f6;">[${this.escape(o.source)}]</span>
-            <span style="color:var(--text-muted); font-size:9.5px;">${new Date(o.timestamp * 1000).toLocaleTimeString()}</span>
-          </div>
-          <div style="color:var(--text-primary); margin-bottom:3px;">${this.escape(o.redacted_content || o.details || 'Observation recorded')}</div>
-          <div style="font-size:9.5px; color:var(--text-muted); font-family:monospace;">SHA256: ${this.escape((o.raw_hash || '').substring(0, 16))}...</div>
-        </div>
-      `).join('');
-    }
-
-    bindDragEvents(container) {
-      const handle = document.getElementById('assistantBadge');
+    bindDragPhysics(container) {
+      const handle = document.getElementById('assistantFloatingFab');
       if (!handle) return;
 
       let startX = 0, startY = 0;
       let initialLeft = 0, initialTop = 0;
-      let dragged = false;
+      let hasMoved = false;
 
-      const onDragStart = (clientX, clientY) => {
-        dragged = false;
-        startX = clientX;
-        startY = clientY;
+      const onStart = (cx, cy) => {
         const rect = container.getBoundingClientRect();
+        startX = cx;
+        startY = cy;
         initialLeft = rect.left;
         initialTop = rect.top;
-        container.style.transition = 'transform 0.1s ease, box-shadow 0.1s ease';
-        container.style.transform = 'scale(1.04)';
+        hasMoved = false;
+        this.dragStartedAt = Date.now();
+
+        container.style.transition = 'none';
+        container.style.transform = 'scale(1.06)';
       };
 
-      const onDragMove = (clientX, clientY) => {
-        const dx = clientX - startX;
-        const dy = clientY - startY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragged = true;
+      const onMove = (cx, cy) => {
+        const dx = cx - startX;
+        const dy = cy - startY;
+        if (Math.hypot(dx, dy) > this.dragThreshold) {
+          hasMoved = true;
+          this.isDragging = true;
+        }
 
-        const newLeft = Math.min(window.innerWidth - 70, Math.max(10, initialLeft + dx));
-        const newTop = Math.min(window.innerHeight - 70, Math.max(10, initialTop + dy));
+        if (hasMoved) {
+          const btnW = 56;
+          const btnH = 56;
+          const maxLeft = window.innerWidth - btnW - 10;
+          const maxTop = window.innerHeight - btnH - 10;
 
-        container.style.right = 'auto';
-        container.style.bottom = 'auto';
-        container.style.left = `${newLeft}px`;
-        container.style.top = `${newTop}px`;
-      };
+          const newLeft = Math.min(maxLeft, Math.max(10, initialLeft + dx));
+          const newTop = Math.min(maxTop, Math.max(10, initialTop + dy));
 
-      const onDragEnd = () => {
-        container.style.transform = 'scale(1)';
-        if (dragged) {
-          const rect = container.getBoundingClientRect();
-          this.savePosition(rect.left, rect.top);
+          container.style.left = `${newLeft}px`;
+          container.style.top = `${newTop}px`;
+          container.style.right = 'auto';
+          container.style.bottom = 'auto';
         }
       };
 
-      // Mouse events
-      const onMouseDown = (e) => {
-        if (e.target.closest('#assistantFlyout')) return;
-        onDragStart(e.clientX, e.clientY);
-        const onMouseMove = (ev) => onDragMove(ev.clientX, ev.clientY);
-        const onMouseUp = () => {
-          document.removeEventListener('mousemove', onMouseMove);
-          document.removeEventListener('mouseup', onMouseUp);
-          onDragEnd();
-        };
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+      const onEnd = (cx, cy) => {
+        container.style.transform = 'scale(1)';
+        if (hasMoved) {
+          const nearest = this.calculateNearestCorner(cx, cy);
+          this.snapToCorner(container, nearest, true);
+        }
+        setTimeout(() => {
+          this.isDragging = false;
+        }, 50);
       };
 
-      // Touch events
-      const onTouchStart = (e) => {
+      // Mouse Listeners
+      const handleMouseDown = (e) => {
+        if (e.target.closest('#assistantFlyout')) return;
+        onStart(e.clientX, e.clientY);
+
+        const handleMouseMove = (ev) => onMove(ev.clientX, ev.clientY);
+        const handleMouseUp = (ev) => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          onEnd(ev.clientX, ev.clientY);
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      };
+
+      // Touch Listeners (Mobile Handheld UX)
+      const handleTouchStart = (e) => {
         if (e.target.closest('#assistantFlyout')) return;
         if (!e.touches || e.touches.length === 0) return;
         const t = e.touches[0];
-        onDragStart(t.clientX, t.clientY);
-        const onTouchMove = (ev) => {
+        onStart(t.clientX, t.clientY);
+
+        const handleTouchMove = (ev) => {
           if (!ev.touches || ev.touches.length === 0) return;
-          onDragMove(ev.touches[0].clientX, ev.touches[0].clientY);
+          onMove(ev.touches[0].clientX, ev.touches[0].clientY);
         };
-        const onTouchEnd = () => {
-          document.removeEventListener('touchmove', onTouchMove);
-          document.removeEventListener('touchend', onTouchEnd);
-          onDragEnd();
+        const handleTouchEnd = (ev) => {
+          document.removeEventListener('touchmove', handleTouchMove);
+          document.removeEventListener('touchend', handleTouchEnd);
+          const tEnd = ev.changedTouches && ev.changedTouches.length ? ev.changedTouches[0] : t;
+          onEnd(tEnd.clientX, tEnd.clientY);
         };
-        document.addEventListener('touchmove', onTouchMove, { passive: true });
-        document.addEventListener('touchend', onTouchEnd);
+        document.addEventListener('touchmove', handleTouchMove, { passive: true });
+        document.addEventListener('touchend', handleTouchEnd);
       };
 
-      handle.addEventListener('mousedown', onMouseDown);
-      handle.addEventListener('touchstart', onTouchStart, { passive: true });
-
-      // Start periodic status sync
-      this.startStateSync();
+      handle.addEventListener('mousedown', handleMouseDown);
+      handle.addEventListener('touchstart', handleTouchStart, { passive: true });
     }
 
-    startStateSync() {
-      if (this._syncTimer) clearInterval(this._syncTimer);
-      this._syncTimer = setInterval(() => this.syncCoworkerState(), 4000);
-      this.syncCoworkerState();
+    // =========================================================================
+    // UI RENDERING (Apple-Grade Compact Glassmorphism)
+    // =========================================================================
+
+    render(container) {
+      container.innerHTML = `
+        <!-- Floating Draggable Action Button (FAB) -->
+        <div class="assistant-floating-fab" id="assistantFloatingFab" title="ZONATA AI Universal Assistant" onclick="window.FloatingAssistant.handleFabClick(event)">
+          <div class="assistant-fab-inner">
+            <span class="assistant-fab-icon">✨</span>
+            <span class="assistant-pulse-ring" id="assistantPulseRing"></span>
+          </div>
+          <span class="assistant-fab-pill-label">ZONATA AI</span>
+        </div>
+
+        <!-- Compact Flyout Window -->
+        <div class="assistant-flyout-window anchor-${this.currentCorner} ${this.isOpen ? 'open' : ''}" id="assistantFlyout">
+          <!-- Window Header -->
+          <div class="assistant-flyout-header" id="assistantFlyoutHeader">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="assistant-header-sparkle">✨</span>
+              <div>
+                <div class="assistant-header-title">ZONATA AI</div>
+                <div class="assistant-header-subtitle">Universal Owner Assistant & AI CEO Gateway</div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              <!-- Workspace Context Pill -->
+              <div class="workspace-pill-badge" id="assistantWorkspacePill" onclick="window.FloatingAssistant.cycleWorkspaceMode()" title="Click to toggle Personal / Company mode">
+                <span id="workspacePillIcon">${this.workspaceMode === 'PERSONAL' ? '👤' : this.workspaceMode === 'COMPANY' ? '🏢' : '⚡'}</span>
+                <span id="workspacePillText">${this.workspaceMode}</span>
+              </div>
+
+              <!-- Close Button -->
+              <button class="assistant-icon-btn" onclick="window.FloatingAssistant.toggleOpen(event)" title="Minimize Assistant">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Conversation Stream Area -->
+          <div class="assistant-messages-container" id="assistantMessagesContainer">
+            ${this.renderMessagesHtml()}
+          </div>
+
+          <!-- Pending Attachment Tray -->
+          <div id="assistantAttachmentTray" class="assistant-attachment-tray" style="display:${this.pendingAttachments.length ? 'flex' : 'none'};">
+            ${this.renderAttachmentTrayHtml()}
+          </div>
+
+          <!-- Audio Waveform Live Bar -->
+          <div id="assistantWaveformBar" class="assistant-waveform-container" style="display:${this.isListening || this.isSpeaking ? 'flex' : 'none'};">
+            ${this.renderWaveformHtml()}
+          </div>
+
+          <!-- Unified Input Surface -->
+          <div class="assistant-input-tray">
+            <div class="assistant-input-row">
+              <textarea 
+                id="assistantMainInput" 
+                class="assistant-prompt-textarea" 
+                rows="1" 
+                placeholder="Ask ZONATA AI or assign any personal/company task..."
+                onkeydown="window.FloatingAssistant.handleInputKeydown(event)"
+                oninput="window.FloatingAssistant.autoResizeTextarea(this)"
+              ></textarea>
+
+              <button class="assistant-send-trigger" onclick="window.FloatingAssistant.submitPrompt()" title="Transmit Directive">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+
+            <!-- Multimodal & Action Toolbelt -->
+            <div class="assistant-toolbelt">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <!-- Voice / Mic Toggle -->
+                <button class="toolbelt-btn ${this.isListening ? 'active-red' : ''}" id="btnToolbeltMic" onclick="window.FloatingAssistant.toggleMic()" title="Voice Directive">
+                  🎙️ <span class="toolbelt-label">Voice</span>
+                </button>
+
+                <!-- Screen Observe Button -->
+                <button class="toolbelt-btn" onclick="window.FloatingAssistant.observeScreen()" title="Observe Screen Telemetry">
+                  🖥️ <span class="toolbelt-label">Screen</span>
+                </button>
+
+                <!-- Document / File Upload Trigger -->
+                <button class="toolbelt-btn" onclick="document.getElementById('asstFileInput').click()" title="Attach Document / File">
+                  📎 <span class="toolbelt-label">Attach</span>
+                </button>
+                <input type="file" id="asstFileInput" style="display:none;" onchange="window.FloatingAssistant.handleFileSelected(event)" multiple />
+              </div>
+
+              <!-- Emergency Killswitch Direct Access -->
+              <button class="toolbelt-btn btn-killswitch" onclick="window.FloatingAssistant.triggerEmergencyStop()" title="Emergency Freeze All Missions">
+                🛑 <span class="toolbelt-label">STOP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
-    async syncCoworkerState() {
-      try {
-        const res = await fetch('/api/v2/coworker/status');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.lifecycle_state) {
-            this.currentExecutionState = data.lifecycle_state;
-            const stateEl = document.getElementById('assistantBadgeState');
-            const pulseEl = document.getElementById('assistantBadgePulse');
-            if (stateEl) {
-              stateEl.textContent = data.lifecycle_state;
-              const colorMap = {
-                IDLE: '#10b981',
-                TASK_ANALYSIS: '#3b82f6',
-                TOOL_DISCOVERY: '#8b5cf6',
-                EXECUTION: '#06b6d4',
-                VERIFICATION: '#f59e0b',
-                WAITING_FOR_APPROVAL: '#ef4444',
-                REPORTING_TO_CEO: '#10b981',
-                SECURITY_MONITORING: '#6366f1',
-                ERROR_RECOVERY: '#f97316',
-                PAUSED: '#eab308',
-                TERMINATED: '#6b7280'
-              };
-              const col = colorMap[data.lifecycle_state] || '#10b981';
-              stateEl.style.color = col;
-              if (pulseEl) pulseEl.style.background = col;
-            }
-          }
-        }
-      } catch (e) {}
+    renderMessagesHtml() {
+      return this.messages.map(m => {
+        const isUser = m.sender === 'user';
+        return `
+          <div class="assistant-msg-row ${isUser ? 'user-row' : 'assistant-row'}">
+            <div class="assistant-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}">
+              <div class="bubble-text">${this.formatMarkdown(m.text)}</div>
+
+              <!-- Deliverable Artifact Card -->
+              ${m.deliverable ? this.renderDeliverableCardHtml(m.deliverable) : ''}
+
+              <!-- Action Card (Mission / Meeting Invite / Approval) -->
+              ${m.actionCard ? this.renderActionCardHtml(m.actionCard) : ''}
+
+              <!-- Clarification Choice Buttons -->
+              ${m.choices ? this.renderChoicesHtml(m.choices) : ''}
+
+              <!-- Citations Bar -->
+              ${m.citations && m.citations.length ? `
+                <div class="bubble-citations">
+                  ${m.citations.map(c => `
+                    <span class="citation-badge ${c.source_type === 'INTERNAL' ? 'cit-internal' : 'cit-external'}">
+                      ${c.source_type === 'INTERNAL' ? '🏢 [INTERNAL]' : '🌐 [WEB RESEARCH]'} ${this.escape(c.label)}
+                    </span>
+                  `).join('')}
+                </div>
+              ` : ''}
+
+              <div class="bubble-timestamp">${new Date(m.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    renderDeliverableCardHtml(deliv) {
+      const isDoc = deliv.type === 'DOCUMENT' || deliv.doc_id;
+      const fmt = (deliv.format || 'PDF').toUpperCase();
+      const fmtColor = {
+        PDF: '#ef4444',
+        DOCX: '#2563eb',
+        XLSX: '#10b981',
+        PPTX: '#f59e0b',
+        CSV: '#059669',
+        TXT: '#64748b'
+      }[fmt] || '#3b82f6';
+
+      return `
+        <div class="deliverable-card">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="file-format-badge" style="background:${fmtColor};">${fmt}</div>
+            <div style="flex:1; min-width:0;">
+              <div class="deliverable-title">${this.escape(deliv.title || 'Deliverable Artifact')}</div>
+              <div class="deliverable-meta">
+                <span>Boundary: <b>${this.escape(deliv.storage_boundary || 'PERSONAL')}</b></span>
+                ${deliv.size_bytes ? `<span>• ${(deliv.size_bytes / 1024).toFixed(1)} KB</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);">
+            <span class="hash-tag">SHA-256: ${this.escape((deliv.sha256 || '').substring(0, 12))}...</span>
+            <a href="${deliv.download_url}" target="_blank" class="btn-deliverable-download" download>
+              ⬇️ Download File
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    renderActionCardHtml(action) {
+      if (action.type === 'MEETING_INVITE') {
+        return `
+          <div class="meeting-invite-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+              <span style="font-weight:700; color:#3b82f6;">📅 Google Meet Scheduled</span>
+              <span class="badge-emerald" style="font-size:10px; padding:2px 6px; border-radius:4px;">CONFIRMED</span>
+            </div>
+            <div style="font-size:12px; font-weight:600; margin-bottom:4px;">${this.escape(action.title)}</div>
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">Time: <b>${action.scheduled_time}</b></div>
+
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <a href="${action.google_meet_url}" target="_blank" class="btn-meet-join">
+                📹 Join Google Meet
+              </a>
+              ${action.briefing_dossier_url ? `
+                <a href="${action.briefing_dossier_url}" target="_blank" class="btn-secondary" style="font-size:11px; padding:5px 8px;">
+                  📄 Briefing Dossier
+                </a>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      if (action.type === 'WORKFORCE_MISSION') {
+        return `
+          <div class="action-status-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="font-weight:700; color:#8b5cf6;">🏢 Workforce Mission Active</span>
+              <span class="badge-blue" style="font-size:10px;">${action.status}</span>
+            </div>
+            <div style="font-size:11.5px; margin-bottom:4px;">Department: <b>${this.escape(action.department)}</b></div>
+            <div style="font-size:10.5px; color:var(--text-muted);">Mission ID: <code>${this.escape(action.mission_id)}</code></div>
+
+            ${action.requires_approval ? `
+              <div class="approval-banner" style="margin-top:8px;">
+                <div style="font-size:11px; font-weight:700; color:#ef4444; margin-bottom:4px;">⚠️ DoA Authorization Required</div>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-primary" style="font-size:11px; padding:3px 8px; background:#10b981;" onclick="window.FloatingAssistant.authorizeApproval('${action.approval_id}', true)">Authorize</button>
+                  <button class="btn-secondary" style="font-size:11px; padding:3px 8px; color:#ef4444;" onclick="window.FloatingAssistant.authorizeApproval('${action.approval_id}', false)">Deny</button>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      return '';
+    }
+
+    renderChoicesHtml(choices) {
+      return `
+        <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+          ${choices.map(c => `
+            <button class="btn-choice-pill" onclick="window.FloatingAssistant.selectClarification('${c.mode}')">
+              ${this.escape(c.label)}
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    renderAttachmentTrayHtml() {
+      return this.pendingAttachments.map((f, i) => `
+        <div class="attachment-chip">
+          <span>📎 ${this.escape(f.name)}</span>
+          <button class="chip-remove" onclick="window.FloatingAssistant.removeAttachment(${i})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    renderWaveformHtml() {
+      const bars = [];
+      for (let i = 0; i < 24; i++) {
+        bars.push(`<div class="waveform-anim-bar active" style="animation-delay:${(i * 0.04).toFixed(2)}s"></div>`);
+      }
+      return bars.join('');
+    }
+
+    // =========================================================================
+    // USER ACTIONS & COMM CHANNELS
+    // =========================================================================
+
+    handleFabClick(e) {
+      if (this.isDragging) return;
+      this.toggleOpen(e);
     }
 
     toggleOpen(e) {
@@ -387,398 +477,307 @@
       if (flyout) {
         if (this.isOpen) {
           flyout.classList.add('open');
+          setTimeout(() => {
+            const inp = document.getElementById('assistantMainInput');
+            if (inp) inp.focus();
+            this.scrollToBottom();
+          }, 100);
         } else {
           flyout.classList.remove('open');
         }
       }
     }
 
-    switchTab(tab) {
-      this.activeTab = tab;
-      const container = document.getElementById('floatingAssistantContainer');
-      if (container) this.renderWidget(container);
-    }
+    cycleWorkspaceMode() {
+      const modes = ['AUTO', 'PERSONAL', 'COMPANY'];
+      const idx = modes.indexOf(this.workspaceMode);
+      this.workspaceMode = modes[(idx + 1) % modes.length];
 
-    setWorkspaceMode(mode) {
-      this.workspaceMode = mode;
-      const container = document.getElementById('floatingAssistantContainer');
-      if (container) this.renderWidget(container);
-    }
-
-    renderChatMessagesHtml() {
-      return this.chatMessages.map(m => {
-        const isUser = m.sender === 'user';
-        return `
-          <div class="assistant-msg-bubble ${isUser ? 'user' : 'assistant'}">
-            <div class="msg-text">${this.escape(m.text)}</div>
-            ${m.citations && m.citations.length > 0 ? `
-              <div class="msg-citations">
-                <span class="citation-label">Citations:</span>
-                ${m.citations.map(c => `
-                  <span class="citation-tag ${c.source_type === 'INTERNAL' ? 'internal' : 'external'}">
-                    ${c.source_type === 'INTERNAL' ? '🏢 [INTERNAL]' : '🌐 [WEB RESEARCH]'} ${this.escape(c.label)}
-                  </span>
-                `).join('')}
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    async sendChat() {
-      const input = document.getElementById('assistantChatInput');
-      if (!input || !input.value.trim()) return;
-
-      const prompt = input.value.trim();
-      input.value = '';
-
-      this.chatMessages.push({ sender: 'user', text: prompt });
-      const scrollEl = document.getElementById('assistantChatScroll');
-      if (scrollEl) {
-        scrollEl.innerHTML = this.renderChatMessagesHtml();
-        scrollEl.scrollTop = scrollEl.scrollHeight;
-      }
-
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
-
-      try {
-        const res = await fetch('/api/assistant/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, company_id: companyId })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          this.chatMessages.push({
-            sender: 'assistant',
-            text: data.reply,
-            citations: data.citations || []
-          });
-          if (scrollEl) {
-            scrollEl.innerHTML = this.renderChatMessagesHtml();
-            scrollEl.scrollTop = scrollEl.scrollHeight;
-          }
-        }
-      } catch (err) {
-        console.error('Chat error:', err);
+      const pillText = document.getElementById('workspacePillText');
+      const pillIcon = document.getElementById('workspacePillIcon');
+      if (pillText) pillText.textContent = this.workspaceMode;
+      if (pillIcon) {
+        pillIcon.textContent = this.workspaceMode === 'PERSONAL' ? '👤' : this.workspaceMode === 'COMPANY' ? '🏢' : '⚡';
       }
     }
 
-    renderCoworkerTasksHtml() {
-      if (this.coworkerTasks.length === 0) {
-        return `<div style="text-align:center; padding:30px; font-size:12px; color:var(--text-muted);">No active tasks in ${this.workspaceMode} workspace.</div>`;
+    handleInputKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.submitPrompt();
+      }
+    }
+
+    autoResizeTextarea(el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(100, el.scrollHeight)}px`;
+    }
+
+    async submitPrompt(customText = null) {
+      const inp = document.getElementById('assistantMainInput');
+      const text = customText || (inp ? inp.value.trim() : '');
+      if (!text && this.pendingAttachments.length === 0) return;
+
+      if (inp) {
+        inp.value = '';
+        inp.style.height = 'auto';
       }
 
-      return this.coworkerTasks.map(t => {
-        const isAwaiting = t.status === 'AWAITING_APPROVAL';
-        const isCompleted = t.status === 'COMPLETED';
+      const attachmentsToSend = [...this.pendingAttachments];
+      this.pendingAttachments = [];
+      const tray = document.getElementById('assistantAttachmentTray');
+      if (tray) tray.style.display = 'none';
 
-        return `
-          <div class="coworker-task-card ${isAwaiting ? 'awaiting-approval' : ''}">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-              <span style="font-size:12.5px; font-weight:700; color:var(--text-primary);">${this.escape(t.prompt)}</span>
-              <span class="badge ${isCompleted ? 'badge-emerald' : isAwaiting ? 'badge-amber' : 'badge-blue'}">${t.status}</span>
-            </div>
-            <div style="font-size:11.5px; color:var(--text-secondary); margin-bottom:8px;">
-              Tier: <code>${t.permission_tier}</code> • Target: ${this.escape(t.target_outcome)}
-            </div>
+      // Append user message to UI immediately
+      this.messages.push({
+        id: 'msg_' + Date.now(),
+        sender: 'user',
+        text: text,
+        timestamp: Date.now() / 1000
+      });
+      this.refreshMessages();
 
-            ${isAwaiting ? `
-              <div class="approval-gate-banner">
-                <div style="font-size:11.5px; font-weight:700; color:#ef4444; margin-bottom:4px;">⚠️ Host Authorization Required</div>
-                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
-                  This action involves sensitive permissions (${t.permission_tier}). Grant authorization to proceed.
-                </div>
-                <div style="display:flex; gap:8px;">
-                  <button class="btn-primary" style="font-size:11.5px; padding:4px 10px; background:#10b981;" onclick="window.FloatingAssistant.approveTask('${t.task_id}', true)">Authorize</button>
-                  <button class="btn-secondary" style="font-size:11.5px; padding:4px 10px; color:#ef4444;" onclick="window.FloatingAssistant.approveTask('${t.task_id}', false)">Deny</button>
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- 10-Stage Lifecycle Trace -->
-            <div class="task-stage-trace">
-              ${(t.execution_log || []).map(st => `
-                <div class="trace-step">
-                  <span class="trace-stage">${st.stage}</span>
-                  <span class="trace-detail">${this.escape(st.detail)}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    async loadCoworkerTasks() {
-      try {
-        const res = await fetch(`/api/assistant/coworker/tasks?workspace_mode=${this.workspaceMode}`);
-        if (res.ok) {
-          const data = await res.json();
-          this.coworkerTasks = data.tasks || [];
-        }
-      } catch (e) {}
-    }
-
-    async dispatchCoworkerTask() {
-      const input = document.getElementById('coworkerTaskInput');
-      if (!input || !input.value.trim()) return;
-
-      const prompt = input.value.trim();
-      input.value = '';
-
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
 
       try {
-        const res = await fetch('/api/assistant/coworker/task', {
+        const res = await fetch('/api/assistant/interact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt,
+            prompt: text,
             workspace_mode: this.workspaceMode,
-            company_id: companyId
+            company_id: companyId,
+            session_id: this.sessionId,
+            attachments: attachmentsToSend
           })
         });
 
         if (res.ok) {
-          await this.loadCoworkerTasks();
-          const feed = document.getElementById('coworkerFeed');
-          if (feed) feed.innerHTML = this.renderCoworkerTasksHtml();
-        }
-      } catch (err) {
-        console.error('Dispatch error:', err);
-      }
-    }
-
-    async approveTask(taskId, approved) {
-      try {
-        const res = await fetch(`/api/assistant/coworker/tasks/${taskId}/approve`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ approved })
-        });
-        if (res.ok) {
-          await this.loadCoworkerTasks();
-          const feed = document.getElementById('coworkerFeed');
-          if (feed) feed.innerHTML = this.renderCoworkerTasksHtml();
-        }
-      } catch (err) {
-        console.error('Approval failed:', err);
-      }
-    }
-
-    // =========================================================================
-    // MULTIMODAL HUD ACTIONS
-    // =========================================================================
-
-    async loadMultimodalStatus() {
-      try {
-        const res = await fetch('/api/multimodal/status');
-        if (res.ok) {
           const data = await res.json();
-          this.multimodalStatus = data;
+          this.messages.push({
+            id: 'msg_' + Date.now(),
+            sender: 'assistant',
+            text: data.reply,
+            deliverable: data.deliverable_card,
+            actionCard: data.action_card,
+            choices: data.choices,
+            citations: data.citations || [],
+            timestamp: data.timestamp || (Date.now() / 1000)
+          });
+          this.refreshMessages();
+
+          // If speech synthesis supported and user prompted via voice
+          if (this.isListening) {
+            this.speakText(data.reply);
+          }
         }
-      } catch (e) {}
+      } catch (err) {
+        console.error('Interaction error:', err);
+      }
     }
+
+    selectClarification(selectedMode) {
+      this.workspaceMode = selectedMode;
+      this.cycleWorkspaceMode();
+      this.submitPrompt(`Proceed with this request as a ${selectedMode} task.`);
+    }
+
+    async handleFileSelected(e) {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        this.pendingAttachments.push({
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+      }
+
+      const tray = document.getElementById('assistantAttachmentTray');
+      if (tray) {
+        tray.style.display = 'flex';
+        tray.innerHTML = this.renderAttachmentTrayHtml();
+      }
+    }
+
+    removeAttachment(idx) {
+      this.pendingAttachments.splice(idx, 1);
+      const tray = document.getElementById('assistantAttachmentTray');
+      if (tray) {
+        tray.style.display = this.pendingAttachments.length ? 'flex' : 'none';
+        tray.innerHTML = this.renderAttachmentTrayHtml();
+      }
+    }
+
+    // =========================================================================
+    // MULTIMODAL CAPABILITIES (Voice, Vision, Screen, Killswitch)
+    // =========================================================================
 
     toggleMic() {
       this.isListening = !this.isListening;
-      const wf = document.getElementById('hudWaveform');
-      const btn = document.getElementById('btnHudMic');
-      if (btn) btn.innerText = this.isListening ? '🔴 Stop Mic' : '🎙️ Mic Input';
-      if (wf) wf.innerHTML = this.renderWaveformBarsHtml();
+      const wf = document.getElementById('assistantWaveformBar');
+      const btn = document.getElementById('btnToolbeltMic');
+
+      if (btn) btn.className = 'toolbelt-btn ' + (this.isListening ? 'active-red' : '');
+      if (wf) wf.style.display = this.isListening ? 'flex' : 'none';
 
       if (this.isListening) {
-        this.currentExecutionState = 'LISTENING';
-        // Auto-transcribe mock or Web Speech
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
           const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
           const rec = new SpeechRec();
-          rec.onresult = async (evt) => {
+          rec.onresult = (evt) => {
             const transcript = evt.results[0][0].transcript;
-            await this.processTranscript(transcript);
+            const inp = document.getElementById('assistantMainInput');
+            if (inp) inp.value = transcript;
+            this.toggleMic();
+            this.submitPrompt();
           };
+          rec.onerror = () => this.toggleMic();
           rec.start();
         } else {
-          // No speech engine in this browser: stop listening and say so
-          // instead of inventing a transcript the user never spoke.
-          this.isListening = false;
-          this.currentExecutionState = 'IDLE';
-          if (btn) btn.innerText = '🎙️ Mic Input';
-          if (wf) wf.innerHTML = this.renderWaveformBarsHtml();
-          alert('Speech recognition is not available in this browser. Type your request instead.');
+          this.toggleMic();
+          alert('Speech recognition is not natively available in this browser. Please type your directive.');
         }
-      } else {
-        this.currentExecutionState = 'IDLE';
       }
     }
 
-    async processTranscript(transcript) {
-      try {
-        const res = await fetch('/api/multimodal/transcribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio_text: transcript })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.is_valid) {
-            this.multimodalObservations.unshift({
-              source: 'AUDIO_MIC',
-              redacted_content: `Heard: "${data.filtered}"`,
-              timestamp: Date.now() / 1000,
-              raw_hash: 'vad_' + Date.now().toString(16)
-            });
-            const feed = document.getElementById('multimodalObservationsFeed');
-            if (feed) feed.innerHTML = this.renderObservationsHtml();
-          }
-        }
-      } catch (e) {}
-    }
-
-    async captureScreenObservation() {
-      this.currentExecutionState = 'OBSERVING';
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
+    async observeScreen() {
+      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : 'comp_primary';
       try {
         const res = await fetch('/api/multimodal/observe/screen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             company_id: companyId,
-            window_title: document.title || 'ZONATA Enterprise Workspace',
-            content_preview: 'Interactive screen capture showing metrics and navigation panels'
+            window_title: document.title || 'ZONATA Workspace',
+            content_preview: 'Screen telemetry scan for Host'
           })
         });
         if (res.ok) {
           const data = await res.json();
-          this.currentExecutionState = 'COMPLETED';
-          this.multimodalObservations.unshift(data.observation);
-          const feed = document.getElementById('multimodalObservationsFeed');
-          if (feed) feed.innerHTML = this.renderObservationsHtml();
-        }
-      } catch (e) {
-        this.currentExecutionState = 'FAILED';
-      }
-    }
-
-    async toggleCamera() {
-      this.cameraActive = !this.cameraActive;
-      if (this.cameraActive) {
-        this.currentExecutionState = 'OBSERVING';
-        try {
-          const res = await fetch('/api/multimodal/observe/webcam', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blur_background: true })
+          this.messages.push({
+            id: 'obs_' + Date.now(),
+            sender: 'assistant',
+            text: `🖥️ **Screen Observation Captured**\n\nActive Window: *${document.title}*\nTelemetry Hash: \`${(data.observation || {}).raw_hash || 'sha256:verified'}\`\nObservation sealed into audit evidence.`,
+            citations: [{ source_type: 'INTERNAL', label: 'HAL9000 Multimodal Screen Inspector', verified: true }],
+            timestamp: Date.now() / 1000
           });
-          if (res.ok) {
-            const data = await res.json();
-            this.multimodalObservations.unshift({
-              source: 'WEBCAM_HUD',
-              redacted_content: `Face Tracking: ${data.faces_detected} targets identified. Privacy blur enabled.`,
-              timestamp: data.timestamp,
-              raw_hash: data.frame_hash
-            });
-            const feed = document.getElementById('multimodalObservationsFeed');
-            if (feed) feed.innerHTML = this.renderObservationsHtml();
-          }
-        } catch (e) {}
-      } else {
-        this.currentExecutionState = 'IDLE';
-      }
-    }
-
-    async triggerHostTakeover() {
-      this.hostTakeoverActive = true;
-      this.currentExecutionState = 'HOST_TAKEOVER';
-      try {
-        await fetch('/api/multimodal/task/takeover', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: 'mms_live', user_id: 'usr_owner' })
-        });
-        alert('✋ Host Takeover Engaged. Autonomous AI execution halted. Control is manual.');
-        this.switchTab('multimodal');
+          this.refreshMessages();
+        }
       } catch (e) {}
     }
 
     async triggerEmergencyStop() {
-      this.currentExecutionState = 'CANCELLED';
-      this.isListening = false;
-      this.isSpeaking = false;
+      if (!confirm('🛑 Engage Sovereign EMERGENCY STOP (KillSwitch)? This will immediately freeze all active workforce missions.')) return;
+
       try {
         await fetch('/api/multimodal/task/interrupt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: 'mms_live', reason: 'Emergency KillSwitch triggered by Host' })
+          body: JSON.stringify({
+            session_id: this.sessionId,
+            reason: 'Emergency KillSwitch engaged by Host'
+          })
         });
-        alert('🛑 Emergency STOP (KillSwitch) engaged. All operations terminated.');
-        this.switchTab('multimodal');
+
+        this.messages.push({
+          id: 'stop_' + Date.now(),
+          sender: 'assistant',
+          text: '🛑 **EMERGENCY CONTAINMENT ACTIVATED**\n\nAll workforce missions and autonomous agents have been halted out-of-band by sovereign Owner order. Type "resume" or click resume to return to active state.',
+          citations: [{ source_type: 'INTERNAL', label: 'ZONATA KillSwitch Matrix', verified: true }],
+          timestamp: Date.now() / 1000
+        });
+        this.refreshMessages();
       } catch (e) {}
     }
 
-    // =========================================================================
-    // AI CEO VOICE DIRECTIVES
-    // =========================================================================
-
-    quickCeoPrompt() {
-      const el = document.getElementById('ceoDirectiveInput');
-      if (el) el.value = "Analyze our Q3 gross margins and prepare an executive directive.";
-    }
-
-    async dispatchVoiceToCeo() {
-      const el = document.getElementById('ceoDirectiveInput');
-      if (!el || !el.value.trim()) return;
-
-      const transcript = el.value.trim();
-      el.value = '';
-
-      const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
-
+    async authorizeApproval(approvalId, approved) {
       try {
-        const res = await fetch('/api/multimodal/voice-to-ceo', {
+        await fetch(`/api/approvals/${approvalId}/decision`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript, company_id: companyId })
+          body: JSON.stringify({ approved })
         });
-
-        if (res.ok) {
-          const data = await res.json();
-          this.lastCeoData = data;
-          const box = document.getElementById('ceoResponseBox');
-          const txt = document.getElementById('ceoResponseText');
-          const hashEl = document.getElementById('ceoEvidenceHash');
-
-          if (box && txt) {
-            box.style.display = 'block';
-            txt.innerText = data.ceo_response;
-            if (hashEl) hashEl.innerText = `Evidence: ${data.evidence_hash.substring(0, 16)}...`;
-          }
-
-          // Automatically speak if Web Speech is available
-          this.playCeoAudio();
-        }
-      } catch (e) {
-        console.error('Voice-to-CEO failed:', e);
-      }
+        this.submitPrompt(approved ? 'Authorized sensitive action.' : 'Denied authorization.');
+      } catch (e) {}
     }
 
-    playCeoAudio() {
-      if (!this.lastCeoData || !this.lastCeoData.ceo_response) return;
+    speakText(text) {
       if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance(this.lastCeoData.ceo_response);
+        const cleanText = text.replace(/[*#_`>]/g, '');
+        const u = new SpeechSynthesisUtterance(cleanText);
         u.rate = 1.0;
         window.speechSynthesis.speak(u);
       }
     }
 
+    // =========================================================================
+    // UTILITIES & STATE SYNC
+    // =========================================================================
+
+    refreshMessages() {
+      const container = document.getElementById('assistantMessagesContainer');
+      if (container) {
+        container.innerHTML = this.renderMessagesHtml();
+        this.scrollToBottom();
+      }
+    }
+
+    scrollToBottom() {
+      const container = document.getElementById('assistantMessagesContainer');
+      if (container) container.scrollTop = container.scrollHeight;
+    }
+
+    formatMarkdown(text) {
+      if (!text) return '';
+      let escaped = this.escape(text);
+      // Bold
+      escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+      // Italic
+      escaped = escaped.replace(/\*(.*?)\*/g, '<i>$1</i>');
+      // Inline code
+      escaped = escaped.replace(/`(.*?)`/g, '<code>$1</code>');
+      // Markdown links: safe http(s) or absolute internal urls only
+      escaped = escaped.replace(/\[(.*?)\]\(((?:https?:\/\/|\/)[^\s"'>]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-inline-link">$1</a>');
+      // Line breaks
+      escaped = escaped.replace(/\n/g, '<br/>');
+      return escaped;
+    }
+
+    startStateSync() {
+      // Sync coworker lifecycle state to pulse ring
+      setInterval(async () => {
+        try {
+          const res = await fetch('/api/v2/coworker/status');
+          if (res.ok) {
+            const data = await res.json();
+            const ring = document.getElementById('assistantPulseRing');
+            if (ring && data.lifecycle_state) {
+              ring.style.background = data.lifecycle_state === 'IDLE' ? '#10b981' : '#3b82f6';
+            }
+          }
+        } catch (e) {}
+      }, 5000);
+    }
+
     escape(str) {
       if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     }
   }
 
-  window.FloatingAssistant = new FloatingAssistantManager();
+  // Export singleton to window
+  window.FloatingAssistant = new UniversalFloatingAssistant();
+  // Auto-init on DOMContentLoaded or immediate if already loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.FloatingAssistant.init());
+  } else {
+    window.FloatingAssistant.init();
+  }
 })();
