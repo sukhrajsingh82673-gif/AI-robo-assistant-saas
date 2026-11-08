@@ -15,7 +15,7 @@
   'use strict';
 
   const API = '/api/settings/v2';
-  const DEFAULT_SECTION = 'general_organization';
+  const DEFAULT_SECTION = 'ai_agents_employees';
   const READY_SECTIONS = [
     'general_organization',
     'companies',
@@ -1153,6 +1153,38 @@
     );
   }
 
+  function liveSectionTargets(sections, allSettings) {
+    return (sections || []).filter(function (section) {
+      return READY_SECTIONS.indexOf(section.id) !== -1 &&
+        (allSettings || []).some(function (definition) {
+          return definition.section === section.id && definition.status === 'live';
+        });
+    }).slice(0, 3);
+  }
+
+  function zeroLiveHtml() {
+    const definitions = sectionSettings(state.sectionId);
+    if (!definitions.length) return '';
+    if (definitions.some(function (definition) { return definition.status === 'live'; })) return '';
+    const targets = liveSectionTargets(state.sections, state.allSettings).filter(function (section) {
+      return section.id !== state.sectionId;
+    });
+    if (!targets.length) return '';
+    return (
+      '<div class="sz-empty sz-live-callout">' +
+      '<strong>No live controls in this section yet</strong>' +
+      '<p>These settings are planned but not enforced, so the console does not render controls for them. Working controls are live in:</p>' +
+      '<div class="sz-live-links">' +
+      targets.map(function (section) {
+        return (
+          '<button type="button" class="sz-btn" data-action="section" data-section="' + esc(section.id) + '">' +
+          esc(section.name) + '</button>'
+        );
+      }).join('') +
+      '</div></div>'
+    );
+  }
+
   function groupsHtml() {
     if (READY_SECTIONS.indexOf(state.sectionId) === -1) return legacyPanelHtml();
     if (state.bootError) {
@@ -1172,14 +1204,16 @@
       );
     }
     const rows = visibleRows();
+    const callout = zeroLiveHtml();
     if (!rows.length) {
+      if (callout && !state.query && state.statusFilter === 'live') return callout;
       return (
         '<div class="sz-empty"><strong>No settings match</strong>' +
         '<p>Clear the search or change the status filter.</p></div>'
       );
     }
     const groups = groupByCategory(rows, state.values, state.categories);
-    return groups.map(function (group) {
+    return callout + groups.map(function (group) {
       const category = state.categories.find(function (item) { return item.id === group.id; });
       return (
         '<section class="sz-group" aria-labelledby="sz-cat-' + esc(group.id) + '">' +
@@ -1546,6 +1580,8 @@
       groupByCategory: groupByCategory,
       formatValue: formatValue,
       rowHtml: rowHtml,
+      liveSectionTargets: liveSectionTargets,
+      DEFAULT_SECTION: DEFAULT_SECTION,
       READY_SECTIONS: READY_SECTIONS.slice()
     },
     _state: state

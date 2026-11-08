@@ -431,5 +431,29 @@ test('labels and descriptions are escaped', () => {
   assert.ok(html.indexOf('&lt;img') !== -1, html);
 });
 
+test('the default landing section has live controls', () => {
+  assert.strictEqual(t.DEFAULT_SECTION, 'ai_agents_employees');
+  assert.ok(t.READY_SECTIONS.indexOf(t.DEFAULT_SECTION) !== -1);
+});
+
+test('empty sections point only at ready sections with live controls', () => {
+  const sections = [
+    { id: 'general_organization', name: 'General' },
+    { id: 'ai_agents_employees', name: 'AI Agents & Employees' },
+    { id: 'spending_budgets', name: 'Spending & Budgets' },
+    { id: 'security_compliance', name: 'Security & Compliance' }
+  ];
+  const settings = [
+    { section: 'general_organization', status: 'coming_soon' },
+    { section: 'ai_agents_employees', status: 'live' },
+    { section: 'spending_budgets', status: 'live' },
+    { section: 'security_compliance', status: 'live' }
+  ];
+  assert.deepStrictEqual(
+    t.liveSectionTargets(sections, settings).map(function (section) { return section.id; }),
+    ['ai_agents_employees', 'spending_budgets']
+  );
+});
+
 console.log('\n' + passed + ' UI contract tests passed.');
 

@@ -792,6 +792,9 @@ and the legacy hub links back to the default console.
 
 ### 17.3 Scope of this preview
 
+- The console lands on `ai_agents_employees`, the rebuilt section with the
+  most enforced controls. Sections that have no live control yet show a
+  callout listing the sections that do, instead of a page of dead rows.
 - Sections 1–6 (`general_organization`, `companies`, `team_access`,
   `ai_agents_employees`, `spending_budgets`, `integrations`) render live
   controls for `status === "live"` definitions.
@@ -802,9 +805,9 @@ and the legacy hub links back to the default console.
 
 ### 17.4 Verification
 
-- `tests/settings_v2_ui_test.js`: 23 passed. Covers the four state labels,
+- `tests/settings_v2_ui_test.js`: 25 passed. Covers the four state labels,
   the anti-decorative rule, real scope parameters, optimistic concurrency,
-  row rendering, secret handling, and escaping.
+  row rendering, secret handling, escaping, and the live-section callout.
 - `tests/test_settings_v2_ui_smoke.py`: 7 passed. Starts an in-process API
   server on an isolated database and verifies the console's exact HTTP
   contract: asset wiring, default routing, registry capabilities,
@@ -819,6 +822,10 @@ and the legacy hub links back to the default console.
 - Staging: `engineering/production-readiness-gap-closure` was fast-forwarded
   to the feature tip and the deployed `settings_v2.js`, `settings_v2.css`,
   and routing were verified live on `zonata-staging.onrender.com`.
+- Staging schema: `deploy/free_tier/apply_settings_v2_schema.py` created the
+  additive Settings V2 tables in the Neon PostgreSQL staging database.
+  Registry reads, effective reads, and a write → reset round-trip were
+  verified against that database before enabling the console.
 
 ### 17.5 Known limitations
 

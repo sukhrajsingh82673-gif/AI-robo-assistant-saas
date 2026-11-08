@@ -819,6 +819,17 @@
   text-decoration: underline;
 }
 
+.sz-live-callout {
+  margin: 0 0 var(--s-4);
+}
+
+.sz-live-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .sz-legacy-panel,
 .sz-empty {
   margin: 8px 0 var(--s-8);
