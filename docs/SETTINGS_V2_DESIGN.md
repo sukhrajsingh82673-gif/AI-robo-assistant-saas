@@ -751,3 +751,75 @@ Not verified here:
   serializes writers, so the current local path is safe.
 
 Phase 2 stops here. UI work starts only after this checkpoint is approved.
+
+---
+
+## 17. Console preview (Phase 3, sections 1–6)
+
+The V2 console is additive. The legacy console stays mounted at `#/settings`
+and the new one is reachable at `#/settings-v2` (also
+`#/workspace/settings-v2`) until all 16 sections reach parity.
+
+### 17.1 Files
+
+| File | Role |
+| --- | --- |
+| `web/settings_v2.js` | Console module: router, scope switcher, section view, rows, drawers, toasts. |
+| `web/settings_v2.css` | All `.sz-*` styles, responsive, dark, and reduced-motion rules. |
+| `web/index.html` | Loads the console stylesheet and script after the legacy module. |
+| `web/app.js` | Routes `/settings-v2` to `SettingsV2.render` in both router branches. |
+| `web/settings_enterprise.js` | Legacy hub links to the new console. |
+
+### 17.2 Scope and state
+
+- The scope switcher always sends a real scope and a real ID:
+  organization → tenant ID, company → company ID, department/agent → IDs
+  from the live lists, user → the current user.
+- Each row shows exactly one of `Default`, `Inherited`, `Overridden`, or
+  `Locked`, plus the provenance string from the resolver and the local row
+  version.
+- Writes send `expected_version: 0` to create a new override and the local
+  row version when the value is already overridden. A `409` reloads the
+  section rather than retrying blindly.
+- `Reset to inherited` is offered only for a value overridden at the viewed
+  scope and refuses locked values.
+- Approval-queued writes return `202` with `code: APPROVAL_REQUIRED`; the
+  console keys off the payload code, not only the HTTP status.
+- Secret rows are password-only, show `Configured` / `Not configured` and
+  `last4` when the caller may see it, and never round-trip plaintext.
+
+### 17.3 Scope of this preview
+
+- Sections 1–6 (`general_organization`, `companies`, `team_access`,
+  `ai_agents_employees`, `spending_budgets`, `integrations`) render live
+  controls for `status === "live"` definitions.
+- Sections 7–16 show a migration panel that links to the legacy console
+  instead of dead controls.
+- `coming_soon` rows render an explanation and no input; the JS contract
+  test enforces this so decorative settings cannot reappear.
+
+### 17.4 Verification
+
+- `tests/settings_v2_ui_test.js`: 23 passed. Covers the four state labels,
+  the anti-decorative rule, real scope parameters, optimistic concurrency,
+  row rendering, secret handling, and escaping.
+- `tests/test_settings_v2_ui_smoke.py`: 6 passed. Starts an in-process API
+  server on an isolated database and verifies the console's exact HTTP
+  contract: asset wiring, registry capabilities, provenance/version fields,
+  write → effective → reset round-trip, stale-version conflict, and
+  observer write denial.
+- Full settings suites: 93 passed
+  (`test_settings_registry_phase1.py` 31,
+  `test_settings_v2_phase2.py` 44, `test_settings_v2_ui_smoke.py` 6,
+  `test_enterprise_settings_center.py` 12).
+- Legacy qualification suite: 22 passed after the UI change.
+
+### 17.5 Known limitations
+
+- No browser or Playwright runtime is available here, so visual and
+  interaction behavior is verified by contract tests and by manual staging
+  review, not by an automated browser test.
+- The API server does not serve static assets; `serve_web.py` does for local
+  preview, and the deployed static host serves `web/` in staging.
+- PostgreSQL runtime remains staging-verified only.
+
