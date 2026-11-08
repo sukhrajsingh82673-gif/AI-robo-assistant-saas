@@ -1,0 +1,838 @@
+# Enterprise Settings V2 — Design and Phase 1 Record
+
+**Status:** Phase 1 complete. Checkpoint 2 approval required before backend or UI work.
+**Branch:** `feat/enterprise-settings-v2`
+**Baseline:** `d054f13` plus the Phase 0 audit (`71084c9`).
+**Audit:** [`SETTINGS_AUDIT.md`](SETTINGS_AUDIT.md)
+**Dry-run evidence:** [`reports/SETTINGS_MIGRATION_DRY_RUN.md`](reports/SETTINGS_MIGRATION_DRY_RUN.md),
+[`reports/SETTINGS_MIGRATION_DRY_RUN.json`](reports/SETTINGS_MIGRATION_DRY_RUN.json)
+
+---
+
+## 1. What Phase 1 delivered
+
+Phase 1 adds the schema, the typed registry, the migration splitter, the
+read-only dry-run tool, and the tests that keep them honest. It does **not**
+change request handling, the resolver used at runtime, the UI, or any stored
+setting value.
+
+| Deliverable | File | State |
+|---|---|---|
+| Canonical, side-effect-free definitions | `core/settings/definitions.py` | Done |
+| Scope/status/models and declarative validation | `core/settings/models.py` | Done |
+| Typed registry with enforcement metadata | `core/settings/registry.py` | Done |
+| 16-section information architecture | `core/settings/sections.py` | Done |
+| Portable Settings V2 schema | `migrations/common/0003_settings_v2_schema.sql` | Done |
+| SQLite append-only guards | `migrations/sqlite/0004_settings_v2_append_only.sql` | Done |
+| PostgreSQL append-only guards | `migrations/pg/0006_settings_v2_append_only.sql` | Done |
+| Dialect-aware SQL splitter | `migrations/migration_manager.py` | Done |
+| Idempotent schema helper | `core/settings/schema.py` | Done |
+| Read-only migration dry-run | `scripts/settings_migration_dry_run.py` | Done |
+| Phase 1 tests | `tests/test_settings_registry_phase1.py` | Done |
+| Phase 0 audit | `docs/SETTINGS_AUDIT.md` | Done |
+
+### Verified numbers
+
+| Measure | Value |
+|---|---:|
+| Setting definitions | 202 |
+| Categories | 45 |
+| Top-level sections | 16 |
+| `live` definitions | 19 |
+| `coming_soon` definitions | 177 |
+| `hidden` definitions | 4 |
+| `action` definitions | 2 |
+| Category-to-section coverage | 45 / 45 |
+| Phase 1 tests | 31 passing |
+| Existing settings center tests | 12 passing |
+| Existing settings qualification tests | 22 passing |
+
+The `live` count is still 19 because Phase 1 did not invent enforcement. A
+definition becomes `live` only when a runtime reader exists and is listed in
+`ENFORCED_BY`. Everything else is explicitly `coming_soon` or `hidden`, which
+stops the new UI from presenting decorative controls as working ones.
+
+---
+
+## 2. Canonical registry
+
+### 2.1 Source of truth
+
+`core/settings/definitions.py` contains the same 202 definitions, 45
+categories, and 6 legacy groups that used to live inside
+`core/settings_service.py`. Importing it has no database side effects. The
+legacy service imports the same data, so there is one source of truth during
+the transition.
+
+### 2.2 Definition fields
+
+Each `SettingDefinition` carries:
+
+| Field | Purpose |
+|---|---|
+| `key` | Stable setting ID; never renamed by the migration. |
+| `section` | One of the 16 top-level navigation sections. |
+| `category` | Stable legacy category ID (45 total). |
+| `label`, `description` | Display text. |
+| `value_type` | `toggle`, `number`, `select`, `text`, `currency`, `multiselect`, `token`, `status`, `slider`, `radio`, `button_action`. |
+| `default` | Canonical default. Secret defaults are masked in public output. |
+| `validation` | Declarative min/max/options/max-length/integer rules. |
+| `allowed_scopes` | Which of Platform, Organization, Company, Department, Agent, User may hold a value. |
+| `required_permission` | Permission needed to write the setting. |
+| `sensitive` | Redact in audit/API responses (includes secrets and a small explicit PII list). |
+| `secret` | Credential: write-only, encrypted, never returned. |
+| `requires_restart` | Value needs a restart/reconnect before it takes effect. |
+| `enforced_by` | Exact runtime reader; required for `live`. |
+| `status` | `live`, `coming_soon`, `hidden`, or `action`. |
+| `risk` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. |
+| `editable_by` | Legacy compatibility label. |
+| `plan_gate` | Optional plan/feature gate for visibility. |
+| `unit` | Display unit for numbers and currency. |
+| `legacy_scope` | Original `Host`, `Company`, or `User` label. |
+| `requires_approval` | Whether a change needs a human decision. |
+| `is_ceo_managed` | Whether the AI CEO may propose changes. |
+| `action_id` | Present only for executable danger-zone actions. |
+
+### 2.3 Status policy
+
+```
+button_action                      -> action
+READ_ONLY or type=status           -> hidden
+enforced_by present                -> live
+otherwise                          -> coming_soon
+```
+
+The registry validator fails construction if:
+
+- a key is duplicated;
+- a category or section is unknown;
+- a definition has no allowed scopes;
+- a permission is not in `KNOWN_PERMISSIONS`;
+- a definition is `live` without an `enforced_by` entry or without a matching
+  key in `ENFORCED_BY`;
+- an `action` has no `action_id`;
+- a section other than the intentionally empty Reports & Documents has no
+  definitions.
+
+This is intentionally strict. Adding a new visible control requires a real
+reader and a test; it cannot silently join the `live` set.
+
+### 2.4 Permissions
+
+`KNOWN_PERMISSIONS` is:
+
+`settings.read`, `settings.write`, `settings.lock`, `secrets.manage`,
+`security.manage`, `billing.manage`, `agents.manage`, `users.manage`,
+`audit.read`, `infrastructure.manage`, `danger.manage`.
+
+Category defaults map to permissions; secrets always require
+`secrets.manage`. Phase 2 will resolve roles from the verified token, never
+from `X-User-Role`.
+
+---
+
+## 3. Scope model and resolver
+
+### 3.1 Scope order
+
+```
+Platform -> Organization -> Company -> Department -> Agent / Employee -> User
+```
+
+`Platform` and `Organization` are broad; `User` is specific. The resolver uses
+two orders:
+
+- **Broad to specific** for selecting the broadest lock.
+- **Specific to broad** for selecting a value when nothing is locked.
+
+### 3.2 Effective-value algorithm (Phase 2)
+
+```
+resolve(key, context):
+    definition = registry.require(key)
+    scopes     = chain_for(definition.allowed_scopes, context)
+
+    # 1. A lock at any scope wins, broadest first.
+    for scope in broad_to_specific(scopes):
+        row = read(scope, key)
+        if row and row.locked:
+            return EffectiveSetting(value=row.value, source=scope,
+                                    is_locked=True, locked_by=scope,
+                                    provenance="Locked by <scope>")
+
+    # 2. Otherwise the most specific stored value wins.
+    for scope in specific_to_broad(scopes):
+        row = read(scope, key)
+        if row:
+            return EffectiveSetting(value=row.value, source=scope,
+                                    overridden_here=(scope == context.scope),
+                                    provenance="Overridden / Inherited")
+
+    # 3. Platform default, then registry default.
+    if env_default(definition):
+        return EffectiveSetting(value=env_default, source=Platform,
+                                provenance="Platform default (env)")
+    return EffectiveSetting(value=definition.default, source=default,
+                            provenance="Default")
+```
+
+Rules:
+
+- A lock at Platform beats a value at Company.
+- A lock at Company beats a value at Department.
+- A lock never changes the stored values underneath it; it only wins
+  resolution.
+- `allowed_scopes` is enforced on write. A User-scoped definition cannot be
+  written at Company scope.
+- `requires_restart` is carried in the response so the UI can say
+  "Restart required" instead of pretending the change is live.
+
+### 3.3 Provenance the UI must show
+
+Every effective value returns:
+
+- `value`;
+- `source_scope` and `source_id`;
+- `is_locked`, `locked_by_scope`, `locked_by_id`;
+- `default_value`;
+- `overridden_here`;
+- `inherits_from`;
+- `provenance` string;
+- `version`;
+- `requires_restart`;
+- `status`.
+
+The four row states are therefore `Default`, `Inherited from <scope>`,
+`Overridden here`, and `Locked by <scope>`. "Reset to inherited" deletes the
+local row and re-resolves; it does not write the default value.
+
+### 3.4 Cache
+
+Phase 2 will key the per-process cache by the full scope chain and setting key,
+and invalidate it through a `settings_revision` counter plus an in-process
+change event. Phase 1 only creates the revision table. No resolver cache is
+changed yet.
+
+---
+
+## 4. Schema
+
+### 4.1 `settings_values`
+
+```sql
+CREATE TABLE settings_values (
+    tenant_id   TEXT NOT NULL,
+    company_id  TEXT,
+    scope_type  TEXT NOT NULL,
+    scope_id    TEXT NOT NULL,
+    setting_key TEXT NOT NULL,
+    value_json  TEXT NOT NULL,
+    locked      INTEGER NOT NULL DEFAULT 0,
+    version     INTEGER NOT NULL DEFAULT 1,
+    updated_by  TEXT NOT NULL,
+    updated_at  REAL NOT NULL,
+    PRIMARY KEY (scope_type, scope_id, setting_key)
+);
+```
+
+- `(scope_type, scope_id, setting_key)` is the uniqueness rule.
+- `version` powers optimistic concurrency.
+- `locked` is intentionally an integer for SQLite/PostgreSQL portability.
+- `tenant_id` and `company_id` are denormalised for scoped queries and audit
+  filtering. Scope IDs remain the authoritative identity.
+
+### 4.2 `settings_audit`
+
+Append-only. Columns: `audit_id`, `tenant_id`, `company_id`, `scope_type`,
+`scope_id`, `setting_key`, redacted `old_value`/`new_value`, `actor`,
+`actor_type`, `reason`, `request_id`, `ip_address`, `version`,
+`approval_status`, `previous_hash`, `entry_hash`, `created_at`.
+
+- SQLite: `BEFORE UPDATE` and `BEFORE DELETE` triggers raise `ABORT`.
+- PostgreSQL: `CREATE RULE ... DO INSTEAD NOTHING` for `UPDATE` and `DELETE`.
+  No PL/pgSQL body is required.
+- Phase 2 writes `entry_hash = SHA-256(previous_hash || canonical_event)` and
+  keeps one chain per tenant.
+
+### 4.3 `secrets`
+
+Write-only credential storage: `secret_id`, `tenant_id`, `company_id`,
+`scope_type`, `scope_id`, `name`, `ciphertext`, `nonce`, `key_id`, `last4`,
+`created_by`, `created_at`, `rotated_at`, `last_used_at`, `version`.
+
+- AES-GCM envelope encryption using the existing `cryptography` dependency.
+- `last4` is derived at write time; plaintext is never stored.
+- No API returns `ciphertext`, `nonce`, or plaintext.
+- A missing `ZONATA_SETTINGS_MASTER_KEY` fails closed for secret writes in
+  production.
+
+### 4.4 Supporting tables
+
+| Table | Purpose |
+|---|---|
+| `settings_presets` | Reusable company/industry presets. |
+| `roles`, `permissions`, `role_permissions` | Permission model. |
+| `user_company_roles` | User membership and role per company. |
+| `settings_approvals` | Human decision queue with actor type, risk, required approvals, expiry. |
+| `settings_environments` | Staging/production dimension for platform scopes. |
+| `settings_revision` | Per-tenant revision counter for cache invalidation. |
+| `settings_schema_migrations` | Checksums of the settings migration files applied by `ensure_schema`. |
+
+### 4.5 Migration runner compatibility
+
+`migrations/migration_manager.py` previously split SQL on every semicolon.
+That breaks SQLite trigger bodies and PostgreSQL dollar-quoted functions. It
+now uses `split_sql_statements()`:
+
+- SQLite: `sqlite3.complete_statement`, which understands `BEGIN ... END`.
+- PostgreSQL: a small state machine for strings, line/block comments, and
+  dollar-quoted bodies.
+
+File versions are ordered so the append-only migration runs after the table
+creation: `common/0003` then `sqlite/0004` or `pg/0006`.
+
+---
+
+## 5. Information architecture
+
+The 16 sections are defined once in `core/settings/sections.py` and mapped from
+the stable category IDs:
+
+| # | Section | Categories |
+|---|---|---|
+| 01 | General & Organization | `account`, `organization`, `localization` |
+| 02 | Companies | `company` |
+| 03 | Team & Access | `users`, `approvals`, `enterprise` |
+| 04 | AI Agents & Employees | `ai`, `ai_providers`, `ai_ceo`, `workforce`, `agent_factory`, `missions`, `workflows`, `tools`, `a2a` |
+| 05 | Spending & Budgets | `finance`, `usage` |
+| 06 | Integrations | `integrations`, `api`, `webhooks`, `mcp` |
+| 07 | Browser & Automation | `desktop`, `browser`, `terminal`, `openhands` |
+| 08 | Security & Compliance | `host`, `governance`, `privacy`, `compliance`, `security` |
+| 09 | Reports & Documents | *(no legacy category; new definitions later)* |
+| 10 | Notifications | `communication`, `notifications` |
+| 11 | Data, Storage & Backups | `data`, `files`, `records`, `recovery` |
+| 12 | Infrastructure & Stack | `monitoring`, `features`, `diagnostics` |
+| 13 | Billing & Plan | `billing` |
+| 14 | Appearance & Accessibility | `appearance` |
+| 15 | Audit & Activity | `audit` |
+| 16 | Advanced & Danger Zone | `advanced`, `danger` |
+
+Category IDs and setting keys are unchanged. Deep links that use the legacy
+32-domain aliases keep working through `DOMAIN_ALIASES` and
+`DOMAIN_CHILD_CATEGORIES`.
+
+---
+
+## 6. Safe secret migration
+
+### 6.1 Classification
+
+The dry-run reduces every `secret=True` value to one of:
+
+- `configured`;
+- `empty`;
+- `placeholder`;
+- `revoked_or_placeholder`;
+- `too_short_for_real_credential`;
+- `unreadable`.
+
+No value, prefix, suffix, or length appears in the report. The only source of
+truth for "is this configured" is the classification, not the presence of a
+non-empty string.
+
+### 6.2 Policy
+
+- `configured` → encrypt with the master key and insert into `secrets` at the
+  same scope, then blank the legacy column only after verification.
+- `placeholder`, `revoked_or_placeholder`, `too_short_for_real_credential`,
+  `empty` → mark unconfigured and require owner re-entry. Do not encrypt a
+  placeholder, because that would create the illusion of a working credential.
+- The legacy JSON mirror is a compatibility cache, not the source of truth. It
+  must stop receiving secret values before production cutover.
+- No secret is ever written to a report, log, audit row, or API response.
+
+### 6.3 Key management
+
+- Production requires `ZONATA_SETTINGS_MASTER_KEY` (32 bytes, hex or base64).
+- Development may use a `0600` local key file; the service prints a warning.
+- If neither exists, secret writes fail closed. Reads of already-encrypted
+  secrets fail closed as well rather than returning ciphertext.
+- A rotate-master-key command re-wraps data encryption keys without needing the
+  old plaintext.
+
+---
+
+## 7. RBAC, approvals, and agent boundaries
+
+### 7.1 RBAC
+
+- Identity comes only from the verified Bearer token; `X-User-Role` is
+  ignored and will be removed from the settings path.
+- Reads require `settings.read` and company membership.
+- Writes require the definition's `required_permission` and write access to the
+  target scope.
+- Locks require `settings.lock`.
+- Secrets require `secrets.manage`.
+- Audit reads require `audit.read` and are company-scoped.
+- Danger actions require `danger.manage`, typed confirmation, and
+  re-authentication.
+
+### 7.2 Approvals
+
+- `requires_approval` is enforced on the write path, not recorded as metadata.
+- The approval row stores `actor_type` (`human`, `agent`, `system`).
+- Agents may propose changes; they may never apply security, spend,
+  permission, or lock changes.
+- The AI CEO cannot approve its own proposal and cannot raise
+  `ceo_spending_limit`, `ceo_autonomy_level`, or any of its own permissions.
+- Two-person rules read `gov_two_person_rule` / `rbac_two_person_rule` once
+  those keys become `live`.
+
+### 7.3 Audit
+
+- Every write and lock emits an append-only audit row with the hash chain.
+- Old/new values are redacted for `sensitive` definitions.
+- Company filter is always applied; a Company A user cannot read Company B's
+  settings audit.
+- Request ID, actor type, and IP are stored.
+
+---
+
+## 8. API v2 sketch (Phase 2, not implemented yet)
+
+```
+GET    /api/settings/v2/registry
+GET    /api/settings/v2/effective?key=&scope=&scope_id=
+POST   /api/settings/v2/values            # expected_version required
+POST   /api/settings/v2/values/reset      # delete local override
+POST   /api/settings/v2/lock              # settings.lock
+GET    /api/settings/v2/secrets           # metadata only: last4, configured
+POST   /api/settings/v2/secrets           # write-only
+POST   /api/settings/v2/secrets/{id}/rotate
+GET    /api/settings/v2/approvals
+POST   /api/settings/v2/approvals/{id}/decide
+GET    /api/settings/v2/audit?company_id=&key=&actor=&from=&to=
+GET    /api/settings/v2/diff?scope_a=&scope_b=
+```
+
+Legacy `/api/settings*` remains as a compatibility wrapper behind
+`ZONATA_SETTINGS_RESOLVER_V2` until parity. The wrapper delegates to the v2
+resolver and never trusts spoofable headers.
+
+---
+
+## 9. UI component structure (Phase 3)
+
+```
+SettingsShell
+├── CommandPalette (Cmd/Ctrl+K)
+├── SectionSidebar (16 sections, search, counts)
+├── ScopeSwitcher (Organization ▸ Company ▸ Department ▸ Agent ▸ User)
+├── SectionView
+│   ├── SectionHeader
+│   ├── SettingGroup
+│   │   └── SettingRow
+│   │       ├── Label + description
+│   │       ├── Control (switch/segmented/stepper/slider/picker/token)
+│   │       ├── StatePill (Default / Inherited / Overridden / Locked)
+│   │       ├── ProvenancePopover
+│   │       ├── ResetToInherited
+│   │       └── LockControl (permission-gated)
+│   └── ComingSoonGroup (clearly labelled, no working control)
+├── SaveBar (form sections) / UndoToast (instant toggles)
+├── ImpactPreview (risky changes)
+├── ApprovalInbox
+└── AuditDrawer
+```
+
+Rules:
+
+- A control is rendered only when `status === "live"`.
+- `coming_soon` rows show a label and explanation, not a disabled fake switch.
+- `hidden` rows are not rendered.
+- `action` rows live in the Danger Zone with typed confirmation and
+  re-authentication.
+- Secret rows show `Configured` / `Not configured`, `last4`, `Rotate`, and
+  `Revoke`; the value is reveal-once at write time only.
+- The scope switcher sends a real scope and scope ID; it is not cosmetic.
+- "Reset to inherited" deletes the override, then re-fetches the effective
+  value.
+
+---
+
+## 10. Migration, rollback, and compatibility
+
+### 10.1 Apply order
+
+1. Create the new tables (`common/0003`, then dialect append-only file).
+2. Keep `enterprise_settings` unchanged.
+3. Dual-read: resolver reads `settings_values`, falls back to
+   `enterprise_settings` only behind the feature flag.
+4. Dry-run classification reviewed; configured secrets encrypted.
+5. Dual-write with audit; verify legacy and v2 agree.
+6. Cut reads over with `ZONATA_SETTINGS_RESOLVER_V2`.
+7. Keep the legacy page at `/settings-legacy` until parity.
+8. Only after verification, stop writing secrets to the JSON mirror and
+   remove plaintext secret values from legacy storage.
+
+### 10.2 Rollback
+
+- Disable the feature flag; the legacy path still exists.
+- Drop only the new tables if the migration must be fully reversed:
+  `settings_values`, `settings_audit`, `secrets`, `settings_presets`,
+  `roles`, `permissions`, `role_permissions`, `user_company_roles`,
+  `settings_approvals`, `settings_environments`, `settings_revision`,
+  `settings_schema_migrations`.
+- The legacy `enterprise_settings` table and JSON mirror are not deleted by
+  Phase 1 or Phase 2.
+- A backup note is required before any production apply. Phase 1 makes no
+  production database change.
+
+### 10.3 Compatibility rules
+
+- 202 setting keys and 45 category IDs remain stable.
+- Existing env vars remain fallbacks; the UI will show them as read-only
+  platform defaults.
+- Existing `/api/settings*` endpoints remain until the v2 wrapper passes
+  parity tests.
+- Existing tests that encode `X-User-Role` or fake drift will be updated only
+  when the hardened contract lands, not by weakening the new tests.
+
+---
+
+## 11. Test plan
+
+### Phase 1 (implemented)
+
+- Registry counts, uniqueness, category/section mapping.
+- `live` implies `enforced_by`; `ENFORCED_BY` and live keys agree.
+- Actions have action IDs and are not treated as values.
+- Permissions and scopes are valid.
+- Secret defaults are masked; sensitive text is redacted but not vaulted.
+- Declarative validation for numbers, selects, toggles, and text.
+- SQL splitter handles SQLite trigger bodies, PostgreSQL dollar quotes,
+  strings, and comments.
+- Schema creation is idempotent, verifies every required table, rejects
+  checksum drift, and enforces append-only audit.
+- Dry-run is read-only, never contains a secret value, classifies secrets,
+  reports conflicts, and treats actions separately.
+- Importing `core.settings` does not import the legacy settings service.
+
+### Phase 2 (required before UI)
+
+- Resolver precedence for all six scopes and broadest-lock rule.
+- Lock/unlock permission and audit.
+- RBAC: non-owner denial, company membership, secret permission.
+- Secret redaction in search, category detail, audit, logs, errors.
+- Append-only audit and hash-chain continuity.
+- Approval and AI-CEO self-limit tests.
+- Optimistic concurrency and atomic bulk writes.
+- Migration up/down on SQLite; PostgreSQL apply in staging.
+
+### Phase 3+ (required before release)
+
+- UI state tests: Default/Inherited/Overridden/Locked, reset to inherited.
+- E2E: scope switch, override, lock, bulk apply, secret rotate, approvals.
+- Accessibility: keyboard, labels, contrast, 360 px layout.
+- Performance: resolver cache hit rate, settings page load.
+- Security review of every new endpoint.
+
+---
+
+## 12. Dry-run result against the tracked database
+
+The report was generated read-only against `storage/roboassistant.db`:
+
+- 204 stored rows across 3 tenants (`tnt_primary`, `tnt_primary_ceo`,
+  `tnt_test_settings`).
+- Stored scope labels: `Company` 121, `Host` 70, `User` 13.
+- 2 danger-zone action rows, separated from configuration.
+- 4 secret rows, all classified as placeholder or revoked; none are proposed
+  for encryption. They must be re-entered by the owner.
+- 0 Organization-default candidates, because no key has an identical value
+  across every registered company in a tenant. Organization defaults will be
+  seeded from the registry instead.
+- The legacy JSON mirror has 46 registry keys plus 13 category/domain aliases;
+  it is not the source of truth.
+- The database contains test tenants and test companies. The report labels
+  this explicitly; it does not treat test data as production configuration.
+
+No secret values appear in the JSON or Markdown report. The tool opens the
+database in SQLite read-only mode and has no `--apply` path.
+
+---
+
+## 13. Known limitations of Phase 1
+
+- PostgreSQL migrations are written and reviewed but not executed here: this
+  environment has no PostgreSQL server. They must be applied in staging.
+- The resolver, RBAC, secrets vault, audit writer, approvals, and API v2 are
+  designed but not implemented. The legacy runtime still uses
+  `get_effective_setting()` and still trusts `X-User-Role`.
+- The 177 `coming_soon` definitions remain stored in the legacy table. They
+  are not visible as working controls in the new UI, but they are still
+  readable through the legacy API until Phase 2 wraps it.
+- The tracked database contains test tenants. It is evidence for the dry-run,
+  not a production snapshot.
+- The JSON mirror still contains a placeholder secret value in this snapshot.
+  Phase 1 does not rewrite it; Phase 2 stops writing secrets there and the
+  owner must re-enter the credential.
+
+---
+
+## 14. Checkpoint 2 approval requested
+
+Approve the following before Phase 2 starts:
+
+1. The schema in §4, including the append-only audit, encrypted secrets table,
+   approval table, and revision counter.
+2. The registry fields and strict `live` policy in §2.
+3. The six-scope resolver and broadest-lock-first algorithm in §3.
+4. The permission model and the rule that `X-User-Role` is never trusted.
+5. The secret policy in §6: placeholders are unconfigured; configured values
+   move to the vault; the JSON mirror stops receiving secrets.
+6. The migration order and rollback in §10.
+7. The rule that only `live` definitions get working controls; everything else
+   is `coming_soon` or hidden.
+8. Building sections 1–6 first, then 7–16.
+
+After approval, Phase 2 starts with the resolver, RBAC, secrets vault, audit
+chain, approvals, and `/api/settings/v2/*`, then stops for a backend
+verification checkpoint before the UI shell.
+
+---
+
+## 15. Phase 2 backend implementation
+
+Phase 2 is backend only. No settings UI has been rewritten yet, and the legacy
+`/api/settings*` endpoints remain mounted behind their existing flags.
+
+### 15.1 Modules
+
+| Module | Responsibility |
+| --- | --- |
+| `core/settings/errors.py` | Typed errors and stable HTTP status codes. |
+| `core/settings/rbac.py` | Verified-token `Principal`, role matrix, company membership, scope rules, agent restrictions, AI-CEO self-limit keys. |
+| `core/settings/resolver.py` | Six-scope precedence, broadest-lock-first, legacy fallback during migration, environment defaults, revision-keyed cache. |
+| `core/settings/audit.py` | Append-only, per-tenant SHA-256 hash chain, company-scoped reads, revision bumps. |
+| `core/settings/secrets.py` | AES-GCM envelope encryption, environment/file key ring, write-only metadata, last4, rotation and revocation. |
+| `core/settings/approvals.py` | Proposal queue, self-approval denial, two-person rule for critical risk, expiry. |
+| `core/settings/service.py` | Write orchestration: validation, RBAC, concurrency, approvals, secrets, audit, bulk, actions, cache invalidation. |
+| `core/settings/api_v2.py` | Thin HTTP adapter for `/api/settings/v2/*`; maps typed errors to status codes and never returns secret values. |
+
+### 15.2 Endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/settings/v2/registry` | Registry catalog, optionally filtered by `section`. |
+| `GET` | `/api/settings/v2/effective` | One effective value with provenance. |
+| `GET` | `/api/settings/v2/values` | Effective values for a section or category. |
+| `GET` | `/api/settings/v2/secrets` | Secret metadata only (name, scope, last4, configured). |
+| `GET` | `/api/settings/v2/approvals` | Pending and resolved proposals. |
+| `GET` | `/api/settings/v2/audit` | Company-scoped audit events. |
+| `GET` | `/api/settings/v2/audit/verify` | Recompute and verify the audit chain. |
+| `GET` | `/api/settings/v2/diff` | Compare effective values between two companies. |
+| `GET` | `/api/settings/v2/revision` | Per-tenant settings revision. |
+| `POST` | `/api/settings/v2/values` | Write or queue a value; requires `expected_version`. |
+| `POST` | `/api/settings/v2/values/reset` | Remove a local override ("Reset to inherited"). |
+| `POST` | `/api/settings/v2/values/bulk` | Atomic bulk preview/apply. |
+| `POST` | `/api/settings/v2/lock` and `/unlock` | Lock or unlock a stored value. |
+| `POST` | `/api/settings/v2/secrets` | Create or update a secret (write-only). |
+| `POST` | `/api/settings/v2/secrets/rotate` | Rotate an existing secret. |
+| `POST` | `/api/settings/v2/secrets/revoke` | Revoke a secret. |
+| `POST` | `/api/settings/v2/approvals` | Propose a change (agents use this path). |
+| `POST` | `/api/settings/v2/approvals/{id}/decide` | Approve or reject. |
+| `POST` | `/api/settings/v2/actions/{action_id}` | Typed-confirmation danger-zone action. |
+
+### 15.3 Write policy
+
+- `X-User-Role`, `X-User-Name`, and `X-Company-ID` are not trusted by Settings
+  V2. Identity comes from the verified bearer token. The resolved company is
+  accepted only when it belongs to the token's tenant.
+- Privileged humans (`OWNER`, `GLOBAL_ADMIN`) apply approved-class changes
+  directly. Non-privileged humans and agents queue approvals.
+- A proposer can never decide their own proposal.
+- An approval applies the value it captured only if the target setting has not
+  changed since the proposal was created; otherwise it fails with a version
+  conflict and the proposal stays pending.
+- `CRITICAL` risk needs two distinct approvers.
+- An agent may not propose or apply a change to the AI CEO's own limits, and an
+  agent may never write a secret or execute a danger-zone action.
+- Secrets are write-only over HTTP. List and effective responses return
+  metadata and last4 only (last4 is withheld for secrets shorter than eight
+  characters); plaintext is available only through the runtime
+  `decrypt_for_runtime()` helper.
+- Secret writes fail closed in production when
+  `ZONATA_SETTINGS_MASTER_KEY` is absent. Development may generate a `0600`
+  key file.
+- Every write is audited in the same transaction as the value. Sensitive
+  values are redacted before hashing.
+- During the migration window the resolver reads the legacy table inside the
+  request tenant only. The old runtime's global `tnt_primary` fallback is
+  disabled by default because it leaks one tenant's configuration into every
+  other tenant; `ZONATA_SETTINGS_LEGACY_GLOBAL_FALLBACK=1` restores it for a
+  short parity window and must not be used in production.
+
+### 15.4 Tenant-scoped primary keys
+
+The Phase 1 `settings_values` primary key was
+`(scope_type, scope_id, setting_key)`. Department, agent and user ids are not
+guaranteed to be globally unique, so that key allowed two tenants using the
+same id to collide or read each other's value.
+
+Phase 2 adds `migrations/sqlite/0005_settings_v2_tenant_keys.sql` and
+`migrations/pg/0007_settings_v2_tenant_keys.sql`, and the primary key becomes
+`(tenant_id, scope_type, scope_id, setting_key)`. Secret uniqueness becomes
+`(tenant_id, scope_type, scope_id, name)`. All resolver and write queries now
+include `tenant_id`.
+
+### 15.5 Backup and rollback
+
+Before applying the new migrations in staging:
+
+```bash
+# SQLite
+sqlite3 storage/roboassistant.db ".backup 'storage/roboassistant.db.bak-$(date +%Y%m%d%H%M)'"
+
+# PostgreSQL
+pg_dump "$DATABASE_URL" --format=custom --file="settings-v2-$(date +%Y%m%d%H%M).dump"
+```
+
+Rollback:
+
+- `0005` (SQLite) rebuilds a table. Restore the file backup, or rebuild the
+  table again without `tenant_id` in the key. Restoring the backup is the
+  supported path.
+- `0007` (PostgreSQL) can be reversed with:
+  `ALTER TABLE settings_values DROP CONSTRAINT IF EXISTS settings_values_pkey;`
+  then re-adding the old key. Restore the dump if duplicate rows across
+  tenants would block the old key.
+- Do not edit an already-applied migration: the schema helper records
+  checksums and refuses to start when a file changes.
+
+### 15.6 Legacy surface status
+
+The legacy `/api/settings*` routes remain mounted and still write configuration
+to `enterprise_settings`. They now require verified-token permissions, no
+longer read `X-User-Role` or `X-User-Name` for authorization, require the
+definition's extra permission for secret keys, and mask secrets and sensitive
+values in search and audit output.
+
+They do not yet redirect secret writes into the encrypted vault. That switch
+belongs to the legacy flag flip in the UI phase. Until then, write secrets
+through `POST /api/settings/v2/secrets`; the legacy token field still stores
+its value in the legacy table.
+
+---
+
+## 16. Backend verification checkpoint
+
+Completed in this environment:
+
+- `tests/test_settings_v2_phase2.py`: 40 passed.
+- `tests/test_settings_registry_phase1.py`: 31 passed.
+- `tests/test_enterprise_settings_center.py`: 12 passed.
+- Manual SQLite smoke test: write, effective read, lock, reset, version
+  conflict, agent proposal + human approval, secret put/list/decrypt, audit
+  chain verification, cross-company denial, and no secret values in audit.
+- `python3 -m py_compile` passes for `api_server.py`, `core/settings/*.py`, and
+  `core/settings_service.py`.
+
+Not verified here:
+
+- PostgreSQL runtime execution. There is no PostgreSQL server in this
+  environment. The PG migration and query set are reviewed but must be run in
+  staging.
+- Browser/E2E behavior. No UI was built in Phase 2.
+- Load and concurrency behavior beyond the optimistic-version test. In
+  PostgreSQL, two concurrent audit writers for the same tenant could compute
+  the same timestamp; serialize them with a per-tenant advisory lock (or a
+  sequence column) before enabling multi-writer PG deployment. SQLite
+  serializes writers, so the current local path is safe.
+
+Phase 2 stops here. UI work starts only after this checkpoint is approved.
+
+---
+
+## 17. Console preview (Phase 3, sections 1–6)
+
+The V2 console is the default Settings experience at `#/settings` (alias
+`#/settings-v2`). The legacy console remains fully available at
+`#/settings-legacy` and for legacy deep links (`#/settings/<category>`) until
+all 16 sections reach parity. Every V2 surface links to the legacy console,
+and the legacy hub links back to the default console.
+
+### 17.1 Files
+
+| File | Role |
+| --- | --- |
+| `web/settings_v2.js` | Console module: router, scope switcher, section view, rows, drawers, toasts. |
+| `web/settings_v2.css` | All `.sz-*` styles, responsive, dark, and reduced-motion rules. |
+| `web/index.html` | Loads the console stylesheet and script after the legacy module. |
+| `web/app.js` | Routes the default `/settings` (and `/settings-v2`) to `SettingsV2.render`; keeps legacy deep links and `/settings-legacy` on the legacy console. |
+| `web/settings_enterprise.js` | Legacy hub links to the new console. |
+
+### 17.2 Scope and state
+
+- The scope switcher always sends a real scope and a real ID:
+  organization → tenant ID, company → company ID, department/agent → IDs
+  from the live lists, user → the current user.
+- Each row shows exactly one of `Default`, `Inherited`, `Overridden`, or
+  `Locked`, plus the provenance string from the resolver and the local row
+  version.
+- Writes send `expected_version: 0` to create a new override and the local
+  row version when the value is already overridden. A `409` reloads the
+  section rather than retrying blindly.
+- `Reset to inherited` is offered only for a value overridden at the viewed
+  scope and refuses locked values.
+- Approval-queued writes return `202` with `code: APPROVAL_REQUIRED`; the
+  console keys off the payload code, not only the HTTP status.
+- Secret rows are password-only, show `Configured` / `Not configured` and
+  `last4` when the caller may see it, and never round-trip plaintext.
+
+### 17.3 Scope of this preview
+
+- The console lands on `ai_agents_employees`, the rebuilt section with the
+  most enforced controls. Sections that have no live control yet show a
+  callout listing the sections that do, instead of a page of dead rows.
+- Sections 1–6 (`general_organization`, `companies`, `team_access`,
+  `ai_agents_employees`, `spending_budgets`, `integrations`) render live
+  controls for `status === "live"` definitions.
+- Sections 7–16 show a migration panel that links to the legacy console
+  instead of dead controls.
+- `coming_soon` rows render an explanation and no input; the JS contract
+  test enforces this so decorative settings cannot reappear.
+
+### 17.4 Verification
+
+- `tests/settings_v2_ui_test.js`: 25 passed. Covers the four state labels,
+  the anti-decorative rule, real scope parameters, optimistic concurrency,
+  row rendering, secret handling, escaping, and the live-section callout.
+- `tests/test_settings_v2_ui_smoke.py`: 7 passed. Starts an in-process API
+  server on an isolated database and verifies the console's exact HTTP
+  contract: asset wiring, default routing, registry capabilities,
+  provenance/version fields, write → effective → reset round-trip,
+  stale-version conflict, and observer write denial.
+- Full settings and navigation suites: 101 passed
+  (`test_frontend_navigation_audit.py` 8,
+  `test_settings_registry_phase1.py` 31,
+  `test_settings_v2_phase2.py` 44, `test_settings_v2_ui_smoke.py` 7,
+  `test_enterprise_settings_center.py` 12).
+- Legacy qualification suite: 22 passed after the UI change.
+- Staging: `engineering/production-readiness-gap-closure` was fast-forwarded
+  to the feature tip and the deployed `settings_v2.js`, `settings_v2.css`,
+  and routing were verified live on `zonata-staging.onrender.com`.
+- Staging schema: `deploy/free_tier/apply_settings_v2_schema.py` created the
+  additive Settings V2 tables in the Neon PostgreSQL staging database.
+  Registry reads, effective reads, and a write → reset round-trip were
+  verified against that database before enabling the console.
+
+### 17.5 Known limitations
+
+- No browser or Playwright runtime is available here, so visual and
+  interaction behavior is verified by contract tests and by manual staging
+  review, not by an automated browser test.
+- The API server does not serve static assets; `serve_web.py` does for local
+  preview, and the deployed static host serves `web/` in staging.
+- PostgreSQL runtime remains staging-verified only.
+

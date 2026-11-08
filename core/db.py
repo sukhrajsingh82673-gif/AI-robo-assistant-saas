@@ -4068,6 +4068,64 @@ CREATE TABLE IF NOT EXISTS corporate_knowledge_assets (
     FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_asset_class ON corporate_knowledge_assets(tenant_id, classification_level);
+
+-- 47b. Persistent Assistant Messages & Conversational Memory
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    message_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    sender TEXT NOT NULL, -- 'user', 'assistant', 'system'
+    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL', 'COMPANY'
+    content TEXT NOT NULL,
+    intent_category TEXT, -- 'PERSONAL_TASK', 'COMPANY_DELEGATION', 'DOCUMENT_REQUEST', 'MEETING_REQUEST', 'INFORMATIONAL'
+    deliverables JSON,
+    citations JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asst_msg_session ON assistant_messages(session_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_asst_msg_tenant_user ON assistant_messages(tenant_id, user_id);
+
+-- 48b. Assistant Generated Deliverables & Documents (Personal & Company Isolated)
+CREATE TABLE IF NOT EXISTS assistant_generated_documents (
+    doc_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    storage_boundary TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL', 'COMPANY'
+    title TEXT NOT NULL,
+    format TEXT NOT NULL, -- 'PDF', 'DOCX', 'XLSX', 'PPTX', 'CSV', 'JSON'
+    category TEXT NOT NULL, -- 'REPORT', 'SUMMARY', 'FINANCIAL', 'CONTRACT', 'MEETING_MINUTES', 'MEMO', 'PRESENTATION', 'SPREADSHEET'
+    file_path TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    sha256 TEXT NOT NULL,
+    metadata JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asst_docs_user ON assistant_generated_documents(tenant_id, user_id, storage_boundary);
+CREATE INDEX IF NOT EXISTS idx_asst_docs_company ON assistant_generated_documents(tenant_id, company_id);
+
+-- 49b. External Calendar & Google Meet Integration Records
+CREATE TABLE IF NOT EXISTS meeting_integrations (
+    integration_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    meeting_id TEXT NOT NULL,
+    schedule_id TEXT,
+    provider TEXT NOT NULL DEFAULT 'GOOGLE_MEET', -- 'GOOGLE_MEET', 'INTERNAL_ROOM'
+    meet_url TEXT NOT NULL,
+    dial_in_info JSON,
+    calendar_event_id TEXT,
+    ai_representative_enabled INTEGER NOT NULL DEFAULT 1,
+    statutory_disclosure_signed INTEGER NOT NULL DEFAULT 1,
+    briefing_dossier_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_mtg_int_comp ON meeting_integrations(tenant_id, company_id);
 """
 
 class DatabaseDialect:
@@ -4334,6 +4392,9 @@ TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
     "employee_tasks": ("task_id",),
     "cross_department_collaborations": ("collab_id",),
     "corporate_knowledge_assets": ("asset_id",),
+    "assistant_messages": ("message_id",),
+    "assistant_generated_documents": ("doc_id",),
+    "meeting_integrations": ("integration_id",),
 }
 
 
@@ -5176,6 +5237,50 @@ class Database:
                 "ALTER TABLE employee_kras ADD COLUMN accountability_statement TEXT",
                 "ALTER TABLE employee_kras ADD COLUMN updated_at REAL",
                 "ALTER TABLE organizations ADD COLUMN company_id TEXT",
+                """CREATE TABLE IF NOT EXISTS assistant_messages (
+                    message_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    sender TEXT NOT NULL,
+                    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL',
+                    content TEXT NOT NULL,
+                    intent_category TEXT,
+                    deliverables JSON,
+                    citations JSON,
+                    timestamp REAL NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS assistant_generated_documents (
+                    doc_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT,
+                    user_id TEXT NOT NULL,
+                    storage_boundary TEXT NOT NULL DEFAULT 'PERSONAL',
+                    title TEXT NOT NULL,
+                    format TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL DEFAULT 0,
+                    sha256 TEXT NOT NULL,
+                    metadata JSON,
+                    created_at REAL NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS meeting_integrations (
+                    integration_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    meeting_id TEXT NOT NULL,
+                    schedule_id TEXT,
+                    provider TEXT NOT NULL DEFAULT 'GOOGLE_MEET',
+                    meet_url TEXT NOT NULL,
+                    dial_in_info JSON,
+                    calendar_event_id TEXT,
+                    ai_representative_enabled INTEGER NOT NULL DEFAULT 1,
+                    statutory_disclosure_signed INTEGER NOT NULL DEFAULT 1,
+                    briefing_dossier_id TEXT,
+                    created_at REAL NOT NULL
+                )""",
             ):
                 try:
                     conn.execute(stmt)

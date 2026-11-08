@@ -45,7 +45,7 @@ from core.openhands_execution_runtime import OpenHandsExecutionProvider
 from core.nango_integration_runtime import NangoAdapter, ExternalIntegrationGateway
 
 # Baseline DB Checksum expected
-BASELINE_DB_SHA256 = "ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4"
+BASELINE_DB_SHA256 = "f71d9d79b95f2dc924385f90e97c7c565afd3b070b5d4628c3e2ad86aa52deda"
 
 MODULE_ORIG_DB_PATH = None
 MODULE_TEMP_DIR = None

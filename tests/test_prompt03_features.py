@@ -189,20 +189,25 @@ class TestPrompt03Features(unittest.TestCase):
         self.assertIn("citations", chat_internal)
         self.assertTrue(any(c["source_type"] == "INTERNAL" for c in chat_internal["citations"]))
 
-        # Query market/competitor
+        # Query market/competitor: external retrieval is not configured, so the
+        # citation must explicitly say so instead of inventing a source.
         chat_external = self.assistant_service.handle_ai_chat("What are competitor trends in enterprise AI?", "comp_primary")
-        self.assertTrue(any(c["source_type"] == "EXTERNAL" for c in chat_external["citations"]))
+        external = [c for c in chat_external["citations"] if c["source_type"] == "EXTERNAL"]
+        self.assertTrue(external)
+        self.assertFalse(external[0]["verified"])
+        self.assertEqual(external[0]["status"], "UNAVAILABLE")
 
     def test_coworker_task_lifecycle_and_gated_approval(self):
-        # 1. Safe task (auto-approved and completed through 10 stages)
+        # 1. Safe task: queued, not auto-completed without an executor.
         safe_task = self.assistant_service.create_coworker_task(
             prompt="Inspect host node logs and system stats",
             workspace_mode="PERSONAL"
         )
-        self.assertEqual(safe_task["status"], "COMPLETED")
+        self.assertIn(safe_task["status"], ("PLANNING", "QUEUED"))
         self.assertEqual(safe_task["permission_tier"], "SAFE_BROWSE")
         self.assertEqual(safe_task["approval_status"], "AUTO")
-        self.assertTrue(len(safe_task["execution_log"]) >= 5)
+        self.assertIsNone(safe_task["receipt_id"])
+        self.assertFalse(any(s["stage"] == "COMPLETED" for s in safe_task["execution_log"]))
 
         # 2. Sensitive task (requires Host authorization gate)
         sensitive_task = self.assistant_service.create_coworker_task(
@@ -214,10 +219,12 @@ class TestPrompt03Features(unittest.TestCase):
         self.assertEqual(sensitive_task["permission_tier"], "FINANCIAL_ACTION")
         self.assertEqual(sensitive_task["approval_status"], "PENDING")
 
-        # 3. Approve sensitive task
+        # 3. Approval authorises but does not fabricate completion.
         approved_task = self.assistant_service.approve_coworker_task(sensitive_task["task_id"], approved=True)
-        self.assertEqual(approved_task["status"], "COMPLETED")
+        self.assertEqual(approved_task["status"], "APPROVED")
         self.assertEqual(approved_task["approval_status"], "APPROVED")
+        self.assertIsNone(approved_task["completed_at"])
+        self.assertIsNone(approved_task["receipt_id"])
 
         # 4. Reject another sensitive task
         rej_task = self.assistant_service.create_coworker_task(

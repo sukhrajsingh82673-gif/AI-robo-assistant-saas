@@ -710,7 +710,14 @@ function handleRoute(path) {
     navKey = 'schedule';
   } else if (cleanPath.startsWith('/workspace/missions') || cleanPath.startsWith('/workspace/work') || cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) {
     navKey = 'missions';
-  } else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  } else if (cleanPath.startsWith('/assistant')) {
+    // The assistant is a single floating surface, not a page.  Legacy links
+    // open the flyout and land on the overview without rendering a second UI.
+    navKey = 'overview';
+    if (window.FloatingAssistant && !window.FloatingAssistant.isOpen) {
+      window.FloatingAssistant.toggleOpen();
+    }
+  }
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
   else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
   else if (cleanPath.startsWith('/files')) navKey = 'files';
@@ -777,8 +784,6 @@ function handleRoute(path) {
       } else {
         renderOverview();
       }
-    } else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
-      window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
     } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
       window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
     } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {
@@ -855,11 +860,20 @@ function handleRoute(path) {
     } else if (navKey === 'design' && window.DesignPreviewWorkspace) {
       window.DesignPreviewWorkspace.render('view-design');
     } else if (navKey === 'settings') {
-      const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
-      if (es && es.render) {
-        es.render(cleanPath);
+      // The V2 console is the default Settings experience. The legacy console
+      // stays reachable at /settings-legacy and for legacy deep links such as
+      // /settings/ai_providers, which the V2 console does not own yet.
+      const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(cleanPath);
+      const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(cleanPath);
+      if (!legacyAlias && !legacyDomain && window.SettingsV2) {
+        window.SettingsV2.render(cleanPath);
       } else {
-        console.warn('[AppRouter] EnterpriseSettings not found');
+        const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
+        if (es && es.render) {
+          es.render(legacyAlias ? '/settings' : cleanPath);
+        } else {
+          console.warn('[AppRouter] EnterpriseSettings not found');
+        }
       }
     } else {
       console.warn(`[AppRouter] No dedicated renderer registered for: ${navKey}`);
@@ -2467,10 +2481,17 @@ function renderSettingsSection() {
   const container = document.getElementById('view-settings');
   if (!container) return;
 
+  const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
+  const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(route);
+  const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(route);
+  if (!legacyAlias && !legacyDomain && window.SettingsV2) {
+    window.SettingsV2.render(route);
+    return;
+  }
+
   const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
   if (es && es.render) {
-    const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
-    es.render(route.startsWith('/settings') ? route : '/settings');
+    es.render(legacyAlias ? '/settings' : (route.startsWith('/settings') ? route : '/settings'));
   }
 }
 
@@ -2488,7 +2509,7 @@ window.returnToSettingsHub = function() {
   if (es && es.navigateTo) {
     es.navigateTo('hub');
   } else {
-    window.navigateTo('/settings');
+    window.navigateTo('/settings-legacy');
   }
 };
 

@@ -10,7 +10,10 @@ import time
 import uuid
 import json
 import hashlib
+import logging
 from .db import db
+
+logger = logging.getLogger("zonata.meetings")
 
 class AiCeoMeetingService:
     def __init__(self, tenant_id: str = "tnt_primary"):
@@ -570,3 +573,334 @@ class AiCeoMeetingService:
             }
             for r in rows
         ]
+
+    # =========================================================================
+    # AUTONOMOUS MEETING ORCHESTRATION & GOOGLE MEET INTEGRATION
+    # =========================================================================
+
+    def schedule_meeting_autonomous(
+        self,
+        prompt: str,
+        company_id: Optional[str] = None,
+        user_id: str = "usr_owner",
+        start_time: Optional[float] = None,
+        duration_minutes: int = 45,
+        attendees: Optional[List[str]] = None,
+        platform: str = "GOOGLE_MEET",
+        ai_representative_enabled: bool = True,
+        calendar_provider: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Schedule a meeting only after a real calendar provider confirms it.
+
+        No Meet link, dial-in number, calendar event id, or "scheduled" status is
+        ever invented.  When no provider is configured the method returns a
+        ``BLOCKED`` result and writes nothing that claims otherwise.
+        """
+        from core.calendar_provider import resolve_calendar_provider, CalendarProviderError
+
+        now = time.time()
+        cid = (company_id or "").strip()
+        if not cid:
+            return {
+                "success": False,
+                "provider_status": "BLOCKED",
+                "scheduled": False,
+                "reason": "COMPANY_CONTEXT_REQUIRED",
+                "message": "A verified company context is required before scheduling a company meeting.",
+            }
+
+        with db.get_connection() as conn:
+            comp = conn.execute("SELECT name FROM companies WHERE company_id = ?", (cid,)).fetchone()
+            comp_name = comp["name"] if comp else "your company"
+
+        # Interpret the requested time when the caller did not supply one.
+        parsed: Dict[str, Any] = {}
+        if start_time is None:
+            try:
+                from core.schedule_service import UniversalScheduleService
+                parsed = UniversalScheduleService(tenant_id=self.tenant_id).parse_natural_language(prompt, cid)
+                start_time = float(parsed.get("start_time") or (now + 86400))
+            except Exception:
+                start_time = now + 86400
+        if start_time <= now:
+            start_time = now + 3600
+        end_time = start_time + max(5, int(duration_minutes)) * 60
+
+        title = (
+            f"Strategic Alignment: {prompt[:60]}"
+            if prompt
+            else f"Executive Council with {comp_name}"
+        )
+
+        disclosure = (
+            "An authorised AI representative (ZONATA AI CEO) will participate in this "
+            "session. Attendance will be disclosed to invitees and recorded in the meeting record."
+        )
+        description = (
+            f"Requested by the Owner via ZONATA AI.\n\n"
+            f"Objective: {prompt}\n\n"
+            f"{disclosure if ai_representative_enabled else 'No AI representative has been enabled for this session.'}"
+        )
+
+        provider = resolve_calendar_provider(calendar_provider)
+        if provider is None or not getattr(provider, "is_configured", lambda: False)():
+            return {
+                "success": False,
+                "provider_status": "BLOCKED",
+                "scheduled": False,
+                "reason": "CALENDAR_PROVIDER_NOT_CONFIGURED",
+                "message": (
+                    "No Google Calendar provider is configured, so no meeting was "
+                    "scheduled and no Meet link exists. Configure Google Calendar "
+                    "OAuth credentials to enable real scheduling."
+                ),
+                "disclosure": disclosure if ai_representative_enabled else None,
+            }
+
+        request_id = f"zonata-{uuid.uuid4().hex}"
+        try:
+            event = provider.create_event(
+                summary=title,
+                description=description,
+                start_ts=start_time,
+                end_ts=end_time,
+                attendees=attendees or [],
+                request_id=request_id,
+            )
+        except CalendarProviderError as exc:
+            logger.warning("Calendar provider rejected meeting: %s", exc)
+            return {
+                "success": False,
+                "provider_status": "BLOCKED",
+                "scheduled": False,
+                "reason": "CALENDAR_PROVIDER_FAILED",
+                "message": (
+                    "The calendar provider did not confirm the event, so no meeting "
+                    "was scheduled and no link is available."
+                ),
+                "error": str(exc),
+                "disclosure": disclosure if ai_representative_enabled else None,
+            }
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Unexpected calendar provider failure")
+            return {
+                "success": False,
+                "provider_status": "BLOCKED",
+                "scheduled": False,
+                "reason": "CALENDAR_PROVIDER_FAILED",
+                "message": "The calendar provider call failed. Nothing was scheduled.",
+                "error": type(exc).__name__,
+                "disclosure": disclosure if ai_representative_enabled else None,
+            }
+
+        meeting_id = f"mtg_{uuid.uuid4().hex[:8]}"
+        event_id = event.get("event_id") or ""
+        meet_url = event.get("meet_url") or ""
+        dial_in = event.get("dial_in") or {}
+        provider_status = "CONFIRMED"
+        if ai_representative_enabled:
+            provider_status = "CONFIRMED"
+
+        # Register the confirmed slot in the universal schedule.
+        schedule_id = None
+        try:
+            from core.schedule_service import UniversalScheduleService
+            sched = UniversalScheduleService(tenant_id=self.tenant_id).create_schedule({
+                "company_id": cid,
+                "title": title,
+                "description": description,
+                "item_type": "meeting",
+                "start_time": start_time,
+                "end_time": end_time,
+                "priority": "HIGH",
+                "assigned_to": "AI CEO & " + (user_id or "Host"),
+                "metadata": {
+                    "meeting_id": meeting_id,
+                    "platform": platform,
+                    "calendar_event_id": event_id,
+                    "provider_status": provider_status,
+                },
+            })
+            schedule_id = sched.get("schedule_id")
+        except Exception:
+            logger.exception("Could not register confirmed meeting in universal schedule")
+
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO ai_ceo_meetings (
+                    meeting_id, tenant_id, company_id, host_user_id, title,
+                    status, strategic_context, video_connected, voice_connected,
+                    text_connected, created_at
+                ) VALUES (?, ?, ?, ?, ?, 'Scheduled', ?, 0, 0, 1, ?)
+                """,
+                (
+                    meeting_id, self.tenant_id, cid, user_id, title,
+                    f"Meeting confirmed by {event.get('provider') or platform}. Objective: {prompt}",
+                    now,
+                ),
+            )
+            conn.commit()
+
+        dossier_id = None
+        dossier_download_url = None
+        try:
+            from core.document_generator import document_generator, DocumentFormat, StorageBoundary, DocumentCategory
+            agenda_content = (
+                "MEETING BRIEFING DOSSIER\n"
+                "========================\n\n"
+                f"Company: {comp_name} ({cid})\n"
+                f"Objective: {prompt}\n"
+                f"Confirmed time: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(start_time))}\n"
+                f"Duration: {duration_minutes} minutes\n"
+                f"Provider: {event.get('provider') or platform}\n"
+                f"Meet link: {meet_url or 'No video link was issued by the provider.'}\n"
+                f"Calendar event: {event_id}\n\n"
+                f"AI REPRESENTATIVE: {disclosure if ai_representative_enabled else 'Not enabled.'}\n\n"
+                "AGENDA\n"
+                f"1. Objective: {prompt}\n"
+                "2. Current status and constraints\n"
+                "3. Decisions required from the Owner\n"
+                "4. Owners and follow-up dates\n"
+            )
+            dossier_doc = document_generator.generate_document(
+                title=f"Briefing Dossier - {title[:30]}",
+                format_type=DocumentFormat.PDF,
+                category=DocumentCategory.MEETING_RECORD,
+                content=agenda_content,
+                metadata={
+                    "meeting_id": meeting_id,
+                    "type": "BRIEFING_DOSSIER",
+                    "provider_status": provider_status,
+                },
+                storage_boundary=StorageBoundary.COMPANY,
+                user_id=user_id,
+                tenant_id=self.tenant_id,
+                company_id=cid,
+            )
+            dossier_id = dossier_doc["doc_id"]
+            dossier_download_url = dossier_doc["download_url"]
+        except Exception:
+            logger.exception("Could not generate briefing dossier")
+
+        integration_id = f"mint_{uuid.uuid4().hex[:8]}"
+        try:
+            with db.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO meeting_integrations (
+                        integration_id, tenant_id, company_id, meeting_id, schedule_id,
+                        provider, meet_url, dial_in_info, calendar_event_id,
+                        ai_representative_enabled, statutory_disclosure_signed,
+                        briefing_dossier_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        integration_id, self.tenant_id, cid, meeting_id, schedule_id,
+                        platform, meet_url, json.dumps(dial_in), event_id,
+                        1 if ai_representative_enabled else 0,
+                        # Disclosure is queued, not attested as signed.
+                        0,
+                        dossier_id, now,
+                    ),
+                )
+                conn.commit()
+        except Exception:
+            logger.exception("Could not persist meeting integration record")
+
+        self.add_transcript_entry(
+            meeting_id=meeting_id,
+            company_id=cid,
+            speaker="SYSTEM",
+            mode="ACTION",
+            message=(
+                f"Calendar provider confirmed event {event_id}. "
+                f"Video link: {meet_url or 'none issued'}. Owner invited: {user_id}."
+            ),
+            related_context="Provider-confirmed scheduling",
+        )
+
+        return {
+            "success": True,
+            "provider_status": provider_status,
+            "scheduled": True,
+            "meeting_id": meeting_id,
+            "integration_id": integration_id,
+            "schedule_id": schedule_id,
+            "title": title,
+            "scheduled_time": start_time,
+            "scheduled_time_formatted": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(start_time)),
+            "duration_minutes": duration_minutes,
+            "platform": platform,
+            "calendar_event_id": event_id,
+            "calendar_html_link": event.get("html_link") or "",
+            "google_meet_url": meet_url,
+            "dial_in": dial_in,
+            "ai_representative_enabled": ai_representative_enabled,
+            "statutory_disclosure": disclosure if ai_representative_enabled else None,
+            "disclosure_attested": False,
+            "briefing_dossier_id": dossier_id,
+            "briefing_dossier_url": dossier_download_url,
+        }
+
+    def generate_post_meeting_records(self, meeting_id: str) -> Dict[str, Any]:
+        """
+        Compiles meeting transcripts, decisions, and outcomes into official Meeting Minutes
+        and an authentic PDF deliverable.
+        """
+        meeting = self.get_meeting(meeting_id)
+        if not meeting:
+            raise ValueError(f"Meeting {meeting_id} not found")
+
+        cid = meeting["company_id"]
+        transcripts = self.get_transcripts(meeting_id)
+        decisions = self.list_decisions(cid)
+        meeting_decisions = [d for d in decisions if d.get("meeting_id") == meeting_id]
+
+        # Synthesize minutes
+        lines = [
+            f"OFFICIAL EXECUTIVE COUNCIL MEETING MINUTES",
+            f"Meeting ID: {meeting_id} | Company: {cid}",
+            f"Session Title: {meeting['title']}",
+            f"Status: {meeting['status']} | Date: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(meeting['created_at']))}",
+            "",
+            "EXECUTIVE DISCUSSION DIGEST:"
+        ]
+        for t in transcripts:
+            lines.append(f"[{t['speaker']} ({t['mode']})]: {t['message']}")
+
+        lines.extend(["", "RECORDED DECISIONS:"])
+        if meeting_decisions:
+            for d in meeting_decisions:
+                grant = (d.get("signed_grant_hash") or "")[:16]
+                suffix = f" (grant {grant}…)" if grant else ""
+                lines.append(f"- {d['title']}: {d['description']}{suffix}")
+        else:
+            lines.append("- No decisions were recorded in this session.")
+
+        if not transcripts:
+            lines.append("")
+            lines.append("No transcript entries exist for this meeting.")
+
+        content_str = "\n".join(lines)
+
+        from core.document_generator import document_generator, DocumentFormat, StorageBoundary, DocumentCategory
+        doc = document_generator.generate_document(
+            title=f"Minutes - {meeting['title'][:30]}",
+            format_type=DocumentFormat.PDF,
+            category=DocumentCategory.MEETING_RECORD,
+            content=content_str,
+            storage_boundary=StorageBoundary.COMPANY,
+            user_id=meeting.get("host_user_id", "usr_owner"),
+            tenant_id=self.tenant_id,
+            company_id=cid,
+            metadata={"meeting_id": meeting_id, "type": "MEETING_MINUTES"}
+        )
+
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "minutes_doc_id": doc["doc_id"],
+            "download_url": doc["download_url"],
+            "sha256": doc["sha256"]
+        }

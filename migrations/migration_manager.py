@@ -5,6 +5,7 @@ Tracks versioned migrations, validates cryptographic checksums, and executes ato
 """
 
 import os
+import re
 import sys
 import time
 import hashlib
@@ -15,6 +16,122 @@ import sqlite3
 logger = logging.getLogger("zonata.migrations")
 
 MIGRATIONS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_DOLLAR_QUOTE_RE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$")
+
+
+def split_sql_statements(sql_content: str, dialect: str = "sqlite") -> List[str]:
+    """Split a migration file into executable statements.
+
+    The previous implementation split on every semicolon.  That corrupts
+    SQLite ``CREATE TRIGGER ... BEGIN ... END`` bodies and PostgreSQL
+    dollar-quoted function bodies.  This splitter is deliberately small and
+    dependency-free:
+
+    * SQLite uses ``sqlite3.complete_statement``, which understands triggers.
+    * PostgreSQL handles single/double quotes, line/block comments, and
+      dollar-quoted bodies without needing a PL/pgSQL parser.
+    """
+    if not sql_content or not sql_content.strip():
+        return []
+
+    if (dialect or "").lower() == "sqlite":
+        statements: List[str] = []
+        buffer = ""
+        for line in sql_content.splitlines(keepends=True):
+            buffer += line
+            if sqlite3.complete_statement(buffer):
+                statement = buffer.strip()
+                if statement:
+                    statements.append(statement)
+                buffer = ""
+        if buffer.strip():
+            statements.append(buffer.strip())
+        return statements
+
+    statements = []
+    buffer: List[str] = []
+    index = 0
+    length = len(sql_content)
+    state = "normal"
+    dollar_tag = ""
+    while index < length:
+        char = sql_content[index]
+        nxt = sql_content[index + 1] if index + 1 < length else ""
+
+        if state == "normal":
+            if char == "'":
+                state = "single"
+                buffer.append(char)
+            elif char == '"':
+                state = "double"
+                buffer.append(char)
+            elif char == "-" and nxt == "-":
+                state = "line_comment"
+                buffer.append("--")
+                index += 2
+                continue
+            elif char == "/" and nxt == "*":
+                state = "block_comment"
+                buffer.append("/*")
+                index += 2
+                continue
+            elif char == "$":
+                match = _DOLLAR_QUOTE_RE.match(sql_content, index)
+                if match:
+                    dollar_tag = match.group(0)
+                    state = "dollar"
+                    buffer.append(dollar_tag)
+                    index += len(dollar_tag)
+                    continue
+                buffer.append(char)
+            elif char == ";":
+                statement = "".join(buffer).strip()
+                if statement:
+                    statements.append(statement)
+                buffer = []
+            else:
+                buffer.append(char)
+        elif state == "single":
+            buffer.append(char)
+            if char == "'":
+                if nxt == "'":
+                    buffer.append("'")
+                    index += 2
+                    continue
+                state = "normal"
+        elif state == "double":
+            buffer.append(char)
+            if char == '"':
+                if nxt == '"':
+                    buffer.append('"')
+                    index += 2
+                    continue
+                state = "normal"
+        elif state == "line_comment":
+            buffer.append(char)
+            if char == "\n":
+                state = "normal"
+        elif state == "block_comment":
+            buffer.append(char)
+            if char == "*" and nxt == "/":
+                buffer.append("/")
+                index += 2
+                state = "normal"
+                continue
+        elif state == "dollar":
+            if sql_content.startswith(dollar_tag, index):
+                buffer.append(dollar_tag)
+                index += len(dollar_tag)
+                state = "normal"
+                continue
+            buffer.append(char)
+        index += 1
+
+    tail = "".join(buffer).strip()
+    if tail:
+        statements.append(tail)
+    return statements
 
 class MigrationManager:
     def __init__(self, db_conn_factory=None):
@@ -95,8 +212,10 @@ class MigrationManager:
                 with open(filepath, "r", encoding="utf-8") as f:
                     sql_content = f.read()
 
-                # Execute statement by statement
-                statements = [s.strip() for s in sql_content.split(";") if s.strip()]
+                # Execute statement by statement.  Use the dialect-aware
+                # splitter so trigger bodies and dollar-quoted functions are
+                # not torn apart at their internal semicolons.
+                statements = split_sql_statements(sql_content, dialect=getattr(engine, "dialect", "sqlite"))
                 for stmt in statements:
                     conn.execute(stmt)
 
