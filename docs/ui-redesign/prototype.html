@@ -1,0 +1,1258 @@
+<title>URA</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Sans+Gurmukhi:wght@400;600&display=swap">
+<style>
+/* Layout: floating translucent sidebar beside a scrolling workspace; on phones the sidebar becomes a drawer and a tab bar appears. */
+:root{
+  --bg:#f5f5f7; --surface:#ffffff; --surface-2:#f9f9fb; --glass:rgba(250,250,252,.76);
+  --fg:#1d1d1f; --fg-2:#515154; --fg-3:#6e6e73; --line:rgba(0,0,0,.12); --line-2:rgba(0,0,0,.06);
+  --fill:rgba(120,120,128,.13); --fill-2:rgba(120,120,128,.07);
+  --accent:#0071e3; --accent-fg:#ffffff; --accent-soft:rgba(0,113,227,.11);
+  --good:#1d7f37; --good-bg:rgba(52,199,89,.17); --warn:#8f5200; --warn-bg:rgba(255,159,10,.18); --bad:#c8102e; --bad-bg:rgba(255,59,48,.12);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 6px 22px rgba(0,0,0,.05);
+  --shadow-lg:0 30px 80px rgba(0,0,0,.28); --scrim:rgba(0,0,0,.34); --grid:rgba(0,0,0,.07);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",Inter,"Noto Sans Devanagari","Noto Sans Gurmukhi","Noto Sans Arabic","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+  --ts:1; --row:46px; --pad:20px; --fs:.875rem; --sbw:17rem;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#000000; --surface:#1c1c1e; --surface-2:#252528; --glass:rgba(34,34,37,.74);
+  --fg:#f5f5f7; --fg-2:#c7c7cc; --fg-3:#98989f; --line:rgba(255,255,255,.16); --line-2:rgba(255,255,255,.08);
+  --fill:rgba(120,120,128,.26); --fill-2:rgba(120,120,128,.15);
+  --accent:#0a84ff; --accent-fg:#ffffff; --accent-soft:rgba(10,132,255,.2);
+  --good:#32d74b; --good-bg:rgba(48,209,88,.18); --warn:#ffb340; --warn-bg:rgba(255,159,10,.2); --bad:#ff6961; --bad-bg:rgba(255,69,58,.2);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 22px rgba(0,0,0,.35); --shadow-lg:0 30px 80px rgba(0,0,0,.7); --scrim:rgba(0,0,0,.55); --grid:rgba(255,255,255,.09);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1c1c1e; --surface-2:#252528; --glass:rgba(34,34,37,.74);
+  --fg:#f5f5f7; --fg-2:#c7c7cc; --fg-3:#98989f; --line:rgba(255,255,255,.16); --line-2:rgba(255,255,255,.08);
+  --fill:rgba(120,120,128,.26); --fill-2:rgba(120,120,128,.15);
+  --accent:#0a84ff; --accent-fg:#ffffff; --accent-soft:rgba(10,132,255,.2);
+  --good:#32d74b; --good-bg:rgba(48,209,88,.18); --warn:#ffb340; --warn-bg:rgba(255,159,10,.2); --bad:#ff6961; --bad-bg:rgba(255,69,58,.2);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 22px rgba(0,0,0,.35); --shadow-lg:0 30px 80px rgba(0,0,0,.7); --scrim:rgba(0,0,0,.55); --grid:rgba(255,255,255,.09);
+  color-scheme:dark}
+:root.hc{--fg-2:var(--fg);--fg-3:var(--fg-2)}
+:root[data-density="compact"]{--row:36px;--pad:14px;--fs:.8125rem}
+html{font-size:calc(100% * var(--ts))}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 var(--fs)/1.45 var(--font);-webkit-font-smoothing:antialiased;letter-spacing:-.006em;overflow:hidden;
+  padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.grow{flex:1}
+.ic{flex:none;display:block}
+[dir="rtl"] .flip{transform:scaleX(-1)}
+
+/* shell */
+#app{height:100%;display:grid;grid-template-columns:var(--sbw) minmax(0,1fr);gap:14px;transition:grid-template-columns .28s cubic-bezier(.3,.8,.3,1)}
+#app.rail{--sbw:5rem}
+.sb{background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(28px);backdrop-filter:saturate(180%) blur(28px);border-radius:22px;box-shadow:var(--shadow),inset 0 0 0 1px var(--line-2);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.cosw{display:flex;align-items:center;gap:10px;margin:10px;padding:8px 10px;border:0;background:var(--fill-2);border-radius:14px;text-align:start;color:var(--fg)}
+.cosw:hover{background:var(--fill)}
+.cochip{width:34px;height:34px;border-radius:10px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-weight:600;font-size:.8125rem;flex:none}
+.cotx{display:flex;flex-direction:column;min-width:0;flex:1}
+.cotx b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cotx small{color:var(--fg-3);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav{flex:1;overflow:auto;padding:2px 10px 26px;min-height:0;-webkit-mask-image:linear-gradient(#000 calc(100% - 22px),transparent);mask-image:linear-gradient(#000 calc(100% - 22px),transparent)}
+.ng{font-size:.75rem;font-weight:600;color:var(--fg-3);padding:11px 10px 4px}
+.nv{display:flex;align-items:center;gap:11px;height:34px;padding:0 10px;border-radius:10px;color:var(--fg);position:relative}
+.nv .ic{color:var(--accent)}
+.nv:hover{background:var(--fill-2)}
+.nv.on{background:var(--fill);font-weight:600}
+.nl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font-size:.6875rem;font-weight:600;display:grid;place-items:center}
+.sbf{padding:6px 10px 10px;border-top:1px solid var(--line-2)}
+.proto{margin:8px 10px 2px;font-size:.6875rem;color:var(--fg-3);line-height:1.35}
+#app.rail .nl,#app.rail .ng,#app.rail .cotx,#app.rail .proto,#app.rail .cosw>.ic{display:none}
+#app.rail .ng{display:block;font-size:0;height:1px;padding:0;margin:8px 14px;background:var(--line-2)}
+#app.rail .nv{justify-content:center;padding:0}
+#app.rail .nb{position:absolute;top:2px;inset-inline-end:8px;min-width:16px;height:16px;font-size:.625rem;padding:0 4px}
+#app.rail .cosw{justify-content:center;padding:8px 0;margin:10px 12px}
+.mn{overflow:auto;border-radius:22px;min-width:0;position:relative;scroll-behavior:smooth;outline:0}
+.tb{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:8px;min-height:56px;padding:6px 6px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:18px;margin-bottom:6px}
+.ib{position:relative;width:38px;height:38px;border:0;background:transparent;border-radius:50%;display:grid;place-items:center;color:var(--fg-2)}
+.ib:hover{background:var(--fill)}
+.ib .bd{position:absolute;top:3px;inset-inline-end:2px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font:600 .625rem/17px var(--font);text-align:center;font-style:normal}
+.crumb{display:flex;align-items:center;gap:6px;min-width:0;color:var(--fg-3);white-space:nowrap}
+.crumb b{color:var(--fg);font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.cr1{overflow:hidden;text-overflow:ellipsis;max-width:14rem}
+.srch{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:0;border-radius:999px;background:var(--fill);color:var(--fg-3);min-width:15rem}
+.srch:hover{background:var(--fill)}
+.srch span{flex:1;text-align:start;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+kbd{font:500 .6875rem var(--font);padding:2px 6px;border-radius:6px;background:var(--surface);color:var(--fg-3);box-shadow:0 0 0 1px var(--line-2)}
+.stat{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:0;border-radius:999px;background:var(--good-bg);color:var(--good);font-weight:500;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;position:relative;flex:none}
+.stat .dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid currentColor;opacity:0;animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.5);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+.clk{color:var(--fg-3);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 4px}
+.av{width:34px;height:34px;border-radius:50%;border:0;background:var(--fill);color:var(--fg);font-weight:600;font-size:.8125rem}
+.av:hover{background:var(--accent);color:var(--accent-fg)}
+.pg{padding:10px 6px 48px;max-width:1180px;margin:0 auto}
+.ph{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:6px 0 20px}
+.ph h1{font-size:1.875rem;line-height:1.15;font-weight:700;letter-spacing:-.022em}
+.ph p{color:var(--fg-3);margin-top:4px;max-width:46rem}
+.ph .acts{display:flex;gap:8px;flex-wrap:wrap;margin-inline-start:auto}
+.tabs{display:none}
+
+/* surfaces */
+.card{background:var(--surface);border-radius:18px;box-shadow:var(--shadow),0 0 0 1px var(--line-2);padding:var(--pad);min-width:0}
+.card>h2,.ch h2{font-size:1.0625rem;font-weight:650;letter-spacing:-.012em}
+.ch{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.ch .sub{color:var(--fg-3);font-size:.8125rem}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))}
+.split{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.list{background:var(--surface);border-radius:16px;box-shadow:0 0 0 1px var(--line-2);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:var(--row);padding:9px 16px;border-top:1px solid var(--line-2);min-width:0}
+.row:first-child{border-top:0}
+.row.click{cursor:pointer;width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:start}
+.row.click:hover{background:var(--fill-2)}
+.rt{flex:1;min-width:0}
+.rt b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis}
+.rt small,.muted{color:var(--fg-3)}
+.rt small{display:block;font-size:.8125rem}
+.ico{width:32px;height:32px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;font-size:.75rem;font-weight:550;background:var(--fill);color:var(--fg-2);white-space:nowrap}
+.pill.good{background:var(--good-bg);color:var(--good)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.pill i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.btn{height:34px;padding:0 16px;border-radius:999px;border:0;background:var(--fill);color:var(--fg);font-weight:550;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:transform .12s,background .15s}
+.btn:hover{background:var(--line)}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--accent);color:var(--accent-fg)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.bad{background:var(--bad-bg);color:var(--bad)}
+.btn.sm{height:28px;padding:0 12px;font-size:.8125rem}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.lnk{border:0;background:none;color:var(--accent);padding:0;font-weight:550}
+.lnk:hover{text-decoration:underline}
+.inp,.sel,.ta{height:36px;padding:0 12px;border-radius:10px;border:0;background:var(--fill);color:var(--fg);width:100%;min-width:0}
+.ta{height:auto;padding:10px 12px;resize:vertical;line-height:1.45}
+.sel{appearance:none;-webkit-appearance:none;padding-inline-end:30px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+[dir="rtl"] .sel{background-position:left 11px center}
+.sel option{color:#1d1d1f;background:#fff}
+.inp::placeholder,.ta::placeholder{color:var(--fg-3)}
+.hc .card,.hc .list,.hc .inp,.hc .sel,.hc .ta,.hc .btn{outline:1.5px solid var(--fg-2);outline-offset:-1px}
+.seg{display:inline-flex;padding:2px;border-radius:10px;background:var(--fill);gap:2px;max-width:100%;flex-wrap:wrap}
+.seg button{height:30px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--fg-2);font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.seg button.sg::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.sw{width:51px;height:31px;border-radius:16px;border:0;background:var(--fill);position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.3);transition:inset-inline-start .2s cubic-bezier(.3,.8,.3,1)}
+.sw[aria-checked="true"]{background:var(--good)}
+.sw[aria-checked="true"]::after{inset-inline-start:22px}
+.sw.sm{width:42px;height:26px}.sw.sm::after{width:22px;height:22px}.sw.sm[aria-checked="true"]::after{inset-inline-start:18px}
+.sw.pend{background:var(--warn)}
+.sw.pend::after{inset-inline-start:12px}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatches button{width:30px;height:30px;border-radius:50%;border:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);position:relative}
+.swatches button.on::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--fg-3)}
+.empty{padding:34px 16px;text-align:center;color:var(--fg-3)}
+.empty b{display:block;color:var(--fg);font-size:1rem;margin-bottom:4px}
+.bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .5s cubic-bezier(.3,.8,.3,1)}
+.bar.good>i{background:var(--good)}.bar.warn>i{background:var(--warn)}
+.av2{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:650;font-size:.8125rem;flex:none}
+.chip{height:32px;padding:0 14px;border-radius:16px;border:0;background:var(--fill);color:var(--fg);font-weight:500;white-space:nowrap}
+.chip:hover{background:var(--line)}
+.chip.on{background:var(--accent);color:var(--accent-fg)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.num{font-variant-numeric:tabular-nums}
+
+/* kpi + charts */
+.kpi{display:flex;flex-direction:column;gap:2px;padding:16px 18px}
+.kpi .kl{color:var(--fg-3);font-size:.8125rem;font-weight:500}
+.kpi .kv{font-size:1.625rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi .kf{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;color:var(--fg-3);font-size:.8125rem}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--fg-3);font:500 11px var(--font)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);color:var(--fg);padding:8px 10px;border-radius:10px;box-shadow:var(--shadow-lg),0 0 0 1px var(--line-2);font-size:.8125rem;white-space:nowrap;transform:translate(-50%,-110%);opacity:0;transition:opacity .1s;z-index:5}
+.tip b{display:block;font-variant-numeric:tabular-nums}
+.tip span{color:var(--fg-3)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:start;color:var(--fg-3);font-weight:500;font-size:.8125rem;padding:8px 12px;border-bottom:1px solid var(--line-2)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line-2);font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:end}
+.scx{overflow-x:auto}
+
+/* phase steps */
+.steps{display:flex;flex-direction:column;gap:2px}
+.step{display:flex;align-items:center;gap:12px;padding:9px 0}
+.step .sd{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--fill);color:var(--fg-3);flex:none}
+.step.done .sd{background:var(--good);color:#fff}
+.step.act .sd{background:var(--accent);color:var(--accent-fg)}
+.step.act b{color:var(--accent)}
+.step small{color:var(--fg-3);display:block}
+
+/* chat */
+.chat{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:420px;padding:0;overflow:hidden}
+@supports (height:100dvh){.chat{height:calc(100dvh - 250px)}}
+.msgs{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:min(36rem,86%);padding:10px 14px;border-radius:20px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-fg);border-end-end-radius:6px}
+.msg.ceo{align-self:flex-start;background:var(--fill);border-end-start-radius:6px}
+.msg .mm{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.msg time{display:block;font-size:.6875rem;opacity:.6;margin-top:4px}
+.typing{display:flex;gap:4px;padding:14px 16px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--fg-3);animation:blink 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.cfoot{padding:12px 16px 14px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:10px}
+.comp{display:flex;gap:8px;align-items:center}
+.comp .inp{height:42px;border-radius:21px;padding:0 18px}
+.send{width:42px;height:42px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+
+/* approvals, employees, kanban */
+.ap{display:flex;flex-direction:column;gap:12px}
+.ap .top{display:flex;gap:12px;align-items:flex-start}
+.ap .bt{display:flex;gap:8px;flex-wrap:wrap}
+.emp{display:flex;flex-direction:column;gap:12px}
+.kb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kc{background:var(--fill-2);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px;min-width:0}
+.kc h3{font-size:.8125rem;font-weight:600;color:var(--fg-2);display:flex;justify-content:space-between}
+.lead{background:var(--surface);border-radius:12px;padding:10px 12px;box-shadow:0 0 0 1px var(--line-2);display:flex;flex-direction:column;gap:6px;min-width:0}
+.lead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* terminal */
+.term{background:#0d0d10;color:#e8e8ed;border-radius:18px;font:400 .8125rem/1.6 var(--mono);display:flex;flex-direction:column;height:calc(100vh - 250px);min-height:380px;overflow:hidden;box-shadow:var(--shadow)}
+@supports (height:100dvh){.term{height:calc(100dvh - 260px)}}
+.tbar{display:flex;gap:7px;padding:12px 14px;background:#1b1b20}
+.tbar i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.tbar i:nth-child(2){background:#febc2e}.tbar i:nth-child(3){background:#28c840}
+.tout{flex:1;overflow:auto;padding:14px 16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.tout .cm{color:#9ecbff}.tout .er{color:#ff8a80}.tout .ok{color:#7ee787}.tout .dm{color:#8b8b95}
+.tin{display:flex;gap:8px;padding:10px 16px;border-top:1px solid #26262c;align-items:center}
+.tin span{color:#7ee787;white-space:nowrap}
+.tin input{flex:1;min-width:0;background:transparent;border:0;color:#e8e8ed;font:inherit;outline:0}
+
+/* settings */
+.set{display:grid;grid-template-columns:17rem minmax(0,1fr);gap:18px;align-items:start}
+.scat{position:sticky;top:70px}
+.scat .row{border:0}
+.sbtn{display:flex;align-items:center;gap:12px;width:100%;padding:9px 12px;border:0;border-radius:12px;background:transparent;text-align:start;color:var(--fg)}
+.sbtn:hover{background:var(--fill-2)}
+.sbtn.on{background:var(--fill);font-weight:600}
+.sbtn .ico{width:30px;height:30px}
+.srow{display:flex;gap:16px;align-items:flex-start;padding:16px 18px;border-top:1px solid var(--line-2)}
+.srow:first-child{border-top:0}
+.sl{flex:1;min-width:0}
+.sl>b{font-weight:600;display:block}
+.sh{color:var(--fg-3);font-size:.8125rem;margin-top:2px;max-width:34rem}
+.sc{flex:none;max-width:48%;display:flex;justify-content:flex-end;align-items:center;min-height:32px}
+.sc .sel,.sc .inp{width:15rem}
+.sug{display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);color:var(--fg-2);font-size:.8125rem;max-width:34rem}
+.sug .ic{color:var(--accent);margin-top:1px}
+.sug .lnk{white-space:nowrap}
+.sug.ok{background:var(--good-bg)}
+.sug.ok .ic{color:var(--good)}
+.guide{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;background:var(--accent-soft);box-shadow:none}
+.back{display:none}
+.ring{position:relative;width:132px;height:132px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .rv{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font-size:1.875rem;font-weight:700;font-variant-numeric:tabular-nums}
+.ring .rv small{font-size:.75rem;font-weight:500;color:var(--fg-3)}
+
+/* overlays */
+.ov{position:fixed;inset:0;z-index:100;background:var(--scrim);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .18s ease-out}
+.sheet{width:min(34rem,100%);max-height:calc(100% - 8px);display:flex;flex-direction:column;background:var(--surface);color:var(--fg);border-radius:24px;box-shadow:var(--shadow-lg),0 0 0 1px var(--line-2);animation:rise .28s cubic-bezier(.3,.8,.3,1);outline:0}
+.sheet.wide{width:min(44rem,100%)}
+.sh-h{display:flex;align-items:center;gap:10px;padding:18px 18px 8px 22px}
+.sh-h h2{flex:1;font-size:1.25rem;font-weight:700;letter-spacing:-.015em}
+.sh-b{padding:6px 22px 18px;overflow:auto;min-height:0}
+.sh-f{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px 16px;border-top:1px solid var(--line-2);flex-wrap:wrap}
+.fld{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.fld>label,.fld>.lb{font-weight:550;font-size:.8125rem;color:var(--fg-2)}
+.fld small{color:var(--fg-3);font-size:.75rem}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.pop{position:fixed;z-index:120;min-width:15rem;max-width:min(22rem,calc(100vw - 24px));max-height:70vh;overflow:auto;background:var(--surface);border-radius:18px;box-shadow:var(--shadow-lg),0 0 0 1px var(--line-2);padding:6px;animation:rise .2s cubic-bezier(.3,.8,.3,1)}
+.pop .pi{display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;border:0;border-radius:11px;background:transparent;text-align:start;color:var(--fg)}
+.pop .pi:hover,.pop .pi.sel{background:var(--fill)}
+.pop .ph2{padding:8px 10px 4px;font-weight:600;font-size:.75rem;color:var(--fg-3)}
+.pop hr{border:0;border-top:1px solid var(--line-2);margin:5px 4px}
+.pop .pi small{display:block;color:var(--fg-3);font-size:.75rem}
+.pop .ni{align-items:flex-start}
+.pop .ni .un{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:6px;flex:none}
+.pop .ni .rd{width:8px;flex:none}
+.pal{align-self:flex-start;margin-top:12vh;width:min(36rem,100%);background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg),0 0 0 1px var(--line-2);overflow:hidden;animation:rise .22s cubic-bezier(.3,.8,.3,1)}
+.pal input{width:100%;height:54px;border:0;background:transparent;padding:0 20px;font-size:1.0625rem;outline:0;border-bottom:1px solid var(--line-2)}
+.pal .pl{max-height:50vh;overflow:auto;padding:6px}
+#toasts{position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:200;pointer-events:none;padding-inline:16px}
+.toast{background:#1d1d1f;color:#f5f5f7;padding:11px 18px;border-radius:999px;box-shadow:var(--shadow-lg);font-weight:500;animation:rise .24s cubic-bezier(.3,.8,.3,1);max-width:min(30rem,100%);text-align:center}
+.toast.bad{background:var(--bad);color:#fff}
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:60;animation:fade .2s}
+.orb{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
+.rm *,.rm *::before,.rm *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* tablet and phone */
+@media (max-width:1100px){.split{grid-template-columns:minmax(0,1fr)}.srch{min-width:0}.srch kbd{display:none}.clk{display:none}}
+@media (max-width:860px){
+  body{padding-block:6px}
+  #app,#app.rail{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:8px}
+  .sb{position:fixed;z-index:70;top:max(8px,env(safe-area-inset-top,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));inset-inline-start:max(8px,env(safe-area-inset-left,0px));width:min(19rem,86vw);transform:translateX(-120%);transition:transform .32s cubic-bezier(.3,.8,.3,1);box-shadow:var(--shadow-lg);background:var(--surface)}
+  [dir="rtl"] .sb{transform:translateX(120%)}
+  .sb.open{transform:none}
+  #app.rail .nl,#app.rail .cotx,#app.rail .proto,#app.rail .cosw>.ic{display:revert}
+  #app.rail .ng{font-size:.75rem;height:auto;padding:14px 10px 5px;margin:0;background:none}
+  #app.rail .nv{justify-content:flex-start;padding:0 10px}
+  #app.rail .nb{position:static;min-width:20px;height:20px;font-size:.6875rem}
+  .ph h1{font-size:1.625rem}
+  .stat span,.crumb .cr1,.crumb .flip{display:none}
+  .stat{padding:0 10px}
+  .srch{width:38px;min-width:38px;padding:0;justify-content:center;background:transparent}
+  .srch span{display:none}
+  .tabs{display:flex;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:22px;padding:6px;box-shadow:var(--shadow),inset 0 0 0 1px var(--line-2);justify-content:space-around}
+  .tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:transparent;color:var(--fg-3);font-size:.6875rem;font-weight:500;padding:5px 2px;border-radius:14px;position:relative;min-width:0}
+  .tabs button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tabs button.on{color:var(--accent)}
+  .tabs .nb{position:absolute;top:0;inset-inline-start:calc(50% + 6px);min-width:16px;height:16px;font-size:.625rem;padding:0 4px}
+  .set{grid-template-columns:minmax(0,1fr)}
+  .set.detail .scat{display:none}
+  .set:not(.detail) .sdet{display:none}
+  .scat{position:static}
+  .back{display:inline-flex}
+  .srow{flex-direction:column;gap:10px}
+  .sc{max-width:100%;justify-content:flex-start}
+  .sc .sel,.sc .inp{width:100%}
+  .kb{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chat{height:calc(100dvh - 300px)}
+  .term{height:calc(100dvh - 310px)}
+  .ov{align-items:flex-end;padding:0}
+  .sheet,.sheet.wide{width:100%;border-radius:24px 24px 0 0;max-height:92%;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .pal{margin-top:calc(env(safe-area-inset-top,0px) + 8px);border-radius:20px;width:calc(100% - 24px);align-self:flex-start;margin-inline:12px}
+  #toasts{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .row{padding-inline:14px}
+}
+@media (max-width:480px){.kb{grid-template-columns:minmax(0,1fr)}.kpi .kv{font-size:1.375rem}}
+
+/* polish pass */
+.guide .rt{flex:1 1 14rem;min-width:0}
+#tabs button span:not(.nb){max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[dir="rtl"] :is(h1,h2,h3,p,small,b,.kv,.kl,.kf>span,.pill,.nl,.chip,.btn){unicode-bidi:plaintext}
+@media (max-width:560px){
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{padding:14px}
+  .kpi .kv{font-size:1.25rem}
+  .kpi .kf{flex-direction:column;align-items:flex-start;gap:6px}
+}
+</style>
+<div id="app">
+  <aside class="sb" id="sb" aria-label="Main menu"></aside>
+  <main class="mn" id="mn" tabindex="-1">
+    <header class="tb" id="tb"></header>
+    <div class="pg" id="pg"></div>
+  </main>
+  <nav class="tabs" id="tabs" aria-label="Quick tabs"></nav>
+</div>
+<div id="scrimwrap"></div>
+<div id="layer"></div>
+<div id="popwrap"></div>
+<div id="toasts" aria-live="polite"></div>
+<script>
+(function(){
+'use strict';
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now=()=>Date.now();
+const rid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const initials=n=>String(n).split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+function rng(seed){let s=0;for(const ch of String(seed))s=(s*31+ch.charCodeAt(0))>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
+const IS_MAC=/Mac|iPhone|iPad/.test(navigator.userAgent);
+
+/* ---------- icons ---------- */
+const IC={
+home:'<path d="M4 10.8 12 4l8 6.8"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5.5h4V20"/>',
+chat:'<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>',
+approve:'<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.4-5.6"/>',
+ops:'<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/>',
+mkt:'<path d="M3 10v4a1 1 0 0 0 1 1h3l8 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M18.5 9.5a4 4 0 0 1 0 5"/>',
+tech:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/>',
+fin:'<path d="M5 19V11M12 19V5M19 19v-6"/><path d="M3 21h18"/>',
+people:'<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.7-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M16.5 14.3c2.3.1 3.7 1.6 4.2 4"/>',
+badge:'<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><circle cx="12" cy="10" r="2.4"/><path d="M8.5 16.5c.5-1.6 1.7-2.5 3.5-2.5s3 .9 3.5 2.5"/>',
+bot:'<rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><circle cx="9" cy="13" r="1.1" fill="currentColor"/><circle cx="15" cy="13" r="1.1" fill="currentColor"/><path d="M9.5 16.2h5"/>',
+spark:'<path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7L4.5 10.9 10.1 9z"/><path d="M19 3.5v3M17.5 5h3"/>',
+plug:'<path d="M9 3v5M15 3v5"/><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 17v4"/>',
+shield:'<path d="M12 3.5 5 6v5.5c0 4.3 2.8 7.4 7 9 4.2-1.6 7-4.7 7-9V6z"/><path d="m9.2 12 2 2 3.6-3.8"/>',
+term:'<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="m7.5 10 3 2.5-3 2.5M12.5 15h4"/>',
+doc:'<path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M14 3.5V8h4M8.5 13h7M8.5 16.5h5"/>',
+building:'<path d="M5 20.5V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5v15"/><path d="M14 10h3.5a1.5 1.5 0 0 1 1.5 1.5v9"/><path d="M3.5 20.5h17M8.5 8h2M8.5 11.5h2M8.5 15h2"/>',
+sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+bell:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5"/><circle cx="12" cy="16.8" r=".6" fill="currentColor"/>',
+chevR:'<path d="m9.5 6 6 6-6 6"/>', chevD:'<path d="m6 9.5 6 6 6-6"/>', chevL:'<path d="m14.5 6-6 6 6 6"/>',
+updown:'<path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>',
+plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="m6 6 12 12M18 6 6 18"/>',
+sidebar:'<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M9.5 5v14"/>',
+menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9S14.6 18.4 12 21c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/>',
+send:'<path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/>',
+play:'<path d="M8 5.5v13l10-6.5z"/>', pause:'<path d="M9 6v12M15 6v12"/>',
+trash:'<path d="M5 7h14M10 7V4.5h4V7M7 7l.8 12.5h8.4L17 7"/>',
+lock:'<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+bolt:'<path d="M13 3 5.5 13.5H12L11 21l7.5-10.5H12z"/>',
+sun:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
+moon:'<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
+check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+refresh:'<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/>',
+user:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+alert:'<path d="M12 4 3.5 19h17z"/><path d="M12 10v4.2"/><circle cx="12" cy="16.8" r=".6" fill="currentColor"/>',
+mail:'<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4 8 8 5.5L20 8"/>',
+bulb:'<path d="M9 18h6M10 21h4M12 3.5a5.5 5.5 0 0 0-3.2 10c.7.6 1.2 1.4 1.2 2.5h4c0-1.1.5-1.9 1.2-2.5A5.5 5.5 0 0 0 12 3.5z"/>',
+logo:'<circle cx="12" cy="12" r="8.5"/><path d="M8.7 8.8v3.6a3.3 3.3 0 0 0 6.6 0V8.8"/>',
+copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>',
+eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+down:'<path d="M12 5v13M6.5 12.5 12 18l5.5-5.5"/>',
+up:'<path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/>'
+};
+const icon=(n,s=20,cls='')=>`<svg class="ic ${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]||''}</svg>`;
+
+/* ---------- translations (menus, titles, greetings) ---------- */
+const L={
+en:{g_workspace:'Workspace',g_departments:'Departments',g_workforce:'Workforce',g_system:'System',overview:'Overview',askceo:'Ask CEO',approvals:'Approvals',ops:'Operations',mkt:'Marketing & Sales',tech:'Technology',fin:'Finance',people:'People',employees:'AI Employees',agents:'Agents',coworker:'Co-worker',tools:'Tools & Integrations',security:'Security',terminal:'Terminal',reports:'Reports',companies:'Companies',settings:'Settings',search:'Search or jump to…',notifications:'Notifications',approve:'Approve',decline:'Decline',morning:'Good morning',afternoon:'Good afternoon',evening:'Good evening',more:'More'},
+hi:{g_workspace:'वर्कस्पेस',g_departments:'विभाग',g_workforce:'कार्यबल',g_system:'सिस्टम',overview:'अवलोकन',askceo:'CEO से पूछें',approvals:'स्वीकृतियाँ',ops:'संचालन',mkt:'मार्केटिंग और बिक्री',tech:'प्रौद्योगिकी',fin:'वित्त',people:'मानव संसाधन',employees:'AI कर्मचारी',agents:'एजेंट',coworker:'सहकर्मी',tools:'टूल और इंटीग्रेशन',security:'सुरक्षा',terminal:'टर्मिनल',reports:'रिपोर्ट',companies:'कंपनियाँ',settings:'सेटिंग्स',search:'खोजें या जाएँ…',notifications:'सूचनाएँ',approve:'स्वीकृत करें',decline:'अस्वीकार करें',morning:'सुप्रभात',afternoon:'नमस्कार',evening:'शुभ संध्या',more:'और'},
+pa:{g_workspace:'ਵਰਕਸਪੇਸ',g_departments:'ਵਿਭਾਗ',g_workforce:'ਕਾਰਜ-ਬਲ',g_system:'ਸਿਸਟਮ',overview:'ਸੰਖੇਪ ਜਾਣਕਾਰੀ',askceo:'CEO ਨੂੰ ਪੁੱਛੋ',approvals:'ਮਨਜ਼ੂਰੀਆਂ',ops:'ਸੰਚਾਲਨ',mkt:'ਮਾਰਕੀਟਿੰਗ ਅਤੇ ਵਿਕਰੀ',tech:'ਤਕਨਾਲੋਜੀ',fin:'ਵਿੱਤ',people:'ਮਨੁੱਖੀ ਸਰੋਤ',employees:'AI ਕਰਮਚਾਰੀ',agents:'ਏਜੰਟ',coworker:'ਸਹਿਕਰਮੀ',tools:'ਟੂਲ ਅਤੇ ਇੰਟੀਗ੍ਰੇਸ਼ਨ',security:'ਸੁਰੱਖਿਆ',terminal:'ਟਰਮੀਨਲ',reports:'ਰਿਪੋਰਟਾਂ',companies:'ਕੰਪਨੀਆਂ',settings:'ਸੈਟਿੰਗਾਂ',search:'ਖੋਜੋ ਜਾਂ ਜਾਓ…',notifications:'ਸੂਚਨਾਵਾਂ',approve:'ਮਨਜ਼ੂਰ ਕਰੋ',decline:'ਰੱਦ ਕਰੋ',morning:'ਸ਼ੁਭ ਸਵੇਰ',afternoon:'ਸਤ ਸ੍ਰੀ ਅਕਾਲ',evening:'ਸ਼ੁਭ ਸ਼ਾਮ',more:'ਹੋਰ'},
+ar:{g_workspace:'مساحة العمل',g_departments:'الأقسام',g_workforce:'القوى العاملة',g_system:'النظام',overview:'نظرة عامة',askceo:'اسأل الرئيس التنفيذي',approvals:'الموافقات',ops:'العمليات',mkt:'التسويق والمبيعات',tech:'التقنية',fin:'المالية',people:'الموارد البشرية',employees:'موظفو الذكاء الاصطناعي',agents:'الوكلاء',coworker:'الزميل',tools:'الأدوات والتكاملات',security:'الأمان',terminal:'الطرفية',reports:'التقارير',companies:'الشركات',settings:'الإعدادات',search:'ابحث أو انتقل إلى…',notifications:'الإشعارات',approve:'موافقة',decline:'رفض',morning:'صباح الخير',afternoon:'مساء الخير',evening:'مساء الخير',more:'المزيد'},
+es:{g_workspace:'Espacio de trabajo',g_departments:'Departamentos',g_workforce:'Equipo',g_system:'Sistema',overview:'Resumen',askceo:'Preguntar al CEO',approvals:'Aprobaciones',ops:'Operaciones',mkt:'Marketing y ventas',tech:'Tecnología',fin:'Finanzas',people:'Personas',employees:'Empleados de IA',agents:'Agentes',coworker:'Compañero',tools:'Herramientas e integraciones',security:'Seguridad',terminal:'Terminal',reports:'Informes',companies:'Empresas',settings:'Ajustes',search:'Buscar o ir a…',notifications:'Notificaciones',approve:'Aprobar',decline:'Rechazar',morning:'Buenos días',afternoon:'Buenas tardes',evening:'Buenas noches',more:'Más'},
+fr:{g_workspace:'Espace de travail',g_departments:'Départements',g_workforce:'Effectifs',g_system:'Système',overview:"Vue d'ensemble",askceo:'Demander au CEO',approvals:'Approbations',ops:'Opérations',mkt:'Marketing et ventes',tech:'Technologie',fin:'Finance',people:'Ressources humaines',employees:'Employés IA',agents:'Agents',coworker:'Collègue',tools:'Outils et intégrations',security:'Sécurité',terminal:'Terminal',reports:'Rapports',companies:'Entreprises',settings:'Réglages',search:'Rechercher ou aller à…',notifications:'Notifications',approve:'Approuver',decline:'Refuser',morning:'Bonjour',afternoon:'Bon après-midi',evening:'Bonsoir',more:'Plus'}
+};
+const LANGS=[['en','English'],['hi','हिन्दी (Hindi)'],['pa','ਪੰਜਾਬੀ (Punjabi)'],['ar','العربية (Arabic)'],['es','Español (Spanish)'],['fr','Français (French)']];
+const t=k=>(L[S.lang]&&L[S.lang][k])||L.en[k]||k;
+
+/* ---------- reference data ---------- */
+const CT={
+IN:{name:'India',cur:'INR',tz:'Asia/Kolkata',lang:'en',date:'dmy',num:'en-IN',hour:'12',region:'in'},
+AE:{name:'United Arab Emirates',cur:'AED',tz:'Asia/Dubai',lang:'en',date:'dmy',num:'en-US',hour:'12',region:'ae'},
+US:{name:'United States',cur:'USD',tz:'America/New_York',lang:'en',date:'mdy',num:'en-US',hour:'12',region:'us'},
+GB:{name:'United Kingdom',cur:'GBP',tz:'Europe/London',lang:'en',date:'dmy',num:'en-US',hour:'24',region:'eu'},
+ES:{name:'Spain',cur:'EUR',tz:'Europe/Madrid',lang:'es',date:'dmy',num:'de-DE',hour:'24',region:'eu'},
+DE:{name:'Germany',cur:'EUR',tz:'Europe/Berlin',lang:'en',date:'dmy',num:'de-DE',hour:'24',region:'eu'},
+FR:{name:'France',cur:'EUR',tz:'Europe/Paris',lang:'fr',date:'dmy',num:'fr-FR',hour:'24',region:'eu'},
+JP:{name:'Japan',cur:'JPY',tz:'Asia/Tokyo',lang:'en',date:'iso',num:'en-US',hour:'24',region:'ap'}
+};
+const REGIONS={in:'India (Mumbai)',ae:'United Arab Emirates (Dubai)',us:'United States (Virginia)',eu:'Europe (Frankfurt)',ap:'Asia Pacific (Tokyo)'};
+const TZS=['Asia/Kolkata','Asia/Dubai','Europe/London','Europe/Madrid','Europe/Paris','Europe/Berlin','America/New_York','America/Los_Angeles','Asia/Tokyo','UTC'];
+const RATES={USD:1,INR:88,EUR:.92,GBP:.79,AED:3.6725,JPY:150};
+const CURNAME={USD:'US dollar',INR:'Indian rupee',EUR:'Euro',GBP:'British pound',AED:'UAE dirham',JPY:'Japanese yen'};
+const IND={
+hotel:{unit:'property',units:'properties',cust:'guest',custs:'guests',booking:'Booking engine',roles:['Reservations Desk','Revenue Manager'],name:'Hotels',leads:['Meridian Travel Group','Aurora Events','Pinecrest Offsites','Lumen Tours','Blue Orchard Weddings','Vantage Airline Crew']},
+clinic:{unit:'clinic',units:'clinics',cust:'patient',custs:'patients',booking:'Appointment system',roles:['Appointment Desk','Billing Coder'],name:'Healthcare',leads:['Harbor Insurance Network','Summit Employer Plan','Clearwater Referral Group','Oakline Wellness','Northgate Care Partners','Willow Corporate Health']},
+logistics:{unit:'route',units:'routes',cust:'shipper',custs:'shippers',booking:'Shipment booking',roles:['Dispatch Planner','Customs Clerk'],name:'Logistics',leads:['Desert Rose Trading','Gulf Harvest Imports','Skyline Retail','Palm Crest Electronics','Marina Foods','Oasis Pharma Supply']},
+food:{unit:'plant',units:'plants',cust:'buyer',custs:'buyers',booking:'Order portal',roles:['Procurement Buyer','Quality Inspector'],name:'Food',leads:['Mercado Fresco','Sierra Gourmet','Costa Dorada Imports','Olivar Retail','Nordic Pantry','Casa Verde Markets']},
+general:{unit:'site',units:'sites',cust:'customer',custs:'customers',booking:'Order system',roles:['Operations Coordinator','Service Desk'],name:'General business',leads:['Northfield Group','Kestrel Partners','Alder & Finch','Redwood Supply','Tidewater Co.','Granite Peak Ltd']}
+};
+const DEPTS={
+coo:{ic:'ops',role:'COO',blurb:'Runs daily work, schedules and quality across the company.'},
+cmo:{ic:'mkt',role:'CMO',blurb:'Plans campaigns, contacts leads, negotiates and closes.'},
+cto:{ic:'tech',role:'CTO',blurb:'Builds the company base, website engines and integrations.'},
+cfo:{ic:'fin',role:'CFO',blurb:'Tracks cash, cost and profit across every country and currency.'},
+chro:{ic:'people',role:'CHRO',blurb:'Manages AI employees, agents, SOPs and KRA/KPI.'}
+};
+const ACC={blue:['#0071e3','#0a84ff','#fff'],indigo:['#5856d6','#7d7aff','#fff'],purple:['#9d3fc4','#bf5af2','#fff'],pink:['#d6246e','#ff5c8a','#fff'],orange:['#b85400','#ff9f0a','#000'],green:['#1a7f37','#30d158','#000'],graphite:['#48484d','#aeaeb2','#000']};
+const NAV=[
+{g:'g_workspace',items:['overview','ceo','approvals']},
+{g:'g_departments',items:['coo','cmo','cto','cfo','chro']},
+{g:'g_workforce',items:['employees','agents','coworker']},
+{g:'g_system',items:['tools','security','terminal','reports','companies']}
+];
+const PAGES={overview:{ic:'home',k:'overview'},ceo:{ic:'chat',k:'askceo'},approvals:{ic:'approve',k:'approvals'},coo:{ic:'ops',k:'ops'},cmo:{ic:'mkt',k:'mkt'},cto:{ic:'tech',k:'tech'},cfo:{ic:'fin',k:'fin'},chro:{ic:'people',k:'people'},employees:{ic:'badge',k:'employees'},agents:{ic:'bot',k:'agents'},coworker:{ic:'spark',k:'coworker'},tools:{ic:'plug',k:'tools'},security:{ic:'shield',k:'security'},terminal:{ic:'term',k:'terminal'},reports:{ic:'doc',k:'reports'},companies:{ic:'building',k:'companies'},preferences:{ic:'sliders',k:'settings'}};
+const COS=[
+{id:'kora',name:'Kora Hospitality',cc:'IN',ind:'hotel',phase:'operating',rev:182000,profit:41500},
+{id:'falak',name:'Falak Logistics',cc:'AE',ind:'logistics',phase:'operating',rev:356000,profit:52800},
+{id:'bright',name:'Brightline Clinics',cc:'US',ind:'clinic',phase:'building',pct:61,day:2,days:3,brief:'We run outpatient clinics in three US cities. We want online booking, automated insurance checks, reminders that cut no-shows, and one dashboard that shows each clinic’s income and waiting time. Keep patient data private and report profit every week.'},
+{id:'almen',name:'Almendra Foods',cc:'ES',ind:'food',phase:'analyzing',pct:34,rev:94000,profit:11800}
+];
+const DEF={theme:'system',accent:'blue',density:'comfortable',sidebar:'full',textSize:100,reduceMotion:false,contrast:false,lang:'en',tz:'auto',hour:'auto',dateFmt:'auto',numFmt:'auto',currency:'company',autonomy:'balanced',payLimit:1000,hours:'247',tone:'brief',n_approvals:true,n_security:true,n_reports:true,n_builds:true,quiet:false,repFreq:'weekly',repEmail:'owner@example.com',repProfit:true,repSales:true,repSec:false,twofa:false,session:'1h',terminalOn:true,audit:'90',region:'in',hidden:[]};
+try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)DEF.reduceMotion=true}catch(e){}
+
+/* ---------- state ---------- */
+let S=Object.assign({},DEF), D=null, cur={pg:'overview',cat:null};
+function load(){
+  try{const s=JSON.parse(localStorage.getItem('ura.s1')||'null');if(s)S=Object.assign({},DEF,s)}catch(e){}
+  try{const d=JSON.parse(localStorage.getItem('ura.d1')||'null');if(d&&d.companies&&d.companies.length)D=d}catch(e){}
+}
+let saveT;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('ura.s1',JSON.stringify(S));localStorage.setItem('ura.d1',JSON.stringify(D))}catch(e){}},150)}
+function initData(){
+  D={cur:'kora',companies:COS.map(c=>Object.assign({},c)),approvals:[],tasks:[],employees:[],agents:[],leads:[],tools:[],threats:[],reports:[],notifs:[],feed:[],chat:{},
+    members:[{id:'m1',name:'Workspace owner',email:'owner@example.com',role:'Owner'},{id:'m2',name:'Priya Nair',email:'priya@example.com',role:'Admin'},{id:'m3',name:'Omar Haddad',email:'omar@example.com',role:'Manager'},{id:'m4',name:'Lena Fischer',email:'lena@example.com',role:'Viewer'}],
+    coworker:{browser:true,desktop:false,company:'off',log:[]},term:[]};
+  D.companies.forEach(buildData);
+}
+function buildData(c){
+  const R=rng(c.id),I=IND[c.ind]||IND.general,id=c.id,T=now(),H=3600e3,op=c.phase!=='building';
+  [['coo',I.roles[0]],['coo',I.roles[1]],['cmo','Sales Closer'],['cmo','Campaign Manager'],['cto','Systems Builder'],['cfo','Accounts Analyst'],['chro','Onboarding Coordinator']].forEach((r,i)=>D.employees.push({id:id+'-e'+i,co:id,dept:r[0],name:r[1],state:R()<.14?'idle':'working',kra:Math.round(76+R()*21),sops:3+Math.floor(R()*6),agents:[]}));
+  [['Lead scorer','template','cmo'],['Invoice reader','template','cfo'],['Web researcher','open-source','cmo'],['Schedule optimiser','in-house','coo'],['Site monitor','in-house','cto'],['Review responder','template','cmo']].forEach((a,i)=>D.agents.push({id:id+'-a'+i,co:id,name:a[0],kind:a[1],dept:a[2],on:R()>.16}));
+  D.employees.filter(e=>e.co===id).forEach(e=>{const m=D.agents.find(a=>a.co===id&&a.dept===e.dept);if(m)e.agents.push(m.id)});
+  if(op)I.leads.forEach((n,i)=>D.leads.push({id:id+'-l'+i,co:id,name:n,usd:Math.round((2400+R()*36000)/100)*100,stage:Math.floor(R()*4),ch:['Phone call','Message','Email'][i%3]}));
+  [['website','Website engine','in-house',1],['booking',I.booking,'api',op?1:0],['sales','Sales engine','in-house',1],['crm','CRM','api',op?1:0],['other','Payments gateway','api',op?1:0],['other','Email and calendar','browser',1],['other','Accounting ledger','mcp',op?1:0]].forEach((x,i)=>D.tools.push({id:id+'-t'+i,co:id,cat:x[0],name:x[1],mode:x[2],on:!!x[3]}));
+  if(op){D.threats.push({id:id+'-s1',co:id,sev:'medium',title:'Unused admin login is still active',where:'Accounts',open:true},{id:id+'-s2',co:id,sev:'low',title:'Website plugin is two versions behind',where:'Website engine',open:true});
+    if(c.phase==='analyzing')D.threats.push({id:id+'-s3',co:id,sev:'high',title:'A customer export link is public',where:'Storage',open:true})}
+  else D.threats.push({id:id+'-s1',co:id,sev:'low',title:'Staging site has no password yet',where:'Website engine',open:true});
+  const ap=[['cfo','Pay supplier invoice batch','7 invoices from '+I.units+' suppliers are due this week.','medium',4200,'task'],
+    ['cmo','Launch spring campaign on 3 channels','Targets '+I.custs+' who came once and did not return.','medium',1800,'task'],
+    ['cto','Connect the '+I.booking.toLowerCase()+' through its API','The CTO needs read and write access to keep records in sync.','high',0,null],
+    ['coo','Change the weekend shift pattern','Cuts idle time by about 9% across your '+I.units+'.','low',0,null],
+    ['chro','Install open-source agent “Lead scorer Pro”','Found on GitHub. The CHRO scanned it and found no risky calls.','medium',0,'agent'],
+    ['cmo','Send follow-up messages to 40 warm leads','Short personal messages. Replies go to the sales agent.','low',0,'task']];
+  (op?ap:[ap[2],ap[3],ap[4]]).forEach((a,i)=>D.approvals.push({id:id+'-p'+i,co:id,dept:a[0],title:a[1],detail:a[2],risk:a[3],usd:a[4],kind:a[5],state:'pending',ts:T-(20+i*47)*60e3}));
+  const TT={coo:['Balance the daily schedule across '+I.units,'Review the '+I.cust+' experience checklist','Audit supplier delivery times'],
+    cmo:['Follow up with warm leads by phone','Draft the spring offer for '+I.custs,'Compare three competitor prices'],
+    cto:['Sync the '+I.booking.toLowerCase()+' with the CRM','Back up the company database','Test the public website on mobile'],
+    cfo:['Reconcile this week’s payments','Forecast next month’s cash','Flag costs above budget'],
+    chro:['Write the SOP for '+I.roles[0],'Review KRA scores for the week','Match agents to open tasks']};
+  Object.keys(TT).forEach(d=>TT[d].forEach((ti,i)=>D.tasks.push({id:id+'-'+d+i,co:id,dept:d,title:ti,status:i===0?'running':i===1?'queued':'done',pct:i===0?Math.round(30+R()*50):i===2?100:0})));
+  if(op){D.reports.push({id:id+'-r1',co:id,title:'Weekly profit report',ts:T-2*24*H},{id:id+'-r2',co:id,title:'Weekly profit report',ts:T-9*24*H},{id:id+'-r3',co:id,title:'Monthly profit report',ts:T-20*24*H})}
+  D.notifs.push({id:id+'-n1',co:id,cat:'approvals',title:'Decisions are waiting',body:'The CEO needs you on payments and system access.',ts:T-25*60e3,read:false,go:'approvals'},
+    {id:id+'-n2',co:id,cat:'security',title:'New finding in Security',body:D.threats.find(x=>x.co===id).title+'.',ts:T-3*H,read:false,go:'security'},
+    {id:id+'-n3',co:id,cat:'reports',title:op?'Weekly report is ready':'First report is scheduled',body:op?'Profit, leads and risks for last week.':'It arrives after the build finishes.',ts:T-20*H,read:true,go:'reports'},
+    {id:id+'-n4',co:id,cat:'builds',title:op?'Integration sync finished':'Build reached the base check',body:op?'The CTO synced your systems with no errors.':'The CEO is checking the company base.',ts:T-30*H,read:true,go:'cto'});
+  const fd=op?[['coo','Rescheduled '+I.units+' to cut idle time',18],['cmo','Sales agent closed a deal with '+I.leads[1],55],['cfo','Reconciled 212 payments',120],['cto','Website engine deployed version 1.18',210],['chro',I.roles[0]+' passed its weekly KRA review',330],['coo','Quality checklist completed',600]]
+    :[['cto','Created the booking and CRM base',40],['cfo','Set up the ledger and currency rules',130],['cmo','Drafted the launch plan for '+I.custs,260],['chro','Hired 7 AI employees from templates',420],['ceo','Read the company brief and briefed all department heads',700]];
+  fd.forEach((f,i)=>D.feed.push({id:id+'-f'+i,co:id,dept:f[0],txt:f[1],ts:T-f[2]*60e3}));
+  D.chat[id]=[{who:'ceo',txt:'I’m the AI CEO of '+c.name+'. Ask me for numbers, or tell me what to delegate, for example “ask marketing to draft the spring offer”.',ts:T-60e3}];
+}
+
+/* ---------- selectors ---------- */
+const co=()=>D.companies.find(c=>c.id===D.cur)||D.companies[0];
+const ci=c=>CT[(c||co()).cc]||CT.US;
+const mine=a=>a.filter(x=>x.co===D.cur);
+const RISK={low:0,medium:1,high:2};
+const autoLvl=()=>({ask:-1,balanced:0,auto:1})[S.autonomy];
+const needsOwner=a=>RISK[a.risk]>autoLvl()||(a.usd||0)>Number(S.payLimit)||a.kind==='cowork';
+const pendingList=()=>D.approvals.filter(a=>a.co===D.cur&&a.state==='pending'&&needsOwner(a));
+const autoList=()=>D.approvals.filter(a=>a.co===D.cur&&a.state==='pending'&&!needsOwner(a));
+const catOn=c=>({approvals:S.n_approvals,security:S.n_security,reports:S.n_reports,builds:S.n_builds})[c]!==false;
+const notifList=()=>mine(D.notifs).filter(n=>catOn(n.cat)).sort((a,b)=>b.ts-a.ts);
+const unread=()=>notifList().filter(n=>!n.read).length;
+const vis=id=>id==='terminal'?S.terminalOn:id==='overview'||id==='preferences'?true:!S.hidden.includes(id);
+function weekly(c,n){const R=rng(c.id+'w'),base=(c.profit||0)/4.3,o=[];for(let i=0;i<n;i++)o.push(Math.max(0,Math.round(base*(.72+.28*i/(n-1)+(R()-.5)*.28))));return o}
+function secScore(){const open=mine(D.threats).filter(x=>x.open).length;let s=58+(S.twofa?14:0)+({'15m':8,'1h':6,'8h':2,never:-8})[S.session]+({'30':1,'90':4,'365':7})[S.audit]-open*6+(S.region===ci().region?3:0);return Math.max(8,Math.min(100,s))}
+function stepsFor(c){
+  const bs=['The CEO reads your brief','Department heads get their briefs','The CTO builds the company base','The CEO checks the base','Handover to operations'];
+  const as=['Connect your systems','Study the company and competitors','Find where profit leaks','Split the work across departments','Start operating'];
+  const list=c.phase==='building'?bs:as,n=list.length,p=c.pct||0;
+  return list.map((l,i)=>({l,state:p>=(i+1)*100/n?'done':p>=i*100/n?'act':'todo'}));
+}
+
+/* ---------- formatting ---------- */
+const ENLOC={IN:'en-IN',GB:'en-GB',AE:'en-AE',US:'en-US',ES:'en-GB'};
+function nloc(){if(S.numFmt!=='auto')return S.numFmt;if(S.lang==='en'){try{return ENLOC[co().cc]||'en-US'}catch(e){}}return({en:'en-US',hi:'hi-IN',pa:'pa-IN',ar:'ar-AE-u-nu-latn',es:'es-ES',fr:'fr-FR'})[S.lang]||'en-US'}
+const dispCur=()=>S.currency==='company'?ci().cur:S.currency;
+function money(usd,o){o=o||{};const cur=o.cur||dispCur(),v=usd*RATES[cur];
+  try{return new Intl.NumberFormat(nloc(),{style:'currency',currency:cur,notation:o.compact?'compact':'standard',maximumFractionDigits:o.compact?1:(cur==='JPY'||Math.abs(v)>=1000?0:2)}).format(v)}catch(e){return cur+' '+Math.round(v)}}
+const num=(n,o)=>{try{return new Intl.NumberFormat(nloc(),o).format(n)}catch(e){return String(n)}};
+const tzName=()=>S.tz==='auto'?((Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC'):S.tz;
+function dparts(d,o){return Object.fromEntries(new Intl.DateTimeFormat('en-US',Object.assign({timeZone:tzName()},o)).formatToParts(d).map(p=>[p.type,p.value]))}
+function fmtDate(d,short){d=new Date(d);const p=dparts(d,{year:'numeric',month:'2-digit',day:'2-digit'}),f=S.dateFmt;
+  if(f==='dmy')return short?p.day+'/'+p.month:p.day+'/'+p.month+'/'+p.year;
+  if(f==='mdy')return short?p.month+'/'+p.day:p.month+'/'+p.day+'/'+p.year;
+  if(f==='iso')return short?p.month+'-'+p.day:p.year+'-'+p.month+'-'+p.day;
+  return new Intl.DateTimeFormat(nloc(),Object.assign({timeZone:tzName(),day:'numeric',month:'short'},short?{}:{year:'numeric'})).format(d)}
+const h12=()=>S.hour==='12'?true:S.hour==='24'?false:undefined;
+const fmtTime=d=>new Intl.DateTimeFormat(nloc(),{timeZone:tzName(),hour:'numeric',minute:'2-digit',hour12:h12()}).format(new Date(d));
+function ago(ts){const m=Math.round((now()-ts)/60000);if(m<1)return 'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' h ago';return fmtDate(ts)}
+function greetKey(){const h=Number(dparts(new Date(),{hour:'numeric',hour12:false}).hour)%24;return h<12?'morning':h<18?'afternoon':'evening'}
+const pillFor=s=>({working:['good','Working'],idle:['','Idle'],paused:['warn','Paused'],running:['acc','Running'],queued:['','Queued'],done:['good','Done'],operating:['good','Operating'],building:['acc','Building'],analyzing:['warn','Studying'],low:['','Low risk'],medium:['warn','Medium risk'],high:['bad','High risk']})[s]||['',s];
+const pill=(s,txt)=>{const p=pillFor(s);return `<span class="pill ${p[0]}"><i></i>${esc(txt||p[1])}</span>`};
+const phaseLabel=c=>pillFor(c.phase)[1];
+
+/* ---------- ui primitives ---------- */
+function toast(msg,kind){const el=document.createElement('div');el.className='toast'+(kind?' '+kind:'');el.textContent=msg;$('#toasts').appendChild(el);setTimeout(()=>el.remove(),3200)}
+let stack=[];
+function openSheet(o){
+  const ov=document.createElement('div');ov.className='ov';
+  ov.innerHTML=`<div class="sheet ${o.wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(o.title)}" tabindex="-1"><div class="sh-h"><h2>${esc(o.title)}</h2><button class="ib" data-act="close" aria-label="Close">${icon('x',18)}</button></div><div class="sh-b">${o.body}</div>${o.foot?`<div class="sh-f">${o.foot}</div>`:''}</div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeTop()});
+  ov._prev=document.activeElement;ov._close=o.onClose;
+  $('#layer').appendChild(ov);stack.push(ov);
+  setTimeout(()=>{const f=$('[autofocus],input:not([type=hidden]),select,textarea',ov);(f||$('.sheet',ov)).focus()},40);
+  return ov;
+}
+function closeTop(){const ov=stack.pop();if(!ov)return false;ov._close&&ov._close();ov.remove();try{ov._prev&&ov._prev.focus&&ov._prev.focus()}catch(e){}return true}
+let popEl=null,popAnchor=null;
+function closePop(){if(popEl){popEl.remove();popEl=null;popAnchor=null}}
+function togglePop(anchor,html,o){if(popAnchor===anchor){closePop();return}openPop(anchor,html,o)}
+function openPop(anchor,html,o){
+  o=o||{};closePop();popAnchor=anchor;
+  const p=document.createElement('div');p.className='pop';p.setAttribute('role','menu');p.innerHTML=html;p.style.visibility='hidden';
+  $('#popwrap').appendChild(p);popEl=p;
+  const r=anchor.getBoundingClientRect(),pw=p.offsetWidth,ph=p.offsetHeight,rtl=document.documentElement.dir==='rtl';
+  let x=(o.end||rtl)?r.right-pw:r.left;x=Math.max(10,Math.min(x,innerWidth-pw-10));
+  let y=r.bottom+8;if(o.up||y+ph>innerHeight-10)y=Math.max(10,r.top-ph-8);
+  p.style.left=x+'px';p.style.top=y+'px';p.style.visibility='';
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(popEl)closePop();else closeTop()}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette()}
+});
+
+/* ---------- shell ---------- */
+const UI={range:12,view:'chart',empF:'all',apTab:'pending',cwScope:'personal',typing:false,term:[],thist:[],tpos:0,tprefill:'',setCat:'general'};
+const head=(title,sub,acts)=>`<div class="ph"><div><h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div>${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+function navItem(id){
+  const p=PAGES[id],lab=t(p.k);let bd='';
+  if(id==='approvals'){const n=pendingList().length;if(n)bd=`<span class="nb">${n}</span>`}
+  if(id==='security'){const n=mine(D.threats).filter(x=>x.open&&x.sev==='high').length;if(n)bd=`<span class="nb">${n}</span>`}
+  return `<a class="nv ${cur.pg===id?'on':''}" href="#${id}" data-go="${id}" title="${esc(lab)}"${cur.pg===id?' aria-current="page"':''}>${icon(p.ic,20)}<span class="nl">${esc(lab)}</span>${bd}</a>`;
+}
+function renderSidebar(){
+  const c=co();
+  let h=`<button class="cosw" data-act="coMenu" aria-haspopup="true" aria-label="Switch company"><span class="cochip">${esc(initials(c.name))}</span><span class="cotx"><b>${esc(c.name)}</b><small>${esc(ci().name)}, ${esc(phaseLabel(c))}</small></span>${icon('updown',16)}</button><nav class="nav" aria-label="Menu">`;
+  NAV.forEach(g=>{const its=g.items.filter(x=>vis(x));if(!its.length)return;h+=`<div class="ng">${esc(t(g.g))}</div>`+its.map(x=>navItem(x)).join('')});
+  h+=`</nav><div class="sbf">${navItem('preferences')}</div>`;
+  $('#sb').innerHTML=h;$('#app').classList.toggle('rail',S.sidebar==='rail');
+}
+const tzShort=()=>{try{return new Intl.DateTimeFormat('en-US',{timeZone:tzName(),timeZoneName:'short'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName').value}catch(e){return ''}};
+const clockText=()=>fmtTime(now())+' '+tzShort();
+const statusText=()=>'CEO online, '+({'247':'24/7',biz:'business hours',night:'nights and weekends'})[S.hours];
+function renderTop(){
+  const p=PAGES[cur.pg]||PAGES.overview,n=unread();
+  $('#tb').innerHTML=`<button class="ib" data-act="sidebar" aria-label="Show or hide the menu">${icon('sidebar',20)}</button>
+<div class="crumb"><span class="cr1">${esc(co().name)}</span>${icon('chevR',14,'flip')}<b>${esc(t(p.k))}</b></div><span class="grow"></span>
+<button class="srch" data-act="palette" aria-label="${esc(t('search'))}">${icon('search',16)}<span>${esc(t('search'))}</span><kbd>${IS_MAC?'⌘K':'Ctrl K'}</kbd></button>
+<button class="stat" data-act="statusPop" aria-label="Agent status"><i class="dot"></i><span>${esc(statusText())}</span></button>
+<span class="clk" id="clk">${esc(clockText())}</span>
+<button class="ib" data-act="bellPop" aria-label="${esc(t('notifications'))}">${icon('bell',20)}${n?`<i class="bd">${n}</i>`:''}</button>
+<button class="ib" data-act="helpPop" aria-label="Help">${icon('help',20)}</button>
+<button class="av" data-act="profPop" aria-label="Account">${icon('user',18)}</button>`;
+}
+function renderTabs(){
+  const ids=['overview','ceo','approvals','employees','coo','agents'].filter(x=>vis(x)).slice(0,4),n=pendingList().length;
+  $('#tabs').innerHTML=ids.map(id=>{const p=PAGES[id];return `<button data-go="${id}" class="${cur.pg===id?'on':''}" aria-label="${esc(t(p.k))}">${icon(p.ic,22)}<span>${esc(id==='employees'&&S.lang==='en'?'Staff':t(p.k))}</span>${id==='approvals'&&n?`<span class="nb">${n}</span>`:''}</button>`}).join('')+`<button data-act="sidebar" aria-label="${esc(t('more'))}">${icon('menu',22)}<span>${esc(t('more'))}</span></button>`;
+}
+
+/* ---------- charts ---------- */
+const CH={};
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x||1))),f=x/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
+function gridLines(top,step,W,H,pl,pr,pt,pb){let g='';const y=v=>pt+(H-pt-pb)*(1-v/top);for(let v=0;v<=top+1e-9;v+=step){g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="${v===0?'var(--line)':'var(--grid)'}" stroke-width="1"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end">${esc(money(v,{compact:true}))}</text>`}return g}
+function areaChart(id,vals,labels){
+  const W=640,H=230,pl=58,pr=16,pt=14,pb=28,n=vals.length,mx=Math.max.apply(null,vals.concat([1])),step=niceStep(mx/4),top=step*Math.ceil(mx/step);
+  const x=i=>pl+(W-pl-pr)*i/(n-1),y=v=>pt+(H-pt-pb)*(1-v/top);
+  CH[id]={type:'area',vals,labels,W,H,pl,pr,pt,pb,top};
+  const line='M'+vals.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).join(' L'),area=line+` L${x(n-1)},${y(0)} L${x(0)},${y(0)} Z`;
+  let xl='';[0,Math.floor((n-1)/2),n-1].forEach((i,k)=>{xl+=`<text x="${x(i)}" y="${H-6}" text-anchor="${k===0?'start':k===2?'end':'middle'}">${esc(labels[i])}</text>`});
+  return `<div class="chart" data-chart="${id}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Net profit by week, latest ${esc(money(vals[n-1]))}"><defs><linearGradient id="ag-${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${gridLines(top,step,W,H,pl,pr,pt,pb)}<path d="${area}" fill="url(#ag-${id})"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><line class="cx" x1="0" x2="0" y1="${pt}" y2="${H-pb}" stroke="var(--fg-3)" stroke-dasharray="3 3" opacity="0"/><circle class="hd" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" cx="${x(n-1)}" cy="${y(vals[n-1])}"/>${xl}</svg><div class="tip"></div></div>`;
+}
+function barChart(id,vals,labels,fmt){
+  const W=640,H=210,pl=58,pr=12,pt=12,pb=28,n=vals.length,mx=Math.max.apply(null,vals.concat([1])),step=niceStep(mx/4),top=step*Math.ceil(mx/step);
+  const band=(W-pl-pr)/n,bw=Math.min(30,band*.5),y=v=>pt+(H-pt-pb)*(1-v/top),y0=y(0);
+  CH[id]={type:'bar',vals,labels,W,H,pl,pr,pt,pb,top,band,bw,fmt};
+  let bars='',xl='',g=gridLines(top,step,W,H,pl,pr,pt,pb);
+  if(fmt)g=g.replace(/<text x="\d+" y="[\d.]+" text-anchor="end">[^<]*<\/text>/g,'').replace(/<\/g>/,'');
+  vals.forEach((v,i)=>{const bx=pl+band*i+(band-bw)/2,by=y(v),h=y0-by,r=Math.min(4,h/2,bw/2);
+    if(h>0)bars+=`<path class="bz" data-i="${i}" d="M${bx},${y0} V${by+r} Q${bx},${by} ${bx+r},${by} H${bx+bw-r} Q${bx+bw},${by} ${bx+bw},${by+r} V${y0} Z" fill="var(--accent)"/>`;
+    xl+=`<text x="${bx+bw/2}" y="${H-6}" text-anchor="middle">${esc(labels[i])}</text>`});
+  let yl='';if(fmt){for(let v=0;v<=top+1e-9;v+=step)yl+=`<text x="${pl-8}" y="${y(v)+4}" text-anchor="end">${esc(fmt(v))}</text>`}
+  return `<div class="chart" data-chart="${id}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">${g}${yl}${bars}${xl}</svg><div class="tip"></div></div>`;
+}
+function bindCharts(){
+  $$('[data-chart]').forEach(el=>{
+    const c=CH[el.dataset.chart];if(!c)return;const svg=$('svg',el),tip=$('.tip',el);
+    const X=i=>c.pl+(c.W-c.pl-c.pr)*i/(c.vals.length-1),Y=v=>c.pt+(c.H-c.pt-c.pb)*(1-v/c.top);
+    const show=(px,py,lab,val)=>{tip.innerHTML=`<span>${esc(lab)}</span><b>${esc(val)}</b>`;tip.style.left=px+'px';tip.style.top=py+'px';tip.style.opacity=1};
+    if(c.type==='area'){
+      const cx=$('.cx',svg),hd=$('.hd',svg),last=c.vals.length-1;
+      svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width*c.W;let i=Math.round((fx-c.pl)/(c.W-c.pl-c.pr)*last);i=Math.max(0,Math.min(last,i));
+        cx.setAttribute('x1',X(i));cx.setAttribute('x2',X(i));cx.setAttribute('opacity',.8);hd.setAttribute('cx',X(i));hd.setAttribute('cy',Y(c.vals[i]));
+        show(X(i)/c.W*r.width,Y(c.vals[i])/c.H*r.height,c.labels[i],money(c.vals[i]))});
+      svg.addEventListener('pointerleave',()=>{cx.setAttribute('opacity',0);hd.setAttribute('cx',X(last));hd.setAttribute('cy',Y(c.vals[last]));tip.style.opacity=0});
+    }else{
+      $$('.bz',svg).forEach(b=>{const i=Number(b.dataset.i);
+        b.addEventListener('pointerenter',()=>{const r=svg.getBoundingClientRect(),bx=c.pl+c.band*i+c.band/2;show(bx/c.W*r.width,(c.pt+(c.H-c.pt-c.pb)*(1-c.vals[i]/c.top))/c.H*r.height,c.labels[i],c.fmt?c.fmt(c.vals[i]):money(c.vals[i]));b.style.opacity=.8});
+        b.addEventListener('pointerleave',()=>{tip.style.opacity=0;b.style.opacity=1})});
+    }
+  });
+}
+function spark(v){const W=96,H=30,n=v.length,mx=Math.max.apply(null,v),mn=Math.min.apply(null,v),x=i=>5+(W-10)*i/(n-1),y=a=>5+(H-10)*(1-(a-mn)/((mx-mn)||1));
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="M${v.map((a,i)=>x(i).toFixed(1)+','+y(a).toFixed(1)).join(' L')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${x(n-1)}" cy="${y(v[n-1])}" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></svg>`}
+const kpi=(l,v,f,s)=>`<div class="card kpi"><span class="kl">${esc(l)}</span><span class="kv">${esc(v)}</span><div class="kf"><span>${esc(f)}</span>${s?spark(s):''}</div></div>`;
+const empty=(t1,t2)=>`<div class="empty"><b>${esc(t1)}</b>${esc(t2||'')}</div>`;
+
+/* ---------- overview ---------- */
+function phaseCard(c){
+  const st=stepsFor(c),b=c.phase==='building',I=IND[c.ind]||IND.general;
+  const leaks=[['Reminders for '+I.custs+' are sent by hand',2100],['Follow-up after the first visit is never sent',3400],['Supplier invoices are paid late',1250]];
+  return `<div class="card" style="margin-bottom:14px"><div class="ch"><h2>${b?'Building your company':'Studying your company'}</h2>${pill(c.phase)}<span class="grow"></span><span class="sub">${b?'Day '+c.day+' of '+c.days:'Usually 1 to 2 days'}</span></div>
+<div class="bar"><i style="width:${c.pct}%"></i></div>
+<div class="steps" style="margin-top:8px">${st.map(s=>`<div class="step ${s.state}"><span class="sd">${s.state==='done'?icon('check',14):''}</span><div><b>${esc(s.l)}</b>${s.state==='act'?'<small>In progress</small>':''}</div></div>`).join('')}</div>
+${b?`<div style="margin-top:8px"><button class="btn sm" data-act="brief">Read the brief</button></div>`:`<div class="list" style="margin-top:12px">${leaks.map(l=>`<div class="row"><span class="ico">${icon('alert',17)}</span><div class="rt"><b>${esc(l[0])}</b><small>Possible loss each month</small></div><b class="num">${esc(money(l[1]))}</b></div>`).join('')}</div>`}</div>`;
+}
+function decisionRows(list,n){return list.slice(0,n).map(a=>`<div class="row" style="align-items:flex-start;flex-wrap:wrap"><div class="rt" style="flex-basis:12rem"><b style="white-space:normal">${esc(a.title)}</b><small>${esc(DEPTS[a.dept]?DEPTS[a.dept].role:'CEO')} asks. ${pill(a.risk)}</small></div><div style="display:flex;gap:6px"><button class="btn sm pri" data-act="apv" data-id="${a.id}" data-v="approved">${esc(t('approve'))}</button><button class="btn sm" data-act="apv" data-id="${a.id}" data-v="declined">${esc(t('decline'))}</button></div></div>`).join('')}
+function pgOverview(){
+  const c=co(),I=IND[c.ind]||IND.general,pend=pendingList(),hasNums=c.rev>0,building=c.phase==='building';
+  let h=head(esc(t(greetKey())),`${esc(c.name)}, ${esc(ci().name)}. ${building?'The CEO is building the company base.':c.phase==='analyzing'?'The CEO is studying how the company works.':'The AI CEO is running the company.'}`,`<button class="btn" data-act="delegate" data-d="coo">${icon('plus',16)}Delegate task</button><button class="btn pri" data-go="ceo">${icon('chat',16)}${esc(t('askceo'))}</button>`);
+  if(c.phase!=='operating')h+=phaseCard(c);
+  const open=mine(D.leads).filter(l=>l.stage<3),play=open.reduce((a,l)=>a+l.usd,0),agOn=mine(D.agents).filter(a=>a.on).length,emW=mine(D.employees).filter(e=>e.state==='working').length,tl=mine(D.tools);
+  if(building){
+    h+=`<div class="grid g4">${kpi('Build progress',c.pct+'%','Day '+c.day+' of '+c.days)}${kpi('Department heads briefed',(c.pct>=20?5:2)+' of 5','CEO, COO, CMO, CTO, CFO')}${kpi('Systems ready',tl.filter(x=>x.on).length+' of '+tl.length,'Built by the CTO')}${kpi('Decisions waiting',String(pend.length),'Needs you before handover')}</div>`;
+  }else{
+    const ws=hasNums?weekly(c,12):null,m=hasNums?Math.round(c.profit/c.rev*100):0;
+    h+=`<div class="grid g4">${kpi('Revenue this month',hasNums?money(c.rev,{compact:true}):'Not measured yet',hasNums?'Up 8.4% on last month':'Appears after systems connect',ws&&ws.map(v=>v*3.3))}${kpi('Net profit',hasNums?money(c.profit,{compact:true}):'Not measured yet',hasNums?m+'% margin':'Appears after systems connect',ws)}${kpi('Open leads',String(open.length),money(play,{compact:true})+' in play')}${kpi('Agents running',agOn+' of '+mine(D.agents).length,emW+' AI employees working')}</div>`;
+  }
+  h+=`<div class="grid split" style="margin-top:14px"><div class="stack">`;
+  if(hasNums&&!building){
+    const all=weekly(c,26),vals=all.slice(-UI.range),labels=vals.map((v,i)=>fmtDate(now()-(vals.length-1-i)*7*864e5,true));
+    h+=`<div class="card"><div class="ch"><h2>Net profit by week</h2><span class="grow"></span><div class="seg" role="group" aria-label="Range">${[4,12,26].map(r=>`<button class="${UI.range===r?'on':''}" data-act="range" data-v="${r}">${r} weeks</button>`).join('')}</div><div class="seg" role="group" aria-label="View"><button class="${UI.view==='chart'?'on':''}" data-act="view" data-v="chart">Chart</button><button class="${UI.view==='table'?'on':''}" data-act="view" data-v="table">Table</button></div></div>`
+    +(UI.view==='chart'?areaChart('profit',vals,labels):`<div class="scx" style="max-height:230px;overflow-y:auto"><table class="tbl"><thead><tr><th>Week of</th><th class="r">Net profit</th></tr></thead><tbody>${vals.map((v,i)=>`<tr><td>${esc(labels[i])}</td><td class="r">${esc(money(v))}</td></tr>`).reverse().join('')}</tbody></table></div>`)
+    +`</div>`;
+  }
+  h+=`<div class="card"><div class="ch"><h2>Departments</h2></div><div class="list">${Object.keys(DEPTS).map(id=>{const n=pend.filter(a=>a.dept===id).length,run=mine(D.tasks).filter(x=>x.dept===id&&x.status==='running').length;return `<button class="row click" data-go="${id}"><span class="ico">${icon(DEPTS[id].ic,17)}</span><div class="rt"><b>${esc(t(PAGES[id].k))}</b><small>${run} ${run===1?'task':'tasks'} running</small></div>${n?pill('warn',n+(n===1?' decision':' decisions')):pill('good','On track')}${icon('chevR',16,'flip')}</button>`}).join('')}</div></div></div>`;
+  h+=`<div class="stack"><div class="card"><div class="ch"><h2>${esc(t('askceo').replace('Ask ','The '))} needs you</h2></div>${pend.length?`<div class="list">${decisionRows(pend,3)}</div>${pend.length>3?`<p style="margin-top:10px"><button class="lnk" data-go="approvals">See all ${pend.length}</button></p>`:''}`:empty('Nothing needs you right now','The CEO is handling the rest within your autonomy setting.')}</div>
+<div class="card"><div class="ch"><h2>Recent activity</h2></div><div class="list">${mine(D.feed).sort((a,b)=>b.ts-a.ts).slice(0,6).map(f=>`<div class="row"><span class="ico">${icon(DEPTS[f.dept]?DEPTS[f.dept].ic:'spark',16)}</span><div class="rt"><b style="font-weight:500;white-space:normal">${esc(f.txt)}</b><small title="${esc(fmtDate(f.ts)+' '+fmtTime(f.ts))}">${esc(ago(f.ts))}</small></div></div>`).join('')}</div></div></div></div>`;
+  return h;
+}
+
+/* ---------- ask the CEO ---------- */
+const CHIPS=['How is profit this month?','How many leads are open?','Ask marketing to draft the spring offer','What are the security risks?','Create a report','Hire a new AI employee'];
+function chatMsgs(){
+  const msgs=D.chat[D.cur]||[];
+  return msgs.map(m=>`<div class="msg ${m.who}">${esc(m.txt)}${m.links&&m.links.length?`<div class="mm">${m.links.map(l=>`<button class="btn sm" data-go="${l[0]}">${esc(l[1])}</button>`).join('')}</div>`:''}<time>${esc(fmtTime(m.ts))}</time></div>`).join('')+(UI.typing?'<div class="msg ceo typing" aria-label="The CEO is typing"><i></i><i></i><i></i></div>':'');
+}
+function pgCeo(){
+  return head(esc(t('askceo')),'Ask for numbers or tell the CEO what to delegate. Delegated work appears in that department right away.')
+  +`<div class="card chat"><div class="msgs" id="msgs" aria-live="polite">${chatMsgs()}</div><div class="cfoot"><div class="chips">${CHIPS.map(c=>`<button class="chip" data-act="chip" data-q="${esc(c)}">${esc(c)}</button>`).join('')}</div><form class="comp" data-form="chat"><input class="inp" id="chatin" placeholder="Message the AI CEO" autocomplete="off" aria-label="Message the AI CEO"><button class="send" type="submit" aria-label="Send">${icon('send',20)}</button></form></div></div>`;
+}
+function paintChat(){const m=$('#msgs');if(m){m.innerHTML=chatMsgs();m.scrollTop=m.scrollHeight}}
+const DMAP=[['coo',/\b(coo|operations?|ops)\b/],['cmo',/\b(cmo|marketing|sales)\b/],['cto',/\b(cto|tech|technology|website|engineering)\b/],['cfo',/\b(cfo|finance|accounts?|payments?)\b/],['chro',/\b(chro|people|hr|hiring)\b/]];
+function addTask(dept,title){D.tasks.push({id:rid('t'),co:D.cur,dept,title,status:'queued',pct:0});D.feed.push({id:rid('f'),co:D.cur,dept,txt:'New task queued: '+title,ts:now()});save()}
+function ceoReply(q){
+  const c=co(),I=IND[c.ind]||IND.general,s=q.toLowerCase(),brief=S.tone==='brief',open=mine(D.leads).filter(l=>l.stage<3),pend=pendingList();
+  const dm=DMAP.find(d=>d[1].test(s)),act=/\b(ask|tell|have|get|delegate|draft|run|launch|prepare|plan|review|fix|build|write|check|compare)\b/.test(s);
+  if(dm&&act&&!/\b(how|what|report)\b/.test(s)){
+    let title=q.replace(/^\s*(please\s+)?(ask|tell|have|get)\s+(the\s+)?\w+(\s+team)?\s+(to\s+)?/i,'').replace(/[.?!]+$/,'').trim()||q;title=(title[0].toUpperCase()+title.slice(1)).slice(0,80);
+    addTask(dm[0],title);
+    return {txt:brief?`Delegated to the ${DEPTS[dm[0]].role}: “${title}”.`:`Delegated to the ${DEPTS[dm[0]].role}: “${title}”. It is queued in ${t(PAGES[dm[0]].k)}. I only bring it to Approvals if it needs money or system access.`,links:[[dm[0],'Open '+t(PAGES[dm[0]].k)]]};
+  }
+  if(/report/.test(s)){D.reports.unshift({id:rid('r'),co:D.cur,title:'On-demand report',ts:now()});save();return {txt:brief?'Done. The report is in Reports.':'Done. I created an on-demand report with the sections you chose in Settings. It is in Reports.',links:[['reports','Open Reports']]}}
+  if(/profit|revenue|money|cash|income|margin/.test(s)){
+    if(!(c.rev>0))return {txt:`There is no revenue to report yet. Profit tracking starts when ${c.phase==='building'?'the build is handed over':'your systems finish connecting'}.`,links:[[c.phase==='building'?'overview':'tools',c.phase==='building'?'See build progress':'Open Tools']]};
+    const m=Math.round(c.profit/c.rev*100);
+    return {txt:brief?`Net profit this month is ${money(c.profit)} on ${money(c.rev)} revenue, a ${m}% margin.`:`Net profit this month is ${money(c.profit)} on ${money(c.rev)} revenue, a ${m}% margin. That is about ${money(c.profit/4.3)} a week. The biggest lever I see is ${I.custs} who come once and do not return. The CMO has a campaign waiting for your approval.`,links:[['cfo','Open Finance']]};
+  }
+  if(/lead|sale|pipeline|close|deal/.test(s)){
+    const v=open.reduce((a,l)=>a+l.usd,0),neg=open.filter(l=>l.stage===2).length;
+    return {txt:open.length?(brief?`${open.length} open leads worth ${money(v)}. ${neg} are in negotiation.`:`${open.length} open leads worth ${money(v)}. ${neg} are in negotiation and the sales agent is following up with the rest by phone, message and email.`):'There are no leads yet. The CMO starts outreach after the build.',links:[['cmo','Open Marketing & Sales']]};
+  }
+  if(/secur|threat|risk|hack|safe/.test(s)){
+    const n=mine(D.threats).filter(x=>x.open).length;
+    return {txt:brief?`Security score is ${secScore()} out of 100 with ${n} open findings.`:`Security score is ${secScore()} out of 100 with ${n} open findings. Turning on two-step sign-in and shortening the session timeout raises it the most.`,links:[['security','Open Security']]};
+  }
+  if(/hire|employee|staff|recruit/.test(s))return {txt:'I can add an AI employee from a template. Open AI Employees and choose Hire.',links:[['employees','Open AI Employees']]};
+  if(/approv|decision|waiting|pending/.test(s))return {txt:pend.length?`${pend.length} decisions are waiting for you. ${pend.filter(a=>a.risk==='high').length} are high risk.`:'Nothing is waiting for you.',links:[['approvals','Open Approvals']]};
+  return {txt:'I took that as a request for the whole company. Name a department so I can delegate it, for example “ask finance to check costs above budget”. I can also report on profit, leads or security.'};
+}
+function sendChat(text){
+  text=String(text||'').trim();if(!text||UI.typing)return;
+  D.chat[D.cur].push({who:'me',txt:text,ts:now()});UI.typing=true;paintChat();save();
+  const cid=D.cur;
+  setTimeout(()=>{const r=ceoReply(text);D.chat[cid].push({who:'ceo',txt:r.txt,links:r.links,ts:now()});UI.typing=false;save();renderShell();if(cur.pg==='ceo')paintChat()},650);
+}
+
+/* ---------- approvals ---------- */
+function resolveApproval(id,v){
+  const a=D.approvals.find(x=>x.id===id);if(!a)return;a.state=v;a.done=now();
+  const I=IND[co().ind]||IND.general;
+  if(v==='approved'){
+    if(a.kind==='cowork')cw().company='on';
+    if(a.kind==='agent')D.agents.push({id:rid('a'),co:a.co,name:'Lead scorer Pro',kind:'open-source',dept:'chro',on:true});
+    if(a.kind==='task')addTask(a.dept,a.title);
+  }else if(a.kind==='cowork')cw().company='off';
+  D.feed.push({id:rid('f'),co:a.co,dept:a.dept,txt:(v==='approved'?'You approved: ':'You declined: ')+a.title,ts:now()});
+  save();toast(v==='approved'?'Approved. The '+(DEPTS[a.dept]?DEPTS[a.dept].role:'CEO')+' can proceed.':'Declined. The '+(DEPTS[a.dept]?DEPTS[a.dept].role:'CEO')+' has been told.');
+}
+function pgApprovals(){
+  const pend=pendingList(),auto=autoList(),hist=mine(D.approvals).filter(a=>a.state!=='pending').sort((x,y)=>y.done-x.done);
+  const lvl={ask:'Ask me for everything',balanced:'Balanced',auto:'Mostly autonomous'}[S.autonomy];
+  let h=head(esc(t('approvals')),'Decisions the AI CEO and department heads need from you. Your autonomy setting decides what reaches this list.',`<button class="btn" data-go="prefs-ai">${icon('sliders',16)}Autonomy: ${esc(lvl)}</button>`);
+  h+=`<div class="seg" style="margin-bottom:14px"><button class="${UI.apTab==='pending'?'on':''}" data-act="aptab" data-v="pending">Waiting (${pend.length})</button><button class="${UI.apTab==='history'?'on':''}" data-act="aptab" data-v="history">History (${hist.length+auto.length})</button></div>`;
+  if(UI.apTab==='pending'){
+    h+=pend.length?`<div class="stack">${pend.map(a=>`<div class="card ap"><div class="top"><span class="ico">${icon(DEPTS[a.dept]?DEPTS[a.dept].ic:'spark',17)}</span><div class="rt"><b style="white-space:normal">${esc(a.title)}</b><small>${esc(a.detail)}</small></div>${pill(a.risk)}</div><div style="display:flex;gap:14px;flex-wrap:wrap;color:var(--fg-3);font-size:.8125rem"><span>From the ${esc(DEPTS[a.dept]?DEPTS[a.dept].role:'CEO')}</span>${a.usd?`<span>Amount ${esc(money(a.usd))}</span>`:''}<span>${esc(ago(a.ts))}</span></div><div class="bt"><button class="btn pri" data-act="apv" data-id="${a.id}" data-v="approved">${icon('check',16)}${esc(t('approve'))}</button><button class="btn" data-act="apv" data-id="${a.id}" data-v="declined">${esc(t('decline'))}</button></div></div>`).join('')}</div>`
+      :`<div class="card">${empty('You are all caught up','Nothing needs your decision. '+(auto.length?auto.length+' low-risk items were handled by the CEO.':''))}</div>`;
+  }else{
+    h+=`<div class="list">${auto.map(a=>`<div class="row"><span class="ico">${icon('bolt',17)}</span><div class="rt"><b style="white-space:normal">${esc(a.title)}</b><small>Handled by the CEO within your autonomy setting</small></div>${pill('acc','Auto')}</div>`).concat(hist.map(a=>`<div class="row"><span class="ico">${icon(a.state==='approved'?'check':'x',17)}</span><div class="rt"><b style="white-space:normal">${esc(a.title)}</b><small>${esc(ago(a.done))}</small></div>${pill(a.state==='approved'?'good':'bad',a.state==='approved'?'Approved':'Declined')}</div>`)).join('')||empty('No history yet','Approved and declined decisions appear here.')}</div>`;
+  }
+  return h;
+}
+
+/* ---------- departments ---------- */
+function deptKpis(id){
+  const c=co(),R=rng(c.id+id),I=IND[c.ind]||IND.general,tk=mine(D.tasks).filter(x=>x.dept===id),tl=mine(D.tools),em=mine(D.employees),ag=mine(D.agents),open=mine(D.leads).filter(l=>l.stage<3);
+  if(id==='coo')return [['Tasks running',String(tk.filter(x=>x.status==='running').length),'of '+tk.length+' in the queue'],['On-time rate',Math.round(90+R()*8)+'%','This week'],['Idle time',(4+R()*5).toFixed(1)+'%','Down 9% this week'],[I.cust[0].toUpperCase()+I.cust.slice(1)+' rating',(4.3+R()*.6).toFixed(1)+' of 5','Last 30 days']];
+  if(id==='cmo')return [['Open leads',String(open.length),'Across 3 channels'],['Pipeline value',money(open.reduce((a,l)=>a+l.usd,0),{compact:true}),'Open leads only'],['Close rate',Math.round(18+R()*14)+'%','Last 30 days'],['Reply time',Math.round(4+R()*9)+' min','Median']];
+  if(id==='cto')return [['Systems connected',tl.filter(x=>x.on).length+' of '+tl.length,'Website, booking, CRM and more'],['Uptime',(99.5+R()*.45).toFixed(2)+'%','Last 30 days'],['Deploys this week',String(2+Math.floor(R()*6)),'No rollbacks'],['Open findings',String(mine(D.threats).filter(x=>x.open).length),'In Security']];
+  if(id==='cfo')return [['Revenue',c.rev>0?money(c.rev,{compact:true}):'Not measured','This month'],['Net profit',c.profit>0?money(c.profit,{compact:true}):'Not measured','This month'],['Cash runway',c.rev>0?(5+R()*7).toFixed(1)+' months':'Not measured','At current spend'],['Costs above budget',String(Math.floor(R()*4)),'Flagged for review']];
+  return [['AI employees',String(em.length),em.filter(e=>e.state==='working').length+' working'],['Agents running',String(ag.filter(a=>a.on).length),'of '+ag.length+' installed'],['Average KRA',Math.round(em.reduce((a,e)=>a+e.kra,0)/Math.max(1,em.length))+'%','Weekly review'],['SOPs live',String(em.reduce((a,e)=>a+e.sops,0)),'Across all roles']];
+}
+function pipeline(){
+  const cols=['New','Contacted','Negotiating','Won'],L2=mine(D.leads);
+  return `<div class="card"><div class="ch"><h2>Lead pipeline</h2><span class="sub">Tap Advance to move a lead forward</span></div><div class="kb">${cols.map((cn,i)=>{const ls=L2.filter(l=>l.stage===i);return `<div class="kc"><h3><span>${cn}</span><span>${ls.length}</span></h3>${ls.map(l=>`<div class="lead"><b title="${esc(l.name)}">${esc(l.name)}</b><span class="muted">${esc(l.ch)}, ${esc(money(l.usd,{compact:true}))}</span>${i<3?`<button class="btn sm" data-act="lead" data-id="${l.id}">Advance</button>`:''}</div>`).join('')||'<span class="muted" style="font-size:.8125rem">No leads</span>'}</div>`}).join('')}</div></div>`;
+}
+function deptModule(id){
+  const c=co(),R=rng(c.id+id+'m');
+  if(id==='cmo')return pipeline();
+  if(id==='cfo'){
+    const mo=[],lab=[];for(let i=5;i>=0;i--){const d=new Date(now()-i*30*864e5);lab.push(new Intl.DateTimeFormat(nloc(),{month:'short',timeZone:tzName()}).format(d));mo.push(c.profit>0?Math.round(c.profit*(.7+.3*(5-i)/5+(R()-.5)*.2)):0)}
+    return `<div class="card"><div class="ch"><h2>Net profit by month</h2></div>${c.profit>0?barChart('cfo',mo,lab):empty('Nothing to chart yet','Profit appears after handover.')}</div><div class="card"><div class="ch"><h2>Currency</h2></div><div class="list"><div class="row"><div class="rt"><b>Company currency</b><small>${esc(CURNAME[ci().cur])}, set by ${esc(ci().name)}</small></div><b>${esc(ci().cur)}</b></div><div class="row"><div class="rt"><b>Shown to you in</b><small>Change this in Settings, Language and region</small></div><b>${esc(dispCur())}</b></div><div class="row"><div class="rt"><b>Sample rate</b><small>Live rates arrive with the connected app</small></div><b class="num">1 USD = ${esc(num(RATES[dispCur()],{maximumFractionDigits:4}))} ${esc(dispCur())}</b></div></div></div>`;
+  }
+  if(id==='cto'){const tl=mine(D.tools).slice(0,5);return `<div class="card"><div class="ch"><h2>Systems</h2><span class="grow"></span><button class="btn sm" data-go="tools">Manage</button></div><div class="list">${tl.map(x=>`<div class="row"><span class="ico">${icon('plug',16)}</span><div class="rt"><b>${esc(x.name)}</b><small>${esc(modeLabel(x.mode))}</small></div>${pill(x.on?'good':'',x.on?'Connected':'Off')}</div>`).join('')}</div></div>`}
+  if(id==='coo'){const d=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>x),v=d.map((x,i)=>Math.round(18+R()*22+(i>4?-6:0)));return `<div class="card"><div class="ch"><h2>Tasks finished by weekday</h2></div>${barChart('coo',v,d,x=>num(x,{maximumFractionDigits:0}))}</div>`}
+  return `<div class="card"><div class="ch"><h2>Who can use whom</h2></div><div class="hier"><div class="hn">AI CEO</div><div class="ha">${icon('down',14)} directs</div><div class="hn">Department heads</div><div class="ha">${icon('down',14)} directs</div><div class="hn">AI employees</div><div class="ha">${icon('down',14)} can use</div><div class="hn">Agents</div></div><p class="muted" style="margin-top:12px">Agents can never use employees. This keeps every action tied to an SOP and a KRA.</p></div>`;
+}
+const modeLabel=m=>({'in-house':'Built in-house','browser':'Runs in a browser and is released after the work',api:'Connected through its API',mcp:'Connected through MCP'})[m]||m;
+function pgDept(id){
+  const d=DEPTS[id],name=t(PAGES[id].k),tasks=mine(D.tasks).filter(x=>x.dept===id),emps=mine(D.employees).filter(e=>e.dept===id);
+  let h=head(esc(name),esc(d.blurb),`<button class="btn pri" data-act="delegate" data-d="${id}">${icon('plus',16)}Delegate task</button>`);
+  h+=`<div class="grid g4">${deptKpis(id).map(k=>kpi(k[0],k[1],k[2])).join('')}</div><div class="grid split" style="margin-top:14px"><div class="stack">`;
+  h+=`<div class="card"><div class="ch"><h2>Work queue</h2><span class="sub">${tasks.filter(x=>x.status!=='done').length} open</span></div><div class="list">${tasks.map(x=>`<button class="row click" data-act="task" data-id="${x.id}"><div class="rt"><b style="white-space:normal">${esc(x.title)}</b>${x.status==='running'?`<div class="bar" style="margin-top:6px;max-width:16rem"><i style="width:${x.pct}%"></i></div>`:''}</div>${pill(x.status)}</button>`).join('')||empty('No work yet','Delegate a task to get started.')}</div></div>`;
+  h+=deptModule(id)+`</div><div class="stack"><div class="card"><div class="ch"><h2>The ${esc(d.role)}</h2></div><p class="muted">${esc(d.blurb)}</p><div class="chips" style="margin-top:12px"><button class="btn sm" data-act="delegate" data-d="${id}">Delegate</button><button class="btn sm" data-go="ceo">Ask the CEO</button></div></div>`;
+  h+=`<div class="card"><div class="ch"><h2>AI employees</h2><span class="grow"></span><button class="btn sm" data-act="empFilter" data-v="${id}">See all</button></div><div class="list">${emps.map(e=>`<button class="row click" data-act="emp" data-id="${e.id}"><span class="av2">${esc(initials(e.name))}</span><div class="rt"><b>${esc(e.name)}</b><small>KRA ${e.kra}%</small></div>${pill(e.state)}</button>`).join('')||empty('No employees in this department')}</div></div></div></div>`;
+  return h;
+}
+
+/* ---------- AI employees and agents ---------- */
+const SOPS=['Start of shift checks','Handling exceptions','Daily handover note','Escalation to the department head','Weekly quality review','Data entry standards'];
+function pgEmployees(){
+  const f=UI.empF,all=mine(D.employees),list=f==='all'?all:all.filter(e=>e.dept===f);
+  let h=head(esc(t('employees')),'Task-specific AI staff. Each one works under SOPs and is scored on its KRA and KPI.',`<button class="btn pri" data-act="hire">${icon('plus',16)}Hire AI employee</button>`);
+  h+=`<div class="chips" style="margin-bottom:14px"><button class="chip ${f==='all'?'on':''}" data-act="empFilter" data-v="all">All (${all.length})</button>${Object.keys(DEPTS).map(d=>`<button class="chip ${f===d?'on':''}" data-act="empFilter" data-v="${d}">${esc(t(PAGES[d].k))}</button>`).join('')}</div>`;
+  h+=list.length?`<div class="grid g3">${list.map(e=>`<div class="card emp"><div style="display:flex;gap:12px;align-items:center"><span class="av2">${esc(initials(e.name))}</span><div class="rt"><b>${esc(e.name)}</b><small>${esc(t(PAGES[e.dept].k))}</small></div>${pill(e.state)}</div><div><div style="display:flex;justify-content:space-between;color:var(--fg-3);font-size:.8125rem;margin-bottom:5px"><span>KRA score</span><b style="color:var(--fg)" class="num">${e.kra}%</b></div><div class="bar ${e.kra>=85?'good':'warn'}"><i style="width:${e.kra}%"></i></div></div><div class="muted" style="font-size:.8125rem">${e.sops} SOPs, uses ${e.agents.length} ${e.agents.length===1?'agent':'agents'}</div><div style="display:flex;gap:8px"><button class="btn sm" data-act="empToggle" data-id="${e.id}">${icon(e.state==='paused'?'play':'pause',14)}${e.state==='paused'?'Resume':'Pause'}</button><button class="btn sm" data-act="emp" data-id="${e.id}">Details</button></div></div>`).join('')}</div>`:`<div class="card">${empty('No AI employees here yet','Hire one from a template.')}</div>`;
+  return h;
+}
+function pgAgents(){
+  const ag=mine(D.agents),emps=mine(D.employees);
+  let h=head(esc(t('agents')),'Agents do focused jobs for AI employees. If none fits, an employee builds one from a template or installs an open-source agent.',`<button class="btn pri" data-act="addAgent">${icon('plus',16)}Add agent</button>`);
+  h+=`<div class="list">${ag.map(a=>{const users=emps.filter(e=>e.agents.includes(a.id)).length;return `<div class="row"><span class="ico">${icon('bot',17)}</span><div class="rt"><b>${esc(a.name)}</b><small>${esc(t(PAGES[a.dept].k))}, used by ${users} ${users===1?'employee':'employees'}</small></div><span class="pill">${esc({template:'Template','open-source':'Open source','in-house':'In-house'}[a.kind])}</span><button class="sw sm" role="switch" aria-checked="${a.on}" data-act="agToggle" data-id="${a.id}" aria-label="${esc(a.name)} running"></button></div>`}).join('')||empty('No agents yet','Add one from a template.')}</div>`;
+  return h;
+}
+
+/* ---------- co-worker ---------- */
+function cw(){D.cwm=D.cwm||{};return D.cwm[D.cur]||(D.cwm[D.cur]={browser:true,desktop:false,company:'off',log:[]})}
+function pgCoworker(){
+  const w=cw(),st=w.company;
+  const cp=st==='on'?pill('good','Allowed by the CEO'):st==='pending'?pill('acc','Waiting for the CEO'):pill('warn','Needs permission');
+  let h=head(esc(t('coworker')),'Your personal assistant for browser and desktop work. It is free and unrestricted for your own tasks. Inside company work it needs the AI CEO’s permission.');
+  h+=`<div class="grid g2"><div class="card"><div class="ch"><h2>Personal tasks</h2>${pill('good','Always allowed')}</div><p class="muted">Travel, files, shopping and anything outside the company.</p><div class="list" style="margin-top:12px"><div class="row"><div class="rt"><b>Browser automation</b><small>Opens sites, fills forms, reads pages</small></div><button class="sw" role="switch" aria-checked="${w.browser}" data-act="cwTog" data-k="browser" aria-label="Browser automation"></button></div><div class="row"><div class="rt"><b>Desktop automation</b><small>Works in apps on your computer</small></div><button class="sw" role="switch" aria-checked="${w.desktop}" data-act="cwTog" data-k="desktop" aria-label="Desktop automation"></button></div></div></div>
+<div class="card"><div class="ch"><h2>Company work</h2>${cp}</div><p class="muted">Changing company records, tools or customer messages. The AI CEO watches everything the co-worker does here and can revoke access.</p><div style="margin-top:14px">${st==='off'?`<button class="btn pri" data-act="cwReq">Request permission</button>`:st==='pending'?`<button class="btn" disabled>Request sent</button> <button class="lnk" data-go="approvals" style="margin-inline-start:10px">Open Approvals</button>`:`<button class="btn bad" data-act="cwRevoke">Revoke access</button>`}</div></div></div>`;
+  h+=`<div class="card" style="margin-top:14px"><div class="ch"><h2>Give it a task</h2></div><div class="seg" role="group" aria-label="Scope"><button class="${UI.cwScope==='personal'?'on':''}" data-act="cwScope" data-v="personal">Personal</button><button class="${UI.cwScope==='company'?'on':''}" data-act="cwScope" data-v="company">Company</button></div><form class="comp" data-form="cw" style="margin-top:12px"><input class="inp" id="cwin" placeholder="${UI.cwScope==='personal'?'Book my flight to Dubai next week':'Update supplier details in the CRM'}" autocomplete="off" aria-label="Task for the co-worker"><button class="btn pri" type="submit" style="height:42px">Run</button></form><p class="muted" style="margin-top:10px;font-size:.8125rem">Prototype: tasks are queued and logged below. Real browser and desktop control arrives with the connected app.</p></div>`;
+  h+=`<div class="card" style="margin-top:14px"><div class="ch"><h2>Activity log</h2></div>${w.log.length?`<div class="list">${w.log.slice().reverse().map(l=>`<div class="row"><div class="rt"><b style="white-space:normal;font-weight:500">${esc(l.txt)}</b><small>${esc(ago(l.ts))}</small></div><span class="pill">${l.scope==='company'?'Company':'Personal'}</span>${pill(l.ok?'good':'warn',l.ok?'Queued':l.why)}</div>`).join('')}</div>`:empty('No activity yet','Tasks you give the co-worker appear here.')}</div>`;
+  return h;
+}
+function cwRun(txt){
+  txt=String(txt||'').trim();if(!txt)return;const w=cw(),sc=UI.cwScope;let ok=true,why='';
+  if(sc==='company'&&w.company!=='on'){ok=false;why='Needs CEO permission'}
+  else if(!w.browser&&!w.desktop){ok=false;why='Automation is off'}
+  w.log.push({txt,scope:sc,ok,why,ts:now()});save();
+  toast(ok?'Queued for the co-worker.':why+'. Open Co-worker to fix it.',ok?'':'bad');render();
+}
+function cwRequest(){
+  const w=cw();if(w.company==='pending'||w.company==='on')return;
+  D.approvals.push({id:rid('p'),co:D.cur,dept:'ceo',title:'Co-worker asks to work inside company systems',detail:'Allows browser and desktop actions in company tools. You or the AI CEO can revoke it at any time.',risk:'high',usd:0,kind:'cowork',state:'pending',ts:now()});
+  w.company='pending';save();toast('Request sent to the AI CEO. It is in Approvals.');render();
+}
+
+/* ---------- tools ---------- */
+const CATS=[['website','Website'],['booking','Booking and orders'],['sales','Sales'],['crm','CRM'],['other','Other tools']];
+function pgTools(){
+  const tl=mine(D.tools),on=tl.filter(x=>x.on).length;
+  let h=head(esc(t('tools')),`Everything your departments use. ${on} of ${tl.length} connected. Agents build missing integrations, MCPs and APIs themselves.`,`<button class="btn pri" data-act="addTool">${icon('plus',16)}Add integration</button>`);
+  h+=CATS.map(c=>{const it=tl.filter(x=>x.cat===c[0]);if(!it.length)return '';return `<div class="ch" style="margin-top:18px"><h2>${esc(c[1])}</h2></div><div class="list">${it.map(x=>`<div class="row"><span class="ico">${icon('plug',16)}</span><div class="rt"><b>${esc(x.name)}</b><small>${esc(modeLabel(x.mode))}</small></div>${pill(x.on?'good':'',x.on?'Connected':'Off')}<button class="sw sm" role="switch" aria-checked="${x.on}" data-act="toolTog" data-id="${x.id}" aria-label="${esc(x.name)} connected"></button></div>`).join('')}</div>`}).join('');
+  return h;
+}
+
+/* ---------- security ---------- */
+function pgSecurity(){
+  const sc=secScore(),open=mine(D.threats).filter(x=>x.open),done=mine(D.threats).filter(x=>!x.open).length;
+  const col=sc>=80?'var(--good)':sc>=60?'var(--warn)':'var(--bad)',lab=sc>=80?'Strong':sc>=60?'Fair':'At risk',C=2*Math.PI*56;
+  const fac=[['Two-step sign-in',S.twofa?pill('good','On'):pill('warn','Off')],['Session timeout',pill('',({'15m':'15 minutes','1h':'1 hour','8h':'8 hours',never:'Never'})[S.session])],['Audit log kept',pill('',({'30':'30 days','90':'90 days','365':'1 year'})[S.audit])],['Data region',pill(S.region===ci().region?'good':'warn',REGIONS[S.region])]];
+  let h=head(esc(t('security')),'The system protects each company and the AI CEO watches it all the time. Your settings change the score.',`<button class="btn pri" data-act="scan" ${UI.scanning?'disabled':''}>${icon('refresh',16)}${UI.scanning?'Scanning':'Run a scan'}</button>`);
+  h+=`<div class="grid split"><div class="stack"><div class="card"><div class="ch"><h2>Open findings</h2><span class="sub">${done} resolved</span></div>${open.length?`<div class="list">${open.map(x=>`<div class="row"><span class="ico">${icon('alert',17)}</span><div class="rt"><b style="white-space:normal">${esc(x.title)}</b><small>${esc(x.where)}</small></div>${pill(x.sev)}<button class="btn sm" data-act="thr" data-id="${x.id}">Resolve</button></div>`).join('')}</div>`:empty('No open findings','The last scan found nothing that needs you.')}</div></div>
+<div class="stack"><div class="card" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><div class="ring"><svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="56" fill="none" stroke="var(--fill)" stroke-width="11"/><circle cx="66" cy="66" r="56" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${(sc/100*C).toFixed(1)} ${C.toFixed(1)}"/></svg><div class="rv">${sc}<small>${lab}</small></div></div><div class="rt"><b style="font-size:1.0625rem">Security score</b><p class="muted">Out of 100, for ${esc(co().name)}.</p></div></div>
+<div class="card"><div class="ch"><h2>What affects the score</h2></div><div class="list">${fac.map(f=>`<button class="row click" data-go="prefs-security"><div class="rt"><b>${f[0]}</b></div>${f[1]}${icon('chevR',16,'flip')}</button>`).join('')}</div></div></div></div>`;
+  return h;
+}
+function doScan(){
+  if(UI.scanning)return;UI.scanning=true;render();
+  setTimeout(()=>{UI.scanning=false;D.scanN=(D.scanN||0)+1;let n=0;
+    if(D.scanN%2===0&&!mine(D.threats).some(x=>x.title.indexOf('Password reuse')===0)){D.threats.push({id:rid('s'),co:D.cur,sev:'low',title:'Password reuse found in 2 accounts',where:'Accounts',open:true});n=1}
+    D.feed.push({id:rid('f'),co:D.cur,dept:'cto',txt:'Security scan finished with '+n+' new '+(n===1?'finding':'findings'),ts:now()});save();
+    toast(n?'Scan finished. 1 new finding.':'Scan finished. Nothing new.');render()},1400);
+}
+
+/* ---------- terminal ---------- */
+const tl2=l=>`<div class="${l.c||''}">${esc(l.s)}</div>`;
+function pgTerminal(){
+  if(!UI.term.length)UI.term=[{c:'dm',s:'URA terminal. Type help to see commands.'}];
+  const pre=UI.tprefill;UI.tprefill='';
+  return head(esc(t('terminal')),'Agents install and run tools here. You can use the same commands.')+`<div class="term"><div class="tbar"><i></i><i></i><i></i></div><div class="tout" id="tout">${UI.term.map(tl2).join('')}</div><form class="tin" data-form="term"><span>ura@${esc(D.cur)} ~ %</span><input id="tin" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal command" value="${esc(pre)}"></form></div>`;
+}
+function tprint(s,c){UI.term.push({s,c});const o=$('#tout');if(o){const d=document.createElement('div');if(c)d.className=c;d.textContent=s;o.appendChild(d);o.scrollTop=o.scrollHeight}}
+function termRun(raw){
+  const cmd=raw.trim();tprint('ura@'+D.cur+' ~ % '+cmd,'cm');if(!cmd)return;UI.thist.push(cmd);UI.tpos=UI.thist.length;
+  const p=cmd.split(/\s+/),a=p[0].toLowerCase(),arg=p.slice(1).join(' '),c=co();
+  if(a==='help'){['help                         show commands','status                       company, phase, agents, security','companies                    list companies','use <name>                   switch company','agents                       list agents','approvals                    count waiting decisions','scan  (or security scan)    run a security scan','whoami                       show who is signed in','theme <light|dark|system>    change the theme','accent <name>                change the accent colour','currency <code|company>      change the display currency','lang <en|hi|pa|ar|es|fr>     change the language','ura agent search <query>     look for open-source agents','ura agent install <name>     install an agent','clear                        clear the screen'].forEach(s=>tprint(s));}
+  else if(a==='clear'){UI.term=[];const o=$('#tout');if(o)o.innerHTML=''}
+  else if(a==='status'){tprint(c.name+' ('+ci().name+')');tprint('phase: '+phaseLabel(c).toLowerCase());tprint('agents running: '+mine(D.agents).filter(x=>x.on).length+' of '+mine(D.agents).length);tprint('decisions waiting: '+pendingList().length);tprint('security score: '+secScore()+' of 100')}
+  else if(a==='companies')D.companies.forEach(x=>tprint((x.id===D.cur?'* ':'  ')+x.name+', '+CT[x.cc].name+', '+phaseLabel(x).toLowerCase()));
+  else if(a==='use'){const m=D.companies.find(x=>x.id===arg.toLowerCase()||x.name.toLowerCase().indexOf(arg.toLowerCase())===0);if(!arg||!m)tprint('No company matches “'+arg+'”. Try: companies','er');else{D.cur=m.id;save();tprint('Switched to '+m.name,'ok');renderShell()}}
+  else if(a==='agents')mine(D.agents).forEach(x=>tprint(x.name.padEnd(20)+(x.on?'running':'stopped').padEnd(10)+x.kind));
+  else if(a==='approvals')tprint(pendingList().length+' waiting for you, '+autoList().length+' handled by the CEO');
+  else if(a==='whoami'){tprint(D.members[0].name+' at '+c.name)}
+  else if(a==='scan'||(a==='security'&&p[1]==='scan')){tprint('Scanning '+c.name+'...','dm');doScan()}
+  else if(a==='theme'){if(['light','dark','system'].indexOf(arg)<0)tprint('Use: theme light, dark or system','er');else{setPref('theme',arg);tprint('Theme set to '+arg,'ok')}}
+  else if(a==='accent'){if(!ACC[arg])tprint('Choose one of: '+Object.keys(ACC).join(', '),'er');else{setPref('accent',arg);tprint('Accent set to '+arg,'ok')}}
+  else if(a==='currency'){const v=arg==='company'?'company':arg.toUpperCase();if(v!=='company'&&!RATES[v])tprint('Choose company or one of: '+Object.keys(RATES).join(', '),'er');else{setPref('currency',v);tprint('Display currency set to '+v,'ok')}}
+  else if(a==='lang'){if(!L[arg])tprint('Choose one of: '+Object.keys(L).join(', '),'er');else{setPref('lang',arg);tprint('Language set to '+arg,'ok')}}
+  else if(a==='ura'&&p[1]==='agent'&&p[2]==='search'){const q=p.slice(3).join(' ')||'agent';tprint('Searching GitHub for “'+q+'” (sample results)...','dm');['sample-org/'+q.replace(/\s+/g,'-')+'-agent','sample-org/'+q.replace(/\s+/g,'-')+'-toolkit','demo-labs/'+q.replace(/\s+/g,'-')+'-lite'].forEach(s=>tprint('  '+s));tprint('Install one with: ura agent install <name>','dm')}
+  else if(a==='ura'&&p[1]==='agent'&&p[2]==='install'){
+    const nm=p.slice(3).join(' ').replace(/[^\w\s\/.-]/g,'').trim();if(!nm){tprint('Name the agent, for example: ura agent install lead-scorer','er');return}
+    const steps=[['Fetching '+nm+'...','dm'],['Checking for risky calls... none found','dm'],['Installing in the sandbox... done','dm']];
+    steps.forEach((s,i)=>setTimeout(()=>tprint(s[0],s[1]),400*(i+1)));
+    setTimeout(()=>{D.agents.push({id:rid('a'),co:D.cur,name:nm.split('/').pop(),kind:'open-source',dept:'chro',on:true});save();tprint('Installed. It is now listed under Agents.','ok');renderShell()},1700);
+  }
+  else tprint('command not found: '+a+'. Type help.','er');
+}
+
+/* ---------- reports ---------- */
+function nextReport(){const d=new Date(now());if(S.repFreq==='daily')d.setDate(d.getDate()+1);else if(S.repFreq==='weekly')d.setDate(d.getDate()+((8-d.getDay())%7||7));else d.setMonth(d.getMonth()+1,1);return d}
+function pgReports(){
+  const rs=mine(D.reports).sort((a,b)=>b.ts-a.ts),inc=[S.repProfit&&'Profit',S.repSales&&'Leads and sales',S.repSec&&'Security'].filter(Boolean);
+  let h=head(esc(t('reports')),'Profit reports and PDFs the AI CEO prepares for you.',`<button class="btn pri" data-act="genReport">${icon('plus',16)}Create report now</button>`);
+  h+=`<div class="card" style="margin-bottom:14px"><div class="ch"><h2>Schedule</h2><span class="grow"></span><button class="btn sm" data-go="prefs-reports">Change</button></div><p>A <b>${esc(S.repFreq)}</b> report goes to <b>${esc(S.repEmail||'no address yet')}</b>. Next one: <b>${esc(fmtDate(nextReport()))}</b>.</p><div class="chips" style="margin-top:10px"><span class="pill">Summary</span>${inc.map(i=>`<span class="pill acc">${esc(i)}</span>`).join('')}</div></div>`;
+  h+=rs.length?`<div class="list">${rs.map(r=>`<button class="row click" data-act="report" data-id="${r.id}"><span class="ico">${icon('doc',17)}</span><div class="rt"><b>${esc(r.title)}</b><small>${esc(fmtDate(r.ts))}, ${esc(fmtTime(r.ts))}</small></div><span class="pill">PDF</span>${icon('chevR',16,'flip')}</button>`).join('')}</div>`:`<div class="card">${empty('No reports yet',co().phase==='building'?'The first report arrives after the build finishes.':'Create one now or wait for the schedule.')}</div>`;
+  return h;
+}
+function reportBody(r){
+  const c=co(),open=mine(D.leads).filter(l=>l.stage<3),thr=mine(D.threats).filter(x=>x.open);
+  let b=`<p class="muted">${esc(c.name)}, prepared by the AI CEO on ${esc(fmtDate(r.ts))}.</p><div class="list" style="margin-top:14px"><div class="row"><div class="rt"><b>Summary</b><small>${c.rev>0?`Net profit ${esc(money(c.profit))} on ${esc(money(c.rev))} revenue this month.`:'Revenue is not measured yet for this company.'}</small></div></div>`;
+  if(S.repProfit)b+=`<div class="row"><div class="rt"><b>Profit</b><small>${c.rev>0?`Margin ${Math.round(c.profit/c.rev*100)}%. Average weekly profit ${esc(money(c.profit/4.3))}.`:'Appears after handover.'}</small></div></div>`;
+  if(S.repSales)b+=`<div class="row"><div class="rt"><b>Leads and sales</b><small>${open.length} open leads worth ${esc(money(open.reduce((a,l)=>a+l.usd,0)))}.</small></div></div>`;
+  if(S.repSec)b+=`<div class="row"><div class="rt"><b>Security</b><small>Score ${secScore()} of 100 with ${thr.length} open findings.</small></div></div>`;
+  return b+'</div>';
+}
+
+/* ---------- companies ---------- */
+function pgCompanies(){
+  const own=S.currency==='company',tot=D.companies.reduce((a,c)=>a+(c.profit||0),0),totR=D.companies.reduce((a,c)=>a+(c.rev||0),0);
+  let h=head(esc(t('companies')),'Every company the AI CEO runs, in every country. Switch to see its own numbers, currency and time zone.',`<button class="btn pri" data-act="addCompany">${icon('plus',16)}Add company</button>`);
+  h+=`<div class="card"><div class="scx"><table class="tbl"><thead><tr><th>Company</th><th>Country</th><th>Phase</th><th class="r">Revenue</th><th class="r">Net profit</th><th></th></tr></thead><tbody>${D.companies.map(c=>{const cur=own?CT[c.cc].cur:S.currency;return `<tr><td><b>${esc(c.name)}</b><div class="muted" style="font-size:.8125rem">${esc((IND[c.ind]||IND.general).name)}, ${esc(CT[c.cc].cur)}</div></td><td>${esc(CT[c.cc].name)}</td><td>${pill(c.phase)}</td><td class="r">${c.rev>0?esc(money(c.rev,{cur,compact:true})):'<span class="muted">Not yet</span>'}</td><td class="r">${c.profit>0?esc(money(c.profit,{cur,compact:true})):'<span class="muted">Not yet</span>'}</td><td class="r">${c.id===D.cur?'<span class="pill acc">Current</span>':`<button class="btn sm" data-act="coSwitch" data-id="${c.id}">Switch</button>`}</td></tr>`}).join('')}</tbody></table></div><p class="muted" style="margin-top:12px;font-size:.8125rem">All companies together: revenue ${esc(money(totR,{cur:own?'USD':S.currency,compact:true}))}, net profit ${esc(money(tot,{cur:own?'USD':S.currency,compact:true}))}${own?' (shown in US dollars so the totals add up)':''}.</p></div>`;
+  return h;
+}
+function coForm(kind){
+  const cs=Object.keys(CT).map(k=>`<option value="${k}">${esc(CT[k].name)}</option>`).join('');
+  return `<div class="seg" role="group" aria-label="Company type"><button class="${kind==='new'?'on':''}" data-act="coKind" data-v="new">New company</button><button class="${kind==='existing'?'on':''}" data-act="coKind" data-v="existing">Existing company</button></div>
+<div class="fld"><label for="cn">Company name</label><input class="inp" id="cn" placeholder="For example, Maple Leaf Resorts"></div>
+<div class="fld"><label for="cc">Country</label><select class="sel" id="cc">${cs}</select><small>Sets the currency, time zone and date style we suggest.</small></div>`
+  +(kind==='new'?`<div class="fld"><label for="cb">Tell the AI CEO about the company</label><textarea class="ta" id="cb" rows="6" placeholder="What the company does, who it serves, how it makes money, what to build first and how you want to be updated."></textarea><small>A longer brief gives the CEO more to work with. Builds take 1 to 3 days depending on size.</small></div>`
+  :`<div class="fld"><label for="cw1">Website</label><input class="inp" id="cw1" placeholder="https://"></div><div class="fld"><label for="cb1">Booking or order system</label><input class="inp" id="cb1" placeholder="Name of the tool you use"></div><div class="fld"><label for="cs1">Sales engine</label><input class="inp" id="cs1"></div><div class="fld"><label for="cr1">CRM</label><input class="inp" id="cr1"></div><div class="fld"><label for="co1">Other tools</label><input class="inp" id="co1" placeholder="Accounting, payments, email"><small>The AI will connect these, study the company and its competitors, then find where profit leaks.</small></div>`);
+}
+function guessInd(s){s=s.toLowerCase();return /hotel|resort|stay|hospitality|guest/.test(s)?'hotel':/clinic|hospital|health|patient|dental|care/.test(s)?'clinic':/logistic|freight|ship|cargo|transport|delivery/.test(s)?'logistics':/food|farm|agri|grocer|restaurant|dehydrat/.test(s)?'food':'general'}
+function createCompany(){
+  const sh=stack[stack.length-1];if(!sh)return;const g=id=>($('#'+id,sh)||{value:''}).value.trim();
+  const name=g('cn'),cc=g('cc')||'IN',kind=UI.coKind||'new';
+  if(!name){toast('Enter a company name first.','bad');return}
+  const text=name+' '+(kind==='new'?g('cb'):[g('cw1'),g('cb1'),g('cs1'),g('cr1'),g('co1')].join(' '));
+  const c={id:rid('c'),name,cc,ind:guessInd(text)};
+  if(kind==='new'){const len=g('cb').length;c.phase='building';c.pct=4;c.day=1;c.days=len<250?1:len<900?2:3;c.brief=g('cb')||'No brief yet. The CEO will ask you questions first.'}
+  else{c.phase='analyzing';c.pct=6}
+  D.companies.push(c);buildData(c);
+  if(kind==='existing'){[['website','cw1'],['booking','cb1'],['sales','cs1'],['crm','cr1']].forEach(m=>{const v=g(m[1]);const tl=D.tools.find(x=>x.co===c.id&&x.cat===m[0]);if(tl&&v){tl.name=v;tl.on=false}});const o=g('co1');if(o){const tl=D.tools.find(x=>x.co===c.id&&x.cat==='other');if(tl){tl.name=o;tl.on=false}}}
+  D.cur=c.id;closeTop();save();go('overview');
+  toast(kind==='new'?'Build started. The CEO will brief the department heads first.':'Analysis started. The CEO will connect your systems first.');
+}
+
+/* ---------- settings registry ---------- */
+const B=[[true,'On'],[false,'Off']];
+const sysLang=()=>{const l=(navigator.language||'en').slice(0,2);return L[l]?l:'en'};
+const LNAME=Object.fromEntries(LANGS);
+const SET={
+appearance:{ic:'sun',title:'Appearance',blurb:'Theme, colour, size and motion',items:[
+ {k:'theme',label:'Theme',type:'seg',opts:[['system','Automatic'],['light','Light'],['dark','Dark']],hint:'Light, dark, or follow your device.',sug:()=>({v:'system',why:'Automatic follows your device, so the app turns dark at night and is easier on your eyes.'})},
+ {k:'accent',label:'Accent colour',type:'swatch',hint:'Used for buttons, links, charts and highlights across every screen.',sug:()=>({v:'blue',why:'Blue is the clearest choice for buttons and links. Pick another if you want to match your brand.'})},
+ {k:'density',label:'Spacing',type:'seg',opts:[['comfortable','Comfortable'],['compact','Compact']],hint:'How much space rows and cards take.',sug:()=>({v:'comfortable',why:'Comfortable is easier to read. Choose Compact when you manage many companies and want more on screen.'})},
+ {k:'sidebar',label:'Menu style',type:'seg',opts:[['full','Icons and names'],['rail','Icons only']],hint:'On a phone the menu always opens as a panel.',sug:()=>({v:'full',why:'Names help new users learn the menu. Switch to icons only once you know every screen.'})},
+ {k:'textSize',label:'Text size',type:'seg',opts:[[90,'Small'],[100,'Default'],[115,'Large'],[130,'Largest']],hint:'Scales text and spacing everywhere.',sug:()=>({v:100,why:'Default suits most screens. Go larger if you read from a distance or have small text on your phone.'})},
+ {k:'reduceMotion',label:'Reduce motion',type:'sw',hint:'Turns off slides, fades and the pulsing status dot.',sug:()=>{let p=false;try{p=matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}return {v:p,why:p?'Your device asks for less motion, so we suggest turning this on.':'Turn it on only if animation distracts you or makes you feel dizzy.'}}},
+ {k:'contrast',label:'Higher contrast',type:'sw',hint:'Darkens secondary text and outlines cards and fields.',sug:()=>({v:false,why:'Turn it on if grey text is hard to read in bright light.'})}]},
+region:{ic:'globe',title:'Language and region',blurb:'Language, time, dates, currency',items:[
+ {k:'lang',label:'Language',type:'sel',opts:LANGS,hint:'Menus, headings and greetings change right away. Other text stays in English until full translation ships. Arabic switches the layout to right-to-left.',sug:()=>{const c=ci(),v=c.lang!=='en'?c.lang:sysLang();return {v,why:v==='en'?'English is the default. Pick your own language if you prefer it.':LNAME[v].split(' (')[0]+' fits your current company in '+c.name+'.'}}},
+ {k:'tz',label:'Time zone',type:'sel',opts:[['auto','Automatic (this device)']].concat(TZS.map(z=>[z,z.replace('_',' ')])),hint:'Sets the clock in the top bar and every time in the app.',sug:()=>({v:'auto',why:'Automatic follows your device, so it stays right when you travel. Fix a zone only if your whole team works to it.'})},
+ {k:'hour',label:'Clock',type:'seg',opts:[['auto','Automatic'],['12','12-hour'],['24','24-hour']],hint:'Affects the top bar, chat times and reports.',sug:()=>({v:'auto',why:'Automatic follows your language and region.'})},
+ {k:'dateFmt',label:'Date style',type:'sel',opts:[['auto','Automatic'],['dmy','31/12/2026 (day first)'],['mdy','12/31/2026 (month first)'],['iso','2026-12-31 (year first)']],hint:'Used on charts, reports and activity.',sug:()=>({v:'iso',why:'Your companies are in different countries. Year first is the one style nobody misreads.'})},
+ {k:'numFmt',label:'Number style',type:'sel',opts:[['auto','Automatic'],['en-US','1,234,567.89'],['en-IN','12,34,567.89'],['de-DE','1.234.567,89'],['fr-FR','1 234 567,89']],hint:'How thousands and decimals are written.',sug:()=>({v:'auto',why:'Automatic follows your language and the country of the company you are viewing, so India shows lakh and crore and the UK shows 1,234,567.89. Pick one style if people in several countries read the same reports.'})},
+ {k:'currency',label:'Show money in',type:'sel',opts:[['company','Each company’s own currency']].concat(Object.keys(RATES).map(c=>[c,c+' ('+CURNAME[c]+')'])),hint:'Changes every amount in the app. Rates here are samples.',sug:()=>({v:'company',why:'Each company then shows the currency its accountants use. Pick one currency to compare companies side by side.'})}]},
+ai:{ic:'spark',title:'AI CEO and autonomy',blurb:'How much the AI decides alone',items:[
+ {k:'autonomy',label:'How much can the AI decide alone?',type:'seg',opts:[['ask','Ask me first'],['balanced','Balanced'],['auto','Mostly autonomous']],hint:'Decides which items reach your Approvals list.',sug:()=>({v:'balanced',why:'The CEO handles low-risk work and asks you about money, access and anything risky. Start here and loosen it as trust grows.'})},
+ {k:'payLimit',label:'Ask me before a payment above',type:'sel',opts:[[0,'Any amount'],[250,'$250'],[1000,'$1,000'],[5000,'$5,000'],[25000,'$25,000']],hint:'Amounts are in US dollars. Applies to every company.',sug:()=>({v:1000,why:'$1,000 catches meaningful payments without asking you about small ones.'})},
+ {k:'hours',label:'When should agents work?',type:'seg',opts:[['247','All the time'],['biz','Business hours'],['night','Nights and weekends']],hint:'Shown in the status pill at the top.',sug:()=>({v:'247',why:'Agents get work done while you sleep. Choose business hours if you want things quiet at night.'})},
+ {k:'tone',label:'How the CEO answers',type:'seg',opts:[['brief','Brief'],['detailed','Detailed']],hint:'Try it in Ask CEO.',sug:()=>({v:'brief',why:'Brief answers save reading time. Pick detailed when you want the reasoning behind a number.'})}]},
+notifications:{ic:'bell',title:'Notifications',blurb:'What reaches your bell',items:[
+ {k:'n_approvals',label:'Decisions waiting',type:'sw',hint:'When the CEO needs you.',sug:()=>({v:true,why:'Keep this on. Work stops at the decision until you answer.'})},
+ {k:'n_security',label:'Security findings',type:'sw',hint:'New risks found in any company.',sug:()=>({v:true,why:'Keep this on so you hear about risks first.'})},
+ {k:'n_reports',label:'Reports',type:'sw',hint:'When a report is ready.',sug:()=>({v:true,why:'Useful, because reports are how the AI CEO proves results.'})},
+ {k:'n_builds',label:'Build and integration progress',type:'sw',hint:'Milestones while a company is built or connected.',sug:()=>({v:true,why:'Leave it on during the 1 to 3 day build. Turn it off once the company is running.'})},
+ {k:'quiet',label:'Quiet hours',type:'sw',hint:'Hides the red badge from 22:00 to 07:00 in your time zone. Notifications still wait in the bell.',sug:()=>({v:true,why:'Recommended when your companies span time zones, so night-time activity does not pull you in.'})}]},
+reports:{ic:'doc',title:'Reports',blurb:'What the CEO sends you',items:[
+ {k:'repFreq',label:'How often',type:'seg',opts:[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly']],hint:'Shown in Reports with the next send date.',sug:()=>({v:'weekly',why:'Weekly balances detail and noise. Choose daily during a build and monthly once the company is stable.'})},
+ {k:'repEmail',label:'Send to',type:'email',hint:'Reports arrive here as a PDF.',sug:()=>({why:'Use an address you check every day, such as a shared finance inbox.'})},
+ {k:'repProfit',label:'Include profit',type:'sw',hint:'Revenue, margin and weekly profit.',sug:()=>({v:true,why:'Profit is the main goal of every company, so keep it in.'})},
+ {k:'repSales',label:'Include leads and sales',type:'sw',hint:'Open leads and pipeline value.',sug:()=>({v:true,why:'It shows what is coming in before it becomes profit.'})},
+ {k:'repSec',label:'Include security',type:'sw',hint:'Score and open findings.',sug:()=>({v:false,why:'Keep reports short. Security findings already reach you in Security and the bell.'})}]},
+security:{ic:'shield',title:'Security and privacy',blurb:'Sign-in, sessions, data location',items:[
+ {k:'twofa',label:'Two-step sign-in',type:'sw',hint:'Adds a one-time code at sign-in. Raises your security score.',sug:()=>({v:true,why:'Strongly recommended. The AI CEO can move money and change systems, so the account needs a second lock.'})},
+ {k:'session',label:'Sign out after inactivity',type:'sel',opts:[['15m','15 minutes'],['1h','1 hour'],['8h','8 hours'],['never','Never']],hint:'Shorter is safer on shared computers.',sug:()=>({v:'1h',why:'One hour balances safety and convenience. Use 15 minutes on shared computers.'})},
+ {k:'audit',label:'Keep the activity log for',type:'sel',opts:[['30','30 days'],['90','90 days'],['365','1 year']],hint:'A record of what you, the CEO and every agent did.',sug:()=>({v:'365',why:'A year helps with audits, especially for healthcare and finance companies.'})},
+ {k:'region',label:'Where data is stored',type:'sel',opts:Object.keys(REGIONS).map(r=>[r,REGIONS[r]]),hint:'Pick the region your local rules expect for the current company.',sug:()=>({v:ci().region,why:'This keeps '+co().name+' data in or near '+ci().name+'.'})},
+ {k:'terminalOn',label:'Show the Terminal',type:'sw',hint:'Hides the Terminal screen from the menu when off. Agents can still use it.',sug:()=>({v:true,why:'Agents install tools through it. Hide it only if non-technical teammates find it confusing.'})}]}
+};
+const SETLIST=Object.keys(SET).concat(['workspace']);
+const SETWS={ic:'sliders',title:'Menu and team',blurb:'Screens you see and who has access'};
+const catMeta=k=>k==='workspace'?SETWS:SET[k];
+function optLabel(it,v){if(it.type==='sw')return v?'On':'Off';if(it.type==='swatch')return v;const o=(it.opts||[]).find(x=>String(x[0])===String(v));return o?o[1]:String(v)}
+function coerce(k,v){const d=DEF[k];return typeof d==='boolean'?(v===true||v==='true'):typeof d==='number'?Number(v):v}
+function sugBox(it){
+  if(!it.sug)return '';const sg=it.sug();if(!sg)return '';
+  if(sg.v===undefined)return `<div class="sug">${icon('bulb',15)}<span>${esc(sg.why)}</span></div>`;
+  if(String(S[it.k])===String(sg.v))return `<div class="sug ok">${icon('check',15)}<span>Matches our suggestion. ${esc(sg.why)}</span></div>`;
+  return `<div class="sug">${icon('bulb',15)}<span>Suggested: <b>${esc(optLabel(it,sg.v))}</b>. ${esc(sg.why)} <button class="lnk" data-act="useSug" data-k="${it.k}" data-v="${esc(sg.v)}">Use this</button></span></div>`;
+}
+function setItem(it){
+  const v=S[it.k],sg=it.sug?it.sug():null,sv=sg&&sg.v!==undefined?String(sg.v):null;let ctl='';
+  if(it.type==='seg')ctl=`<div class="seg" role="group" aria-label="${esc(it.label)}">${it.opts.map(o=>`<button class="${String(v)===String(o[0])?'on':''} ${sv!==null&&sv===String(o[0])?'sg':''}" data-act="set" data-k="${it.k}" data-v="${esc(o[0])}" data-fk="${it.k}|${esc(o[0])}" aria-pressed="${String(v)===String(o[0])}">${esc(o[1])}</button>`).join('')}</div>`;
+  else if(it.type==='sw')ctl=`<button class="sw" role="switch" aria-checked="${!!v}" data-act="tog" data-k="${it.k}" data-fk="${it.k}|" aria-label="${esc(it.label)}"></button>`;
+  else if(it.type==='sel')ctl=`<select class="sel" id="s-${it.k}" data-sel="${it.k}" data-fk="${it.k}|" aria-label="${esc(it.label)}">${it.opts.map(o=>`<option value="${esc(o[0])}" ${String(v)===String(o[0])?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`;
+  else if(it.type==='email')ctl=`<input class="inp" id="s-${it.k}" type="email" data-inp="${it.k}" data-fk="${it.k}|" value="${esc(v)}" placeholder="name@company.com" aria-label="${esc(it.label)}">`;
+  else if(it.type==='swatch')ctl=`<div class="swatches" role="group" aria-label="Accent colour">${Object.keys(ACC).map(n=>`<button class="${v===n?'on':''}" style="background:${ACC[n][0]}" data-act="set" data-k="accent" data-v="${n}" data-fk="accent|${n}" aria-label="${n}" aria-pressed="${v===n}" title="${n}"></button>`).join('')}</div>`;
+  return `<div class="srow"><div class="sl"><b>${esc(it.label)}</b><div class="sh">${esc(it.hint||'')}</div>${sugBox(it)}</div><div class="sc">${ctl}</div></div>`;
+}
+const ROLES=['Admin','Manager','Viewer'];
+function workspaceBody(){
+  const items=[].concat.apply([],NAV.map(g=>g.items)).filter(x=>x!=='overview'&&x!=='terminal');
+  const hid=S.hidden;
+  let h=`<div class="list"><div class="srow"><div class="sl"><b>Screens in the menu</b><div class="sh">Hide screens your team does not use. Hidden screens keep working in the background and stay in search.</div><div class="sug"><span class="ic">${icon('bulb',15)}</span><span>Tip: a solo owner can hide People and Co-worker at first, then switch them on when the company grows.</span></div></div></div>`
+  +items.map(id=>`<div class="srow" style="align-items:center;padding-top:10px;padding-bottom:10px"><span class="ico">${icon(PAGES[id].ic,17)}</span><div class="sl"><b style="font-weight:500">${esc(t(PAGES[id].k))}</b></div><button class="sw sm" role="switch" aria-checked="${!hid.includes(id)}" data-act="menuTog" data-id="${id}" data-fk="m-${id}|" aria-label="Show ${esc(t(PAGES[id].k))} in the menu"></button></div>`).join('')+`</div>`;
+  h+=`<div class="ch" style="margin-top:22px"><h2>Team</h2><span class="grow"></span><button class="btn sm pri" data-act="addMember">${icon('plus',14)}Invite teammate</button></div><div class="sug" style="margin:0 0 10px;max-width:none"><span class="ic">${icon('bulb',15)}</span><span>Give each person the lowest role that lets them do their job. Admins can change settings, Managers can approve decisions, Viewers can only read.</span></div><div class="list">${D.members.map(m=>`<div class="row"><span class="av2">${esc(initials(m.name))}</span><div class="rt"><b>${esc(m.name)}</b><small>${esc(m.email)}${m.invited?', invited':''}</small></div>${m.role==='Owner'?'<span class="pill">Owner</span>':`<select class="sel" style="width:8rem" data-role="${m.id}" aria-label="Role for ${esc(m.name)}">${ROLES.map(r=>`<option ${m.role===r?'selected':''}>${r}</option>`).join('')}</select><button class="ib" data-act="rmMember" data-id="${m.id}" aria-label="Remove ${esc(m.name)}">${icon('trash',17)}</button>`}</div>`).join('')}</div>`;
+  return h;
+}
+function pgPrefs(){
+  const c=cur.cat,k=c||'appearance',meta=catMeta(k);
+  let h=head('Settings','Every setting comes with a suggestion in plain words. Change one and the whole app updates right away. This prototype uses sample data and saves changes in this browser only.');
+  h+=`<div class="set ${c?'detail':''}"><div class="card scat" style="padding:8px">${SETLIST.map(id=>{const m=catMeta(id);return `<button class="sbtn ${k===id?'on':''}" data-go="prefs-${id}"><span class="ico">${icon(m.ic,16)}</span><span class="rt"><b style="font-weight:inherit">${esc(m.title)}</b><small>${esc(m.blurb)}</small></span></button>`}).join('')}</div>`;
+  h+=`<div class="sdet stack"><div class="back"><button class="btn sm" data-act="setBack">${icon('chevL',14,'flip')}All settings</button></div><div class="ch" style="margin:0"><h2 style="font-size:1.375rem">${esc(meta.title)}</h2></div>`;
+  if(k==='workspace')h+=workspaceBody();
+  else{
+    const it=SET[k].items,mis=it.filter(i=>i.sug&&i.sug().v!==undefined&&String(S[i.k])!==String(i.sug().v)).length;
+    h+=`<div class="card guide"><span class="ico">${icon('bulb',17)}</span><div class="rt"><b>New here? Read the blue tip under each setting.</b><small>A dot on an option marks the suggested choice.</small></div>${mis?`<button class="btn sm pri" data-act="applyAll" data-v="${k}">${mis===1?'Use the suggestion':'Use all '+mis+' suggestions'}</button>`:pill('good','All suggestions applied')}</div><div class="list">${it.map(setItem).join('')}</div>`;
+  }
+  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" data-act="resetSettings">Reset settings to defaults</button><button class="btn sm" data-act="resetData">Reset sample data</button></div></div></div>`;
+  return h;
+}
+
+/* ---------- applying settings ---------- */
+const root=document.documentElement;let HOST_THEME=null;
+const hexRgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+function isDark(){const e=S.theme==='system'?(HOST_THEME||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')):S.theme;return e==='dark'}
+function applyPrefs(){
+  if(S.theme==='system'){HOST_THEME?root.setAttribute('data-theme',HOST_THEME):root.removeAttribute('data-theme')}else root.setAttribute('data-theme',S.theme);
+  root.setAttribute('data-density',S.density);
+  root.style.setProperty('--ts',String(S.textSize/100));
+  root.classList.toggle('rm',!!S.reduceMotion);root.classList.toggle('hc',!!S.contrast);
+  const a=ACC[S.accent]||ACC.blue,d=isDark(),rgb=hexRgb(d?a[1]:a[0]);
+  root.style.setProperty('--accent',d?a[1]:a[0]);root.style.setProperty('--accent-btn',a[0]);root.style.setProperty('--accent-fg','#fff');
+  root.style.setProperty('--accent-soft','rgba('+rgb.join(',')+','+(d?.2:.11)+')');
+  root.lang=S.lang;root.dir=S.lang==='ar'?'rtl':'ltr';
+}
+function setPref(k,v){if(S[k]===v)return;S[k]=v;save();applyPrefs();render()}
+function isQuiet(){if(!S.quiet)return false;const h=Number(dparts(new Date(),{hour:'numeric',hour12:false}).hour)%24;return h>=22||h<7}
+
+/* ---------- navigation ---------- */
+function go(id){if(location.hash.slice(1)===id)route();else location.hash=id}
+function route(){
+  const h=location.hash.replace(/^#/,'');cur.locked=false;
+  if(h.indexOf('prefs-')===0&&SETLIST.indexOf(h.slice(6))>=0){cur.pg='preferences';cur.cat=h.slice(6)}
+  else if(h==='preferences'){cur.pg='preferences';cur.cat=null}
+  else if(PAGES[h]&&h!=='preferences'&&vis(h)){cur.pg=h}
+  else if(PAGES[h]&&h!=='preferences'&&!vis(h)){cur.pg=h;cur.locked=true}
+  else cur.pg='overview';
+  closePop();closeDrawer();render();
+  const m=$('#mn');if(m)m.scrollTop=0;
+}
+function openDrawer(){$('#sb').classList.add('open');$('#scrimwrap').innerHTML='<div class="scrim" data-act="drawerClose"></div>'}
+function closeDrawer(){$('#sb').classList.remove('open');$('#scrimwrap').innerHTML=''}
+function renderShell(){renderSidebar();renderTop();renderTabs()}
+const PAGEFN={overview:pgOverview,ceo:pgCeo,approvals:pgApprovals,coo:()=>pgDept('coo'),cmo:()=>pgDept('cmo'),cto:()=>pgDept('cto'),cfo:()=>pgDept('cfo'),chro:()=>pgDept('chro'),employees:pgEmployees,agents:pgAgents,coworker:pgCoworker,tools:pgTools,security:pgSecurity,terminal:pgTerminal,reports:pgReports,companies:pgCompanies,preferences:pgPrefs};
+function pgLocked(){const k=PAGES[cur.pg].k,nm=esc(t(k));return head(nm,'')+`<div class="card" style="max-width:36rem"><div class="ch"><h2>${nm} is hidden</h2></div><p>You turned this screen off in Settings, so it is not in your menu. Nothing was deleted, and agents still use it behind the scenes.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-act="unhide" data-id="${cur.pg}">Show ${nm} again</button><button class="btn" data-go="overview">Back to Overview</button></div></div>`}
+function render(){
+  const ae=document.activeElement,fk=ae&&ae.dataset&&ae.dataset.fk,top=$('#mn')?$('#mn').scrollTop:0;
+  renderShell();
+  $('#pg').innerHTML=cur.locked?pgLocked():(PAGEFN[cur.pg]||pgOverview)();
+  bindCharts();
+  const m=$('#mn');if(m&&cur.pg!=='ceo')m.scrollTop=top;
+  if(cur.pg==='ceo'){const ms=$('#msgs');if(ms)ms.scrollTop=ms.scrollHeight}
+  if(cur.pg==='terminal'&&!stack.length){const ti=$('#tin');if(ti){ti.focus();const o=$('#tout');if(o)o.scrollTop=o.scrollHeight}}
+  else if(fk){const el=$('[data-fk="'+fk.replace(/"/g,'')+'"]');if(el)el.focus({preventScroll:true})}
+}
+
+/* ---------- popovers ---------- */
+function coMenuHtml(){return `<div class="ph2">Companies</div>`+D.companies.map(c=>`<button class="pi ${c.id===D.cur?'sel':''}" data-act="coSwitch" data-id="${c.id}"><span class="cochip" style="width:30px;height:30px;border-radius:9px">${esc(initials(c.name))}</span><span class="rt"><b>${esc(c.name)}</b><small>${esc(CT[c.cc].name)}, ${esc(phaseLabel(c))}</small></span>${c.id===D.cur?icon('check',16):''}</button>`).join('')+`<hr><button class="pi" data-act="addCompany">${icon('plus',18)}Add company</button><button class="pi" data-go="companies">${icon('building',18)}See all companies</button>`}
+function statusHtml(){const ag=mine(D.agents),run=mine(D.tasks).filter(x=>x.status==='running').length;return `<div class="ph2">AI CEO</div><div class="pi"><i class="dot" style="color:var(--good)"></i><span class="rt"><b>${esc(statusText())}</b><small>Watching all of ${esc(co().name)}</small></span></div><div class="pi"><span class="rt"><b>${ag.filter(a=>a.on).length} of ${ag.length} agents running</b><small>${run} tasks in progress</small></span></div><hr><button class="pi" data-go="prefs-ai">${icon('sliders',18)}Change working hours</button><button class="pi" data-go="agents">${icon('bot',18)}See agents</button>`}
+function bellHtml(){const ns=notifList();return `<div class="ph2">${esc(t('notifications'))}${isQuiet()?' (quiet hours on)':''}</div>`+(ns.length?ns.map(n=>`<button class="pi ni" data-act="notif" data-id="${n.id}"><span class="${n.read?'rd':'un'}"></span><span class="rt"><b style="white-space:normal">${esc(n.title)}</b><small>${esc(n.body)}</small><small>${esc(ago(n.ts))}</small></span></button>`).join(''):'<div class="empty">Nothing new</div>')+`<hr><button class="pi" data-act="readAll">${icon('check',18)}Mark all as read</button><button class="pi" data-go="prefs-notifications">${icon('sliders',18)}Notification settings</button>`}
+function helpHtml(){return `<div class="ph2">Help</div><button class="pi" data-act="palette">${icon('search',18)}Search everything<kbd style="margin-inline-start:auto">${IS_MAC?'⌘K':'Ctrl K'}</kbd></button><button class="pi" data-act="how">${icon('bulb',18)}How URA works</button><button class="pi" data-act="keys">${icon('term',18)}Keyboard shortcuts</button><button class="pi" data-go="preferences">${icon('sliders',18)}Open Settings</button>`}
+function profHtml(){const m=D.members[0];return `<div class="pi" style="cursor:default"><span class="av2">${esc(initials(m.name))}</span><span class="rt"><b>${esc(m.name)}</b><small>${esc(S.repEmail||m.email)}</small></span></div><hr><div class="ph2">Theme</div><div style="padding:0 8px 8px"><div class="seg">${[['system','Auto'],['light','Light'],['dark','Dark']].map(o=>`<button class="${S.theme===o[0]?'on':''}" data-act="set" data-k="theme" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div><hr><button class="pi" data-go="prefs-region">${icon('globe',18)}Language and region</button><button class="pi" data-go="prefs-security">${icon('shield',18)}Security</button><button class="pi" data-go="preferences">${icon('sliders',18)}Settings</button>`}
+
+/* ---------- command palette ---------- */
+function openPalette(){
+  if(stack.some(o=>o._pal))return;
+  const items=[];
+  Object.keys(PAGES).filter(id=>id==='preferences'||vis(id)).forEach(id=>items.push({l:t(PAGES[id].k),s:'Go to',ic:PAGES[id].ic,run:()=>go(id)}));
+  SETLIST.forEach(id=>items.push({l:catMeta(id).title,s:'Settings',ic:catMeta(id).ic,run:()=>go('prefs-'+id)}));
+  D.companies.forEach(c=>items.push({l:'Switch to '+c.name,s:CT[c.cc].name,ic:'building',run:()=>{D.cur=c.id;save();render();toast('Switched to '+c.name+'.')}}));
+  items.push({l:'Delegate a task',s:'Action',ic:'plus',run:()=>sheetDelegate('coo')},{l:'Hire AI employee',s:'Action',ic:'badge',run:()=>go('employees')},{l:'Run a security scan',s:'Action',ic:'shield',run:()=>{go('security');setTimeout(doScan,80)}},{l:'Create report now',s:'Action',ic:'doc',run:()=>ACT.genReport()},{l:isDark()?'Switch to light theme':'Switch to dark theme',s:'Action',ic:isDark()?'sun':'moon',run:()=>setPref('theme',isDark()?'light':'dark')});
+  const ov=document.createElement('div');ov.className='ov';ov._pal=true;ov.style.alignItems='flex-start';
+  ov.innerHTML=`<div class="pal" role="dialog" aria-modal="true" aria-label="Search"><input id="palin" placeholder="${esc(t('search'))}" autocomplete="off" aria-label="Search"><div class="pl" id="pall"></div></div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeTop()});ov._prev=document.activeElement;
+  $('#layer').appendChild(ov);stack.push(ov);
+  let sel=0,list=items;const inp=$('#palin',ov),pl=$('#pall',ov);
+  const draw=()=>{pl.innerHTML=list.length?list.map((x,i)=>`<button class="pi ${i===sel?'sel':''}" data-i="${i}">${icon(x.ic,18)}<span class="rt"><b style="font-weight:500">${esc(x.l)}</b></span><small class="muted">${esc(x.s)}</small></button>`).join(''):'<div class="empty">No match. Try a department, a company or a setting.</div>';const s=$('.sel',pl);if(s)s.scrollIntoView({block:'nearest'})};
+  const run=i=>{const x=list[i];if(!x)return;closeTop();x.run()};
+  inp.addEventListener('input',()=>{const q=inp.value.toLowerCase().trim();list=q?items.filter(x=>(x.l+' '+x.s).toLowerCase().indexOf(q)>=0):items;sel=0;draw()});
+  inp.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(list.length-1,sel+1);draw()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(0,sel-1);draw()}else if(e.key==='Enter'){e.preventDefault();run(sel)}});
+  pl.addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)run(Number(b.dataset.i))});
+  draw();setTimeout(()=>inp.focus(),30);
+}
+
+/* ---------- sheets ---------- */
+const sv=id=>{const sh=stack[stack.length-1],el=sh&&$('#'+id,sh);return el?el.value.trim():''};
+const deptOpts=d=>Object.keys(DEPTS).map(k=>`<option value="${k}" ${k===d?'selected':''}>${esc(t(PAGES[k].k))}</option>`).join('');
+const foot=ok=>`<button class="btn" data-act="close">Cancel</button><button class="btn pri" data-act="${ok[0]}">${ok[1]}</button>`;
+function sheetDelegate(d){openSheet({title:'Delegate a task',body:`<div class="fld"><label for="dd">Department</label><select class="sel" id="dd">${deptOpts(d)}</select></div><div class="fld"><label for="dt">What should it do?</label><textarea class="ta" id="dt" rows="3" placeholder="For example, compare our prices with three competitors"></textarea><small>It joins that department’s work queue. The department head asks you only if it needs money or access.</small></div>`,foot:foot(['delegateGo','Delegate'])})}
+const SHEETS={
+how(){openSheet({title:'How URA works',wide:true,body:`<div class="list">${[['chat','AI CEO','Reads your brief or your systems, builds the plan and watches everything.'],['people','Department heads','COO, CMO, CTO, CFO and CHRO each run their own area.'],['badge','AI employees','Task-specific staff with SOPs and KRA/KPI scores.'],['bot','Agents','Do focused jobs for employees. Agents can never use employees.'],['spark','Co-worker','Your personal assistant for browser and desktop tasks.'],['shield','Security','Protects every company and is watched by the CEO.']].map(r=>`<div class="row"><span class="ico">${icon(r[0],17)}</span><div class="rt"><b>${r[1]}</b><small style="white-space:normal">${r[2]}</small></div></div>`).join('')}</div>`,foot:`<button class="btn pri" data-act="close">Got it</button>`})},
+keys(){openSheet({title:'Keyboard shortcuts',body:`<div class="list"><div class="row"><div class="rt"><b>Search everything</b></div><kbd>${IS_MAC?'⌘K':'Ctrl K'}</kbd></div><div class="row"><div class="rt"><b>Close a panel or menu</b></div><kbd>Esc</kbd></div><div class="row"><div class="rt"><b>Terminal history</b></div><kbd>Up and Down</kbd></div></div>`,foot:`<button class="btn pri" data-act="close">Done</button>`})}
+};
+function sheetHire(){openSheet({title:'Hire AI employee',body:`<div class="fld"><label for="hd">Department</label><select class="sel" id="hd">${deptOpts('coo')}</select></div><div class="fld"><label for="hn">Role</label><input class="inp" id="hn" placeholder="For example, Supplier Negotiator"><small>Employees start from a template and follow SOPs. They are scored on KRA and KPI every week.</small></div>`,foot:foot(['hireGo','Hire'])})}
+function sheetAgent(){openSheet({title:'Add agent',body:`<div class="fld"><label for="an">Name</label><input class="inp" id="an" placeholder="For example, Price watcher"></div><div class="fld"><label for="ad">Used by</label><select class="sel" id="ad">${deptOpts('cmo')}</select></div><div class="fld"><label for="ak">Source</label><select class="sel" id="ak"><option value="template">From an app template</option><option value="open-source">Open-source agent from GitHub</option><option value="in-house">Built in-house</option></select><small>Open-source agents are installed in a sandbox through the Terminal and scanned first.</small></div>`,foot:foot(['agentGo','Add agent'])})}
+function sheetTool(){openSheet({title:'Add integration',body:`<div class="fld"><label for="tc">Type</label><select class="sel" id="tc">${CATS.map(c=>`<option value="${c[0]}">${esc(c[1])}</option>`).join('')}</select></div><div class="fld"><label for="tn">Name</label><input class="inp" id="tn" placeholder="For example, Stripe"></div><div class="fld"><label for="tm">How to connect</label><select class="sel" id="tm"><option value="api">Through its API</option><option value="mcp">Through MCP</option><option value="browser">Through a browser (released after use)</option><option value="in-house">Build it in-house</option></select><small>If no connection exists, the CTO builds one.</small></div>`,foot:foot(['toolGo','Add integration'])})}
+function sheetMember(){openSheet({title:'Invite teammate',body:`<div class="fld"><label for="mn">Name</label><input class="inp" id="mn2" placeholder="Full name"></div><div class="fld"><label for="me">Work email</label><input class="inp" id="me" type="email" placeholder="name@company.com"></div><div class="fld"><label for="mr">Role</label><select class="sel" id="mr">${ROLES.map(r=>`<option ${r==='Viewer'?'selected':''}>${r}</option>`).join('')}</select><small>Start with Viewer. You can raise the role later.</small></div>`,foot:foot(['memberGo','Invite'])})}
+function sheetCompany(kind){UI.coKind=kind;closePop();const sh=stack[stack.length-1];
+  if(sh&&sh._co){const b=$('.sh-b',sh);b.innerHTML=coForm(kind);return}
+  const ov=openSheet({title:'Add company',wide:true,body:coForm(kind),foot:foot(['coCreate','Start'])});ov._co=true}
+function sheetTask(id){const x=D.tasks.find(a=>a.id===id);if(!x)return;
+  openSheet({title:x.title,body:`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(x.status)}<span class="pill">${esc(t(PAGES[x.dept].k))}</span></div>${x.status==='running'?`<div class="bar" style="margin-top:14px"><i style="width:${x.pct}%"></i></div><p class="muted" style="margin-top:6px">${x.pct}% complete</p>`:''}<p class="muted" style="margin-top:14px">${x.status==='queued'?'Waiting for its turn in the queue.':x.status==='running'?'An AI employee is working on this now.':'Finished. You can reopen it if it needs more work.'}</p>`,
+    foot:`<button class="btn bad" data-act="taskDel" data-id="${id}">Remove</button><span class="grow"></span>${x.status==='queued'?`<button class="btn pri" data-act="taskNext" data-id="${id}">Start now</button>`:x.status==='running'?`<button class="btn pri" data-act="taskNext" data-id="${id}">Mark done</button>`:`<button class="btn" data-act="taskNext" data-id="${id}">Reopen</button>`}`})}
+function sheetEmp(id){const e=D.employees.find(a=>a.id===id);if(!e)return;const ags=e.agents.map(a=>D.agents.find(x=>x.id===a)).filter(Boolean);
+  openSheet({title:e.name,body:`<div style="display:flex;gap:8px;flex-wrap:wrap">${pill(e.state)}<span class="pill">${esc(t(PAGES[e.dept].k))}</span></div><div class="fld"><span class="lb">KRA score</span><div class="bar ${e.kra>=85?'good':'warn'}"><i style="width:${e.kra}%"></i></div><small>${e.kra}% this week</small></div><div class="fld"><span class="lb">SOPs it follows</span><div class="chips">${SOPS.slice(0,e.sops).map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div></div><div class="fld"><span class="lb">Agents it uses</span>${ags.length?`<div class="chips">${ags.map(a=>`<span class="pill acc">${esc(a.name)}</span>`).join('')}</div>`:'<small>None yet.</small>'}</div>`,
+    foot:`<button class="btn bad" data-act="empDel" data-id="${id}">Remove</button><span class="grow"></span><button class="btn pri" data-act="empToggle" data-id="${id}" data-close="1">${e.state==='paused'?'Resume':'Pause'}</button>`})}
+
+/* ---------- actions ---------- */
+const POPTRIG=new Set(['coMenu','statusPop','bellPop','helpPop','profPop']);
+const ACT={
+close(){closeTop()},
+drawerClose(){closeDrawer()},
+sidebar(){if(innerWidth<=860){$('#sb').classList.contains('open')?closeDrawer():openDrawer()}else setPref('sidebar',S.sidebar==='rail'?'full':'rail')},
+palette(){closePop();openPalette()},
+coMenu(a){togglePop(a,coMenuHtml())},
+statusPop(a){togglePop(a,statusHtml(),{end:true})},
+bellPop(a){togglePop(a,bellHtml(),{end:true})},
+helpPop(a){togglePop(a,helpHtml(),{end:true})},
+profPop(a){togglePop(a,profHtml(),{end:true})},
+how(){SHEETS.how()},keys(){SHEETS.keys()},
+notif(a){const n=D.notifs.find(x=>x.id===a.dataset.id);if(n){n.read=true;save();go(n.go)}},
+readAll(){mine(D.notifs).forEach(n=>n.read=true);save();render();toast('All notifications marked as read.')},
+brief(){openSheet({title:'Company brief',body:`<p style="white-space:pre-wrap">${esc(co().brief||'No brief yet.')}</p>`,foot:`<button class="btn pri" data-act="close">Close</button>`})},
+delegate(a){sheetDelegate(a.dataset.d)},
+delegateGo(){const t1=sv('dt'),d=sv('dd');if(!t1){toast('Describe the task first.','bad');return}addTask(d,t1);closeTop();render();toast('Delegated to the '+DEPTS[d].role+'.')},
+range(a){UI.range=Number(a.dataset.v);render()},view(a){UI.view=a.dataset.v;render()},
+chip(a){sendChat(a.dataset.q)},
+apv(a){resolveApproval(a.dataset.id,a.dataset.v);render()},
+aptab(a){UI.apTab=a.dataset.v;render()},
+task(a){sheetTask(a.dataset.id)},
+taskNext(a){const x=D.tasks.find(t1=>t1.id===a.dataset.id);if(!x)return;if(x.status==='queued'){x.status='running';x.pct=5}else if(x.status==='running'){x.status='done';x.pct=100;D.feed.push({id:rid('f'),co:x.co,dept:x.dept,txt:'Finished: '+x.title,ts:now()})}else{x.status='queued';x.pct=0}save();closeTop();render()},
+taskDel(a){D.tasks=D.tasks.filter(x=>x.id!==a.dataset.id);save();closeTop();render();toast('Task removed.')},
+emp(a){sheetEmp(a.dataset.id)},
+empFilter(a){UI.empF=a.dataset.v;if(cur.pg!=='employees')go('employees');else render()},
+empToggle(a){const e=D.employees.find(x=>x.id===a.dataset.id);if(!e)return;e.state=e.state==='paused'?'working':'paused';save();if(a.dataset.close)closeTop();render();toast(e.name+(e.state==='paused'?' paused.':' resumed.'))},
+empDel(a){D.employees=D.employees.filter(x=>x.id!==a.dataset.id);save();closeTop();render();toast('Employee removed.')},
+hire(){sheetHire()},
+hireGo(){const n=sv('hn'),d=sv('hd');if(!n){toast('Give the role a name.','bad');return}D.employees.push({id:rid('e'),co:D.cur,dept:d,name:n,state:'working',kra:80,sops:3,agents:[]});D.feed.push({id:rid('f'),co:D.cur,dept:'chro',txt:'Hired a new AI employee: '+n,ts:now()});save();closeTop();render();toast(n+' hired.')},
+addAgent(){sheetAgent()},
+agentGo(){const n=sv('an');if(!n){toast('Give the agent a name.','bad');return}D.agents.push({id:rid('a'),co:D.cur,name:n,kind:sv('ak'),dept:sv('ad'),on:true});save();closeTop();render();toast(n+' added.')},
+agToggle(a){const x=D.agents.find(g=>g.id===a.dataset.id);if(x){x.on=!x.on;save();render()}},
+lead(a){const l=D.leads.find(x=>x.id===a.dataset.id);if(!l)return;l.stage=Math.min(3,l.stage+1);if(l.stage===3)D.feed.push({id:rid('f'),co:l.co,dept:'cmo',txt:'Closed a deal with '+l.name,ts:now()});save();render();if(l.stage===3)toast('Deal won with '+l.name+'.')},
+cwTog(a){const w=cw();w[a.dataset.k]=!w[a.dataset.k];save();render()},
+cwReq(){cwRequest()},
+cwRevoke(){cw().company='off';save();render();toast('Company access revoked.')},
+cwScope(a){UI.cwScope=a.dataset.v;render()},
+addTool(){sheetTool()},
+toolGo(){const n=sv('tn');if(!n){toast('Name the integration.','bad');return}D.tools.push({id:rid('t'),co:D.cur,cat:sv('tc'),name:n,mode:sv('tm'),on:true});save();closeTop();render();toast(n+' connected.')},
+toolTog(a){const x=D.tools.find(g=>g.id===a.dataset.id);if(x){x.on=!x.on;save();render()}},
+scan(){doScan()},
+thr(a){const x=D.threats.find(g=>g.id===a.dataset.id);if(x){x.open=false;save();render();toast('Finding resolved.')}},
+genReport(){D.reports.unshift({id:rid('r'),co:D.cur,title:'On-demand report',ts:now()});save();if(cur.pg==='reports')render();else renderShell();toast('Report created.')},
+report(a){const r=D.reports.find(x=>x.id===a.dataset.id);if(!r)return;openSheet({title:r.title,wide:true,body:reportBody(r),foot:`<button class="btn" data-act="close">Close</button><button class="btn pri" data-act="copyReport" data-id="${r.id}">${icon('copy',15)}Copy summary</button>`})},
+copyReport(a){const r=D.reports.find(x=>x.id===a.dataset.id),sh=stack[stack.length-1],txt=sh?$('.sh-b',sh).innerText:'';try{navigator.clipboard.writeText(txt).then(()=>toast('Summary copied.'),()=>toast('Copy is blocked here. Select the text instead.','bad'))}catch(e){toast('Copy is blocked here. Select the text instead.','bad')}},
+addCompany(){sheetCompany('new')},coKind(a){sheetCompany(a.dataset.v)},coCreate(){createCompany()},
+coSwitch(a){D.cur=a.dataset.id;save();closePop();render();toast('Switched to '+co().name+'.')},
+set(a){setPref(a.dataset.k,coerce(a.dataset.k,a.dataset.v))},
+tog(a){setPref(a.dataset.k,!S[a.dataset.k])},
+useSug(a){setPref(a.dataset.k,coerce(a.dataset.k,a.dataset.v));toast('Suggestion applied.')},
+applyAll(a){const cat=SET[a.dataset.v];let n=0;cat.items.forEach(it=>{const sg=it.sug&&it.sug();if(sg&&sg.v!==undefined&&String(S[it.k])!==String(sg.v)){S[it.k]=coerce(it.k,sg.v);n++}});save();applyPrefs();render();toast(n===0?'Already using every suggestion.':n===1?'1 suggestion applied.':n+' suggestions applied.')},
+menuTog(a){const id=a.dataset.id;S.hidden=S.hidden.includes(id)?S.hidden.filter(x=>x!==id):S.hidden.concat([id]);save();render()},
+setBack(){go('preferences')},
+addMember(){sheetMember()},
+memberGo(){const n=sv('mn2'),e=sv('me');if(!n||!/^\S+@\S+\.\S+$/.test(e)){toast('Enter a name and a valid email address.','bad');return}D.members.push({id:rid('m'),name:n,email:e,role:sv('mr'),invited:true});save();closeTop();render();toast('Invitation added for '+n+'. Sending arrives with the connected app.')},
+rmMember(a){D.members=D.members.filter(m=>m.id!==a.dataset.id);save();render();toast('Teammate removed.')},
+unhide(a){const id=a.dataset.id;if(id==='terminal')S.terminalOn=true;else S.hidden=S.hidden.filter(x=>x!==id);save();applyPrefs();route();toast('Back in your menu.')},
+resetSettings(){S=Object.assign({},DEF);save();applyPrefs();render();toast('Settings reset to defaults.')},
+resetData(){const cc=D.cur;initData();D.cur=D.companies.some(c=>c.id===cc)?cc:'kora';save();render();toast('Sample data reset.')}
+};
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){e.preventDefault();closePop();const sh=stack.length&&e.target.closest('.ov');if(sh)closeTop();go(g.dataset.go);return}
+  const a=e.target.closest('[data-act]');
+  if(!a){if(popEl&&!popEl.contains(e.target))closePop();return}
+  const n=a.dataset.act;if(!POPTRIG.has(n)&&n!=='set'&&popEl)closePop();
+  if(n==='set'&&popEl&&popEl.contains(a))closePop();
+  if(ACT[n])ACT[n](a,e);
+});
+document.addEventListener('change',e=>{
+  const s=e.target.closest('[data-sel]');if(s){setPref(s.dataset.sel,coerce(s.dataset.sel,s.value));return}
+  const i=e.target.closest('[data-inp]');if(i){const v=i.value.trim();if(!/^\S+@\S+\.\S+$/.test(v)){toast('Enter a valid email address, such as name@company.com.','bad');i.value=S[i.dataset.inp];return}setPref(i.dataset.inp,v);toast('Saved.');return}
+  const r=e.target.closest('[data-role]');if(r){const m=D.members.find(x=>x.id===r.dataset.role);if(m){m.role=r.value;save();toast(m.name+' is now '+r.value+'.')}}
+});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();const inp=$('input',f),v=inp.value;
+  if(f.dataset.form==='chat'){inp.value='';sendChat(v)}
+  else if(f.dataset.form==='cw'){inp.value='';cwRun(v)}
+  else if(f.dataset.form==='term'){inp.value='';termRun(v)}
+});
+document.addEventListener('keydown',e=>{
+  if(e.target.id==='tin'){
+    if(e.key==='ArrowUp'&&UI.thist.length){e.preventDefault();UI.tpos=Math.max(0,UI.tpos-1);e.target.value=UI.thist[UI.tpos]||''}
+    else if(e.key==='ArrowDown'&&UI.thist.length){e.preventDefault();UI.tpos=Math.min(UI.thist.length,UI.tpos+1);e.target.value=UI.thist[UI.tpos]||''}
+  }
+});
+
+/* ---------- boot ---------- */
+load();if(!D)initData();
+HOST_THEME=root.getAttribute('data-theme');
+applyPrefs();
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{applyPrefs()})}catch(e){}
+addEventListener('hashchange',route);
+setInterval(()=>{const c=$('#clk');if(c)c.textContent=clockText()},15000);
+route();
+})();
+</script>
