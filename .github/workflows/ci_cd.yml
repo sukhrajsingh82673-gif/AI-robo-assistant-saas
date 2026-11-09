@@ -110,6 +110,7 @@ jobs:
       - name: Validate Kubernetes Manifests & Container Configuration
         run: |
           echo "Verifying K8s YAML syntax..."
+          python3 -m pip install --quiet pyyaml
           python3 -c "
           import os, yaml
           for f in os.listdir('k8s'):
