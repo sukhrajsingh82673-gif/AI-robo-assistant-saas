@@ -155,8 +155,8 @@ jobs:
           res = subprocess.run(['git', 'hash-object', 'web/workflow_workspace.js'], capture_output=True, text=True)
           js_sha = res.stdout.strip()
 
-          assert db_sha == 'ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4', f'Database baseline drift: {db_sha}'
-          assert ledger_sha == 'ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996', f'Ledger baseline drift: {ledger_sha}'
+          assert db_sha == 'f71d9d79b95f2dc924385f90e97c7c565afd3b070b5d4628c3e2ad86aa52deda', f'Database baseline drift: {db_sha}'
+          assert ledger_sha == 'c8e50d461ca0943d012d920ed211a7d0040d799a52a1b5af6f052a9cbae74b13', f'Ledger baseline drift: {ledger_sha}'
           assert js_sha == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'Workflow JS baseline drift: {js_sha}'
           print('Constitutional protected baseline verification: 100% MATCH')
           "

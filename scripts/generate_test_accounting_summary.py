@@ -327,10 +327,42 @@ def run_single_suite(suite_info: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _isolate_child_suites_from_tracked_storage() -> None:
+    """Point child suites at disposable copies of the constitutional assets.
+
+    The accounting auditor executes standalone suites in subprocesses. Some of
+    them write through the default database/ledger paths, which mutates the
+    tracked storage/roboassistant.db and storage/evidence/audit_ledger.jsonl.
+    CI verifies those exact bytes after this script runs, so the auditor must
+    never touch them. Copy first, then point ZONATA_* at the copies; tests that
+    read the tracked files directly still see the pristine baseline.
+    """
+    import shutil
+    import tempfile
+
+    if os.environ.get("ZONATA_DB_PATH") and os.environ.get("ZONATA_EVIDENCE_PATH"):
+        return
+
+    scratch = tempfile.mkdtemp(prefix="zonata_accounting_")
+    pairs = (
+        ("ZONATA_DB_PATH", os.path.join(BASE_DIR, "storage", "roboassistant.db"),
+         os.path.join(scratch, "roboassistant.db")),
+        ("ZONATA_EVIDENCE_PATH", os.path.join(BASE_DIR, "storage", "evidence", "audit_ledger.jsonl"),
+         os.path.join(scratch, "audit_ledger.jsonl")),
+    )
+    for env_key, source, target in pairs:
+        if os.environ.get(env_key) or not os.path.exists(source):
+            continue
+        shutil.copyfile(source, target)
+        os.environ[env_key] = target
+
+
 def main():
     if len(sys.argv) >= 5 and sys.argv[1] == "--run-suite-json":
         run_suite_in_process(sys.argv[2], sys.argv[3], sys.argv[4])
         return
+
+    _isolate_child_suites_from_tracked_storage()
 
     print("=" * 80)
     print("ZONATA SaaS — Automated Test Accounting Auditor")

@@ -151,6 +151,12 @@ jobs:
           python3 -m unittest -v tests/test_universal_automation_fabric_qualification.py
 
       - name: Run Enterprise Capability Expansion & Browser Qualification Suites
+        env:
+          # The browser qualification suite exercises the explicit test fixture
+          # path (no headless engine is installed in this job). Without this,
+          # navigation attempts a real fetch and the governed runtime correctly
+          # refuses to fabricate interactions.
+          ZONATA_TEST_MODE: "1"
         run: |
           if [ -f tests/test_enterprise_capability_expansion_qualification.py ]; then
             python3 -m unittest -v tests/test_enterprise_capability_expansion_qualification.py
