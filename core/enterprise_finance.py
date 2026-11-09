@@ -92,8 +92,12 @@ class EnterpriseFinanceEngine:
             ):
                 try:
                     conn.execute(stmt)
+                    conn.commit()
                 except Exception:
-                    pass
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             conn.commit()
 
     def _ensure_company_coa(self, company_id: str, conn=None) -> None:

@@ -5284,8 +5284,14 @@ class Database:
             ):
                 try:
                     conn.execute(stmt)
+                    conn.commit()
                 except Exception:
-                    pass
+                    # Additive migration already applied (or unsupported):
+                    # roll back so PostgreSQL does not stay in aborted state.
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             conn.commit()
 
 # Global Singleton Database Instance

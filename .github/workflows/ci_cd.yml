@@ -68,6 +68,7 @@ jobs:
               re.compile(r'-----BEGIN [A-Z\s]+PRIVATE KEY-----'),
               re.compile(r'\bsk-[a-zA-Z0-9]{32,}\b'),
               re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'),
+              re.compile(r'\bgithub_pat_[A-Za-z0-9_]{20,}\b'),
               re.compile(r'\bAKIA[0-9A-Z]{16}\b'),
               re.compile(r'\bxox[baprs]-[a-zA-Z0-9\-]{20,}\b'),
               re.compile(r'Bearer\s+eyJ[a-zA-Z0-9_\-\.]{40,}'),
@@ -109,6 +110,7 @@ jobs:
       - name: Validate Kubernetes Manifests & Container Configuration
         run: |
           echo "Verifying K8s YAML syntax..."
+          python3 -m pip install --quiet pyyaml
           python3 -c "
           import os, yaml
           for f in os.listdir('k8s'):
@@ -149,6 +151,12 @@ jobs:
           python3 -m unittest -v tests/test_universal_automation_fabric_qualification.py
 
       - name: Run Enterprise Capability Expansion & Browser Qualification Suites
+        env:
+          # The browser qualification suite exercises the explicit test fixture
+          # path (no headless engine is installed in this job). Without this,
+          # navigation attempts a real fetch and the governed runtime correctly
+          # refuses to fabricate interactions.
+          ZONATA_TEST_MODE: "1"
         run: |
           if [ -f tests/test_enterprise_capability_expansion_qualification.py ]; then
             python3 -m unittest -v tests/test_enterprise_capability_expansion_qualification.py

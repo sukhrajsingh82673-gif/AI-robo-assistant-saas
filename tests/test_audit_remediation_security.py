@@ -354,11 +354,15 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def test_01_container_runtime_fails_closed_without_sandbox(self):
         """Container adapter must fail closed with code 126 and sandbox_failure flag."""
         adapter = ContainerRuntimeAdapter()
-        res = adapter.execute_command(
-            session_id="test_sess_01",
-            command="echo 'unauthorized_execution'",
-            cwd=tempfile.gettempdir()
-        )
+        # Force the "no container engine" condition deterministically. CI runners
+        # ship Docker, so relying on host detection would make this test pass or
+        # fail based on the machine rather than on the fail-closed contract.
+        with patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value=None):
+            res = adapter.execute_command(
+                session_id="test_sess_01",
+                command="echo 'unauthorized_execution'",
+                cwd=tempfile.gettempdir()
+            )
         self.assertEqual(res.get("exit_code"), 126)
         self.assertTrue(res.get("sandbox_failure"))
         self.assertIn("sandbox unavailable", res.get("stderr", "").lower())

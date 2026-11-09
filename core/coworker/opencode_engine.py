@@ -52,8 +52,16 @@ class OpenCodeEngine:
         self.worktree_base = "/tmp/zonata_opencode_worktrees"
         os.makedirs(self.worktree_base, exist_ok=True)
         import shutil
-        self.opencode_cli_path: Optional[str] = shutil.which("opencode") or (
-            "/usr/local/bin/opencode" if os.path.exists("/usr/local/bin/opencode") else None
+        # Resolve the CLI portably: PATH first, then common install prefixes.
+        self.opencode_cli_path: Optional[str] = shutil.which("opencode") or next(
+            (
+                p for p in (
+                    os.path.expanduser("~/.opencode/bin/opencode"),
+                    "/usr/local/bin/opencode",
+                    "/usr/bin/opencode",
+                ) if os.path.exists(p)
+            ),
+            None,
         )
         self.opencode_cli_available: bool = self.opencode_cli_path is not None
         self.opencode_cli_version: Optional[str] = None
@@ -313,7 +321,7 @@ class OpenCodeEngine:
                 "success": False,
                 "executed": False,
                 "error": "OPENCODE_CLI_UNAVAILABLE",
-                "reason": "Host executable 'opencode' was not found in PATH (/usr/local/bin/opencode)."
+                "reason": "Host executable 'opencode' was not found on PATH or in a known install location."
             }
         cmd = [self.opencode_cli_path] + args
         target_cwd = cwd or self.repo_root
