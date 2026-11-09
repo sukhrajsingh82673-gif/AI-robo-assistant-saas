@@ -68,6 +68,7 @@ jobs:
               re.compile(r'-----BEGIN [A-Z\s]+PRIVATE KEY-----'),
               re.compile(r'\bsk-[a-zA-Z0-9]{32,}\b'),
               re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'),
+              re.compile(r'\bgithub_pat_[A-Za-z0-9_]{20,}\b'),
               re.compile(r'\bAKIA[0-9A-Z]{16}\b'),
               re.compile(r'\bxox[baprs]-[a-zA-Z0-9\-]{20,}\b'),
               re.compile(r'Bearer\s+eyJ[a-zA-Z0-9_\-\.]{40,}'),

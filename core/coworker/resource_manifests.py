@@ -282,13 +282,24 @@ class ResourceManifestStore:
         ap = os.path.abspath(path)
         sha = _sha256_file(ap) if os.path.isfile(ap) else None
         with self._connect() as conn:
-            conn.execute(
-                """INSERT OR REPLACE INTO file_ownership
-                   (path, owner_task_id, mission_id, manifest_id, kind, sha256, tenant_id, created_at)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (ap, owner_task_id, mission_id, manifest_id, kind, sha,
-                 self.tenant_id, time.time()),
+            # Portable upsert: UPDATE-then-INSERT works on both SQLite and
+            # PostgreSQL, unlike SQLite's INSERT OR REPLACE.
+            updated = conn.execute(
+                """UPDATE file_ownership
+                   SET owner_task_id = ?, mission_id = ?, manifest_id = ?,
+                       kind = ?, sha256 = ?, tenant_id = ?, created_at = ?
+                   WHERE path = ?""",
+                (owner_task_id, mission_id, manifest_id, kind, sha,
+                 self.tenant_id, time.time(), ap),
             )
+            if updated.rowcount == 0:
+                conn.execute(
+                    """INSERT INTO file_ownership
+                       (path, owner_task_id, mission_id, manifest_id, kind, sha256, tenant_id, created_at)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (ap, owner_task_id, mission_id, manifest_id, kind, sha,
+                     self.tenant_id, time.time()),
+                )
             conn.commit()
         return {
             "path": ap,

@@ -283,7 +283,9 @@ class UniversalAutomationFabric:
             );
             CREATE INDEX IF NOT EXISTS idx_autosign_status ON automation_signing_keys(status);
             """)
-            if getattr(db, 'dialect', None) and getattr(db.dialect, 'value', '') == 'postgresql':
+            dialect = getattr(db, 'dialect', None)
+            dialect_value = str(getattr(dialect, 'value', dialect)).lower()
+            if dialect_value == 'postgresql':
                 try:
                     conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS actor_role TEXT")
                     conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS receipt_signature TEXT")
@@ -295,14 +297,20 @@ class UniversalAutomationFabric:
                         pass
                     logger.debug(f"Approval columns check: {e}")
             else:
-                try:
-                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT")
-                except Exception:
-                    pass
-                try:
-                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT")
-                except Exception:
-                    pass
+                for stmt in (
+                    "ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT",
+                    "ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT",
+                ):
+                    try:
+                        conn.execute(stmt)
+                        conn.commit()
+                    except Exception:
+                        # Already-present column: roll back so the connection
+                        # stays usable (PostgreSQL aborts the transaction).
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
                 conn.commit()
 
     # =========================================================================

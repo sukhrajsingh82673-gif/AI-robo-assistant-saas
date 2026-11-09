@@ -347,6 +347,25 @@ class ExecutionDecisionEngine:
             license_status="APPROVED"
         )
 
+    @staticmethod
+    def _discovery_failure(status: str, package_name: str, error: str, **extra: Any) -> Dict[str, Any]:
+        """Schema-complete failure payload so callers never KeyError on a field."""
+        payload: Dict[str, Any] = {
+            "success": False,
+            "status": status,
+            "package_name": package_name,
+            "license_approved": False,
+            "integrity_verified": False,
+            "local_sha256": None,
+            "download_path": None,
+            "sandbox_path": None,
+            "manifest_id": None,
+            "error": error,
+            "provenance": None,
+        }
+        payload.update(extra)
+        return payload
+
     def discover_external_package(
         self,
         package_name: str,
@@ -374,21 +393,13 @@ class ExecutionDecisionEngine:
             with urllib.request.urlopen(req, timeout=10.0) as resp:
                 pypi_data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            return {
-                "success": False,
-                "status": "PACKAGE_NOT_FOUND" if e.code == 404 else "PYPI_HTTP_ERROR",
-                "package_name": package_name,
-                "error": f"PyPI responded with status {e.code}: {e.reason}",
-                "provenance": None
-            }
+            return self._discovery_failure(
+                "PACKAGE_NOT_FOUND" if e.code == 404 else "PYPI_HTTP_ERROR",
+                package_name,
+                f"PyPI responded with status {e.code}: {e.reason}",
+            )
         except Exception as e:
-            return {
-                "success": False,
-                "status": "PYPI_NETWORK_ERROR",
-                "package_name": package_name,
-                "error": str(e),
-                "provenance": None
-            }
+            return self._discovery_failure("PYPI_NETWORK_ERROR", package_name, str(e))
 
         info = pypi_data.get("info", {})
         version = info.get("version", "unknown")
@@ -415,15 +426,14 @@ class ExecutionDecisionEngine:
                         break
 
         if not license_approved:
-            return {
-                "success": False,
-                "status": "LICENSE_REJECTED",
-                "package_name": package_name,
-                "version": version,
-                "license": effective_license,
-                "error": f"License '{effective_license}' is not in approved sovereign runtime licenses.",
-                "provenance": {"version": version, "license": effective_license}
-            }
+            return self._discovery_failure(
+                "LICENSE_REJECTED",
+                package_name,
+                f"License '{effective_license}' is not in approved sovereign runtime licenses.",
+                version=version,
+                license=effective_license,
+                provenance={"version": version, "license": effective_license},
+            )
 
         # Find best release distribution (prefer bdist_wheel or sdist)
         urls = pypi_data.get("urls", [])
@@ -436,13 +446,12 @@ class ExecutionDecisionEngine:
             chosen_dist = urls[0]
 
         if not chosen_dist:
-            return {
-                "success": False,
-                "status": "NO_DISTRIBUTION_FOUND",
-                "package_name": package_name,
-                "version": version,
-                "error": "No downloadable release archives available on PyPI."
-            }
+            return self._discovery_failure(
+                "NO_DISTRIBUTION_FOUND",
+                package_name,
+                "No downloadable release archives available on PyPI.",
+                version=version,
+            )
 
         download_url = chosen_dist.get("url")
         pypi_sha256 = chosen_dist.get("digests", {}).get("sha256")
@@ -472,22 +481,19 @@ class ExecutionDecisionEngine:
                         requested_by="coworker/level4",
                     )
                 if not integrity_verified:
-                    return {
-                        "success": False,
-                        "status": "INTEGRITY_CHECK_FAILED",
-                        "package_name": package_name,
-                        "version": version,
-                        "pypi_sha256": pypi_sha256,
-                        "local_sha256": local_sha256,
-                        "error": "Local file SHA-256 does not match PyPI published digest!"
-                    }
+                    return self._discovery_failure(
+                        "INTEGRITY_CHECK_FAILED",
+                        package_name,
+                        "Local file SHA-256 does not match PyPI published digest!",
+                        version=version,
+                        license=effective_license,
+                        pypi_sha256=pypi_sha256,
+                        local_sha256=local_sha256,
+                    )
             except Exception as e:
-                return {
-                    "success": False,
-                    "status": "DOWNLOAD_FAILED",
-                    "package_name": package_name,
-                    "error": str(e)
-                }
+                return self._discovery_failure(
+                    "DOWNLOAD_FAILED", package_name, str(e), version=version
+                )
 
         # Provision Level 4 isolated sandbox venv
         install_target = local_file_path if (allow_download and os.path.exists(local_file_path)) else package_name
