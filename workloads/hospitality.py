@@ -12,6 +12,7 @@ from core.models import (
 from core.workforce import DynamicAgentFactory
 from core.control_kernel import UniversalControlKernel
 from core.portfolio import OperatingContext
+from workloads.paths import sandbox_artifact
 
 def run_hospitality_night_audit(company: OperatingContext, kernel: UniversalControlKernel) -> Mission:
     # 1. Mission Creation
@@ -40,7 +41,7 @@ def run_hospitality_night_audit(company: OperatingContext, kernel: UniversalCont
     mission.status = MissionStatus.PLAN
 
     # 3. Action Contract Preparation
-    output_path = "/roboassistant/storage/sandbox/hospitality_night_audit.json"
+    output_path = sandbox_artifact("hospitality_night_audit.json")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     action = ActionContract(

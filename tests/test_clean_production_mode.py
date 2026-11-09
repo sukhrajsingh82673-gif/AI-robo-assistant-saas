@@ -23,14 +23,20 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.db import Database, DatabaseDialect, db
-from core.enterprise_finance import EnterpriseFinanceEngine
-from core.enterprise_files import EnterpriseFilesEngine
-from core.enterprise_records import EnterpriseRecordsEngine
-from core.enterprise_reports import EnterpriseReportsEngine
-from core.schedule_service import UniversalScheduleService
-from core.plugins_service import PluginsAndConnectionsService
-from core.coworker_governance import GovernedCoworkerRegistry
 from core.db import configure_isolated_test_db
+
+# The enterprise engines are imported lazily inside setUpModule. Each of those
+# modules instantiates its engine as a module-level singleton, whose __init__
+# initializes schema through the active database handle. Importing them before
+# isolation therefore writes into storage/roboassistant.db — the tracked
+# constitutional baseline that CI hash-pins and that this suite must not touch.
+EnterpriseFinanceEngine = None
+EnterpriseFilesEngine = None
+EnterpriseRecordsEngine = None
+EnterpriseReportsEngine = None
+UniversalScheduleService = None
+PluginsAndConnectionsService = None
+GovernedCoworkerRegistry = None
 
 MODULE_TEMP_DIR = None
 MODULE_ORIG_DB_PATH = None
@@ -38,11 +44,24 @@ MODULE_ORIG_ENV_DB_PATH = None
 
 def setUpModule():
     global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
+    global EnterpriseFinanceEngine, EnterpriseFilesEngine
+    global EnterpriseRecordsEngine, EnterpriseReportsEngine
+    global UniversalScheduleService, PluginsAndConnectionsService
+    global GovernedCoworkerRegistry
     MODULE_ORIG_DB_PATH = db.db_path
     MODULE_ORIG_ENV_DB_PATH = os.environ.get("ZONATA_DB_PATH")
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "clean_prod_test_isolated.db")
     configure_isolated_test_db(isolated_db)
+
+    # Import only after the database handle points at the isolated copy.
+    from core.enterprise_finance import EnterpriseFinanceEngine
+    from core.enterprise_files import EnterpriseFilesEngine
+    from core.enterprise_records import EnterpriseRecordsEngine
+    from core.enterprise_reports import EnterpriseReportsEngine
+    from core.schedule_service import UniversalScheduleService
+    from core.plugins_service import PluginsAndConnectionsService
+    from core.coworker_governance import GovernedCoworkerRegistry
 
 def tearDownModule():
     global MODULE_TEMP_DIR, MODULE_ORIG_DB_PATH, MODULE_ORIG_ENV_DB_PATH
