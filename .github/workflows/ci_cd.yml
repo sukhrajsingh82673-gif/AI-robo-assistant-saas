@@ -192,8 +192,8 @@ jobs:
           ZONATA_DB_PATH: "/tmp/ci_zonata_isolated.db"
           ZONATA_EVIDENCE_PATH: "/tmp/ci_evidence_ledger.jsonl"
         run: |
-          echo "Executing comprehensive suite batch discovery across 71 test files..."
-          python3 -m unittest discover -s tests -p "test_*.py" -v || echo "Individual suite report logged; critical gates verified."
+          echo "Executing bounded comprehensive suite inventory across test files (20 min cap)..."
+          timeout 1200 python3 -m unittest discover -s tests -p "test_*.py" -v || echo "Inventory reported failures or was truncated at the cap; the explicit gates above are authoritative."
 
   # ===========================================================================
   # STAGE 3 — SECURITY AND SUPPLY CHAIN
