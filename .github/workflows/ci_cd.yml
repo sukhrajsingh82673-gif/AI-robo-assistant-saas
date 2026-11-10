@@ -273,25 +273,32 @@ jobs:
 
       - name: Validate Containerfiles & Build Definitions
         run: |
-          echo "Validating Dockerfile.api, Dockerfile.worker, Dockerfile.supervisor..."
-          test -f Dockerfile.api && echo "Dockerfile.api present"
-          test -f Dockerfile.worker && echo "Dockerfile.worker present"
-          test -f Dockerfile.supervisor && echo "Dockerfile.supervisor present"
+          echo "Validating docker/Dockerfile.api, docker/Dockerfile.worker, docker/Dockerfile.supervisor..."
+          test -f docker/Dockerfile.api && echo "docker/Dockerfile.api present"
+          test -f docker/Dockerfile.worker && echo "docker/Dockerfile.worker present"
+          test -f docker/Dockerfile.supervisor && echo "docker/Dockerfile.supervisor present"
+          echo "Container build definitions validated."
 
       - name: Generate SLSA Level 3 Provenance Digest
         run: |
-          python3 -c "
+          # Digest the exact build definitions the images are produced from.
+          # The previous value was "sha256:" + commit SHA, which identifies a
+          # commit rather than the artifact and is not verifiable as a digest.
+          BUILD_DEF_DIGEST="sha256:$(cat docker/Dockerfile.api docker/Dockerfile.worker docker/Dockerfile.supervisor | sha256sum | cut -d' ' -f1)"
+          echo "Build definition digest: $BUILD_DEF_DIGEST"
+          BUILD_DEF_DIGEST="$BUILD_DEF_DIGEST" python3 -c "
+          import json
+          import os
           from core.secure_supply_chain import SecureSupplyChainController
           controller = SecureSupplyChainController()
           attestation = controller.create_slsa_provenance(
-              artifact_name='zonata-automation-fabric',
-              artifact_digest='sha256:' + '${{ github.sha }}',
+              artifact_name='zonata-container-build-definitions',
+              artifact_digest=os.environ['BUILD_DEF_DIGEST'],
               source_commit='${{ github.sha }}'
           )
-          import json
           with open('slsa_provenance.json', 'w') as f:
               json.dump(attestation.to_dict(), f, indent=2)
-          print('SLSA provenance attestation created.')
+          print('SLSA provenance attestation created for', attestation.artifact_digest)
           "
 
       - name: Upload Build Attestation Artifact
