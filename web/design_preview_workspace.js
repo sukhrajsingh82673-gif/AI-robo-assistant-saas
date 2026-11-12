@@ -340,8 +340,8 @@
                 Open Security Center (/governance) →
               </button>
               <button class="btn-apple btn-apple-secondary spring-press"
-                      onclick="window.navigateTo('/assistant')">
-                Open Co-Worker Assistant (/assistant) →
+                      onclick="window.URAAssistant && window.URAAssistant.open()">
+                Open URA Assistant →
               </button>
             </div>
           </section>

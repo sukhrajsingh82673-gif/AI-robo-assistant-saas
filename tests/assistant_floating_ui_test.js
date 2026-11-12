@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * ZONATA AI floating assistant UI contract tests.
- * Static checks that catch the exact regressions found during the audit:
- * duplicate entry points, fabricated meeting/screen data, clarification replay,
- * metadata-only attachments, and fake killswitch/approval success.
+ * URA Assistant UI contract tests.
+ *
+ * These are static guarantees for the one-assistant rule, the Co-worker
+ * boundary, route aliases, drag/snap persistence, upload honesty and the
+ * non-fabricated meeting/screen/killswitch states.
  */
 'use strict';
 
@@ -13,10 +14,11 @@ const assert = require('assert');
 
 const root = path.resolve(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const js = read('web/floating_assistant.js');
+const js = read('web/ura_assistant.js');
 const app = read('web/app.js');
 const index = read('web/index.html');
-const css = read('web/styles.css');
+const css = read('web/ura_assistant.css');
+const styles = read('web/styles.css');
 let passed = 0;
 
 function test(name, fn) {
@@ -25,67 +27,107 @@ function test(name, fn) {
   console.log(`  ok  ${name}`);
 }
 
-test('exactly one floating assistant container and no full-page assistant view', () => {
-  const containers = index.match(/id="floatingAssistantContainer"/g) || [];
-  assert.strictEqual(containers.length, 1);
+test('exactly one assistant mount and no full-page assistant view', () => {
+  assert.strictEqual((index.match(/id="uraAssistantRoot"/g) || []).length, 1);
+  assert.ok(!index.includes('floatingAssistantContainer'));
+  assert.ok(!index.includes('ask-ura-bar'));
   assert.ok(!index.includes('id="view-assistant"'));
-  assert.ok(!app.includes("renderAssistant('view-assistant')"));
+  assert.ok(!index.includes('floating_assistant.js'));
 });
 
-test('mobile navigation does not duplicate the assistant entry point', () => {
+test('the Co-worker screen, route, nav and renderer are preserved', () => {
+  assert.ok(index.includes('data-nav="coworker"'));
+  assert.ok(index.includes('id="view-coworker"'));
+  assert.ok(index.includes('assistant_coworker_workspace.js'));
+  assert.ok(index.includes('apple_coworker_assistant.js'));
+  assert.ok(app.includes("cleanPath.startsWith('/coworker')"));
+  assert.ok(app.includes("navKey = 'coworker'"));
+  assert.ok(app.includes("renderCoworker('view-coworker')"));
+});
+
+test('AI CEO chat is gone and legacy CEO links open the assistant', () => {
+  assert.ok(!index.includes('ceoCommandInput'));
+  assert.ok(!index.includes('ceoChatFeedback'));
+  assert.ok(app.includes("cleanPath.startsWith('/ceo')"));
+  assert.ok(app.includes('window.URAAssistant.open({ focus'));
+  assert.ok(index.includes('data-nav="ceo-records"'));
+  assert.ok(app.includes("cleanPath.startsWith('/company/ceo-records')"));
+  assert.ok(app.includes("render('view-ceo-records')"));
+});
+
+test('mobile navigation has one assistant tab and no floating launcher', () => {
   const mobileNav = index.slice(index.indexOf('mobile-bottom-nav'));
-  assert.ok(!mobileNav.includes('ZONATA AI'), 'mobile nav must not add a second assistant entry');
+  assert.strictEqual((mobileNav.match(/id="mobileAssistantTab"/g) || []).length, 1);
+  assert.ok(mobileNav.includes('toggleSheet()'));
+  assert.ok(css.includes('.ura-launcher { display: none !important; }'));
 });
 
-test('legacy /assistant route opens the single flyout instead of a page', () => {
-  assert.ok(app.includes("navKey = 'overview'"));
-  assert.ok(app.includes('window.FloatingAssistant.toggleOpen()'));
+test('legacy /assistant and /meeting links open the single window', () => {
+  assert.ok(app.includes("cleanPath.startsWith('/assistant')"));
+  assert.ok(app.includes("cleanPath.startsWith('/meeting')"));
+  assert.ok(app.includes('window.URAAssistant.open()'));
+  assert.ok(app.includes("focus: 'meetings'"));
 });
 
-test('drag supports pointer and touch with persisted corner snapping', () => {
-  assert.ok(js.includes("addEventListener('mousedown'"));
-  assert.ok(js.includes("addEventListener('touchstart'"));
-  assert.ok(js.includes("localStorage.setItem('zonata_assistant_corner'"));
-  assert.ok(js.includes("addEventListener('resize'"));
-  assert.ok(!js.includes("currentCorner = 'bottom-left'; // hardcoded"));
+test('launcher drag uses pointer events and persists eight snap anchors', () => {
+  assert.ok(js.includes("addEventListener('pointerdown'"));
+  assert.ok(js.includes("pointermove"));
+  assert.ok(js.includes('computeAnchor'));
+  assert.ok(js.includes("['top-left'"));
+  assert.ok(js.includes("['bottom-right'"));
+  assert.ok(js.includes('localStorage.setItem(this.storageKey'));
+  assert.ok(js.includes("data-anchor"));
+  assert.ok(js.includes('startResize'));
+  assert.ok(js.includes('clamp(rect.width'));
 });
 
-test('clarification resumes the original prompt instead of replaying a placeholder', () => {
-  assert.ok(js.includes('this.lastPrompt = text'));
-  assert.ok(js.includes('this.submitPrompt(this.lastPrompt, selectedMode)'));
+test('window has dock, expand, minimise, close and persisted size/mode', () => {
+  assert.ok(js.includes("action === 'dock'"));
+  assert.ok(js.includes("action === 'expand'"));
+  assert.ok(js.includes("action === 'minimise'"));
+  assert.ok(js.includes("action === 'close'"));
+  assert.ok(js.includes('this.winPos'));
+  assert.ok(css.includes(".ura-window[data-mode='docked']"));
+  assert.ok(css.includes(".ura-window[data-mode='expanded']"));
+});
+
+test('clarification resumes the original prompt instead of a placeholder', () => {
+  assert.ok(js.includes('this.lastPrompt = prompt'));
+  assert.ok(js.includes('if (this.lastPrompt) this.send(this.lastPrompt)'));
   assert.ok(!js.includes('Proceed with this request as a'));
 });
 
 test('attachments are uploaded before being reported as attached', () => {
   assert.ok(js.includes('/api/assistant/documents/upload'));
   assert.ok(js.includes('content_base64'));
-  assert.ok(js.includes('readFileAsDataUrl'));
+  assert.ok(js.includes('readAsDataURL'));
   assert.ok(!js.includes('Attachment metadata was received'));
 });
 
 test('meeting card only claims confirmation when the provider confirmed', () => {
-  assert.ok(js.includes("action.provider_status === 'CONFIRMED'"));
-  assert.ok(js.includes('Meeting Not Scheduled'));
+  assert.ok(js.includes("action.status === 'SCHEDULED' && action.provider_status === 'CONFIRMED'"));
+  assert.ok(js.includes('Meeting not scheduled'));
   assert.ok(!js.includes('Google Meet Scheduled'));
   assert.ok(!js.includes('gcal_'));
 });
 
 test('screen observation does not fabricate a hash or seal', () => {
   assert.ok(js.includes('Screen observation is not connected in this build'));
-  assert.ok(!js.includes("sha256:verified"));
+  assert.ok(!js.includes('sha256:verified'));
   assert.ok(!js.includes('Observation sealed into audit evidence'));
 });
 
-test('killswitch calls the real matrix endpoint and reports its answer', () => {
+test('emergency stop calls the real endpoint and reports its answer', () => {
   assert.ok(js.includes('/api/assistant/emergency-stop'));
   assert.ok(js.includes('data.switch_id'));
   assert.ok(!js.includes('/api/multimodal/task/interrupt'));
   assert.ok(!js.includes('EMERGENCY CONTAINMENT ACTIVATED'));
 });
 
-test('approval decisions do not fabricate a success follow-up prompt', () => {
+test('approval decisions use the real approval endpoint', () => {
   assert.ok(js.includes('/api/approvals/'));
-  assert.ok(!js.includes("this.submitPrompt(approved ? 'Authorized sensitive action.'"));
+  assert.ok(js.includes('/decide'));
+  assert.ok(!js.includes("this.send('Authorized sensitive action.')"));
 });
 
 test('workforce mission card shows delegation and unverified status', () => {
@@ -95,16 +137,24 @@ test('workforce mission card shows delegation and unverified status', () => {
 });
 
 test('deliverable card only shows checksum and download when present', () => {
-  assert.ok(js.includes('No checksum issued'));
-  assert.ok(js.includes('No download available'));
+  assert.ok(js.includes('deliverable.sha256 ?'));
+  assert.ok(js.includes('deliverable.download_url ?'));
   assert.ok(!js.includes("(deliv.sha256 || '').substring"));
 });
 
-test('flyout has minimize and close controls and responsive anchoring', () => {
-  assert.ok(js.includes('toggleMinimize'));
-  assert.ok(css.includes('.assistant-flyout-window.minimized'));
-  assert.ok(css.includes('.assistant-flyout-window.anchor-bottom-left'));
-  assert.ok(css.includes('.assistant-flyout-window.anchor-top-right'));
+test('the shell reserves one global bottom clearance, not per-page offsets', () => {
+  assert.ok(styles.includes('var(--ura-clearance, 104px)'));
+  assert.ok(styles.includes('padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))'));
+  assert.ok(!styles.includes('padding-bottom: 70px !important'));
+});
+
+test('non-modal dialog, aria-live and keyboard contract', () => {
+  assert.ok(js.includes('aria-modal="false"'));
+  assert.ok(js.includes('aria-live="polite"'));
+  assert.ok(js.includes("event.key === 'Enter' && !event.shiftKey"));
+  assert.ok(js.includes("event.key === 'ArrowUp'"));
+  assert.ok(js.includes('Ctrl/Cmd+J'));
+  assert.ok(app.includes("e.key.toLowerCase() === 'j'"));
 });
 
 test('no fabricated Meet link generator remains in the assistant UI', () => {
@@ -112,4 +162,4 @@ test('no fabricated Meet link generator remains in the assistant UI', () => {
   assert.ok(!js.includes('+1 415-555-0199'));
 });
 
-console.log(`\n${passed} floating assistant UI contract tests passed.`);
+console.log(`\n${passed} URA Assistant UI contract tests passed.`);

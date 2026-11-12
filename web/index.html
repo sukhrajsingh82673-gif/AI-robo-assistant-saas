@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="components.css" />
   <link rel="stylesheet" href="app_shell.css" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="ura_assistant.css" />
   <link rel="stylesheet" href="settings_v2.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50%' y='68%' font-size='60' font-weight='800' fill='white' text-anchor='middle'>Z</text></svg>" />
 </head>
@@ -187,11 +188,11 @@
 
         <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
 
-        <button class="nav-item" data-nav="ceo" id="navItemCeo">
+        <button class="nav-item" data-nav="ceo-records" id="navItemCeo">
           <div class="nav-icon-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           </div>
-          <span class="nav-label">AI CEO</span>
+          <span class="nav-label">AI CEO Records</span>
         </button>
 
         <button class="nav-item" data-nav="workforce" id="navItemWorkforce">
@@ -337,6 +338,11 @@
             <span class="status-text">Kernel Active</span>
           </div>
 
+          <!-- URA Assistant trigger -->
+          <button class="topbar-icon-btn" id="uraTopbarTrigger" onclick="window.URAAssistant && window.URAAssistant.toggle()" title="Open URA Assistant (Ctrl/Cmd+J)" aria-label="Open URA Assistant">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6L15.5 18.5l2.6-.9L19 15z"/></svg>
+          </button>
+
           <!-- Notifications & Approvals Trigger -->
           <button class="topbar-icon-btn" onclick="window.navigateTo('/approvals')" title="Approvals & Governance Notifications">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -373,6 +379,7 @@
           <section id="view-company" class="view-section"></section>
           <section id="view-organization" class="view-section"></section>
           <section id="view-ceo" class="view-section"></section>
+          <section id="view-ceo-records" class="view-section"></section>
           <section id="view-meeting" class="view-section"></section>
           <section id="view-workforce" class="view-section"></section>
           <section id="view-terminal" class="view-section"></section>
@@ -394,19 +401,6 @@
           <section id="view-404" class="view-section"></section>
         </div>
       </main>
-
-      <!-- Floating Ask URA Bar (Spotlight Bar) -->
-      <div class="ask-ura-bar-wrap" id="askUraBarWrap">
-        <div class="ask-ura-bar spring-press" onclick="AppShell.openAskUra()" title="Ask URA or search (⌘K)">
-          <div id="askUraOrbThumb">
-            <div class="ura-ai-orb-wrap state-idle" style="width:26px; height:26px;">
-              <div class="ura-ai-orb-core"></div>
-            </div>
-          </div>
-          <span class="ask-ura-text">Ask URA anything, or type a command...</span>
-          <kbd class="ask-ura-badge">⌘K</kbd>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -428,8 +422,8 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer"></div>
 
-  <!-- Floating Live Assistant Container -->
-  <div id="floatingAssistantContainer" class="floating-assistant-container"></div>
+  <!-- URA Assistant is the only assistant surface (launcher + window) -->
+  <div id="uraAssistantRoot"></div>
 
   <!-- Mobile Bottom Navigation Bar (Responsive Handheld UX) -->
   <nav class="mobile-bottom-nav">
@@ -440,6 +434,10 @@
     <button class="mobile-nav-btn" onclick="switchNav('missions')" title="Work & Missions">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       <span>Work</span>
+    </button>
+    <button class="mobile-nav-btn mobile-assistant-btn" id="mobileAssistantTab" onclick="window.URAAssistant && window.URAAssistant.toggleSheet()" title="URA Assistant" aria-label="Open URA Assistant">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6L15.5 18.5l2.6-.9L19 15z"/></svg>
+      <span>Assistant</span>
     </button>
     <button class="mobile-nav-btn" onclick="switchNav('records')" title="Enterprise Records">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -466,7 +464,7 @@
   <script src="tools_factory.js"></script>
   <script src="schedule_workspace.js"></script>
   <script src="plugins_workspace.js"></script>
-  <script src="floating_assistant.js"></script>
+  <script src="ura_assistant.js"></script>
   <script src="overview_workspace.js"></script>
   <script src="workflow_workspace.js"></script>
   <script src="agent_network_workspace.js"></script>
