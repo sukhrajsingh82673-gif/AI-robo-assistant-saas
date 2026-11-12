@@ -114,6 +114,9 @@
       this.busy = false;
       this.sessionId = null;
       this.lastPrompt = '';
+      this.agentRole = null;
+      this.streamState = null;
+      this.pendingConfirmations = [];
       this.drag = null;
       this.storageKey = `${STORAGE}:${userKey()}`;
       this.initialized = false;
@@ -223,6 +226,7 @@
           <div class="ura-context">
             <span class="ura-chip" id="uraContextChip">Looking at Overview</span>
             <span class="ura-chip" id="uraCompanyChip" hidden></span>
+            <span class="ura-chip ura-agent-chip" id="uraAgentChip" hidden></span>
           </div>
 
           <div class="ura-banner" id="uraPermissionBanner" hidden>
@@ -241,7 +245,9 @@
               <button type="button" data-plus="screen">🖥️ Observe my screen</button>
               <button type="button" data-plus="stop">🛑 Emergency stop</button>
               <div class="ura-menu-note">The Co-worker is an agent/employee workspace.</div>
-              <button type="button" data-plus="clear">🗑️ Clear this conversation</button>
+              <button type="button" data-plus="remember">🧠 Remember this</button>
+              <button type="button" data-plus="memory">🧠 Saved memory</button>
+              <button type="button" data-plus="clear">🗑️ Clear history</button>
             </div>
             <div class="ura-composer">
               <button class="ura-round" type="button" data-action="plus" title="Add" aria-label="Add attachment or action" aria-expanded="false">
@@ -271,6 +277,12 @@
         if (actionBtn) { this.action(actionBtn.dataset.action); return; }
         const plusBtn = event.target.closest('[data-plus]');
         if (plusBtn) { this.plusAction(plusBtn.dataset.plus); return; }
+        const confirmBtn = event.target.closest('[data-confirm-index]');
+        if (confirmBtn) { this.confirmTool(Number(confirmBtn.dataset.confirmIndex)); return; }
+        const forgetBtn = event.target.closest('[data-forget-memory]');
+        if (forgetBtn) { this.forgetMemory(forgetBtn.dataset.forgetMemory); return; }
+        if (event.target.closest('[data-open-memory]')) { this.openMemory(); return; }
+        if (event.target.closest('[data-forget-all]')) { this.forgetAllMemories(); return; }
         if (event.target.closest('#uraAskPermission')) { this.askCompanyPermission(); }
       });
 
@@ -577,6 +589,8 @@
       }
       if (action === 'screen') this.observeScreen();
       if (action === 'stop') this.emergencyStop();
+      if (action === 'remember') this.rememberLast();
+      if (action === 'memory') this.openMemory();
       if (action === 'clear') this.clearConversation();
     }
 
@@ -808,17 +822,42 @@
       const citations = Array.isArray(message.citations) && message.citations.length
         ? `<div class="ura-citations">${message.citations.map((c) => `<span>${escapeHtml(c.label || c.source_type || 'Source')}</span>`).join('')}</div>`
         : '';
+      const metaName = mine ? 'You' : 'URA';
       return `
         <div class="ura-msg ${mine ? 'user' : 'assistant'}">
-          <div class="ura-body">${mine ? escapeHtml(message.text) : formatText(message.text || '')}${this.renderExtra(message)}</div>
+          <div class="ura-body">${mine ? escapeHtml(message.text) : formatText(message.text || '')}${message.streaming && !message.text ? '<span class="ura-typing" aria-label="Working"><i></i><i></i><i></i></span>' : ''}${this.renderExtra(message)}</div>
           ${citations}
-          <div class="ura-meta">${mine ? 'You' : 'URA'} · ${time}</div>
+          <div class="ura-meta">${metaName}${message.agent ? ` · ${escapeHtml(message.agent)}` : ''} · ${time}${message.streaming ? ' · streaming' : ''}</div>
         </div>
       `;
     }
 
     renderExtra(message) {
       let html = '';
+      if (message.streaming && message.text) {
+        html += '<span class="ura-typing" aria-hidden="true"><i></i><i></i><i></i></span>';
+      }
+      if (message.card) {
+        html += this.renderToolCard(message.card);
+      }
+      if (message.confirmationIndex != null) {
+        html += `<div class="ura-confirm" role="group" aria-label="Confirm action">
+          <button class="ura-confirm-yes" type="button" data-confirm-index="${message.confirmationIndex}">Confirm</button>
+          <span class="ura-confirm-risk">${escapeHtml(message.risk || 'MEDIUM')} risk</span>
+        </div>`;
+      }
+      if (Array.isArray(message.memoryList)) {
+        const items = message.memoryList;
+        html += `<div class="ura-memory-list">
+          ${items.length ? items.map((m) => `
+            <div class="ura-memory-row">
+              <span>${escapeHtml(m.content)}</span>
+              <button type="button" data-forget-memory="${escapeHtml(m.memory_id)}" title="Forget this" aria-label="Forget this memory">✕</button>
+            </div>`).join('') : '<div class="ura-card-meta">No saved memory.</div>'}
+          <button class="ura-memory-link" type="button" data-open-memory>Refresh saved memory</button>
+          ${items.length ? '<button class="ura-memory-link ura-memory-danger" type="button" data-forget-all>Forget all</button>' : ''}
+        </div>`;
+      }
       const deliverable = message.deliverable;
       if (deliverable) {
         html += `<div class="ura-card">
@@ -843,6 +882,15 @@
             <div class="ura-card-meta">${escapeHtml(action.department || 'Operations')} · ${escapeHtml(action.status || 'DELEGATED')} · ${escapeHtml(action.verification_status || 'UNVERIFIED')}</div>
             ${action.requires_approval && action.approval_id ? `<div style="margin-top:6px;display:flex;gap:6px;"><button class="ura-round ura-send" type="button" onclick="window.URAAssistant.decideApproval('${escapeHtml(action.approval_id)}', true)">Approve</button><button class="ura-round" type="button" onclick="window.URAAssistant.decideApproval('${escapeHtml(action.approval_id)}', false)">Decline</button></div>` : ''}
           </div>`;
+        } else if (action.type === 'PERMISSION_REQUIRED') {
+          html += `<div class="ura-card">
+            <div class="ura-card-title">Company access is locked</div>
+            <div class="ura-card-meta">An approved request with “URA Assistant” and “(kind: cowork)” is required.</div>
+            <div class="ura-card-actions">
+              <button class="ura-confirm-yes" type="button" id="uraAskPermission">Ask the AI CEO</button>
+              <button class="ura-memory-link" type="button" onclick="window.navigateTo('/approvals')">Open approvals</button>
+            </div>
+          </div>`;
         }
       }
       if (Array.isArray(message.choices) && message.choices.length) {
@@ -851,10 +899,68 @@
       return html;
     }
 
+    renderToolCard(card) {
+      if (!card || !card.type) return '';
+      const title = escapeHtml(card.title || card.label || 'Action');
+      let body = '';
+      if (card.type === 'NAVIGATE') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.label || card.path || '')}</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('${escapeHtml(card.path || '/overview')}')">Open</button></div>`;
+      } else if (card.type === 'SEARCH_RESULTS') {
+        body = `<div class="ura-card-meta">${(card.items || []).length} record(s)</div>
+          <div class="ura-memory-list">${(card.items || []).map((item) => `
+            <div class="ura-memory-row"><span>${escapeHtml(item.title || 'Record')}</span><span class="ura-card-meta">${escapeHtml(item.category || '')}</span></div>
+          `).join('')}</div>`;
+      } else if (card.type === 'COWORKER_TASK') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.status || 'DELEGATED')}${card.task_id ? ` · ${escapeHtml(card.task_id)}` : ''}</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('/coworker')">Open the Co-worker</button></div>`;
+      } else if (card.type === 'APPROVAL_DECISION') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.request_id || '')} · ${escapeHtml(card.status || '')}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" onclick="window.navigateTo('/approvals')">Open approvals</button></div>`;
+      } else if (card.type === 'SETTING_CHANGED') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.key || '')} = ${escapeHtml(JSON.stringify(card.value))}</div>`;
+      } else if (card.type === 'SECURITY_SCAN') {
+        body = `<div class="ura-card-meta">${card.finding_count == null ? 'Findings were not reported.' : `${card.finding_count} finding(s)`}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" onclick="window.navigateTo('/governance')">Open governance</button></div>`;
+      } else if (card.type === 'REPORT_LIST') {
+        body = `<div class="ura-card-meta">${card.count || 0} report(s)</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('/reports')">Open reports</button></div>`;
+      } else if (card.type === 'REPORT_CREATED') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.report_id || '')} · ${escapeHtml(card.title || '')}</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('/reports')">Open reports</button></div>`;
+      } else if (card.type === 'AGENT_BLUEPRINT') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.name || 'Blueprint prepared')} · not activated</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('/agent-factory')">Review in Agent Factory</button></div>`;
+      } else if (card.type === 'INTEGRATION_HANDOFF' || card.type === 'TERMINAL_HANDOFF') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.provider || card.command || '')} · nothing connected automatically</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('${escapeHtml(card.path || '/integrations')}')">Open</button></div>`;
+      } else {
+        body = `<div class="ura-card-meta">${escapeHtml(card.path || '')}</div>`;
+      }
+      return `<div class="ura-card ura-card-tool">
+        <div class="ura-card-title">${title}</div>
+        ${body}
+      </div>`;
+    }
+
     chooseScope(mode, label) {
       this.setScope(mode === 'COMPANY' ? 'COMPANY' : 'PERSONAL');
       if (this.lastPrompt) this.send(this.lastPrompt);
       else if (label) this.send(label);
+    }
+
+    async forgetAllMemories() {
+      try {
+        const res = await fetch(`/api/assistant/memory?scope=${encodeURIComponent(this.scope)}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.messages = this.messages.map((m) => (m.memoryList ? { ...m, memoryList: [] } : m));
+        this.save();
+        this.renderMessages();
+        this.addToolStep(`Forgot ${data.removed || 0} memory item(s)`);
+      } catch (err) {
+        this.addMessage('assistant', `I could not clear saved memory: ${err.message}.`);
+      }
     }
 
     async decideApproval(approvalId, approved) {
@@ -875,6 +981,8 @@
 
     clearConversation() {
       this.messages = [];
+      this.pendingConfirmations = [];
+      this.streamState = null;
       this.sessionId = `ura_${Math.random().toString(36).slice(2, 10)}`;
       this.save();
       this.renderMessages();
@@ -915,6 +1023,28 @@
       if (dot) dot.hidden = state !== 'needs-you';
     }
 
+    pageContext() {
+      const page = this.currentPage();
+      return {
+        page,
+        path: (window.location && window.location.hash) ? window.location.hash.slice(1) : `/${page}`,
+      };
+    }
+
+    setAgentChip(role, label) {
+      this.agentRole = role || null;
+      const chip = document.getElementById('uraAgentChip');
+      if (!chip) return;
+      if (role && label) {
+        chip.hidden = false;
+        chip.textContent = `→ ${label}`;
+        chip.title = `Routing to the ${label}`;
+      } else {
+        chip.hidden = true;
+        chip.textContent = '';
+      }
+    }
+
     async send(text) {
       const input = document.getElementById('uraInput');
       const prompt = (text != null ? text : (input ? input.value : '')).trim();
@@ -931,30 +1061,39 @@
       let failed = false;
       this.setLauncherState('working');
       this.addToolStep('Reading your request', true);
+      this.pendingToolRow = this.messages.length - 1;
+
+      const body = {
+        prompt,
+        workspace_mode: this.scope,
+        company_id: this.scope === 'COMPANY' ? this.getCompanyId() : null,
+        session_id: this.sessionId,
+        page_context: this.pageContext(),
+        attachments: this.pendingAttachments
+      };
 
       try {
-        const companyId = this.getCompanyId();
-        const res = await fetch('/api/assistant/interact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt,
-            workspace_mode: this.scope,
-            company_id: this.scope === 'COMPANY' ? companyId : null,
-            session_id: this.sessionId,
-            attachments: this.pendingAttachments
-          })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        const handled = await this.streamReply(body);
+        if (!handled) {
+          // Older server: fall back to the single-response contract.
+          const data = await this.postInteract(body);
+          this.pendingAttachments = [];
+          const generic = this.pendingToolRow != null ? this.messages[this.pendingToolRow] : null;
+          if (generic && generic.sender === 'tool' && generic.working) {
+            generic.text = 'Checked live app data';
+            generic.working = false;
+            this.renderMessages();
+          } else {
+            this.addToolStep('Checked live app data');
+          }
+          this.addMessage('assistant', data.reply || 'The assistant returned no answer. Nothing was changed.', {
+            deliverable: data.deliverable_card || null,
+            actionCard: data.action_card || null,
+            choices: data.choices || null,
+            citations: data.citations || []
+          });
+        }
         this.pendingAttachments = [];
-        this.addToolStep('Checked live app data');
-        this.addMessage('assistant', data.reply || 'The assistant returned no answer. Nothing was changed.', {
-          deliverable: data.deliverable_card || null,
-          actionCard: data.action_card || null,
-          choices: data.choices || null,
-          citations: data.citations || []
-        });
         this.checkCompanyPermission();
       } catch (err) {
         failed = true;
@@ -969,6 +1108,294 @@
             if (this.launcher && this.launcher.dataset.state !== 'needs-you') this.setLauncherState('idle');
           }, 1200);
         }
+      }
+    }
+
+    async postInteract(body) {
+      const res = await fetch('/api/assistant/interact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    /**
+     * Consume the NDJSON assistant stream.
+     * Returns false when the server does not expose the stream endpoint so the
+     * caller can fall back to the single response endpoint.
+     */
+    async streamReply(body) {
+      const res = await fetch('/api/assistant/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+        body: JSON.stringify(body)
+      });
+      if (res.status === 404 || res.status === 405) return false;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      this.streamState = { message: null, toolIndex: null };
+      if (!res.body || !res.body.getReader) {
+        const text = await res.text();
+        this.consumeLines(text.split('\n'));
+        this.finishStream();
+        return true;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        this.consumeLines(lines);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) this.consumeLines([buffer]);
+      this.finishStream();
+      return true;
+    }
+
+    consumeLines(lines) {
+      for (const raw of lines) {
+        const line = (raw || '').trim();
+        if (!line) continue;
+        let event;
+        try { event = JSON.parse(line); } catch (err) { continue; }
+        this.handleStreamEvent(event);
+      }
+    }
+
+    handleStreamEvent(event) {
+      if (!event || !event.type) return;
+      if (event.type === 'context') {
+        const ctx = event.context || {};
+        if (ctx.agent) this.setAgentChip(ctx.agent, ctx.agent_label);
+        else this.setAgentChip(null, null);
+        if (ctx.page) {
+          const chip = document.getElementById('uraContextChip');
+          const label = PAGE_LABELS[ctx.page] || String(ctx.page);
+          if (chip) chip.innerHTML = `Looking at <b>${escapeHtml(label)}</b>`;
+        }
+        if (ctx.company_name) {
+          const companyChip = document.getElementById('uraCompanyChip');
+          if (companyChip) { companyChip.hidden = false; companyChip.textContent = ctx.company_name; }
+        }
+        return;
+      }
+      if (event.type === 'agent') {
+        this.setAgentChip(event.role, event.label);
+        this.addToolStep(`Routing to the ${event.label}`);
+        return;
+      }
+      if (event.type === 'tool') {
+        const label = event.label || event.tool || 'Working';
+        if (event.status === 'running') {
+          const generic = this.pendingToolRow != null ? this.messages[this.pendingToolRow] : null;
+          if (generic && generic.sender === 'tool' && generic.working && !generic.toolName) {
+            generic.text = label;
+            generic.toolName = event.tool;
+            this.streamState.toolIndex = this.pendingToolRow;
+            this.renderMessages();
+          } else {
+            this.streamState.toolIndex = this.messages.length;
+            this.addToolStep(label, true);
+            this.messages[this.streamState.toolIndex].toolName = event.tool;
+          }
+        } else {
+          const index = this.streamState.toolIndex;
+          const existing = index != null ? this.messages[index] : null;
+          if (existing && existing.sender === 'tool') {
+            existing.text = label;
+            existing.working = false;
+            existing.ok = event.ok !== false;
+            this.renderMessages();
+          } else {
+            this.addToolStep(label, false);
+          }
+        }
+        return;
+      }
+      if (event.type === 'permission') {
+        this.showPermissionState(event);
+        return;
+      }
+      if (event.type === 'confirm') {
+        this.addConfirmation(event);
+        return;
+      }
+      if (event.type === 'answer') {
+        this.appendAnswer(event.delta || '');
+        return;
+      }
+      if (event.type === 'card') {
+        this.attachCard(event.card);
+        return;
+      }
+      if (event.type === 'error') {
+        this.addMessage('assistant', event.message || 'The assistant stream failed. Nothing was executed.');
+        return;
+      }
+      if (event.type === 'done') {
+        if (this.streamState && this.streamState.message) {
+          this.streamState.message.citations = event.citations || this.streamState.message.citations || [];
+          this.streamState.message.agent = event.agent || null;
+          this.save();
+          this.renderMessages();
+        }
+      }
+    }
+
+    showPermissionState(event) {
+      this.renderPermissionBanner();
+      if (event.state === 'NO_COMPANY') {
+        this.addMessage('assistant', event.message || 'Company scope needs a selected company.');
+        return;
+      }
+      this.addToolStep('Company scope is locked');
+      this.addMessage('assistant', event.message || 'Company access is not approved yet. Nothing was read.', {
+        actionCard: { type: 'PERMISSION_REQUIRED', company_id: event.company_id || null }
+      });
+    }
+
+    addConfirmation(event) {
+      this.pendingConfirmations = this.pendingConfirmations || [];
+      const index = this.pendingConfirmations.length;
+      this.pendingConfirmations.push({
+        tool: event.tool,
+        arguments: event.arguments || {},
+        preview: event.preview || ''
+      });
+      this.addMessage('assistant', event.preview || 'This action needs your confirmation.', {
+        confirmationIndex: index,
+        risk: event.risk || 'MEDIUM'
+      });
+    }
+
+    appendAnswer(delta) {
+      if (!this.streamState) this.streamState = { message: null, toolIndex: null };
+      if (!this.streamState.message) {
+        this.streamState.message = this.addMessage('assistant', '', { streaming: true });
+        this.streamState.message = this.messages[this.messages.length - 1];
+      }
+      this.streamState.message.text += delta;
+      this.renderMessages();
+    }
+
+    attachCard(card) {
+      if (!card) return;
+      if (this.streamState && this.streamState.message) {
+        this.streamState.message.card = card;
+      } else {
+        this.addMessage('assistant', '', { card });
+      }
+      this.save();
+      this.renderMessages();
+    }
+
+    finishStream() {
+      if (this.streamState && this.streamState.message) {
+        this.streamState.message.streaming = false;
+      }
+      if (this.pendingToolRow != null) {
+        const generic = this.messages[this.pendingToolRow];
+        if (generic && generic.sender === 'tool' && generic.working) {
+          generic.working = false;
+          generic.text = generic.toolName ? generic.text : 'Checked the request';
+        }
+      }
+      this.streamState = null;
+      this.pendingToolRow = null;
+      this.save();
+      this.renderMessages();
+    }
+
+    async confirmTool(index) {
+      const pending = (this.pendingConfirmations || [])[index];
+      if (!pending) return;
+      this.addToolStep(`Confirmed: ${pending.preview || pending.tool}`, true);
+      try {
+        const res = await fetch('/api/assistant/tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: pending.tool,
+            arguments: pending.arguments,
+            workspace_mode: this.scope,
+            company_id: this.scope === 'COMPANY' ? this.getCompanyId() : null
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          throw new Error((data.result && data.result.summary) || data.error || `HTTP ${res.status}`);
+        }
+        const result = data.result || {};
+        this.addToolStep(result.summary || 'Action completed', false);
+        this.addMessage('assistant', result.summary || 'Action completed.', { card: result.card || null });
+      } catch (err) {
+        this.addMessage('assistant', `The action did not complete: ${err.message}. Nothing changed.`);
+      }
+    }
+
+    // ---------------------------------------------------------------- memory
+    async rememberLast() {
+      const lastUser = [...this.messages].reverse().find((m) => m.sender === 'user');
+      if (!lastUser) {
+        this.addMessage('assistant', 'There is nothing to remember yet. Ask or tell me something first.');
+        return;
+      }
+      const content = lastUser.text;
+      try {
+        const res = await fetch('/api/assistant/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, scope: this.scope, session_id: this.sessionId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+        this.addToolStep('Saved to memory');
+        this.addMessage('assistant', `I will remember: “${content}”.`);
+      } catch (err) {
+        this.addMessage('assistant', `I could not save that memory: ${err.message}. Nothing was stored.`);
+      }
+    }
+
+    async openMemory() {
+      try {
+        const res = await fetch(`/api/assistant/memory?scope=${encodeURIComponent(this.scope)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        const memories = data.memories || [];
+        this.addMessage('assistant', memories.length
+          ? `I am holding ${memories.length} saved ${this.scope.toLowerCase()} memory item(s).`
+          : 'I am not holding any saved memory for this scope yet.', {
+          memoryList: memories,
+          memoryScope: this.scope
+        });
+      } catch (err) {
+        this.addMessage('assistant', `I could not read saved memory: ${err.message}.`);
+      }
+    }
+
+    async forgetMemory(memoryId) {
+      try {
+        const res = await fetch(`/api/assistant/memory/${encodeURIComponent(memoryId)}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.messages = this.messages.map((m) => (
+          m.memoryList ? { ...m, memoryList: m.memoryList.filter((x) => x.memory_id !== memoryId) } : m
+        ));
+        this.save();
+        this.renderMessages();
+        this.addToolStep('Forgot one memory item');
+      } catch (err) {
+        this.addMessage('assistant', `I could not forget that memory: ${err.message}.`);
       }
     }
 

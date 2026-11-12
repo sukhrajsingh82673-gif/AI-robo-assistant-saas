@@ -162,4 +162,90 @@ test('no fabricated Meet link generator remains in the assistant UI', () => {
   assert.ok(!js.includes('+1 415-555-0199'));
 });
 
+// ---------------------------------------------------------------------------
+// Stage 2 — streaming service, typed tools, agents, memory, confirmations
+// ---------------------------------------------------------------------------
+
+test('the browser consumes the NDJSON assistant stream with a fallback', () => {
+  assert.ok(js.includes('/api/assistant/stream'));
+  assert.ok(js.includes('getReader()'));
+  assert.ok(js.includes('consumeLines'));
+  assert.ok(js.includes('handleStreamEvent'));
+  assert.ok(js.includes("event.type === 'tool'"));
+  assert.ok(js.includes("event.type === 'confirm'"));
+  assert.ok(js.includes('page_context'));
+  assert.ok(js.includes('/api/assistant/interact'));
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(service.includes('def stream('));
+  assert.ok(service.includes('"type": "tool"'));
+  assert.ok(service.includes('"type": "answer"'));
+  assert.ok(service.includes('"type": "done"'));
+});
+
+test('typed tools are gated, previewed and executed only after confirmation', () => {
+  const service = read('core/ura_assistant_service.py');
+  for (const tool of [
+    'navigate', 'query_data', 'delegate_task', 'decide_approval',
+    'change_setting', 'run_security_scan', 'generate_report',
+    'install_agent', 'connect_integration', 'run_terminal'
+  ]) {
+    assert.ok(service.includes(`"${tool}"`), `missing typed tool ${tool}`);
+  }
+  assert.ok(service.includes('def execute_tool('));
+  assert.ok(service.includes('requires_confirmation') || service.includes('mutating'));
+  assert.ok(js.includes('/api/assistant/tool'));
+  assert.ok(js.includes('confirmTool'));
+  assert.ok(js.includes('data-confirm-index'));
+});
+
+test('company scope requires an approved cowork permission and never fakes it', () => {
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(service.includes('(kind:'));
+  assert.ok(service.includes('cowork)'));
+  assert.ok(service.includes('company_permission'));
+  assert.ok(service.includes('request_company_permission'));
+  assert.ok(service.includes('PERMISSION_REQUIRED'));
+  assert.ok(js.includes('Company scope is locked'));
+});
+
+test('agent routing supports the six executive roles', () => {
+  const service = read('core/ura_assistant_service.py');
+  for (const role of ['CEO', 'COO', 'CMO', 'CTO', 'CFO', 'CHRO']) {
+    assert.ok(service.includes(`"${role}": {`), `missing agent ${role}`);
+  }
+  assert.ok(service.includes('resolve_agent'));
+  assert.ok(js.includes('setAgentChip'));
+  assert.ok(js.includes('uraAgentChip'));
+});
+
+test('memory has remember, list, forget and clear paths', () => {
+  assert.ok(js.includes("data-plus=\"remember\""));
+  assert.ok(js.includes("data-plus=\"memory\""));
+  assert.ok(js.includes('/api/assistant/memory'));
+  assert.ok(js.includes('rememberLast'));
+  assert.ok(js.includes('openMemory'));
+  assert.ok(js.includes('forgetMemory'));
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(service.includes('def remember('));
+  assert.ok(service.includes('def list_memories('));
+  assert.ok(service.includes('def forget('));
+  assert.ok(service.includes('def clear_memories('));
+  const server = read('api_server.py');
+  assert.ok(server.includes('/api/assistant/stream'));
+  assert.ok(server.includes('/api/assistant/tool'));
+  assert.ok(server.includes('/api/assistant/memory'));
+  assert.ok(server.includes('/api/assistant/permission'));
+});
+
+test('stream events are honest about permissions and confirmations', () => {
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(service.includes('Nothing was read from company data'));
+  assert.ok(service.includes('I have not executed it'));
+  const server = read('api_server.py');
+  assert.ok(server.includes('The assistant stream failed. Nothing was executed.'));
+  assert.ok(service.includes('def _tool_connect_integration'));
+  assert.ok(service.includes('cannot complete it from chat'));
+  assert.ok(service.includes('Terminal commands are not executed from the assistant chat'));
+});
+
 console.log(`\n${passed} URA Assistant UI contract tests passed.`);

@@ -759,6 +759,38 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _start_ndjson(self):
+        """Begin a chunked NDJSON stream (assistant events)."""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, no-transform")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Transfer-Encoding", "chunked")
+        self._apply_cors_headers()
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self._ndjson_open = True
+
+    def _write_ndjson(self, event):
+        if not getattr(self, "_ndjson_open", False):
+            self._start_ndjson()
+        try:
+            payload = (json.dumps(event, default=str) + "\n").encode("utf-8")
+            chunk = f"{len(payload):X}\r\n".encode("ascii") + payload + b"\r\n"
+            self.wfile.write(chunk)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            self._ndjson_open = False
+
+    def _end_ndjson(self):
+        if getattr(self, "_ndjson_open", False):
+            try:
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            self._ndjson_open = False
+
     def _send_file_bytes(self, file_bytes: bytes, filename: str, content_type: str = "application/octet-stream", status=200):
         req_id = getattr(self, "_request_id", None) or f"req_{uuid.uuid4().hex[:10]}"
         try:
@@ -2484,6 +2516,29 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(file_path, "rb") as f:
                 content_bytes = f.read()
             self._send_file_bytes(content_bytes, filename=filename, content_type=content_type)
+            return
+
+        elif path == "/api/assistant/memory":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            scope = (query_params.get("scope", [None])[0] or "PERSONAL").upper()
+            if scope not in ("PERSONAL", "COMPANY"):
+                scope = "PERSONAL"
+            if scope == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            q = query_params.get("q", [None])[0]
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            memories = svc.list_memories(
+                uid,
+                scope=scope,
+                company_id=company_id if scope == "COMPANY" else None,
+                query=q,
+            )
+            self._send_json({"memories": memories, "count": len(memories), "scope": scope})
             return
 
         elif path == "/api/assistant/history":
@@ -6209,6 +6264,127 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         # Prompt 03: Floating Live Assistant & Coworker POST Handlers
         # =====================================================================
+        elif path == "/api/assistant/stream":
+            # The one streaming assistant service.  Events are NDJSON so the
+            # browser can render tool steps, confirmations and answer chunks as
+            # they happen instead of waiting for a single JSON blob.
+            prompt = str(req_data.get("prompt", ""))
+            ws_mode = str(req_data.get("workspace_mode", "PERSONAL")).upper()
+            if ws_mode not in ("AUTO", "PERSONAL", "COMPANY"):
+                ws_mode = "PERSONAL"
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            if ws_mode == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            page_context = req_data.get("page_context") if isinstance(req_data.get("page_context"), dict) else {}
+            agent_role = req_data.get("agent_role")
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            started = False
+            try:
+                self._start_ndjson()
+                started = True
+                events = svc.stream(
+                    prompt=prompt,
+                    user_id=uid,
+                    workspace_mode=ws_mode,
+                    company_id=company_id if ws_mode == "COMPANY" else None,
+                    page_context=page_context,
+                    session_id=req_data.get("session_id"),
+                    agent_role=agent_role,
+                    attachments=req_data.get("attachments") or [],
+                )
+                for event in events:
+                    self._write_ndjson(event)
+            except Exception as exc:
+                logger.exception("Assistant stream failed")
+                if started:
+                    self._write_ndjson({
+                        "type": "error",
+                        "message": "The assistant stream failed. Nothing was executed.",
+                        "detail": type(exc).__name__,
+                    })
+                else:
+                    self._send_json({"error": "Assistant stream failed"}, status=500)
+            finally:
+                self._end_ndjson()
+            return
+
+        elif path == "/api/assistant/tool":
+            # Executes one confirmed typed tool from the assistant's action card.
+            name = str(req_data.get("tool") or "").strip()
+            arguments = req_data.get("arguments") if isinstance(req_data.get("arguments"), dict) else {}
+            ws_mode = str(req_data.get("workspace_mode", "PERSONAL")).upper()
+            if ws_mode not in ("PERSONAL", "COMPANY"):
+                ws_mode = "PERSONAL"
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            if ws_mode == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.ura_assistant_service import TOOL_SPECS, URAAssistantService
+            spec = TOOL_SPECS.get(name)
+            if not spec:
+                self._send_json({"error": "Unknown tool", "tool": name}, status=400)
+                return
+            if name == "decide_approval" and self._approver_denied(auth_context):
+                return
+            if name == "run_terminal" and self._blocked_by_global_killswitch("terminal execution"):
+                return
+            svc = URAAssistantService(tenant_id=tenant_id)
+            result = svc.execute_tool(
+                name,
+                arguments,
+                user_id=uid,
+                scope=ws_mode,
+                company_id=company_id if ws_mode == "COMPANY" else None,
+                role=str(auth_context.get("role") or ""),
+            )
+            self._send_json({"success": bool(result.get("ok")), "tool": name, "result": result})
+            return
+
+        elif path == "/api/assistant/permission":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            if not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.request_company_permission(company_id, uid)
+            self._send_json(res, status=200 if res.get("success") else 409)
+            return
+
+        elif path == "/api/assistant/memory":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            scope = str(req_data.get("scope", "PERSONAL")).upper()
+            if scope not in ("PERSONAL", "COMPANY"):
+                scope = "PERSONAL"
+            if scope == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.remember(
+                content=str(req_data.get("content") or ""),
+                user_id=uid,
+                scope=scope,
+                company_id=company_id if scope == "COMPANY" else None,
+                source_session_id=req_data.get("session_id"),
+            )
+            self._send_json(res, status=200 if res.get("success") else 400)
+            return
+
         elif path == "/api/assistant/interact":
             prompt = str(req_data.get("prompt", ""))
             ws_mode = str(req_data.get("workspace_mode", "AUTO")).upper()
@@ -9554,6 +9730,34 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self._send_json({"error": "Not Found", "detail": f"Deal '{deal_id}' not found in tenant"}, status=404)
             except KeyError as e:
                 self._send_json({"error": "Not Found", "detail": str(e)}, status=404)
+            return
+        elif path == "/api/assistant/memory":
+            uid = str(auth_ctx.get("user_id") or auth_ctx.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            parsed_q = urllib.parse.parse_qs(parsed.query)
+            scope = (parsed_q.get("scope", [None])[0] or "PERSONAL").upper()
+            if scope not in ("PERSONAL", "COMPANY"):
+                scope = "PERSONAL"
+            if scope == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.clear_memories(uid, scope)
+            self._send_json(res)
+            return
+        elif path.startswith("/api/assistant/memory/"):
+            memory_id = path.split("/")[4] if len(path.split("/")) > 4 else ""
+            uid = str(auth_ctx.get("user_id") or auth_ctx.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.forget(memory_id, uid)
+            self._send_json(res, status=200 if res.get("success") else 404)
             return
         self._send_json({"error": "Method not allowed or endpoint not found"}, status=404)
 

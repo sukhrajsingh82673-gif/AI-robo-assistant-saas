@@ -85,7 +85,64 @@ employee/agent workspace; the assistant opens it from the “+” menu.
 - Playwright/Chromium is not installed in this environment, so browser
   screenshots and the Playwright e2e run remain pending (see Stage 5).
 
-## Stage 2 — intelligent service (pending)
+## Stage 2 — intelligent service (complete)
+
+**One service.** `core/ura_assistant_service.py` now owns the assistant brain:
+deterministic planning, typed tools, scope gating, agent routing, memory and an
+NDJSON event stream. The browser (`web/ura_assistant.js`) consumes
+`POST /api/assistant/stream` incrementally and falls back to
+`POST /api/assistant/interact` on an older server.
+
+**Stream events.** `context`, `agent`, `tool` (running/done/blocked), `permission`,
+`confirm`, `answer` chunks, `card`, `done`, `error`. The HTTP layer emits chunked
+`application/x-ndjson` (`_start_ndjson` / `_write_ndjson` / `_end_ndjson`).
+
+**Typed tools** (`TOOL_SPECS`, all with a JSON parameter schema, `mutating` and
+`scope`): `navigate`, `query_data`, `delegate_task`, `decide_approval`,
+`change_setting`, `run_security_scan`, `generate_report`, `install_agent`,
+`connect_integration`, `run_terminal`. Each tool delegates to the existing
+implementation (`GlobalSearchEngine`, `create_coworker_task`,`ApprovalPipeline`,
+`settings_service`, `DefensiveCybersecurityMonitor`, `EnterpriseReportsEngine`,
+`EnterpriseAgentFactory`). Nothing is fabricated: a refused or unavailable tool
+returns a blocked result.
+
+**Planning is deterministic.** A regex/intent map picks the executing tool; the
+model may compose prose but never chooses an executing tool. Navigation
+intent wins over search so "open reports" is a screen change.
+
+**App awareness.** Every request carries `page_context` (screen key, hash path);
+the service names the current screen in its answer and the window shows a
+"Looking at …" chip.
+
+**Personal / Company scope.** Personal is the private sandbox. Company scope is
+locked until an `APPROVED` approval whose `action_desc` contains
+"URA Assistant" and "(kind: cowork)" exists; otherwise the stream emits a
+`permission` event and stops without reading company data. "Ask the AI CEO" files
+the cowork request through `POST /api/assistant/permission`.
+
+**Agent routing.** `@CEO/@COO/@CMO/@CTO/@CFO/@CHRO` (and "chief …" aliases) resolve
+to a role chip, change the answer's remit, and route delegation/query arguments.
+An unknown role is refused rather than silently ignored.
+
+**Memory.** Explicit only: `assistant_memory` table plus
+`GET/POST /api/assistant/memory` and
+`DELETE /api/assistant/memory[/{id}]`. "Remember this", "Saved memory" and
+"Forget all" in the "+" menu. Scoped per user (and per company for company
+memory); the model never writes memory on its own.
+
+**Safety.** Mutating tools never execute on the first turn. The stream returns a
+`confirm` event with a preview and risk; the UI renders a confirmation card and
+only `POST /api/assistant/tool` executes it, re-checking scope, approver role and
+the global killswitch. Terminal and integration connections are explicit
+handoffs to their governed screens.
+
+**Gates (after the final Stage 2 edit).**
+- `npm run typecheck`: 60 JavaScript files parsed.
+- `npm run lint`: assistant consolidation checks passed.
+- `npm run build`: passed.
+- `npm run test:assistant`: 24 static contract tests + 10 jsdom checks +
+  18 pytest service tests passed.
+- Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
 ## Stage 3 — background work and research (pending)
 

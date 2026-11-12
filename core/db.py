@@ -4088,6 +4088,20 @@ CREATE TABLE IF NOT EXISTS assistant_messages (
 CREATE INDEX IF NOT EXISTS idx_asst_msg_session ON assistant_messages(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_asst_msg_tenant_user ON assistant_messages(tenant_id, user_id);
 
+-- 48a. Assistant explicit memory (the owner's saved preferences and facts)
+CREATE TABLE IF NOT EXISTS assistant_memory (
+    memory_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL' | 'COMPANY'
+    content TEXT NOT NULL,
+    source_session_id TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_memory_user
+    ON assistant_memory(tenant_id, user_id, created_at);
+
 -- 48b. Assistant Generated Deliverables & Documents (Personal & Company Isolated)
 CREATE TABLE IF NOT EXISTS assistant_generated_documents (
     doc_id TEXT PRIMARY KEY,
