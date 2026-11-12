@@ -17,8 +17,12 @@ route/menu/tab/palette audit, fixed-overlay audit, server capabilities and the
 stage-by-stage plan are in `docs/ui-redesign/ASSISTANT.md`.
 
 **Decisions.**
-- One launcher/window. Old `/assistant`, `/ceo`, `/coworker` and `/meeting`
-  links open it.
+- One launcher/window. Old `/assistant`, `/ceo` and `/meeting` links open it.
+- **The Co-worker stays.** It is an agent/employee workspace with real mission,
+  fleet, approval, terminal and node capabilities. Keep its menu entry,
+  `view-coworker`, `/coworker` route, `assistant_coworker_workspace.js` and
+  `apple_coworker_assistant.js`. The assistant links to it; it is not mounted as
+  a second chat.
 - The CEO console's non-chat sections are preserved at `/company/ceo-records`;
   only its chat and menu entry are removed.
 - Reuse `FloatingAssistantService`, the coworker task/permission API, the
@@ -38,8 +42,9 @@ stage-by-stage plan are in `docs/ui-redesign/ASSISTANT.md`.
 - added `docs/ui-redesign/ASSISTANT.md`
 - added `docs/ui-redesign/PROGRESS.md`
 
-**Next.** Stage 1: remove the four old surfaces, add the launcher/window and
-aliases, one global bottom clearance, update tests.
+**Next.** Stage 1: remove the Ask URA bar and AI CEO chat, add the launcher/window
+and aliases, one global bottom clearance, update tests. The Co-worker screen is
+preserved.
 
 ## Stage 1 — shell (pending)
 

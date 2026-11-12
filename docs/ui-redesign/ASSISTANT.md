@@ -9,11 +9,19 @@ Sources read: `AGENTS.md` (not present on this branch), `docs/ui-redesign/SPEC.m
 audit exists only on `fix/green-baseline`). The prototype has no floating
 launcher: the launcher and window in this task are new.
 
-There is **one code base, four competing assistant surfaces** plus two
+There is **one code base with three competing assistant surfaces** plus two
 assistant-shaped screens. `web/index.html` mounts a fixed "Ask URA" bar, a
 fixed floating ZONATA AI assistant, an "AI CEO" console with a chat box, and a
-"Coworker 2.0" screen. Only the floating assistant is wired to a real backend
+"Co-worker" screen. Only the floating assistant is wired to a real backend
 (`/api/assistant/interact`); the Ask URA bar returns a fabricated answer.
+
+**Co-worker correction (user decision).** The Co-worker is not an assistant to
+delete. It is an agent/employee workspace with real mission, fleet, approval,
+terminal and node capabilities. It keeps its menu entry, route, screen and
+renderers; the URA Assistant is the conversational front door and links to the
+Co-worker for execution work. The "exactly one assistant" rule therefore
+removes the Ask URA bar, the floating assistant, and the AI CEO chat, not the
+Co-worker.
 
 ## 1. Surface inventory
 
@@ -21,14 +29,14 @@ fixed floating ZONATA AI assistant, an "AI CEO" console with a chat box, and a
 |---|---------|-------|--------------------|----------|------|
 | 1 | Fixed "Ask URA" spotlight bar | `web/index.html:398-409`; `.ask-ura-bar-wrap` `web/app_shell.css:260-323`; `AppShell.openAskUra` / `submitAskUra` `web/app_shell.js:94-190`; `AppShell.init` Cmd/Ctrl+K `web/app_shell.js:15-23` | Fixed to the bottom-centre of every page. Opens a modal, then streams a **hard-coded** answer (`₹4,28,500`, "2 pending executive approvals", fake leak amount). Second Cmd/Ctrl+K listener conflicts with `app.js`. | **Remove** | Delete the markup, CSS and fake modal. Replace with the one URA Assistant launcher. Cmd/Ctrl+K stays search; Cmd/Ctrl+J opens the assistant. |
 | 2 | Floating ZONATA AI assistant (FAB + flyout) | `web/index.html:431-432`; `web/floating_assistant.js` (919 lines); CSS `web/styles.css:4663-5200`; init `web/app.js:1068-1069`; `/assistant` route `web/app.js:713-719` | Draggable 4-corner FAB with persisted corner, flyout window, scope AUTO/PERSONAL/COMPANY, attachments, document cards, meeting cards, approval cards, emergency stop, status polling. Calls `/api/assistant/interact`, `/api/assistant/documents/upload`, `/api/assistant/emergency-stop`, `/api/approvals/{id}/decision`, `/api/v2/coworker/status`. | **Merge** | Keep and port the working logic (drag/snap/persist, upload, approvals, emergency stop, document/meeting cards, honest failure states) into the new window. Replace old markup/CSS with the new glass window; keep `#floatingAssistantContainer` only as the launcher mount (renamed). |
-| 3 | "Coworker 2.0" screen | Nav `web/index.html:79-85`; section `:357`; route `/coworker` `web/app.js:721,787-788`; `web/assistant_coworker_workspace.js` (missions, HUD, terminal, co-worker cockpit); sample conversation `web/apple_coworker_assistant.js` | Full-page Jarvis screen and a sample chat; coworker task lifecycle lives on the server (`/api/assistant/coworker/task(s)`). | **Remove screen/menu/route; merge logic** | Delete the nav item, section, route and sample renderer. Move Personal/Company scope, permission request (approval of kind `cowork`), browser/desktop automation toggles and recent actions into the assistant's scope control. Old `/coworker` and `/workspace/coworkers` links call `URAAssistant.open('cowork')`. |
+| 3 | "Coworker 2.0" screen (agent / employee) | Nav `web/index.html:79-85`; section `:357`; route `/coworker` `web/app.js:721,787-788`; `web/assistant_coworker_workspace.js` (Coworker 3.0 cockpit, mission pipeline, fleet HUD, approvals, governed terminal, activity, artifacts, nodes); `web/apple_coworker_assistant.js` | A full agent/employee workplace: autonomous missions, 7-stage pipeline, agent cloud, OpenCode/Hermes execution, security patrol, approvals, terminal and fleet nodes. The conversational sample in `apple_coworker_assistant.js` is not mounted by the router. | **Keep (do not remove)** | Keep the nav item, `view-coworker`, `/coworker` route, the workspace manager, its tabs, and all mission/terminal/fleet APIs. The Co-worker is an employee/agent surface, not an assistant: it stays a destination screen. From the URA Assistant, "Manage Co-worker" / delegation cards link to it. The assistant's Company scope uses the same coworker task/permission APIs. Do not delete `apple_coworker_assistant.js`; it stays as the Co-worker's execution narrative and must not be mounted as a second chat. |
 | 4 | "AI CEO" console chat (the "Ask CEO" surface) | Nav `web/index.html:190-195`; `/ceo`, `/ai-ceo`, `/workspace/ai-ceo` `web/app.js:693-695`; chat box `web/ai_ceo_workspace.js:229-245`; `sendQuickCommand` → `/api/v8/chat` `:1667-1700`; Overview link `web/overview_workspace.js:1649-1650`; prototype `pgCeo`, `ceoReply`, `sendChat`, `addTask` | A chat box inside a 14-section executive console. Replies come from the real CEO conversation endpoint (`/api/v8/chat`) with model/evidence metadata. | **Remove chat; merge** | Delete the chat box, suggested chips and `/ceo` menu item. `/ceo` (and aliases) open the assistant instead. The assistant becomes the only place to chat with the CEO. |
 | 5 | AI CEO console body (14 sections) | `web/ai_ceo_workspace.js` (strategy, objectives, departments, workforce, missions, KPIs, finance, risks, opportunities, decisions, approvals, evidence, reports, plus capital/contracts/scenarios/constitution) | Executive operating console backed by `/api/v8/*`. Not an assistant, but it would be lost if `/ceo` were deleted. | **Keep, re-home** | Preserve every section as a non-assistant screen at `/company/ceo-records` ("AI CEO records"), linked from Company and Governance. Remove only its chat pane and its "AI CEO" menu entry. List in the final report. |
 | 6 | "AI CEO Meeting Room" | Route `/meeting`, `/ceo/meeting` `web/app.js:731,822-823`; `web/meeting_room_workspace.js` (648 lines); no menu item; real meeting APIs | Video/voice room with live transcript, decisions and reports. Dead route, no menu entry. | **Remove screen/route; merge** | Fold briefs, live notes/transcript, summaries, decisions and action items into the assistant's Meetings area. Old `/meeting` links open the assistant in Meetings. Keep all `/api/meetings/*` endpoints. |
 | 7 | "AI Company Discovery" panel | `web/company_workspace.js:661+` | Onboarding discovery actions for websites/public data/documents. Not a chat assistant. | **Keep** | No change; it is part of the company intake flow. |
 | 8 | `ai_orb.js` | `web/ai_orb.js`; used by auth, onboarding hero, entity tiles and the old Ask URA bar | Decorative assistant orb (idle/listening/speaking states). | **Keep, reuse** | Keep for onboarding/entity tiles. The new launcher uses the sparkle glyph and its own working ring; the orb is not a second assistant entry point. |
 | 9 | Design preview link | `web/design_preview_workspace.js:343-345` | Button "Open Co-Worker Assistant (/assistant)". | **Update** | Point at the new assistant and rename the label. |
-| 10 | Sample coworker conversation | `web/apple_coworker_assistant.js` (INITIAL_MESSAGES) | Example chat with a fabricated ₹45,000/₹1,20,000 answer. | **Remove** | Not used by the new assistant; delete the file's registration (or gate behind `USE_SAMPLE_DATA`). Never show sample amounts as live. |
+| 10 | Coworker execution sample | `web/apple_coworker_assistant.js` (INITIAL_MESSAGES) | A sample Personal/Company conversation with fabricated amounts. Not routed today; the real Co-worker screen is item 3. | **Keep file, not as an assistant** | Preserve the file and its Co-worker control vocabulary; do not mount it as a chat and do not show its sample amounts as live data. If it is ever surfaced, it must be clearly labelled sample content. |
 
 ## 2. Routes, menu, tab bar and palette
 
@@ -36,11 +44,11 @@ fixed floating ZONATA AI assistant, an "AI CEO" console with a chat box, and a
 |------|-------|----------|
 | `/assistant` | `web/app.js:713-719` | Keep as an alias that opens the launcher (no page). |
 | `/ceo`, `/ai-ceo`, `/workspace/ai-ceo`, `/workspace/ceo` | `web/app.js:693-695` | Open the assistant (and remove the nav item). Console moves to `/company/ceo-records`. |
-| `/coworker`, `/workspace/coworkers` | `web/app.js:721,695` | Open the assistant in Company scope (permission card if not granted). |
+| `/coworker`, `/workspace/coworkers` | `web/app.js:721` | **Keep.** The Co-worker is an agent/employee screen, not an assistant surface. The assistant links to it. |
 | `/meeting`, `/ceo/meeting` | `web/app.js:731` | Open the assistant in Meetings. |
-| Nav "Coworker 2.0" | `web/index.html:79-85` | Remove. |
-| Nav "AI CEO" | `web/index.html:190-195` | Remove; add "AI CEO records" link in Company/Governance. |
-| Breadcrumbs `assistant`, `coworker`, `ceo`, `meeting` | `web/app.js:485-512` | Remove those labels; the assistant is an overlay and never a breadcrumb. |
+| Nav "Coworker 2.0" | `web/index.html:79-85` | **Keep.** The Co-worker is a first-class agent/employee workspace. |
+| Nav "AI CEO" | `web/index.html:190-195` | Replace with "AI CEO records" (same console, no chat). |
+| Breadcrumbs `assistant`, `ceo`, `meeting` | `web/app.js:485-512` | Remove those assistant labels; the assistant is an overlay and never a breadcrumb. Keep `coworker` (a real screen). |
 | Phone bottom tab bar | `web/index.html:435-452` (Home, Work, Records, Menu) | Five tabs with **Assistant in the middle**: Home, Work, Assistant, Records, Menu. It opens the bottom sheet. |
 | Command palette | `web/index.html` `#globalSearchInput`; `/api/search` `web/app.js:930-1000` | Keep search; add the command "Ask the assistant" (and "Open assistant"). The palette closes before the window opens. |
 | Keyboard | Cmd/Ctrl+K search (`app.js:1004-1011`, `app_shell.js:15-23`); no assistant shortcut | Keep one Cmd/Ctrl+K listener; add Cmd/Ctrl+J for the assistant; Esc minimises the window. |
@@ -94,8 +102,12 @@ Only the launcher, toasts and the phone tab bar may be fixed to the bottom.
   - Top bar sparkle, Cmd/Ctrl+J, palette command, `/assistant`, `/ceo`,
     `/coworker`, `/meeting` aliases.
   - Global bottom clearance on the workspace scroll area.
-- Remove the Ask URA bar, fake modal, Coworker screen/route/nav, AI CEO
-  chat box/nav/route, Meeting Room route, sample coworker chat.
+- Remove the Ask URA bar and fake modal, the AI CEO chat box and its menu
+  entry (the console moves to `/company/ceo-records`), and the Meeting Room
+  route. **Do not remove the Co-worker screen, nav item, route or workspace.**
+  It remains the agent/employee execution surface and the assistant links to it.
+- Keep `apple_coworker_assistant.js` for the Co-worker's execution narrative but
+  do not mount it as a second assistant chat.
 - Re-home the CEO console at `/company/ceo-records`.
 - Update `tests/assistant_floating_ui_test.js` and add a jsdom smoke test for
   launcher/window modes, drag/snap persistence, keyboard and removal of old
@@ -159,7 +171,8 @@ To be listed in `STUBS.md` when built:
 ## 7. Fake-data findings to remove with the merge
 
 - `web/app_shell.js:169-173` fabricated profit/approvals/leak answer.
-- `web/apple_coworker_assistant.js` sample conversation with invented amounts.
+- `web/apple_coworker_assistant.js` sample conversation: keep the file for the
+  Co-worker, but never mount it as a chat or present its sample amounts as live.
 - `web/ceo_command_center.js:61+` hard-coded department metrics (adjacent, not
   an assistant; flag for the redesign backlog).
 - `web/ai_ceo_workspace.js` shows `model_used` from the API; keep only real
