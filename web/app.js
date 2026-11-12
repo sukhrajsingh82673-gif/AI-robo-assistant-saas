@@ -4,6 +4,12 @@
  * Zero Mock Data Failure • Pure Dynamic State • Local & Live API Synced
  */
 
+// The only switch for sample content in the app. Off by default: every screen
+// must use live API data or an honest empty state. Named samples (pipeline
+// board, report previews) are kept for demos only and are listed in
+// docs/ui-redesign/STUBS.md. Never enable this in production.
+window.USE_SAMPLE_DATA = false;
+
 // ============================================================================
 // Global Authenticated Fetch Interceptor
 // Injects Bearer token and X-Tenant-ID headers on all internal /api/ requests
@@ -897,12 +903,13 @@ function handleRoute(path) {
 
 // Event Listeners
 function setupEventListeners() {
-  // Navigation clicks
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const targetNav = item.getAttribute('data-nav');
-      if (targetNav) window.navigateTo(`/${targetNav}`);
-    });
+  // Navigation clicks (delegated: the sidebar is rebuilt when menu
+  // visibility changes, so per-item listeners would be lost)
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.nav-item[data-nav]');
+    if (!item) return;
+    const targetNav = item.getAttribute('data-nav');
+    if (targetNav) window.navigateTo(`/${targetNav}`);
   });
 
   // Router hash listener

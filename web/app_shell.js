@@ -14,13 +14,28 @@
     }
 
     init() {
-      // Global shortcut listener for ⌘K and Ctrl+K
+      // The URA shell owns the command palette. Keep this shortcut working even
+      // if this legacy controller is still mounted.
       document.addEventListener('keydown', (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
           e.preventDefault();
+          if (window.URAShell && window.URAShell.openPalette) {
+            window.URAShell.openPalette();
+            return;
+          }
           this.openAskUra();
         }
       });
+    }
+
+    openAskUra() {
+      // The new UI chats with the CEO on a real screen. The old modal is kept
+      // only as a fallback when the URA layer has not loaded.
+      if (window.URAShell) {
+        window.navigateTo('/ask-ceo');
+        return;
+      }
+      this.openAskUraModal();
     }
 
     toggleSidebarCollapse() {
@@ -85,7 +100,7 @@
       }
     }
 
-    openAskUra() {
+    openAskUraModal() {
       if (!window.UI || !window.UI.openModal) return;
 
       const starterQuestions = [
@@ -142,7 +157,7 @@
       }, 100);
     }
 
-    submitAskUra(query) {
+    async submitAskUra(query) {
       if (!query || !query.trim()) return;
       const input = document.getElementById('askUraModalInput');
       if (input) input.value = query;
@@ -152,17 +167,33 @@
       if (!replyArea || !streamEl) return;
 
       replyArea.style.display = 'block';
-      streamEl.innerHTML = '<span class="status-pulse-dot"></span> Thinking...';
+      streamEl.innerHTML = '<span class="status-pulse-dot"></span> Asking the CEO service...';
 
-      // Simulate streaming AI answer with citation chips
-      setTimeout(() => {
-        let answer = `Everything in your company is running smoothly. Today's profit stands at ₹4,28,500 (+12% vs last week). There are 2 pending executive approvals in your queue for marketing campaign deployment.`;
-        if (query.toLowerCase().includes('losing money') || query.toLowerCase().includes('leak')) {
-          answer = `We identified about ₹1,85,000 per month in abandoned checkout drop-offs and competitor undercutting in the DACH territory. Review the analysis on the Executive Overview page.`;
+      // The old build scripted an answer here. This now calls the real CEO
+      // endpoint and reports an honest connection error instead of inventing
+      // profit figures or approval counts.
+      try {
+        const res = await fetch('/api/v8/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: query.trim() })
+        }).then(r => r.json());
+
+        const reply = res.reply || {};
+        const answer = reply.answer || res.answer;
+        if (!res.success || !answer) {
+          throw new Error(res.error || res.detail || 'The CEO service returned no answer.');
         }
 
         streamEl.innerHTML = '';
-        const words = answer.split(' ');
+        const meta = [
+          reply.model_used,
+          reply.epistemic_classification,
+          reply.evidence_digest ? 'Evidence ' + String(reply.evidence_digest).slice(0, 18) : ''
+        ].filter(Boolean).join(' · ');
+
+        // Keep the short reveal, but reveal the real answer rather than a script.
+        const words = String(answer).split(' ');
         let idx = 0;
         const interval = setInterval(() => {
           if (idx < words.length) {
@@ -170,14 +201,23 @@
             idx++;
           } else {
             clearInterval(interval);
+            if (meta) {
+              streamEl.innerHTML += `<div style="margin-top:8px;font-size:11px;color:var(--label-3);">${escapeHtml(meta)}</div>`;
+            }
             streamEl.innerHTML += `
               <div style="margin-top:12px; display:flex; gap:8px;">
-                <span class="chip-apple chip-accent" style="cursor:pointer;" onclick="window.navigateTo('/overview'); UI.closeModal();">View In Overview →</span>
+                <span class="chip-apple chip-accent" style="cursor:pointer;" onclick="window.navigateTo('/ask-ceo'); UI.closeModal();">Open Ask CEO →</span>
               </div>
             `;
           }
-        }, 40);
-      }, 450);
+        }, 20);
+      } catch (err) {
+        streamEl.innerHTML = `<div style="color:var(--red);font-size:13px;line-height:1.55;">
+          <b>Could not reach the CEO service.</b><br>${escapeHtml(err.message || 'Unknown error')}<br>
+          <span style="color:var(--label-2);">Nothing is being simulated. Check the connection and try again.</span>
+        </div>
+        <div style="margin-top:10px;"><button class="btn-apple btn-apple-secondary" onclick="AppShell.submitAskUra(${JSON.stringify(query).replace(/"/g, '&quot;')})">Retry</button></div>`;
+      }
     }
 
     openInspector(title, contentHtml) {

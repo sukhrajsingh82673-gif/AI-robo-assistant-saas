@@ -90,7 +90,7 @@
     // 1. ASSISTANT VIEW (Natural Language Front Door)
     // =========================================================================
     async renderAssistant(containerId) {
-      if (window.AppleCoworkerAssistant) {
+      if (window.USE_SAMPLE_DATA && window.AppleCoworkerAssistant) {
         window.AppleCoworkerAssistant.render(containerId, 'company');
         return;
       }
