@@ -129,9 +129,9 @@
         <div class="overview-state-panel">
           <div class="state-icon">🏢</div>
           <h3>No Company Data Available</h3>
-          <p>Connect your first company or select a valid operating entity to view intelligence.</p>
+          <p>Add your first company or select a valid operating entity to view intelligence.</p>
           <div style="margin-top:16px;">
-            <button class="btn-primary" onclick="if(window.navigateTo) window.navigateTo('/company'); else window.location.hash='#/company';">
+            <button class="btn-primary" onclick="if(window.navigateTo) window.navigateTo('/company/add'); else window.location.hash='#/company/add';">
               + Add Company
             </button>
           </div>

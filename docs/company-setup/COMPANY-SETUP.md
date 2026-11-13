@@ -18,7 +18,7 @@ Rules of engagement for this program:
 |---|---|---|
 | 0 | Audit only (this document) | **Complete** |
 | 1 | Data model, API, permissions, drafts | **Complete** |
-| 2 | Company switcher + Add company page + entry points + i18n/RTL | Not started |
+| 2 | Company switcher + Add company page + entry points + i18n/RTL | **Complete** |
 | 3 | Create new company (form, review, build workflow) | Not started |
 | 4 | Add existing company (form, connections, ingestion shell, diagnosis) | Not started |
 | 5 | Overview, edit, protected delete + export | Not started |
@@ -378,6 +378,41 @@ GET    legacy /api/companies              -> new company visible (portfolio refr
 
 ---
 
+## 4c. Stage 2 — delivered
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `web/i18n.js` | English + Arabic dictionaries, `data-i18n` application, `<html lang/dir>`, language-change event, Indian lakh/crore currency + compact formatting |
+| `web/company_setup_switcher.js` | One switcher: current first, real empty state, Add last, phone bottom sheet / desktop dialog, arrow + Tab trap + Escape, sidebar sync, assistant intent matcher |
+| `web/company_setup_add.js` | `/company/add` page: two cards, per-card points, "Not sure which one?", permission-aware disabled state, language toggle, flow handoff |
+| `web/company_setup.css` | Apple-style switcher sheet/dialog and Add page; 360px phone layout, RTL logical properties, status dot tones, focus/reduced-motion rules |
+| `tests/company_setup_ui_test.js` | 16 jsdom/static checks (order, empty, keyboard, permissions, i18n/RTL, lakh/crore, intent, wiring) |
+
+**Touched:** `web/index.html` (CSS/script order, Arabic font, `sidebarCompanyStatus`, real empty labels), `web/app_shell.js` (delegates instead of the fake modal), `web/app.js` (route `/company/add`, current-first dropdown, `syncCompanySurfaces`, palette rows for switch/add, no `comp_primary`), `web/company_context.js` (current-first dropdown, truthful empty state, sidebar sync, empty-state CTA to `/company/add`), `web/entry_flows.js` (`renderWelcome` delegates to the Add page; fake `comp_primary` welcome removed), `web/overview_workspace.js` (empty CTA → `/company/add`), `web/ura_assistant.js` (company intent shortcut before any network call + company suggestions), `package.json` (`test:company` now also runs the UI test).
+
+**Behaviour delivered**
+
+1. The switcher lists the current company first, then the others in server order, with status dot + label. "Current" chip on the active row.
+2. No companies: a real empty state and an Add button. No placeholder or fabricated company anywhere in these surfaces.
+3. "Add company" is always the last control; on phones the switcher is a bottom sheet, on desktop a centred dialog.
+4. Full keyboard support: focus enters the dialog, ArrowUp/Down cycles, Tab is trapped, Escape closes and focus returns.
+5. `/company/add` shows the two-card choice with honest expectations (Creating vs Onboarding, read-only connections, editable/deletable later) and a "Not sure which one?" panel.
+6. Agents see a disabled state and an explanation; the server remains the real gate.
+7. Arabic switches the whole document to `dir="rtl"` and translates the company-setup labels; Arabic font is requested in `index.html`.
+8. Currency helpers use Indian grouping (`₹12,00,000`) and lakh/crore compaction (`₹12L`, `₹1.3Cr`).
+9. Assistant phrases such as "add a company" / "switch company" open the page or switcher and say nothing was created or switched; no request is sent.
+10. The topbar dropdown also lists the current company first and shows a truthful "No company yet — add one" state.
+
+**Handoff note:** the two cards still open the existing `EntryFlows` brief/intake collector. Stage 3 replaces that collector with the typed, validated company setup workflow; Stage 2 deliberately does not write company rows.
+
+**Gates:** `npm run typecheck` (65 files), `npm run lint`, `npm run test:company` (45 pytest + 16 UI checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey checks).
+
+**Not verifiable here:** no Chromium/Playwright, so no screenshots or true 360px/RTL visual pass. Behaviour is covered in jsdom; visual checks need a device/browser.
+
+---
+
 ## 5. Risks
 
 1. **`render.yaml` branch mismatch.** Blueprint tracks `engineering/production-readiness-gap-closure`; this work is on `ui-redesign`. Auto-deploy will not ship it. Needs a dashboard/blueprint change (Stage 1 report will restate this).
@@ -426,6 +461,7 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 | Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | No (run row is real, execution not started) | 3/4 | Queued, `workflow_started: false` |
 | Company export PDF/ZIP | `core/company_setup/export.py` (planned) | No (`409 EXPORT_NOT_READY`) | 5 | Not ready |
 | Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`) | 5 | Not configured |
+| Browser e2e / screenshots | Playwright runner | No (no Chromium in this environment); jsdom contract + journey tests stand in | 6 | Not available |
 
 ---
 
@@ -445,3 +481,14 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Deletion: request → exact name → password (+2FA when verifiable); export/email/purge intentionally return honest "not ready" until Stage 5.
 - Gates: 45 company tests, 44 existing company/tenant tests, typecheck 61 JS files, lint, `npm run test:assistant` (79 pytest + 41 JS checks). Live HTTP journey verified against a temporary strict-auth server; foreign-tenant ids return 404 and the legacy `/api/companies` list sees new companies.
 - Stub note: build execution, export/email and provider handshakes are not implemented yet; no fake success is shown.
+
+### Stage 2 — switcher, Add page, entry points, i18n/RTL
+- Added `web/i18n.js`, `web/company_setup_switcher.js`, `web/company_setup_add.js`, `web/company_setup.css` and `tests/company_setup_ui_test.js`.
+- Rewired `index.html`, `app_shell.js`, `app.js`, `company_context.js`, `entry_flows.js`, `overview_workspace.js`, `ura_assistant.js`. Removed the fabricated `comp_primary / ZONATA Technologies` fallbacks from the company surfaces.
+- Switcher: current first, real empty state, Add always last, phone bottom sheet, desktop dialog, arrow/Tab/Escape keyboard model, focus return, status tones, sidebar sync.
+- Add page: two cards with honest expectations, help panel, language toggle, agent-disabled state, intent persisted, handoff to `EntryFlows` (Stage 3 replaces the collector).
+- i18n/RTL: Arabic dictionaries, `<html dir="rtl">`, `data-i18n` application, Arabic font request, Indian lakh/crore currency and compact formatting.
+- Entry points: sidebar switcher, topbar dropdown, Companies empty states, command palette (Switch/Add), assistant intent shortcut (navigation only; nothing is created).
+- Gates: typecheck 65 JS files, lint, `npm run test:company` (45 pytest + 16 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12 checks).
+- Honest limits: no Chromium/Playwright here, so no screenshots or true 360px/RTL visual verification; jsdom covers the behaviour. The Add cards still use the legacy intake until Stage 3.
+- Waiting for "continue" before Stage 3.

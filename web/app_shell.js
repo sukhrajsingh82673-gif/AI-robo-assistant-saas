@@ -25,53 +25,21 @@
     }
 
     openCompanySwitcher() {
-      if (!window.UI || !window.UI.openModal) return;
-      const companies = (window.state && window.state.companies) || [
-        { company_id: 'comp_primary', name: 'ZONATA Technologies', industry: 'SaaS / AI Systems', status: 'ACTIVE' }
-      ];
-
-      const rows = companies.map(c => `
-        <div class="list-row-apple spring-press" onclick="AppShell.selectCompany('${c.company_id}')" style="margin-bottom:8px; border-radius:var(--r-md); border:0.5px solid var(--separator);">
-          <div class="list-row-left">
-            ${window.AppTile ? window.AppTile({ entity: 'company', size: 36 }) : ''}
-            <div>
-              <div class="t-headline" style="font-size:14px;">${escapeHtml(c.name)}</div>
-              <div class="t-caption" style="color:var(--label-2);">${escapeHtml(c.industry || 'Active Operating Company')}</div>
-            </div>
-          </div>
-          <div class="list-row-right">
-            <span class="chip-apple chip-green">Active</span>
-          </div>
-        </div>
-      `).join('');
-
-      window.UI.openModal(
-        'Switch Company Operating Context',
-        `
-          <p class="t-body" style="color:var(--label-2); margin-bottom:16px;">
-            Select an operating company or onboard a new business entity:
-          </p>
-          <div style="margin-bottom:20px;">
-            ${rows}
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; pt:12px; border-top:0.5px solid var(--separator);">
-            <button class="btn-apple btn-apple-secondary" onclick="window.navigateTo('/company/new'); UI.closeModal();">
-              ${window.Icon ? window.Icon({ name: 'plus', size: 16, tone: 'accent' }) : '+'}
-              <span>Add New Company</span>
-            </button>
-            <button class="btn-apple btn-apple-plain" onclick="UI.closeModal()">Cancel</button>
-          </div>
-        `
-      );
+      // One switcher for the whole app (web/company_setup_switcher.js).
+      if (window.CompanySetupSwitcher && typeof window.CompanySetupSwitcher.open === 'function') {
+        window.CompanySetupSwitcher.open();
+        return;
+      }
+      // Fallback: a clear message rather than a fabricated company.
+      if (window.UI && window.UI.showToast) {
+        window.UI.showToast('The company switcher did not load. Reload the page.', 'error');
+      }
     }
 
     selectCompany(companyId) {
-      if (window.CurrentCompanyContext && window.CurrentCompanyContext.setCompanyId) {
-        window.CurrentCompanyContext.setCompanyId(companyId);
-      }
-      if (window.UI) {
-        window.UI.showToast(`Switched context to: ${companyId}`, 'info');
-        window.UI.closeModal();
+      if (!companyId) return;
+      if (window.CompanySetupSwitcher && typeof window.CompanySetupSwitcher.selectCompany === 'function') {
+        window.CompanySetupSwitcher.selectCompany(companyId);
       }
     }
 

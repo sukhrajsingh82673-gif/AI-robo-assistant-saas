@@ -1,0 +1,837 @@
+/* ==========================================================================
+   URA / ZONATA — Company Setup surfaces
+   Company switcher (bottom sheet on phones, dialog on desktop) and the
+   "Add a company" page. Apple restraint: one accent, quiet separators,
+   generous spacing, 44pt touch targets, real focus rings, full RTL.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Switcher shell
+   -------------------------------------------------------------------------- */
+.zc-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-6);
+  background: rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: saturate(160%) blur(8px);
+  backdrop-filter: saturate(160%) blur(8px);
+  animation: zc-overlay-in 0.18s ease both;
+}
+
+.zc-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  max-height: min(78vh, 640px);
+  background: var(--surface);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-4);
+  overflow: hidden;
+  animation: zc-dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.zc-sheet-grabber {
+  display: none;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 0;
+  border-radius: var(--r-pill);
+  background: var(--separator);
+  flex: 0 0 auto;
+}
+
+.zc-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-5) var(--s-3);
+  flex: 0 0 auto;
+}
+
+.zc-sheet-title {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--label);
+}
+
+.zc-sheet-subtitle {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--label-2);
+}
+
+.zc-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--label-2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zc-icon-button:hover {
+  background: var(--separator);
+  color: var(--label);
+}
+
+.zc-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--s-5) var(--s-3);
+}
+
+.zc-sheet-footer {
+  flex: 0 0 auto;
+  padding: var(--s-3) var(--s-5) var(--s-5);
+  border-top: 0.5px solid var(--separator);
+  background: var(--surface);
+}
+
+/* --------------------------------------------------------------------------
+   2. Company rows
+   -------------------------------------------------------------------------- */
+.zc-company-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.zc-company-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 10px var(--s-2);
+  border: 0.5px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.zc-company-row:hover {
+  background: var(--surface-2);
+}
+
+.zc-company-row.is-current {
+  background: var(--accent-tint);
+  border-color: rgba(0, 113, 227, 0.24);
+}
+
+.zc-company-tile {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.zc-company-tile-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: linear-gradient(180deg, #0071E3 0%, #0051A8 100%);
+}
+
+.zc-company-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.zc-company-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zc-company-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zc-status-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--label-3);
+}
+
+.zc-status-dot[data-tone='green'] {
+  background: var(--green);
+}
+
+.zc-status-dot[data-tone='accent'] {
+  background: var(--accent);
+}
+
+.zc-status-dot[data-tone='orange'] {
+  background: var(--orange);
+}
+
+.zc-status-dot[data-tone='red'] {
+  background: var(--red);
+}
+
+.zc-status-dot[data-tone='neutral'] {
+  background: var(--label-3);
+}
+
+.zc-chip {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.zc-chip-current {
+  color: var(--accent);
+  background: var(--surface);
+  border: 0.5px solid rgba(0, 113, 227, 0.3);
+}
+
+.zc-company-enter {
+  flex: 0 0 auto;
+  font-size: 18px;
+  color: var(--label-3);
+}
+
+/* --------------------------------------------------------------------------
+   3. Empty / status notices
+   -------------------------------------------------------------------------- */
+.zc-switcher-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+}
+
+.zc-switcher-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--s-1);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  color: var(--label-2);
+}
+
+.zc-switcher-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--label);
+}
+
+.zc-switcher-empty-body {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+.zc-inline-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 var(--s-3);
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.zc-inline-notice-warning {
+  color: var(--label);
+  background: var(--orange-tint);
+  border: 0.5px solid rgba(255, 149, 0, 0.28);
+}
+
+.zc-inline-notice-muted {
+  color: var(--label-2);
+  background: var(--surface-2);
+  border: 0.5px solid var(--separator);
+}
+
+/* --------------------------------------------------------------------------
+   4. Add company button inside the switcher
+   -------------------------------------------------------------------------- */
+.zc-add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.zc-add-button:hover {
+  background: var(--accent-press);
+}
+
+.zc-add-button:active {
+  transform: scale(0.985);
+}
+
+.zc-add-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   5. Add company page
+   -------------------------------------------------------------------------- */
+.zc-add-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-6) var(--s-12);
+}
+
+.zc-add-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+}
+
+.zc-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 6px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zc-back-link:hover {
+  background: var(--accent-tint);
+}
+
+.zc-back-arrow {
+  font-size: 15px;
+  line-height: 1;
+}
+
+html[dir='rtl'] .zc-back-arrow {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+.zc-language-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 0.5px solid var(--separator);
+}
+
+.zc-language-toggle button {
+  min-height: 30px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--label-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zc-language-toggle button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--label);
+  box-shadow: var(--shadow-1);
+}
+
+.zc-add-header {
+  max-width: 62ch;
+  margin-bottom: var(--s-6);
+}
+
+.zc-add-title {
+  margin: 0 0 var(--s-2);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  color: var(--label);
+}
+
+.zc-add-subtitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--label-2);
+}
+
+.zc-add-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-4);
+}
+
+.zc-add-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  text-align: start;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.2s ease,
+              border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .zc-add-card:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-3);
+    border-color: rgba(0, 113, 227, 0.3);
+  }
+}
+
+.zc-add-card:active:not(:disabled) {
+  transform: scale(0.995);
+}
+
+.zc-add-card:disabled,
+.zc-add-card[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.zc-add-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.zc-add-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  color: #FFFFFF;
+  box-shadow: var(--shadow-1);
+}
+
+.zc-add-tile-new {
+  background: linear-gradient(180deg, #0A84FF 0%, #0060D0 100%);
+}
+
+.zc-add-tile-existing {
+  background: linear-gradient(180deg, #34C759 0%, #1E9E40 100%);
+}
+
+.zc-add-badge {
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.zc-add-badge-new {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.zc-add-badge-existing {
+  color: #1E9E40;
+  background: var(--green-tint);
+}
+
+.zc-add-card-title {
+  font-size: 19px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--label);
+}
+
+.zc-add-card-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--label-2);
+}
+
+.zc-add-points {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--s-1);
+}
+
+.zc-add-point {
+  position: relative;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.zc-add-point::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--label-3);
+}
+
+.zc-add-card-new .zc-add-point::before {
+  background: var(--accent);
+}
+
+.zc-add-card-existing .zc-add-point::before {
+  background: var(--green);
+}
+
+.zc-add-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: var(--s-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.zc-add-card-existing .zc-add-cta {
+  color: #1E9E40;
+}
+
+html[dir='rtl'] .zc-add-cta span[aria-hidden='true'] {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+.zc-add-help {
+  margin-top: var(--s-5);
+  border-top: 0.5px solid var(--separator);
+  padding-top: var(--s-4);
+}
+
+.zc-help-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.zc-help-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.zc-help-panel {
+  max-width: 70ch;
+  margin-top: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 0.5px solid var(--separator);
+}
+
+.zc-help-panel[hidden] {
+  display: none;
+}
+
+.zc-help-title {
+  margin: 0 0 var(--s-2);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--label);
+}
+
+.zc-help-panel p {
+  margin: 0 0 var(--s-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--label-2);
+}
+
+.zc-help-panel p:last-child {
+  margin-bottom: 0;
+}
+
+.zc-help-note {
+  padding-top: var(--s-2);
+  border-top: 0.5px solid var(--separator);
+  color: var(--label-3) !important;
+  font-size: 12.5px !important;
+}
+
+.zc-add-footnote {
+  margin: var(--s-6) 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--label-3);
+}
+
+/* --------------------------------------------------------------------------
+   6. Sidebar sync
+   -------------------------------------------------------------------------- */
+.company-status-row .status-dot-active[data-tone='green'] {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+.company-status-row .status-dot-active[data-tone='accent'] {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.company-status-row .status-dot-active[data-tone='orange'] {
+  background: var(--orange);
+  box-shadow: 0 0 6px var(--orange);
+}
+
+.company-status-row .status-dot-active[data-tone='red'] {
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+}
+
+.company-status-row .status-dot-active[data-tone='neutral'] {
+  background: var(--label-3);
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   7. RTL
+   -------------------------------------------------------------------------- */
+html[dir='rtl'] .zc-company-enter {
+  transform: scaleX(-1);
+}
+
+html[dir='rtl'] .zc-add-page,
+html[dir='rtl'] .zc-sheet {
+  text-align: start;
+}
+
+/* --------------------------------------------------------------------------
+   8. Phones — bottom sheet, single column, 360px safe
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .zc-sheet-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .zc-sheet {
+    max-width: none;
+    max-height: 86vh;
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: zc-sheet-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .zc-sheet-grabber {
+    display: block;
+  }
+
+  .zc-sheet-header {
+    padding: var(--s-4) var(--s-4) var(--s-2);
+  }
+
+  .zc-sheet-body {
+    padding: 0 var(--s-4) var(--s-2);
+  }
+
+  .zc-sheet-footer {
+    padding: var(--s-3) var(--s-4) var(--s-4);
+  }
+
+  .zc-company-row {
+    min-height: 56px;
+    padding: 10px var(--s-2);
+  }
+
+  .zc-add-page {
+    padding: var(--s-4) var(--s-4) var(--s-10);
+  }
+
+  .zc-add-title {
+    font-size: 24px;
+  }
+
+  .zc-add-subtitle {
+    font-size: 14px;
+  }
+
+  .zc-add-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-3);
+  }
+
+  .zc-add-card {
+    padding: var(--s-4);
+  }
+
+  .zc-add-card-title {
+    font-size: 17px;
+  }
+
+  .zc-add-top {
+    margin-bottom: var(--s-4);
+  }
+}
+
+/* 360px and narrower: keep every control tappable without clipping. */
+@media (max-width: 380px) {
+  .zc-add-page {
+    padding-inline: 12px;
+  }
+
+  .zc-add-title {
+    font-size: 22px;
+  }
+
+  .zc-language-toggle button {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  .zc-company-meta {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. Animation + reduced motion
+   -------------------------------------------------------------------------- */
+@keyframes zc-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes zc-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes zc-sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+body.zc-sheet-open {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zc-sheet-overlay,
+  .zc-sheet {
+    animation: none;
+  }
+
+  .zc-add-card,
+  .zc-add-button {
+    transition: none;
+  }
+
+  .zc-add-card:hover:not(:disabled) {
+    transform: none;
+  }
+}

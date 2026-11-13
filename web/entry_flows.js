@@ -72,99 +72,23 @@
     // 9.1 Welcome and Company Chooser
     // ------------------------------------------------------------------------
     renderWelcome(container) {
-      if (!container) return;
-
-      const existingCompanies = (window.state && window.state.companies && window.state.companies.length > 0)
-        ? window.state.companies
-        : [{ company_id: 'comp_primary', name: 'ZONATA Technologies', industry: 'SaaS / AI Systems', profit: '₹4,28,500' }];
-
-      const companyRows = existingCompanies.map(c => `
-        <div class="list-row-apple spring-press"
-             onclick="EntryFlows.selectExistingAndOpen('${c.company_id}')"
-             style="border-radius:var(--r-md); border:0.5px solid var(--separator); margin-bottom:8px;">
-          <div class="list-row-left">
-            ${window.AppTile ? window.AppTile({ entity: 'company', size: 36 }) : ''}
-            <div>
-              <div class="t-headline" style="font-size:14px;">${escapeHtml(c.name)}</div>
-              <div class="t-caption" style="color:var(--label-2);">${escapeHtml(c.industry || 'Autonomous Company')}</div>
-            </div>
+      // One Add company surface for the whole app. The old welcome screen
+      // invented a placeholder company and fabricated profit figures, so it
+      // now delegates instead of rendering a parallel chooser.
+      if (container && window.CompanySetupAdd) {
+        window.CompanySetupAdd.render(container);
+        return;
+      }
+      if (container) {
+        container.innerHTML = `
+          <div style="max-width:640px; margin:0 auto; padding:48px 20px; text-align:center;">
+            <h2 class="t-title-2" style="margin-bottom:8px;">Add a company</h2>
+            <p class="t-body" style="color:var(--label-2);">
+              The company setup screen did not load. Reload the page and try again.
+            </p>
           </div>
-          <div class="list-row-right">
-            <span class="t-callout tabular-nums" style="color:var(--green); font-weight:600;">${c.profit || '₹0'}</span>
-            <span class="status-dot-active"></span>
-          </div>
-        </div>
-      `).join('');
-
-      container.innerHTML = `
-        <div style="max-width:920px; margin:0 auto; padding:40px 20px 80px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-
-          <!-- Centered 220px Hero AiOrb -->
-          <div style="margin-bottom:28px;">
-            ${window.AiOrb ? window.AiOrb({ state: 'idle', size: 180 }) : ''}
-          </div>
-
-          <h1 class="t-large-title" style="margin-bottom:10px;">What would you like to build today?</h1>
-          <p class="t-body" style="color:var(--label-2); max-width:540px; margin-bottom:48px; line-height:1.5;">
-            Your AI CEO and executive team orchestrate the entire company lifecycle. Choose how to begin:
-          </p>
-
-          <!-- Two Side-by-Side Cards -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px; width:100%; margin-bottom:48px; text-align:left;">
-
-            <!-- Card 1: Start a New Company -->
-            <div class="card-apple hover-lift spring-press"
-                 onclick="EntryFlows.startFlow('new', '${container.id}')"
-                 style="display:flex; flex-direction:column; justify-content:space-between; padding:32px;">
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
-                  ${window.AppTile ? window.AppTile({ entity: 'assistant', size: 48 }) : ''}
-                  <span class="chip-apple chip-accent">Build Phase</span>
-                </div>
-                <h2 class="t-title-2" style="margin-bottom:8px;">Start a New Company</h2>
-                <p class="t-body" style="color:var(--label-2); line-height:1.5; margin-bottom:20px;">
-                  Provide a brief of what you want to build. Your AI CEO and CTO build the base, storefronts, and hire your team in 1–3 days.
-                </p>
-              </div>
-              <button class="btn-apple btn-apple-primary" style="width:100%;">
-                <span>Start New Company</span>
-                ${window.Icon ? window.Icon({ name: 'arrow-right', size: 16, tone: 'white' }) : '→'}
-              </button>
-            </div>
-
-            <!-- Card 2: Connect an Existing Company -->
-            <div class="card-apple hover-lift spring-press"
-                 onclick="EntryFlows.startFlow('existing', '${container.id}')"
-                 style="display:flex; flex-direction:column; justify-content:space-between; padding:32px;">
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
-                  ${window.AppTile ? window.AppTile({ entity: 'ceo', size: 48 }) : ''}
-                  <span class="chip-apple chip-green">Revenue Recovery</span>
-                </div>
-                <h2 class="t-title-2" style="margin-bottom:8px;">Connect Existing Company</h2>
-                <p class="t-body" style="color:var(--label-2); line-height:1.5; margin-bottom:20px;">
-                  Connect your website, CRM, and booking engines. URA inspects your systems, studies competitors, and identifies lost profit.
-                </p>
-              </div>
-              <button class="btn-apple btn-apple-secondary" style="width:100%;">
-                <span>Connect Company</span>
-                ${window.Icon ? window.Icon({ name: 'arrow-right', size: 16, tone: 'accent' }) : '→'}
-              </button>
-            </div>
-
-          </div>
-
-          <!-- Existing Active Companies List -->
-          <div style="width:100%; max-width:680px; text-align:left;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <span class="t-caption" style="text-transform:uppercase; letter-spacing:0.04em;">Your Operating Companies:</span>
-              <span class="t-footnote" style="color:var(--label-3);">Today's Profit</span>
-            </div>
-            ${companyRows}
-          </div>
-
-        </div>
-      `;
+        `;
+      }
     }
 
     startFlow(flow, containerId) {

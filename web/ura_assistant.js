@@ -61,6 +61,7 @@
     coworker: ['What is the Co-worker doing?', 'Open mission control', 'Pause the current mission'],
     people: ['Who is overloaded?', 'Summarize the team', 'Open workforce'],
     meetings: ['Prepare my next meeting', 'Show past decisions', 'Open the meeting library'],
+    company: ['Add a company', 'Switch company', 'What still needs setup?'],
     reports: ['Generate a weekly report', 'What changed since last week?', 'Open evidence'],
     default: ['What can you do?', 'Open the Co-worker', 'What needs my attention?']
   };
@@ -1973,6 +1974,30 @@
         this.addMessage('assistant', 'Company scope is locked until the AI CEO approves access. Use “Ask the CEO” in the banner, or switch to Personal. Nothing was sent to company data.');
         return;
       }
+
+      // Company setup intents are navigation only. Nothing is created,
+      // connected or switched until the user completes the real flow.
+      const intent = window.CompanySetupSwitcher && window.CompanySetupSwitcher.matchIntent
+        ? window.CompanySetupSwitcher.matchIntent(prompt)
+        : null;
+      if (intent === 'ADD' || intent === 'SWITCH') {
+        this.lastPrompt = prompt;
+        if (input) { input.value = ''; input.style.height = 'auto'; }
+        this.addMessage('user', prompt);
+        const key = intent === 'ADD' ? 'assistant.add_opened' : 'assistant.switch_opened';
+        const fallback = intent === 'ADD'
+          ? 'Opening the Add company page. Nothing has been created yet.'
+          : 'Opening your companies. Nothing has been switched yet.';
+        this.addMessage('assistant', window.I18n ? window.I18n.t(key) : fallback);
+        if (intent === 'ADD') {
+          if (window.navigateTo) window.navigateTo('/company/add');
+          else window.location.hash = '#/company/add';
+        } else if (window.CompanySetupSwitcher && window.CompanySetupSwitcher.open) {
+          window.CompanySetupSwitcher.open();
+        }
+        return;
+      }
+
       this.lastPrompt = prompt;
       if (input) { input.value = ''; input.style.height = 'auto'; }
       this.addMessage('user', prompt);
