@@ -54,9 +54,9 @@ class TestAppleAppShell(unittest.TestCase):
         self.assertIn('<link rel="stylesheet" href="app_shell.css" />', self.index_html)
         self.assertIn('<script src="app_shell.js"></script>', self.index_html)
 
-        # Company Switcher
-        self.assertIn('class="apple-company-switcher"', self.index_html)
-        self.assertIn('AppShell.openCompanySwitcher()', self.index_html)
+        # Company Switcher (URA shell company chip opens the company menu)
+        self.assertIn('class="ura-company-chip"', self.index_html)
+        self.assertIn('id="companyChipBtn"', self.index_html)
 
         # Floating Ask URA Bar
         self.assertIn('id="askUraBarWrap"', self.index_html)

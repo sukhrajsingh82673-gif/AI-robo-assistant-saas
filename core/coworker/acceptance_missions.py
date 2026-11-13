@@ -65,6 +65,7 @@ from .opencode_engine import OpenCodeEngine, ConstitutionalViolationError
 from .defense_monitor import DefensiveCybersecurityMonitor, PatrolScheduler
 from .contracts_v2 import PatrolSeverity, PatrolType
 from .evidence_reporting import EvidenceAndReportingEngine
+from core.paths import get_repo_root
 
 
 @dataclass
@@ -87,7 +88,7 @@ class AcceptanceMissionsHarness:
     """
 
     def __init__(self, workspace_root: Optional[str] = None):
-        self.workspace_root = workspace_root or "/root/roboassistant"
+        self.workspace_root = os.path.abspath(workspace_root or get_repo_root())
         self.evidence_engine = EvidenceAndReportingEngine()
         self.operating_loop = ExecutiveOperatingLoop()
         self.support_service = EmployeeSupportService()

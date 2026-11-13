@@ -318,7 +318,7 @@
     }
 
     renderPipelineTabHtml() {
-      if (window.AppleSalesBoard && window.AppleSalesBoard.renderHtml) {
+      if (window.USE_SAMPLE_DATA && window.AppleSalesBoard && window.AppleSalesBoard.renderHtml) {
         return window.AppleSalesBoard.renderHtml();
       }
 

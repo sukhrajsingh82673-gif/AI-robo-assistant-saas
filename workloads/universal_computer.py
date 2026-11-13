@@ -21,6 +21,7 @@ from core.workforce import DynamicAgentFactory
 from core.control_kernel import UniversalControlKernel
 from core.tool_fabric import ToolDiscoveryEngine, CapabilityRegistry
 from core.portfolio import OperatingContext
+from workloads.paths import sandbox_artifact
 
 def run_universal_capability_discovery_task(
     company: OperatingContext,
@@ -71,8 +72,8 @@ def run_universal_capability_discovery_task(
     mission.status = MissionStatus.PLAN
 
     # 4. Action Contract Preparation
-    db_path = "/roboassistant/storage/sandbox/universal_analytics.db"
-    output_json = "/roboassistant/storage/sandbox/universal_database_analysis.json"
+    db_path = sandbox_artifact("universal_analytics.db")
+    output_json = sandbox_artifact("universal_database_analysis.json")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     action = ActionContract(

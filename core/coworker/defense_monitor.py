@@ -24,6 +24,7 @@ from .contracts_v2 import (
     SecurityPatrolFinding, PatrolType, PatrolSeverity
 )
 from .db_store_v2 import CoworkerDbStoreV2
+from core.paths import get_repo_root
 
 
 def calculate_shannon_entropy(data: str) -> float:
@@ -71,20 +72,20 @@ class DefensiveCybersecurityMonitor:
         cls,
         db_store: Optional[CoworkerDbStoreV2] = None,
         store: Optional[CoworkerDbStoreV2] = None,
-        scan_root: str = "/root/roboassistant"
+        scan_root: Optional[str] = None
     ) -> DefensiveCybersecurityMonitor:
         if cls._instance is None:
-            cls._instance = cls(db_store=db_store, store=store, scan_root=scan_root)
+            cls._instance = cls(db_store=db_store, store=store, scan_root=scan_root or get_repo_root())
         return cls._instance
 
     def __init__(
         self,
         db_store: Optional[CoworkerDbStoreV2] = None,
-        scan_root: str = "/root/roboassistant",
+        scan_root: Optional[str] = None,
         store: Optional[CoworkerDbStoreV2] = None
     ):
         self.db = store or db_store or CoworkerDbStoreV2.get_instance()
-        self.scan_root = scan_root
+        self.scan_root = os.path.abspath(scan_root or get_repo_root())
         self.last_scan_time: Optional[float] = None
         self.findings_history: List[SecurityPatrolFinding] = []
 
