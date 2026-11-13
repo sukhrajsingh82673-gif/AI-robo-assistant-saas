@@ -698,3 +698,136 @@ html[dir='rtl'] .ura-window[data-mode='window'][data-anchor='top-right'] { right
   }
   .ura-window { animation: none !important; }
 }
+
+/* ------------------------------------------------------- jobs & web panels */
+.ura-jobs-btn { position: relative; }
+.ura-badge-corner {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff375f;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+.ura-plus-count { color: var(--accent, #0071e3); font-size: 10px; }
+
+.ura-panel {
+  margin: 0 12px 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--ura-tool);
+  max-height: 44%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ura-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ura-panel-head strong { font-size: 12px; }
+.ura-panel-meta {
+  margin-inline-start: auto;
+  font-size: 10.5px;
+  color: var(--label-3, #6e6e73);
+}
+.ura-jobs-list { display: flex; flex-direction: column; gap: 8px; }
+.ura-job {
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--ura-hairline);
+}
+.ura-job-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ura-job-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ura-job-status {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--ura-tool);
+  color: var(--label-2, #515154);
+}
+.ura-job-status[data-status='RUNNING'],
+.ura-job-status[data-status='QUEUED'] { color: var(--accent, #0071e3); }
+.ura-job-status[data-status='SUCCEEDED'] { color: #1d7f37; }
+.ura-job-status[data-status='FAILED'] { color: #c8102e; }
+.ura-job-status[data-status='PAUSED'] { color: #8f5200; }
+.ura-job-bar {
+  height: 4px;
+  margin: 6px 0 4px;
+  border-radius: 999px;
+  background: var(--ura-tool);
+  overflow: hidden;
+}
+.ura-job-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #0071e3);
+  transition: width 0.3s ease;
+}
+.ura-job-steps {
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--label-3, #6e6e73);
+}
+.ura-job-error { color: #c8102e; margin-top: 4px; }
+:root[data-theme='dark'] .ura-job-error { color: #ff6961; }
+.ura-job .ura-card-actions { margin-top: 6px; }
+.ura-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--label-2, #515154);
+}
+.ura-field select,
+.ura-field textarea {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--surface, #fff);
+  color: var(--label, #1d1d1f);
+  resize: vertical;
+}
+.ura-sample-note {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  color: #8f5200;
+  background: rgba(255, 159, 10, 0.16);
+}
+.ura-citations em {
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8f5200;
+}

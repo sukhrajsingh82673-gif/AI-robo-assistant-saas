@@ -248,4 +248,95 @@ test('stream events are honest about permissions and confirmations', () => {
   assert.ok(service.includes('Terminal commands are not executed from the assistant chat'));
 });
 
+// ---------------------------------------------------------------------------
+// Stage 3 — background jobs, web research and web access
+// ---------------------------------------------------------------------------
+
+test('background jobs use the server store with a three-job limit', () => {
+  const jobs = read('core/ura_assistant_jobs.py');
+  const server = read('api_server.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(jobs.includes('MAX_ACTIVE_JOBS = 3'));
+  assert.ok(jobs.includes('def create('));
+  assert.ok(jobs.includes('def active_count('));
+  assert.ok(jobs.includes('def reset_for_retry('));
+  assert.ok(jobs.includes('def recover_jobs(') || service.includes('def recover_jobs('));
+  for (const action of ['pause', 'resume', 'cancel', 'retry', 'takeover']) {
+    assert.ok(service.includes(`"${action}"`), `missing job action ${action}`);
+  }
+  assert.ok(server.includes('/api/assistant/jobs'));
+  assert.ok(server.includes('/action'));
+  assert.ok(server.includes('/watch'));
+  assert.ok(js.includes("fetch('/api/assistant/jobs'"));
+  assert.ok(js.includes('/action`'));
+  assert.ok(js.includes('/watch`'));
+  assert.ok(js.includes('startBackground'));
+  assert.ok(js.includes('watchJob'));
+  assert.ok(js.includes('jobRequest'));
+  assert.ok(js.includes('markJobsSeen'));
+  assert.ok(js.includes('of ${limit} active') || js.includes('active`'));
+});
+
+test('jobs render their status, progress and result honestly', () => {
+  const jobs = read('core/ura_assistant_jobs.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(js.includes('uraJobsPanel'));
+  assert.ok(js.includes('uraJobsList'));
+  assert.ok(js.includes('jobStatusLabel'));
+  assert.ok(js.includes('JOB_RESULT'));
+  assert.ok(js.includes('HANDOFF'));
+  assert.ok(css.includes('.ura-job-bar'));
+  assert.ok(css.includes(".ura-job-status[data-status='FAILED']"));
+  assert.ok(jobs.includes('status="FAILED"'));
+  assert.ok(service.includes('so it did not') || jobs.includes('so it did not'));
+  assert.ok(!js.includes('Job completed successfully'));
+});
+
+test('web research is provider-backed, cited and labelled when sample', () => {
+  const web = read('core/ura_assistant_web.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(web.includes('class WebSearchProvider'));
+  assert.ok(web.includes('class NoWebSearchProvider'));
+  assert.ok(web.includes('class SampleWebSearchProvider'));
+  assert.ok(web.includes('provider_id = "sample"'));
+  assert.ok(web.includes('Sample data. Not a real source.'));
+  assert.ok(web.includes('WEB') || service.includes('"source_type": "WEB"'));
+  assert.ok(service.includes('def _tool_web_research'));
+  assert.ok(service.includes('web_research'));
+  assert.ok(js.includes('WEB_SOURCES'));
+  assert.ok(js.includes('Sample provider is on'));
+  assert.ok(js.includes('sample data, not real pages'));
+  assert.ok(js.includes('WEB_ACCESS_OFF'));
+  assert.ok(!js.includes('TAVILY_API_KEY'));
+  assert.ok(!js.includes('BRAVE_SEARCH_API_KEY'));
+});
+
+test('web access is a company setting with off, allow list and open modes', () => {
+  const definitions = read('core/settings/definitions.py');
+  const server = read('api_server.py');
+  const web = read('core/ura_assistant_web.py');
+  for (const key of ['assistant_web_access', 'assistant_web_allowlist', 'assistant_web_blocklist']) {
+    assert.ok(definitions.includes(`"${key}"`), `missing setting ${key}`);
+  }
+  assert.ok(web.includes('def load_web_access('));
+  assert.ok(web.includes('def filter_results('));
+  assert.ok(web.includes('"off", "allowlist", "open"'));
+  assert.ok(server.includes('/api/assistant/web-access'));
+  assert.ok(js.includes('/api/assistant/web-access'));
+  assert.ok(js.includes('saveWebAccess'));
+  assert.ok(js.includes('uraWebPanel'));
+  assert.ok(css.includes('.ura-field'));
+});
+
+test('a background job that cannot run fails with a plain reason', () => {
+  const jobs = read('core/ura_assistant_jobs.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(jobs.includes('Web access is off for this workspace'));
+  assert.ok(jobs.includes('No web search provider is configured'));
+  assert.ok(jobs.includes('Company scope is required'));
+  assert.ok(service.includes('The server restarted while this job was running'));
+  assert.ok(jobs.includes('Excluded by the access policy'));
+  assert.ok(!jobs.includes('No problem'));
+});
+
 console.log(`\n${passed} URA Assistant UI contract tests passed.`);

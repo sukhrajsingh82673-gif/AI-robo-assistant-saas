@@ -6,7 +6,7 @@
     "build": "node -e \"console.log('Building ZONATA Enterprise & Neon services...'); console.log('Neon configuration and assets verified successfully.')\"",
     "typecheck": "node scripts/typecheck.js",
     "lint": "node scripts/lint.js",
-    "test:assistant": "node tests/assistant_floating_ui_test.js && node tests/assistant_jsdom_smoke_test.js && python3 -m pytest tests/test_ura_assistant_service.py -q",
+    "test:assistant": "node tests/assistant_floating_ui_test.js && node tests/assistant_jsdom_smoke_test.js && python3 -m pytest tests/test_ura_assistant_service.py tests/test_ura_assistant_jobs.py -q",
     "start": "python3 api_server.py",
     "test:neon": "python3 deploy/free_tier/verify_neon_e2e.py"
   },

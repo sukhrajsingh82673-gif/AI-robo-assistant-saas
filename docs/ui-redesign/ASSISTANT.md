@@ -135,7 +135,7 @@ Only the launcher, toasts and the phone tab bar may be fixed to the bottom.
   Jobs list, pause/cancel/retry, result card and bell notification.
 - "Watch me" steps with pause/take-over/stop; "Run in background" survives
   reload.
-- `core/ura_assistant/adapters/web_search.py`: `WebSearchProvider` interface;
+- `core/ura_assistant_web.py`: `WebSearchProvider` interface;
   real provider only when configured server-side, `SampleWebSearchProvider`
   behind `URA_ASSISTANT_WEB_SEARCH_PROVIDER=sample` and a visible sample label;
   default "web access not configured". Web-access setting, allow/block lists,

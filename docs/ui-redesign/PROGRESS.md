@@ -144,7 +144,48 @@ handoffs to their governed screens.
   18 pytest service tests passed.
 - Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
-## Stage 3 — background work and research (pending)
+## Stage 3 — background work and research (complete)
+
+**Jobs.** `assistant_jobs` (schema in `core/db.py`, store/runner in
+`core/ura_assistant_jobs.py`) keeps a job across reloads. At most three may be
+active (queued, running or paused) per user; the limit is enforced on the
+server. Every job records progress, steps, result, citations and a plain error.
+Pause, resume, cancel, retry and take-over act on the stored row; the worker
+checks the row between steps, so a pause from another request really stops
+progress. A job left `RUNNING` by a server restart is marked `FAILED` with
+"the server restarted" when jobs are next read — never a stale success.
+
+**Kinds.** `research` (web) and `query` (live company data). Mutating work stays
+in the foreground behind the existing confirmation gate; it is never queued as
+a background job.
+
+**Web research.** `core/ura_assistant_web.py` defines a typed
+`WebSearchProvider` with `NoWebSearchProvider` (default), `TavilySearchProvider`,
+`BraveSearchProvider` and a clearly-labelled `SampleWebSearchProvider` (only with
+`URA_ASSISTANT_WEB_SEARCH_PROVIDER=sample`). Keys live in `TAVILY_API_KEY` /
+`BRAVE_SEARCH_API_KEY` on the server only. Results are filtered by the company
+policy (`off` / `allowlist` / `open`, plus a block list) and every excluded
+source is reported with its reason. Sample results carry `sample=true` and are
+labelled in the UI.
+
+**Endpoints.** `GET/POST /api/assistant/jobs`, `GET /api/assistant/jobs/{id}`,
+`POST /api/assistant/jobs/{id}/action`, `POST /api/assistant/jobs/{id}/watch`
+(NDJSON snapshots), `POST /api/assistant/jobs/inbox/seen`,
+`GET/POST /api/assistant/web-access`.
+
+**UI.** Jobs bell with unseen badge, jobs panel (status, progress bar, last
+steps, actions), "Watch me" stream, "Run in background", "Research the web",
+web-access panel with mode and lists. `WEB_SOURCES`, `JOB_RESULT` and `HANDOFF`
+cards; citation links are rendered only when a URL exists; take-over pauses the
+job and hands off to the preserved Co-worker.
+
+**Gates (after the final Stage 3 edit).**
+- `npm run typecheck`: 60 JavaScript files parsed.
+- `npm run lint`: assistant consolidation checks passed.
+- `npm run build`: passed.
+- `npm run test:assistant`: 29 static contract tests + 17 jsdom checks +
+  41 pytest service/jobs tests passed.
+- Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
 ## Stage 4 — meetings (pending)
 

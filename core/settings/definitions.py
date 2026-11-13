@@ -187,6 +187,7 @@ CATEGORIES_CATALOG = [
     {"id": "notifications", "group_id": GROUP_BUSINESS, "name": "Notifications & Alerts", "icon": "🔔", "desc": "Immediate SMS alerts, in-app notifications, priority paging, and digest cadence.", "status": "Healthy", "scope": "Company"},
 
     # Group E - Control & Trust
+    {"id": "assistant", "group_id": GROUP_GOVERNANCE, "name": "URA Assistant", "icon": "✨", "desc": "The single assistant: scope, confirmations, memory, background work and web access.", "status": "Healthy", "scope": "Company"},
     {"id": "approvals", "group_id": GROUP_GOVERNANCE, "name": "Approvals & Decision Center", "icon": "⚖️", "desc": "Financial limits, two-person rules, timeout escalations, and owner sign-offs.", "status": "Healthy", "scope": "Company"},
     {"id": "governance", "group_id": GROUP_GOVERNANCE, "name": "Governance & Constitution", "icon": "🛡️", "desc": "Sovereign authority hierarchy, policy IF/THEN builder, and instant kill switches.", "status": "Healthy", "scope": "Host"},
     {"id": "privacy", "group_id": GROUP_GOVERNANCE, "name": "Privacy & Data Protection", "icon": "🔒", "desc": "PII anonymization, AI training zero-retention, and data sovereignty rules.", "status": "Healthy", "scope": "Company"},
@@ -456,6 +457,24 @@ SETTINGS_DEFINITIONS = [
         "id": "ceo_continuous_cognition_mins", "category": "ai_ceo", "name": "Continuous Cognition Interval", "type": "number",
         "default": 15, "scope": "Company", "editable_by": "SHARED", "is_ceo_managed": True, "risk": "LOW", "min": 1, "max": 1440, "unit": "minutes",
         "desc": "Scheduled interval for proactive enterprise heartbeat, risk scans, and opportunity evaluation."
+    },
+
+    # --- 8b. URA Assistant ---
+    {
+        "id": "assistant_web_access", "category": "assistant", "name": "Web access", "type": "select",
+        "default": "off", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "options": ["off", "allowlist", "open"],
+        "desc": "Off: the assistant never reads the web. Allow list: only listed domains. Open: any public domain except the block list."
+    },
+    {
+        "id": "assistant_web_allowlist", "category": "assistant", "name": "Web allow list", "type": "text",
+        "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "desc": "Comma-separated domains the assistant may read when web access is set to allow list."
+    },
+    {
+        "id": "assistant_web_blocklist", "category": "assistant", "name": "Web block list", "type": "text",
+        "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "desc": "Comma-separated domains the assistant must never cite, even when web access is open."
     },
 
     # --- 9. AI Workforce ---

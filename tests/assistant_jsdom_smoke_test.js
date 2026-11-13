@@ -3,8 +3,8 @@
  * jsdom smoke test for the single URA Assistant shell.
  *
  * Exercises the real DOM factory, open/minimise/mode changes, the scope lock,
- * the NDJSON streaming contract, typed tool confirmations, memory actions and
- * per-user persistence without Playwright.
+ * the NDJSON streaming contract, typed tool confirmations, memory actions,
+ * background jobs, web access and per-user persistence without Playwright.
  */
 'use strict';
 
@@ -47,12 +47,96 @@ function ndjsonResponse(events) {
   return { ok: true, status: 200, body: null, text: async () => text, json: async () => ({}) };
 }
 
+window.__URA_NO_POLL__ = true;
+
+let jobsState = [
+  {
+    job_id: 'job_1', title: 'Research competitors', prompt: 'Research competitors', kind: 'research',
+    status: 'RUNNING', progress: 35, step: 'Searching the web', notification_seen: 0,
+    steps: [{ label: 'Queued' }, { label: 'Searching the web' }]
+  },
+  {
+    job_id: 'job_2', title: 'Approvals count', prompt: 'How many approvals are waiting?', kind: 'query',
+    status: 'SUCCEEDED', progress: 100, step: 'Completed', notification_seen: 0,
+    result: { summary: 'There are 2 approvals waiting.' }, steps: [{ label: 'Completed' }]
+  }
+];
+
 window.fetch = async (url, options) => {
   const method = (options && options.method) || 'GET';
   const body = options && options.body ? JSON.parse(options.body) : null;
   calls.push(['fetch', method, url, body]);
   if (url === '/api/approvals') return jsonResponse({ approvals: [] });
   if (url === '/api/approvals/req_1/decide') return jsonResponse({ success: true });
+  if (url === '/api/assistant/jobs' && method === 'POST') {
+    const job = {
+      job_id: 'job_new', title: body.prompt, prompt: body.prompt, kind: 'research',
+      status: 'QUEUED', progress: 0, step: 'Queued', steps: [{ label: 'Queued' }],
+      notification_seen: 0, workspace_mode: body.workspace_mode
+    };
+    jobsState = [job, ...jobsState];
+    return jsonResponse({ success: true, job, limit: 3 });
+  }
+  if (url === '/api/assistant/jobs/inbox/seen') {
+    jobsState = jobsState.map((job) => ({ ...job, notification_seen: 1 }));
+    return jsonResponse({ success: true, marked: jobsState.length });
+  }
+  if (url.startsWith('/api/assistant/jobs/') && url.endsWith('/watch')) {
+    const id = url.split('/')[4];
+    const finished = {
+      ...(jobsState.find((job) => job.job_id === id) || {}),
+      status: 'SUCCEEDED', progress: 100, step: 'Completed', notification_seen: 0,
+      result: { summary: 'There are 2 approvals waiting.' },
+      citations: [{ source_type: 'WEB', label: 'Sample source', url: 'https://example.com/sample', sample: true }]
+    };
+    jobsState = jobsState.map((job) => (job.job_id === id ? finished : job));
+    return ndjsonResponse([{ type: 'job', job: finished }, { type: 'job_done', job: finished }]);
+  }
+  if (url.startsWith('/api/assistant/jobs/') && url.endsWith('/action')) {
+    const id = url.split('/')[4];
+    const current = jobsState.find((job) => job.job_id === id) || { job_id: id };
+    if (body.action === 'takeover') {
+      const paused = { ...current, status: 'PAUSED', step: 'Paused for you to take over' };
+      jobsState = jobsState.map((job) => (job.job_id === id ? paused : job));
+      return jsonResponse({
+        success: true, job: paused,
+        handoff: {
+          path: '/coworker', label: 'Take over in the Co-worker',
+          message: 'The job is paused. Continue it yourself in the Co-worker.'
+        }
+      });
+    }
+    const statuses = { pause: 'PAUSED', resume: 'RUNNING', cancel: 'CANCELLED', retry: 'QUEUED' };
+    const updated = { ...current, status: statuses[body.action] || current.status };
+    jobsState = jobsState.map((job) => (job.job_id === id ? updated : job));
+    return jsonResponse({ success: true, job: updated });
+  }
+  if (url.startsWith('/api/assistant/jobs?')) {
+    const active = jobsState.filter((job) => ['QUEUED', 'RUNNING', 'PAUSED'].includes(job.status)).length;
+    const unseen = jobsState.filter((job) => !job.notification_seen).length;
+    return jsonResponse({ jobs: jobsState, active, unseen, limit: 3 });
+  }
+  if (url === '/api/assistant/web-access' && method === 'POST') {
+    return jsonResponse({
+      success: true,
+      web_access: {
+        configured: true, provider: 'sample',
+        provider_label: 'Sample web results (not connected)', sample_provider: true,
+        access: {
+          mode: body.access,
+          allowlist: String(body.allowlist || '').split(',').map((s) => s.trim()).filter(Boolean),
+          blocklist: []
+        }
+      }
+    });
+  }
+  if (url === '/api/assistant/web-access') {
+    return jsonResponse({
+      configured: true, provider: 'sample',
+      provider_label: 'Sample web results (not connected)', sample_provider: true,
+      access: { mode: 'open', allowlist: [], blocklist: [] }
+    });
+  }
   if (url === '/api/assistant/stream') {
     return ndjsonResponse([
       { type: 'context', context: { page: 'approvals', path: '/approvals', scope: body.workspace_mode, company_id: 'comp_1', company_name: 'Kora Hospitality', agent: 'CFO', agent_label: 'AI CFO' } },
@@ -152,6 +236,68 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   assert.ok(memoryDelete, 'forget calls the memory endpoint');
   console.log('  ok  remember, list and forget memory');
 
+  // Stage 3 — background jobs, watch, hand-off and web access.
+  await assistant.refreshJobs();
+  assert.strictEqual(assistant.jobs.length, 2);
+  assert.strictEqual(assistant.jobsBadgeCount(), 2);
+  assistant.openJobs();
+  assert.strictEqual(window.document.getElementById('uraJobsPanel').hidden, false);
+  const jobsText = window.document.getElementById('uraJobsList').textContent;
+  assert.ok(jobsText.includes('Research competitors'));
+  assert.ok(window.document.getElementById('uraJobsLimit').textContent.includes('1 of 3 active'));
+  assert.strictEqual(window.document.getElementById('uraJobsBadge').hidden, false);
+  console.log('  ok  jobs panel lists jobs, progress and the active limit');
+
+  await assistant.startBackground('Research pricing tools');
+  const createJob = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/jobs');
+  assert.ok(createJob, 'background start posts to the jobs endpoint');
+  assert.strictEqual(createJob[3].prompt, 'Research pricing tools');
+  assert.strictEqual(createJob[3].workspace_mode, 'PERSONAL');
+  assert.ok(assistant.jobs.some((job) => job.job_id === 'job_new'));
+  console.log('  ok  Run in background creates a persisted job');
+
+  await assistant.jobRequest('job_new', 'takeover');
+  assert.ok(calls.some((c) => c[0] === 'navigate' && c[1] === '/coworker'), 'take over hands off to the Co-worker');
+  assert.ok(window.document.getElementById('uraMessages').textContent.includes('The job is paused'));
+  await assistant.jobRequest('job_new', 'cancel');
+  assert.ok(assistant.jobs.find((job) => job.job_id === 'job_new').status === 'CANCELLED');
+  console.log('  ok  take over hands off and stop cancels the job');
+
+  await assistant.watchJob('job_1');
+  assert.ok(calls.some((c) => c[2] === '/api/assistant/jobs/job_1/watch'), 'watch streams the job');
+  assert.strictEqual(assistant.jobs.find((job) => job.job_id === 'job_1').status, 'SUCCEEDED');
+  assert.ok(window.document.getElementById('uraMessages').textContent.includes('There are 2 approvals waiting.'));
+  assert.ok(window.document.querySelector('.ura-citations a[href="https://example.com/sample"]'), 'sources render as labelled links');
+  console.log('  ok  watch streams progress and opens the cited result');
+
+  await assistant.markJobsSeen();
+  assert.ok(calls.some((c) => c[1] === 'POST' && c[2] === '/api/assistant/jobs/inbox/seen'));
+  assert.ok(assistant.jobs.every((job) => job.notification_seen), 'unseen notifications are cleared');
+  assert.strictEqual(assistant.jobsBadgeCount(), 0);
+  console.log('  ok  the jobs badge reflects unseen notifications');
+
+  await assistant.jobRequest('job_2', 'retry');
+  const retryCall = calls.find((c) => c[2] === '/api/assistant/jobs/job_2/action');
+  assert.ok(retryCall && retryCall[3].action === 'retry');
+  assert.strictEqual(assistant.jobs.find((job) => job.job_id === 'job_2').status, 'QUEUED');
+  await assistant.jobRequest('job_2', 'cancel');
+  console.log('  ok  retry and cancel act on the stored job');
+
+  await assistant.openWebAccess();
+  assert.strictEqual(window.document.getElementById('uraWebPanel').hidden, false);
+  const webBody = window.document.getElementById('uraWebBody').textContent;
+  assert.ok(webBody.includes('Sample web results'));
+  assert.ok(webBody.includes('Sample provider is on'));
+  assert.strictEqual(window.document.getElementById('uraWebMode').value, 'open');
+  window.document.getElementById('uraWebMode').value = 'allowlist';
+  window.document.getElementById('uraWebAllow').value = 'example.com';
+  await assistant.saveWebAccess();
+  const webSave = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/web-access');
+  assert.ok(webSave, 'web access saves through the settings endpoint');
+  assert.strictEqual(webSave[3].access, 'allowlist');
+  assert.strictEqual(webSave[3].allowlist, 'example.com');
+  console.log('  ok  web access loads, labels sample data and saves the allow list');
+
   assistant.action('dock');
   assert.strictEqual(window.document.getElementById('uraWindow').dataset.mode, 'docked');
   assistant.action('expand');
@@ -178,7 +324,7 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   }
   console.log('  ok  all eight snap anchors resolve');
 
-  console.log('\n10 URA Assistant jsdom checks passed.');
+  console.log('\n17 URA Assistant jsdom checks passed.');
 })().catch((err) => {
   console.error(err);
   process.exit(1);

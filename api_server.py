@@ -2518,6 +2518,48 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_file_bytes(content_bytes, filename=filename, content_type=content_type)
             return
 
+        elif path == "/api/assistant/jobs":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            from core.ura_assistant_jobs import AssistantJobStore
+            from core.ura_assistant_service import URAAssistantService
+            store = AssistantJobStore(tenant_id)
+            svc = URAAssistantService(tenant_id=tenant_id)
+            status_filter = (query_params.get("status", [None])[0] or "all").lower()
+            jobs = svc.recover_jobs(uid) if status_filter == "all" else store.list(uid, status=status_filter)
+            self._send_json({
+                "jobs": jobs,
+                "active": store.active_count(uid),
+                "unseen": store.unseen_count(uid),
+                "limit": 3,
+            })
+            return
+
+        elif path.startswith("/api/assistant/jobs/"):
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            job_id = path.split("/")[4] if len(path.split("/")) > 4 else ""
+            from core.ura_assistant_jobs import AssistantJobStore
+            job = AssistantJobStore(tenant_id).get(job_id, uid)
+            if job:
+                self._send_json({"job": job})
+            else:
+                self._send_json({"error": "Job not found"}, status=404)
+            return
+
+        elif path == "/api/assistant/web-access":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            from core.ura_assistant_web import web_status
+            self._send_json(web_status(tenant_id, company_id))
+            return
+
         elif path == "/api/assistant/memory":
             uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
             if not uid:
@@ -6264,6 +6306,136 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # =====================================================================
         # Prompt 03: Floating Live Assistant & Coworker POST Handlers
         # =====================================================================
+        elif path == "/api/assistant/jobs":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            ws_mode = str(req_data.get("workspace_mode", "PERSONAL")).upper()
+            if ws_mode not in ("PERSONAL", "COMPANY"):
+                ws_mode = "PERSONAL"
+            if ws_mode == "COMPANY" and not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.create_job(
+                prompt=str(req_data.get("prompt") or ""),
+                user_id=uid,
+                workspace_mode=ws_mode,
+                company_id=company_id,
+                session_id=req_data.get("session_id"),
+                kind=req_data.get("kind"),
+            )
+            self._send_json(res, status=200 if res.get("success") else 409)
+            return
+
+        elif path == "/api/assistant/jobs/inbox/seen":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            from core.ura_assistant_jobs import AssistantJobStore
+            store = AssistantJobStore(tenant_id)
+            self._send_json(store.mark_all_seen(uid))
+            return
+
+        elif path.startswith("/api/assistant/jobs/") and path.endswith("/action"):
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            parts = path.split("/")
+            job_id = parts[4] if len(parts) > 4 else ""
+            from core.ura_assistant_service import URAAssistantService
+            svc = URAAssistantService(tenant_id=tenant_id)
+            res = svc.job_action(job_id, uid, str(req_data.get("action") or ""))
+            self._send_json(res, status=200 if res.get("success") else 400)
+            return
+
+        elif path.startswith("/api/assistant/jobs/") and path.endswith("/watch"):
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            parts = path.split("/")
+            job_id = parts[4] if len(parts) > 4 else ""
+            from core.ura_assistant_jobs import AssistantJobStore, TERMINAL_STATUSES
+            store = AssistantJobStore(tenant_id)
+            job = store.get(job_id, uid)
+            if not job:
+                self._send_json({"error": "Job not found"}, status=404)
+                return
+            started = False
+            try:
+                self._start_ndjson()
+                started = True
+                deadline = time.time() + 600
+                last_snapshot = None
+                while True:
+                    current = store.get(job_id, uid)
+                    if not current:
+                        self._write_ndjson({"type": "job_missing", "job_id": job_id})
+                        break
+                    snapshot = (
+                        current.get("status"), current.get("progress"), current.get("step"),
+                    )
+                    if snapshot != last_snapshot:
+                        self._write_ndjson({"type": "job", "job": current})
+                        last_snapshot = snapshot
+                    if str(current.get("status") or "").upper() in TERMINAL_STATUSES:
+                        self._write_ndjson({"type": "job_done", "job": current})
+                        break
+                    if time.time() > deadline:
+                        self._write_ndjson({
+                            "type": "error",
+                            "message": "The watch session timed out. The job is still recorded; open Jobs to check it.",
+                        })
+                        break
+                    time.sleep(0.4)
+            except Exception:
+                logger.exception("Job watch stream failed")
+                if started:
+                    self._write_ndjson({
+                        "type": "error",
+                        "message": "The job watch stream failed. Nothing was executed.",
+                    })
+                else:
+                    self._send_json({"error": "Job watch failed"}, status=500)
+            finally:
+                self._end_ndjson()
+            return
+
+        elif path == "/api/assistant/web-access":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            mode = str(req_data.get("access") or req_data.get("mode") or "").lower()
+            if mode not in ("off", "allowlist", "open"):
+                self._send_json({"error": "Web access must be off, allowlist or open."}, status=400)
+                return
+            if not company_id:
+                self._send_json({"error": "Verified company context required"}, status=400)
+                return
+            from core.settings_service import settings_service
+            actor = str(auth_context.get("user_id") or "assistant")
+            role = str(auth_context.get("role") or "OWNER").upper()
+            for key, value in (
+                ("assistant_web_access", mode),
+                ("assistant_web_allowlist", str(req_data.get("allowlist") or "")),
+                ("assistant_web_blocklist", str(req_data.get("blocklist") or "")),
+            ):
+                res = settings_service.update_single_setting(
+                    tenant_id, company_id, key, value, actor=actor, actor_role=role,
+                )
+                if isinstance(res, dict) and res.get("success") is False:
+                    self._send_json(res, status=res.get("status_code") or 400)
+                    return
+            from core.ura_assistant_web import web_status
+            self._send_json({"success": True, "web_access": web_status(tenant_id, company_id)})
+            return
+
         elif path == "/api/assistant/stream":
             # The one streaming assistant service.  Events are NDJSON so the
             # browser can render tool steps, confirmations and answer chunks as
@@ -6291,7 +6463,7 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     prompt=prompt,
                     user_id=uid,
                     workspace_mode=ws_mode,
-                    company_id=company_id if ws_mode == "COMPANY" else None,
+                    company_id=company_id,
                     page_context=page_context,
                     session_id=req_data.get("session_id"),
                     agent_role=agent_role,

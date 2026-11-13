@@ -229,6 +229,19 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         "mutating": True,
         "scope": "COMPANY",
     },
+    "web_research": {
+        "description": "Research a question on the public web and cite the sources that were read.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to research."},
+                "limit": {"type": "number", "description": "Maximum sources to read."},
+            },
+            "required": ["query"],
+        },
+        "mutating": False,
+        "scope": "ANY",
+    },
 }
 
 
@@ -368,6 +381,9 @@ def _plan_tool(prompt: str, page: str) -> Tuple[Optional[str], Dict[str, Any]]:
         target = _extract_target(text)
         if target:
             return "navigate", {"target": target}
+
+    if _first(("research ", "web research", "search the web", "look up online", "look online", "find sources", "latest news", "on the web", "from the internet", "internet search"), lower):
+        return "web_research", {"query": text}
 
     if _first(("run command", "terminal", "shell command", "$ "), lower):
         command = re.sub(r"^(run|execute|please run|can you run)\s+(the\s+)?(command|in terminal|terminal)?\s*", "", text, flags=re.IGNORECASE).strip(" `")
@@ -616,6 +632,145 @@ class URAAssistantService:
             consequence="Assistant can read company context and propose governed actions.",
         )
         return {"success": True, "status": "PENDING", "request": req}
+
+    # ------------------------------------------------------------ background
+    def plan_job_kind(self, prompt: str) -> str:
+        tool, _ = _plan_tool(prompt, "overview")
+        return "research" if tool == "web_research" else "query"
+
+    def create_job(
+        self,
+        prompt: str,
+        user_id: str,
+        workspace_mode: str = "PERSONAL",
+        company_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        kind: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Start a background job.  At most three may be active per user."""
+        prompt = (prompt or "").strip()
+        if not prompt:
+            return {"success": False, "error": "Type what the job should do."}
+        from .ura_assistant_jobs import (
+            AssistantJobRunner, AssistantJobStore, MAX_ACTIVE_JOBS,
+        )
+
+        store = AssistantJobStore(self.tenant_id)
+        active = store.active_count(user_id)
+        if active >= MAX_ACTIVE_JOBS:
+            return {
+                "success": False,
+                "error": (
+                    f"You already have {MAX_ACTIVE_JOBS} active jobs. "
+                    "Pause, cancel or wait for one to finish before starting another."
+                ),
+                "limit": MAX_ACTIVE_JOBS,
+                "active": active,
+            }
+        scope = "COMPANY" if str(workspace_mode or "PERSONAL").upper() == "COMPANY" else "PERSONAL"
+        if scope == "COMPANY" and not company_id:
+            return {"success": False, "error": "Company scope needs a selected company."}
+        job_kind = kind if kind in ("research", "query") else self.plan_job_kind(prompt)
+        job = store.create(
+            user_id=user_id,
+            title=prompt[:80],
+            prompt=prompt,
+            kind=job_kind,
+            company_id=company_id,
+            workspace_mode=scope,
+            session_id=session_id,
+        )
+        AssistantJobRunner.instance().start(store, job)
+        return {
+            "success": True,
+            "job": store.get(job["job_id"], user_id) or job,
+            "limit": MAX_ACTIVE_JOBS,
+        }
+
+    def job_action(self, job_id: str, user_id: str, action: str) -> Dict[str, Any]:
+        from .ura_assistant_jobs import (
+            AssistantJobRunner, AssistantJobStore, MAX_ACTIVE_JOBS,
+        )
+
+        store = AssistantJobStore(self.tenant_id)
+        job = store.get(job_id, user_id)
+        if not job:
+            return {"success": False, "error": "Job not found."}
+        runner = AssistantJobRunner.instance()
+        action = str(action or "").lower()
+        status = str(job.get("status") or "").upper()
+        if action == "pause":
+            if status not in ("QUEUED", "RUNNING"):
+                return {"success": False, "error": f"A {status.lower()} job cannot be paused."}
+            runner.request_pause(job_id, True)
+            store.update(job_id, status="PAUSED", step="Paused", append_step=True)
+        elif action == "resume":
+            if status != "PAUSED":
+                return {"success": False, "error": "Only a paused job can resume."}
+            runner.request_pause(job_id, False)
+            store.update(job_id, status="RUNNING", step="Resumed", append_step=True)
+        elif action in ("cancel", "stop"):
+            if status in ("SUCCEEDED", "FAILED", "CANCELLED"):
+                return {"success": False, "error": "This job has already finished."}
+            runner.request_cancel(job_id)
+            store.update(
+                job_id,
+                status="CANCELLED",
+                progress=job.get("progress", 0),
+                step="Cancelled",
+                append_step=True,
+            )
+        elif action == "retry":
+            if status not in ("FAILED", "CANCELLED", "SUCCEEDED"):
+                return {"success": False, "error": "Only a finished job can be retried."}
+            if store.active_count(user_id) >= MAX_ACTIVE_JOBS:
+                return {"success": False, "error": f"The {MAX_ACTIVE_JOBS}-job limit is reached."}
+            reset = store.reset_for_retry(job_id, user_id)
+            if not reset:
+                return {"success": False, "error": "The job could not be reset."}
+            runner.start(store, reset)
+        elif action == "takeover":
+            if status in ("SUCCEEDED", "FAILED", "CANCELLED"):
+                return {"success": False, "error": "This job has already finished."}
+            runner.request_pause(job_id, True)
+            store.update(job_id, status="PAUSED", step="Paused for you to take over", append_step=True)
+            return {
+                "success": True,
+                "job": store.get(job_id, user_id),
+                "handoff": {
+                    "path": "/coworker",
+                    "label": "Take over in the Co-worker",
+                    "message": (
+                        "The job is paused. Continue it yourself in the Co-worker screen; "
+                        "the assistant will not restart it unless you press Resume."
+                    ),
+                },
+            }
+        else:
+            return {"success": False, "error": "Unknown job action."}
+        return {"success": True, "job": store.get(job_id, user_id)}
+
+    def recover_jobs(self, user_id: str) -> List[Dict[str, Any]]:
+        """Honestly mark jobs interrupted by a server restart."""
+        from .ura_assistant_jobs import AssistantJobRunner, AssistantJobStore
+
+        store = AssistantJobStore(self.tenant_id)
+        runner = AssistantJobRunner.instance()
+        jobs = store.list(user_id, status="active", limit=50)
+        for job in jobs:
+            if job.get("status") in ("QUEUED", "RUNNING") and not runner.is_live(job["job_id"]):
+                store.update(
+                    job["job_id"],
+                    status="FAILED",
+                    progress=job.get("progress", 0),
+                    step="Interrupted",
+                    error=(
+                        "The server restarted while this job was running, so it did not "
+                        "finish. Retry it to continue."
+                    ),
+                    append_step=True,
+                )
+        return store.list(user_id, status="all", limit=25)
 
     # --------------------------------------------------------------- context
     def resolve_agent(self, prompt: str) -> Tuple[Optional[str], str]:
@@ -940,6 +1095,94 @@ class URAAssistantService:
             },
         }
 
+    def _tool_web_research(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        query = str(args.get("query") or "").strip()
+        if not query:
+            return {"ok": False, "summary": "Tell me what to research."}
+        from .ura_assistant_web import filter_results, get_web_search_provider, load_web_access
+
+        company_id = kwargs.get("company_id")
+        policy = load_web_access(self.tenant_id, company_id)
+        if policy.mode == "off":
+            return {
+                "ok": False,
+                "summary": (
+                    "Web access is off, so I did not search the internet. "
+                    "Turn it on in Assistant → Web access."
+                ),
+                "card": {"type": "WEB_ACCESS_OFF"},
+            }
+        provider = get_web_search_provider()
+        if not provider.configured():
+            return {
+                "ok": False,
+                "summary": (
+                    "No web search provider is configured on the server, so I did not "
+                    "search the internet. Nothing was invented."
+                ),
+                "card": {"type": "WEB_NOT_CONFIGURED"},
+            }
+        try:
+            results = provider.search(query, limit=int(args.get("limit") or 5))
+        except Exception as exc:
+            logger.exception("Web research failed")
+            return {
+                "ok": False,
+                "summary": f"The web search failed: {exc}. Nothing was invented.",
+                "card": {"type": "WEB_SEARCH_FAILED"},
+            }
+        allowed, blocked = filter_results(results, policy)
+        if not allowed:
+            reason = blocked[0]["reason"] if blocked else "The provider returned no results."
+            return {
+                "ok": False,
+                "summary": f"No allowed source could be read: {reason}",
+                "data": {"blocked": blocked},
+                "card": {"type": "WEB_NO_SOURCES", "blocked": blocked},
+            }
+        citations = [
+            {
+                "source_type": "WEB",
+                "label": result.title,
+                "url": result.url,
+                "provider": result.provider,
+                "sample": bool(result.sample),
+                "verified": not result.sample,
+            }
+            for result in allowed
+        ]
+        lines = []
+        for index, result in enumerate(allowed, start=1):
+            lines.append(f"{index}. {result.title} — {result.domain}")
+            if result.snippet:
+                lines.append(f"   {result.snippet[:400]}")
+            if result.sample:
+                lines.append("   Sample data. Not a real source.")
+        answer = f"I read {len(allowed)} allowed source(s):\n" + "\n".join(lines)
+        if blocked:
+            answer += "\n\nExcluded by the access policy: " + "; ".join(
+                f"{item['url']} ({item['reason']})" for item in blocked
+            )
+        if provider.is_sample:
+            answer += (
+                "\n\nSample provider: these are demonstration results, not pages fetched "
+                "from the internet."
+            )
+        return {
+            "ok": True,
+            "summary": f"Read {len(allowed)} allowed source(s).",
+            "answer": answer,
+            "citations": citations,
+            "data": {"sources": citations, "blocked": blocked, "sample": bool(provider.is_sample)},
+            "card": {
+                "type": "WEB_SOURCES",
+                "title": f"{len(allowed)} source(s) for “{query[:60]}”",
+                "sources": citations,
+                "blocked": blocked,
+                "sample": bool(provider.is_sample),
+            },
+        }
+
     def _tool_delegate_task(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         prompt = str(args.get("prompt") or "").strip()
         if not prompt:
@@ -1178,12 +1421,14 @@ class URAAssistantService:
         tool_name: Optional[str],
         tool_result: Optional[Dict[str, Any]],
     ) -> Tuple[str, List[Dict[str, Any]], str]:
-        citations: List[Dict[str, Any]] = []
+        citations: List[Dict[str, Any]] = list((tool_result or {}).get("citations") or [])
         routed_to = "PERSONAL_SANDBOX" if scope == "PERSONAL" else "AI_CEO"
 
         if tool_result:
             if tool_result.get("answer"):
-                return str(tool_result["answer"]), citations, routed_to
+                return str(tool_result["answer"]), citations, (
+                    "WEB_RESEARCH" if tool_name == "web_research" else routed_to
+                )
             if not tool_result.get("ok"):
                 return (
                     str(tool_result.get("summary") or "The action did not complete."),
@@ -1210,7 +1455,7 @@ class URAAssistantService:
         # Build honest grounding for the answer.
         context_lines = self._page_context_lines(page_context)
         context_lines += self._memory_lines(user_id, scope, company_id)
-        if company_id:
+        if scope == "COMPANY" and company_id:
             name = self._company_name(company_id)
             if name:
                 context_lines.append(f"Company: {name} ({company_id}).")

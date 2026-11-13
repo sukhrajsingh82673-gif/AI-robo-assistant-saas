@@ -117,6 +117,11 @@
       this.agentRole = null;
       this.streamState = null;
       this.pendingConfirmations = [];
+      this.jobs = [];
+      this.jobsOpen = false;
+      this.webOpen = false;
+      this.watchingJobId = null;
+      this.jobPollTimer = null;
       this.drag = null;
       this.storageKey = `${STORAGE}:${userKey()}`;
       this.initialized = false;
@@ -137,6 +142,7 @@
       this.bind();
       this.refreshContext();
       this.checkCompanyPermission();
+      this.startJobsPolling();
       if (this.showButton === 'hidden' && this.launcher) this.launcher.hidden = true;
       this.applyAnchor();
       this.applyMode();
@@ -208,6 +214,10 @@
               <button type="button" data-scope="COMPANY" aria-pressed="false">Company <span class="ura-lock" id="uraCompanyLock" hidden>🔒</span></button>
             </div>
             <div class="ura-actions">
+              <button class="ura-icon-btn ura-jobs-btn" type="button" data-action="jobs" title="Background jobs" aria-label="Background jobs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span class="ura-badge ura-badge-corner" id="uraJobsBadge" hidden>0</span>
+              </button>
               <button class="ura-icon-btn" type="button" data-action="dock" title="Dock to side panel" aria-label="Dock to side panel">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
               </button>
@@ -229,6 +239,23 @@
             <span class="ura-chip ura-agent-chip" id="uraAgentChip" hidden></span>
           </div>
 
+          <div class="ura-panel" id="uraJobsPanel" hidden aria-label="Background jobs">
+            <div class="ura-panel-head">
+              <strong>Jobs</strong>
+              <span class="ura-panel-meta" id="uraJobsLimit"></span>
+              <button class="ura-memory-link" type="button" data-jobs-close>Done</button>
+            </div>
+            <div class="ura-jobs-list" id="uraJobsList"></div>
+          </div>
+
+          <div class="ura-panel" id="uraWebPanel" hidden aria-label="Web access settings">
+            <div class="ura-panel-head">
+              <strong>Web access</strong>
+              <button class="ura-memory-link" type="button" data-web-close>Done</button>
+            </div>
+            <div class="ura-web-body" id="uraWebBody">Loading…</div>
+          </div>
+
           <div class="ura-banner" id="uraPermissionBanner" hidden>
             <span>Company scope needs the AI CEO's permission.</span>
             <button type="button" id="uraAskPermission">Ask the CEO</button>
@@ -245,6 +272,10 @@
               <button type="button" data-plus="screen">🖥️ Observe my screen</button>
               <button type="button" data-plus="stop">🛑 Emergency stop</button>
               <div class="ura-menu-note">The Co-worker is an agent/employee workspace.</div>
+              <button type="button" data-plus="research">🔎 Research the web</button>
+              <button type="button" data-plus="background">⏳ Run in background</button>
+              <button type="button" data-plus="jobs">🗂️ Jobs <span class="ura-plus-count" id="uraPlusJobsCount"></span></button>
+              <button type="button" data-plus="web">🌐 Web access…</button>
               <button type="button" data-plus="remember">🧠 Remember this</button>
               <button type="button" data-plus="memory">🧠 Saved memory</button>
               <button type="button" data-plus="clear">🗑️ Clear history</button>
@@ -281,6 +312,17 @@
         if (confirmBtn) { this.confirmTool(Number(confirmBtn.dataset.confirmIndex)); return; }
         const forgetBtn = event.target.closest('[data-forget-memory]');
         if (forgetBtn) { this.forgetMemory(forgetBtn.dataset.forgetMemory); return; }
+        const jobBtn = event.target.closest('[data-job-action]');
+        if (jobBtn) { this.jobRequest(jobBtn.dataset.jobId, jobBtn.dataset.jobAction); return; }
+        const watchBtn = event.target.closest('[data-watch-job]');
+        if (watchBtn) { this.watchJob(watchBtn.dataset.watchJob); return; }
+        const openJobBtn = event.target.closest('[data-open-job]');
+        if (openJobBtn) { this.showJobResult(openJobBtn.dataset.openJob); return; }
+        if (event.target.closest('[data-jobs-panel]')) { this.openJobs(); return; }
+        if (event.target.closest('[data-jobs-close]')) { this.closeJobs(); return; }
+        if (event.target.closest('[data-web-close]')) { this.closeWebAccess(); return; }
+        if (event.target.closest('[data-web-save]')) { this.saveWebAccess(); return; }
+        if (event.target.closest('[data-jobs-seen]')) { this.markJobsSeen(); return; }
         if (event.target.closest('[data-open-memory]')) { this.openMemory(); return; }
         if (event.target.closest('[data-forget-all]')) { this.forgetAllMemories(); return; }
         if (event.target.closest('#uraAskPermission')) { this.askCompanyPermission(); }
@@ -558,6 +600,7 @@
       else if (action === 'mic') this.dictate();
       else if (action === 'dock') this.setMode(this.mode === 'docked' ? 'window' : 'docked');
       else if (action === 'expand') this.setMode(this.mode === 'expanded' ? 'window' : 'expanded');
+      else if (action === 'jobs') this.openJobs();
       else if (action === 'minimise') this.minimise();
       else if (action === 'close') this.close();
     }
@@ -589,6 +632,10 @@
       }
       if (action === 'screen') this.observeScreen();
       if (action === 'stop') this.emergencyStop();
+      if (action === 'research') this.researchLast();
+      if (action === 'background') this.startBackground();
+      if (action === 'jobs') this.openJobs();
+      if (action === 'web') this.openWebAccess();
       if (action === 'remember') this.rememberLast();
       if (action === 'memory') this.openMemory();
       if (action === 'clear') this.clearConversation();
@@ -820,7 +867,14 @@
       const time = new Date((message.timestamp || Date.now() / 1000) * 1000)
         .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const citations = Array.isArray(message.citations) && message.citations.length
-        ? `<div class="ura-citations">${message.citations.map((c) => `<span>${escapeHtml(c.label || c.source_type || 'Source')}</span>`).join('')}</div>`
+        ? `<div class="ura-citations">${message.citations.map((c) => {
+          const label = escapeHtml(c.label || c.source_type || 'Source');
+          const inner = c.url
+            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+            : label;
+          const sample = c.sample ? ' <em>sample</em>' : '';
+          return `<span>${inner}${sample}</span>`;
+        }).join('')}</div>`
         : '';
       const metaName = mine ? 'You' : 'URA';
       return `
@@ -934,6 +988,28 @@
       } else if (card.type === 'INTEGRATION_HANDOFF' || card.type === 'TERMINAL_HANDOFF') {
         body = `<div class="ura-card-meta">${escapeHtml(card.provider || card.command || '')} · nothing connected automatically</div>
           <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('${escapeHtml(card.path || '/integrations')}')">Open</button></div>`;
+      } else if (card.type === 'WEB_SOURCES') {
+        const sources = Array.isArray(card.sources) ? card.sources : [];
+        const blocked = Array.isArray(card.blocked) ? card.blocked : [];
+        body = `<div class="ura-card-meta">${sources.length} allowed source(s)${card.sample ? ' · sample data, not real pages' : ''}</div>
+          <div class="ura-memory-list">${sources.map((source, index) => `
+            <div class="ura-memory-row">
+              <span>${index + 1}. <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || source.url)}</a></span>
+              <span class="ura-card-meta">${escapeHtml(source.sample ? 'sample' : (source.provider || 'web'))}</span>
+            </div>
+          `).join('')}</div>
+          ${blocked.length ? `<div class="ura-card-meta">${blocked.length} source(s) excluded by the access policy.</div>` : ''}
+          ${card.sample ? '<div class="ura-sample-note">Sample data. These are not pages fetched from the internet.</div>' : ''}`;
+      } else if (card.type === 'WEB_ACCESS_OFF' || card.type === 'WEB_NOT_CONFIGURED' || card.type === 'WEB_SEARCH_FAILED' || card.type === 'WEB_NO_SOURCES') {
+        body = `<div class="ura-card-meta">${escapeHtml((card.blocked || []).map((b) => b.reason).join(' ') || 'No source was read.')}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-plus="web">Open web access</button></div>`;
+      } else if (card.type === 'JOB_RESULT') {
+        const result = (card.job && card.job.result) || {};
+        body = `<div class="ura-card-meta">${escapeHtml(card.job ? this.jobStatusLabel(card.job.status) : '')}${result.summary ? ' · see the answer above' : ''}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-jobs-panel>Job details</button></div>`;
+      } else if (card.type === 'HANDOFF') {
+        body = `<div class="ura-card-meta">${escapeHtml(card.label || 'Take over there')}</div>
+          <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('${escapeHtml(card.path || '/coworker')}')">Open</button></div>`;
       } else {
         body = `<div class="ura-card-meta">${escapeHtml(card.path || '')}</div>`;
       }
@@ -979,6 +1055,375 @@
       }
     }
 
+    // ------------------------------------------------------------------ jobs
+    jobsBadgeCount() {
+      const terminal = ['SUCCEEDED', 'FAILED'];
+      return this.jobs.filter((job) => {
+        const status = String(job.status || '').toUpperCase();
+        if (['QUEUED', 'RUNNING', 'PAUSED'].includes(status)) return true;
+        return terminal.includes(status) && !job.notification_seen;
+      }).length;
+    }
+
+    startJobsPolling() {
+      if (window.__URA_NO_POLL__ || this.jobPollTimer) return;
+      this.refreshJobs();
+      this.jobPollTimer = window.setInterval(() => this.refreshJobs(), 6000);
+    }
+
+    stopJobsPolling() {
+      if (this.jobPollTimer) {
+        clearInterval(this.jobPollTimer);
+        this.jobPollTimer = null;
+      }
+    }
+
+    async refreshJobs() {
+      try {
+        const res = await fetch('/api/assistant/jobs?status=all');
+        if (!res.ok) return;
+        const data = await res.json();
+        this.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+        this.jobLimit = data.limit || 3;
+        this.jobActive = data.active || 0;
+        this.updateJobsBadge();
+        if (this.jobsOpen) this.renderJobs();
+      } catch (err) { /* offline: keep the last known list */ }
+    }
+
+    updateJobsBadge() {
+      const count = this.jobsBadgeCount();
+      ['uraJobsBadge', 'uraBadge'].forEach((id) => {
+        const badge = document.getElementById(id);
+        if (!badge) return;
+        badge.hidden = !count;
+        badge.textContent = String(count);
+      });
+      const plusCount = document.getElementById('uraPlusJobsCount');
+      if (plusCount) plusCount.textContent = count ? `(${count})` : '';
+    }
+
+    openJobs() {
+      this.jobsOpen = true;
+      this.webOpen = false;
+      const jobsPanel = document.getElementById('uraJobsPanel');
+      const webPanel = document.getElementById('uraWebPanel');
+      if (jobsPanel) jobsPanel.hidden = false;
+      if (webPanel) webPanel.hidden = true;
+      this.renderJobs();
+      this.refreshJobs();
+    }
+
+    closeJobs() {
+      this.jobsOpen = false;
+      const panel = document.getElementById('uraJobsPanel');
+      if (panel) panel.hidden = true;
+    }
+
+    jobStatusLabel(status) {
+      const map = {
+        QUEUED: 'Queued', RUNNING: 'Running', PAUSED: 'Paused',
+        SUCCEEDED: 'Done', FAILED: 'Failed', CANCELLED: 'Stopped'
+      };
+      return map[String(status || '').toUpperCase()] || String(status || 'Unknown');
+    }
+
+    renderJobs() {
+      const box = document.getElementById('uraJobsList');
+      if (!box) return;
+      const limit = this.jobLimit || 3;
+      const limitEl = document.getElementById('uraJobsLimit');
+      if (limitEl) limitEl.textContent = `${this.jobActive || 0} of ${limit} active`;
+      if (!this.jobs.length) {
+        box.innerHTML = '<div class="ura-card-meta">No jobs yet. Ask something, then choose “Run in background”. Up to three jobs run at once and they survive a reload.</div>';
+        return;
+      }
+      box.innerHTML = this.jobs.map((job) => this.renderJob(job)).join('');
+    }
+
+    renderJob(job) {
+      const status = String(job.status || '').toUpperCase();
+      const terminal = ['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(status);
+      const progress = Math.max(0, Math.min(100, Number(job.progress) || 0));
+      const steps = Array.isArray(job.steps) ? job.steps.slice(-4) : [];
+      const busy = ['QUEUED', 'RUNNING', 'PAUSED'].includes(status);
+      const id = escapeHtml(job.job_id);
+      const actions = [];
+      if (this.watchingJobId === job.job_id) actions.push('<span class="ura-card-meta">Watching…</span>');
+      if (status === 'RUNNING') actions.push(`<button class="ura-memory-link" type="button" data-job-action="pause" data-job-id="${id}">Pause</button>`);
+      if (status === 'PAUSED') actions.push(`<button class="ura-memory-link" type="button" data-job-action="resume" data-job-id="${id}">Resume</button>`);
+      if (busy) {
+        actions.push(`<button class="ura-memory-link" type="button" data-watch-job="${id}">Watch me</button>`);
+        actions.push(`<button class="ura-memory-link" type="button" data-job-action="takeover" data-job-id="${id}">Take over</button>`);
+        actions.push(`<button class="ura-memory-link ura-memory-danger" type="button" data-job-action="cancel" data-job-id="${id}">Stop</button>`);
+      }
+      if (terminal) {
+        if (job.result || job.error) actions.push(`<button class="ura-memory-link" type="button" data-open-job="${id}">Open result</button>`);
+        if (status !== 'SUCCEEDED') actions.push(`<button class="ura-memory-link" type="button" data-job-action="retry" data-job-id="${id}">Retry</button>`);
+      }
+      return `<div class="ura-job" data-status="${escapeHtml(status)}">
+        <div class="ura-job-head">
+          <span class="ura-job-title">${escapeHtml(job.title || job.prompt || 'Job')}</span>
+          <span class="ura-job-status" data-status="${escapeHtml(status)}">${escapeHtml(this.jobStatusLabel(status))}</span>
+        </div>
+        <div class="ura-job-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div>
+        <div class="ura-card-meta">${escapeHtml(job.step || '')}${job.kind ? ` · ${escapeHtml(job.kind)}` : ''}</div>
+        ${steps.length ? `<div class="ura-job-steps">${steps.map((s) => `<div>${escapeHtml(s.label || '')}</div>`).join('')}</div>` : ''}
+        ${job.error ? `<div class="ura-card-meta ura-job-error">${escapeHtml(job.error)}</div>` : ''}
+        <div class="ura-card-actions">${actions.join('')}</div>
+      </div>`;
+    }
+
+    async jobRequest(jobId, action) {
+      if (!jobId || !action) return;
+      try {
+        const res = await fetch(`/api/assistant/jobs/${encodeURIComponent(jobId)}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+        if (data.handoff) {
+          this.addMessage('assistant', data.handoff.message || 'The job is paused. Take over there.', {
+            card: { type: 'HANDOFF', path: data.handoff.path, label: data.handoff.label }
+          });
+          if (data.handoff.path && window.navigateTo) window.navigateTo(data.handoff.path);
+        } else {
+          this.addToolStep(`Job ${action}`);
+        }
+        await this.refreshJobs();
+      } catch (err) {
+        this.addMessage('assistant', `That job action failed: ${err.message}. Nothing changed.`);
+      }
+    }
+
+    async startBackground(prompt) {
+      const input = document.getElementById('uraInput');
+      let text = (prompt != null ? prompt : (input ? input.value : '')).trim();
+      if (input) { input.value = ''; input.style.height = 'auto'; }
+      if (!text) {
+        const lastUser = [...this.messages].reverse().find((m) => m.sender === 'user');
+        if (lastUser) text = lastUser.text;
+      }
+      if (!text) {
+        this.addMessage('assistant', 'Tell me what to work on first — type it, then choose “Run in background”.');
+        return;
+      }
+      if (this.scope === 'COMPANY' && !this.companyGranted) {
+        this.renderPermissionBanner();
+        this.addMessage('assistant', 'Company scope is locked until the AI CEO approves access. Nothing was started.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/assistant/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: text,
+            workspace_mode: this.scope,
+            company_id: this.scope === 'COMPANY' ? this.getCompanyId() : null,
+            session_id: this.sessionId
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+        const job = data.job || {};
+        this.openJobs();
+        this.addToolStep('Started a background job');
+        this.addMessage('assistant', `I started “${job.title || text}” in the background. It keeps running if you close the window; open Jobs to watch, pause or stop it.`);
+        await this.refreshJobs();
+      } catch (err) {
+        this.addMessage('assistant', `I could not start that job: ${err.message}. Nothing was started.`);
+      }
+    }
+
+    researchLast() {
+      const input = document.getElementById('uraInput');
+      let text = (input ? input.value : '').trim();
+      if (input) { input.value = ''; input.style.height = 'auto'; }
+      if (!text) {
+        const lastUser = [...this.messages].reverse().find((m) => m.sender === 'user');
+        text = lastUser ? lastUser.text : '';
+      }
+      if (!text) {
+        this.addMessage('assistant', 'Tell me what to research first. Web access must be on in Assistant → Web access.');
+        return;
+      }
+      this.send(`research ${text}`);
+    }
+
+    async watchJob(jobId) {
+      if (!jobId) return;
+      this.watchingJobId = jobId;
+      this.openJobs();
+      try {
+        const res = await fetch(`/api/assistant/jobs/${encodeURIComponent(jobId)}/watch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        if (!res.body || !res.body.getReader) {
+          const text = await res.text();
+          text.split('\n').filter(Boolean).forEach((line) => {
+            try { this.handleJobEvent(JSON.parse(line)); } catch (err) { /* skip partial line */ }
+          });
+        } else {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try { this.handleJobEvent(JSON.parse(line)); } catch (err) { /* skip */ }
+            }
+          }
+        }
+      } catch (err) {
+        this.addMessage('assistant', `I could not watch that job: ${err.message}.`);
+      } finally {
+        this.watchingJobId = null;
+        await this.refreshJobs();
+      }
+    }
+
+    handleJobEvent(event) {
+      if (!event) return;
+      if (event.type === 'job' || event.type === 'job_done') {
+        const job = event.job;
+        if (!job) return;
+        const index = this.jobs.findIndex((j) => j.job_id === job.job_id);
+        if (index >= 0) this.jobs[index] = job;
+        else this.jobs.unshift(job);
+        this.renderJobs();
+        this.updateJobsBadge();
+      }
+      if (event.type === 'error') this.addMessage('assistant', event.message || 'The watch session ended.');
+      if (event.type === 'job_done' && event.job) this.showJobResult(event.job.job_id);
+    }
+
+    showJobResult(jobId) {
+      const job = this.jobs.find((j) => j.job_id === jobId);
+      if (!job) return;
+      const status = String(job.status || '').toUpperCase();
+      if (status === 'FAILED') {
+        this.addMessage('assistant', `Job “${job.title || jobId}” failed: ${job.error || 'no reason was recorded.'}`, {
+          card: { type: 'JOB_RESULT', job }
+        });
+        return;
+      }
+      if (status === 'CANCELLED') {
+        this.addMessage('assistant', `Job “${job.title || jobId}” was stopped.`, {
+          card: { type: 'JOB_RESULT', job }
+        });
+        return;
+      }
+      const result = job.result || {};
+      this.addMessage('assistant', result.summary || 'The job finished but recorded no summary.', {
+        citations: Array.isArray(job.citations) ? job.citations : [],
+        card: { type: 'JOB_RESULT', job }
+      });
+    }
+
+    async markJobsSeen() {
+      try {
+        await fetch('/api/assistant/jobs/inbox/seen', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        this.jobs = this.jobs.map((job) => ({ ...job, notification_seen: 1 }));
+        this.updateJobsBadge();
+        this.renderJobs();
+      } catch (err) { /* notifications are non-critical */ }
+    }
+
+    // ------------------------------------------------------------ web access
+    async openWebAccess() {
+      this.jobsOpen = false;
+      this.webOpen = true;
+      const jobsPanel = document.getElementById('uraJobsPanel');
+      const webPanel = document.getElementById('uraWebPanel');
+      if (jobsPanel) jobsPanel.hidden = true;
+      if (webPanel) webPanel.hidden = false;
+      const body = document.getElementById('uraWebBody');
+      if (body) body.textContent = 'Loading…';
+      try {
+        const res = await fetch('/api/assistant/web-access');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.renderWebAccess(data);
+      } catch (err) {
+        if (body) body.innerHTML = `<div class="ura-card-meta">Could not read web access: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    closeWebAccess() {
+      this.webOpen = false;
+      const panel = document.getElementById('uraWebPanel');
+      if (panel) panel.hidden = true;
+    }
+
+    renderWebAccess(data) {
+      const body = document.getElementById('uraWebBody');
+      if (!body) return;
+      const access = data.access || {};
+      const mode = access.mode || 'off';
+      const providerNote = data.configured
+        ? `${escapeHtml(data.provider_label || data.provider)}${data.sample_provider ? ' · sample data, not real pages' : ''}`
+        : 'No web search provider is configured on the server.';
+      body.innerHTML = `
+        <label class="ura-field"><span>Web access</span>
+          <select id="uraWebMode">
+            <option value="off"${mode === 'off' ? ' selected' : ''}>Off — never read the web</option>
+            <option value="allowlist"${mode === 'allowlist' ? ' selected' : ''}>Allow list — only these domains</option>
+            <option value="open"${mode === 'open' ? ' selected' : ''}>Open — any domain except the block list</option>
+          </select>
+        </label>
+        <label class="ura-field"><span>Allow list (comma-separated domains)</span>
+          <textarea id="uraWebAllow" rows="2">${escapeHtml((access.allowlist || []).join(', '))}</textarea>
+        </label>
+        <label class="ura-field"><span>Block list (comma-separated domains)</span>
+          <textarea id="uraWebBlock" rows="2">${escapeHtml((access.blocklist || []).join(', '))}</textarea>
+        </label>
+        <div class="ura-card-meta">${providerNote}</div>
+        ${data.sample_provider ? '<div class="ura-sample-note">Sample provider is on. Results are labelled sample and are not real sources.</div>' : ''}
+        <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" data-web-save>Save</button></div>
+      `;
+    }
+
+    async saveWebAccess() {
+      const mode = document.getElementById('uraWebMode') ? document.getElementById('uraWebMode').value : 'off';
+      const allowlist = document.getElementById('uraWebAllow') ? document.getElementById('uraWebAllow').value : '';
+      const blocklist = document.getElementById('uraWebBlock') ? document.getElementById('uraWebBlock').value : '';
+      const companyId = this.getCompanyId();
+      if (!companyId) {
+        this.addMessage('assistant', 'Web access is a company setting. Onboard a company or select one first.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/assistant/web-access', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access: mode, allowlist, blocklist, company_id: companyId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+        this.renderWebAccess(data.web_access || {});
+        this.addToolStep('Saved web access');
+        this.addMessage('assistant', `Web access is now “${mode}”. Research uses only sources allowed by these lists.`);
+      } catch (err) {
+        this.addMessage('assistant', `I could not save web access: ${err.message}. Nothing changed.`);
+      }
+    }
+
     clearConversation() {
       this.messages = [];
       this.pendingConfirmations = [];
@@ -1014,10 +1459,12 @@
     setLauncherState(state, count = 0) {
       if (!this.launcher) return;
       this.launcher.dataset.state = state;
-      const badge = document.getElementById('uraBadge');
-      if (badge) {
-        badge.hidden = !count;
-        badge.textContent = String(count);
+      if (count > 0) {
+        const badge = document.getElementById('uraBadge');
+        if (badge) {
+          badge.hidden = false;
+          badge.textContent = String(count);
+        }
       }
       const dot = document.getElementById('uraDot');
       if (dot) dot.hidden = state !== 'needs-you';
