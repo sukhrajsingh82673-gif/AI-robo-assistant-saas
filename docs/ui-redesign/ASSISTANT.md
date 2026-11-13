@@ -146,7 +146,9 @@ Only the launcher, toasts and the phone tab bar may be fixed to the bottom.
   company data/decisions; join/listen, live notes, summary, decisions, action
   items → tasks/approvals; recording banner and announcement setting;
   searchable meeting library.
-- `TranscriptionAdapter` with a sample provider when no provider is configured.
+- `TranscriptionAdapter`: "not connected" by default; a labelled sample
+  provider only behind `URA_ASSISTANT_TRANSCRIPTION_PROVIDER=sample` (no audio
+  is captured).
 
 ### Stage 5 — settings and tests
 - Assistant settings category with control, plain-language hint, suggestion and

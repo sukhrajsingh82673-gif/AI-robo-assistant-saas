@@ -62,6 +62,17 @@ let jobsState = [
   }
 ];
 
+let meetingsState = [
+  {
+    meeting_id: 'meet_1', title: 'Executive Briefing with Kora', status: 'Ended',
+    strategic_context: 'Q4 budget', summary: 'The retreat was approved with a cap.',
+    created_at: 1710000000, matches: []
+  }
+];
+let meetingNotesState = [];
+let recordingEnabled = true;
+let meetingLive = null;
+
 window.fetch = async (url, options) => {
   const method = (options && options.method) || 'GET';
   const body = options && options.body ? JSON.parse(options.body) : null;
@@ -135,6 +146,84 @@ window.fetch = async (url, options) => {
       configured: true, provider: 'sample',
       provider_label: 'Sample web results (not connected)', sample_provider: true,
       access: { mode: 'open', allowlist: [], blocklist: [] }
+    });
+  }
+  if (url.startsWith('/api/assistant/meetings?') || url === '/api/assistant/meetings') {
+    const q = url.includes('?q=') ? decodeURIComponent(url.split('?q=')[1]).toLowerCase() : '';
+    const meetings = meetingsState.filter((m) => !q
+      || m.title.toLowerCase().includes(q) || String(m.summary || '').toLowerCase().includes(q));
+    return jsonResponse({
+      company_id: 'comp_1',
+      meetings, count: meetings.length, query: q,
+      calendar: { configured: false, provider: 'none', label: 'Calendar not connected' },
+      transcription: { configured: true, provider: 'sample', label: 'Sample transcript (not connected)', sample: true },
+      recording: {
+        enabled: recordingEnabled,
+        text: 'Sample transcript only. No audio is being recorded.',
+        announcement: recordingEnabled ? 'Recording announcement (sample mode): no audio is captured.' : '',
+        transcription: { configured: true, provider: 'sample', label: 'Sample transcript (not connected)', sample: true }
+      }
+    });
+  }
+  if (url === '/api/assistant/meetings/brief') {
+    return jsonResponse({
+      company: { company_id: 'comp_1', name: 'Kora Hospitality', industry: 'Hospitality' },
+      pending_approvals: [{ request_id: 'apr_pending4', action_desc: 'Approve the Q4 retreat budget', risk_level: 'HIGH' }],
+      decisions: [], missions: [],
+      scheduled_meetings: [],
+      agenda: ['Decide 1 pending approval(s), starting with “Approve the Q4 retreat budget”.'],
+      summary: 'Pre-meeting brief for Kora Hospitality.',
+      sources: [{ source_type: 'INTERNAL', label: 'Live approvals, decisions, missions and meetings', verified: true }]
+    });
+  }
+  if (url === '/api/assistant/meetings/listen') {
+    meetingLive = {
+      success: true,
+      meeting: { meeting_id: 'meet_1', title: 'Executive Briefing with Kora', status: 'Live' },
+      segments: [
+        { speaker: 'Sample transcript', text: 'Sample transcript line: no microphone was opened and no audio was captured.', sample: true }
+      ],
+      recording: { enabled: recordingEnabled, announcement: 'Recording announcement (sample mode).' },
+      sample: true,
+      message: 'Listening in sample mode. The lines below are labelled sample text, not captured audio.'
+    };
+    return jsonResponse(meetingLive);
+  }
+  if (url === '/api/assistant/meetings/notes') {
+    const note = { speaker: 'HOST', mode: 'NOTE', message: body.note };
+    meetingNotesState.push(note);
+    return jsonResponse({ success: true, meeting: meetingLive.meeting, note });
+  }
+  if (url === '/api/assistant/meetings/summary') {
+    return jsonResponse({
+      success: true,
+      meeting: { meeting_id: 'meet_1', title: 'Executive Briefing with Kora', status: 'Ended' },
+      summary: 'Meeting: Executive Briefing with Kora\nNotes:\n- Keep the Goa retreat.',
+      notes: meetingNotesState,
+      decisions: [],
+      minutes: { doc_id: 'doc_1', download_url: '/api/assistant/documents/doc_1/download' },
+      minutes_error: null
+    });
+  }
+  if (url === '/api/assistant/meetings/actions') {
+    const request = body.requires_approval
+      ? { request_id: 'apr_action', status: 'PENDING' }
+      : { task_id: 'cwk_action', status: 'PLANNING' };
+    return jsonResponse({
+      success: true,
+      kind: body.requires_approval ? 'APPROVAL' : 'TASK',
+      title: body.title, meeting_id: 'meet_1', request
+    });
+  }
+  if (url === '/api/assistant/meetings/recording') {
+    recordingEnabled = Boolean(body.enabled);
+    return jsonResponse({
+      success: true,
+      recording: {
+        enabled: recordingEnabled,
+        text: recordingEnabled ? 'Sample transcript only.' : 'The announcement is off.',
+        announcement: recordingEnabled ? 'Recording announcement (sample mode).' : ''
+      }
     });
   }
   if (url === '/api/assistant/stream') {
@@ -298,6 +387,79 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   assert.strictEqual(webSave[3].allowlist, 'example.com');
   console.log('  ok  web access loads, labels sample data and saves the allow list');
 
+  // Stage 4 — meetings, brief, live notes, summary and governed action items.
+  assistant.companyGranted = true;
+  assistant.setScope('COMPANY');
+  await assistant.openMeetings();
+  assert.strictEqual(window.document.getElementById('uraMeetingsPanel').hidden, false);
+  const meetingsBody = window.document.getElementById('uraMeetingsBody').textContent;
+  assert.ok(meetingsBody.includes('Calendar not connected'), 'calendar is reported as not connected');
+  assert.ok(meetingsBody.includes('Sample transcript'), 'sample transcription is labelled');
+  assert.ok(meetingsBody.includes('Executive Briefing with Kora'), 'library lists stored meetings');
+  assert.ok(meetingsBody.includes('Announce recording before listening'));
+  assert.strictEqual(window.document.getElementById('uraMeetingsMeta').textContent, '1 meeting(s)');
+  console.log('  ok  meetings panel shows calendar, transcription and the meeting library');
+
+  await assistant.loadMeetingBrief();
+  const briefText = window.document.getElementById('uraMeetingsBody').textContent;
+  assert.ok(briefText.includes('Decide 1 pending approval'), 'brief agenda comes from live counts');
+  assert.ok(calls.some((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/brief'));
+  console.log('  ok  pre-meeting brief is built from live approvals and missions');
+
+  await assistant.startMeetingListen();
+  const listenCall = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/listen');
+  assert.ok(listenCall, 'listen posts to the meetings endpoint');
+  assert.ok(assistant.meetingLive && assistant.meetingLive.sample, 'sample transcript is kept labelled');
+  assert.ok(window.document.getElementById('uraMeetingsBody').textContent.includes('no audio was captured'));
+  console.log('  ok  listening labels the sample transcript and captures nothing');
+
+  window.document.getElementById('uraMeetingNote').value = 'Keep the Goa retreat.';
+  await assistant.saveMeetingNote();
+  const noteCall = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/notes');
+  assert.ok(noteCall && noteCall[3].note === 'Keep the Goa retreat.');
+  assert.strictEqual(assistant.meetingNotes.length, 1);
+  assert.ok(window.document.getElementById('uraMeetingsBody').textContent.includes('Keep the Goa retreat.'));
+  console.log('  ok  live notes are saved to the meeting record');
+
+  await assistant.summariseMeeting();
+  const summaryCall = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/summary');
+  assert.ok(summaryCall && summaryCall[3].end === true);
+  assert.ok(assistant.meetingSummary && assistant.meetingSummary.minutes);
+  assert.ok(window.document.querySelector('a[href="/api/assistant/documents/doc_1/download"]'), 'minutes link renders only when returned');
+  assert.ok(window.document.getElementById('uraMessages').textContent.includes('Keep the Goa retreat.'));
+  console.log('  ok  the summary compiles the record and links the minutes');
+
+  window.document.getElementById('uraMeetingAction').value = 'Send the budget to finance';
+  await assistant.createMeetingAction();
+  let actionCall = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/actions');
+  assert.ok(actionCall && actionCall[3].requires_approval === false);
+  assert.ok(assistant.meetingActionFlash.includes('cwk_action'));
+  window.document.getElementById('uraMeetingAction').value = 'Approve the retreat spend';
+  window.document.getElementById('uraMeetingActionApproval').checked = true;
+  await assistant.createMeetingAction();
+  actionCall = calls.filter((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/actions').pop();
+  assert.strictEqual(actionCall[3].requires_approval, true);
+  assert.ok(assistant.meetingActionFlash.includes('apr_action'));
+  console.log('  ok  action items become a Co-worker task or a pending approval');
+
+  const searchBefore = calls.filter((c) => String(c[2]).startsWith('/api/assistant/meetings')).length;
+  window.document.getElementById('uraMeetingSearch').value = 'kora';
+  assistant.searchMeetings();
+  await wait();
+  assert.ok(calls.filter((c) => String(c[2]).startsWith('/api/assistant/meetings')).length > searchBefore);
+  assert.strictEqual(assistant.meetingQuery, 'kora');
+  console.log('  ok  the library search re-queries the server');
+
+  const toggle = window.document.querySelector('[data-recording-toggle]');
+  toggle.checked = false;
+  await assistant.toggleRecordingNotice();
+  const recordingCall = calls.find((c) => c[1] === 'POST' && c[2] === '/api/assistant/meetings/recording');
+  assert.ok(recordingCall && recordingCall[3].enabled === false);
+  assert.strictEqual(assistant.meetingData.recording.enabled, false);
+  console.log('  ok  the recording announcement is a saved setting');
+  assistant.companyGranted = false;
+  assistant.applyScopeUi();
+
   assistant.action('dock');
   assert.strictEqual(window.document.getElementById('uraWindow').dataset.mode, 'docked');
   assistant.action('expand');
@@ -324,7 +486,7 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   }
   console.log('  ok  all eight snap anchors resolve');
 
-  console.log('\n17 URA Assistant jsdom checks passed.');
+  console.log('\n25 URA Assistant jsdom checks passed.');
 })().catch((err) => {
   console.error(err);
   process.exit(1);

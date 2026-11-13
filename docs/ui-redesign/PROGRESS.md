@@ -187,6 +187,66 @@ job and hands off to the preserved Co-worker.
   41 pytest service/jobs tests passed.
 - Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
-## Stage 4 — meetings (pending)
+## Stage 4 — meetings, briefs and live notes (complete)
+
+**One surface.** Meetings live inside the assistant: a Meetings button in the
+header, a Meetings entry in the plus menu, and `#uraMeetingsPanel`. `/meeting`
+still opens the assistant focused on meetings. The existing
+`meeting_room_workspace.js` and `/api/meetings/*` routes are preserved; the
+assistant is now the only place they are used from.
+
+**Backend.** `core/ura_assistant_meetings.py` holds the operations and the
+adapters: calendar status from `core/calendar_provider.py`, a typed
+`TranscriptionAdapter` (`none` by default, `sample` only when
+`URA_ASSISTANT_TRANSCRIPTION_PROVIDER=sample`), a pre-meeting brief assembled
+from live approvals/decisions/missions/meetings, meeting-library search over
+titles and transcripts, live notes stored as `mode='NOTE'` transcript entries,
+a summary compiled from the stored record plus the existing
+`generate_post_meeting_records` minutes, and action items that become governed
+Co-worker tasks (`cwk_…`) or pending approvals (`apr_…`).
+
+**Honesty.** Scheduling uses `AiCeoMeetingService.schedule_meeting_autonomous`
+and only claims success when the calendar provider returns `CONFIRMED`; without
+a provider it returns `CALENDAR_PROVIDER_NOT_CONFIGURED`, creates no event and
+shows no link. Listening without a transcription provider returns
+`TRANSCRIPTION_NOT_CONFIGURED` and says no microphone was opened. A sample
+transcript is labelled and captures nothing. The recording announcement is a
+Company setting (`assistant_meeting_recording_notice`, default on) and is
+written once to the meeting record with `related_context='Recording
+announcement'`.
+
+**Tools.** `meeting_brief`, `meeting_library`, `meeting_notes`,
+`meeting_listen`, `meeting_note`, `meeting_summary`, `meeting_action` and
+`schedule_meeting` are typed tools with planner mappings, previews and kind
+classification. All but `meeting_brief`/`meeting_library`/`meeting_notes` are
+mutating and go through the existing confirmation gate. Every one requires
+Company scope.
+
+**Permission.** `_ura_meeting_access` in `api_server.py` reuses the assistant's
+`company_permission` (the approved cowork approval). Without it the endpoints
+return `403 {"code": "PERMISSION_REQUIRED"}` and the panel renders the gate
+instead of reading company data.
+
+**Endpoints.** `GET /api/assistant/meetings`, `GET /api/assistant/calendar`,
+`GET /api/assistant/transcription`, and the `POST
+/api/assistant/meetings/{brief,listen,notes,summary,actions,recording}`
+endpoints.
+
+**UI.** Status chips for calendar and transcription, a recording banner with
+its toggle, brief + agenda, live meeting (announcement, transcript lines, note
+box), summary with minutes link, action-item composer with an approval
+checkbox, and a searchable library with transcript snippets. New cards:
+`MEETING_BRIEF`, `MEETING_LIBRARY`, `MEETING_LIVE`, `MEETING_NOTES`,
+`MEETING_NOTE`, `MEETING_SUMMARY`, `MEETING_ACTION`, `MEETING_LISTEN_BLOCKED`.
+`MEETING_INVITE` keeps its Stage 1 rule: confirmed only when the provider
+confirmed it.
+
+**Gates (after the final Stage 4 edit).**
+- `npm run typecheck`: 60 JavaScript files parsed.
+- `npm run lint`: assistant consolidation checks passed.
+- `npm run build`: passed.
+- `npm run test:assistant`: 36 static contract tests + 25 jsdom checks +
+  64 pytest service/jobs/meetings tests passed.
+- Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
 ## Stage 5 — settings and tests (pending)

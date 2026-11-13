@@ -476,6 +476,11 @@ SETTINGS_DEFINITIONS = [
         "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
         "desc": "Comma-separated domains the assistant must never cite, even when web access is open."
     },
+    {
+        "id": "assistant_meeting_recording_notice", "category": "assistant", "name": "Announce recording", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "Show and record a plain-language recording and transcription announcement when listening starts."
+    },
 
     # --- 9. AI Workforce ---
     {

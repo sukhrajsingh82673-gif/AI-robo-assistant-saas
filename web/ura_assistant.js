@@ -120,6 +120,13 @@
       this.jobs = [];
       this.jobsOpen = false;
       this.webOpen = false;
+      this.meetingsOpen = false;
+      this.meetingData = null;
+      this.meetingBrief = null;
+      this.meetingLive = null;
+      this.meetingNotes = [];
+      this.meetingSummary = null;
+      this.meetingListenError = null;
       this.watchingJobId = null;
       this.jobPollTimer = null;
       this.drag = null;
@@ -214,6 +221,9 @@
               <button type="button" data-scope="COMPANY" aria-pressed="false">Company <span class="ura-lock" id="uraCompanyLock" hidden>🔒</span></button>
             </div>
             <div class="ura-actions">
+              <button class="ura-icon-btn" type="button" data-action="meetings" title="Meetings" aria-label="Meetings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </button>
               <button class="ura-icon-btn ura-jobs-btn" type="button" data-action="jobs" title="Background jobs" aria-label="Background jobs">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 <span class="ura-badge ura-badge-corner" id="uraJobsBadge" hidden>0</span>
@@ -256,6 +266,15 @@
             <div class="ura-web-body" id="uraWebBody">Loading…</div>
           </div>
 
+          <div class="ura-panel" id="uraMeetingsPanel" hidden aria-label="Meetings">
+            <div class="ura-panel-head">
+              <strong>Meetings</strong>
+              <span class="ura-panel-meta" id="uraMeetingsMeta"></span>
+              <button class="ura-memory-link" type="button" data-meetings-close>Done</button>
+            </div>
+            <div class="ura-meetings-body" id="uraMeetingsBody">Loading…</div>
+          </div>
+
           <div class="ura-banner" id="uraPermissionBanner" hidden>
             <span>Company scope needs the AI CEO's permission.</span>
             <button type="button" id="uraAskPermission">Ask the CEO</button>
@@ -275,6 +294,7 @@
               <button type="button" data-plus="research">🔎 Research the web</button>
               <button type="button" data-plus="background">⏳ Run in background</button>
               <button type="button" data-plus="jobs">🗂️ Jobs <span class="ura-plus-count" id="uraPlusJobsCount"></span></button>
+              <button type="button" data-plus="meetings">📅 Meetings</button>
               <button type="button" data-plus="web">🌐 Web access…</button>
               <button type="button" data-plus="remember">🧠 Remember this</button>
               <button type="button" data-plus="memory">🧠 Saved memory</button>
@@ -319,13 +339,28 @@
         const openJobBtn = event.target.closest('[data-open-job]');
         if (openJobBtn) { this.showJobResult(openJobBtn.dataset.openJob); return; }
         if (event.target.closest('[data-jobs-panel]')) { this.openJobs(); return; }
+        if (event.target.closest('[data-meetings-panel]')) { this.openMeetings(); return; }
         if (event.target.closest('[data-jobs-close]')) { this.closeJobs(); return; }
         if (event.target.closest('[data-web-close]')) { this.closeWebAccess(); return; }
         if (event.target.closest('[data-web-save]')) { this.saveWebAccess(); return; }
+        if (event.target.closest('[data-meetings-close]')) { this.closeMeetings(); return; }
+        if (event.target.closest('[data-meeting-switch]')) { this.setScope('COMPANY'); this.renderMeetingsGate(); return; }
+        if (event.target.closest('[data-meeting-ask]')) { this.askCompanyPermission(); return; }
+        if (event.target.closest('[data-meeting-brief]')) { this.loadMeetingBrief(); return; }
+        if (event.target.closest('[data-meeting-listen]')) { this.startMeetingListen(); return; }
+        if (event.target.closest('[data-meeting-note-save]')) { this.saveMeetingNote(); return; }
+        if (event.target.closest('[data-meeting-summary]')) { this.summariseMeeting(); return; }
+        if (event.target.closest('[data-meeting-action-save]')) { this.createMeetingAction(); return; }
+        if (event.target.closest('[data-meeting-search]')) { this.searchMeetings(); return; }
+        if (event.target.closest('[data-recording-toggle]')) { this.toggleRecordingNotice(); return; }
         if (event.target.closest('[data-jobs-seen]')) { this.markJobsSeen(); return; }
         if (event.target.closest('[data-open-memory]')) { this.openMemory(); return; }
         if (event.target.closest('[data-forget-all]')) { this.forgetAllMemories(); return; }
         if (event.target.closest('#uraAskPermission')) { this.askCompanyPermission(); }
+      });
+
+      root.addEventListener('change', (event) => {
+        if (event.target.matches('[data-recording-toggle]')) this.toggleRecordingNotice();
       });
 
       this.launcher.addEventListener('pointerdown', (event) => this.startLauncherDrag(event));
@@ -601,6 +636,7 @@
       else if (action === 'dock') this.setMode(this.mode === 'docked' ? 'window' : 'docked');
       else if (action === 'expand') this.setMode(this.mode === 'expanded' ? 'window' : 'expanded');
       else if (action === 'jobs') this.openJobs();
+      else if (action === 'meetings') this.openMeetings();
       else if (action === 'minimise') this.minimise();
       else if (action === 'close') this.close();
     }
@@ -635,6 +671,7 @@
       if (action === 'research') this.researchLast();
       if (action === 'background') this.startBackground();
       if (action === 'jobs') this.openJobs();
+      if (action === 'meetings') this.openMeetings();
       if (action === 'web') this.openWebAccess();
       if (action === 'remember') this.rememberLast();
       if (action === 'memory') this.openMemory();
@@ -1010,6 +1047,51 @@
       } else if (card.type === 'HANDOFF') {
         body = `<div class="ura-card-meta">${escapeHtml(card.label || 'Take over there')}</div>
           <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('${escapeHtml(card.path || '/coworker')}')">Open</button></div>`;
+      } else if (card.type === 'MEETING_BRIEF') {
+        const agenda = Array.isArray(card.agenda) ? card.agenda : [];
+        body = `<div class="ura-card-meta">${(card.pending_approvals || []).length} pending approval(s) · ${(card.decisions || []).length} decision(s) · ${(card.missions || []).length} open mission(s)</div>
+          <ol class="ura-agenda">${agenda.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-meetings-panel>Open meetings</button></div>`;
+      } else if (card.type === 'MEETING_LIBRARY') {
+        const meetings = Array.isArray(card.meetings) ? card.meetings : [];
+        body = `<div class="ura-card-meta">${meetings.length} meeting(s)${card.query ? ` matching “${escapeHtml(card.query)}”` : ''}</div>
+          <div class="ura-memory-list">${meetings.map((meeting) => `
+            <div class="ura-memory-row"><span>${escapeHtml(meeting.title || 'Meeting')}</span><span class="ura-card-meta">${escapeHtml(meeting.status || '')}</span></div>
+            ${(meeting.matches || []).map((match) => `<div class="ura-meeting-match"><em>${escapeHtml(match.speaker || '')}</em> ${escapeHtml(match.snippet || '')}</div>`).join('')}
+          `).join('')}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-meetings-panel>Open meetings</button></div>`;
+      } else if (card.type === 'MEETING_NOTES' || card.type === 'MEETING_NOTE') {
+        const notes = Array.isArray(card.notes) ? card.notes : (card.note ? [card.note] : []);
+        const recent = Array.isArray(card.recent) ? card.recent : [];
+        body = `<div class="ura-card-meta">${notes.length} live note(s)</div>
+          <div class="ura-job-steps">${notes.map((entry) => `<div><strong>Note:</strong> ${escapeHtml(entry.message || '')}</div>`).join('')}</div>
+          ${recent.length ? `<details><summary>Recent transcript</summary><div class="ura-job-steps">${recent.map((entry) => `<div>${escapeHtml(entry.speaker || '')}: ${escapeHtml(entry.message || '')}</div>`).join('')}</div></details>` : ''}`;
+      } else if (card.type === 'MEETING_LIVE') {
+        const segments = Array.isArray(card.segments) ? card.segments : [];
+        const recording = card.recording || {};
+        body = `<div class="ura-card-meta">${escapeHtml((card.meeting || {}).title || 'Active meeting')} · listening</div>
+          ${recording.enabled && recording.announcement ? `<div class="ura-card-meta">${escapeHtml(recording.announcement)}</div>` : ''}
+          ${card.sample ? '<div class="ura-sample-note">Sample transcript. No microphone was opened and no audio was captured.</div>' : ''}
+          <div class="ura-segments">${segments.map((segment) => `<div><span class="ura-card-meta">${escapeHtml(segment.speaker || '')}</span> ${escapeHtml(segment.text || segment.message || '')}</div>`).join('')}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-meetings-panel>Open live notes</button></div>`;
+      } else if (card.type === 'MEETING_LISTEN_BLOCKED') {
+        const recording = card.recording || {};
+        body = `<div class="ura-card-meta">${escapeHtml(card.reason || 'TRANSCRIPTION_NOT_CONFIGURED')}</div>
+          <div class="ura-card-meta">${escapeHtml(recording.text || 'No audio was recorded.')}</div>
+          <div class="ura-card-actions"><button class="ura-memory-link" type="button" data-meetings-panel>Open meetings</button></div>`;
+      } else if (card.type === 'MEETING_SUMMARY') {
+        const minutes = card.minutes || null;
+        body = `<div class="ura-card-meta">${(card.decisions || []).length} decision(s) recorded</div>
+          <pre class="ura-meeting-summary">${escapeHtml(card.summary || '')}</pre>
+          ${minutes && minutes.download_url ? `<div class="ura-card-actions"><a href="${escapeHtml(minutes.download_url)}" target="_blank" rel="noopener noreferrer">Minutes PDF</a></div>` : ''}
+          ${!minutes ? '<div class="ura-card-meta">Minutes were not generated for this meeting.</div>' : ''}`;
+      } else if (card.type === 'MEETING_ACTION') {
+        const request = card.request || {};
+        body = card.kind === 'APPROVAL'
+          ? `<div class="ura-card-meta">Approval ${escapeHtml(request.request_id || '')} · waiting for a decision. Nothing was executed.</div>
+             <div class="ura-card-actions"><button class="ura-memory-link" type="button" onclick="window.navigateTo('/approvals')">Open approvals</button></div>`
+          : `<div class="ura-card-meta">Co-worker task ${escapeHtml(request.task_id || '')} · ${escapeHtml(request.status || 'PLANNING')}</div>
+             <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" onclick="window.navigateTo('/coworker')">Open the Co-worker</button></div>`;
       } else {
         body = `<div class="ura-card-meta">${escapeHtml(card.path || '')}</div>`;
       }
@@ -1106,10 +1188,13 @@
     openJobs() {
       this.jobsOpen = true;
       this.webOpen = false;
+      this.meetingsOpen = false;
       const jobsPanel = document.getElementById('uraJobsPanel');
       const webPanel = document.getElementById('uraWebPanel');
+      const meetingsPanel = document.getElementById('uraMeetingsPanel');
       if (jobsPanel) jobsPanel.hidden = false;
       if (webPanel) webPanel.hidden = true;
+      if (meetingsPanel) meetingsPanel.hidden = true;
       this.renderJobs();
       this.refreshJobs();
     }
@@ -1349,10 +1434,13 @@
     async openWebAccess() {
       this.jobsOpen = false;
       this.webOpen = true;
+      this.meetingsOpen = false;
       const jobsPanel = document.getElementById('uraJobsPanel');
       const webPanel = document.getElementById('uraWebPanel');
+      const meetingsPanel = document.getElementById('uraMeetingsPanel');
       if (jobsPanel) jobsPanel.hidden = true;
       if (webPanel) webPanel.hidden = false;
+      if (meetingsPanel) meetingsPanel.hidden = true;
       const body = document.getElementById('uraWebBody');
       if (body) body.textContent = 'Loading…';
       try {
@@ -1421,6 +1509,330 @@
         this.addMessage('assistant', `Web access is now “${mode}”. Research uses only sources allowed by these lists.`);
       } catch (err) {
         this.addMessage('assistant', `I could not save web access: ${err.message}. Nothing changed.`);
+      }
+    }
+
+    // -------------------------------------------------------------- meetings
+    renderMeetingsGate() {
+      this.meetingsOpen = true;
+      const panel = document.getElementById('uraMeetingsPanel');
+      if (panel) panel.hidden = false;
+      const meta = document.getElementById('uraMeetingsMeta');
+      if (meta) meta.textContent = 'Company scope required';
+      const body = document.getElementById('uraMeetingsBody');
+      if (!body) return;
+      body.innerHTML = `
+        <div class="ura-card-meta">Meetings use company data. Company scope is locked until the AI CEO approves assistant access (kind: cowork). Nothing was read.</div>
+        <div class="ura-card-actions">
+          <button class="ura-memory-link" type="button" data-meeting-switch>Switch to Company</button>
+          <button class="ura-confirm-yes" type="button" data-meeting-ask>Ask the AI CEO</button>
+        </div>`;
+    }
+
+    async openMeetings() {
+      this.jobsOpen = false;
+      this.webOpen = false;
+      this.meetingsOpen = true;
+      const jobsPanel = document.getElementById('uraJobsPanel');
+      const webPanel = document.getElementById('uraWebPanel');
+      const meetingsPanel = document.getElementById('uraMeetingsPanel');
+      if (jobsPanel) jobsPanel.hidden = true;
+      if (webPanel) webPanel.hidden = true;
+      if (meetingsPanel) meetingsPanel.hidden = false;
+      if (this.scope !== 'COMPANY' || !this.companyGranted) {
+        this.renderMeetingsGate();
+        return;
+      }
+      await this.refreshMeetings();
+    }
+
+    closeMeetings() {
+      this.meetingsOpen = false;
+      const panel = document.getElementById('uraMeetingsPanel');
+      if (panel) panel.hidden = true;
+    }
+
+    async refreshMeetings(query) {
+      const body = document.getElementById('uraMeetingsBody');
+      if (body && !this.meetingData) body.textContent = 'Loading…';
+      const q = query != null ? query : (this.meetingQuery || '');
+      try {
+        const url = q ? `/api/assistant/meetings?q=${encodeURIComponent(q)}` : '/api/assistant/meetings';
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (data.code === 'PERMISSION_REQUIRED') {
+            this.companyGranted = false;
+            this.applyScopeUi();
+            this.renderMeetingsGate();
+            return;
+          }
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        this.meetingData = data;
+        this.meetingQuery = q;
+        this.renderMeetings();
+      } catch (err) {
+        if (body) body.innerHTML = `<div class="ura-card-meta">Could not load meetings: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    meetingStatusChip(label, ok) {
+      return `<span class="ura-chip${ok ? '' : ' ura-chip-off'}">${escapeHtml(label)}</span>`;
+    }
+
+    renderMeetings() {
+      const body = document.getElementById('uraMeetingsBody');
+      if (!body) return;
+      const data = this.meetingData || {};
+      const calendar = data.calendar || {};
+      const transcription = data.transcription || {};
+      const recording = data.recording || {};
+      const meta = document.getElementById('uraMeetingsMeta');
+      if (meta) meta.textContent = `${(data.meetings || []).length} meeting(s)`;
+      const tone = transcription.sample ? 'sample' : transcription.configured ? 'live' : 'off';
+
+      let html = `
+        <div class="ura-meeting-status">
+          ${this.meetingStatusChip(calendar.label || 'Calendar not connected', Boolean(calendar.configured))}
+          ${this.meetingStatusChip(transcription.label || 'Transcription not connected', Boolean(transcription.configured))}
+        </div>
+        <div class="ura-recording-banner" data-tone="${tone}">
+          <strong>Recording</strong>
+          <div>${escapeHtml(recording.text || '')}</div>
+          <label class="ura-toggle"><input type="checkbox" data-recording-toggle ${recording.enabled ? 'checked' : ''}> Announce recording before listening</label>
+        </div>`;
+
+      html += `<div class="ura-meeting-block">
+        <div class="ura-panel-head"><strong>Pre-meeting brief</strong>
+          <button class="ura-memory-link" type="button" data-meeting-brief>${this.meetingBrief ? 'Refresh' : 'Brief me'}</button>
+        </div>`;
+      if (this.meetingBrief) {
+        html += `<div class="ura-card-meta">${escapeHtml((this.meetingBrief.company || {}).name || '')}</div>
+          <ol class="ura-agenda">${(this.meetingBrief.agenda || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>`;
+        const pending = this.meetingBrief.pending_approvals || [];
+        const decisions = this.meetingBrief.decisions || [];
+        if (pending.length) html += `<div class="ura-card-meta">${pending.length} pending approval(s)</div>`;
+        if (decisions.length) html += `<div class="ura-card-meta">${decisions.length} recent decision(s)</div>`;
+      } else {
+        html += '<div class="ura-card-meta">Build an agenda from live approvals, decisions, missions and confirmed meetings.</div>';
+      }
+      html += '</div>';
+
+      html += '<div class="ura-meeting-block"><div class="ura-panel-head"><strong>Live meeting</strong>';
+      if (this.meetingLive && this.meetingLive.meeting) {
+        html += `<span class="ura-card-meta">${escapeHtml(this.meetingLive.meeting.title || '')} · ${escapeHtml(this.meetingLive.meeting.status || '')}</span>`;
+      }
+      html += '</div>';
+      if (this.meetingListenError) html += `<div class="ura-sample-note">${escapeHtml(this.meetingListenError)}</div>`;
+      if (!this.meetingLive) {
+        html += '<div class="ura-card-meta">Listening records the meeting announcement, then adds transcript and notes to the company record.</div>'
+          + '<div class="ura-card-actions"><button class="ura-confirm-yes" type="button" data-meeting-listen>Start listening</button></div>';
+      } else {
+        if (this.meetingLive.sample) {
+          html += '<div class="ura-sample-note">Sample transcript. No microphone was opened and no audio was captured.</div>';
+        }
+        const segments = this.meetingLive.segments || [];
+        if (segments.length) {
+          html += `<div class="ura-segments">${segments.map((segment) => `<div><span class="ura-card-meta">${escapeHtml(segment.speaker || '')}</span> ${escapeHtml(segment.text || segment.message || '')}</div>`).join('')}</div>`;
+        }
+        if (this.meetingNotes.length) {
+          html += `<div class="ura-job-steps">${this.meetingNotes.map((entry) => `<div>HOST: ${escapeHtml(entry.message || '')}</div>`).join('')}</div>`;
+        }
+        html += `<label class="ura-field"><span>Add a note</span><textarea id="uraMeetingNote" rows="2" placeholder="What was decided or who owns it"></textarea></label>
+          <div class="ura-card-actions">
+            <button class="ura-memory-link" type="button" data-meeting-note-save>Add note</button>
+            <button class="ura-memory-link ura-memory-danger" type="button" data-meeting-summary>End &amp; summarise</button>
+          </div>`;
+      }
+      if (this.meetingSummary) {
+        const minutes = this.meetingSummary.minutes;
+        html += `<div class="ura-meeting-summary">
+          <div class="ura-card-meta">${escapeHtml((this.meetingSummary.meeting || {}).status || '')}</div>
+          <pre>${escapeHtml(this.meetingSummary.summary || '')}</pre>
+          ${minutes && minutes.download_url ? `<a href="${escapeHtml(minutes.download_url)}" target="_blank" rel="noopener noreferrer">Minutes PDF</a>` : ''}
+        </div>`;
+      }
+      html += '</div>';
+
+      html += `<div class="ura-meeting-block">
+        <strong>Action item</strong>
+        <label class="ura-field"><span>Turn a decision into governed work</span>
+          <input id="uraMeetingAction" type="text" placeholder="Send the revised budget to finance" />
+        </label>
+        <label class="ura-toggle"><input type="checkbox" id="uraMeetingActionApproval" /> Needs approval first</label>
+        <div class="ura-card-actions"><button class="ura-confirm-yes" type="button" data-meeting-action-save>Create</button></div>
+        ${this.meetingActionFlash ? `<div class="ura-card-meta">${escapeHtml(this.meetingActionFlash)}</div>` : ''}
+      </div>`;
+
+      const meetings = data.meetings || [];
+      html += `<div class="ura-meeting-block">
+        <div class="ura-panel-head"><strong>Meeting library</strong>
+          <span class="ura-card-meta">${escapeHtml(this.meetingQuery || '')}</span>
+        </div>
+        <div class="ura-meeting-search">
+          <input id="uraMeetingSearch" type="search" placeholder="Search titles and transcripts" value="${escapeHtml(this.meetingQuery || '')}" />
+          <button class="ura-memory-link" type="button" data-meeting-search>Search</button>
+        </div>`;
+      if (!meetings.length) {
+        html += `<div class="ura-card-meta">${this.meetingQuery ? 'No meeting matched that search.' : 'No meetings have been recorded for this company yet.'}</div>`;
+      } else {
+        html += meetings.map((meeting) => {
+          const when = meeting.created_at ? new Date(meeting.created_at * 1000).toLocaleString() : '';
+          const matches = (meeting.matches || []).map((match) => `<div class="ura-meeting-match"><em>${escapeHtml(match.speaker || '')}</em> ${escapeHtml(match.snippet || '')}</div>`).join('');
+          return `<div class="ura-meeting-row">
+            <div class="ura-job-head"><span class="ura-job-title">${escapeHtml(meeting.title || 'Meeting')}</span>
+              <span class="ura-job-status">${escapeHtml(meeting.status || '')}</span></div>
+            <div class="ura-card-meta">${escapeHtml(when)}</div>
+            ${meeting.summary ? `<div class="ura-card-meta">${escapeHtml(String(meeting.summary).slice(0, 200))}</div>` : ''}
+            ${matches}
+          </div>`;
+        }).join('');
+      }
+      html += '</div>';
+
+      body.innerHTML = html;
+    }
+
+    async loadMeetingBrief() {
+      try {
+        const res = await fetch('/api/assistant/meetings/brief', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        this.meetingBrief = data;
+        this.renderMeetings();
+      } catch (err) {
+        this.addMessage('assistant', `I could not build the brief: ${err.message}. Nothing was invented.`);
+      }
+    }
+
+    async startMeetingListen() {
+      this.meetingListenError = null;
+      try {
+        const res = await fetch('/api/assistant/meetings/listen', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+          this.meetingLive = null;
+          this.meetingListenError = data.message || data.error || `HTTP ${res.status}`;
+          this.renderMeetings();
+          return;
+        }
+        this.meetingLive = data;
+        this.meetingNotes = [];
+        this.meetingSummary = null;
+        this.renderMeetings();
+      } catch (err) {
+        this.meetingListenError = `Could not start listening: ${err.message}. Nothing was recorded.`;
+        this.renderMeetings();
+      }
+    }
+
+    async saveMeetingNote() {
+      const input = document.getElementById('uraMeetingNote');
+      const note = input ? input.value.trim() : '';
+      if (!note) return;
+      try {
+        const res = await fetch('/api/assistant/meetings/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            note,
+            meeting_id: this.meetingLive && this.meetingLive.meeting ? this.meetingLive.meeting.meeting_id : null
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        this.meetingNotes.push(data.note);
+        this.renderMeetings();
+        this.addToolStep('Meeting note saved');
+      } catch (err) {
+        this.addMessage('assistant', `The note was not saved: ${err.message}.`);
+      }
+    }
+
+    async summariseMeeting() {
+      try {
+        const res = await fetch('/api/assistant/meetings/summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            end: true,
+            meeting_id: this.meetingLive && this.meetingLive.meeting ? this.meetingLive.meeting.meeting_id : null
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        this.meetingSummary = data;
+        this.meetingLive = data.meeting ? { ...(this.meetingLive || {}), meeting: data.meeting } : this.meetingLive;
+        this.renderMeetings();
+        this.addMessage('assistant', data.summary || 'The meeting summary is ready.', {
+          card: {
+            type: 'MEETING_SUMMARY',
+            meeting_id: data.meeting ? data.meeting.meeting_id : '',
+            summary: data.summary,
+            minutes: data.minutes,
+            decisions: data.decisions || []
+          }
+        });
+      } catch (err) {
+        this.addMessage('assistant', `I could not summarise the meeting: ${err.message}. Nothing was written.`);
+      }
+    }
+
+    async createMeetingAction() {
+      const input = document.getElementById('uraMeetingAction');
+      const approval = document.getElementById('uraMeetingActionApproval');
+      const title = input ? input.value.trim() : '';
+      if (!title) return;
+      try {
+        const res = await fetch('/api/assistant/meetings/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            requires_approval: Boolean(approval && approval.checked),
+            meeting_id: this.meetingLive && this.meetingLive.meeting ? this.meetingLive.meeting.meeting_id : null
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        this.meetingActionFlash = data.kind === 'APPROVAL'
+          ? `Approval ${data.request.request_id} is waiting for a decision.`
+          : `Co-worker task ${data.request.task_id} created (${data.request.status || 'PLANNING'}).`;
+        this.renderMeetings();
+        this.addMessage('assistant', this.meetingActionFlash, {
+          card: { type: 'MEETING_ACTION', kind: data.kind, title, request: data.request }
+        });
+      } catch (err) {
+        this.addMessage('assistant', `The action item was not created: ${err.message}.`);
+      }
+    }
+
+    searchMeetings() {
+      const input = document.getElementById('uraMeetingSearch');
+      this.refreshMeetings(input ? input.value.trim() : '');
+    }
+
+    async toggleRecordingNotice() {
+      const toggle = document.querySelector('[data-recording-toggle]');
+      const enabled = Boolean(toggle && toggle.checked);
+      try {
+        const res = await fetch('/api/assistant/meetings/recording', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+        if (this.meetingData) this.meetingData.recording = data.recording;
+        this.renderMeetings();
+        this.addToolStep(enabled ? 'Recording announcement on' : 'Recording announcement off');
+      } catch (err) {
+        this.addMessage('assistant', `I could not change the recording announcement: ${err.message}. Nothing changed.`);
       }
     }
 

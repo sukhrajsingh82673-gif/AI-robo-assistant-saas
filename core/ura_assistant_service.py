@@ -242,6 +242,83 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         "mutating": False,
         "scope": "ANY",
     },
+    "meeting_brief": {
+        "description": "Build a pre-meeting brief from live approvals, decisions, missions and meetings.",
+        "parameters": {"type": "object", "properties": {}},
+        "mutating": False,
+        "scope": "COMPANY",
+    },
+    "meeting_library": {
+        "description": "Search the company meeting library, including transcripts and summaries.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words to search for."},
+            },
+        },
+        "mutating": False,
+        "scope": "COMPANY",
+    },
+    "meeting_notes": {
+        "description": "Read the live notes and recent transcript for the current meeting.",
+        "parameters": {"type": "object", "properties": {}},
+        "mutating": False,
+        "scope": "COMPANY",
+    },
+    "meeting_listen": {
+        "description": "Start listening to the company meeting through the transcription adapter.",
+        "parameters": {"type": "object", "properties": {}},
+        "mutating": True,
+        "scope": "COMPANY",
+    },
+    "meeting_note": {
+        "description": "Add an Owner note to the current meeting record.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "note": {"type": "string", "description": "The note to record."},
+            },
+            "required": ["note"],
+        },
+        "mutating": True,
+        "scope": "COMPANY",
+    },
+    "meeting_summary": {
+        "description": "Summarise the meeting from its transcript, notes and decisions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "end": {"type": "boolean", "description": "End the meeting after summarising."},
+            },
+        },
+        "mutating": True,
+        "scope": "COMPANY",
+    },
+    "meeting_action": {
+        "description": "Turn a meeting action item into a governed Co-worker task or approval.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "The action item."},
+                "requires_approval": {"type": "boolean"},
+            },
+            "required": ["title"],
+        },
+        "mutating": True,
+        "scope": "COMPANY",
+    },
+    "schedule_meeting": {
+        "description": "Book a company meeting through the calendar provider; only claims success when confirmed.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "What the meeting is about."},
+            },
+            "required": ["prompt"],
+        },
+        "mutating": True,
+        "scope": "COMPANY",
+    },
 }
 
 
@@ -390,6 +467,35 @@ def _plan_tool(prompt: str, page: str) -> Tuple[Optional[str], Dict[str, Any]]:
         if command.lower().startswith("command "):
             command = command[8:].strip()
         return "run_terminal", {"command": command or text}
+
+    # Meetings — the assistant is the meeting surface; the old Meeting Room
+    # screen is preserved but no longer a second assistant.
+    if _first(("schedule a meeting", "schedule meeting", "book a meeting", "book meeting", "set up a meeting"), lower):
+        return "schedule_meeting", {"prompt": text}
+
+    if _first(("prepare me for", "prepare my next meeting", "meeting brief", "brief me for", "brief me on", "prep me for", "pre-meeting brief", "briefing for the meeting"), lower):
+        return "meeting_brief", {}
+
+    if _first(("meeting library", "past meetings", "search meetings", "find meetings", "previous meetings", "meeting history"), lower):
+        return "meeting_library", {"query": text}
+
+    if _first(("join the meeting", "start listening", "listen to the meeting", "start the meeting", "go live"), lower):
+        return "meeting_listen", {}
+
+    if _first(("meeting summary", "summarise the meeting", "summarize the meeting", "summarise this meeting", "summarize this meeting", "end the meeting", "wrap up the meeting", "close the meeting"), lower):
+        return "meeting_summary", {"end": _first(("end the meeting", "wrap", "close the meeting"), lower)}
+
+    if _first(("action item", "create a task from", "follow up on"), lower):
+        return "meeting_action", {
+            "title": text,
+            "requires_approval": _first(("approval", "approve"), lower),
+        }
+
+    if _first(("meeting notes", "show notes", "live notes", "what notes", "transcript"), lower):
+        return "meeting_notes", {}
+
+    if _first(("add a note", "note that ", "write down", "live note"), lower):
+        return "meeting_note", {"note": text}
 
     approval_id = re.search(r"\b(apr_[A-Za-z0-9]+)\b", text)
     if approval_id and _first(("approve", "decline", "reject", "deny"), lower):
@@ -1183,6 +1289,274 @@ class URAAssistantService:
             },
         }
 
+    def _tool_meeting_brief(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        brief = AssistantMeetingService(self.tenant_id).brief(company_id)
+        return {
+            "ok": True,
+            "summary": f"Brief ready for {brief['company']['name']}.",
+            "answer": brief["summary"],
+            "citations": brief["sources"],
+            "data": brief,
+            "card": {
+                "type": "MEETING_BRIEF",
+                "title": f"Brief for {brief['company']['name']}",
+                "agenda": brief["agenda"],
+                "pending_approvals": brief["pending_approvals"],
+                "decisions": brief["decisions"],
+                "missions": brief["missions"],
+            },
+        }
+
+    def _tool_meeting_library(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        query = str(args.get("query") or "").strip()
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        library = AssistantMeetingService(self.tenant_id).library(company_id, query)
+        meetings = library["meetings"]
+        if not meetings:
+            scope = f" for “{query}”" if query else ""
+            return {
+                "ok": True,
+                "summary": f"No meetings matched{scope}.",
+                "answer": f"No meeting in the company library matched{scope}.",
+                "data": library,
+                "card": {"type": "MEETING_LIBRARY", "meetings": [], "query": query},
+            }
+        lines = [
+            f"{item['title']} — {item['status']} ({len(item['matches'])} transcript match(es))"
+            for item in meetings[:8]
+        ]
+        return {
+            "ok": True,
+            "summary": f"Found {len(meetings)} meeting(s).",
+            "answer": "Meeting library results:\n" + "\n".join(f"{i + 1}. {line}" for i, line in enumerate(lines)),
+            "data": library,
+            "card": {"type": "MEETING_LIBRARY", "meetings": meetings[:8], "query": query},
+        }
+
+    def _tool_meeting_notes(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        res = AssistantMeetingService(self.tenant_id).notes(company_id)
+        if not res.get("success"):
+            return {"ok": False, "summary": res.get("message") or "No meeting is active."}
+        notes = res.get("notes") or []
+        recent = res.get("recent") or []
+        lines = [f"{entry['speaker']}: {entry['message']}" for entry in recent[-6:]]
+        answer = (
+            f"Notes for “{res['meeting']['title']}” ({len(notes)} note(s))."
+            + ("\n\nRecent transcript:\n" + "\n".join(lines) if lines else "\n\nNo transcript entries yet.")
+        )
+        return {
+            "ok": True,
+            "summary": f"{len(notes)} live note(s) recorded.",
+            "answer": answer,
+            "data": res,
+            "card": {
+                "type": "MEETING_NOTES",
+                "meeting_id": res["meeting"]["meeting_id"],
+                "notes": notes,
+                "recent": recent[-6:],
+            },
+        }
+
+    def _tool_meeting_listen(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        res = AssistantMeetingService(self.tenant_id).listen(
+            company_id, kwargs.get("user_id") or "usr_owner"
+        )
+        if not res.get("success"):
+            return {
+                "ok": False,
+                "summary": res.get("message") or "Transcription is not connected.",
+                "data": res,
+                "card": {
+                    "type": "MEETING_LISTEN_BLOCKED",
+                    "reason": res.get("reason") or "TRANSCRIPTION_NOT_CONFIGURED",
+                    "recording": res.get("recording") or {},
+                },
+            }
+        recording = res.get("recording") or {}
+        answer = str(res.get("message") or "Listening.")
+        if recording.get("enabled") and recording.get("announcement"):
+            answer += "\n\n" + str(recording["announcement"])
+        return {
+            "ok": True,
+            "summary": "Listening through the transcription adapter.",
+            "answer": answer,
+            "data": res,
+            "card": {
+                "type": "MEETING_LIVE",
+                "meeting": res.get("meeting"),
+                "segments": res.get("segments") or [],
+                "recording": recording,
+                "sample": bool(res.get("sample")),
+            },
+        }
+
+    def _tool_meeting_note(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        note = str(args.get("note") or "").strip()
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        res = AssistantMeetingService(self.tenant_id).add_note(
+            company_id, note, args.get("meeting_id"), kwargs.get("user_id") or "usr_owner"
+        )
+        if not res.get("success"):
+            return {"ok": False, "summary": res.get("message") or "The note was not saved."}
+        return {
+            "ok": True,
+            "summary": "Note added to the meeting record.",
+            "answer": f"Saved the note to “{res['meeting']['title']}”.",
+            "data": res,
+            "card": {
+                "type": "MEETING_NOTE",
+                "meeting_id": res["meeting"]["meeting_id"],
+                "note": res["note"],
+            },
+        }
+
+    def _tool_meeting_summary(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        res = AssistantMeetingService(self.tenant_id).summarise(
+            company_id,
+            meeting_id=args.get("meeting_id"),
+            end_meeting=bool(args.get("end")),
+            user_id=kwargs.get("user_id") or "usr_owner",
+        )
+        if not res.get("success"):
+            return {"ok": False, "summary": res.get("message") or "The meeting was not found."}
+        answer = res["summary"]
+        if res.get("minutes"):
+            answer += f"\n\nMinutes: {res['minutes'].get('download_url') or res['minutes'].get('doc_id')}"
+        elif res.get("minutes_error"):
+            answer += f"\n\nMinutes could not be generated: {res['minutes_error']}"
+        return {
+            "ok": True,
+            "summary": "Meeting summary compiled from the stored record.",
+            "answer": answer,
+            "data": res,
+            "card": {
+                "type": "MEETING_SUMMARY",
+                "meeting_id": res["meeting"]["meeting_id"],
+                "summary": res["summary"],
+                "minutes": res.get("minutes"),
+                "decisions": res.get("decisions") or [],
+            },
+        }
+
+    def _tool_meeting_action(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        title = str(args.get("title") or "").strip()
+        from .ura_assistant_meetings import AssistantMeetingService
+
+        res = AssistantMeetingService(self.tenant_id).action_item(
+            company_id,
+            title,
+            args.get("meeting_id"),
+            kwargs.get("user_id") or "usr_owner",
+            requires_approval=bool(args.get("requires_approval")),
+        )
+        if not res.get("success"):
+            return {"ok": False, "summary": res.get("message") or "The action item was not created."}
+        if res["kind"] == "APPROVAL":
+            request = res["request"]
+            summary = f"Filed approval {request['request_id']} for “{title}”."
+            answer = (
+                f"The action item is waiting for approval ({request['request_id']}). "
+                "Nothing has been executed yet."
+            )
+        else:
+            task = res["request"]
+            summary = f"Assigned “{title}” to the Co-worker."
+            answer = (
+                f"The Co-worker task {task.get('task_id')} was created with status "
+                f"{task.get('status') or 'PLANNING'}. Execution stays governed."
+            )
+        return {
+            "ok": True,
+            "summary": summary,
+            "answer": answer,
+            "data": res,
+            "card": {
+                "type": "MEETING_ACTION",
+                "kind": res["kind"],
+                "title": title,
+                "request": res["request"],
+            },
+        }
+
+    def _tool_schedule_meeting(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        company_id = kwargs.get("company_id")
+        prompt = str(args.get("prompt") or "").strip()
+        if not prompt:
+            return {"ok": False, "summary": "Tell me what the meeting is about."}
+        from .meeting_service import AiCeoMeetingService
+
+        res = AiCeoMeetingService(tenant_id=self.tenant_id).schedule_meeting_autonomous(
+            prompt=prompt,
+            company_id=company_id,
+            user_id=kwargs.get("user_id") or "usr_owner",
+            ai_representative_enabled=True,
+        )
+        confirmed = bool(res.get("success")) and str(res.get("provider_status") or "").upper() == "CONFIRMED"
+        if not confirmed:
+            reason = res.get("reason") or "CALENDAR_PROVIDER_NOT_CONFIGURED"
+            return {
+                "ok": False,
+                "summary": f"Meeting not scheduled ({reason}).",
+                "answer": (
+                    "I did not schedule the meeting. "
+                    + str(res.get("message") or "The calendar provider did not confirm the event.")
+                    + f"\n\nProvider status: {res.get('provider_status') or 'BLOCKED'} ({reason})."
+                ),
+                "data": res,
+                "card": {
+                    "type": "MEETING_INVITE",
+                    "status": "BLOCKED",
+                    "provider_status": res.get("provider_status") or "BLOCKED",
+                    "reason": reason,
+                    "title": res.get("title"),
+                    "google_meet_url": None,
+                },
+            }
+        meet_url = res.get("google_meet_url") or ""
+        lines = [
+            "**Meeting confirmed by the calendar provider.**",
+            "",
+            f"- Session: {res.get('title')}",
+            f"- Time: {res.get('scheduled_time_formatted')} ({res.get('duration_minutes')} minutes)",
+            f"- Video link: {meet_url or 'none was issued by the provider for this event.'}",
+        ]
+        if res.get("calendar_event_id"):
+            lines.append(f"- Calendar event: {res['calendar_event_id']}")
+        if res.get("statutory_disclosure"):
+            lines.append(f"- AI participation: {res['statutory_disclosure']}")
+        return {
+            "ok": True,
+            "summary": "Meeting confirmed by the calendar provider.",
+            "answer": "\n".join(lines),
+            "data": res,
+            "card": {
+                "type": "MEETING_INVITE",
+                "status": "SCHEDULED",
+                "provider_status": "CONFIRMED",
+                "meeting_id": res.get("meeting_id"),
+                "title": res.get("title"),
+                "google_meet_url": meet_url or None,
+                "calendar_event_id": res.get("calendar_event_id"),
+            },
+        }
+
     def _tool_delegate_task(self, args: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         prompt = str(args.get("prompt") or "").strip()
         if not prompt:
@@ -1549,6 +1923,16 @@ class URAAssistantService:
             return f"Start connecting {args.get('provider') or 'an integration'}"
         if name == "run_terminal":
             return f"Run the command “{str(args.get('command') or '')[:80]}”"
+        if name == "meeting_listen":
+            return "Start listening to the company meeting"
+        if name == "meeting_note":
+            return f"Add a meeting note: “{str(args.get('note') or '')[:80]}”"
+        if name == "meeting_summary":
+            return "Summarise and record the meeting minutes"
+        if name == "meeting_action":
+            return f"Create a governed action item: “{str(args.get('title') or '')[:80]}”"
+        if name == "schedule_meeting":
+            return f"Book a company meeting for “{str(args.get('prompt') or '')[:70]}”"
         return name.replace("_", " ")
 
     def _is_confirmed(self, prompt: str, args: Dict[str, Any]) -> bool:

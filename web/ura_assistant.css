@@ -831,3 +831,115 @@ html[dir='rtl'] .ura-window[data-mode='window'][data-anchor='top-right'] { right
   letter-spacing: 0.04em;
   color: #8f5200;
 }
+
+/* ---------------------------------------------------------------- meetings */
+.ura-meetings-body { display: flex; flex-direction: column; gap: 10px; }
+.ura-meeting-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ura-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(52, 199, 89, 0.16);
+  color: #1d7f37;
+}
+.ura-chip-off {
+  background: var(--ura-tool);
+  color: var(--label-3, #6e6e73);
+}
+.ura-recording-banner {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--surface-2, rgba(255, 255, 255, 0.6));
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--label-2, #515154);
+}
+.ura-recording-banner[data-tone='sample'] {
+  background: rgba(255, 159, 10, 0.14);
+  color: #8f5200;
+}
+.ura-recording-banner[data-tone='off'] {
+  background: var(--ura-tool);
+}
+.ura-recording-banner strong { display: block; font-size: 11px; margin-bottom: 2px; }
+.ura-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.ura-meeting-block {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--surface-2, rgba(255, 255, 255, 0.6));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.ura-meeting-block strong { font-size: 11.5px; }
+.ura-agenda {
+  margin: 2px 0 0;
+  padding-inline-start: 18px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--label-2, #515154);
+}
+.ura-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--label-2, #515154);
+}
+.ura-meeting-search {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ura-meeting-search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--surface, #fff);
+  color: var(--label, #1d1d1f);
+}
+.ura-meeting-row {
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--ura-hairline);
+  background: var(--surface, #fff);
+}
+.ura-meeting-match {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--label-3, #6e6e73);
+}
+.ura-meeting-match em { font-style: normal; font-weight: 600; }
+.ura-meeting-summary {
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--ura-tool);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ura-card-actions a { font-size: 11px; color: var(--accent, #0071e3); }

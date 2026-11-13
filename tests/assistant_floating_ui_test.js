@@ -339,4 +339,105 @@ test('a background job that cannot run fails with a plain reason', () => {
   assert.ok(!jobs.includes('No problem'));
 });
 
+// ---------------------------------------------------------------------------
+// Stage 4 — meetings, briefs, live notes and governed action items
+// ---------------------------------------------------------------------------
+
+test('meetings run behind typed adapters and never fake a calendar', () => {
+  const meetings = read('core/ura_assistant_meetings.py');
+  assert.ok(meetings.includes('class TranscriptionAdapter'));
+  assert.ok(meetings.includes('class NoTranscriptionAdapter'));
+  assert.ok(meetings.includes('class SampleTranscriptionAdapter'));
+  assert.ok(meetings.includes('URA_ASSISTANT_TRANSCRIPTION_PROVIDER'));
+  assert.ok(meetings.includes('def calendar_status('));
+  assert.ok(meetings.includes('Calendar not connected'));
+  assert.ok(meetings.includes('resolve_calendar_provider'));
+  assert.ok(!meetings.includes('meet.google.com/new'));
+  assert.ok(!meetings.includes('Generate a link'));
+});
+
+test('a sample transcript is opt-in, labelled and records no audio', () => {
+  const meetings = read('core/ura_assistant_meetings.py');
+  assert.ok(meetings.includes('Sample transcript line'));
+  assert.ok(meetings.includes('no audio was captured'));
+  assert.ok(meetings.includes('"sample": True'));
+  assert.ok(meetings.includes('TRANSCRIPTION_NOT_CONFIGURED'));
+  assert.ok(meetings.includes('did not open a microphone'));
+  assert.ok(js.includes('Sample transcript. No microphone was opened'));
+  assert.ok(!js.includes('Recording started'));
+});
+
+test('meeting notes, summaries and minutes come from the stored record', () => {
+  const meetings = read('core/ura_assistant_meetings.py');
+  assert.ok(meetings.includes("mode=\"NOTE\""));
+  assert.ok(meetings.includes('generate_post_meeting_records'));
+  assert.ok(meetings.includes('No live notes were recorded.'));
+  assert.ok(meetings.includes('No decisions were recorded in this session.'));
+  assert.ok(meetings.includes('Recording announcement'));
+  assert.ok(js.includes('MEETING_SUMMARY'));
+  assert.ok(js.includes('Minutes PDF'));
+  assert.ok(css.includes('.ura-meeting-summary'));
+  assert.ok(js.includes('MEETING_NOTES') && js.includes('MEETING_NOTE'));
+});
+
+test('action items become a governed task or a pending approval', () => {
+  const meetings = read('core/ura_assistant_meetings.py');
+  assert.ok(meetings.includes('create_coworker_task'));
+  assert.ok(meetings.includes('ApprovalPipeline.create_request'));
+  assert.ok(js.includes('waiting for a decision'));
+  assert.ok(js.includes('MEETING_ACTION'));
+  assert.ok(js.includes("kind === 'APPROVAL'"));
+  assert.ok(js.includes('Nothing was executed'));
+  assert.ok(!js.includes('Task completed'));
+});
+
+test('the meeting brief counts live rows and invents nothing', () => {
+  const meetings = read('core/ura_assistant_meetings.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(meetings.includes('def brief('));
+  assert.ok(meetings.includes('Pending approvals'));
+  assert.ok(meetings.includes('Suggested agenda'));
+  assert.ok(meetings.includes('No pending approvals'));
+  assert.ok(service.includes('"meeting_brief"'));
+  assert.ok(service.includes('"meeting_library"'));
+  assert.ok(service.includes('"meeting_listen"'));
+  assert.ok(service.includes('"meeting_note"'));
+  assert.ok(service.includes('"meeting_summary"'));
+  assert.ok(service.includes('"meeting_action"'));
+  assert.ok(service.includes('"schedule_meeting"'));
+  assert.ok(js.includes('MEETING_BRIEF'));
+  assert.ok(js.includes('MEETING_LIBRARY'));
+  assert.ok(css.includes('.ura-agenda'));
+});
+
+test('meeting endpoints are company-gated and the panel says why', () => {
+  const server = read('api_server.py');
+  assert.ok(server.includes('def _ura_meeting_access('));
+  assert.ok(server.includes('/api/assistant/meetings'));
+  assert.ok(server.includes('/api/assistant/meetings/brief'));
+  assert.ok(server.includes('/api/assistant/meetings/listen'));
+  assert.ok(server.includes('/api/assistant/meetings/notes'));
+  assert.ok(server.includes('/api/assistant/meetings/summary'));
+  assert.ok(server.includes('/api/assistant/meetings/actions'));
+  assert.ok(server.includes('/api/assistant/meetings/recording'));
+  assert.ok(server.includes('PERMISSION_REQUIRED'));
+  assert.ok(js.includes('renderMeetingsGate'));
+  assert.ok(js.includes('uraMeetingsPanel'));
+  assert.ok(js.includes('data-meetings-close'));
+  assert.ok(js.includes('data-meeting-listen'));
+  assert.ok(js.includes('data-recording-toggle'));
+});
+
+test('recording announcement is a company setting and scheduling stays honest', () => {
+  const definitions = read('core/settings/definitions.py');
+  const meetings = read('core/ura_assistant_meetings.py');
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(definitions.includes('"assistant_meeting_recording_notice"'));
+  assert.ok(meetings.includes('RECORDING_SETTING'));
+  assert.ok(meetings.includes('announcement'));
+  assert.ok(service.includes('CALENDAR_PROVIDER_NOT_CONFIGURED'));
+  assert.ok(js.includes('schedule_meeting') || js.includes('MEETING_INVITE'));
+  assert.ok(js.includes("action.status === 'SCHEDULED' && action.provider_status === 'CONFIRMED'"));
+});
+
 console.log(`\n${passed} URA Assistant UI contract tests passed.`);

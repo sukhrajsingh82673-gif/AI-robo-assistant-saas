@@ -335,6 +335,21 @@ def get_real_system_host(tenant_id: str = "tnt_primary"):
         "latency_ms": 1
     }
 
+def _ura_meeting_access(tenant_id: str, company_id: Optional[str]) -> tuple:
+    """Company meeting data is gated by the same assistant cowork approval."""
+    if not company_id:
+        return False, "Verified company context required."
+    from core.ura_assistant_service import URAAssistantService
+
+    permission = URAAssistantService(tenant_id=tenant_id).company_permission(company_id)
+    if not permission.get("granted"):
+        return False, (
+            "Company scope is locked until the AI CEO approves assistant access "
+            "(kind: cowork). Nothing was read from company meeting data."
+        )
+    return True, ""
+
+
 def _cw(tenant_id: str, company_id: str = None):
     """Tenant-scoped Universal Co-worker engine."""
     return get_coworker(tenant_id, company_id)
@@ -2558,6 +2573,42 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
             from core.ura_assistant_web import web_status
             self._send_json(web_status(tenant_id, company_id))
+            return
+
+        elif path == "/api/assistant/meetings":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import (
+                AssistantMeetingService, calendar_status, recording_notice,
+                transcription_status,
+            )
+            q = (query_params.get("q", [None])[0] or "").strip()
+            library = AssistantMeetingService(tenant_id).library(company_id, q)
+            self._send_json({
+                "company_id": company_id,
+                "meetings": library["meetings"],
+                "count": library["count"],
+                "query": library["query"],
+                "calendar": calendar_status(),
+                "transcription": transcription_status(),
+                "recording": recording_notice(tenant_id, company_id),
+            })
+            return
+
+        elif path == "/api/assistant/calendar":
+            from core.ura_assistant_meetings import calendar_status
+            self._send_json(calendar_status())
+            return
+
+        elif path == "/api/assistant/transcription":
+            from core.ura_assistant_meetings import transcription_status
+            self._send_json(transcription_status())
             return
 
         elif path == "/api/assistant/memory":
@@ -6434,6 +6485,117 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
             from core.ura_assistant_web import web_status
             self._send_json({"success": True, "web_access": web_status(tenant_id, company_id)})
+            return
+
+        elif path == "/api/assistant/meetings/brief":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import AssistantMeetingService
+            self._send_json(AssistantMeetingService(tenant_id).brief(company_id))
+            return
+
+        elif path == "/api/assistant/meetings/listen":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import AssistantMeetingService
+            res = AssistantMeetingService(tenant_id).listen(company_id, uid)
+            self._send_json(res, status=200 if res.get("success") else 409)
+            return
+
+        elif path == "/api/assistant/meetings/notes":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import AssistantMeetingService
+            service = AssistantMeetingService(tenant_id)
+            if str(req_data.get("action") or "").lower() == "list":
+                self._send_json(service.notes(company_id, req_data.get("meeting_id")))
+            else:
+                res = service.add_note(
+                    company_id,
+                    str(req_data.get("note") or ""),
+                    req_data.get("meeting_id"),
+                    uid,
+                )
+                self._send_json(res, status=200 if res.get("success") else 400)
+            return
+
+        elif path == "/api/assistant/meetings/summary":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import AssistantMeetingService
+            res = AssistantMeetingService(tenant_id).summarise(
+                company_id,
+                meeting_id=req_data.get("meeting_id"),
+                end_meeting=bool(req_data.get("end")),
+                user_id=uid,
+            )
+            self._send_json(res, status=200 if res.get("success") else 404)
+            return
+
+        elif path == "/api/assistant/meetings/actions":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.ura_assistant_meetings import AssistantMeetingService
+            res = AssistantMeetingService(tenant_id).action_item(
+                company_id,
+                str(req_data.get("title") or ""),
+                req_data.get("meeting_id"),
+                uid,
+                requires_approval=bool(req_data.get("requires_approval")),
+            )
+            self._send_json(res, status=200 if res.get("success") else 400)
+            return
+
+        elif path == "/api/assistant/meetings/recording":
+            uid = str(auth_context.get("user_id") or auth_context.get("username") or "")
+            if not uid:
+                self._send_json({"error": "Authenticated user required"}, status=401)
+                return
+            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            if not allowed:
+                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                return
+            from core.settings_service import settings_service
+            from core.ura_assistant_meetings import RECORDING_SETTING, recording_notice
+            res = settings_service.update_single_setting(
+                tenant_id, company_id, RECORDING_SETTING, bool(req_data.get("enabled")),
+                actor=str(auth_context.get("user_id") or "assistant"),
+                actor_role=str(auth_context.get("role") or "OWNER").upper(),
+            )
+            if isinstance(res, dict) and res.get("success") is False:
+                self._send_json(res, status=res.get("status_code") or 400)
+                return
+            self._send_json({"success": True, "recording": recording_notice(tenant_id, company_id)})
             return
 
         elif path == "/api/assistant/stream":
