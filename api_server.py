@@ -1309,6 +1309,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         if not self._enforce_tenant_fairness(path, "GET", auth_context=auth_context):
             return
 
+        # Company Setup API (tenant-scoped lifecycle, drafts, deletion steps).
+        if path == "/api/v1/companies" or path.startswith("/api/v1/companies/"):
+            from core.company_setup.api import company_setup_api
+
+            result = company_setup_api.handle("GET", path, query_params, {}, auth_context, company_id)
+            if result is not None:
+                self._send_json(result[1], status=result[0])
+                return
+
         # Settings V2 API (backend only; the legacy surface remains mounted).
         if path == "/api/settings/v2" or path.startswith("/api/settings/v2/"):
             from core.settings.api_v2 import settings_v2_api
@@ -4390,6 +4399,15 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if not self._enforce_tenant_fairness(path, "POST", auth_context=auth_context):
             return
+
+        # Company Setup API (tenant-scoped lifecycle, drafts, deletion steps).
+        if path == "/api/v1/companies" or path.startswith("/api/v1/companies/"):
+            from core.company_setup.api import company_setup_api
+
+            result = company_setup_api.handle("POST", path, query_params, req_data, auth_context, company_id)
+            if result is not None:
+                self._send_json(result[1], status=result[0])
+                return
 
         # Settings V2 API (backend only; the legacy surface remains mounted).
         if path == "/api/settings/v2" or path.startswith("/api/settings/v2/"):
@@ -9899,12 +9917,21 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         actor = auth_ctx.get("user_id", "usr_unknown")
         actor_role = auth_ctx.get("role", UserRole.OPERATOR)
 
+        # Company Setup API (update submits as PATCH; do_PATCH delegates here).
         length = int(self.headers.get('content-length', 0))
         raw_body = self.rfile.read(length) if length > 0 else b"{}"
         try:
             req_data = json.loads(raw_body.decode('utf-8'))
         except Exception:
             req_data = {}
+
+        if path == "/api/v1/companies" or path.startswith("/api/v1/companies/"):
+            from core.company_setup.api import company_setup_api
+
+            result = company_setup_api.handle("PATCH", path, urllib.parse.parse_qs(parsed.query), req_data, auth_ctx, company_id)
+            if result is not None:
+                self._send_json(result[1], status=result[0])
+                return
 
         if path.startswith("/api/crm/deals/") and len(path.split("/")) == 5:
             deal_id = path.split("/")[4]
@@ -10016,6 +10043,17 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if not self._enforce_tenant_fairness(path, "DELETE", auth_context=auth_ctx):
             return
+
+        # Company Setup API (connection and admin removal).
+        if path == "/api/v1/companies" or path.startswith("/api/v1/companies/"):
+            from core.company_setup.api import company_setup_api
+
+            result = company_setup_api.handle(
+                "DELETE", path, urllib.parse.parse_qs(parsed.query), {}, auth_ctx, company_id
+            )
+            if result is not None:
+                self._send_json(result[1], status=result[0])
+                return
 
         # Milestone J: Deactivate Pilot Organization Slot
         if path in ("/api/pilot/organizations/me", f"/api/pilot/organizations/{tenant_id}"):
