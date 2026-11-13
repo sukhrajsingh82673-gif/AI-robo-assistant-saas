@@ -128,6 +128,7 @@ CATEGORY_TO_SECTION: Dict[str, str] = {
     "ai": "ai_agents_employees",
     "ai_providers": "ai_agents_employees",
     "ai_ceo": "ai_agents_employees",
+    "assistant": "ai_agents_employees",
     "workforce": "ai_agents_employees",
     "agent_factory": "ai_agents_employees",
     "missions": "ai_agents_employees",

@@ -72,11 +72,18 @@ let meetingsState = [
 let meetingNotesState = [];
 let recordingEnabled = true;
 let meetingLive = null;
+window.__assistantSettings = {};
 
 window.fetch = async (url, options) => {
   const method = (options && options.method) || 'GET';
   const body = options && options.body ? JSON.parse(options.body) : null;
   calls.push(['fetch', method, url, body]);
+  if (url.startsWith('/api/settings/v2/values?category=assistant')) {
+    const settings = Object.entries(window.__assistantSettings || {}).map(([key, value]) => ({
+      key, value, version: 1, overridden_here: true
+    }));
+    return jsonResponse({ success: true, settings });
+  }
   if (url === '/api/approvals') return jsonResponse({ approvals: [] });
   if (url === '/api/approvals/req_1/decide') return jsonResponse({ success: true });
   if (url === '/api/assistant/jobs' && method === 'POST') {
@@ -457,6 +464,49 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   assert.ok(recordingCall && recordingCall[3].enabled === false);
   assert.strictEqual(assistant.meetingData.recording.enabled, false);
   console.log('  ok  the recording announcement is a saved setting');
+
+  // Stage 5 — assistant settings change the assistant itself.
+  window.__assistantSettings = {
+    assistant_show_button: false,
+    assistant_meetings_enabled: false,
+    assistant_background_work: false,
+    assistant_open_as: 'docked',
+    assistant_default_scope: 'COMPANY'
+  };
+  await assistant.loadAssistantSettings();
+  assert.strictEqual(assistant.settings.assistant_show_button, false);
+  assert.strictEqual(window.document.getElementById('uraLauncher').hidden, true, 'the launcher can be hidden');
+  assert.strictEqual(window.document.querySelector('[data-action="meetings"]').hidden, true, 'meetings control hides');
+  assert.strictEqual(window.document.querySelector('[data-plus="meetings"]').hidden, true, 'meetings menu entry hides');
+  assert.strictEqual(window.document.querySelector('[data-plus="research"]').hidden, true, 'research entry hides');
+  assert.strictEqual(window.document.querySelector('[data-plus="background"]').hidden, true, 'background entry hides');
+  assistant.savedState = false;
+  assistant.applyAssistantSettings();
+  assert.strictEqual(assistant.mode, 'docked', 'open as docked applies once');
+  assert.strictEqual(assistant.scope, 'COMPANY', 'default scope applies once');
+  assert.ok(calls.some((c) => String(c[2]).startsWith('/api/settings/v2/values?category=assistant')), 'settings are read from the console API');
+  console.log('  ok  settings hide the launcher, meetings and background entries and apply defaults');
+
+  const jobsBefore = assistant.jobs.length;
+  await assistant.startBackground('Research pricing tools');
+  assert.strictEqual(assistant.jobs.length, jobsBefore, 'background work off starts no job');
+  assert.ok(window.document.getElementById('uraMessages').textContent.includes('Background work is turned off'));
+  assistant.addMessage('user', 'Research competitor pricing');
+  assistant.researchLast();
+  assert.ok(window.document.getElementById('uraMessages').textContent.includes('Background work is turned off'));
+  console.log('  ok  background work off blocks jobs and research without a request');
+
+  window.__assistantSettings = {
+    assistant_show_button: true,
+    assistant_meetings_enabled: true,
+    assistant_background_work: true
+  };
+  await assistant.loadAssistantSettings();
+  assert.strictEqual(window.document.getElementById('uraLauncher').hidden, false);
+  assert.strictEqual(window.document.querySelector('[data-action="meetings"]').hidden, false);
+  // Put the window back in its default mode so the dock/expand checks start clean.
+  assistant.mode = 'window';
+  assistant.applyMode();
   assistant.companyGranted = false;
   assistant.applyScopeUi();
 
@@ -486,7 +536,7 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
   }
   console.log('  ok  all eight snap anchors resolve');
 
-  console.log('\n25 URA Assistant jsdom checks passed.');
+  console.log('\n29 URA Assistant jsdom checks passed.');
 })().catch((err) => {
   console.error(err);
   process.exit(1);

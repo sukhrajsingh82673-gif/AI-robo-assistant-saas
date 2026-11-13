@@ -249,4 +249,78 @@ confirmed it.
   64 pytest service/jobs/meetings tests passed.
 - Playwright/Chromium remains unavailable; browser e2e/screenshots are Stage 5.
 
-## Stage 5 — settings and tests (pending)
+## Stage 5 — settings and tests (complete)
+
+**Settings.** The assistant now has a full section under Settings → AI, Agents &
+Employees (`assistant` category, `ai_agents_employees` section). Every control
+is a real, enforced setting:
+
+| Key | Control | Default |
+|---|---|---|
+| `assistant_show_button` | Show the launcher | on |
+| `assistant_open_as` | Window or docked | window |
+| `assistant_default_scope` | Personal or Company | Personal |
+| `assistant_confirmations` | Confirm risky actions | on |
+| `assistant_remember_conversations` | Keep turns for history | on |
+| `assistant_background_work` | Background jobs/research | on |
+| `assistant_meetings_enabled` | Meetings area | on |
+| `assistant_web_access` | off / allow list / open | off |
+| `assistant_web_allowlist` | Allowed domains | empty |
+| `assistant_web_blocklist` | Blocked domains | empty |
+| `assistant_meeting_recording_notice` | Announce recording | on |
+
+Each definition carries `hint` (plain-language explanation), `suggestion` (the
+recommended value) and `reason` (why), plumbed through `SettingDefinition`,
+`to_public_dict` and the registry. Every key names an `ENFORCED_BY` entry, so
+Settings V2 shows it as `live` instead of `coming_soon`.
+
+**Server enforcement.**
+- `assistant_background_work` off: `URAAssistantService.create_job` refuses with
+  a plain reason and starts nothing.
+- `assistant_confirmations` off: mutating tools run without the confirm card,
+  except `run_terminal`, which always asks and is `HIGH` risk.
+- `assistant_remember_conversations` off: neither the user nor the assistant
+  turn is persisted; explicit “Remember this” still works.
+- `assistant_meetings_enabled` off: `_ura_meeting_access` returns
+  `MEETINGS_DISABLED`; no company meeting data is read.
+- `assistant_web_access` / allow list / block list were already enforced by
+  `core/ura_assistant_web.py` in Stage 3.
+- `assistant_meeting_recording_notice` was already enforced by
+  `core/ura_assistant_meetings.py` in Stage 4.
+
+**Client enforcement.** `web/ura_assistant.js` reads the assistant category from
+`/api/settings/v2/values?category=assistant` on open, hides the launcher, the
+Meetings controls and the research/background entries, blocks
+`startBackground`/`researchLast`, and applies the default scope and open mode
+once when no personal state is saved. Personal choices still win afterwards.
+
+**Settings V2.** Rows render the hint, a “Suggested: … — reason” callout when
+the current value differs, and a per-group “Use all suggestions” button that
+posts to the existing `/api/settings/v2/values/bulk` endpoint. Only `live`,
+non-secret assistant keys are applied.
+
+**Bug found by the e2e journey.** The client permission check uppercased the
+approval status and then tested a lowercase regex, so a real `APPROVED` cowork
+approval never unlocked Company scope. It now lowercases the status.
+
+**Tests.** New `tests/test_ura_assistant_settings.py` (15 tests) covers the
+registry metadata, the four server gates and the meetings codes. Static
+contract tests grew to 41 and the jsdom smoke test to 29 checks. A new
+`tests/assistant_e2e_test.js` walks a reconstructed (a)-(l) journey in jsdom:
+one surface, old routes to the one assistant with the Co-worker kept, launcher
+and eight snap anchors, phone sheet, streaming + typed confirmation, Company
+lock, `@role` + memory, background jobs/hand-off, labelled web sources,
+meetings end to end, settings effects and accessibility/persistence.
+
+**Gates (after the final Stage 5 edit).**
+- `npm run typecheck`: 61 JavaScript files parsed.
+- `npm run lint`: assistant consolidation checks passed.
+- `npm run build`: passed.
+- `npm run test:assistant`: 41 static contract tests + 29 jsdom checks +
+  12 e2e journey checks + 79 pytest tests passed.
+
+**Not done: screenshots and real browser e2e.** This environment has no
+Chromium, Playwright or browser binary, so light/dark screenshots and the
+Playwright run of the same journey could not be produced. The jsdom runner is
+the runnable fallback in the repo; the browser pass remains an environment
+gap, not a code gap.

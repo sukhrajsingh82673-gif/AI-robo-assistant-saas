@@ -150,14 +150,18 @@ Only the launcher, toasts and the phone tab bar may be fixed to the bottom.
   provider only behind `URA_ASSISTANT_TRANSCRIPTION_PROVIDER=sample` (no audio
   is captured).
 
-### Stage 5 — settings and tests
-- Assistant settings category with control, plain-language hint, suggestion and
-  reason per item, plus "Use all suggestions": show button, open as, default
-  scope, background work, web access, meetings, announce recording,
-  confirmations, remember conversations. Autonomy, payment limit, tone and
-  Terminal settings continue to apply.
-- E2E coverage (a)-(l) from the task, runnable locally (jsdom fallback when no
-  Chromium), screenshots in light/dark.
+### Stage 5 — settings and tests (complete)
+- Assistant settings category under AI, Agents & Employees with a control,
+  plain-language hint, suggestion and reason per item, plus “Use all
+  suggestions” through the existing bulk endpoint: show button, open as,
+  default scope, background work, web access and lists, meetings, announce
+  recording, confirmations, remember conversations. Autonomy, payment limit,
+  tone and Terminal settings continue to apply.
+- Server and client both enforce every key; each key names its enforcement
+  point so Settings V2 marks it live.
+- E2E journey (a)-(l) runs as `tests/assistant_e2e_test.js` in jsdom because
+  this environment has no Chromium or Playwright. The browser/screenshot pass
+  remains an environment gap; see `PROGRESS.md` Stage 5.
 
 ## 6. Adapters and STUBS
 

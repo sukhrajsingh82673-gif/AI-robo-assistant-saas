@@ -128,6 +128,9 @@
       this.meetingSummary = null;
       this.meetingListenError = null;
       this.watchingJobId = null;
+      this.settings = {};
+      this.settingsLoaded = false;
+      this.savedState = false;
       this.jobPollTimer = null;
       this.drag = null;
       this.storageKey = `${STORAGE}:${userKey()}`;
@@ -149,6 +152,7 @@
       this.bind();
       this.refreshContext();
       this.checkCompanyPermission();
+      this.loadAssistantSettings();
       this.startJobsPolling();
       if (this.showButton === 'hidden' && this.launcher) this.launcher.hidden = true;
       this.applyAnchor();
@@ -173,6 +177,7 @@
       let saved = null;
       try { saved = JSON.parse(localStorage.getItem(this.storageKey) || 'null'); } catch (err) { saved = null; }
       const data = saved && typeof saved === 'object' ? saved : {};
+      this.savedState = Boolean(saved && typeof saved === 'object');
       this.anchor = data.anchor || 'bottom-right';
       this.mode = data.mode || 'window';
       if (!['window', 'docked', 'expanded'].includes(this.mode)) this.mode = 'window';
@@ -487,7 +492,7 @@
         const list = Array.isArray(data.approvals) ? data.approvals : [];
         const granted = list.some((item) => {
           const desc = String(item.action_desc || item.action || item.title || '');
-          const status = String(item.status || item.state || '').toUpperCase();
+          const status = String(item.status || item.state || '').toLowerCase();
           return /ura assistant/i.test(desc) && /(approved|granted|executed|complete)/.test(status);
         });
         this.companyGranted = granted;
@@ -528,6 +533,52 @@
       }
     }
 
+    // ------------------------------------------------- assistant settings
+    async loadAssistantSettings() {
+      const companyId = this.getCompanyId();
+      if (!companyId) return;
+      this.settingsLoaded = true;
+      try {
+        const res = await fetch(`/api/settings/v2/values?category=assistant&scope=company&company_id=${encodeURIComponent(companyId)}`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const map = {};
+        (data.settings || []).forEach((row) => { if (row && row.key) map[row.key] = row.value; });
+        this.settings = map;
+      } catch (err) {
+        this.settings = {};
+      }
+      this.applyAssistantSettings();
+    }
+
+    applyAssistantSettings() {
+      const settings = this.settings || {};
+      if (this.launcher) {
+        const show = settings.assistant_show_button !== false && this.showButton !== 'hidden';
+        this.launcher.hidden = !show;
+      }
+      const meetingsOn = settings.assistant_meetings_enabled !== false;
+      this.root.querySelectorAll('[data-action="meetings"], [data-plus="meetings"]').forEach((el) => {
+        el.hidden = !meetingsOn;
+      });
+      if (!meetingsOn) this.closeMeetings();
+      const backgroundOn = settings.assistant_background_work !== false;
+      this.root.querySelectorAll('[data-plus="research"], [data-plus="background"]').forEach((el) => {
+        el.hidden = !backgroundOn;
+      });
+      if (this.savedState) return;
+      this.savedState = true;
+      if (settings.assistant_open_as === 'docked') this.mode = 'docked';
+      if (settings.assistant_default_scope === 'COMPANY') this.scope = 'COMPANY';
+      this.applyScopeUi();
+      this.applyMode();
+      this.save();
+    }
+
+    backgroundWorkOff() {
+      return this.settings ? this.settings.assistant_background_work === false : false;
+    }
+
     // -------------------------------------------------------------- open/ui
     open(options = {}) {
       if (!this.initialized) this.init();
@@ -539,6 +590,7 @@
       if (options.focus === 'meetings') {
         this.renderSuggestions('meetings');
       }
+      this.loadAssistantSettings();
       if (this.phone) {
         this.mode = this.mode === 'sheet-full' ? 'sheet-full' : 'sheet';
       } else if (!['window', 'docked', 'expanded'].includes(this.mode)) {
@@ -1295,6 +1347,10 @@
         this.addMessage('assistant', 'Tell me what to work on first — type it, then choose “Run in background”.');
         return;
       }
+      if (this.backgroundWorkOff()) {
+        this.addMessage('assistant', 'Background work is turned off for this workspace in Settings, so the job was not started.');
+        return;
+      }
       if (this.scope === 'COMPANY' && !this.companyGranted) {
         this.renderPermissionBanner();
         this.addMessage('assistant', 'Company scope is locked until the AI CEO approves access. Nothing was started.');
@@ -1324,6 +1380,10 @@
     }
 
     researchLast() {
+      if (this.backgroundWorkOff()) {
+        this.addMessage('assistant', 'Background work is turned off for this workspace in Settings. Ask directly instead and the answer stays here.');
+        return;
+      }
       const input = document.getElementById('uraInput');
       let text = (input ? input.value : '').trim();
       if (input) { input.value = ''; input.style.height = 'auto'; }

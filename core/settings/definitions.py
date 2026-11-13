@@ -461,25 +461,95 @@ SETTINGS_DEFINITIONS = [
 
     # --- 8b. URA Assistant ---
     {
+        "id": "assistant_show_button", "category": "assistant", "name": "Show the assistant button", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "Show the one URA Assistant launcher in the corner of every screen.",
+        "hint": "On phones the assistant lives in the middle tab, so this only affects desktop.",
+        "suggestion": True,
+        "reason": "The launcher is the only conversational entry point now that the old bars are gone."
+    },
+    {
+        "id": "assistant_open_as", "category": "assistant", "name": "Open as", "type": "select",
+        "default": "window", "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "options": ["window", "docked"],
+        "desc": "How the assistant opens the first time each session.",
+        "hint": "Docked keeps it beside your work; window keeps it free-floating.",
+        "suggestion": "window",
+        "reason": "A floating window stays available on every screen without shrinking the page."
+    },
+    {
+        "id": "assistant_default_scope", "category": "assistant", "name": "Default scope", "type": "select",
+        "default": "PERSONAL", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "options": ["PERSONAL", "COMPANY"],
+        "desc": "Which workspace the assistant starts in when it opens.",
+        "hint": "Company data still needs the approved cowork permission, whichever default is set.",
+        "suggestion": "PERSONAL",
+        "reason": "Personal starts without reading company data, and Company is one click away when you need it."
+    },
+    {
+        "id": "assistant_confirmations", "category": "assistant", "name": "Confirm risky actions", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "HIGH",
+        "desc": "Ask for an in-window confirmation before the assistant runs a tool that changes something.",
+        "hint": "Terminal commands and any high-risk tool always ask, even when this is off.",
+        "suggestion": True,
+        "reason": "A single confirmation keeps changes visible before they happen."
+    },
+    {
+        "id": "assistant_remember_conversations", "category": "assistant", "name": "Remember conversations", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "desc": "Keep the assistant's turns so memory and history can refer to them later.",
+        "hint": "“Remember this” still saves the item you choose when this is off.",
+        "suggestion": True,
+        "reason": "History makes follow-up questions work; explicit memory stays opt-in either way."
+    },
+    {
+        "id": "assistant_background_work", "category": "assistant", "name": "Background work", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
+        "desc": "Allow long research or data work to run as a background job (three active per user).",
+        "hint": "With this off, answers stay in the open window and nothing runs after you leave.",
+        "suggestion": True,
+        "reason": "Background jobs keep research moving without holding the window open."
+    },
+    {
+        "id": "assistant_meetings_enabled", "category": "assistant", "name": "Meetings", "type": "toggle",
+        "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
+        "desc": "Show the Meetings area: briefs, live notes, summaries and the meeting library.",
+        "hint": "Turning this off hides the meeting controls but keeps stored meeting records.",
+        "suggestion": True,
+        "reason": "Meetings are part of the single assistant, so the controls should be visible by default."
+    },
+    {
         "id": "assistant_web_access", "category": "assistant", "name": "Web access", "type": "select",
         "default": "off", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
         "options": ["off", "allowlist", "open"],
-        "desc": "Off: the assistant never reads the web. Allow list: only listed domains. Open: any public domain except the block list."
+        "desc": "Off: the assistant never reads the web. Allow list: only listed domains. Open: any public domain except the block list.",
+        "hint": "Web search also needs a server-side provider; without one the assistant says it is not configured.",
+        "suggestion": "off",
+        "reason": "Starting off means no page is read until you name the domains you trust."
     },
     {
         "id": "assistant_web_allowlist", "category": "assistant", "name": "Web allow list", "type": "text",
         "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
-        "desc": "Comma-separated domains the assistant may read when web access is set to allow list."
+        "desc": "Comma-separated domains the assistant may read when web access is set to allow list.",
+        "hint": "Subdomains match with a leading wildcard, for example *.example.com.",
+        "suggestion": "",
+        "reason": "An empty list is honest: nothing is read until a domain is added."
     },
     {
         "id": "assistant_web_blocklist", "category": "assistant", "name": "Web block list", "type": "text",
         "default": "", "scope": "Company", "editable_by": "OWNER", "risk": "MEDIUM",
-        "desc": "Comma-separated domains the assistant must never cite, even when web access is open."
+        "desc": "Comma-separated domains the assistant must never cite, even when web access is open.",
+        "hint": "The block list wins over both the allow list and open access.",
+        "suggestion": "",
+        "reason": "Nothing needs blocking by default, and the list is checked before any source is cited."
     },
     {
         "id": "assistant_meeting_recording_notice", "category": "assistant", "name": "Announce recording", "type": "toggle",
         "default": True, "scope": "Company", "editable_by": "OWNER", "risk": "LOW",
-        "desc": "Show and record a plain-language recording and transcription announcement when listening starts."
+        "desc": "Show and record a plain-language recording and transcription announcement when listening starts.",
+        "hint": "The announcement is written to the meeting record once, before any transcript line.",
+        "suggestion": True,
+        "reason": "People in the meeting should hear that it is being recorded before it starts."
     },
 
     # --- 9. AI Workforce ---

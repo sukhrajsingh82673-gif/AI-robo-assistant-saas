@@ -440,4 +440,93 @@ test('recording announcement is a company setting and scheduling stays honest', 
   assert.ok(js.includes("action.status === 'SCHEDULED' && action.provider_status === 'CONFIRMED'"));
 });
 
+// ---------------------------------------------------------------------------
+// Stage 5 — assistant settings are real controls
+// ---------------------------------------------------------------------------
+
+test('assistant settings carry a hint, a suggestion and a reason', () => {
+  const definitions = read('core/settings/definitions.py');
+  const keys = [
+    'assistant_show_button', 'assistant_open_as', 'assistant_default_scope',
+    'assistant_confirmations', 'assistant_remember_conversations',
+    'assistant_background_work', 'assistant_meetings_enabled',
+    'assistant_web_access', 'assistant_web_allowlist', 'assistant_web_blocklist',
+    'assistant_meeting_recording_notice',
+  ];
+  keys.forEach((key) => {
+    assert.ok(definitions.includes(`"id": "${key}"`), `${key} is defined`);
+  });
+  const assistantBlock = definitions.slice(definitions.indexOf('--- 8b. URA Assistant ---'));
+  assert.ok(assistantBlock.split('"hint":').length - 1 >= keys.length);
+  assert.ok(assistantBlock.split('"suggestion":').length - 1 >= keys.length);
+  assert.ok(assistantBlock.split('"reason":').length - 1 >= keys.length);
+  const models = read('core/settings/models.py');
+  assert.ok(models.includes('hint: str = ""'));
+  assert.ok(models.includes('suggestion: Any = None'));
+  assert.ok(models.includes('reason: str = ""'));
+  assert.ok(models.includes('"suggestion":'));
+  const registry = read('core/settings/registry.py');
+  assert.ok(registry.includes('hint=str(raw.get("hint"'));
+  assert.ok(registry.includes('suggestion=raw.get("suggestion")'));
+});
+
+test('every assistant setting is enforced somewhere real', () => {
+  const registry = read('core/settings/registry.py');
+  const enforced = registry.slice(registry.indexOf('ENFORCED_BY'));
+  const keys = [
+    'assistant_show_button', 'assistant_open_as', 'assistant_default_scope',
+    'assistant_confirmations', 'assistant_remember_conversations',
+    'assistant_background_work', 'assistant_meetings_enabled',
+    'assistant_web_access', 'assistant_web_allowlist', 'assistant_web_blocklist',
+    'assistant_meeting_recording_notice',
+  ];
+  keys.forEach((key) => {
+    assert.ok(enforced.includes(`"${key}":`), `${key} names its enforcement point`);
+  });
+  const sections = read('core/settings/sections.py');
+  assert.ok(sections.includes('"assistant": "ai_agents_employees"'));
+});
+
+test('the server enforces the assistant settings', () => {
+  const service = read('core/ura_assistant_service.py');
+  assert.ok(service.includes('def _setting('));
+  assert.ok(service.includes('"assistant_background_work"'));
+  assert.ok(service.includes('Background work is turned off'));
+  assert.ok(service.includes('"assistant_remember_conversations"'));
+  assert.ok(service.includes('"assistant_confirmations"'));
+  assert.ok(service.includes('confirmations or tool_name == "run_terminal"'));
+  assert.ok(service.includes('if not remember:'));
+  const server = read('api_server.py');
+  assert.ok(server.includes('"assistant_meetings_enabled"'));
+  assert.ok(server.includes('MEETINGS_DISABLED'));
+  assert.ok(server.includes('code or "PERMISSION_REQUIRED"'));
+});
+
+test('the client applies the settings and hides what is off', () => {
+  assert.ok(js.includes('async loadAssistantSettings()'));
+  assert.ok(js.includes('applyAssistantSettings()'));
+  assert.ok(js.includes('backgroundWorkOff()'));
+  assert.ok(js.includes('/api/settings/v2/values?category=assistant'));
+  assert.ok(js.includes("settings.assistant_show_button !== false"));
+  assert.ok(js.includes("settings.assistant_meetings_enabled !== false"));
+  assert.ok(js.includes("settings.assistant_background_work !== false"));
+  assert.ok(js.includes("settings.assistant_open_as === 'docked'"));
+  assert.ok(js.includes("settings.assistant_default_scope === 'COMPANY'"));
+  assert.ok(js.includes('Background work is turned off'));
+});
+
+test('Settings V2 shows hints, suggestions and applies them in bulk', () => {
+  const v2 = read('web/settings_v2.js');
+  const v2css = read('web/settings_v2.css');
+  assert.ok(v2.includes('definition.hint'));
+  assert.ok(v2.includes('sz-suggestion'));
+  assert.ok(v2.includes('Suggested:'));
+  assert.ok(v2.includes('Use all suggestions'));
+  assert.ok(v2.includes('applySuggestions'));
+  assert.ok(v2.includes("API + '/values/bulk'"));
+  assert.ok(v2.includes("definition.status === 'live'"));
+  assert.ok(v2css.includes('.sz-suggestion'));
+  assert.ok(v2css.includes('.sz-suggest-btn'));
+});
+
 console.log(`\n${passed} URA Assistant UI contract tests passed.`);

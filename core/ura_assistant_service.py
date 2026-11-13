@@ -679,6 +679,17 @@ class URAAssistantService:
         return {"success": True, "removed": removed}
 
     # ---------------------------------------------------------- scope gating
+    def _setting(self, company_id: Optional[str], key: str, default: Any = None) -> Any:
+        """Read a Company setting with a safe fallback; never break the stream."""
+        try:
+            from .settings_service import settings_service
+
+            return settings_service.get_effective_setting(
+                self.tenant_id, company_id or "comp_primary", key, default
+            )
+        except Exception:
+            return default
+
     def company_permission(self, company_id: Optional[str]) -> Dict[str, Any]:
         if not company_id:
             return {"granted": False, "reason": "NO_COMPANY", "request": None}
@@ -757,6 +768,14 @@ class URAAssistantService:
         prompt = (prompt or "").strip()
         if not prompt:
             return {"success": False, "error": "Type what the job should do."}
+        if not bool(self._setting(company_id, "assistant_background_work", True)):
+            return {
+                "success": False,
+                "error": (
+                    "Background work is turned off for this workspace in Settings, "
+                    "so the job was not started."
+                ),
+            }
         from .ura_assistant_jobs import (
             AssistantJobRunner, AssistantJobStore, MAX_ACTIVE_JOBS,
         )
@@ -936,6 +955,8 @@ class URAAssistantService:
         sess_id = session_id or f"ura_{uuid.uuid4().hex[:10]}"
         scope = "COMPANY" if str(workspace_mode or "PERSONAL").upper() == "COMPANY" else "PERSONAL"
         company_name = self._company_name(company_id) if company_id else None
+        remember = bool(self._setting(company_id, "assistant_remember_conversations", True))
+        confirmations = bool(self._setting(company_id, "assistant_confirmations", True))
 
         role, cleaned = self.resolve_agent(prompt)
         if agent_role and not role:
@@ -996,18 +1017,19 @@ class URAAssistantService:
 
         # ---- Record the user turn -----------------------------------------
         assistant = self._assistant_service()
-        try:
-            assistant._record_message(
-                session_id=sess_id,
-                user_id=user_id,
-                company_id=company_id if scope == "COMPANY" else None,
-                sender="user",
-                workspace_mode=scope,
-                content=(f"@{role} " if role else "") + prompt,
-                intent_category="COMPANY_DELEGATION" if scope == "COMPANY" else "PERSONAL_TASK",
-            )
-        except Exception:
-            logger.exception("Could not record the assistant user turn")
+        if remember:
+            try:
+                assistant._record_message(
+                    session_id=sess_id,
+                    user_id=user_id,
+                    company_id=company_id if scope == "COMPANY" else None,
+                    sender="user",
+                    workspace_mode=scope,
+                    content=(f"@{role} " if role else "") + prompt,
+                    intent_category="COMPANY_DELEGATION" if scope == "COMPANY" else "PERSONAL_TASK",
+                )
+            except Exception:
+                logger.exception("Could not record the assistant user turn")
 
         # ---- Plan a typed tool --------------------------------------------
         tool_name, arguments = _plan_tool(prompt, (page_context or {}).get("page") or "overview")
@@ -1038,7 +1060,10 @@ class URAAssistantService:
                 return
 
             preview = self._preview_tool(tool_name, arguments)
-            if spec.get("mutating") and not self._is_confirmed(prompt, arguments):
+            needs_confirmation = bool(spec.get("mutating")) and (
+                confirmations or tool_name == "run_terminal"
+            )
+            if needs_confirmation and not self._is_confirmed(prompt, arguments):
                 yield {
                     "type": "tool",
                     "tool": tool_name,
@@ -1062,6 +1087,7 @@ class URAAssistantService:
                 self._record_assistant_turn(
                     assistant, sess_id, user_id, scope, company_id,
                     f"Awaiting confirmation for {tool_name}.", intent="CONFIRMATION",
+                    remember=remember,
                 )
                 yield {"type": "done", "session_id": sess_id, "routed_to": "CONFIRMATION_REQUIRED"}
                 return
@@ -1114,6 +1140,7 @@ class URAAssistantService:
         self._record_assistant_turn(
             assistant, sess_id, user_id, scope, company_id, answer,
             citations=citations, intent="COMPANY_DELEGATION" if scope == "COMPANY" else "PERSONAL_TASK",
+            remember=remember,
         )
 
         yield {
@@ -1974,7 +2001,10 @@ class URAAssistantService:
         answer: str,
         citations: Optional[List[Dict[str, Any]]] = None,
         intent: str = "INFORMATION",
+        remember: bool = True,
     ) -> None:
+        if not remember:
+            return
         try:
             assistant._record_message(
                 session_id=session_id,

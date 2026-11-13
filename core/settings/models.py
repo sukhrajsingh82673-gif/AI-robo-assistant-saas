@@ -190,6 +190,9 @@ class SettingDefinition:
     requires_approval: bool = False
     is_ceo_managed: bool = False
     action_id: Optional[str] = None
+    hint: str = ""
+    suggestion: Any = None
+    reason: str = ""
 
     @property
     def is_live(self) -> bool:
@@ -226,6 +229,9 @@ class SettingDefinition:
             "requires_approval": self.requires_approval,
             "is_ceo_managed": self.is_ceo_managed,
             "action_id": self.action_id,
+            "hint": self.hint,
+            "suggestion": "••••••••" if self.secret else self.suggestion,
+            "reason": self.reason,
         }
 
 

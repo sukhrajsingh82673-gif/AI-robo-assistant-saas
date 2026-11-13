@@ -336,18 +336,24 @@ def get_real_system_host(tenant_id: str = "tnt_primary"):
     }
 
 def _ura_meeting_access(tenant_id: str, company_id: Optional[str]) -> tuple:
-    """Company meeting data is gated by the same assistant cowork approval."""
+    """Company meeting data is gated by the assistant setting and cowork approval."""
     if not company_id:
-        return False, "Verified company context required."
+        return False, "Verified company context required.", "COMPANY_REQUIRED"
     from core.ura_assistant_service import URAAssistantService
 
-    permission = URAAssistantService(tenant_id=tenant_id).company_permission(company_id)
+    service = URAAssistantService(tenant_id=tenant_id)
+    if not bool(service._setting(company_id, "assistant_meetings_enabled", True)):
+        return False, (
+            "Meetings are turned off for this workspace in Settings. "
+            "Nothing was read from company meeting data."
+        ), "MEETINGS_DISABLED"
+    permission = service.company_permission(company_id)
     if not permission.get("granted"):
         return False, (
             "Company scope is locked until the AI CEO approves assistant access "
             "(kind: cowork). Nothing was read from company meeting data."
-        )
-    return True, ""
+        ), "PERMISSION_REQUIRED"
+    return True, "", ""
 
 
 def _cw(tenant_id: str, company_id: str = None):
@@ -2580,9 +2586,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import (
                 AssistantMeetingService, calendar_status, recording_notice,
@@ -6492,9 +6498,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import AssistantMeetingService
             self._send_json(AssistantMeetingService(tenant_id).brief(company_id))
@@ -6505,9 +6511,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import AssistantMeetingService
             res = AssistantMeetingService(tenant_id).listen(company_id, uid)
@@ -6519,9 +6525,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import AssistantMeetingService
             service = AssistantMeetingService(tenant_id)
@@ -6542,9 +6548,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import AssistantMeetingService
             res = AssistantMeetingService(tenant_id).summarise(
@@ -6561,9 +6567,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.ura_assistant_meetings import AssistantMeetingService
             res = AssistantMeetingService(tenant_id).action_item(
@@ -6581,9 +6587,9 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not uid:
                 self._send_json({"error": "Authenticated user required"}, status=401)
                 return
-            allowed, message = _ura_meeting_access(tenant_id, company_id)
+            allowed, message, code = _ura_meeting_access(tenant_id, company_id)
             if not allowed:
-                self._send_json({"error": message, "code": "PERMISSION_REQUIRED"}, status=403)
+                self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
             from core.settings_service import settings_service
             from core.ura_assistant_meetings import RECORDING_SETTING, recording_notice
