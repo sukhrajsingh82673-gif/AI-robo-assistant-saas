@@ -237,8 +237,16 @@
         window.UI.showToast(t(kind === 'NEW' ? 'company.add.intent_new' : 'company.add.intent_existing'), 'info');
       }
 
-      // Reuse the existing intake surfaces for now. Stage 3 replaces the
-      // collector with the typed company setup workflow.
+      if (kind === 'NEW') {
+        // New companies use the typed create flow (Stage 3). It validates,
+        // reviews, creates the draft and starts the Company Build workflow.
+        if (typeof window.navigateTo === 'function') window.navigateTo('/company/create');
+        else window.location.hash = '#/company/create';
+        return;
+      }
+
+      // Existing companies keep the intake collector until Stage 4 replaces it
+      // with read-only connections and the diagnosis workspace.
       if (window.EntryFlows && typeof window.EntryFlows.startFlow === 'function') {
         if (typeof window.navigateTo === 'function') window.navigateTo('/company/new');
         window.EntryFlows.startFlow(mode, 'view-company');

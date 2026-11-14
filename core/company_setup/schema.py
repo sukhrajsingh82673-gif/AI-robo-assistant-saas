@@ -37,6 +37,16 @@ _COMPANY_COLUMNS: List[tuple] = [
     ("readiness_score", "REAL"),
     ("deleted_at", "REAL"),
     ("deleted_by", "TEXT"),
+    ("target_customers", "TEXT"),
+    ("budget_amount", "REAL"),
+    ("budget_currency", "TEXT"),
+    ("timeline", "TEXT"),
+    ("setup_notes", "TEXT"),
+    ("assets", "JSON"),
+]
+
+_BUILD_RUN_COLUMNS: List[tuple] = [
+    ("workflow_run_id", "TEXT"),
 ]
 
 _EXTERNAL_CONNECTION_COLUMNS: List[tuple] = [
@@ -223,6 +233,7 @@ def ensure_schema(force: bool = False) -> bool:
                         pass
                 _add_missing_columns(conn, "companies", _COMPANY_COLUMNS)
                 _add_missing_columns(conn, "external_connections", _EXTERNAL_CONNECTION_COLUMNS)
+                _add_missing_columns(conn, "company_build_runs", _BUILD_RUN_COLUMNS)
                 # Backfill timestamps and normalise the legacy ATTENTION status.
                 try:
                     conn.execute(

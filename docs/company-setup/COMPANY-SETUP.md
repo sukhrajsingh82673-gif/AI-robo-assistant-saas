@@ -19,7 +19,7 @@ Rules of engagement for this program:
 | 0 | Audit only (this document) | **Complete** |
 | 1 | Data model, API, permissions, drafts | **Complete** |
 | 2 | Company switcher + Add company page + entry points + i18n/RTL | **Complete** |
-| 3 | Create new company (form, review, build workflow) | Not started |
+| 3 | Create new company (form, review, build workflow) | **Complete** |
 | 4 | Add existing company (form, connections, ingestion shell, diagnosis) | Not started |
 | 5 | Overview, edit, protected delete + export | Not started |
 | 6 | Settings wiring, tests, abuse tests, hardening | Not started |
@@ -306,8 +306,8 @@ Delivered in Stage 1 as a single suite (`tests/test_company_setup.py`, 45 tests)
 
 Planned for later stages:
 
-- `tests/company_setup_e2e_test.js` — jsdom journeys for add new / add existing / edit / delete
-- `tests/test_company_setup_build_workflow.py` — real phases, resume after failure (Stage 3/4)
+- `tests/company_setup_e2e_test.js` — jsdom journeys for add existing / edit / delete (create-new is covered in `tests/company_setup_ui_test.js`)
+- `tests/test_company_setup_build_workflow.py` — delivered as `tests/test_company_build_workflow.py` (Stage 3); resume-after-failure for EXISTING companies belongs to Stage 4
 - `tests/test_company_setup_abuse.py` — script injection, oversized upload, prompt injection, double submit (Stage 6)
 
 ---
@@ -350,7 +350,7 @@ Planned for later stages:
 
 **Honest limitations left for later stages**
 
-- Company Build / Onboarding execution engine (Stage 3/4): `workflow_started: false` is returned on submit.
+- Company Build / Onboarding execution engine (Stage 3/4): superseded by Stage 3 for NEW companies (submit now starts the real build); EXISTING onboarding still returns `workflow_started: false`.
 - Export generation and email delivery (Stage 5): `GET /export` returns `409 EXPORT_NOT_READY`.
 - Provider handshakes (Stage 4): `test` returns `simulated: true`, `verified: false`, "Nothing was read".
 - No UI yet (Stage 2+).
@@ -361,7 +361,7 @@ Planned for later stages:
 POST   /api/v1/companies                  -> 201 (draft, INR)
 GET    /api/v1/companies                  -> list
 PATCH  /api/v1/companies/<id>             -> 200 title updated
-POST   /api/v1/companies/<id>/submit      -> 202 CREATING + BUILD run, workflow_started false
+POST   /api/v1/companies/<id>/submit      -> 202 CREATING + BUILD run, workflow_started false (Stage 1; Stage 3 starts the build)
 GET    /api/v1/companies/<id>/build       -> INTAKE/PENDING, estimate 1-3 days
 GET    /api/v1/companies/<id>/audit       -> created + submitted
 GET    /api/v1/companies/comp_foreign     -> 404 (foreign tenant)
@@ -405,11 +405,64 @@ GET    legacy /api/companies              -> new company visible (portfolio refr
 9. Assistant phrases such as "add a company" / "switch company" open the page or switcher and say nothing was created or switched; no request is sent.
 10. The topbar dropdown also lists the current company first and shows a truthful "No company yet — add one" state.
 
-**Handoff note:** the two cards still open the existing `EntryFlows` brief/intake collector. Stage 3 replaces that collector with the typed, validated company setup workflow; Stage 2 deliberately does not write company rows.
+**Handoff note:** Stage 3 replaced the "Create new" card collector with the typed create flow. The "Add existing" card still opens `EntryFlows` until Stage 4; Stage 2 deliberately did not write company rows.
 
 **Gates:** `npm run typecheck` (65 files), `npm run lint`, `npm run test:company` (45 pytest + 16 UI checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey checks).
 
 **Not verifiable here:** no Chromium/Playwright, so no screenshots or true 360px/RTL visual pass. Behaviour is covered in jsdom; visual checks need a device/browser.
+
+---
+
+## 4d. Stage 3 — delivered
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `core/company_setup/build_workflow.py` | Company Build graph on `core/durable_workflow_runtime.py` (`StateGraph` + `GovernedLangGraphRuntime`): 7 NEW phases, null research/builder adapters, phase/log/gap projection onto `company_build_runs`, retry as a new attempt |
+| `web/company_setup_create.js` | `/company/create`: one-column form, free/guided description (four answers compose one string), collapsed optional section, per-field hints/examples, draft autosave, review screen, duplicate-name handling, submit → build |
+| `web/company_setup_progress.js` | `/company/<id>/build`: real phase list, progress bar, plain-language log, "waiting on you" gaps, honest failure, retry, polling only while running |
+| `migrations/pg/0009_company_build_workflow.sql` | Additive columns for optional create fields + `company_build_runs.workflow_run_id` |
+| `migrations/rollback/pg/0009_company_build_workflow_rollback.sql` | Manual reverse migration (never auto-applied) |
+| `tests/test_company_build_workflow.py` | 9 tests: phases, skipped phases never faked, progress/estimate, audit, retry attempt, tenant isolation, EXISTING not started, visible failure |
+
+**Touched:** `core/company_setup/service.py` (new optional fields, validation, insert/update, `get_build` normalization, submit starts the build, `retry_build`), `core/company_setup/schema.py` (columns + idempotent bootstrap), `core/company_setup/api.py` (`POST /build/retry`), `tests/test_company_setup.py` (submit/retry API expectations), `web/company_setup_add.js` (NEW card → `/company/create`), `web/app.js` (create + build routes, progress teardown), `web/index.html`, `web/i18n.js` (English + Arabic create/build strings), `web/company_setup.css` (form, review, progress, 360px, reduced motion), `tests/company_setup_ui_test.js` (23 checks), `package.json`.
+
+**Behaviour delivered**
+
+1. Form → review → create. Nothing is written until review is confirmed; the review shows exactly what will be submitted.
+2. Description can be free text or four guided answers; the guided answers compose one description and show a live preview.
+3. Optional details (website, asset links, target customers, budget/currency, timeline, notes) stay collapsed until opened.
+4. Drafts autosave through `POST /api/v1/companies/drafts`; if the network fails the brief remains on the device and the status line says so.
+5. Client validation mirrors the server rules (name, title, ≥20-character description, owner name, country, industry, URLs, budget) and the server remains the real gate. `409 DUPLICATE_COMPANY_NAME` is shown on the name field; no silent rename or duplicate.
+6. Submit creates a `DRAFT`, then submits it: `NEW → CREATING`, and the build starts on the durable runtime. If the build cannot start, the company stays a draft and the UI says so instead of faking progress.
+7. Real local phases run: intake, plan, legal drafts (records in `company_legal_items`), verification and the operational transition. Research and website building use null adapters: they are recorded `SKIPPED` with a reason and a gap, never `DONE`.
+8. With the adapters unconfigured the company ends `NEEDS_ATTENTION` with the gaps listed. It only becomes `OPERATIONAL` when verification has no gaps.
+9. Retry is a new attempt: the previous run is preserved, attempt increments, and only `CREATING` / `NEEDS_ATTENTION` can retry; a running build is never restarted.
+10. Progress shows phase state, percent, estimate ("1–3 days, an estimate"), plain-language log, waiting-on-you items; polling runs only while a phase is actually running.
+
+**Gates:** `npm run typecheck` (67 JS files), `npm run lint`, `npm run test:company` (55 pytest + 23 jsdom/static checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey checks).
+
+**Live HTTP verification** (temporary strict-auth server, isolated SQLite):
+
+```
+POST /api/v1/companies                          -> 201 DRAFT, budget + asset persisted
+POST /api/v1/companies/<id>/submit              -> 202 workflow_started true
+GET  /api/v1/companies/<id>/build               -> VERIFY / DONE_WITH_GAPS, attempt 1
+phases INTAKE DONE · RESEARCH SKIPPED · PLAN DONE · BUILD SKIPPED · LEGAL_PACK DONE · VERIFY DONE
+POST /api/v1/companies/<id>/build/retry         -> 202 workflow_started true, attempt 2 (run 1 kept)
+GET  /api/v1/companies/comp_does_not_exist      -> 404
+```
+
+**Honest limits**
+
+- Research and website building are skipped until a provider is connected; no findings, assets or websites are invented.
+- Legal items are drafts and say so; a qualified professional must verify them.
+- The overview rewrite (including an embedded progress block) remains Stage 5; Stage 3 provides the dedicated `/company/<id>/build` page.
+- EXISTING companies still use the Stage 2 intake (`workflow_started: false`); the onboarding workflow is Stage 4.
+- No Chromium/Playwright here: jsdom covers behaviour, but no screenshots, true 360px render or visual RTL pass was possible.
+- A build failure leaves the company `CREATING` so retry remains possible; the failure reason is projected on the build row and audited.
+
 
 ---
 
@@ -449,16 +502,16 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 
 | Capability | Planned adapter | Real today | Stage | Dev label |
 |---|---|---|---|---|
-| AI market/competitor research | `ResearchAdapter` | No | 3 | Simulated |
-| Website builder / base systems | `WebsiteBuilderAdapter` | No (some in-house tooling exists in `inhouse_tools/`, to be inspected) | 3 | Simulated |
-| Legal document generator | `LegalPackAdapter` | No | 3 | Draft: verify with a qualified professional |
+| AI market/competitor research | `ResearchAdapter` (null until configured) | No; phase is `SKIPPED` with a reason and a gap | 3 | Skipped — not simulated, not invented |
+| Website builder / base systems | `WebsiteBuilderAdapter` (null until configured) | No (some in-house tooling exists in `inhouse_tools/`, to be inspected) | 3 | Skipped — nothing built |
+| Legal document generator | `LegalPackAdapter` | Local draft checklist and legal items only; no external generator | 3 | Draft: verify with a qualified professional |
 | Email delivery (export, first report) | `EmailAdapter` (Null + SMTP) | No | 5 | Not configured |
 | OAuth connections (booking, CRM, accounting, drives) | `ConnectionAdapter` per provider | No | 4 | Simulated |
 | DNS/domain ownership verification | `DomainVerificationAdapter` | No | 4 | Simulated |
 | Malware scanning of uploads | `ScanAdapter` | No | 4 | Unscanned |
 | Diagnosis findings (profit leaks) | `DiagnosisAdapter` | No | 4 | Simulated |
 | Object storage backend (S3/MinIO) | `ObjectStorageService` backend swap | Local FS only | 4/6 | Local storage |
-| Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | No (run row is real, execution not started) | 3/4 | Queued, `workflow_started: false` |
+| Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | NEW: real graph, real phases, real gaps. EXISTING: not started yet | 3/4 | NEW real; EXISTING queued (`workflow_started: false`) |
 | Company export PDF/ZIP | `core/company_setup/export.py` (planned) | No (`409 EXPORT_NOT_READY`) | 5 | Not ready |
 | Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`) | 5 | Not configured |
 | Browser e2e / screenshots | Playwright runner | No (no Chromium in this environment); jsdom contract + journey tests stand in | 6 | Not available |
@@ -486,9 +539,18 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Added `web/i18n.js`, `web/company_setup_switcher.js`, `web/company_setup_add.js`, `web/company_setup.css` and `tests/company_setup_ui_test.js`.
 - Rewired `index.html`, `app_shell.js`, `app.js`, `company_context.js`, `entry_flows.js`, `overview_workspace.js`, `ura_assistant.js`. Removed the fabricated `comp_primary / ZONATA Technologies` fallbacks from the company surfaces.
 - Switcher: current first, real empty state, Add always last, phone bottom sheet, desktop dialog, arrow/Tab/Escape keyboard model, focus return, status tones, sidebar sync.
-- Add page: two cards with honest expectations, help panel, language toggle, agent-disabled state, intent persisted, handoff to `EntryFlows` (Stage 3 replaces the collector).
+- Add page: two cards with honest expectations, help panel, language toggle, agent-disabled state, intent persisted. The NEW card hands off to the Stage 3 create flow; EXISTING still uses `EntryFlows` until Stage 4.
 - i18n/RTL: Arabic dictionaries, `<html dir="rtl">`, `data-i18n` application, Arabic font request, Indian lakh/crore currency and compact formatting.
 - Entry points: sidebar switcher, topbar dropdown, Companies empty states, command palette (Switch/Add), assistant intent shortcut (navigation only; nothing is created).
 - Gates: typecheck 65 JS files, lint, `npm run test:company` (45 pytest + 16 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12 checks).
 - Honest limits: no Chromium/Playwright here, so no screenshots or true 360px/RTL visual verification; jsdom covers the behaviour. The Add cards still use the legacy intake until Stage 3.
-- Waiting for "continue" before Stage 3.
+
+### Stage 3 — create new company + build workflow
+- Added `core/company_setup/build_workflow.py`, `web/company_setup_create.js`, `web/company_setup_progress.js`, migrations `0009` (+ rollback) and `tests/test_company_build_workflow.py`.
+- Submit now creates the company, derives `NEW → CREATING`, and runs the 7-phase build on the existing durable runtime. Research and website phases are `SKIPPED` behind null adapters with gaps; the company ends `NEEDS_ATTENTION`, never a fake `OPERATIONAL`.
+- Create flow: free/guided description, collapsed optional details, hints/examples, client + server validation, duplicate-name handling, draft autosave, review screen, submit.
+- Progress: real phases, percent, estimate, plain-language log, waiting-on-you gaps, visible failure, retry as a new attempt, polling only while running.
+- Routes: `/company/create`, `/company/<id>/build`; NEW card wired to the create flow. Overview rewrite stays Stage 5.
+- Gates: typecheck 67 JS files, lint, `npm run test:company` (55 pytest + 23 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12). Live strict-auth HTTP journey verified (submit, build, retry attempt 2, foreign id 404).
+- Honest limits: providers are null adapters (research/build skipped with reasons), legal items are drafts, no browser visual/RTL pass here, EXISTING onboarding is Stage 4.
+- Waiting for "continue" before Stage 4.

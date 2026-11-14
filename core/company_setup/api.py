@@ -13,6 +13,7 @@ never from the body or a header):
     PATCH  /api/v1/companies/<company_id>
     POST   /api/v1/companies/<company_id>/submit
     GET    /api/v1/companies/<company_id>/build
+    POST   /api/v1/companies/<company_id>/build/retry
     GET    /api/v1/companies/<company_id>/connections
     POST   /api/v1/companies/<company_id>/connections
     POST   /api/v1/companies/<company_id>/connections/<connection_id>/test
@@ -163,6 +164,9 @@ class CompanySetupAPI:
             if not build:
                 return 404, {"error": "No build run for this company", "code": "BUILD_NOT_FOUND"}
             return 200, build
+
+        if action == "build" and third in ("retry", "resume") and method == "POST":
+            return 202, service.retry_build(principal, company_id)
 
         if action == "connections":
             if method == "GET" and third is None:

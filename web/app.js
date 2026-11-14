@@ -816,6 +816,9 @@ function handleRoute(path) {
   }
 
   try {
+    if (window.CompanySetupProgress && !/^\/company\/[^/]+\/build\/?$/.test(cleanPath)) {
+      window.CompanySetupProgress.destroy();
+    }
     if (navKey === 'overview') {
       if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
         window.OverviewWorkspace.render('view-overview');
@@ -863,7 +866,13 @@ function handleRoute(path) {
       window.PluginsWorkspace.render('view-plugins');
     } else if (navKey === 'company' && (cleanPath === '/company/add' || cleanPath === '/company/add/') && window.CompanySetupAdd) {
       window.CompanySetupAdd.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/create' || cleanPath === '/company/create/') && window.CompanySetupCreate) {
+      window.CompanySetupCreate.render('view-company');
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/build\/?$/.test(cleanPath) && window.CompanySetupProgress) {
+      const buildMatch = cleanPath.match(/^\/company\/([^/]+)\/build\/?$/);
+      window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
     } else if (navKey === 'company' && window.CompanyWorkspace) {
+      if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
       window.CompanyWorkspace.render(cleanPath);
     } else if (navKey === 'organization' && window.OrgWorkspace) {
       window.OrgWorkspace.render('view-organization', cleanPath);
@@ -1802,8 +1811,23 @@ function drawOverviewActivityChart() {
 // ==========================================================================
 function renderCompanySection() {
   const currentRoute = (window.location.hash.slice(1) || '/company');
+  const route = currentRoute.startsWith('/company') ? currentRoute : '/company';
+  if (route === '/company/add' || route === '/company/add/') {
+    if (window.CompanySetupAdd) window.CompanySetupAdd.render('view-company');
+    return;
+  }
+  if (route === '/company/create' || route === '/company/create/') {
+    if (window.CompanySetupCreate) window.CompanySetupCreate.render('view-company');
+    return;
+  }
+  const buildMatch = route.match(/^\/company\/([^/]+)\/build\/?$/);
+  if (buildMatch && window.CompanySetupProgress) {
+    window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    return;
+  }
+  if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
   if (window.CompanyWorkspace) {
-    window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
+    window.CompanyWorkspace.render(route);
   }
 }
 

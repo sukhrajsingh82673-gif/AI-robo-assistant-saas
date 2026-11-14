@@ -33,6 +33,20 @@ function test(name, fn) {
   console.log(`  ok  ${name}`);
 }
 
+async function testAsync(name, fn) {
+  await fn();
+  passed += 1;
+  console.log(`  ok  ${name}`);
+}
+
+function jsonResponse(data, status) {
+  return Promise.resolve({
+    ok: (status || 200) < 400,
+    status: status || 200,
+    json: async () => data
+  });
+}
+
 function makeDom(html) {
   return new JSDOM(html || '<!doctype html><html lang="en"><head></head><body></body></html>', {
     url: 'https://example.test/',
@@ -54,6 +68,24 @@ function loadSwitcher(window) {
 function loadAddPage(window) {
   window.eval(read('web/company_setup_add.js'));
   return window.CompanySetupAdd;
+}
+
+function loadCreateFlow(window) {
+  window.eval(read('web/company_setup_create.js'));
+  return window.CompanySetupCreate;
+}
+
+function loadProgress(window) {
+  window.eval(read('web/company_setup_progress.js'));
+  return window.CompanySetupProgress;
+}
+
+function setField(window, name, value) {
+  const el = window.document.getElementById(`zcField-${name}`);
+  assert.ok(el, `field ${name} exists`);
+  el.value = value;
+  el.dispatchEvent(new window.Event('input', { bubbles: true }));
+  return el;
 }
 
 function stubContext(window, companies, activeId) {
@@ -326,6 +358,10 @@ test('index.html loads the company setup modules in a safe order', () => {
   assert.ok(i18nAt < appAt, 'i18n loads before the app');
   assert.ok(switcherAt < appAt, 'switcher loads before the router');
   assert.ok(addAt < appAt, 'Add page loads before the router');
+  const createAt = index.indexOf('src="company_setup_create.js"');
+  const progressAt = index.indexOf('src="company_setup_progress.js"');
+  assert.ok(createAt > addAt && createAt < appAt, 'create flow loads before the router');
+  assert.ok(progressAt > addAt && progressAt < appAt, 'progress loads before the router');
   assert.ok(index.includes('id="sidebarCompanyStatus"'));
 });
 
@@ -337,6 +373,10 @@ test('router and palette expose /company/add and the switcher', () => {
   assert.ok(app.includes('Switch company'));
   assert.ok(app.includes('Add company'));
   assert.ok(app.includes('function syncCompanySurfaces'));
+  assert.ok(app.includes("cleanPath === '/company/create'"));
+  assert.ok(app.includes('window.CompanySetupCreate.render'));
+  assert.ok(app.includes('window.CompanySetupProgress.render'));
+  assert.ok(app.includes('/build\\/?$'), 'the build route is explicit');
   assert.ok(!/comp_primary/.test(app), 'the router does not fabricate a primary company');
 });
 
@@ -363,4 +403,240 @@ test('assistant handles company intents before any network call', () => {
   assert.ok(assistant.includes("company: ['Add a company', 'Switch company'"));
 });
 
-console.log(`\n${passed} company setup UI checks passed.`);
+// ------------------------------------------------------- (i) create flow
+test('create flow renders one column, guided toggle and collapsed extras', () => {
+  const dom = makeDom('<div id="view"></div>');
+  const { window } = dom;
+  window.scrollTo = () => {};
+  loadI18n(window);
+  const create = loadCreateFlow(window);
+
+  create.render('view');
+  const root = window.document.querySelector('[data-company-create]');
+  assert.ok(root, 'create page rendered');
+  assert.ok(root.querySelector('#zcField-name'));
+  assert.ok(root.querySelector('#zcField-title'));
+  assert.ok(root.querySelector('#zcField-owner_name'));
+  assert.ok(root.querySelector('#zcField-country'));
+  assert.ok(root.querySelector('#zcField-industry'));
+
+  const guided = root.querySelector('[data-description-mode="guided"]');
+  assert.strictEqual(guided.getAttribute('aria-pressed'), 'false');
+  const optionalBody = root.querySelector('#zcOptional');
+  assert.strictEqual(optionalBody.hidden, true, 'optional section starts collapsed');
+  const optionalToggle = root.querySelector('#zcOptionalToggle');
+  optionalToggle.click();
+  assert.strictEqual(optionalBody.hidden, false);
+  assert.strictEqual(optionalToggle.getAttribute('aria-expanded'), 'true');
+});
+
+test('guided answers compose one description and the preview follows', () => {
+  const dom = makeDom('<div id="view"></div>');
+  const { window } = dom;
+  window.scrollTo = () => {};
+  loadI18n(window);
+  const create = loadCreateFlow(window);
+  create.render('view');
+
+  window.document.querySelector('[data-description-mode="guided"]').click();
+  setField(window, 'guided_offer', 'Ordering software for bakeries');
+  setField(window, 'guided_audience', 'independent bakery owners');
+  const preview = window.document.getElementById('zcGuidedPreview');
+  assert.ok(preview.textContent.includes('Ordering software for bakeries'));
+  assert.ok(preview.textContent.includes('It serves independent bakery owners.'));
+
+  const data = create.data();
+  assert.strictEqual(data.description_mode, 'guided');
+  assert.ok(create.effectiveDescription().length > 20);
+});
+
+test('client validation blocks review and focuses the first problem', () => {
+  const dom = makeDom('<div id="view"></div>');
+  const { window } = dom;
+  window.scrollTo = () => {};
+  loadI18n(window);
+  const create = loadCreateFlow(window);
+  create.render('view');
+
+  const form = window.document.getElementById('zcCreateForm');
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  assert.strictEqual(create.step, 'form');
+  assert.ok(window.document.getElementById('zcErr-name').textContent.includes('company name'));
+  assert.ok(window.document.getElementById('zcErr-country') === null || create.errors.name);
+});
+
+(async () => {
+  await testAsync('review shows the brief and submit creates then starts the build', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const create = loadCreateFlow(window);
+    create.render('view');
+
+    setField(window, 'name', 'Nightowl Bakery');
+    setField(window, 'title', 'Neighbourhood bakery with online ordering');
+    setField(window, 'description', 'A bakery that sells bread, pastries and coffee to walk-in and online customers.');
+    setField(window, 'owner_name', 'Amina Rao');
+    setField(window, 'industry', 'Food & Beverage');
+    window.document.getElementById('zcCreateReview').click();
+
+    assert.strictEqual(create.step, 'review');
+    const review = window.document.querySelector('.zc-review');
+    assert.ok(review);
+    assert.ok(review.textContent.includes('Nightowl Bakery'));
+    assert.ok(review.textContent.includes('Amina Rao'));
+
+    const calls = [];
+    window.fetch = (url, init) => {
+      calls.push({ url, method: (init && init.method) || 'GET', body: init && init.body });
+      if (url === '/api/v1/companies/drafts') return jsonResponse({ draft_id: 'drf_1' });
+      if (url === '/api/v1/companies') return jsonResponse({ id: 'comp_1' }, 201);
+      if (url.indexOf('/api/v1/companies/comp_1/submit') === 0) {
+        return jsonResponse({ company: { status: 'NEEDS_ATTENTION' }, workflow_started: true }, 202);
+      }
+      return jsonResponse({ deleted: true });
+    };
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+
+    await create.submit();
+    const created = calls.find((call) => call.url === '/api/v1/companies');
+    assert.ok(created, 'create call made');
+    const body = JSON.parse(created.body);
+    assert.strictEqual(body.type, 'NEW');
+    assert.strictEqual(body.name, 'Nightowl Bakery');
+    assert.ok(body.description.length > 20);
+    assert.ok(calls.some((call) => call.url.endsWith('/comp_1/submit')));
+    assert.deepStrictEqual(navigations, ['/company/comp_1/build']);
+    create.reset();
+    dom.window.close();
+  });
+
+  await testAsync('duplicate company names are shown on the name field, never faked', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const create = loadCreateFlow(window);
+    create.render('view');
+
+    setField(window, 'name', 'Nightowl Bakery');
+    setField(window, 'title', 'Neighbourhood bakery');
+    setField(window, 'description', 'A bakery that sells bread and coffee to walk-in customers.');
+    setField(window, 'owner_name', 'Amina Rao');
+    setField(window, 'industry', 'Food & Beverage');
+    window.document.getElementById('zcCreateReview').click();
+    assert.strictEqual(create.step, 'review');
+
+    window.fetch = (url) => {
+      if (url === '/api/v1/companies') {
+        return jsonResponse({ error: 'exists', code: 'DUPLICATE_COMPANY_NAME' }, 409);
+      }
+      return jsonResponse({ draft_id: 'drf_1' });
+    };
+    window.navigateTo = () => {};
+
+    await create.submit();
+    assert.strictEqual(create.step, 'form');
+    assert.ok(window.document.getElementById('zcErr-name').textContent.toLowerCase().includes('already exists'));
+    create.reset();
+    dom.window.close();
+  });
+
+  await testAsync('progress shows real phases, gaps and a working retry', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const progress = loadProgress(window);
+
+    const build = {
+      build_id: 'bld_1',
+      company_id: 'comp_1',
+      phase: 'VERIFY',
+      phase_state: 'DONE_WITH_GAPS',
+      progress: 0.57,
+      progress_percent: 57,
+      attempt: 1,
+      estimate: { min_days: 1, max_days: 3, is_estimate: true },
+      phases: [
+        { id: 'INTAKE', label: 'Understanding your brief', state: 'DONE', note: 'Brief confirmed' },
+        { id: 'RESEARCH', label: 'Researching the market', state: 'SKIPPED', note: 'No provider connected' },
+        { id: 'BUILD', label: 'Building base systems', state: 'SKIPPED', note: 'No builder connected' },
+        { id: 'VERIFY', label: 'Checking everything', state: 'DONE', note: 'Built with gaps' },
+        { id: 'OPERATIONAL', label: 'Going operational', state: 'PENDING', note: '' }
+      ],
+      log: [{ at: 1794559547, phase: 'INTAKE', level: 'success', message: 'Brief confirmed.' }],
+      gaps: [
+        { phase: 'RESEARCH', message: 'Market research needs a connected provider.' },
+        { phase: 'BUILD', message: 'Base systems need a connected builder.' }
+      ],
+      waiting_on: [
+        { phase: 'RESEARCH', message: 'Market research needs a connected provider.' },
+        { phase: 'BUILD', message: 'Base systems need a connected builder.' }
+      ]
+    };
+    const calls = [];
+    window.fetch = (url, init) => {
+      calls.push({ url, method: (init && init.method) || 'GET' });
+      if (url === '/api/v1/companies/comp_1') {
+        return jsonResponse({ id: 'comp_1', name: 'Nightowl Bakery', status: 'NEEDS_ATTENTION' });
+      }
+      if (url === '/api/v1/companies/comp_1/build') return jsonResponse(build);
+      if (url === '/api/v1/companies/comp_1/build/retry') {
+        return jsonResponse({ workflow_started: true, build }, 202);
+      }
+      return jsonResponse({}, 404);
+    };
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+
+    await progress.render('view', 'comp_1');
+    const root = window.document.querySelector('[data-company-build]');
+    assert.ok(root, 'progress page rendered');
+    assert.ok(root.textContent.includes('Nightowl Bakery'));
+    assert.strictEqual(root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '57');
+    assert.ok(root.textContent.includes('Researching the market'));
+    assert.ok(root.textContent.includes('Skipped'));
+    const waiting = root.querySelectorAll('.zc-waiting-item');
+    assert.strictEqual(waiting.length, 2);
+    assert.ok(root.textContent.includes('Waiting on you'));
+
+    await progress.retry();
+    assert.ok(calls.some((call) => call.url.endsWith('/build/retry') && call.method === 'POST'));
+
+    const overview = root.querySelector('#zcBuildOverview');
+    overview.click();
+    assert.ok(navigations.includes('/company/comp_1/overview'));
+    progress.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('progress never shows a build that does not exist', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const progress = loadProgress(window);
+    window.fetch = (url) => {
+      if (url === '/api/v1/companies/comp_2') {
+        return jsonResponse({ id: 'comp_2', name: 'Quiet Co', status: 'DRAFT' });
+      }
+      return jsonResponse({ error: 'No build run', code: 'BUILD_NOT_FOUND' }, 404);
+    };
+    window.navigateTo = () => {};
+
+    await progress.render('view', 'comp_2');
+    const root = window.document.querySelector('[data-company-build]');
+    assert.ok(root.textContent.includes('No build has started'));
+    assert.strictEqual(root.querySelectorAll('.zc-phase').length, 0);
+    progress.destroy();
+    dom.window.close();
+  });
+
+  console.log(`\n${passed} company setup UI checks passed.`);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

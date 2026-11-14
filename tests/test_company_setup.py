@@ -197,11 +197,21 @@ class TestStatusMachine(CompanySetupTestBase):
     def test_submit_new_moves_to_creating_with_build_run(self):
         company = self.make_company()
         result = self.service.submit_company(self.owner_principal(), company["id"])
-        self.assertEqual(result["company"]["status"], CompanyStatus.CREATING)
         self.assertEqual(result["build"]["run_type"], "BUILD")
-        self.assertEqual(result["build"]["phase"], "INTAKE")
-        self.assertFalse(result["workflow_started"])
+        self.assertTrue(result["workflow_started"])
         self.assertTrue(result["build"]["estimate"]["is_estimate"])
+        # The build runs synchronously on the durable runtime. With no research
+        # or builder provider connected it finishes with gaps, so the company is
+        # moved to NEEDS_ATTENTION rather than pretending the build succeeded.
+        self.assertEqual(result["build"]["phase_state"], "DONE_WITH_GAPS")
+        self.assertEqual(result["company"]["status"], CompanyStatus.NEEDS_ATTENTION)
+        self.assertTrue(result["build"]["gaps"])
+        states = {phase["id"]: phase["state"] for phase in result["build"]["phases"]}
+        self.assertEqual(states["INTAKE"], "DONE")
+        self.assertEqual(states["RESEARCH"], "SKIPPED")
+        self.assertEqual(states["BUILD"], "SKIPPED")
+        self.assertEqual(states["LEGAL_PACK"], "DONE")
+        self.assertNotEqual(states["RESEARCH"], "DONE")
 
         with self.assertRaises(CompanySetupError) as ctx:
             self.service.submit_company(self.owner_principal(), company["id"])
@@ -450,12 +460,13 @@ class TestDeletionFlow(CompanySetupTestBase):
 
     def test_cancel_reports_the_real_current_status(self):
         company = self.make_company()
-        self.service.submit_company(self.owner_principal(), company["id"])
+        submitted = self.service.submit_company(self.owner_principal(), company["id"])
+        expected_status = submitted["company"]["status"]
         self.service.request_deletion(self.owner_principal(), company["id"])
         result = self.service.cancel_deletion(self.owner_principal(), company["id"])
-        self.assertEqual(result["company_status"], CompanyStatus.CREATING)
+        self.assertEqual(result["company_status"], expected_status)
         current = self.service.get_company(self.owner_principal(), company["id"])
-        self.assertEqual(current["status"], CompanyStatus.CREATING)
+        self.assertEqual(current["status"], expected_status)
 
     def test_export_not_ready_is_honest(self):
         company = self.make_company()
@@ -551,15 +562,33 @@ class TestApiRouter(CompanySetupTestBase):
 
         status, submitted = self._handle("POST", f"/api/v1/companies/{company_id}/submit")
         self.assertEqual(status, 202)
-        self.assertEqual(submitted["company"]["status"], CompanyStatus.CREATING)
+        self.assertTrue(submitted["workflow_started"])
+        self.assertEqual(submitted["company"]["status"], CompanyStatus.NEEDS_ATTENTION)
 
         status, build = self._handle("GET", f"/api/v1/companies/{company_id}/build")
         self.assertEqual(status, 200)
-        self.assertEqual(build["phase"], "INTAKE")
+        self.assertEqual(build["phase"], "VERIFY")
+        self.assertTrue(build["phases"])
 
         status, audit = self._handle("GET", f"/api/v1/companies/{company_id}/audit")
         self.assertEqual(status, 200)
         self.assertGreaterEqual(audit["total"], 3)
+
+    def test_build_retry_route_starts_a_new_attempt(self):
+        status, created = self._handle("POST", "/api/v1/companies", dict(BASE_PAYLOAD, name="Router Retry Co"))
+        self.assertEqual(status, 201)
+        company_id = created["id"]
+        status, _ = self._handle("POST", f"/api/v1/companies/{company_id}/submit")
+        self.assertEqual(status, 202)
+
+        status, retried = self._handle("POST", f"/api/v1/companies/{company_id}/build/retry")
+        self.assertEqual(status, 202)
+        self.assertTrue(retried["workflow_started"])
+        self.assertEqual(retried["build"]["attempt"], 2)
+
+        status, build = self._handle("GET", f"/api/v1/companies/{company_id}/build")
+        self.assertEqual(status, 200)
+        self.assertEqual(build["attempt"], 2)
 
     def test_unknown_route_returns_404(self):
         status, payload = self._handle("GET", "/api/v1/companies/comp_x/unknown")

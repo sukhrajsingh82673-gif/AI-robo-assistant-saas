@@ -219,6 +219,14 @@ class CompanySetupService:
             "timezone": record.get("timezone"),
             "website": record.get("website"),
             "business_model": record.get("business_model"),
+            "target_customers": record.get("target_customers"),
+            "budget": {
+                "amount": record.get("budget_amount"),
+                "currency": record.get("budget_currency"),
+            },
+            "timeline": record.get("timeline"),
+            "setup_notes": record.get("setup_notes"),
+            "assets": _json_load(record.get("assets"), []),
             "revenue": {
                 "amount": revenue_amount or 0.0,
                 "currency": record.get("revenue_currency") or record.get("currency"),
@@ -381,6 +389,55 @@ class CompanySetupService:
         business_model = _clean_text(payload.get("business_model"), 4000)
         clean["business_model"] = business_model
 
+        target_customers = _clean_text(payload.get("target_customers"), 500)
+        clean["target_customers"] = target_customers
+
+        timeline = _clean_text(payload.get("timeline"), 120, strip_angles=True)
+        clean["timeline"] = timeline
+
+        setup_notes = _clean_text(payload.get("setup_notes"), 4000)
+        clean["setup_notes"] = setup_notes
+
+        budget = payload.get("budget") if isinstance(payload.get("budget"), dict) else {}
+        budget_amount: Optional[float] = None
+        budget_raw = budget.get("amount", payload.get("budget_amount"))
+        if budget_raw not in (None, ""):
+            try:
+                budget_amount = float(budget_raw)
+                if budget_amount < 0:
+                    add_error("budget.amount", "INVALID_AMOUNT", "Budget cannot be negative")
+            except (TypeError, ValueError):
+                add_error("budget.amount", "INVALID_AMOUNT", "Budget must be a number")
+        budget_currency = _clean_text(
+            budget.get("currency") or payload.get("budget_currency") or payload.get("currency"), 8
+        ).upper()
+        if budget_currency and len(budget_currency) != 3:
+            add_error("budget.currency", "INVALID_CURRENCY", "Use a 3-letter currency code such as INR or USD")
+        clean["budget_amount"] = budget_amount
+        clean["budget_currency"] = budget_currency
+
+        assets_raw = payload.get("assets")
+        assets: List[str] = []
+        if isinstance(assets_raw, str):
+            stripped = assets_raw.strip()
+            if stripped.startswith("["):
+                try:
+                    assets_raw = json.loads(stripped)
+                except (TypeError, ValueError):
+                    assets_raw = []
+            else:
+                assets_raw = [part.strip() for part in stripped.split(",") if part.strip()]
+        if isinstance(assets_raw, (list, tuple)):
+            for item in list(assets_raw)[:5]:
+                url = _clean_text(item, 2048)
+                if not url:
+                    continue
+                if not URL_RE.match(url):
+                    add_error("assets", "INVALID_URL", "Each asset link must start with http:// or https://")
+                    continue
+                assets.append(url)
+        clean["assets"] = assets
+
         revenue = payload.get("revenue") if isinstance(payload.get("revenue"), dict) else {}
         amount_raw = revenue.get("amount", payload.get("revenue_amount"))
         amount: Optional[float] = None
@@ -474,8 +531,9 @@ class CompanySetupService:
                     operating_rules, baseline_summary, created_at,
                     title, description, owner_name, owner_email, owner_role, created_by,
                     updated_at, website, business_model, revenue_amount, revenue_currency,
-                    revenue_period, readiness_score
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    revenue_period, readiness_score, target_customers, budget_amount,
+                    budget_currency, timeline, setup_notes, assets
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     company_id,
@@ -507,6 +565,12 @@ class CompanySetupService:
                     values.get("revenue_currency") or "",
                     values.get("revenue_period") or "",
                     0.0,
+                    values.get("target_customers") or "",
+                    values.get("budget_amount"),
+                    values.get("budget_currency") or "",
+                    values.get("timeline") or "",
+                    values.get("setup_notes") or "",
+                    _json_dump(values.get("assets") or []),
                 ),
             )
             conn.commit()
@@ -534,6 +598,11 @@ class CompanySetupService:
         "currency",
         "timezone",
         "readiness_score",
+        "target_customers",
+        "budget",
+        "timeline",
+        "setup_notes",
+        "assets",
     }
 
     def update_company(self, principal: Principal, company_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -576,7 +645,9 @@ class CompanySetupService:
                     name = ?, title = ?, description = ?, owner_name = ?, owner_email = ?,
                     owner_role = ?, country = ?, industry = ?, website = ?, business_model = ?,
                     currency = ?, timezone = ?, revenue = ?, revenue_amount = ?,
-                    revenue_currency = ?, revenue_period = ?, updated_at = ?
+                    revenue_currency = ?, revenue_period = ?, target_customers = ?,
+                    budget_amount = ?, budget_currency = ?, timeline = ?, setup_notes = ?,
+                    assets = ?, updated_at = ?
                 WHERE company_id = ? AND tenant_id = ?
                 """,
                 (
@@ -596,6 +667,12 @@ class CompanySetupService:
                     values.get("revenue_amount"),
                     values.get("revenue_currency") or record.get("revenue_currency") or "",
                     values.get("revenue_period") or record.get("revenue_period") or "",
+                    values.get("target_customers") if values.get("target_customers") is not None else (record.get("target_customers") or ""),
+                    values.get("budget_amount") if values.get("budget_amount") is not None else record.get("budget_amount"),
+                    values.get("budget_currency") or record.get("budget_currency") or "",
+                    values.get("timeline") if values.get("timeline") is not None else (record.get("timeline") or ""),
+                    values.get("setup_notes") if values.get("setup_notes") is not None else (record.get("setup_notes") or ""),
+                    _json_dump(values.get("assets") if values.get("assets") is not None else _json_load(record.get("assets"), [])),
                     now,
                     company_id,
                     self.tenant_id,
@@ -700,13 +777,31 @@ class CompanySetupService:
             "company.submitted",
             {"status": new_status, "build_id": build_id, "type": company_type},
         )
+
+        workflow = {"started": False, "reason": "The build engine is unavailable."}
+        try:
+            from core.company_setup.build_workflow import CompanyBuildWorkflow
+
+            workflow = CompanyBuildWorkflow(self.tenant_id, company_id, principal).start()
+        except Exception as exc:  # visible failure, never a fake success
+            workflow = {"started": False, "reason": str(exc)}
+
+        if workflow.get("started"):
+            audit.record_event(
+                self.tenant_id,
+                company_id,
+                principal.user_id,
+                principal.role,
+                "company.build_started",
+                {"workflow_id": workflow.get("workflow_id"), "run_id": workflow.get("run_id")},
+            )
+
         self._refresh_portfolio()
         return {
             "company": self.get_company(principal, company_id),
             "build": self.get_build(company_id),
-            # Honest: the workflow engine is wired in Stage 3/4.
-            "workflow_started": False,
-            "workflow_note": "Queued for the Company Build workflow; execution engine arrives in a later stage.",
+            "workflow_started": bool(workflow.get("started")),
+            "workflow_note": None if workflow.get("started") else workflow.get("reason"),
         }
 
     # ---------------------------------------------------------------- drafts
@@ -816,14 +911,37 @@ class CompanySetupService:
         if not record:
             return None
         meta = _json_load(record.get("log"), {})
+        phases = meta.get("phases") or []
+        if phases and isinstance(phases[0], str):
+            # Rows written before Stage 3 stored phase ids as plain strings.
+            phases = [
+                {
+                    "id": phase_id,
+                    "label": phase_id.replace("_", " ").title(),
+                    "state": "PENDING",
+                    "note": "",
+                    "started_at": None,
+                    "finished_at": None,
+                }
+                for phase_id in phases
+            ]
+        progress = record.get("progress")
+        try:
+            progress_pct = int(round(float(progress or 0) * 100))
+        except (TypeError, ValueError):
+            progress_pct = 0
+        gaps = meta.get("gaps") or []
         return {
             "build_id": record["build_id"],
             "company_id": record["company_id"],
             "run_type": record.get("run_type"),
             "workflow_id": record.get("workflow_id"),
+            "workflow_run_id": record.get("workflow_run_id"),
             "phase": record.get("phase"),
             "phase_state": record.get("phase_state"),
-            "progress": record.get("progress"),
+            "progress": progress,
+            "progress_percent": progress_pct,
+            "attempt": meta.get("attempt", 1),
             "estimate": {
                 "min_days": record.get("estimate_min_days"),
                 "max_days": record.get("estimate_max_days"),
@@ -832,9 +950,67 @@ class CompanySetupService:
             "started_at": record.get("started_at"),
             "finished_at": record.get("finished_at"),
             "failure_reason": record.get("failure_reason"),
-            "phases": meta.get("phases", []),
-            "log": meta.get("log", []),
+            "phases": phases,
+            "log": meta.get("log") or [],
+            "gaps": gaps,
+            "waiting_on": meta.get("waiting_on") if meta.get("waiting_on") is not None else gaps,
+            "checks": meta.get("checks") or [],
+            "brief": meta.get("brief") or {},
+            "plan": meta.get("plan") or {},
             "updated_at": record.get("updated_at"),
+        }
+
+    # ----------------------------------------------------------- build retry
+    def retry_build(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        """Resume a failed build, or re-run a build that finished with gaps.
+
+        A running build is never restarted. A previous attempt is kept, and the
+        new attempt starts from a fresh checkpoint.
+        """
+        record = self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        assert_can_submit(principal, self.tenant_id, granted=granted)
+
+        status = normalize_status(record["status"])
+        if status not in (CompanyStatus.CREATING, CompanyStatus.NEEDS_ATTENTION):
+            raise CompanySetupError(
+                "BUILD_NOT_RETRYABLE",
+                "Only a company that is creating or needs attention can retry its build",
+                status=409,
+                detail={"status": status},
+            )
+
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT phase_state, build_id FROM company_build_runs "
+                "WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC LIMIT 1",
+                (self.tenant_id, company_id),
+            ).fetchone()
+        if row and str(row["phase_state"]) == "RUNNING":
+            raise CompanySetupError(
+                "BUILD_RUNNING",
+                "The build is already running",
+                status=409,
+                detail={"build_id": row["build_id"]},
+            )
+
+        from core.company_setup.build_workflow import CompanyBuildWorkflow
+
+        workflow = CompanyBuildWorkflow(self.tenant_id, company_id, principal).retry()
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.build_retry_requested",
+            {"started": workflow.get("started"), "reason": workflow.get("reason")},
+        )
+        self._refresh_portfolio()
+        return {
+            "company": self.get_company(principal, company_id),
+            "build": self.get_build(company_id),
+            "workflow_started": bool(workflow.get("started")),
+            "workflow_note": None if workflow.get("started") else workflow.get("reason"),
         }
 
     # ----------------------------------------------------------- connections
