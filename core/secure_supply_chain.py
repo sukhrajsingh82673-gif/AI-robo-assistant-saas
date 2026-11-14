@@ -201,15 +201,15 @@ class SecureSupplyChainController:
 
         # 2. Vulnerability Gating
         vulns = vulnerabilities or []
-        allowed, status, blocked_vulns = self.evaluate_vulnerability_scan(artifact_digest, vulns)
-        if not allowed:
+        scan = self.evaluate_vulnerability_scan(artifact_digest, vulns)
+        if not scan["admitted"]:
             self._quarantined_artifacts[artifact_digest] = {
                 "name": artifact_name,
-                "reason": status,
-                "cves": [v.to_dict() for v in blocked_vulns],
+                "reason": scan["status"],
+                "cves": scan["blocking_cves"],
                 "timestamp": time.time()
             }
-            raise ValueError(f"Artifact '{artifact_name}' quarantined due to security vulnerabilities: {[v.cve_id for v in blocked_vulns]}")
+            raise ValueError(f"Artifact '{artifact_name}' quarantined due to security vulnerabilities: {scan['blocking_cves']}")
 
         # 3. Create SLSA Level 3 Provenance Record
         attestation = SlsaProvenanceAttestation(

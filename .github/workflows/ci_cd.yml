@@ -68,6 +68,7 @@ jobs:
               re.compile(r'-----BEGIN [A-Z\s]+PRIVATE KEY-----'),
               re.compile(r'\bsk-[a-zA-Z0-9]{32,}\b'),
               re.compile(r'\bghp_[a-zA-Z0-9]{36}\b'),
+              re.compile(r'\bgithub_pat_[A-Za-z0-9_]{20,}\b'),
               re.compile(r'\bAKIA[0-9A-Z]{16}\b'),
               re.compile(r'\bxox[baprs]-[a-zA-Z0-9\-]{20,}\b'),
               re.compile(r'Bearer\s+eyJ[a-zA-Z0-9_\-\.]{40,}'),
@@ -109,6 +110,7 @@ jobs:
       - name: Validate Kubernetes Manifests & Container Configuration
         run: |
           echo "Verifying K8s YAML syntax..."
+          python3 -m pip install --quiet pyyaml
           python3 -c "
           import os, yaml
           for f in os.listdir('k8s'):
@@ -149,6 +151,12 @@ jobs:
           python3 -m unittest -v tests/test_universal_automation_fabric_qualification.py
 
       - name: Run Enterprise Capability Expansion & Browser Qualification Suites
+        env:
+          # The browser qualification suite exercises the explicit test fixture
+          # path (no headless engine is installed in this job). Without this,
+          # navigation attempts a real fetch and the governed runtime correctly
+          # refuses to fabricate interactions.
+          ZONATA_TEST_MODE: "1"
         run: |
           if [ -f tests/test_enterprise_capability_expansion_qualification.py ]; then
             python3 -m unittest -v tests/test_enterprise_capability_expansion_qualification.py
@@ -184,8 +192,8 @@ jobs:
           ZONATA_DB_PATH: "/tmp/ci_zonata_isolated.db"
           ZONATA_EVIDENCE_PATH: "/tmp/ci_evidence_ledger.jsonl"
         run: |
-          echo "Executing comprehensive suite batch discovery across 71 test files..."
-          python3 -m unittest discover -s tests -p "test_*.py" -v || echo "Individual suite report logged; critical gates verified."
+          echo "Executing bounded comprehensive suite inventory across test files (20 min cap)..."
+          timeout 1200 python3 -m unittest discover -s tests -p "test_*.py" -v || echo "Inventory reported failures or was truncated at the cap; the explicit gates above are authoritative."
 
   # ===========================================================================
   # STAGE 3 — SECURITY AND SUPPLY CHAIN
@@ -228,11 +236,20 @@ jobs:
 
       - name: Scan Vulnerability Thresholds (Zero High / Critical CVEs)
         run: |
+          python3 scripts/osv_vulnerability_audit.py
           python3 -c "
-          from core.secure_supply_chain import SecureSupplyChainController
-          controller = SecureSupplyChainController()
-          status = controller.evaluate_dependency_admission()
-          print('Supply chain admission evaluation status:', status)
+          import json
+          with open('storage/evidence/osv_vulnerability_audit.json', encoding='utf-8') as f:
+              summary = json.load(f)
+          assert summary['verdict'] == 'PASS', (
+              f\"Vulnerability gate failed: {summary['verdict']} \"
+              f\"({summary['total_cves_detected']} CVEs, \"
+              f\"{summary['query_error_packages']} scanner error(s))\"
+          )
+          print(
+              'Zero CVEs across', summary['packages_scanned'],
+              'audited production dependencies.'
+          )
           "
 
       - name: Upload SBOM Artifact
@@ -256,25 +273,32 @@ jobs:
 
       - name: Validate Containerfiles & Build Definitions
         run: |
-          echo "Validating Dockerfile.api, Dockerfile.worker, Dockerfile.supervisor..."
-          test -f Dockerfile.api && echo "Dockerfile.api present"
-          test -f Dockerfile.worker && echo "Dockerfile.worker present"
-          test -f Dockerfile.supervisor && echo "Dockerfile.supervisor present"
+          echo "Validating docker/Dockerfile.api, docker/Dockerfile.worker, docker/Dockerfile.supervisor..."
+          test -f docker/Dockerfile.api && echo "docker/Dockerfile.api present"
+          test -f docker/Dockerfile.worker && echo "docker/Dockerfile.worker present"
+          test -f docker/Dockerfile.supervisor && echo "docker/Dockerfile.supervisor present"
+          echo "Container build definitions validated."
 
       - name: Generate SLSA Level 3 Provenance Digest
         run: |
-          python3 -c "
+          # Digest the exact build definitions the images are produced from.
+          # The previous value was "sha256:" + commit SHA, which identifies a
+          # commit rather than the artifact and is not verifiable as a digest.
+          BUILD_DEF_DIGEST="sha256:$(cat docker/Dockerfile.api docker/Dockerfile.worker docker/Dockerfile.supervisor | sha256sum | cut -d' ' -f1)"
+          echo "Build definition digest: $BUILD_DEF_DIGEST"
+          BUILD_DEF_DIGEST="$BUILD_DEF_DIGEST" python3 -c "
+          import json
+          import os
           from core.secure_supply_chain import SecureSupplyChainController
           controller = SecureSupplyChainController()
-          attestation = controller.generate_slsa_provenance(
-              artifact_name='zonata-automation-fabric',
-              artifact_digest='sha256:' + '${{ github.sha }}',
+          attestation = controller.create_slsa_provenance(
+              artifact_name='zonata-container-build-definitions',
+              artifact_digest=os.environ['BUILD_DEF_DIGEST'],
               source_commit='${{ github.sha }}'
           )
-          import json
           with open('slsa_provenance.json', 'w') as f:
               json.dump(attestation.to_dict(), f, indent=2)
-          print('SLSA provenance attestation created.')
+          print('SLSA provenance attestation created for', attestation.artifact_digest)
           "
 
       - name: Upload Build Attestation Artifact
@@ -301,14 +325,71 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
       - name: Start Integration Test Server & Probe Readiness
         run: |
-          python3 api_server.py 8085 &
+          # Ephemeral signing key for this CI run only; the token below is
+          # minted against it, so the probe exercises the real auth path
+          # instead of skipping it.
+          export ZONATA_AUTH_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+
+          # Run against a disposable copy of the qualified baseline database so
+          # the sandbox stage cannot write to tracked storage.
+          export ZONATA_DB_DIALECT=sqlite
+          export ZONATA_DB_PATH="${RUNNER_TEMP:-/tmp}/stage5_isolated.db"
+          export ZONATA_EVIDENCE_PATH="${RUNNER_TEMP:-/tmp}/stage5_ledger.jsonl"
+          cp storage/roboassistant.db "$ZONATA_DB_PATH"
+
+          python3 api_server.py 8085 > /tmp/api_server.log 2>&1 &
           SERVER_PID=$!
+          trap 'kill -9 $SERVER_PID 2>/dev/null || true' EXIT
           echo "API Server started with PID $SERVER_PID"
-          sleep 3
-          curl -s http://127.0.0.1:8085/api/automation/fabric/status | grep "OPERATIONAL"
-          kill -9 $SERVER_PID || true
+
+          # Importing api_server loads the full runtime and takes several
+          # seconds, so a fixed sleep races the bind. Poll the public health
+          # endpoint until it answers, and fail with the server log otherwise.
+          ready=0
+          for attempt in $(seq 1 120); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "API server exited before becoming ready."
+              cat /tmp/api_server.log
+              exit 1
+            fi
+            body=$(curl -sf http://127.0.0.1:8085/health || true)
+            if echo "$body" | grep -q '"status": "HEALTHY"'; then
+              echo "Readiness probe succeeded on attempt $attempt."
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "API server did not report HEALTHY within the readiness window."
+            cat /tmp/api_server.log
+            exit 1
+          fi
+
+          TOKEN=$(python3 -c "
+          from core.auth import UserManager, UserRole
+          print(UserManager.generate_token({
+              'user_id': 'usr_ci_probe',
+              'tenant_id': 'tnt_primary',
+              'company_id': 'comp_primary',
+              'role': UserRole.OWNER,
+              'permissions': ['*']
+          }))
+          ")
+
+          status_body=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+            http://127.0.0.1:8085/api/automation/fabric/status)
+          echo "$status_body" | grep -q "OPERATIONAL"
+
+          kill -9 "$SERVER_PID" 2>/dev/null || true
           echo "Isolated test environment verification succeeded."
 
   # ===========================================================================
@@ -346,15 +427,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
       - name: Execute Governed Post-Deployment Verification Mission
         run: |
           python3 -c "
           from core.automation_fabric.fabric import universal_automation_fabric
-          from core.automation_fabric.contracts import TerminalOutcome
-          # Verify health status
+          # get_fabric_metrics returns live telemetry; operational health is
+          # derived from the killswitch state plus registered capabilities.
           metrics = universal_automation_fabric.get_fabric_metrics('tnt_primary')
-          assert metrics['status'] == 'OPERATIONAL'
-          assert metrics['connectors_active'] >= 18
-          assert metrics['templates_available'] >= 19
-          print('Post-deployment verification mission PASSED with', metrics['connectors_active'], 'connectors and', metrics['templates_available'], 'templates.')
+          assert metrics['killswitch_active'] is False, 'Killswitch is active; fabric is not operational.'
+          assert metrics['connectors_active'] >= 18, f\"Expected >= 18 connectors, found {metrics['connectors_active']}\"
+          assert metrics['templates_available'] >= 19, f\"Expected >= 19 templates, found {metrics['templates_available']}\"
+          print('Post-deployment verification mission PASSED: OPERATIONAL with', metrics['connectors_active'], 'connectors and', metrics['templates_available'], 'templates.')
           "

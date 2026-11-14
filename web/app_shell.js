@@ -17,6 +17,16 @@
 
     init() {}
 
+    openAskUra() {
+      // The new UI chats with the CEO on a real screen. The old modal is kept
+      // only as a fallback when the URA layer has not loaded.
+      if (window.URAShell) {
+        window.navigateTo('/ask-ceo');
+        return;
+      }
+      this.openAskUraModal();
+    }
+
     toggleSidebarCollapse() {
       const sidebar = document.getElementById('appSidebar');
       if (!sidebar) return;

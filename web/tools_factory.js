@@ -65,8 +65,10 @@ const ToolsFactory = (function() {
   // ------------------------------------------------------------------------
   // ROUTE RENDERER
   // ------------------------------------------------------------------------
-  async function render(route) {
-    const container = document.getElementById('view-tools');
+  async function render(route, containerOrId) {
+    const container = typeof containerOrId === 'string'
+      ? document.getElementById(containerOrId)
+      : (containerOrId || document.getElementById('view-tools'));
     if (!container) return;
 
     if (toolsList.length === 0) {

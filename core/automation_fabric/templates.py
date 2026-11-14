@@ -16,6 +16,7 @@ Templates:
 """
 
 import time
+import uuid
 from typing import Dict, Any, List, Optional
 from core.automation_fabric.contracts import WorkflowTemplate, LicenseType
 
@@ -616,7 +617,12 @@ class TemplateCatalog:
                 raise ValueError(f"Missing required parameter '{field_name}' for template '{template_id}'.")
 
         customized_spec = dict(tmpl.workflow_spec)
-        customized_spec["id"] = f"{tmpl.workflow_spec['id']}_{int(time.time())}"
+        # Second-resolution timestamps collide when the same template is
+        # instantiated twice within one second (e.g. two acceptance tests),
+        # which surfaces as a UNIQUE violation on automation_workflows.
+        customized_spec["id"] = (
+            f"{tmpl.workflow_spec['id']}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        )
         customized_spec["labels"] = {
             "tenant_id": tenant_id,
             "company_id": company_id,

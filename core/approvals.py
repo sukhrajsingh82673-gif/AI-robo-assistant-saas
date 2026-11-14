@@ -79,7 +79,12 @@ class ApprovalPipeline:
                 conn.execute("ALTER TABLE approvals ADD COLUMN decision_reason TEXT")
                 conn.commit()
             except Exception:
-                pass
+                # PostgreSQL aborts the transaction when the column already
+                # exists; roll back so subsequent statements still execute.
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
             row = conn.execute(
                 "SELECT company_id, status FROM approvals WHERE tenant_id = ? AND request_id = ?",
                 (tenant_id, request_id)
