@@ -475,6 +475,9 @@ function handleGlobalCompanyContextChange(companyId) {
   }
   populateGlobalCompanySelector();
   updateBreadcrumbs();
+  if (window.URAAssistant && window.URAAssistant.refreshContext) {
+    window.URAAssistant.refreshContext();
+  }
   
   const comp = state.companies.find(c => c.id === companyId);
   const label = comp ? comp.name : 'All Companies (Group Portfolio)';
@@ -490,8 +493,7 @@ function updateBreadcrumbs() {
 
   const navLabels = {
     overview: 'Overview',
-    assistant: 'AI Assistant',
-    coworker: 'Autonomous Coworker',
+    coworker: 'Co-worker (Agent / Employee)',
     missions: 'Work & Missions',
     work: 'Work & Missions',
     approvals: 'Sovereign Approvals',
@@ -511,8 +513,9 @@ function updateBreadcrumbs() {
     governance: 'Sovereign Governance & HOST Authority',
     company: 'Company & Structure',
     organization: 'Organization Matrix',
-    ceo: 'AI CEO Command',
-    meeting: 'AI CEO Meeting Room',
+    ceo: 'AI CEO Records',
+    'ceo-records': 'AI CEO Records',
+    meeting: 'Meetings',
     workforce: 'AI Workforce',
     tasks: 'TaskMaker',
     workflows: 'Workflow Runtime',
@@ -696,8 +699,13 @@ function handleRoute(path) {
     navKey = 'overview';
   } else if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview') || cleanPath === '/workspace' || cleanPath === '/workspace/dashboard' || cleanPath === '/workspace/overview') {
     navKey = 'overview';
+  } else if (cleanPath.startsWith('/company/ceo-records') || cleanPath.startsWith('/ceo-records')) {
+    navKey = 'ceo-records';
   } else if (cleanPath.startsWith('/workspace/ai-ceo') || cleanPath.startsWith('/workspace/ceo') || cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) {
-    navKey = 'ceo';
+    // The AI CEO chat was merged into the one URA Assistant. Legacy links open
+    // the assistant instead of 404ing; the console itself lives at /ceo-records.
+    navKey = 'overview';
+    if (window.URAAssistant) window.URAAssistant.open({ focus: 'company' });
   } else if (cleanPath.startsWith('/workspace/coworkers') || cleanPath.startsWith('/workspace/workforce') || cleanPath.startsWith('/workforce')) {
     navKey = 'workforce';
   } else if (cleanPath.startsWith('/workspace/finance') || cleanPath.startsWith('/workspace/accounting') || cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) {
@@ -717,12 +725,10 @@ function handleRoute(path) {
   } else if (cleanPath.startsWith('/workspace/missions') || cleanPath.startsWith('/workspace/work') || cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) {
     navKey = 'missions';
   } else if (cleanPath.startsWith('/assistant')) {
-    // The assistant is a single floating surface, not a page.  Legacy links
-    // open the flyout and land on the overview without rendering a second UI.
+    // The assistant is a single floating surface, not a page. Legacy links
+    // open the one URA Assistant and land on the overview.
     navKey = 'overview';
-    if (window.FloatingAssistant && !window.FloatingAssistant.isOpen) {
-      window.FloatingAssistant.toggleOpen();
-    }
+    if (window.URAAssistant) window.URAAssistant.open();
   }
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
   else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
@@ -734,7 +740,10 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/terminal')) navKey = 'terminal';
   else if (cleanPath.startsWith('/activity')) navKey = 'activity';
   else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
-  else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
+  else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) {
+    navKey = 'overview';
+    if (window.URAAssistant) window.URAAssistant.open({ focus: 'meetings' });
+  }
   else if (cleanPath.startsWith('/plugins')) navKey = 'plugins';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
@@ -776,6 +785,10 @@ function handleRoute(path) {
   }
 
   updateBreadcrumbs();
+
+  if (window.URAAssistant && window.URAAssistant.refreshContext) {
+    window.URAAssistant.refreshContext();
+  }
 
   if (navKey === '404') {
     renderNotFoundView(cleanPath);
@@ -833,6 +846,8 @@ function handleRoute(path) {
       window.CompanyWorkspace.render(cleanPath);
     } else if (navKey === 'organization' && window.OrgWorkspace) {
       window.OrgWorkspace.render('view-organization', cleanPath);
+    } else if (navKey === 'ceo-records' && window.AiCeoWorkspace) {
+      window.AiCeoWorkspace.render('view-ceo-records');
     } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
       window.AiCeoWorkspace.render('view-ceo', cleanPath);
     } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
@@ -923,13 +938,29 @@ function setupEventListeners() {
   const searchDropdown = document.getElementById('commandPaletteResults');
   let searchDebounceTimer = null;
   if (searchInput) {
+    const assistantPaletteRow = `
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onclick="if(window.URAAssistant){window.URAAssistant.open();} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">✨</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Ask the assistant</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Open URA Assistant · Ctrl/Cmd+J</div>
+        </div>
+      </div>`;
+    searchInput.addEventListener('focus', () => {
+      if (searchDropdown && !searchInput.value.trim()) {
+        searchDropdown.innerHTML = assistantPaletteRow;
+        searchDropdown.style.display = 'block';
+      }
+    });
     searchInput.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       clearTimeout(searchDebounceTimer);
       if (!q || q.length < 2) {
         if (searchDropdown) {
-          searchDropdown.style.display = 'none';
-          searchDropdown.innerHTML = '';
+          searchDropdown.innerHTML = assistantPaletteRow;
+          searchDropdown.style.display = 'block';
         }
         return;
       }
@@ -1008,7 +1039,7 @@ function setupEventListeners() {
     });
   }
 
-  // Universal Command Palette (⌘K / Ctrl+K) & Modal ESC handler
+  // Universal Command Palette (⌘K / Ctrl+K), assistant shortcut, & modal ESC
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
@@ -1017,6 +1048,10 @@ function setupEventListeners() {
         searchEl.focus();
         searchEl.select();
       }
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      e.preventDefault();
+      if (window.URAAssistant) window.URAAssistant.toggle();
     }
     if (e.key === 'Escape') closeModal();
   });
@@ -1072,8 +1107,8 @@ function renderApp() {
     const cleanRoute = initialRoute.startsWith('/') ? initialRoute : '/' + initialRoute;
     window.navigateTo(cleanRoute);
 
-    if (window.FloatingAssistant && window.FloatingAssistant.init) {
-      window.FloatingAssistant.init();
+    if (window.URAAssistant && window.URAAssistant.init) {
+      window.URAAssistant.init();
     }
   }
 }

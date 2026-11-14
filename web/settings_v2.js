@@ -700,6 +700,46 @@
     }
   }
 
+  async function applySuggestions(category) {
+    const definitions = (state.allSettings || []).filter(function (definition) {
+      return definition.category === category &&
+        definition.suggestion !== null && definition.suggestion !== undefined &&
+        definition.status === 'live';
+    });
+    const changes = [];
+    definitions.forEach(function (definition) {
+      const row = rowFor(definition.key);
+      const current = row ? row.value : definition.default;
+      if (JSON.stringify(current) === JSON.stringify(definition.suggestion)) return;
+      changes.push({
+        key: definition.key,
+        value: definition.suggestion,
+        scope_type: state.scope.type,
+        scope_id: state.scope.id
+      });
+    });
+    if (!changes.length) {
+      toast('Every suggestion is already applied.', 'info');
+      return;
+    }
+    try {
+      const payload = await api(API + '/values/bulk', {
+        method: 'POST',
+        body: JSON.stringify({
+          changes: changes,
+          company_id: state.companyId,
+          reason: 'Applied every suggestion in the assistant category.'
+        })
+      });
+      toast('Applied ' + (payload.applied_count || changes.length) + ' suggestion(s).', 'success');
+      await reloadValues();
+    } catch (err) {
+      toast(err.message || 'Could not apply the suggestions.', 'error');
+    } finally {
+      paint();
+    }
+  }
+
   async function decideApproval(approvalId, approve) {
     try {
       const payload = await api(API + '/approvals/' + encodeURIComponent(approvalId) + '/decide', {
@@ -1128,6 +1168,11 @@
       pillHtml(row, definition) +
       '</div></div>' +
       '<p class="sz-row-desc">' + esc(definition.description) + '</p>' +
+      (definition.hint ? '<p class="sz-hint sz-row-hint">' + esc(definition.hint) + '</p>' : '') +
+      (definition.suggestion !== null && definition.suggestion !== undefined && row && JSON.stringify(row.value) !== JSON.stringify(definition.suggestion)
+        ? '<p class="sz-suggestion"><strong>Suggested: ' + esc(formatValue({ value: definition.suggestion }, definition)) + '</strong>' +
+          (definition.reason ? ' — ' + esc(definition.reason) : '') + '</p>'
+        : '') +
       '<div class="sz-row-meta">' + meta.join('') + '</div>' +
       (row && row.provenance && definition.status === 'live'
         ? '<div class="sz-provenance">' + esc(row.provenance) + '</div>'
@@ -1220,6 +1265,9 @@
         '<header class="sz-group-head">' +
         '<h2 id="sz-cat-' + esc(group.id) + '">' + esc(category ? category.name : group.id) + '</h2>' +
         '<span>' + group.rows.length + (group.rows.length === 1 ? ' setting' : ' settings') + '</span>' +
+        (group.rows.some(function (entry) { return entry.definition.suggestion !== null && entry.definition.suggestion !== undefined; })
+          ? '<button type="button" class="sz-btn sz-suggest-btn" data-action="apply-suggestions" data-category="' + esc(group.id) + '">Use all suggestions</button>'
+          : '') +
         '</header>' +
         group.rows.map(function (entry) {
           return rowHtml(entry.definition, entry.row);
@@ -1468,6 +1516,8 @@
       verifyAudit();
     } else if (action === 'retry-values') {
       reloadValues();
+    } else if (action === 'apply-suggestions') {
+      applySuggestions(target.getAttribute('data-category'));
     }
   }
 

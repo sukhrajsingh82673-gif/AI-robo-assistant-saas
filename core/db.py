@@ -4088,6 +4088,46 @@ CREATE TABLE IF NOT EXISTS assistant_messages (
 CREATE INDEX IF NOT EXISTS idx_asst_msg_session ON assistant_messages(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_asst_msg_tenant_user ON assistant_messages(tenant_id, user_id);
 
+-- 48a. Assistant explicit memory (the owner's saved preferences and facts)
+CREATE TABLE IF NOT EXISTS assistant_memory (
+    memory_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL' | 'COMPANY'
+    content TEXT NOT NULL,
+    source_session_id TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_memory_user
+    ON assistant_memory(tenant_id, user_id, created_at);
+
+-- 48b. Assistant background jobs (survive reload; max 3 active per user)
+CREATE TABLE IF NOT EXISTS assistant_jobs (
+    job_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    session_id TEXT,
+    kind TEXT NOT NULL DEFAULT 'research',
+    title TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL',
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    progress REAL NOT NULL DEFAULT 0,
+    step TEXT NOT NULL DEFAULT 'Queued',
+    steps JSON,
+    result JSON,
+    citations JSON,
+    error TEXT,
+    notification_seen INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    finished_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_jobs_user
+    ON assistant_jobs(tenant_id, user_id, created_at);
+
 -- 48b. Assistant Generated Deliverables & Documents (Personal & Company Isolated)
 CREATE TABLE IF NOT EXISTS assistant_generated_documents (
     doc_id TEXT PRIMARY KEY,

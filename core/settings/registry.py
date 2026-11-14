@@ -106,6 +106,17 @@ ENFORCED_BY: Dict[str, str] = {
     "wf_autonomous_spawning": "core/agent_factory_runtime.py:GovernedAgentFactory",
     "term_execution_enabled": "api_server.py:POST /api/terminal/execute",
     "term_max_lease_seconds": "api_server.py:POST /api/terminal/execute",
+    "assistant_show_button": "web/ura_assistant.js:applyAssistantSettings",
+    "assistant_open_as": "web/ura_assistant.js:applyAssistantSettings",
+    "assistant_default_scope": "web/ura_assistant.js:applyAssistantSettings",
+    "assistant_confirmations": "core/ura_assistant_service.py:URAAssistantService.stream",
+    "assistant_remember_conversations": "core/ura_assistant_service.py:URAAssistantService.stream",
+    "assistant_background_work": "core/ura_assistant_service.py:URAAssistantService.create_job",
+    "assistant_meetings_enabled": "api_server.py:_ura_meeting_access",
+    "assistant_web_access": "core/ura_assistant_web.py:load_web_access",
+    "assistant_web_allowlist": "core/ura_assistant_web.py:load_web_access",
+    "assistant_web_blocklist": "core/ura_assistant_web.py:load_web_access",
+    "assistant_meeting_recording_notice": "core/ura_assistant_meetings.py:recording_notice",
 }
 
 # Text values that should be redacted in audit/API even though they are not
@@ -274,6 +285,9 @@ def build_definition(raw: Dict[str, Any]) -> SettingDefinition:
         requires_approval=bool(raw.get("requires_approval")),
         is_ceo_managed=bool(raw.get("is_ceo_managed")),
         action_id=key if value_type == "button_action" else None,
+        hint=str(raw.get("hint", "") or ""),
+        suggestion=raw.get("suggestion"),
+        reason=str(raw.get("reason", "") or ""),
     )
 
 

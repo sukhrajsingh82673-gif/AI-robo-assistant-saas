@@ -1199,3 +1199,19 @@
     animation: none;
   }
 }
+
+/* Assistant suggestions */
+.sz-group-head > h2 { margin-inline-end: auto; }
+.sz-group-head .sz-suggest-btn { flex: none; }
+.sz-row-hint { margin: 2px 0 0; }
+.sz-suggestion {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--accent-tint);
+  border: 1px solid var(--separator);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--label);
+}
+.sz-suggestion strong { font-weight: 600; }
