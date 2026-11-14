@@ -20,7 +20,7 @@ Rules of engagement for this program:
 | 1 | Data model, API, permissions, drafts | **Complete** |
 | 2 | Company switcher + Add company page + entry points + i18n/RTL | **Complete** |
 | 3 | Create new company (form, review, build workflow) | **Complete** |
-| 4 | Add existing company (form, connections, ingestion shell, diagnosis) | Not started |
+| 4 | Add existing company (form, connections, ingestion shell, diagnosis) | **Complete** |
 | 5 | Overview, edit, protected delete + export | Not started |
 | 6 | Settings wiring, tests, abuse tests, hardening | Not started |
 
@@ -174,7 +174,7 @@ Migrations are versioned files under `migrations/pg/` applied by `migrations/mig
 | Phase state, plain-language log, waiting-on-me, safe resume after failure | Workflow engine supports checkpoints/interrupts | UI + per-phase log projection |
 | Estimate 1–3 days, shown as estimate | None | `company_build_runs.estimate_min/max_days` + copy rules |
 
-### Stage 4 — add existing company
+### Stage 4 — add existing company (delivered; see 4e)
 
 | Requirement | Today | Gap |
 |---|---|---|
@@ -307,7 +307,7 @@ Delivered in Stage 1 as a single suite (`tests/test_company_setup.py`, 45 tests)
 Planned for later stages:
 
 - `tests/company_setup_e2e_test.js` — jsdom journeys for add existing / edit / delete (create-new is covered in `tests/company_setup_ui_test.js`)
-- `tests/test_company_setup_build_workflow.py` — delivered as `tests/test_company_build_workflow.py` (Stage 3); resume-after-failure for EXISTING companies belongs to Stage 4
+- `tests/test_company_setup_build_workflow.py` — delivered as `tests/test_company_build_workflow.py` (Stage 3) and `tests/test_company_onboarding.py` (Stage 4, EXISTING onboarding and retry)
 - `tests/test_company_setup_abuse.py` — script injection, oversized upload, prompt injection, double submit (Stage 6)
 
 ---
@@ -350,9 +350,9 @@ Planned for later stages:
 
 **Honest limitations left for later stages**
 
-- Company Build / Onboarding execution engine (Stage 3/4): superseded by Stage 3 for NEW companies (submit now starts the real build); EXISTING onboarding still returns `workflow_started: false`.
+- Company Build / Onboarding execution engine (Stage 3/4): superseded in Stage 3 for NEW and in Stage 4 for EXISTING; both now start their real workflow on submit.
 - Export generation and email delivery (Stage 5): `GET /export` returns `409 EXPORT_NOT_READY`.
-- Provider handshakes (Stage 4): `test` returns `simulated: true`, `verified: false`, "Nothing was read".
+- Provider handshakes (Stage 4): superseded; `test` returns `simulated: false`, `available: false`, `verified: false`, "Nothing was read".
 - No UI yet (Stage 2+).
 
 **HTTP verification performed** (temporary server, isolated SQLite, strict auth):
@@ -361,7 +361,7 @@ Planned for later stages:
 POST   /api/v1/companies                  -> 201 (draft, INR)
 GET    /api/v1/companies                  -> list
 PATCH  /api/v1/companies/<id>             -> 200 title updated
-POST   /api/v1/companies/<id>/submit      -> 202 CREATING + BUILD run, workflow_started false (Stage 1; Stage 3 starts the build)
+POST   /api/v1/companies/<id>/submit      -> 202 CREATING + BUILD run (Stage 1 recorded workflow_started false; Stage 3 starts the build)
 GET    /api/v1/companies/<id>/build       -> INTAKE/PENDING, estimate 1-3 days
 GET    /api/v1/companies/<id>/audit       -> created + submitted
 GET    /api/v1/companies/comp_foreign     -> 404 (foreign tenant)
@@ -405,7 +405,7 @@ GET    legacy /api/companies              -> new company visible (portfolio refr
 9. Assistant phrases such as "add a company" / "switch company" open the page or switcher and say nothing was created or switched; no request is sent.
 10. The topbar dropdown also lists the current company first and shows a truthful "No company yet — add one" state.
 
-**Handoff note:** Stage 3 replaced the "Create new" card collector with the typed create flow. The "Add existing" card still opens `EntryFlows` until Stage 4; Stage 2 deliberately did not write company rows.
+**Handoff note:** Stage 3 replaced the "Create new" card collector with the typed create flow, and Stage 4 replaced the "Add existing" `EntryFlows` hand-off with `/company/existing`. Stage 2 deliberately did not write company rows.
 
 **Gates:** `npm run typecheck` (65 files), `npm run lint`, `npm run test:company` (45 pytest + 16 UI checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey checks).
 
@@ -459,10 +459,54 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 - Research and website building are skipped until a provider is connected; no findings, assets or websites are invented.
 - Legal items are drafts and say so; a qualified professional must verify them.
 - The overview rewrite (including an embedded progress block) remains Stage 5; Stage 3 provides the dedicated `/company/<id>/build` page.
-- EXISTING companies still use the Stage 2 intake (`workflow_started: false`); the onboarding workflow is Stage 4.
+- EXISTING companies used the Stage 2 intake until Stage 4 replaced it with `/company/existing` and the real onboarding workflow (see 4e).
 - No Chromium/Playwright here: jsdom covers behaviour, but no screenshots, true 360px render or visual RTL pass was possible.
 - A build failure leaves the company `CREATING` so retry remains possible; the failure reason is projected on the build row and audited.
 
+
+---
+
+## 4e. Stage 4 — delivered
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `core/company_setup/sources.py` | The eight-source catalogue (accounting, banking, payments, commerce, CRM, workspace, communications, uploads) with `reads` / `why` / `never`, read-only scope, classification and required-verification flags. One contract shared by API and UI. |
+| `core/company_setup/connections.py` | `ConnectionAdapter` null adapters, `get_adapter`, `OwnershipVerifier` (`available = False`). Nothing is read and no token is accepted. |
+| `core/company_setup/readiness.py` | 0–100 readiness score from profile facts, connection state, skips and uploads, with weighted checks and a named reason for every missing point. |
+| `core/company_setup/ingestion.py` | Ingestion validation shell: filename sanitisation, type/size allow-list (25 MB), SHA-256 requirement, duplicate detection, prompt-injection flagging. Records metadata only. |
+| `core/company_setup/onboarding_workflow.py` | `CompanyOnboardingWorkflow` on the same durable runtime: CONNECT_VERIFY → STUDY → DIAGNOSE → PLAN → ACT → OPERATIONAL. Connect inventory and plan are real; study/diagnose/act are skipped with reasons. |
+| `web/company_setup_existing.js` | `/company/existing`: three steps (business, sources, review), required revenue/currency/period/role/business model, eight source cards with read/why/never and connect/skip/later, skip reason ≥5 characters, review, create + apply choices + submit, draft autosave. |
+| `migrations/pg/0010_company_onboarding.sql` | Additive columns: `external_connections.source_id`, `classification`, verification token/request/expiry; `company_files.flags`; two indexes. |
+| `migrations/rollback/pg/0010_company_onboarding_rollback.sql` | Manual reverse migration (never auto-applied). |
+| `tests/test_company_onboarding.py` | 13 tests: onboarding phases and honest gaps, retry attempt 2, catalogue contract, skip/restore, connected-source skip refusal, null connection test, 501 verification, ingestion accept/duplicate/oversize/blocked/injection, tenant isolation, guessed connection id. |
+
+**Touched:** `core/company_setup/build_workflow.py` (generalised phase specs, `RUN_TYPE`, `DECISION_PHASE`, readiness/diagnosis/study/sources projection), `core/company_setup/service.py` (onboarding dispatch, `ONBOARDING` retry, source/readiness/file methods, honest `test_connection`, least-privilege scope from the catalogue), `core/company_setup/api.py` (catalogue, sources, skip/unskip, readiness, files, verify routes), `core/company_setup/schema.py` (new columns + idempotent bootstrap), `web/company_setup_add.js` (EXISTING card), `web/app.js` (route), `web/index.html`, `web/company_setup_progress.js` (onboarding eyebrow, readiness, diagnosis, sources, ONBOARDING retry), `web/i18n.js` (English + Arabic), `web/company_setup.css`, `tests/company_setup_ui_test.js`, `tests/test_company_setup.py`, `tests/test_company_build_workflow.py`, `package.json`.
+
+**Behaviour delivered**
+
+1. Add Existing opens a real three-step form. Name, title, ≥20-character description, country, industry, business model, revenue amount/currency/period, owner name and role are required on the client and again on the server.
+2. Revenue is shown in Indian lakh/crore notation as it is typed; currency and period are server-validated enum values.
+3. The eight sources each show what ZONATA would read, why it helps and what is never copied. A source can be connected (read-only record), skipped with a reason (≥5 characters) or left undecided. Nothing is required.
+4. Submitting creates the company (`DRAFT`), records each connection or skip, then submits it: `EXISTING → ONBOARDING` and the onboarding workflow starts. If a source choice fails to save, the company still exists and the UI names how many choices failed instead of pretending.
+5. Onboarding runs six phases on the shared durable runtime. Connect inventory, readiness and the plan are local and real. STUDY, DIAGNOSE and ACT report `SKIPPED` with a reason and a gap because every adapter is null; no finding, reading or write is invented. The company ends `NEEDS_ATTENTION`, not `OPERATIONAL`.
+6. Readiness is computed from facts and returned with checks, counts and named reasons; skipped sources without a reason lower the score.
+7. Uploads validate name/type/size/SHA-256/duplicates and flag prompt-injection text; the file is recorded as metadata with `stored: false`, and a flagged file is never sent to a prompt.
+8. Ownership verification and connection tests are honest: `501 VERIFICATION_NOT_CONFIGURED`, and `simulated: false / available: false / verified: false` with "Nothing was read".
+9. Progress shows onboarding-specific copy, a readiness ring with counts and reasons, the diagnosis gap and saved sources; retry is allowed for `CREATING`, `ONBOARDING` and `NEEDS_ATTENTION` and creates a new attempt while preserving the old run.
+10. All Stage 4 surfaces are tenant-scoped; foreign and guessed ids return `404`, and cross-tenant skip/read/write is denied.
+
+**Gates:** `npm run typecheck` (68 JS files), `npm run lint`, `npm run test:company` (68 pytest across 3 files + 28 jsdom/static checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey checks).
+
+**Honest limits**
+
+- Every provider adapter is null: nothing is read from a real source, no OAuth handshake exists, and no diagnosis finding is produced.
+- Uploads are metadata only; no object-storage backend is configured, so file bytes are not stored.
+- Prompt-injection detection is pattern-based; it flags, it does not prove safety.
+- Ownership verification has no DNS/mailbox adapter; request and confirm both return 501.
+- No Chromium/Playwright here: jsdom covers behaviour, but no screenshots, true 360px render or visual RTL pass was possible.
+- `ZONATA_SETTINGS_MASTER_KEY` is absent from `render.yaml`; connection secrets need it when real providers arrive.
 
 ---
 
@@ -506,12 +550,12 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 | Website builder / base systems | `WebsiteBuilderAdapter` (null until configured) | No (some in-house tooling exists in `inhouse_tools/`, to be inspected) | 3 | Skipped — nothing built |
 | Legal document generator | `LegalPackAdapter` | Local draft checklist and legal items only; no external generator | 3 | Draft: verify with a qualified professional |
 | Email delivery (export, first report) | `EmailAdapter` (Null + SMTP) | No | 5 | Not configured |
-| OAuth connections (booking, CRM, accounting, drives) | `ConnectionAdapter` per provider | No | 4 | Simulated |
-| DNS/domain ownership verification | `DomainVerificationAdapter` | No | 4 | Simulated |
-| Malware scanning of uploads | `ScanAdapter` | No | 4 | Unscanned |
-| Diagnosis findings (profit leaks) | `DiagnosisAdapter` | No | 4 | Simulated |
-| Object storage backend (S3/MinIO) | `ObjectStorageService` backend swap | Local FS only | 4/6 | Local storage |
-| Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | NEW: real graph, real phases, real gaps. EXISTING: not started yet | 3/4 | NEW real; EXISTING queued (`workflow_started: false`) |
+| OAuth / read-only API connections (accounting, banking, payments, commerce, CRM, workspace, communications) | `ConnectionAdapter` per provider in `core/company_setup/connections.py` | Connection and skip records are real; every adapter is null (`available: false`, `verified: false`, nothing read) | 4 | Unavailable — not simulated |
+| DNS/domain ownership verification | `OwnershipVerifier` in `core/company_setup/connections.py` | Request/confirm return `501 VERIFICATION_NOT_CONFIGURED`; no token is accepted | 4 | Not configured |
+| Malware scanning of uploads | `ScanAdapter` | Metadata validation, type/size allow-list, SHA-256 duplicate refusal and prompt-injection flagging are real; bytes are not stored and no AV engine runs | 4 | Unscanned — no bytes stored |
+| Diagnosis findings (profit leaks) | `DiagnosisAdapter` in `core/company_setup/onboarding_workflow.py` | No findings: the phase is `SKIPPED` with a reason and a gap | 4 | Unavailable — nothing invented |
+| Object storage backend (S3/MinIO) | `ObjectStorageService` backend swap | File metadata is recorded (`stored: false`); `company_files.storage_key` stays empty | 4/6 | Metadata only — bytes not stored |
+| Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | NEW: 7-phase build. EXISTING: 6-phase onboarding. Both real, both honest about null-adapter gaps | 3/4 | Real graphs; provider phases skipped with reasons |
 | Company export PDF/ZIP | `core/company_setup/export.py` (planned) | No (`409 EXPORT_NOT_READY`) | 5 | Not ready |
 | Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`) | 5 | Not configured |
 | Browser e2e / screenshots | Playwright runner | No (no Chromium in this environment); jsdom contract + journey tests stand in | 6 | Not available |
@@ -554,3 +598,14 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Gates: typecheck 67 JS files, lint, `npm run test:company` (55 pytest + 23 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12). Live strict-auth HTTP journey verified (submit, build, retry attempt 2, foreign id 404).
 - Honest limits: providers are null adapters (research/build skipped with reasons), legal items are drafts, no browser visual/RTL pass here, EXISTING onboarding is Stage 4.
 - Waiting for "continue" before Stage 4.
+
+### Stage 4 — add existing company + onboarding workflow
+- Added `core/company_setup/sources.py`, `connections.py`, `readiness.py`, `ingestion.py`, `onboarding_workflow.py`, `web/company_setup_existing.js`, migrations `0010` (+ rollback) and `tests/test_company_onboarding.py`.
+- Add Existing is now a three-step flow (business, eight sources, review) with required revenue/currency/period/role/business model, connect/skip/decide-later per source, skip reasons and draft autosave.
+- Submit records the source choices and starts the 6-phase onboarding workflow on the shared durable runtime. Connect inventory, readiness and plan are real; study, diagnose and act are `SKIPPED` behind null adapters with gaps. The company ends `NEEDS_ATTENTION`, never a fake `OPERATIONAL`.
+- Progress gained onboarding copy, a readiness score with named reasons, the diagnosis gap and saved sources; retry now also accepts `ONBOARDING`.
+- Uploads validate type/size/SHA-256/duplicates and flag prompt-injection text; metadata only, bytes are not stored. Ownership verification and connection tests return honest 501/unavailable results.
+- Routes: `/company/existing`; EXISTING card wired to it. Overview rewrite stays Stage 5.
+- Gates: typecheck 68 JS files, lint, `npm run test:company` (68 pytest across 3 files + 28 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12).
+- Honest limits: all provider adapters are null, uploads are metadata-only, verification has no DNS/mailbox adapter, no browser visual/RTL pass here, `ZONATA_SETTINGS_MASTER_KEY` missing from `render.yaml`.
+- Waiting for "continue" before Stage 5.

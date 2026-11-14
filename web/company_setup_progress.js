@@ -209,7 +209,8 @@
       const status = String(this.company && this.company.status || '').toUpperCase();
       const phaseState = String(this.build.phase_state || '').toUpperCase();
       if (phaseState === 'RUNNING') return false;
-      return status === 'CREATING' || status === 'NEEDS_ATTENTION';
+      // The server allows retry for CREATING, ONBOARDING and NEEDS_ATTENTION.
+      return status === 'CREATING' || status === 'ONBOARDING' || status === 'NEEDS_ATTENTION';
     }
 
     async retry() {
@@ -334,16 +335,19 @@
       const log = Array.isArray(build.log) ? build.log : [];
       const visibleLog = this.showAllLog ? log.slice(-40) : log.slice(-8);
       const running = isRunning(build);
+      const onboarding = String(build.run_type || '').toUpperCase() === 'ONBOARDING';
 
       return `
         <header class="zc-flow-header zc-build-header">
-          <p class="zc-eyebrow">${escapeHtml(t('company.build.eyebrow'))}</p>
+          <p class="zc-eyebrow">${escapeHtml(t(onboarding ? 'company.build.onboarding.eyebrow' : 'company.build.eyebrow'))}</p>
           <div class="zc-build-title-row">
             <h1 class="zc-flow-title">${escapeHtml(company.name || t('company.build.title'))}</h1>
             <span class="zc-pill zc-pill-${runMeta.tone}">${escapeHtml(t(runMeta.key))}</span>
           </div>
-          <p class="zc-flow-subtitle">${escapeHtml(t('company.build.subtitle'))}</p>
+          <p class="zc-flow-subtitle">${escapeHtml(t(onboarding ? 'company.build.onboarding.subtitle' : 'company.build.subtitle'))}</p>
         </header>
+
+        ${this._readinessHtml(build)}
 
         <section class="zc-build-summary" aria-labelledby="zcBuildSummaryTitle">
           <div class="zc-build-summary-top">
@@ -377,6 +381,9 @@
             ${phases.map((phase) => this._phaseHtml(phase)).join('')}
           </ol>
         </section>
+
+        ${this._diagnosisHtml(build)}
+        ${this._sourcesHtml(build)}
 
         ${gaps.length ? `
           <section class="zc-build-waiting" aria-labelledby="zcBuildWaitingTitle">
@@ -448,6 +455,100 @@
             ${phase.description ? `<span class="zc-phase-description">${escapeHtml(phase.description)}</span>` : ''}
           </span>
         </li>
+      `;
+    }
+
+    _readinessHtml(build) {
+      const readiness = build && build.readiness;
+      if (!readiness || readiness.score == null) return '';
+      const score = Math.max(0, Math.min(100, Number(readiness.score) || 0));
+      const band = String(readiness.band || '').toUpperCase();
+      const bandKey = band === 'HIGH' ? 'high' : (band === 'MEDIUM' ? 'medium' : 'low');
+      const reasons = Array.isArray(readiness.reasons) ? readiness.reasons : [];
+      const counts = readiness.counts || {};
+      return `
+        <section class="zc-build-readiness" aria-labelledby="zcReadinessTitle">
+          <div class="zc-build-summary-top">
+            <h2 class="zc-section-title" id="zcReadinessTitle">${escapeHtml(t('company.build.readiness.title'))}</h2>
+            <span class="zc-pill zc-pill-${band === 'HIGH' ? 'green' : (band === 'MEDIUM' ? 'orange' : 'neutral')}">${escapeHtml(t(`company.build.readiness.band.${bandKey}`))}</span>
+          </div>
+          <div class="zc-readiness-score">
+            <div class="zc-readiness-ring" role="img" aria-label="${escapeHtml(t('company.build.readiness.value', { score }))}" style="--zc-readiness: ${score}">
+              <span class="zc-readiness-number">${score}</span>
+              <span class="zc-readiness-unit">/ 100</span>
+            </div>
+            <div class="zc-readiness-body">
+              <p class="zc-readiness-counts">${escapeHtml(t('company.build.readiness.counts', {
+                connected: Number(counts.sources_connected || 0),
+                verified: Number(counts.sources_verified || 0),
+                skipped: Number(counts.sources_skipped || 0),
+                files: Number(counts.files || 0)
+              }))}</p>
+              ${reasons.length ? `
+                <p class="zc-readiness-next-label">${escapeHtml(t('company.build.readiness.next'))}</p>
+                <ul class="zc-readiness-reasons">
+                  ${reasons.slice(0, 6).map((reason) => `
+                    <li><strong>${escapeHtml(reason.label || reason.id)}</strong>${reason.detail ? ` — ${escapeHtml(reason.detail)}` : ''}</li>
+                  `).join('')}
+                </ul>
+              ` : ''}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    _diagnosisHtml(build) {
+      const diagnosis = build && build.diagnosis;
+      if (!diagnosis || typeof diagnosis !== 'object') return '';
+      const findings = Array.isArray(diagnosis.findings) ? diagnosis.findings : [];
+      return `
+        <section class="zc-build-diagnosis" aria-labelledby="zcDiagnosisTitle">
+          <h2 class="zc-section-title" id="zcDiagnosisTitle">${escapeHtml(t('company.build.diagnosis.title'))}</h2>
+          ${findings.length ? `
+            <ul class="zc-diagnosis-list">
+              ${findings.map((finding) => `
+                <li class="zc-diagnosis-item">
+                  <span class="zc-diagnosis-title">${escapeHtml(finding.title || finding.id || '')}</span>
+                  ${finding.detail ? `<span class="zc-diagnosis-detail">${escapeHtml(finding.detail)}</span>` : ''}
+                </li>
+              `).join('')}
+            </ul>
+          ` : `
+            <div class="zc-inline-notice zc-inline-notice-muted" role="status">
+              <strong>${escapeHtml(t('company.build.diagnosis.unavailable'))}</strong>
+              <span>${escapeHtml(t('company.build.diagnosis.none'))}</span>
+            </div>
+          `}
+          ${diagnosis.reason ? `
+            <p class="zc-diagnosis-reason"><span class="zc-diagnosis-reason-label">${escapeHtml(t('company.build.diagnosis.why'))}</span> ${escapeHtml(diagnosis.reason)}</p>
+          ` : ''}
+        </section>
+      `;
+    }
+
+    _sourcesHtml(build) {
+      const sources = build && Array.isArray(build.sources) ? build.sources : [];
+      if (!sources.length) return '';
+      return `
+        <section class="zc-build-sources" aria-labelledby="zcSourcesTitle">
+          <h2 class="zc-section-title" id="zcSourcesTitle">${escapeHtml(t('company.build.sources.title'))}</h2>
+          <p class="zc-section-note">${escapeHtml(t('company.build.sources.note'))}</p>
+          <ul class="zc-build-source-list">
+            ${sources.map((source) => {
+              const status = String(source.status || 'NOT_STARTED').toUpperCase();
+              const key = status.toLowerCase();
+              const tone = status === 'VERIFIED' ? 'green' : (status === 'SKIPPED' ? 'orange' : (status === 'NEEDS_CHECK' ? 'accent' : 'neutral'));
+              return `
+                <li class="zc-build-source">
+                  <span class="zc-build-source-name">${escapeHtml(source.name || source.source_id || '')}</span>
+                  <span class="zc-pill zc-pill-${tone}">${escapeHtml(t(`company.build.sources.status.${key}`))}</span>
+                  ${source.skipped && source.skip_reason ? `<span class="zc-build-source-reason">${escapeHtml(source.skip_reason)}</span>` : ''}
+                </li>
+              `;
+            }).join('')}
+          </ul>
+        </section>
       `;
     }
 

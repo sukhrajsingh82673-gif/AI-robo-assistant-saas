@@ -224,7 +224,6 @@
         return;
       }
 
-      const mode = kind === 'EXISTING' ? 'existing' : 'new';
       try {
         localStorage.setItem(INTENT_KEY, JSON.stringify({
           type: kind,
@@ -245,16 +244,10 @@
         return;
       }
 
-      // Existing companies keep the intake collector until Stage 4 replaces it
-      // with read-only connections and the diagnosis workspace.
-      if (window.EntryFlows && typeof window.EntryFlows.startFlow === 'function') {
-        if (typeof window.navigateTo === 'function') window.navigateTo('/company/new');
-        window.EntryFlows.startFlow(mode, 'view-company');
-      } else if (typeof window.navigateTo === 'function') {
-        window.navigateTo('/company/new');
-      } else {
-        window.location.hash = '#/company/new';
-      }
+      // Existing companies use the typed onboarding flow: facts, the eight
+      // read-only sources, review, then the real onboarding workflow.
+      if (typeof window.navigateTo === 'function') window.navigateTo('/company/existing');
+      else window.location.hash = '#/company/existing';
     }
   }
 

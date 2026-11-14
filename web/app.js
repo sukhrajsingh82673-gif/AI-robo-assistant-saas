@@ -868,6 +868,8 @@ function handleRoute(path) {
       window.CompanySetupAdd.render('view-company');
     } else if (navKey === 'company' && (cleanPath === '/company/create' || cleanPath === '/company/create/') && window.CompanySetupCreate) {
       window.CompanySetupCreate.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/existing' || cleanPath === '/company/existing/') && window.CompanySetupExisting) {
+      window.CompanySetupExisting.render('view-company');
     } else if (navKey === 'company' && /^\/company\/[^/]+\/build\/?$/.test(cleanPath) && window.CompanySetupProgress) {
       const buildMatch = cleanPath.match(/^\/company\/([^/]+)\/build\/?$/);
       window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
@@ -1818,6 +1820,10 @@ function renderCompanySection() {
   }
   if (route === '/company/create' || route === '/company/create/') {
     if (window.CompanySetupCreate) window.CompanySetupCreate.render('view-company');
+    return;
+  }
+  if (route === '/company/existing' || route === '/company/existing/') {
+    if (window.CompanySetupExisting) window.CompanySetupExisting.render('view-company');
     return;
   }
   const buildMatch = route.match(/^\/company\/([^/]+)\/build\/?$/);

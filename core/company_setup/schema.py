@@ -51,14 +51,23 @@ _BUILD_RUN_COLUMNS: List[tuple] = [
 
 _EXTERNAL_CONNECTION_COLUMNS: List[tuple] = [
     ("provider_id", "TEXT"),
+    ("source_id", "TEXT"),
+    ("classification", "TEXT"),
     ("scope", "JSON"),
     ("status", "TEXT"),
     ("last_check_at", "REAL"),
     ("secret_ref", "TEXT"),
     ("verified_at", "REAL"),
     ("verification_method", "TEXT"),
+    ("verification_token", "TEXT"),
+    ("verification_requested_at", "REAL"),
+    ("verification_expires_at", "REAL"),
     ("skipped", "INTEGER DEFAULT 0"),
     ("skip_reason", "TEXT"),
+]
+
+_COMPANY_FILE_COLUMNS: List[tuple] = [
+    ("flags", "JSON"),
 ]
 
 _TABLES = [
@@ -95,6 +104,7 @@ _TABLES = [
         storage_key TEXT,
         sha256 TEXT,
         scan_status TEXT NOT NULL DEFAULT 'UNSCANNED',
+        flags JSON,
         uploaded_by TEXT,
         created_at REAL NOT NULL
     )
@@ -234,6 +244,7 @@ def ensure_schema(force: bool = False) -> bool:
                 _add_missing_columns(conn, "companies", _COMPANY_COLUMNS)
                 _add_missing_columns(conn, "external_connections", _EXTERNAL_CONNECTION_COLUMNS)
                 _add_missing_columns(conn, "company_build_runs", _BUILD_RUN_COLUMNS)
+                _add_missing_columns(conn, "company_files", _COMPANY_FILE_COLUMNS)
                 # Backfill timestamps and normalise the legacy ATTENTION status.
                 try:
                     conn.execute(

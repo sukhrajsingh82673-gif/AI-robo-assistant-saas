@@ -80,6 +80,11 @@ function loadProgress(window) {
   return window.CompanySetupProgress;
 }
 
+function loadExistingFlow(window) {
+  window.eval(read('web/company_setup_existing.js'));
+  return window.CompanySetupExisting;
+}
+
 function setField(window, name, value) {
   const el = window.document.getElementById(`zcField-${name}`);
   assert.ok(el, `field ${name} exists`);
@@ -264,16 +269,17 @@ test('choosing a card stores intent and hands off without creating anything', ()
   window.state = { host: { role: 'OWNER', user_id: 'u1' } };
   const routes = [];
   window.navigateTo = (p) => routes.push(p);
-  const flows = [];
-  window.EntryFlows = { startFlow: (mode) => flows.push(mode) };
 
   add.render('view-company');
   window.document.querySelector('[data-add-type="EXISTING"]').click();
-  assert.deepStrictEqual(flows, ['existing']);
-  assert.ok(routes.includes('/company/new'));
+  assert.ok(routes.includes('/company/existing'), 'existing companies open the onboarding flow');
   const intent = JSON.parse(window.localStorage.getItem('zonata_company_setup_intent'));
   assert.strictEqual(intent.type, 'EXISTING');
   assert.strictEqual(intent.source, 'company_add_page');
+
+  window.document.querySelector('[data-add-type="NEW"]').click();
+  assert.ok(routes.includes('/company/create'), 'new companies open the build flow');
+  assert.strictEqual(routes.length, 2);
 });
 
 // ---------------------------------------------------------------- (e) i18n
@@ -359,8 +365,10 @@ test('index.html loads the company setup modules in a safe order', () => {
   assert.ok(switcherAt < appAt, 'switcher loads before the router');
   assert.ok(addAt < appAt, 'Add page loads before the router');
   const createAt = index.indexOf('src="company_setup_create.js"');
+  const existingAt = index.indexOf('src="company_setup_existing.js"');
   const progressAt = index.indexOf('src="company_setup_progress.js"');
   assert.ok(createAt > addAt && createAt < appAt, 'create flow loads before the router');
+  assert.ok(existingAt > createAt && existingAt < appAt, 'existing flow loads before the router');
   assert.ok(progressAt > addAt && progressAt < appAt, 'progress loads before the router');
   assert.ok(index.includes('id="sidebarCompanyStatus"'));
 });
@@ -375,6 +383,8 @@ test('router and palette expose /company/add and the switcher', () => {
   assert.ok(app.includes('function syncCompanySurfaces'));
   assert.ok(app.includes("cleanPath === '/company/create'"));
   assert.ok(app.includes('window.CompanySetupCreate.render'));
+  assert.ok(app.includes("cleanPath === '/company/existing'"));
+  assert.ok(app.includes('window.CompanySetupExisting.render'));
   assert.ok(app.includes('window.CompanySetupProgress.render'));
   assert.ok(app.includes('/build\\/?$'), 'the build route is explicit');
   assert.ok(!/comp_primary/.test(app), 'the router does not fabricate a primary company');
@@ -465,7 +475,226 @@ test('client validation blocks review and focuses the first problem', () => {
   assert.ok(window.document.getElementById('zcErr-country') === null || create.errors.name);
 });
 
+// ------------------------------------------------ (j) existing-company flow
+const CATALOGUE = [
+  {
+    id: 'accounting', name: 'Accounting and books', category: 'FINANCIAL',
+    examples: ['Tally', 'Zoho Books'], reads: 'Ledger summary and invoices.',
+    why: 'Shows margin and cash risk.', never: 'Salaries or personal bank details.',
+    scope: ['read:ledger'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'banking', name: 'Bank accounts', category: 'FINANCIAL',
+    examples: ['Statement feed'], reads: 'Balances and transactions.',
+    why: 'Shows the real cash position.', never: 'Card numbers or credentials.',
+    scope: ['read:balance'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'payments', name: 'Payments and settlements', category: 'FINANCIAL',
+    examples: ['Razorpay'], reads: 'Settlements and fees.',
+    why: 'Shows revenue quality.', never: 'Full card numbers.',
+    scope: ['read:settlements'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'commerce', name: 'Store, POS and orders', category: 'OPERATIONAL',
+    examples: ['Shopify'], reads: 'Orders and stock.',
+    why: 'Shows what sells.', never: 'Customer addresses.',
+    scope: ['read:orders'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'crm', name: 'CRM and pipeline', category: 'CUSTOMER',
+    examples: ['HubSpot'], reads: 'Pipeline stages.',
+    why: 'Shows where revenue stalls.', never: 'Contact notes.',
+    scope: ['read:pipeline'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'workspace', name: 'Files and spreadsheets', category: 'DOCUMENT',
+    examples: ['Google Workspace'], reads: 'Only the files you select.',
+    why: 'Reuses trusted reports.', never: 'The rest of the drive.',
+    scope: ['read:selected_files'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'communications', name: 'Email and business messaging', category: 'CUSTOMER',
+    examples: ['Gmail read-only'], reads: 'Counts only.',
+    why: 'Shows service load.', never: 'Message bodies.',
+    scope: ['read:thread_metadata'], requires_secret: true, requires_verification: true
+  },
+  {
+    id: 'uploads', name: 'Upload files directly', category: 'DOCUMENT',
+    examples: ['CSV', 'XLSX'], reads: 'Only the files you upload.',
+    why: 'Fastest way to start.', never: 'Anything outside the file.',
+    scope: ['read:uploaded_files'], requires_secret: false, requires_verification: false
+  }
+];
+
+function fillExistingDetails(window, existing) {
+  const set = (name, value) => {
+    const el = window.document.getElementById(`zcExistField-${name}`);
+    assert.ok(el, `field ${name} exists`);
+    el.value = value;
+    el.dispatchEvent(new window.Event('input', { bubbles: true }));
+  };
+  set('name', 'Onboarding Bakery');
+  set('title', 'Neighbourhood bakery chain');
+  set('description', 'A six-store bakery serving walk-in and online customers every day.');
+  set('industry', 'Food & Beverage');
+  set('business_model', 'Retail bakery with online ordering and corporate catering.');
+  set('revenue_amount', '12000000');
+  set('revenue_currency', 'INR');
+  set('revenue_period', 'ANNUAL');
+  set('owner_name', 'Amina Rao');
+  set('owner_role', 'Founder');
+}
+
+test('existing flow renders the business, revenue and role fields', () => {
+  const dom = makeDom('<div id="view"></div>');
+  const { window } = dom;
+  window.scrollTo = () => {};
+  loadI18n(window);
+  const existing = loadExistingFlow(window);
+  existing.render('view');
+
+  const root = window.document.querySelector('[data-company-existing]');
+  assert.ok(root, 'existing page rendered');
+  ['name', 'title', 'description', 'industry', 'business_model', 'revenue_amount', 'owner_name', 'owner_role']
+    .forEach((field) => assert.ok(root.querySelector(`#zcExistField-${field}`), `${field} exists`));
+  assert.ok(root.querySelector('#zcExistField-revenue_currency'));
+  assert.ok(root.querySelector('#zcExistField-revenue_period'));
+  assert.ok(root.textContent.includes('How it makes money'));
+
+  // Client validation mirrors the server: revenue, period, role and model are required.
+  existing.toSources();
+  assert.strictEqual(existing.step, 'details');
+  assert.ok(existing.errors.revenue_amount);
+  assert.ok(existing.errors.business_model);
+  assert.ok(existing.errors.owner_role);
+});
+
 (async () => {
+  await testAsync('existing sources show read/why/never and require a skip reason', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const existing = loadExistingFlow(window);
+    window.fetch = (url) => {
+      if (url === '/api/v1/companies/sources/catalogue') return jsonResponse({ sources: CATALOGUE });
+      if (url === '/api/v1/companies/drafts') return jsonResponse({ draft_id: 'drf_ex' });
+      return jsonResponse({}, 404);
+    };
+    existing.render('view');
+    fillExistingDetails(window, existing);
+    existing.toSources();
+    assert.strictEqual(existing.step, 'sources');
+    await existing.loadCatalogue();
+
+    const cards = window.document.querySelectorAll('[data-source-card]');
+    assert.strictEqual(cards.length, 8);
+    const first = cards[0];
+    assert.ok(first.textContent.includes('Ledger summary and invoices.'));
+    assert.ok(first.textContent.includes('Shows margin and cash risk.'));
+    assert.ok(first.textContent.includes('Salaries or personal bank details.'));
+    assert.strictEqual(first.querySelectorAll('[data-source-choice]').length, 3);
+
+    existing._setSourceChoice('commerce', 'skip');
+    const reasonBox = window.document.querySelector('[data-source-reason-box="commerce"]');
+    assert.strictEqual(reasonBox.hidden, false);
+    assert.strictEqual(existing.toReview(), false, 'a skip without a reason blocks review');
+    assert.ok(window.document.getElementById('zcSourceReasonErr-commerce').textContent.length > 0);
+
+    const reason = window.document.getElementById('zcSourceReason-commerce');
+    reason.value = 'Orders are kept in a paper book.';
+    reason.dispatchEvent(new window.Event('input', { bubbles: true }));
+    assert.strictEqual(existing.toReview(), true);
+    assert.strictEqual(existing.step, 'review');
+    const review = window.document.querySelector('.zc-review');
+    assert.ok(review.textContent.includes('Store, POS and orders'));
+    assert.ok(review.textContent.includes('Orders are kept in a paper book.'));
+    existing.reset();
+    dom.window.close();
+  });
+
+  await testAsync('existing submit saves choices then starts onboarding', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const existing = loadExistingFlow(window);
+    const calls = [];
+    window.fetch = (url, init) => {
+      calls.push({ url, method: (init && init.method) || 'GET', body: init && init.body });
+      if (url === '/api/v1/companies/sources/catalogue') return jsonResponse({ sources: CATALOGUE });
+      if (url === '/api/v1/companies/drafts') return jsonResponse({ draft_id: 'drf_ex' });
+      if (url === '/api/v1/companies') return jsonResponse({ id: 'comp_9' }, 201);
+      if (/\/sources\/commerce\/skip$/.test(url)) return jsonResponse({ skipped: true });
+      if (/\/connections$/.test(url)) return jsonResponse({ connection_id: 'con_1', status: 'NEEDS_CHECK' }, 201);
+      if (/\/comp_9\/submit$/.test(url)) return jsonResponse({ workflow_started: true }, 202);
+      return jsonResponse({ deleted: true });
+    };
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+
+    existing.render('view');
+    fillExistingDetails(window, existing);
+    existing.toSources();
+    await existing.loadCatalogue();
+    existing._setSourceChoice('accounting', 'connect');
+    existing._setSourceChoice('commerce', 'skip');
+    existing.sources().commerce.reason = 'Orders are kept in a paper book.';
+    assert.strictEqual(existing.toReview(), true);
+
+    await existing.submit();
+    const created = calls.find((call) => call.url === '/api/v1/companies' && call.method === 'POST');
+    assert.ok(created, 'company created');
+    const body = JSON.parse(created.body);
+    assert.strictEqual(body.type, 'EXISTING');
+    assert.strictEqual(body.name, 'Onboarding Bakery');
+    assert.deepStrictEqual(body.revenue, { amount: 12000000, currency: 'INR', period: 'ANNUAL' });
+    assert.strictEqual(body.owner.role, 'Founder');
+
+    const skip = calls.find((call) => /\/sources\/commerce\/skip$/.test(call.url));
+    assert.ok(skip, 'skip applied');
+    assert.strictEqual(JSON.parse(skip.body).reason, 'Orders are kept in a paper book.');
+    const connect = calls.find((call) => call.url === '/api/v1/companies/comp_9/connections');
+    assert.ok(connect, 'connection recorded');
+    assert.strictEqual(JSON.parse(connect.body).source_id, 'accounting');
+    assert.ok(calls.some((call) => /\/comp_9\/submit$/.test(call.url)));
+    assert.deepStrictEqual(navigations, ['/company/comp_9/build']);
+    existing.reset();
+    dom.window.close();
+  });
+
+  await testAsync('existing create errors stay on the field and never fake success', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const existing = loadExistingFlow(window);
+    window.fetch = (url) => {
+      if (url === '/api/v1/companies/sources/catalogue') return jsonResponse({ sources: CATALOGUE });
+      if (url === '/api/v1/companies/drafts') return jsonResponse({ draft_id: 'drf_ex' });
+      if (url === '/api/v1/companies') {
+        return jsonResponse({ error: 'exists', code: 'DUPLICATE_COMPANY_NAME' }, 409);
+      }
+      return jsonResponse({}, 404);
+    };
+    let navigated = null;
+    window.navigateTo = (path) => { navigated = path; };
+
+    existing.render('view');
+    fillExistingDetails(window, existing);
+    existing.toSources();
+    await existing.loadCatalogue();
+    existing.toReview();
+    await existing.submit();
+
+    assert.strictEqual(existing.step, 'details');
+    assert.ok(window.document.getElementById('zcExistErr-name').textContent.toLowerCase().includes('already exists'));
+    assert.strictEqual(navigated, null, 'no navigation on failure');
+    existing.reset();
+    dom.window.close();
+  });
+
   await testAsync('review shows the brief and submit creates then starts the build', async () => {
     const dom = makeDom('<div id="view"></div>');
     const { window } = dom;
@@ -631,6 +860,80 @@ test('client validation blocks review and focuses the first problem', () => {
     const root = window.document.querySelector('[data-company-build]');
     assert.ok(root.textContent.includes('No build has started'));
     assert.strictEqual(root.querySelectorAll('.zc-phase').length, 0);
+    progress.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('progress shows readiness, a named diagnosis gap and sources for onboarding', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    loadI18n(window);
+    const progress = loadProgress(window);
+
+    const build = {
+      build_id: 'bld_2',
+      company_id: 'comp_3',
+      run_type: 'ONBOARDING',
+      phase: 'ACT',
+      phase_state: 'DONE_WITH_GAPS',
+      progress: 0.83,
+      progress_percent: 83,
+      attempt: 1,
+      estimate: { min_days: 1, max_days: 3, is_estimate: true },
+      phases: [
+        { id: 'CONNECT_VERIFY', label: 'Connecting', state: 'DONE', note: '1 connected' },
+        { id: 'STUDY', label: 'Studying', state: 'SKIPPED', note: 'No adapter' },
+        { id: 'DIAGNOSE', label: 'Diagnosing', state: 'SKIPPED', note: 'No provider' },
+        { id: 'PLAN', label: 'Planning', state: 'DONE', note: '2 workstreams' },
+        { id: 'ACT', label: 'Acting', state: 'SKIPPED', note: 'No approved action' },
+        { id: 'OPERATIONAL', label: 'Going operational', state: 'PENDING', note: '' }
+      ],
+      log: [],
+      waiting_on: [{ phase: 'STUDY', message: 'Nothing was read.' }],
+      diagnosis: { available: false, findings: [], reason: 'No source was read, so no finding was invented.' },
+      study: { read: false },
+      sources: [
+        { source_id: 'accounting', name: 'Accounting and books', status: 'NEEDS_CHECK', skipped: false },
+        { source_id: 'commerce', name: 'Store, POS and orders', status: 'SKIPPED', skipped: true, skip_reason: 'Paper book' }
+      ],
+      readiness: {
+        score: 58,
+        band: 'MEDIUM',
+        counts: { sources_connected: 1, sources_verified: 0, sources_skipped: 1, files: 0 },
+        checks: [],
+        reasons: [{ id: 'source_verified', label: 'Ownership verified', detail: 'Confirm ownership first.' }]
+      }
+    };
+    const calls = [];
+    window.fetch = (url, init) => {
+      calls.push({ url, method: (init && init.method) || 'GET' });
+      if (url === '/api/v1/companies/comp_3') {
+        return jsonResponse({ id: 'comp_3', name: 'Onboarding Bakery', status: 'ONBOARDING' });
+      }
+      if (url === '/api/v1/companies/comp_3/build') return jsonResponse(build);
+      if (url === '/api/v1/companies/comp_3/build/retry') {
+        return jsonResponse({ workflow_started: true, build }, 202);
+      }
+      return jsonResponse({}, 404);
+    };
+    window.navigateTo = () => {};
+
+    await progress.render('view', 'comp_3');
+    const root = window.document.querySelector('[data-company-build]');
+    assert.ok(root.textContent.includes('Onboarding progress'));
+    assert.ok(root.textContent.includes('Readiness'));
+    assert.strictEqual(root.querySelector('.zc-readiness-number').textContent, '58');
+    assert.ok(root.textContent.includes('Ownership verified'));
+    assert.ok(root.textContent.includes('No diagnosis was produced'));
+    assert.ok(root.textContent.includes('no finding was invented'));
+    assert.ok(root.textContent.includes('Store, POS and orders'));
+    assert.ok(root.textContent.includes('Skipped'));
+    assert.ok(root.textContent.includes('Waiting on you'));
+
+    assert.ok(progress.canRetry(), 'ONBOARDING companies can retry');
+    await progress.retry();
+    assert.ok(calls.some((call) => call.url.endsWith('/build/retry') && call.method === 'POST'));
     progress.destroy();
     dom.window.close();
   });

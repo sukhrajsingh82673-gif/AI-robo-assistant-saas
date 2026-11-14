@@ -228,15 +228,16 @@ class TestBuildIsolation(BuildWorkflowTestBase):
             foreign_service.retry_build(self.other_principal(), company["id"])
         self.assertIsNone(foreign_service.get_build(company["id"]))
 
-    def test_existing_company_submit_does_not_start_the_new_build(self):
+    def test_existing_company_submit_starts_the_onboarding_workflow(self):
         company = self.make_company(EXISTING_PAYLOAD)
         result = self.service().submit_company(self.owner_principal(), company["id"])
 
-        self.assertFalse(result["workflow_started"])
-        self.assertEqual(result["company"]["status"], CompanyStatus.ONBOARDING)
-        self.assertIn("Stage 4", result["workflow_note"])
-        self.assertEqual(result["build"]["phase"], "CONNECT_VERIFY")
-        self.assertEqual(result["build"]["phase_state"], "PENDING")
+        self.assertTrue(result["workflow_started"])
+        self.assertEqual(result["company"]["status"], CompanyStatus.NEEDS_ATTENTION)
+        self.assertEqual(result["build"]["run_type"], "ONBOARDING")
+        self.assertEqual(result["build"]["phase"], "ACT")
+        self.assertEqual(result["build"]["phase_state"], "DONE_WITH_GAPS")
+        self.assertEqual(result["build"]["phases"][0]["id"], "CONNECT_VERIFY")
 
     def test_failure_is_visible_and_never_marks_the_company_operational(self):
         company = self.make_company()

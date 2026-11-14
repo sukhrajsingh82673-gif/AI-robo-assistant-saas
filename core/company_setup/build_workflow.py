@@ -155,13 +155,33 @@ def _add_gap(state: Dict[str, Any], phase: str, kind: str, message: str, action:
 
 
 class CompanyBuildWorkflow:
-    """One company's build, executed on the shared durable runtime."""
+    """One company's build, executed on the shared durable runtime.
+
+    The base class implements the NEW-company graph. Existing companies reuse
+    the same runtime, projection and retry semantics through
+    :class:`core.company_setup.onboarding_workflow.CompanyOnboardingWorkflow`,
+    which only adds its own phase handlers.
+    """
+
+    #: Stored on the build row and shown by the progress page.
+    RUN_TYPE = "BUILD"
+    #: The phase whose decision decides whether the company may go operational.
+    DECISION_PHASE = "VERIFY"
 
     def __init__(self, tenant_id: str, company_id: str, principal: Principal):
         self.tenant_id = tenant_id
         self.company_id = company_id
         self.principal = principal
         ensure_schema()
+
+    # ------------------------------------------------------------- type
+    def _company_type(self) -> str:
+        record = self._company() or {}
+        return str(record.get("company_type") or "NEW").upper()
+
+    def _specs(self) -> List[Dict[str, str]]:
+        specs = PHASE_SPECS.get(self._company_type())
+        return specs or PHASE_SPECS["NEW"]
 
     # ------------------------------------------------------------- records
     def _company(self) -> Optional[Dict[str, Any]]:
@@ -191,8 +211,7 @@ class CompanyBuildWorkflow:
 
     # --------------------------------------------------------------- graph
     def _build_graph(self, record: Dict[str, Any], attempt: int) -> Tuple[str, str, Any]:
-        company_type = str(record.get("company_type") or "NEW").upper()
-        specs = PHASE_SPECS.get(company_type) or PHASE_SPECS["NEW"]
+        specs = self._specs()
         graph = StateGraph({"phases": list, "log": list, "gaps": list})
 
         for spec in specs:
@@ -213,14 +232,14 @@ class CompanyBuildWorkflow:
         for left, right in zip(specs, specs[1:]):
             graph.add_edge(left["id"], right["id"])
 
-        # Verification decides whether the company may go operational. When
-        # gaps exist the run ends at verification instead of pretending.
-        verify_id = "VERIFY"
+        # The decision phase decides whether the company may go operational.
+        # When gaps exist the run ends there instead of pretending.
+        decision_id = self.DECISION_PHASE
         operational_id = "OPERATIONAL"
-        if any(spec["id"] == verify_id for spec in specs) and any(spec["id"] == operational_id for spec in specs):
-            graph.edges = [e for e in graph.edges if not (e["source"] == verify_id and e["target"] == operational_id)]
+        if any(spec["id"] == decision_id for spec in specs) and any(spec["id"] == operational_id for spec in specs):
+            graph.edges = [e for e in graph.edges if not (e["source"] == decision_id and e["target"] == operational_id)]
             graph.add_conditional_edges(
-                verify_id,
+                decision_id,
                 lambda state: "OPERATIONAL" if not state.get("gaps") else "END",
                 {"OPERATIONAL": operational_id, "END": NodeType.END},
             )
@@ -274,6 +293,10 @@ class CompanyBuildWorkflow:
             _set_phase(state, phase_id, "DONE", "Operational")
             state["operational"] = True
             return state
+
+        handler = getattr(self, f"_phase_{phase_id.lower()}", None)
+        if handler is not None:
+            return handler(state, record)
 
         raise ValueError(f"Unknown build phase: {phase_id}")
 
@@ -466,14 +489,9 @@ class CompanyBuildWorkflow:
         record = self._company()
         if not record:
             raise ValueError("The company no longer exists")
-        if str(record.get("company_type") or "NEW").upper() != "NEW":
-            return {
-                "started": False,
-                "reason": "The onboarding workflow for existing companies arrives in Stage 4.",
-            }
 
+        specs = self._specs()
         attempt = attempt or self._attempt_number()
-        specs = PHASE_SPECS["NEW"]
         phases = [dict(spec, state="PENDING", note="", started_at=None, finished_at=None) for spec in specs]
         workflow_id, runtime, _ = self._build_graph(record, attempt)
         inputs = {"phases": phases, "log": [], "gaps": []}
@@ -510,13 +528,14 @@ class CompanyBuildWorkflow:
                     build_id, tenant_id, company_id, run_type, workflow_id, workflow_run_id,
                     phase, phase_state, progress, estimate_min_days, estimate_max_days,
                     started_at, finished_at, failure_reason, log, created_at, updated_at
-                ) VALUES (?, ?, ?, 'BUILD', NULL, NULL, ?, 'PENDING', 0.0, 1, 3, NULL, NULL, NULL, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, NULL, NULL, ?, 'PENDING', 0.0, 1, 3, NULL, NULL, NULL, ?, ?, ?)
                 """,
                 (
                     f"bld_{uuid.uuid4().hex[:12]}",
                     self.tenant_id,
                     self.company_id,
-                    PHASE_SPECS["NEW"][0]["id"],
+                    self.RUN_TYPE,
+                    self._specs()[0]["id"],
                     _json({"phases": [], "log": [], "gaps": [], "attempt": attempt}),
                     now,
                     now,
@@ -540,19 +559,19 @@ class CompanyBuildWorkflow:
         completed = [p for p in phases if p.get("state") == "DONE"]
         skipped = [p for p in phases if p.get("state") == "SKIPPED"]
         gaps = state.get("waiting_on") if state.get("waiting_on") is not None else state.get("gaps") or []
-        total = len(phases) or len(PHASE_SPECS["NEW"])
+        total = len(phases) or len(self._specs())
         progress = round(len(completed) / total, 4) if total else 0.0
         success = result.get("status") == WorkflowState.COMPLETED
         now = _now()
 
         if not success:
-            phase = state.get("phase") or "INTAKE"
+            phase = state.get("phase") or self._specs()[0]["id"]
             phase_state = "FAILED"
             failure_reason = result.get("error") or "The build stopped unexpectedly."
             target_status = None
             finished_at = now
         elif gaps:
-            phase = "VERIFY"
+            phase = self.DECISION_PHASE
             phase_state = "DONE_WITH_GAPS"
             failure_reason = None
             target_status = CompanyStatus.NEEDS_ATTENTION
@@ -573,6 +592,10 @@ class CompanyBuildWorkflow:
             "plan": state.get("plan") or {},
             "research": state.get("research") or {},
             "build": state.get("build") or {},
+            "study": state.get("study") or {},
+            "diagnosis": state.get("diagnosis") or {},
+            "sources": state.get("sources") or [],
+            "readiness": state.get("readiness") or {},
             "attempt": attempt,
         }
 
@@ -610,12 +633,13 @@ class CompanyBuildWorkflow:
                         build_id, tenant_id, company_id, run_type, workflow_id, workflow_run_id,
                         phase, phase_state, progress, estimate_min_days, estimate_max_days,
                         started_at, finished_at, failure_reason, log, created_at, updated_at
-                    ) VALUES (?, ?, ?, 'BUILD', ?, ?, ?, ?, ?, 1, 3, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 3, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         build_id,
                         self.tenant_id,
                         self.company_id,
+                        self.RUN_TYPE,
                         workflow_id,
                         result.get("run_id"),
                         phase,
@@ -721,6 +745,10 @@ class CompanyBuildWorkflow:
             "checks": meta.get("checks") or [],
             "brief": meta.get("brief") or {},
             "plan": meta.get("plan") or {},
+            "study": meta.get("study") or {},
+            "diagnosis": meta.get("diagnosis") or {},
+            "sources": meta.get("sources") or [],
+            "readiness": meta.get("readiness") or {},
             "updated_at": record.get("updated_at"),
         }
 

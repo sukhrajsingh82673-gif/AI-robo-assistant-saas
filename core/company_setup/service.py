@@ -17,6 +17,10 @@ from typing import Any, Dict, List, Optional
 
 from core.auth import verify_password
 from core.company_setup import audit
+from core.company_setup import ingestion as ingestion_module
+from core.company_setup import readiness as readiness_module
+from core.company_setup import sources as source_module
+from core.company_setup.connections import get_adapter
 from core.company_setup.permissions import (
     PermissionDenied,
     Principal,
@@ -780,9 +784,14 @@ class CompanySetupService:
 
         workflow = {"started": False, "reason": "The build engine is unavailable."}
         try:
-            from core.company_setup.build_workflow import CompanyBuildWorkflow
+            if company_type == "EXISTING":
+                from core.company_setup.onboarding_workflow import CompanyOnboardingWorkflow
 
-            workflow = CompanyBuildWorkflow(self.tenant_id, company_id, principal).start()
+                workflow = CompanyOnboardingWorkflow(self.tenant_id, company_id, principal).start()
+            else:
+                from core.company_setup.build_workflow import CompanyBuildWorkflow
+
+                workflow = CompanyBuildWorkflow(self.tenant_id, company_id, principal).start()
         except Exception as exc:  # visible failure, never a fake success
             workflow = {"started": False, "reason": str(exc)}
 
@@ -957,6 +966,10 @@ class CompanySetupService:
             "checks": meta.get("checks") or [],
             "brief": meta.get("brief") or {},
             "plan": meta.get("plan") or {},
+            "study": meta.get("study") or {},
+            "diagnosis": meta.get("diagnosis") or {},
+            "sources": meta.get("sources") or [],
+            "readiness": meta.get("readiness") or {},
             "updated_at": record.get("updated_at"),
         }
 
@@ -972,10 +985,10 @@ class CompanySetupService:
         assert_can_submit(principal, self.tenant_id, granted=granted)
 
         status = normalize_status(record["status"])
-        if status not in (CompanyStatus.CREATING, CompanyStatus.NEEDS_ATTENTION):
+        if status not in (CompanyStatus.CREATING, CompanyStatus.ONBOARDING, CompanyStatus.NEEDS_ATTENTION):
             raise CompanySetupError(
                 "BUILD_NOT_RETRYABLE",
-                "Only a company that is creating or needs attention can retry its build",
+                "Only a company that is creating, onboarding or needs attention can retry",
                 status=409,
                 detail={"status": status},
             )
@@ -996,7 +1009,13 @@ class CompanySetupService:
 
         from core.company_setup.build_workflow import CompanyBuildWorkflow
 
-        workflow = CompanyBuildWorkflow(self.tenant_id, company_id, principal).retry()
+        workflow_cls = CompanyBuildWorkflow
+        if str(record.get("company_type") or "NEW").upper() == "EXISTING":
+            from core.company_setup.onboarding_workflow import CompanyOnboardingWorkflow
+
+            workflow_cls = CompanyOnboardingWorkflow
+
+        workflow = workflow_cls(self.tenant_id, company_id, principal).retry()
         audit.record_event(
             self.tenant_id,
             company_id,
@@ -1030,6 +1049,8 @@ class CompanySetupService:
                     "connection_id": record["connection_id"],
                     "company_id": record["company_id"],
                     "provider_id": record.get("provider_id") or "custom",
+                    "source_id": record.get("source_id") or record.get("provider_id") or "custom",
+                    "classification": record.get("classification"),
                     "name": record.get("name"),
                     "service_type": record.get("service_type"),
                     "scope": _json_load(record.get("scope"), []),
@@ -1053,14 +1074,22 @@ class CompanySetupService:
             raise PermissionDenied("connect a data source")
 
         provider_id = _clean_text(payload.get("provider_id") or payload.get("provider"), 80, strip_angles=True)
+        source_id = _clean_text(payload.get("source_id"), 80, strip_angles=True).lower() or None
+        source = source_module.find_source(source_id or provider_id)
+        if source and not provider_id:
+            provider_id = source["id"]
+            source_id = source["id"]
         if not provider_id:
             raise CompanySetupError("PROVIDER_REQUIRED", "A provider is required")
-        name = _clean_text(payload.get("name") or provider_id, 160, strip_angles=True)
+        name = _clean_text(payload.get("name") or (source or {}).get("name") or provider_id, 160, strip_angles=True)
         service_type = _clean_text(payload.get("service_type") or "CUSTOM_API", 80, strip_angles=True).upper()
         scope = payload.get("scope") or []
         if not isinstance(scope, list):
             raise CompanySetupError("INVALID_SCOPE", "Scope must be a list of permissions")
         scope = [_clean_text(item, 80, strip_angles=True) for item in scope][:40]
+        if not scope and source:
+            # Use the read-only scope published in the catalogue, never more.
+            scope = list(source.get("scope") or [])
         if any("write" in item.lower() and "read" not in item.lower() for item in scope):
             # Least privilege: read-only by default in this stage.
             raise CompanySetupError(
@@ -1068,6 +1097,9 @@ class CompanySetupService:
                 "Only read-only scopes are allowed until write approval is configured",
                 status=422,
             )
+        classification = (source or {}).get("category") or _clean_text(
+            payload.get("classification"), 40, strip_angles=True
+        ).upper() or None
 
         connection_id = f"con_{uuid.uuid4().hex[:12]}"
         now = _now()
@@ -1089,8 +1121,8 @@ class CompanySetupService:
                     connection_id, tenant_id, company_id, name, service_type, connector_adapter,
                     auth_status, health_score, latency_ms, field_mappings, permission_scope,
                     endpoint_url, created_at, updated_at,
-                    provider_id, scope, status, secret_ref, skipped
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    provider_id, source_id, classification, scope, status, secret_ref, skipped
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     connection_id,
@@ -1108,6 +1140,8 @@ class CompanySetupService:
                     now,
                     now,
                     provider_id,
+                    source_id,
+                    classification,
                     _json_dump(scope),
                     "NEEDS_CHECK",
                     secret_ref,
@@ -1127,6 +1161,8 @@ class CompanySetupService:
         return {
             "connection_id": connection_id,
             "provider_id": provider_id,
+            "source_id": source_id or provider_id,
+            "classification": classification,
             "status": "NEEDS_CHECK",
             # Real state: no provider handshake has run yet.
             "verified": False,
@@ -1181,19 +1217,32 @@ class CompanySetupService:
         if not row:
             raise CompanySetupError("CONNECTION_NOT_FOUND", "Connection not found", status=404)
         now = _now()
+        adapter = get_adapter(row["source_id"] if "source_id" in row.keys() and row["source_id"] else row["provider_id"])
+        result = adapter.test(dict(row))
+        status = "NEEDS_CHECK" if result.get("status") in (None, "UNAVAILABLE") else result.get("status")
         with db.get_connection() as conn:
             conn.execute(
                 "UPDATE external_connections SET last_check_at = ?, status = ?, updated_at = ? WHERE connection_id = ?",
-                (now, "NEEDS_CHECK", now, connection_id),
+                (now, status, now, connection_id),
             )
             conn.commit()
-        # Honest: no provider adapter exists yet, so the check cannot succeed.
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.connection.tested",
+            {"connection_id": connection_id, "status": status, "verified": bool(result.get("verified"))},
+        )
+        # Honest: a null adapter reports that it could not read anything.
         return {
             "connection_id": connection_id,
-            "status": "NEEDS_CHECK",
-            "verified": False,
-            "simulated": True,
-            "error": "No provider adapter is configured yet. Nothing was read.",
+            "provider_id": result.get("provider_id"),
+            "status": status,
+            "verified": bool(result.get("verified")),
+            "simulated": False,
+            "available": bool(result.get("available")),
+            "error": result.get("error"),
             "checked_at": now,
         }
 
@@ -1247,6 +1296,428 @@ class CompanySetupService:
             {"connection_id": connection_id, "secret_revoked": revoked},
         )
         return {"connection_id": connection_id, "disconnected": True, "secret_revoked": revoked}
+
+    # ----------------------------------------------------- source catalogue
+    def _source_rows(self, company_id: str) -> List[Dict[str, Any]]:
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM external_connections WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
+                (self.tenant_id, company_id),
+            ).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def list_sources(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        assert_can_view(principal, self.tenant_id)
+        self._require_company(company_id)
+        rows = self._source_rows(company_id)
+        by_source: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            source_id = str(row.get("source_id") or row.get("provider_id") or "custom")
+            if source_id in by_source:
+                continue
+            skipped = bool(row.get("skipped"))
+            verified = bool(row.get("verified_at"))
+            by_source[source_id] = {
+                "connection_id": row.get("connection_id"),
+                "status": "SKIPPED" if skipped else ("VERIFIED" if verified else "NEEDS_CHECK"),
+                "skipped": skipped,
+                "skip_reason": row.get("skip_reason") or "",
+                "verified": verified,
+            }
+
+        items = []
+        for source in source_module.catalogue():
+            state = by_source.get(source["id"]) or {
+                "connection_id": None,
+                "status": "NOT_STARTED",
+                "skipped": False,
+                "skip_reason": "",
+                "verified": False,
+            }
+            items.append(dict(source, **state))
+
+        return {
+            "sources": items,
+            "counts": {
+                "connected": len([item for item in items if item["status"] in ("NEEDS_CHECK", "VERIFIED")]),
+                "verified": len([item for item in items if item["verified"]]),
+                "skipped": len([item for item in items if item["skipped"]]),
+                "not_started": len([item for item in items if item["status"] == "NOT_STARTED"]),
+            },
+        }
+
+    def skip_source(self, principal: Principal, company_id: str, source_id: str, reason: str) -> Dict[str, Any]:
+        self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        if not can_manage_connections(principal, granted=granted):
+            raise PermissionDenied("skip a source")
+
+        source = source_module.find_source(source_id)
+        if not source:
+            raise CompanySetupError("SOURCE_NOT_FOUND", "Unknown source", status=404)
+        text = _clean_text(reason, 500, strip_angles=True)
+        if len(text) < 5:
+            raise CompanySetupError(
+                "SKIP_REASON_REQUIRED",
+                "A short reason is required when skipping a source",
+                status=422,
+            )
+
+        rows = self._source_rows(company_id)
+        existing_skipped = None
+        for row in rows:
+            sid = str(row.get("source_id") or row.get("provider_id") or "")
+            if sid != source["id"]:
+                continue
+            if not row.get("skipped"):
+                raise CompanySetupError(
+                    "SOURCE_ALREADY_CONNECTED",
+                    "This source is already connected. Disconnect it before skipping.",
+                    status=409,
+                )
+            existing_skipped = row
+
+        now = _now()
+        if existing_skipped:
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE external_connections SET skip_reason = ?, updated_at = ? WHERE connection_id = ?",
+                    (text, now, existing_skipped["connection_id"]),
+                )
+                conn.commit()
+            connection_id = existing_skipped["connection_id"]
+        else:
+            connection_id = f"con_{uuid.uuid4().hex[:12]}"
+            with db.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO external_connections (
+                        connection_id, tenant_id, company_id, name, service_type, connector_adapter,
+                        auth_status, health_score, latency_ms, field_mappings, permission_scope,
+                        endpoint_url, created_at, updated_at,
+                        provider_id, source_id, classification, scope, status, skipped, skip_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        connection_id,
+                        self.tenant_id,
+                        company_id,
+                        source["name"],
+                        "SKIPPED_SOURCE",
+                        f"{source['id']}_adapter",
+                        "SKIPPED",
+                        0.0,
+                        0,
+                        None,
+                        _json_dump([]),
+                        None,
+                        now,
+                        now,
+                        source["id"],
+                        source["id"],
+                        source.get("category"),
+                        _json_dump([]),
+                        "SKIPPED",
+                        1,
+                        text,
+                    ),
+                )
+                conn.commit()
+
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.source.skipped",
+            {"source_id": source["id"], "reason": text, "connection_id": connection_id},
+        )
+        self._refresh_readiness(company_id)
+        return {
+            "connection_id": connection_id,
+            "source_id": source["id"],
+            "skipped": True,
+            "skip_reason": text,
+            "readiness": self.readiness(company_id),
+        }
+
+    def unskip_source(self, principal: Principal, company_id: str, source_id: str) -> Dict[str, Any]:
+        self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        if not can_manage_connections(principal, granted=granted):
+            raise PermissionDenied("restore a source")
+
+        source = source_module.find_source(source_id)
+        if not source:
+            raise CompanySetupError("SOURCE_NOT_FOUND", "Unknown source", status=404)
+        rows = self._source_rows(company_id)
+        skipped = [
+            row
+            for row in rows
+            if str(row.get("source_id") or row.get("provider_id") or "") == source["id"] and row.get("skipped")
+        ]
+        if not skipped:
+            raise CompanySetupError("SOURCE_NOT_SKIPPED", "This source is not skipped", status=404)
+        with db.get_connection() as conn:
+            conn.execute(
+                "DELETE FROM external_connections WHERE connection_id = ? AND tenant_id = ?",
+                (skipped[0]["connection_id"], self.tenant_id),
+            )
+            conn.commit()
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.source.restored",
+            {"source_id": source["id"]},
+        )
+        self._refresh_readiness(company_id)
+        return {"source_id": source["id"], "skipped": False, "readiness": self.readiness(company_id)}
+
+    # --------------------------------------------------- ownership verify
+    def request_verification(
+        self,
+        principal: Principal,
+        company_id: str,
+        connection_id: str,
+        method: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        if not can_manage_connections(principal, granted=granted):
+            raise PermissionDenied("verify a connection")
+
+        rows = self._source_rows(company_id)
+        row = next((item for item in rows if item.get("connection_id") == connection_id), None)
+        if not row or row.get("skipped"):
+            raise CompanySetupError("CONNECTION_NOT_FOUND", "Connection not found", status=404)
+
+        from core.company_setup.connections import OwnershipVerifier
+
+        verifier = OwnershipVerifier()
+        chosen = str(method or "DNS_TXT").upper()
+        if chosen not in ("DNS_TXT", "EMAIL"):
+            raise CompanySetupError("INVALID_VERIFICATION_METHOD", "Use DNS_TXT or EMAIL", status=422)
+
+        if not verifier.available:
+            audit.record_event(
+                self.tenant_id,
+                company_id,
+                principal.user_id,
+                principal.role,
+                "company.connection.verification_unavailable",
+                {"connection_id": connection_id, "method": chosen},
+            )
+            raise CompanySetupError(
+                "VERIFICATION_NOT_CONFIGURED",
+                verifier.unavailable_reason(),
+                status=501,
+                detail=verifier.instructions(chosen),
+            )
+
+        token = verifier.issue_token()
+        now = _now()
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE external_connections SET verification_token = ?, verification_method = ?, "
+                "verification_requested_at = ?, status = 'PENDING_VERIFICATION', updated_at = ? "
+                "WHERE connection_id = ? AND tenant_id = ?",
+                (token, chosen, now, now, connection_id, self.tenant_id),
+            )
+            conn.commit()
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.connection.verification_requested",
+            {"connection_id": connection_id, "method": chosen},
+        )
+        return {
+            "connection_id": connection_id,
+            "status": "PENDING_VERIFICATION",
+            "method": chosen,
+            "token": token,
+            "configured": True,
+            "instructions": verifier.instructions(chosen, token)["instructions"],
+        }
+
+    def confirm_verification(
+        self,
+        principal: Principal,
+        company_id: str,
+        connection_id: str,
+        token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        if not can_manage_connections(principal, granted=granted):
+            raise PermissionDenied("verify a connection")
+
+        from core.company_setup.connections import OwnershipVerifier
+
+        verifier = OwnershipVerifier()
+        if not verifier.available:
+            raise CompanySetupError(
+                "VERIFICATION_NOT_CONFIGURED",
+                verifier.unavailable_reason(),
+                status=501,
+            )
+        # No verifier exists today; a future one must check the real DNS/mailbox.
+        raise CompanySetupError(
+            "VERIFICATION_NOT_IMPLEMENTED",
+            "No ownership verifier is wired yet",
+            status=501,
+        )
+
+    # ---------------------------------------------------------- readiness
+    def readiness(self, company_id: str) -> Dict[str, Any]:
+        record = self._require_company(company_id, include_deleted=True)
+        rows = self._source_rows(company_id)
+        file_count = 0
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM company_files WHERE tenant_id = ? AND company_id = ?",
+                (self.tenant_id, company_id),
+            ).fetchone()
+            file_count = int((row["n"] if row else 0) or 0)
+        result = readiness_module.compute(record, rows, file_count)
+        result["company_id"] = company_id
+        return result
+
+    def _refresh_readiness(self, company_id: str) -> None:
+        try:
+            score = self.readiness(company_id)["score"]
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE companies SET readiness_score = ?, updated_at = ? WHERE tenant_id = ? AND company_id = ?",
+                    (score, _now(), self.tenant_id, company_id),
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    def get_readiness(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        assert_can_view(principal, self.tenant_id)
+        result = self.readiness(company_id)
+        self._refresh_readiness(company_id)
+        return result
+
+    # ------------------------------------------------------------ ingestion
+    def list_files(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        assert_can_view(principal, self.tenant_id)
+        self._require_company(company_id)
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM company_files WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
+                (self.tenant_id, company_id),
+            ).fetchall()
+        files = []
+        for row in rows:
+            record = _row_to_dict(row)
+            files.append(
+                {
+                    "file_id": record["file_id"],
+                    "company_id": record["company_id"],
+                    "kind": record.get("kind"),
+                    "filename": record.get("filename"),
+                    "mime": record.get("mime"),
+                    "size_bytes": record.get("size_bytes"),
+                    "sha256": record.get("sha256"),
+                    "scan_status": record.get("scan_status"),
+                    "flags": _json_load(record.get("flags"), []),
+                    "stored": bool(record.get("storage_key")),
+                    "uploaded_by": record.get("uploaded_by"),
+                    "created_at": record.get("created_at"),
+                }
+            )
+        return {"files": files, "total": len(files)}
+
+    def record_file(self, principal: Principal, company_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        if not can_manage_connections(principal, granted=granted):
+            raise PermissionDenied("add a file")
+
+        inspected = ingestion_module.inspect(payload)
+        if not inspected["ok"]:
+            raise CompanySetupError(
+                "VALIDATION_FAILED",
+                "The file could not be accepted",
+                status=422,
+                detail=inspected["errors"],
+            )
+
+        file_meta = inspected["file"]
+        with db.get_connection() as conn:
+            duplicate = conn.execute(
+                "SELECT file_id, filename FROM company_files WHERE tenant_id = ? AND company_id = ? AND sha256 = ?",
+                (self.tenant_id, company_id, file_meta["sha256"]),
+            ).fetchone()
+        if duplicate:
+            raise CompanySetupError(
+                "DUPLICATE_FILE",
+                "This file has already been recorded for this company",
+                status=409,
+                detail={"file_id": duplicate["file_id"], "filename": duplicate["filename"]},
+            )
+
+        file_id = f"fil_{uuid.uuid4().hex[:12]}"
+        now = _now()
+        scan_status = "FLAGGED" if file_meta["flagged"] else "UNSCANNED"
+        flags = inspected["warnings"]
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO company_files (
+                    file_id, tenant_id, company_id, kind, filename, mime, size_bytes,
+                    storage_key, sha256, scan_status, flags, uploaded_by, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                """,
+                (
+                    file_id,
+                    self.tenant_id,
+                    company_id,
+                    file_meta["kind"],
+                    file_meta["filename"],
+                    file_meta["mime"],
+                    file_meta["size_bytes"],
+                    file_meta["sha256"],
+                    scan_status,
+                    _json_dump(flags),
+                    principal.user_id,
+                    now,
+                ),
+            )
+            conn.commit()
+
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.file.flagged" if file_meta["flagged"] else "company.file.recorded",
+            {
+                "file_id": file_id,
+                "filename": file_meta["filename"],
+                "sha256": file_meta["sha256"],
+                "scan_status": scan_status,
+            },
+        )
+        self._refresh_readiness(company_id)
+        return {
+            "file_id": file_id,
+            "filename": file_meta["filename"],
+            "mime": file_meta["mime"],
+            "size_bytes": file_meta["size_bytes"],
+            "sha256": file_meta["sha256"],
+            "scan_status": scan_status,
+            "flags": flags,
+            "stored": False,
+            "note": inspected["note"],
+            "readiness": self.readiness(company_id),
+        }
 
     # --------------------------------------------------------------- deletion
     def _mfa_required(self, company_id: str) -> bool:

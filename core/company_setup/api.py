@@ -124,6 +124,11 @@ class CompanySetupAPI:
 
         head = segments[0]
 
+        if head == "sources" and len(segments) == 2 and segments[1] == "catalogue" and method == "GET":
+            from core.company_setup import sources as source_module
+
+            return 200, {"sources": source_module.catalogue()}
+
         if head == "drafts":
             if len(segments) == 1:
                 if method == "GET":
@@ -175,8 +180,35 @@ class CompanySetupAPI:
                 return 201, service.connect(principal, company_id, body)
             if third and fourth == "test" and method == "POST":
                 return 200, service.test_connection(principal, company_id, third)
+            if third and fourth == "verify" and method == "POST":
+                return 200, service.request_verification(
+                    principal, company_id, third, method=body.get("method")
+                )
+            if third and fourth == "verify" and method == "PUT":
+                return 200, service.confirm_verification(
+                    principal, company_id, third, token=body.get("token")
+                )
             if third and method == "DELETE":
                 return 200, service.disconnect(principal, company_id, third)
+            return 405, {"error": "Method not allowed", "code": "METHOD_NOT_ALLOWED"}
+
+        if action == "sources":
+            if method == "GET" and third is None:
+                return 200, service.list_sources(principal, company_id)
+            if third and fourth == "skip" and method == "POST":
+                return 200, service.skip_source(principal, company_id, third, body.get("reason"))
+            if third and fourth == "skip" and method == "DELETE":
+                return 200, service.unskip_source(principal, company_id, third)
+            return 405, {"error": "Method not allowed", "code": "METHOD_NOT_ALLOWED"}
+
+        if action == "readiness" and method == "GET":
+            return 200, service.get_readiness(principal, company_id)
+
+        if action == "files":
+            if method == "GET":
+                return 200, service.list_files(principal, company_id)
+            if method == "POST":
+                return 201, service.record_file(principal, company_id, body)
             return 405, {"error": "Method not allowed", "code": "METHOD_NOT_ALLOWED"}
 
         if action == "deletion" and method == "GET":

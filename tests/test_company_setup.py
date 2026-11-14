@@ -217,7 +217,7 @@ class TestStatusMachine(CompanySetupTestBase):
             self.service.submit_company(self.owner_principal(), company["id"])
         self.assertEqual(ctx.exception.code, "ALREADY_SUBMITTED")
 
-    def test_submit_existing_requires_revenue_and_moves_to_onboarding(self):
+    def test_submit_existing_requires_revenue_and_starts_onboarding(self):
         payload = self.complete_existing_payload()
         del payload["revenue"]
         company = self.make_company(**payload)
@@ -227,8 +227,12 @@ class TestStatusMachine(CompanySetupTestBase):
 
         fixed = self.make_company(**self.complete_existing_payload())
         result = self.service.submit_company(self.owner_principal(), fixed["id"])
-        self.assertEqual(result["company"]["status"], CompanyStatus.ONBOARDING)
-        self.assertEqual(result["build"]["phase"], "CONNECT_VERIFY")
+        # Onboarding runs immediately. With no provider adapters configured it
+        # honestly ends in NEEDS_ATTENTION instead of a fake OPERATIONAL state.
+        self.assertTrue(result["workflow_started"])
+        self.assertEqual(result["build"]["run_type"], "ONBOARDING")
+        self.assertEqual(result["build"]["phase"], "ACT")
+        self.assertIn(result["company"]["status"], (CompanyStatus.ONBOARDING, CompanyStatus.NEEDS_ATTENTION))
 
     def test_server_rejects_unknown_company_type(self):
         with self.assertRaises(CompanySetupError) as ctx:
@@ -514,7 +518,8 @@ class TestConnections(CompanySetupTestBase):
         check = self.service.test_connection(
             self.owner_principal(), company["id"], connection["connection_id"]
         )
-        self.assertTrue(check["simulated"])
+        self.assertFalse(check["simulated"])
+        self.assertFalse(check["available"])
         self.assertFalse(check["verified"])
         self.assertIn("Nothing was read", check["error"])
 
