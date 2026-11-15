@@ -21,7 +21,7 @@ Rules of engagement for this program:
 | 2 | Company switcher + Add company page + entry points + i18n/RTL | **Complete** |
 | 3 | Create new company (form, review, build workflow) | **Complete** |
 | 4 | Add existing company (form, connections, ingestion shell, diagnosis) | **Complete** |
-| 5 | Overview, edit, protected delete + export | Not started |
+| 5 | Overview, edit, protected delete + export | **Complete** |
 | 6 | Settings wiring, tests, abuse tests, hardening | Not started |
 
 ---
@@ -510,18 +510,61 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 
 ---
 
+## 4f. Stage 5 — overview, edit, protected delete, export
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `core/company_setup/export.py` | Native PDF writer (no new dependency) with cover, company facts, sources, connections, files, audit and legal sections; numbered parts when the page budget is exceeded; ZIP packaging when split or when non-Latin characters had to be replaced; JSON sidecar of the original values and a SHA-256 manifest; deterministic filenames. |
+| `core/company_setup/email_adapter.py` | `ExportEmailAdapter` with a real SMTP backend when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` exist and an honest null backend otherwise (`NOT_CONFIGURED`). Never reports `SENT` without an accepted SMTP send. |
+| `web/company_setup_overview.js` | `/company/<id>/overview`: identity, four key numbers, build/onboarding progress, sources and connections, legal drafts, recent audit trail, deletion banner, and one keyboard-accessible options menu for Edit/Delete. |
+| `web/company_setup_edit.js` | `/company/<id>/edit`: the same facts in one column, fixed company type, client validation with server as the real gate, duplicate-name mapping, connection add/remove. |
+| `web/company_setup_delete.js` | Protected five-step wizard in a bottom sheet on phones and a centred dialog on desktop: what happens → exact name → password (+2FA when configured) → export → recovery window, with cancel and an honest purge. |
+| `migrations/pg/0011_company_deletion_export.sql` | Additive `company_deletion_requests` export/email/recovery columns plus indexes. |
+| `migrations/rollback/pg/0011_company_deletion_export_rollback.sql` | Manual reverse migration (never auto-applied). |
+| `tests/test_company_deletion_export.py` | 15 tests: PDF and ZIP output, split packaging, manifest/checksum, Unicode replacement, email null backend, plan counts, export-before-purge, download confirmation, cancel restore, zero-day windows, tenant isolation and step skipping. |
+
+**Touched:** `core/company_setup/service.py` (deletion plan, export generation, delivery gate, purge, cancel, recovery days, `export_filename`), `core/company_setup/api.py` (`/legal`, `/delete/plan`, `/delete/export`, `/delete/purge`, binary `/export`), `api_server.py` (streams binary export responses), `core/company_setup/schema.py`, `core/company_setup/status.py` (cancel transitions), `core/settings/definitions.py` (`company_delete_recovery_days`, default 7), `web/app.js` (overview/edit routes), `web/index.html`, `web/company_workspace.js` (Overview tab and Reconfigure Profile point at the new pages), `web/i18n.js` (English + Arabic overview/edit/delete/status/activity keys), `web/company_setup.css` (overview grid, edit form, menu, delete sheet, 360px and RTL rules), `tests/company_setup_ui_test.js`, `tests/test_company_setup.py`, `package.json`.
+
+**Behaviour delivered**
+
+1. Overview is the real company home. It reads the company, sources, connections, readiness, legal items, files and audit trail; a failing secondary panel shows a partial-data notice instead of inventing values.
+2. Edit shows the current facts, validates name/email/URL/amounts/assets on the client and sends a `PATCH`; clearing an optional field really clears it. Duplicate names map back to the name field and the form stays open.
+3. Only the owner or a granted admin sees Edit/Delete; an agent sees "View only" and no menu. The server repeats every permission check.
+4. Delete is deliberately multi-step. `GET /delete/plan` is non-mutating and returns real removal counts, the configured recovery window, MFA state and whether email can actually be delivered.
+5. The exact company name is compared by the client and again by the server; a wrong name cannot advance.
+6. Identity always requires the signed-in account password. When two-step is required but no verifier exists, the server returns `501 TWO_STEP_NOT_CONFIGURED` and the UI says so; it never skips the requirement.
+7. After identity, the export is written before anything is removed: PDF (split + zipped when needed), JSON sidecar and manifest. A failed export is shown as failed and blocks purge.
+8. Delivery is honest. Email is attempted only for a verified account email and only when SMTP is configured. Otherwise the in-app download is the delivery path; purge waits for an email `SENT` or a confirmed download.
+9. The recovery window defaults to 7 days (`0` = immediate). The wizard and overview show the real countdown; cancel restores the company's exact previous status and writes an audit event.
+10. Purge removes company-scoped rows and stored references, keeps `companies`, `company_audit_events` and `company_deletion_requests` as a tombstone, nulls sensitive fields, sets `DELETED`, and writes the final audit record.
+11. All routes stay tenant-scoped: foreign or guessed ids return `404`, cross-tenant deletion fails, and out-of-order steps return `409`.
+
+**Gates:** `npm run typecheck` (71 JS files), `npm run lint`, `npm run test:company` (83 pytest across 4 files + 41 jsdom/static checks).
+
+**Honest limits**
+
+- `sec_require_mfa` defaults to true and this deployment has no TOTP verifier, so real deletion stops at `501 TWO_STEP_NOT_CONFIGURED`. The UI reports it; it does not bypass it.
+- SMTP is only real when credentials are supplied; without them email status is `NOT_CONFIGURED` and the download is used.
+- The PDF is intentionally plain: text, rules and page numbers, no layout engine or embedded fonts beyond the built-in set. Non-Latin glyphs that the built-in font cannot represent are replaced and force the ZIP report to say so.
+- No Chromium/Playwright here: no screenshots, no true 360px render and no visual RTL pass; jsdom covers behaviour and static wiring.
+
+---
+
 ## 5. Risks
 
 1. **`render.yaml` branch mismatch.** Blueprint tracks `engineering/production-readiness-gap-closure`; this work is on `ui-redesign`. Auto-deploy will not ship it. Needs a dashboard/blueprint change (Stage 1 report will restate this).
 2. **Status remap is the most dangerous migration.** Existing rows use `DRAFT|ONBOARDING|OPERATIONAL|ATTENTION|SUSPENDED`. Adding `CREATING|NEEDS_ATTENTION|PENDING_EXPORT|PENDING_DELETION|DELETED` must not orphan existing rows; map `ATTENTION → NEEDS_ATTENTION` in a data migration with a reversible reverse map, and keep old values readable.
-3. **Email does not exist.** "Deletion continues only after the email is confirmed sent" cannot be honoured with a fake. Stage 5 must default to the in-app download path and only enable email when an adapter is configured and reports a real send.
+3. **Email is only real when SMTP credentials exist.** The adapter now sends through SMTP when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` are present and reports `NOT_CONFIGURED` otherwise. The in-app download remains the delivery path on deployments without mail; purge waits for one of them.
 4. **No i18n infrastructure.** Arabic RTL is net-new and touches every screen in scope. Scoping it to the company-setup surfaces first avoids a repo-wide rewrite in this program.
-5. **PDF export of a whole company could be large.** `DocumentGenerator` is pure Python and in-memory; a big company may blow memory. Export must be chunked (per department/workflow/file manifest) and streamed to parts + ZIP.
+5. **PDF export of a whole company could be large.** `DocumentGenerator` is pure Python and in-memory; a big company may blow memory. Stage 5 splits the PDF into numbered parts and zips them, but generation still happens in memory before streaming.
 6. **`/api/onboard` currently trusts client `status`.** Anyone authenticated can set `OPERATIONAL`. The new submit endpoint must derive status server-side.
 7. **Company-scoped admin allow-list does not exist.** Roles are tenant-wide. Stage 1 adds an allow-list; until then "admins I allow" means tenant OWNER/EXECUTIVE with an explicit per-company grant.
 8. **Prompt-injection guarding is partial.** Existing regexes are in the durable runtime; uploaded documents need their own sanitizer before any LLM prompt.
 9. **Draft storage is file-based per tenant.** Multi-instance Render deploys would not share it unless the volume is shared. Stage 1 should move drafts into Postgres (additive table) while keeping the file store as a fallback.
 10. **Test environment has no browser.** Playwright e2e cannot run here; jsdom is the substitute. Real 360px/RTL visual verification must be done by you on a device.
+11. **Purge is evaluated lazily.** `purge_due` runs when a deletion is read (company detail, deletion status) or after a download/purge call; there is no background scheduler in this deployment. A company whose window expires while nobody opens it stays in `PENDING_DELETION` until the next read. This delays removal but never destroys data early. A cron/worker should call `purge_due` per tenant before production.
 
 ---
 
@@ -549,15 +592,15 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 | AI market/competitor research | `ResearchAdapter` (null until configured) | No; phase is `SKIPPED` with a reason and a gap | 3 | Skipped — not simulated, not invented |
 | Website builder / base systems | `WebsiteBuilderAdapter` (null until configured) | No (some in-house tooling exists in `inhouse_tools/`, to be inspected) | 3 | Skipped — nothing built |
 | Legal document generator | `LegalPackAdapter` | Local draft checklist and legal items only; no external generator | 3 | Draft: verify with a qualified professional |
-| Email delivery (export, first report) | `EmailAdapter` (Null + SMTP) | No | 5 | Not configured |
+| Email delivery (export, first report) | `ExportEmailAdapter` (Null + SMTP) | SMTP sends are real when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` are set; otherwise `NOT_CONFIGURED` and the in-app download is used | 5 | Real when configured; otherwise not configured |
+| Company export PDF/ZIP | `core/company_setup/export.py` | Real native PDF (split into numbered parts when needed), ZIP with JSON sidecar and SHA-256 manifest, integrity checked before serving | 5 | Real |
+| Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`); even a correctly shaped code is refused, never accepted from a dummy | 5 | Not configured |
 | OAuth / read-only API connections (accounting, banking, payments, commerce, CRM, workspace, communications) | `ConnectionAdapter` per provider in `core/company_setup/connections.py` | Connection and skip records are real; every adapter is null (`available: false`, `verified: false`, nothing read) | 4 | Unavailable — not simulated |
 | DNS/domain ownership verification | `OwnershipVerifier` in `core/company_setup/connections.py` | Request/confirm return `501 VERIFICATION_NOT_CONFIGURED`; no token is accepted | 4 | Not configured |
 | Malware scanning of uploads | `ScanAdapter` | Metadata validation, type/size allow-list, SHA-256 duplicate refusal and prompt-injection flagging are real; bytes are not stored and no AV engine runs | 4 | Unscanned — no bytes stored |
 | Diagnosis findings (profit leaks) | `DiagnosisAdapter` in `core/company_setup/onboarding_workflow.py` | No findings: the phase is `SKIPPED` with a reason and a gap | 4 | Unavailable — nothing invented |
 | Object storage backend (S3/MinIO) | `ObjectStorageService` backend swap | File metadata is recorded (`stored: false`); `company_files.storage_key` stays empty | 4/6 | Metadata only — bytes not stored |
 | Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | NEW: 7-phase build. EXISTING: 6-phase onboarding. Both real, both honest about null-adapter gaps | 3/4 | Real graphs; provider phases skipped with reasons |
-| Company export PDF/ZIP | `core/company_setup/export.py` (planned) | No (`409 EXPORT_NOT_READY`) | 5 | Not ready |
-| Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`) | 5 | Not configured |
 | Browser e2e / screenshots | Playwright runner | No (no Chromium in this environment); jsdom contract + journey tests stand in | 6 | Not available |
 
 ---
@@ -609,3 +652,15 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Gates: typecheck 68 JS files, lint, `npm run test:company` (68 pytest across 3 files + 28 jsdom/static), `npm run test:assistant` (79 pytest + 41 + 29 + 12).
 - Honest limits: all provider adapters are null, uploads are metadata-only, verification has no DNS/mailbox adapter, no browser visual/RTL pass here, `ZONATA_SETTINGS_MASTER_KEY` missing from `render.yaml`.
 - Waiting for "continue" before Stage 5.
+
+### Stage 5 — overview, edit, protected delete, export
+- Added `core/company_setup/export.py`, `core/company_setup/email_adapter.py`, `web/company_setup_overview.js`, `web/company_setup_edit.js`, `web/company_setup_delete.js`, migration `0011` (+ manual rollback) and `tests/test_company_deletion_export.py`.
+- Overview replaced the legacy telemetry pane: real identity, four key numbers, build/onboarding progress, sources and connections, legal drafts, audit trail, a deletion banner and one keyboard-accessible Edit/Delete menu. A failing secondary panel yields a partial-data notice, not invented values.
+- Edit shows the recorded facts, validates on the client and again on the server, clears optional fields honestly, maps duplicate names to the name field, and can add/remove read-only connections.
+- Delete is a five-step protected sheet: real plan counts, exact company name, signed-in password (+2FA when configured), export, recovery window. Wrong names never reach the server; a missing verifier returns `501 TWO_STEP_NOT_CONFIGURED` and stops the flow.
+- Export is real: native multi-page PDF, numbered splits and ZIP when needed, JSON sidecar, SHA-256 manifest and an integrity check before serving. Email sends only through configured SMTP for a verified account email; otherwise the in-app download is the delivery path.
+- Purge waits for email `SENT` or a confirmed download and the recovery window (default 7 days, `0` = immediate). Cancel restores the exact previous status. Purge keeps `companies`, `company_audit_events` and `company_deletion_requests`, nulls sensitive fields and writes the final audit record.
+- Routes: `/company/<id>/overview`, `/company/<id>/edit`; Overview tab and "Reconfigure Profile" now point at them.
+- Gates: typecheck 71 JS files, lint, `npm run test:company` (83 pytest across 4 files + 41 jsdom/static), `npm run test:assistant`.
+- Honest limits: deletion stops at `501` while `sec_require_mfa` is true and no TOTP verifier exists; SMTP is real only when configured; the PDF uses built-in fonts and reports replaced characters; purge is evaluated lazily (no background scheduler); no browser visual/RTL pass here.
+- Waiting for "continue" before Stage 6.

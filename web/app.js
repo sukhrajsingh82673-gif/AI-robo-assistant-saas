@@ -873,6 +873,12 @@ function handleRoute(path) {
     } else if (navKey === 'company' && /^\/company\/[^/]+\/build\/?$/.test(cleanPath) && window.CompanySetupProgress) {
       const buildMatch = cleanPath.match(/^\/company\/([^/]+)\/build\/?$/);
       window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/overview\/?$/.test(cleanPath) && window.CompanySetupOverview) {
+      const overviewMatch = cleanPath.match(/^\/company\/([^/]+)\/overview\/?$/);
+      window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/edit\/?$/.test(cleanPath) && window.CompanySetupEdit) {
+      const editMatch = cleanPath.match(/^\/company\/([^/]+)\/edit\/?$/);
+      window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
     } else if (navKey === 'company' && window.CompanyWorkspace) {
       if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
       window.CompanyWorkspace.render(cleanPath);
@@ -1829,6 +1835,16 @@ function renderCompanySection() {
   const buildMatch = route.match(/^\/company\/([^/]+)\/build\/?$/);
   if (buildMatch && window.CompanySetupProgress) {
     window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    return;
+  }
+  const overviewMatch = route.match(/^\/company\/([^/]+)\/overview\/?$/);
+  if (overviewMatch && window.CompanySetupOverview) {
+    window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    return;
+  }
+  const editMatch = route.match(/^\/company\/([^/]+)\/edit\/?$/);
+  if (editMatch && window.CompanySetupEdit) {
+    window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
     return;
   }
   if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();

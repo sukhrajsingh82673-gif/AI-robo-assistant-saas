@@ -70,6 +70,17 @@ _COMPANY_FILE_COLUMNS: List[tuple] = [
     ("flags", "JSON"),
 ]
 
+_DELETION_REQUEST_COLUMNS: List[tuple] = [
+    ("previous_status", "TEXT"),
+    ("export_ready_at", "REAL"),
+    ("export_sha256", "TEXT"),
+    ("export_size_bytes", "INTEGER"),
+    ("export_content_type", "TEXT"),
+    ("recovery_days", "INTEGER"),
+    ("email_recipient", "TEXT"),
+    ("purge_blocked_reason", "TEXT"),
+]
+
 _TABLES = [
     """
     CREATE TABLE IF NOT EXISTS company_build_runs (
@@ -165,7 +176,15 @@ _TABLES = [
         requested_by TEXT NOT NULL,
         created_at REAL NOT NULL,
         updated_at REAL NOT NULL,
-        completed_at REAL
+        completed_at REAL,
+        previous_status TEXT,
+        export_ready_at REAL,
+        export_sha256 TEXT,
+        export_size_bytes INTEGER,
+        export_content_type TEXT,
+        recovery_days INTEGER,
+        email_recipient TEXT,
+        purge_blocked_reason TEXT
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_company_deletion_requests_company ON company_deletion_requests(company_id)",
@@ -245,6 +264,7 @@ def ensure_schema(force: bool = False) -> bool:
                 _add_missing_columns(conn, "external_connections", _EXTERNAL_CONNECTION_COLUMNS)
                 _add_missing_columns(conn, "company_build_runs", _BUILD_RUN_COLUMNS)
                 _add_missing_columns(conn, "company_files", _COMPANY_FILE_COLUMNS)
+                _add_missing_columns(conn, "company_deletion_requests", _DELETION_REQUEST_COLUMNS)
                 # Backfill timestamps and normalise the legacy ATTENTION status.
                 try:
                     conn.execute(

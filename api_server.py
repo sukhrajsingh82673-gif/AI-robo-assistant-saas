@@ -1315,7 +1315,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             result = company_setup_api.handle("GET", path, query_params, {}, auth_context, company_id)
             if result is not None:
-                self._send_json(result[1], status=result[0])
+                payload = result[1]
+                if isinstance(payload, dict) and payload.get("__file__") is not None:
+                    self._send_file_bytes(
+                        payload["__file__"],
+                        payload.get("filename") or "export.bin",
+                        payload.get("content_type") or "application/octet-stream",
+                        status=result[0],
+                    )
+                else:
+                    self._send_json(payload, status=result[0])
                 return
 
         # Settings V2 API (backend only; the legacy surface remains mounted).

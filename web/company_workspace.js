@@ -1910,7 +1910,7 @@ const CompanyWorkspace = (function() {
 
             <!-- Top Actions -->
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn-secondary" onclick="window.navigateTo('/company/new')">
+              <button class="btn-secondary" onclick="window.navigateTo('/company/${encodeURIComponent(company.id)}/edit')">
                 Reconfigure Profile
               </button>
               <button class="btn-secondary" onclick="window.navigateTo('/settings/integrations')">
@@ -2876,6 +2876,10 @@ const CompanyWorkspace = (function() {
 
   function setSubtab(tab, cid) {
     activeCompanySubtab = tab;
+    if (tab === 'overview') {
+      window.navigateTo(`/company/${cid}/overview`);
+      return;
+    }
     render(`/company/${cid}/${tab}`);
   }
 

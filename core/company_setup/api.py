@@ -19,11 +19,15 @@ never from the body or a header):
     POST   /api/v1/companies/<company_id>/connections/<connection_id>/test
     DELETE /api/v1/companies/<company_id>/connections/<connection_id>
     GET    /api/v1/companies/<company_id>/deletion
+    GET    /api/v1/companies/<company_id>/delete/plan
     POST   /api/v1/companies/<company_id>/delete/request
     POST   /api/v1/companies/<company_id>/delete/confirm-name
     POST   /api/v1/companies/<company_id>/delete/confirm-identity
     POST   /api/v1/companies/<company_id>/delete/cancel
+    POST   /api/v1/companies/<company_id>/delete/export
+    POST   /api/v1/companies/<company_id>/delete/purge
     GET    /api/v1/companies/<company_id>/export
+    GET    /api/v1/companies/<company_id>/legal
     GET    /api/v1/companies/<company_id>/audit
     GET    /api/v1/companies/<company_id>/admins
     POST   /api/v1/companies/<company_id>/admins
@@ -216,6 +220,8 @@ class CompanySetupAPI:
             return 200, {"deletion": service.get_deletion(company_id)}
 
         if action == "delete":
+            if third == "plan" and method == "GET":
+                return 200, service.deletion_plan(principal, company_id)
             if method != "POST":
                 return 405, {"error": "Method not allowed", "code": "METHOD_NOT_ALLOWED"}
             if third == "request":
@@ -231,10 +237,17 @@ class CompanySetupAPI:
                 )
             if third == "cancel":
                 return 200, service.cancel_deletion(principal, company_id)
+            if third == "export":
+                return 200, service.retry_export(principal, company_id)
+            if third == "purge":
+                return 200, service.purge_now(principal, company_id)
             return 404, {"error": "Unknown delete step", "code": "NOT_FOUND"}
 
         if action == "export" and method == "GET":
-            return 200, service.download_export(principal, company_id)
+            return 200, service.download_export_file(principal, company_id)
+
+        if action == "legal" and method == "GET":
+            return 200, {"legal_items": service.list_legal_items(principal, company_id)}
 
         if action == "audit" and method == "GET":
             return 200, service.audit_events(

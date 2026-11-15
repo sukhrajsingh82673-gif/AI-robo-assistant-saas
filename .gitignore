@@ -48,6 +48,7 @@ storage/evidence/tenants/
 storage/evidence/*test*
 storage/evidence/debug_*
 storage/reports/
+storage/company_exports/
 storage/voice_output/
 storage/terminal_backups/
 storage/soak_telemetry.json

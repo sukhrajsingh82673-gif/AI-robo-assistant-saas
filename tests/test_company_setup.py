@@ -435,24 +435,35 @@ class TestDeletionFlow(CompanySetupTestBase):
             with self.assertRaises(CompanySetupError):
                 self.service.confirm_delete_identity(principal, company["id"], password="wrong")
             ok = self.service.confirm_delete_identity(principal, company["id"], password="correct horse battery")
-            self.assertEqual(ok["export"]["status"], "NOT_STARTED")
+            self.assertEqual(ok["export"]["status"], "READY")
+            self.assertTrue(ok["export"]["filename"].endswith((".pdf", ".zip")))
+            self.assertEqual(ok["deletion"]["status"], "PENDING_DELETION")
         finally:
             self.service._mfa_required = original
 
     def test_mfa_enabled_is_honest_not_bypassed(self):
         company = self.make_company()
-        original = self.service._mfa_required
+        original_mfa = self.service._mfa_required
+        original_verify = self.service._verify_owner_password
         self.service._mfa_required = lambda company_id: True
+        self.service._verify_owner_password = lambda principal, password: True
         try:
             self.service.request_deletion(self.owner_principal(), company["id"])
             self.service.confirm_delete_name(self.owner_principal(), company["id"], company["name"])
+
+            # With no verifier wired, both a missing and a dummy code must be
+            # refused with the same honest 501. Neither may imply an authenticator
+            # exists or that a code would help.
+            for extra in ({}, {"two_step_code": "123456"}):
+                with self.assertRaises(CompanySetupError) as ctx:
+                    self.service.confirm_delete_identity(
+                        self.owner_principal(), company["id"], password="correct horse battery", **extra
+                    )
+                self.assertEqual(ctx.exception.code, "TWO_STEP_NOT_CONFIGURED")
+                self.assertEqual(ctx.exception.status, 501)
         finally:
-            self.service._mfa_required = original
-        with self.assertRaises(CompanySetupError) as ctx:
-            self.service.confirm_delete_identity(
-                self.owner_principal(), company["id"], password=None, two_step_code="123456"
-            )
-        self.assertIn(ctx.exception.code, ("INVALID_PASSWORD", "TWO_STEP_NOT_CONFIGURED"))
+            self.service._mfa_required = original_mfa
+            self.service._verify_owner_password = original_verify
 
     def test_cancel_before_purge_keeps_company(self):
         company = self.make_company()

@@ -10,7 +10,10 @@ the rest of the app sees the new company immediately.
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 import re
+import shutil
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -51,6 +54,15 @@ MAX_NAME = 160
 MAX_TITLE = 200
 MAX_DESCRIPTION = 20000
 MAX_TEXT = 2000
+
+DEFAULT_EXPORT_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "storage", "company_exports")
+)
+EXPORT_AUDIT_LIMIT = 500
+EXPORT_TABLE_LIMIT = 500
+#: Tables that must survive a purge: the company tombstone, the audit trail and
+#: the deletion request itself are the minimal record promised to the owner.
+PURGE_KEEP_TABLES = {"companies", "company_audit_events", "company_deletion_requests"}
 
 
 BUILD_PHASES_NEW = [
@@ -656,24 +668,24 @@ class CompanySetupService:
                 """,
                 (
                     values.get("name") or record["name"],
-                    values.get("title") or record.get("title") or "",
-                    values.get("description") or record.get("description") or "",
-                    values.get("owner_name") or record.get("owner_name") or "",
-                    values.get("owner_email") or record.get("owner_email") or "",
-                    values.get("owner_role") or record.get("owner_role") or "",
+                    values.get("title") or "",
+                    values.get("description") or "",
+                    values.get("owner_name") or "",
+                    values.get("owner_email") or "",
+                    values.get("owner_role") or "",
                     values.get("country") or record.get("country") or "IN",
                     values.get("industry") or record.get("industry") or "General Business",
                     values.get("website") or "",
-                    values.get("business_model") or record.get("business_model") or "",
+                    values.get("business_model") or "",
                     values.get("revenue_currency") or record.get("currency") or "INR",
                     values.get("timezone") or record.get("timezone") or "Asia/Kolkata",
-                    values.get("revenue_amount") if values.get("revenue_amount") is not None else (record.get("revenue") or 0.0),
+                    values.get("revenue_amount") if values.get("revenue_amount") is not None else 0.0,
                     values.get("revenue_amount"),
-                    values.get("revenue_currency") or record.get("revenue_currency") or "",
-                    values.get("revenue_period") or record.get("revenue_period") or "",
-                    values.get("target_customers") if values.get("target_customers") is not None else (record.get("target_customers") or ""),
-                    values.get("budget_amount") if values.get("budget_amount") is not None else record.get("budget_amount"),
-                    values.get("budget_currency") or record.get("budget_currency") or "",
+                    values.get("revenue_currency") or "",
+                    values.get("revenue_period") or "",
+                    values.get("target_customers") or "",
+                    values.get("budget_amount") if values.get("budget_amount") is not None else None,
+                    values.get("budget_currency") or "",
                     values.get("timeline") if values.get("timeline") is not None else (record.get("timeline") or ""),
                     values.get("setup_notes") if values.get("setup_notes") is not None else (record.get("setup_notes") or ""),
                     _json_dump(values.get("assets") if values.get("assets") is not None else _json_load(record.get("assets"), [])),
@@ -1036,6 +1048,9 @@ class CompanySetupService:
     def list_connections(self, principal: Principal, company_id: str) -> List[Dict[str, Any]]:
         assert_can_view(principal, self.tenant_id)
         self._require_company(company_id)
+        return self._connections_payload(company_id)
+
+    def _connections_payload(self, company_id: str) -> List[Dict[str, Any]]:
         with db.get_connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM external_connections WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
@@ -1309,6 +1324,9 @@ class CompanySetupService:
     def list_sources(self, principal: Principal, company_id: str) -> Dict[str, Any]:
         assert_can_view(principal, self.tenant_id)
         self._require_company(company_id)
+        return self._sources_payload(company_id)
+
+    def _sources_payload(self, company_id: str) -> Dict[str, Any]:
         rows = self._source_rows(company_id)
         by_source: Dict[str, Dict[str, Any]] = {}
         for row in rows:
@@ -1608,6 +1626,9 @@ class CompanySetupService:
     def list_files(self, principal: Principal, company_id: str) -> Dict[str, Any]:
         assert_can_view(principal, self.tenant_id)
         self._require_company(company_id)
+        return self._files_payload(company_id)
+
+    def _files_payload(self, company_id: str) -> Dict[str, Any]:
         with db.get_connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM company_files WHERE tenant_id = ? AND company_id = ? ORDER BY created_at DESC",
@@ -1719,6 +1740,35 @@ class CompanySetupService:
             "readiness": self.readiness(company_id),
         }
 
+    # --------------------------------------------------------------- legal
+    def list_legal_items(self, principal: Principal, company_id: str) -> List[Dict[str, Any]]:
+        assert_can_view(principal, self.tenant_id)
+        self._require_company(company_id, include_deleted=True)
+        return self._legal_items_payload(company_id)
+
+    def _legal_items_payload(self, company_id: str) -> List[Dict[str, Any]]:
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM company_legal_items WHERE tenant_id = ? AND company_id = ? ORDER BY created_at ASC",
+                (self.tenant_id, company_id),
+            ).fetchall()
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            record = _row_to_dict(row)
+            items.append(
+                {
+                    "item_id": record.get("item_id"),
+                    "name": record.get("name"),
+                    "authority": record.get("authority"),
+                    "status": record.get("status"),
+                    "instructions": record.get("instructions"),
+                    "draft_disclaimer": record.get("draft_disclaimer"),
+                    "created_at": record.get("created_at"),
+                    "updated_at": record.get("updated_at"),
+                }
+            )
+        return items
+
     # --------------------------------------------------------------- deletion
     def _mfa_required(self, company_id: str) -> bool:
         try:
@@ -1727,6 +1777,18 @@ class CompanySetupService:
             return bool(settings_service.get_effective_setting(self.tenant_id, company_id, "sec_require_mfa", False))
         except Exception:
             return False
+
+    def _recovery_days(self, company_id: str) -> int:
+        try:
+            from core.settings_service import settings_service
+
+            value = settings_service.get_effective_setting(
+                self.tenant_id, company_id, "company_delete_recovery_days", 7
+            )
+            days = int(value)
+        except Exception:
+            days = 7
+        return max(0, min(days, 365))
 
     def _deletion_row(self, company_id: str) -> Optional[Dict[str, Any]]:
         with db.get_connection() as conn:
@@ -1738,23 +1800,63 @@ class CompanySetupService:
         record = _row_to_dict(row)
         return record or None
 
-    def _deletion_payload(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _latest_deletion(self, company_id: str) -> Optional[Dict[str, Any]]:
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM company_deletion_requests WHERE tenant_id = ? AND company_id = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (self.tenant_id, company_id),
+            ).fetchone()
+        record = _row_to_dict(row)
+        return record or None
+
+    def _mask_email(self, email: Optional[str]) -> str:
+        text = str(email or "").strip()
+        if not text or "@" not in text:
+            return ""
+        local, domain = text.split("@", 1)
+        visible = local[:1]
+        return f"{visible}{'*' * max(1, len(local) - 1)}@{domain}"
+
+    def _deletion_payload(self, record: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not record:
+            return None
+        export_status = record.get("export_status")
+        export_available = export_status in ("READY", "EMAILED") and bool(record.get("export_ref"))
+        status = str(record.get("status") or "")
         return {
             "request_id": record["request_id"],
             "company_id": record["company_id"],
-            "status": record["status"],
+            "status": status,
             "steps_done": _json_load(record.get("steps_done"), []),
             "removal_summary": _json_load(record.get("removal_summary"), {}),
-            "export_status": record.get("export_status"),
+            "previous_status": record.get("previous_status"),
+            "export_status": export_status,
             "export_parts": record.get("export_parts"),
+            "export_ready_at": record.get("export_ready_at"),
+            "export_size_bytes": record.get("export_size_bytes"),
+            "export_sha256": record.get("export_sha256"),
+            "export_available": export_available,
+            "export_filename": os.path.basename(str(record.get("export_ref") or "")),
+            "export_download_path": (
+                f"/api/v1/companies/{record['company_id']}/export" if export_available else None
+            ),
             "email_status": record.get("email_status"),
+            "email_recipient": record.get("email_recipient"),
             "download_confirmed_at": record.get("download_confirmed_at"),
             "purge_after": record.get("purge_after"),
+            "purge_blocked_reason": record.get("purge_blocked_reason"),
+            "recovery_days": record.get("recovery_days"),
+            "mfa_required": self._mfa_required(record["company_id"]),
+            "two_step_configured": False,
+            "can_cancel": status in ("AWAITING_NAME", "AWAITING_IDENTITY", "EXPORTING", "PENDING_DELETION"),
             "created_at": record.get("created_at"),
             "updated_at": record.get("updated_at"),
+            "completed_at": record.get("completed_at"),
         }
 
     def get_deletion(self, company_id: str) -> Optional[Dict[str, Any]]:
+        self.purge_due(company_id=company_id)
         record = self._deletion_row(company_id)
         return self._deletion_payload(record) if record else None
 
@@ -1780,10 +1882,43 @@ class CompanySetupService:
             "will_stop": ["running workflows", "scheduled work", "connection access"],
         }
 
+    def deletion_plan(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        """Non-mutating preview of what a deletion would do.
+
+        The wizard shows this before it creates a deletion request, so the
+        owner sees real counts, the real recovery window and whether email can
+        actually be delivered on this deployment.
+        """
+        record = self._require_company(company_id)
+        granted = self._granted(company_id, principal.user_id)
+        assert_can_delete(principal, self.tenant_id, granted=granted)
+        recipient, verified = self._account_email(principal)
+        return {
+            "company_id": company_id,
+            "company_name": record.get("name"),
+            "removal_summary": self._removal_summary(company_id),
+            "recovery_days": self._recovery_days(company_id),
+            "mfa_required": self._mfa_required(company_id),
+            "two_step_configured": False,
+            "email_available": bool(verified and recipient),
+            "email_recipient": self._mask_email(recipient) if verified and recipient else "",
+            "export_format": "PDF, split into numbered parts and zipped when needed",
+        }
+
     def request_deletion(self, principal: Principal, company_id: str) -> Dict[str, Any]:
         record = self._require_company(company_id)
         granted = self._granted(company_id, principal.user_id)
         assert_can_delete(principal, self.tenant_id, granted=granted)
+
+        if normalize_status(record["status"]) in (CompanyStatus.PENDING_EXPORT, CompanyStatus.PENDING_DELETION):
+            existing = self._deletion_row(company_id)
+            if existing:
+                return self._deletion_payload(existing)
+            raise CompanySetupError(
+                "DELETION_ALREADY_STARTED",
+                "This company is already in the deletion workflow",
+                status=409,
+            )
 
         existing = self._deletion_row(company_id)
         if existing:
@@ -1798,8 +1933,9 @@ class CompanySetupService:
                 """
                 INSERT INTO company_deletion_requests (
                     request_id, tenant_id, company_id, status, steps_done, removal_summary,
-                    export_status, export_parts, email_status, requested_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    export_status, export_parts, email_status, requested_by, created_at, updated_at,
+                    previous_status, recovery_days
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     request_id,
@@ -1814,6 +1950,8 @@ class CompanySetupService:
                     principal.user_id,
                     now,
                     now,
+                    normalize_status(record["status"]),
+                    self._recovery_days(company_id),
                 ),
             )
             conn.commit()
@@ -1826,13 +1964,71 @@ class CompanySetupService:
             "company.delete.requested",
             {"request_id": request_id, "removal_summary": summary},
         )
-        return self._deletion_payload(self._deletion_row(company_id) or {})
+        return self._deletion_payload(self._deletion_row(company_id))
 
     def _require_deletion(self, company_id: str) -> Dict[str, Any]:
         record = self._deletion_row(company_id)
         if not record:
             raise CompanySetupError("DELETION_NOT_REQUESTED", "Start the deletion flow first", status=409)
         return record
+
+    def _update_deletion(self, request_id: str, **fields: Any) -> None:
+        if not fields:
+            return
+        allowed = {
+            "status",
+            "steps_done",
+            "export_status",
+            "export_parts",
+            "export_ref",
+            "export_sha256",
+            "export_size_bytes",
+            "export_content_type",
+            "export_ready_at",
+            "email_status",
+            "email_recipient",
+            "download_confirmed_at",
+            "purge_after",
+            "purge_blocked_reason",
+            "previous_status",
+            "recovery_days",
+            "completed_at",
+            "updated_at",
+        }
+        assignments = []
+        values: List[Any] = []
+        for key, value in fields.items():
+            if key not in allowed:
+                continue
+            assignments.append(f"{key} = ?")
+            if key in ("steps_done",):
+                values.append(_json_dump(value))
+            else:
+                values.append(value)
+        if not assignments:
+            return
+        assignments.append("updated_at = ?")
+        values.append(_now())
+        values.append(request_id)
+        with db.get_connection() as conn:
+            conn.execute(
+                f"UPDATE company_deletion_requests SET {', '.join(assignments)} WHERE request_id = ?",
+                tuple(values),
+            )
+            conn.commit()
+
+    def _set_company_status(self, company_id: str, target: str) -> str:
+        record = self._require_company(company_id, include_deleted=True)
+        normalized = validate_transition(record["status"], target)
+        now = _now()
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE companies SET status = ?, updated_at = ? WHERE company_id = ? AND tenant_id = ?",
+                (normalized, now, company_id, self.tenant_id),
+            )
+            conn.commit()
+        self._refresh_portfolio()
+        return normalized
 
     def confirm_delete_name(self, principal: Principal, company_id: str, name: str) -> Dict[str, Any]:
         record = self._require_company(company_id)
@@ -1855,16 +2051,15 @@ class CompanySetupService:
             )
 
         mfa = self._mfa_required(company_id)
-        next_status = "AWAITING_IDENTITY"
         steps = _json_load(request.get("steps_done"), [])
-        steps.append("name_confirmed")
-        now = _now()
-        with db.get_connection() as conn:
-            conn.execute(
-                "UPDATE company_deletion_requests SET status = ?, steps_done = ?, updated_at = ? WHERE request_id = ?",
-                (next_status, _json_dump(steps), now, request["request_id"]),
-            )
-            conn.commit()
+        if "name_confirmed" not in steps:
+            steps.append("name_confirmed")
+        self._update_deletion(
+            request["request_id"],
+            status="AWAITING_IDENTITY",
+            steps_done=steps,
+            previous_status=normalize_status(record["status"]),
+        )
         audit.record_event(
             self.tenant_id,
             company_id,
@@ -1873,7 +2068,7 @@ class CompanySetupService:
             "company.delete.name_confirmed",
             {"request_id": request["request_id"], "mfa_required": mfa},
         )
-        return self._deletion_payload(self._deletion_row(company_id) or {})
+        return self._deletion_payload(self._deletion_row(company_id)) or {}
 
     def confirm_delete_identity(
         self,
@@ -1882,7 +2077,7 @@ class CompanySetupService:
         password: Optional[str] = None,
         two_step_code: Optional[str] = None,
     ) -> Dict[str, Any]:
-        self._require_company(company_id)
+        record = self._require_company(company_id)
         granted = self._granted(company_id, principal.user_id)
         assert_can_delete(principal, self.tenant_id, granted=granted)
 
@@ -1898,44 +2093,110 @@ class CompanySetupService:
         if not self._verify_owner_password(principal, password):
             raise CompanySetupError("INVALID_PASSWORD", "Password is incorrect", status=403)
 
-        if self._mfa_required(company_id) and not two_step_code:
-            raise CompanySetupError(
-                "TWO_STEP_REQUIRED",
-                "A two-step verification code is required",
-                status=400,
-            )
         if self._mfa_required(company_id):
-            # No real TOTP verifier is wired yet; never accept a dummy value.
+            # No real TOTP verifier is wired yet. Never accept a dummy code and
+            # never say "enter a code" when nothing could verify it: 501 is the
+            # honest answer whether or not a code was supplied.
             raise CompanySetupError(
                 "TWO_STEP_NOT_CONFIGURED",
                 "Two-step verification is enabled but no verifier is configured on this deployment",
                 status=501,
             )
 
+        previous_status = normalize_status(record["status"])
+        target = validate_transition(previous_status, CompanyStatus.PENDING_EXPORT)
         steps = _json_load(request.get("steps_done"), [])
-        steps.append("identity_confirmed")
-        now = _now()
-        with db.get_connection() as conn:
-            conn.execute(
-                "UPDATE company_deletion_requests SET status = ?, steps_done = ?, updated_at = ? WHERE request_id = ?",
-                ("EXPORTING", _json_dump(steps), now, request["request_id"]),
-            )
-            conn.commit()
+        if "identity_confirmed" not in steps:
+            steps.append("identity_confirmed")
+        self._update_deletion(
+            request["request_id"],
+            status="EXPORTING",
+            steps_done=steps,
+            previous_status=previous_status,
+            export_status="GENERATING",
+            purge_blocked_reason=None,
+        )
+        self._set_company_status(company_id, target)
         audit.record_event(
             self.tenant_id,
             company_id,
             principal.user_id,
             principal.role,
             "company.delete.identity_confirmed",
+            {"request_id": request["request_id"], "previous_status": previous_status},
+        )
+        self._stop_company_work(company_id, principal)
+
+        try:
+            export = self._generate_export(company_id, request["request_id"])
+        except Exception as exc:
+            self._update_deletion(
+                request["request_id"],
+                export_status="FAILED",
+                purge_blocked_reason="EXPORT_FAILED",
+            )
+            audit.record_event(
+                self.tenant_id,
+                company_id,
+                principal.user_id,
+                principal.role,
+                "company.export.failed",
+                {"request_id": request["request_id"], "error_type": type(exc).__name__},
+            )
+            return {
+                "deletion": self._deletion_payload(self._deletion_row(company_id)),
+                "export": {
+                    "status": "FAILED",
+                    "message": "The export could not be generated. Nothing has been purged.",
+                },
+            }
+
+        return self._finalize_export(principal, company_id, export, transition=True)
+
+    def retry_export(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        record = self._require_company(company_id, include_deleted=True)
+        granted = self._granted(company_id, principal.user_id)
+        assert_can_delete(principal, self.tenant_id, granted=granted)
+        request = self._require_deletion(company_id)
+        if request["status"] not in ("EXPORTING", "PENDING_DELETION"):
+            raise CompanySetupError(
+                "STEP_OUT_OF_ORDER",
+                "The export can only be retried after identity confirmation",
+                status=409,
+                detail={"status": request["status"]},
+            )
+        self._update_deletion(request["request_id"], export_status="GENERATING", purge_blocked_reason=None)
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.export.retry_requested",
             {"request_id": request["request_id"]},
         )
-        return {
-            "deletion": self._deletion_payload(self._deletion_row(company_id) or {}),
-            "export": {
-                "status": "NOT_STARTED",
-                "message": "Export generation is implemented in Stage 5. Nothing has been deleted.",
-            },
-        }
+        try:
+            export = self._generate_export(company_id, request["request_id"])
+        except Exception as exc:
+            self._update_deletion(request["request_id"], export_status="FAILED", purge_blocked_reason="EXPORT_FAILED")
+            audit.record_event(
+                self.tenant_id,
+                company_id,
+                principal.user_id,
+                principal.role,
+                "company.export.failed",
+                {"request_id": request["request_id"], "error_type": type(exc).__name__},
+            )
+            raise CompanySetupError(
+                "EXPORT_FAILED",
+                "The export could not be generated. Nothing has been purged.",
+                status=500,
+            )
+        return self._finalize_export(
+            principal,
+            company_id,
+            export,
+            transition=normalize_status(record["status"]) == CompanyStatus.PENDING_EXPORT,
+        )
 
     def _verify_owner_password(self, principal: Principal, password: Optional[str]) -> bool:
         if not password:
@@ -1955,61 +2216,572 @@ class CompanySetupService:
         except Exception:
             return False
 
+    def _account_email(self, principal: Principal) -> tuple:
+        """Return the signed-in account email and whether it is a verified identity.
+
+        The only verified identity we can prove without an email challenge is
+        the address on the authenticated account itself. A company profile
+        email that is not tied to the signed-in account is never used for
+        outbound deletion mail.
+        """
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT email FROM users WHERE user_id = ? AND tenant_id = ?",
+                    (principal.user_id, self.tenant_id),
+                ).fetchone()
+        except Exception:
+            return None, False
+        email = str(row["email"] if row else "").strip()
+        return (email, True) if email else (None, False)
+
+    def _export_base_dir(self) -> str:
+        return os.path.abspath(os.environ.get("ZONATA_COMPANY_EXPORT_DIR") or DEFAULT_EXPORT_DIR)
+
+    def _export_data(self, record: Dict[str, Any], request_id: str) -> Dict[str, Any]:
+        company_id = record["company_id"]
+        return {
+            "export_type": "ZONATA company export",
+            "request_id": request_id,
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "company": self._serialize(record),
+            "build": self.get_build(company_id),
+            "readiness": self.readiness(company_id),
+            "sources": self._sources_payload(company_id),
+            "connections": self._connections_payload(company_id),
+            "files": self._files_payload(company_id).get("files", []),
+            "legal_items": self._legal_items_payload(company_id),
+            "audit": audit.list_events(self.tenant_id, company_id, limit=EXPORT_AUDIT_LIMIT),
+            "counts": self._removal_summary(company_id).get("will_remove", {}),
+        }
+
+    def _generate_export(self, company_id: str, request_id: str) -> Dict[str, Any]:
+        from core.company_setup.export import build_company_export
+
+        record = self._require_company(company_id, include_deleted=True)
+        data = self._export_data(record, request_id)
+        base_dir = self._export_base_dir()
+        os.makedirs(base_dir, exist_ok=True, mode=0o750)
+        return build_company_export(data, base_dir, self.tenant_id, company_id, request_id)
+
+    def _finalize_export(
+        self,
+        principal: Principal,
+        company_id: str,
+        export: Dict[str, Any],
+        transition: bool = True,
+    ) -> Dict[str, Any]:
+        request = self._require_deletion(company_id)
+        days = self._recovery_days(company_id)
+        recipient, verified = self._account_email(principal)
+        email_status = "SKIPPED_UNVERIFIED"
+        email_detail = "The signed-in account has no verified email address; use the in-app download."
+        if verified and recipient:
+            from core.company_setup.email_adapter import export_email_adapter
+
+            try:
+                with open(export["path"], "rb") as handle:
+                    content = handle.read()
+                result = export_email_adapter.send(
+                    tenant_id=self.tenant_id,
+                    company_id=company_id,
+                    company_name=(self._require_company(company_id, include_deleted=True).get("name") or "your company"),
+                    recipient=recipient,
+                    filename=export["filename"],
+                    content=content,
+                    content_type=export["content_type"],
+                    recovery_days=days,
+                )
+                email_status = str(result.get("status") or "FAILED")
+                email_detail = str(result.get("detail") or "")
+            except Exception as exc:
+                email_status = "FAILED"
+                email_detail = "The email could not be sent. Use the in-app download instead."
+                audit.record_event(
+                    self.tenant_id,
+                    company_id,
+                    principal.user_id,
+                    principal.role,
+                    "company.export.email_failed",
+                    {"request_id": request["request_id"], "error_type": type(exc).__name__},
+                )
+
+        now = _now()
+        purge_after = now if days == 0 else now + days * 86400
+        export_status = "EMAILED" if email_status == "SENT" else "READY"
+        blocked = None if email_status == "SENT" else "WAITING_FOR_DOWNLOAD"
+        steps = _json_load(request.get("steps_done"), [])
+        for step in ("export_ready", "email_sent" if email_status == "SENT" else "in_app_download"):
+            if step not in steps:
+                steps.append(step)
+
+        if transition:
+            self._set_company_status(company_id, CompanyStatus.PENDING_DELETION)
+        self._update_deletion(
+            request["request_id"],
+            status="PENDING_DELETION",
+            steps_done=steps,
+            export_status=export_status,
+            export_parts=export.get("parts") or 1,
+            export_ref=export.get("relative_ref"),
+            export_sha256=export.get("sha256"),
+            export_size_bytes=export.get("size_bytes"),
+            export_content_type=export.get("content_type"),
+            export_ready_at=now,
+            email_status=email_status,
+            email_recipient=self._mask_email(recipient),
+            purge_after=purge_after,
+            purge_blocked_reason=blocked,
+            recovery_days=days,
+        )
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.export.generated",
+            {
+                "request_id": request["request_id"],
+                "filename": export.get("filename"),
+                "parts": export.get("parts"),
+                "pages": export.get("pages"),
+                "sha256": export.get("sha256"),
+                "size_bytes": export.get("size_bytes"),
+                "archive": export.get("archive"),
+                "replaced_characters": export.get("replaced_characters"),
+            },
+        )
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.export.email",
+            {
+                "request_id": request["request_id"],
+                "status": email_status,
+                "recipient": self._mask_email(recipient),
+                "detail": email_detail,
+            },
+        )
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.delete.pending_purge",
+            {
+                "request_id": request["request_id"],
+                "purge_after": purge_after,
+                "recovery_days": days,
+                "email_status": email_status,
+            },
+        )
+
+        purged = None
+        if days == 0 and email_status == "SENT":
+            purged = self._purge_company_data(
+                company_id,
+                request["request_id"],
+                principal.user_id,
+                principal.role,
+                reason="IMMEDIATE_WINDOW_AFTER_EMAIL",
+            )
+
+        payload = self._deletion_payload(self._deletion_row(company_id) or self._latest_deletion(company_id))
+        return {
+            "deletion": payload,
+            "export": {
+                "status": export_status,
+                "filename": export.get("filename"),
+                "parts": export.get("parts"),
+                "pages": export.get("pages"),
+                "size_bytes": export.get("size_bytes"),
+                "sha256": export.get("sha256"),
+                "content_type": export.get("content_type"),
+                "archive": export.get("archive"),
+                "download_path": f"/api/v1/companies/{company_id}/export",
+                "message": (
+                    "The export was emailed. The recovery window has started."
+                    if email_status == "SENT"
+                    else email_detail or "Download the export from this device before the recovery window ends."
+                ),
+            },
+            "email": {
+                "status": email_status,
+                "recipient": self._mask_email(recipient),
+                "detail": email_detail,
+            },
+            "recovery_days": days,
+            "purge_after": purge_after,
+            "purged": bool(purged),
+        }
+
     def cancel_deletion(self, principal: Principal, company_id: str) -> Dict[str, Any]:
         record = self._require_company(company_id, include_deleted=True)
         granted = self._granted(company_id, principal.user_id)
         assert_can_delete(principal, self.tenant_id, granted=granted)
         request = self._require_deletion(company_id)
-        if request["status"] == "COMPLETED":
+        if request["status"] == "COMPLETED" or normalize_status(record["status"]) == CompanyStatus.DELETED:
             raise CompanySetupError("ALREADY_DELETED", "This company has already been deleted", status=409)
 
         now = _now()
-        previous_status = record["status"]
-        restore_to = CompanyStatus.OPERATIONAL
-        restored = None
+        previous_status = normalize_status(record["status"])
+        desired = normalize_status(request.get("previous_status") or "")
+        restore_to = None
         if previous_status in (CompanyStatus.PENDING_EXPORT, CompanyStatus.PENDING_DELETION):
-            try:
-                restore_to = validate_transition(previous_status, CompanyStatus.OPERATIONAL)
-            except InvalidTransition:
-                restore_to = CompanyStatus.NEEDS_ATTENTION
+            candidates = [desired] if desired else []
+            candidates.extend([CompanyStatus.OPERATIONAL, CompanyStatus.NEEDS_ATTENTION])
+            for candidate in candidates:
+                if not candidate:
+                    continue
+                try:
+                    restore_to = validate_transition(previous_status, candidate)
+                    break
+                except InvalidTransition:
+                    continue
         with db.get_connection() as conn:
             conn.execute(
-                "UPDATE company_deletion_requests SET status = 'CANCELLED', updated_at = ? WHERE request_id = ?",
+                "UPDATE company_deletion_requests SET status = 'CANCELLED', updated_at = ?, purge_blocked_reason = NULL "
+                "WHERE request_id = ?",
                 (now, request["request_id"]),
             )
-            if previous_status in (CompanyStatus.PENDING_EXPORT, CompanyStatus.PENDING_DELETION):
+            if restore_to:
                 conn.execute(
                     "UPDATE companies SET status = ?, updated_at = ? WHERE company_id = ? AND tenant_id = ?",
                     (restore_to, now, company_id, self.tenant_id),
                 )
-                restored = restore_to
             conn.commit()
+        self._refresh_portfolio()
         audit.record_event(
             self.tenant_id,
             company_id,
             principal.user_id,
             principal.role,
             "company.delete.cancelled",
-            {"request_id": request["request_id"], "restored_status": restored or previous_status},
+            {
+                "request_id": request["request_id"],
+                "restored_status": restore_to or previous_status,
+                "recovery_days": request.get("recovery_days"),
+                "export_status": request.get("export_status"),
+            },
         )
-        return {"cancelled": True, "company_status": normalize_status(restored or previous_status)}
+        return {"cancelled": True, "company_status": normalize_status(restore_to or previous_status)}
+
+    def _export_file_path(self, request: Dict[str, Any]) -> str:
+        base = self._export_base_dir()
+        ref = str(request.get("export_ref") or "")
+        if not ref:
+            raise CompanySetupError("EXPORT_NOT_READY", "No company export is available yet", status=409)
+        candidate = os.path.realpath(os.path.join(base, ref))
+        base_real = os.path.realpath(base)
+        if candidate != base_real and not candidate.startswith(base_real + os.sep):
+            raise CompanySetupError("EXPORT_NOT_FOUND", "The export file is not available", status=404)
+        if not os.path.isfile(candidate):
+            raise CompanySetupError(
+                "EXPORT_NOT_FOUND",
+                "The export file is no longer on this deployment",
+                status=410,
+            )
+        return candidate
+
+    def download_export_file(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        record = self._require_company(company_id, include_deleted=True)
+        granted = self._granted(company_id, principal.user_id)
+        assert_can_delete(principal, self.tenant_id, granted=granted)
+        request = self._latest_deletion(company_id)
+        if not request or request.get("export_status") not in ("READY", "EMAILED"):
+            raise CompanySetupError("EXPORT_NOT_READY", "No company export is available yet", status=409)
+        path = self._export_file_path(request)
+        with open(path, "rb") as handle:
+            content = handle.read()
+        expected = str(request.get("export_sha256") or "")
+        if expected and hashlib.sha256(content).hexdigest() != expected:
+            raise CompanySetupError(
+                "EXPORT_CORRUPT",
+                "The export file failed its integrity check and will not be served",
+                status=500,
+            )
+
+        now = _now()
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE company_deletion_requests SET download_confirmed_at = ?, purge_blocked_reason = ?, updated_at = ? "
+                "WHERE request_id = ? AND download_confirmed_at IS NULL",
+                (now, None if request.get("email_status") == "SENT" else "DOWNLOADED", now, request["request_id"]),
+            )
+            conn.commit()
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.export.downloaded",
+            {"request_id": request["request_id"], "size_bytes": len(content)},
+        )
+
+        if (
+            request.get("status") == "PENDING_DELETION"
+            and request.get("email_status") != "SENT"
+            and now >= float(request.get("purge_after") or 0)
+        ):
+            self._purge_company_data(
+                company_id,
+                request["request_id"],
+                principal.user_id,
+                principal.role,
+                reason="DOWNLOADED_AFTER_WINDOW",
+            )
+        elif request.get("status") == "PENDING_DELETION":
+            self.purge_due(company_id=company_id)
+
+        return {
+            "__file__": content,
+            "filename": os.path.basename(path),
+            "content_type": request.get("export_content_type") or (
+                "application/zip" if path.lower().endswith(".zip") else "application/pdf"
+            ),
+            "size_bytes": len(content),
+            "sha256": expected or hashlib.sha256(content).hexdigest(),
+        }
 
     def download_export(self, principal: Principal, company_id: str) -> Dict[str, Any]:
-        self._require_company(company_id, include_deleted=True)
-        assert_can_view(principal, self.tenant_id)
-        request = self._deletion_row(company_id)
-        if not request or request.get("export_status") not in ("READY", "EMAILED"):
+        """Metadata-only view used by tests and non-browser clients."""
+        payload = self.download_export_file(principal, company_id)
+        return {
+            "filename": payload["filename"],
+            "content_type": payload["content_type"],
+            "size_bytes": payload["size_bytes"],
+            "sha256": payload["sha256"],
+            "download_path": f"/api/v1/companies/{company_id}/export",
+        }
+
+    def purge_now(self, principal: Principal, company_id: str) -> Dict[str, Any]:
+        record = self._require_company(company_id, include_deleted=True)
+        granted = self._granted(company_id, principal.user_id)
+        assert_can_delete(principal, self.tenant_id, granted=granted)
+        request = self._require_deletion(company_id)
+        if request["status"] != "PENDING_DELETION":
             raise CompanySetupError(
-                "EXPORT_NOT_READY",
-                "No company export is available yet",
+                "STEP_OUT_OF_ORDER",
+                "The deletion is not waiting for its recovery window",
+                status=409,
+                detail={"status": request["status"]},
+            )
+        now = _now()
+        if float(request.get("purge_after") or 0) > now:
+            raise CompanySetupError(
+                "RECOVERY_WINDOW_ACTIVE",
+                "The recovery window has not ended yet",
+                status=409,
+                detail={"purge_after": request.get("purge_after")},
+            )
+        if request.get("email_status") != "SENT" and not request.get("download_confirmed_at"):
+            raise CompanySetupError(
+                "EXPORT_NOT_DELIVERED",
+                "Download the export or configure email delivery before purging",
                 status=409,
             )
-        # Actual PDF/ZIP streaming is delivered in Stage 5.
-        raise CompanySetupError(
-            "EXPORT_NOT_READY",
-            "The export file is not available on this deployment yet",
-            status=409,
+        return self._purge_company_data(
+            company_id,
+            request["request_id"],
+            principal.user_id,
+            principal.role,
+            reason="OWNER_CONFIRMED_DUE",
         )
+
+    def purge_due(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        now = _now()
+        clauses = ["tenant_id = ?", "status = 'PENDING_DELETION'", "purge_after IS NOT NULL", "purge_after <= ?"]
+        params: List[Any] = [self.tenant_id, now]
+        if company_id:
+            clauses.append("company_id = ?")
+            params.append(company_id)
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM company_deletion_requests WHERE {' AND '.join(clauses)}", tuple(params)
+            ).fetchall()
+        purged: List[Dict[str, Any]] = []
+        for row in rows:
+            request = _row_to_dict(row)
+            if request.get("email_status") != "SENT" and not request.get("download_confirmed_at"):
+                self._update_deletion(request["request_id"], purge_blocked_reason="WAITING_FOR_DOWNLOAD")
+                continue
+            result = self._purge_company_data(
+                request["company_id"],
+                request["request_id"],
+                str(request.get("requested_by") or "system"),
+                "SYSTEM",
+                reason="RECOVERY_WINDOW_ENDED",
+            )
+            purged.append(result)
+        return purged
+
+    def _company_scoped_tables(self) -> Dict[str, bool]:
+        """Map table -> has_tenant_id for every company-scoped base table."""
+        found: Dict[str, bool] = {}
+        dialect = getattr(db, "dialect", "sqlite")
+        if dialect == "postgresql":
+            with db.get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT table_name, column_name FROM information_schema.columns "
+                    "WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' "
+                    "AND column_name IN ('company_id', 'tenant_id')"
+                ).fetchall()
+            for row in rows:
+                table = str(row[0])
+                if str(row[1]) == "tenant_id":
+                    found[table] = True
+                else:
+                    found.setdefault(table, False)
+            return found
+
+        with db.get_connection() as conn:
+            tables = [
+                str(row[0])
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+            for table in tables:
+                if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table):
+                    continue
+                columns = {
+                    str(row[1]).lower()
+                    for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+                }
+                if "company_id" in columns:
+                    found[table] = "tenant_id" in columns
+        return found
+
+    def _delete_company_scoped_rows(self, company_id: str) -> List[Dict[str, str]]:
+        errors: List[Dict[str, str]] = []
+        tables = self._company_scoped_tables()
+        for table, has_tenant in sorted(tables.items()):
+            if table in PURGE_KEEP_TABLES:
+                continue
+            if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table):
+                continue
+            try:
+                with db.get_connection() as conn:
+                    if has_tenant:
+                        conn.execute(
+                            f'DELETE FROM "{table}" WHERE company_id = ? AND tenant_id = ?',
+                            (company_id, self.tenant_id),
+                        )
+                    else:
+                        conn.execute(f'DELETE FROM "{table}" WHERE company_id = ?', (company_id,))
+                    conn.commit()
+            except Exception as exc:
+                errors.append({"table": table, "error_type": type(exc).__name__})
+        return errors
+
+    def _delete_company_storage(self, company_id: str) -> None:
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", str(company_id or ""))
+        if not safe_id or safe_id in (".", ".."):
+            return
+        try:
+            from core.document_generator import DocumentGenerator
+
+            base = DocumentGenerator().base_dir
+        except Exception:
+            base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "storage"))
+        target = os.path.realpath(os.path.join(base, "companies", safe_id))
+        root = os.path.realpath(os.path.join(base, "companies"))
+        if target.startswith(root + os.sep) and os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)
+
+    def _stop_company_work(self, company_id: str, principal: Principal) -> bool:
+        cancelled = False
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT workflow_run_id FROM company_build_runs WHERE tenant_id = ? AND company_id = ? "
+                    "AND workflow_run_id IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+                    (self.tenant_id, company_id),
+                ).fetchone()
+            run_id = str(row["workflow_run_id"] if row else "").strip()
+            if run_id:
+                from core.durable_workflow_runtime import get_workflow_runtime
+
+                get_workflow_runtime(self.tenant_id).cancel_workflow(run_id, reason="COMPANY_DELETION")
+                cancelled = True
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE company_build_runs SET phase_state = 'CANCELLED', "
+                    "failure_reason = 'Stopped because deletion was requested', updated_at = ? "
+                    "WHERE tenant_id = ? AND company_id = ? AND phase_state IN ('RUNNING', 'PENDING')",
+                    (_now(), self.tenant_id, company_id),
+                )
+                conn.commit()
+        except Exception:
+            cancelled = False
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            principal.user_id,
+            principal.role,
+            "company.work.stopped",
+            {"workflow_cancelled": cancelled},
+        )
+        return cancelled
+
+    def _purge_company_data(
+        self,
+        company_id: str,
+        request_id: str,
+        actor_id: str,
+        actor_role: str,
+        reason: str,
+    ) -> Dict[str, Any]:
+        record = self._require_company(company_id, include_deleted=True)
+        summary = self._removal_summary(company_id)
+        errors = self._delete_company_scoped_rows(company_id)
+        self._delete_company_storage(company_id)
+        now = _now()
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE companies SET
+                    status = ?, deleted_at = ?, deleted_by = ?, updated_at = ?,
+                    description = NULL, owner_email = NULL, website = NULL,
+                    business_model = NULL, target_customers = NULL, setup_notes = NULL,
+                    assets = '[]', revenue = 0, revenue_amount = NULL, cost = 0, contribution = 0
+                WHERE company_id = ? AND tenant_id = ?
+                """,
+                (CompanyStatus.DELETED, now, actor_id, now, company_id, self.tenant_id),
+            )
+            conn.execute(
+                "UPDATE company_deletion_requests SET status = 'COMPLETED', completed_at = ?, updated_at = ?, "
+                "purge_blocked_reason = NULL WHERE request_id = ? AND tenant_id = ?",
+                (now, now, request_id, self.tenant_id),
+            )
+            conn.commit()
+        self._refresh_portfolio()
+        audit.record_event(
+            self.tenant_id,
+            company_id,
+            actor_id,
+            actor_role,
+            "company.delete.purged",
+            {
+                "request_id": request_id,
+                "reason": reason,
+                "removed": summary.get("will_remove", {}),
+                "kept": "minimal company record and audit trail",
+                "purge_errors": errors,
+                "completed_at": now,
+            },
+        )
+        return {
+            "purged": True,
+            "company_id": company_id,
+            "request_id": request_id,
+            "completed_at": now,
+            "removed": summary.get("will_remove", {}),
+            "purge_errors": errors,
+        }
+
 
     # ---------------------------------------------------------------- admins
     def list_admins(self, principal: Principal, company_id: str) -> List[Dict[str, Any]]:

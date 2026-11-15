@@ -938,6 +938,596 @@ test('existing flow renders the business, revenue and role fields', () => {
     dom.window.close();
   });
 
+  // ---------------------------------------------------------------- Stage 5
+  // Overview, edit and the protected deletion wizard.
+
+  function loadOverview(window) {
+    window.eval(read('web/company_setup_overview.js'));
+    return window.CompanySetupOverview;
+  }
+
+  function loadEdit(window) {
+    window.eval(read('web/company_setup_edit.js'));
+    return window.CompanySetupEdit;
+  }
+
+  function loadDelete(window) {
+    window.eval(read('web/company_setup_delete.js'));
+    return window.CompanySetupDelete;
+  }
+
+  // The page modules kick off their own fetches and re-render when they
+  // settle. jsdom has real timers, so yield until the module is quiet.
+  async function settle(isDone, label) {
+    for (let i = 0; i < 200; i += 1) {
+      if (isDone()) return;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    throw new Error(`timed out waiting for ${label || 'render'}`);
+  }
+
+  function companyFixture(overrides) {
+    return Object.assign({
+      id: 'comp_1',
+      tenant_id: 'tnt_1',
+      type: 'EXISTING',
+      name: 'Nightowl Bakery',
+      title: 'Sourdough, wholesale and a small cafe',
+      description: 'A neighbourhood bakery that supplies four cafes and runs one counter.',
+      status: 'ONBOARDING',
+      country: 'IN',
+      industry: 'Food & Beverage',
+      website: 'https://nightowl.example',
+      currency: 'INR',
+      owner: { name: 'Aarti Rao', email: 'aarti@nightowl.example', role: 'Founder' },
+      revenue: { amount: 4800000, currency: 'INR', period: 'ANNUAL' },
+      budget: { amount: 500000, currency: 'INR' },
+      business_model: 'Wholesale bread plus counter sales',
+      target_customers: 'Cafes and walk-in customers',
+      timeline: 'Ready in about 2 weeks',
+      setup_notes: 'Two ovens, no POS yet.',
+      assets: ['https://nightowl.example/brand.pdf'],
+      readiness_score: 58,
+      created_at: 1794000000,
+      updated_at: 1794550000,
+      permissions: { view: true, edit: true, delete: true, manage_connections: true },
+      build: null,
+      deletion: null
+    }, overrides || {});
+  }
+
+  function overviewFetch(window, options) {
+    const opts = options || {};
+    const company = opts.company || companyFixture();
+    return (url) => {
+      if (url === '/api/v1/companies/comp_1') return jsonResponse(company);
+      if (url === '/api/v1/companies/comp_1/sources') {
+        if (opts.sourcesFails) return jsonResponse({ error: 'nope' }, 500);
+        return jsonResponse({
+          sources: [
+            { id: 'accounting', name: 'Accounting and books', status: 'VERIFIED' },
+            { id: 'commerce', name: 'Store, POS and orders', status: 'SKIPPED' }
+          ]
+        });
+      }
+      if (url === '/api/v1/companies/comp_1/connections') {
+        return jsonResponse({
+          connections: [
+            { connection_id: 'con_1', name: 'Tally', status: 'NEEDS_CHECK', verified_at: null }
+          ]
+        });
+      }
+      if (url === '/api/v1/companies/comp_1/readiness') {
+        return jsonResponse({
+          score: 58,
+          band: 'MEDIUM',
+          counts: { sources_connected: 1, sources_verified: 1, sources_skipped: 1, files: 2 }
+        });
+      }
+      if (url === '/api/v1/companies/comp_1/legal') {
+        return jsonResponse({
+          legal_items: [
+            { name: 'Founder agreement (draft)', status: 'DRAFT', draft_disclaimer: 'A draft, not a filing.' }
+          ]
+        });
+      }
+      if (url === '/api/v1/companies/comp_1/audit?limit=12') {
+        return jsonResponse({
+          events: [
+            { action: 'company.created', actor_role: 'OWNER', created_at: 1794000100 },
+            { action: 'company.connection_added', actor_role: 'OWNER', created_at: 1794550000 }
+          ]
+        });
+      }
+      if (url === '/api/v1/companies/comp_1/files') return jsonResponse({ total: 2, files: [] });
+      return jsonResponse({}, 404);
+    };
+  }
+
+  await testAsync('overview renders the real record, numbers and audit trail', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    window.fetch = overviewFetch(window);
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+
+    const root = window.document.querySelector('[data-company-overview]');
+    assert.ok(root, 'overview rendered');
+    assert.ok(root.textContent.includes('Nightowl Bakery'));
+    assert.ok(root.textContent.includes('Food & Beverage'));
+    assert.ok(root.textContent.includes('Aarti Rao'));
+    assert.ok(root.textContent.includes('₹48L') || root.textContent.includes('48,00,000'), 'Indian compact revenue');
+    assert.strictEqual(root.querySelectorAll('.zc-metric').length, 4);
+    assert.strictEqual(root.querySelectorAll('.zc-overview-activity li').length, 2);
+    assert.ok(root.textContent.includes('Company created'));
+    assert.ok(root.textContent.includes('Connection added'));
+    assert.ok(root.textContent.includes('Accounting and books'));
+    assert.ok(root.textContent.includes('Founder agreement (draft)'));
+    assert.strictEqual(overview.partialError, false);
+
+    overview.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('overview menu only exists for editors and opens with the keyboard', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    window.fetch = overviewFetch(window);
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+    const button = window.document.getElementById('zcOverviewMenuButton');
+    const menu = window.document.getElementById('zcOverviewMenu');
+    assert.ok(button && menu, 'menu exists for an owner');
+    assert.strictEqual(button.getAttribute('aria-expanded'), 'false');
+    assert.strictEqual(menu.hidden, true);
+
+    button.click();
+    assert.strictEqual(button.getAttribute('aria-expanded'), 'true');
+    assert.strictEqual(menu.hidden, false);
+    assert.strictEqual(menu.querySelectorAll('[role="menuitem"]').length, 2);
+    assert.ok(window.document.activeElement.textContent.includes('Edit company'), 'focus enters the menu');
+
+    menu.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.strictEqual(menu.hidden, true);
+    assert.strictEqual(button.getAttribute('aria-expanded'), 'false');
+
+    overview.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('overview hides edit and delete from an agent', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    window.fetch = overviewFetch(window, {
+      company: companyFixture({ permissions: { view: true, edit: false, delete: false } })
+    });
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+    const root = window.document.querySelector('[data-company-overview]');
+    assert.strictEqual(root.querySelector('#zcOverviewMenuButton'), null);
+    assert.ok(root.textContent.includes('View only'));
+    overview.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('overview deletion banner shows the real window and opens the export view', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    const purgeAfter = Math.floor(Date.now() / 1000) + 6 * 86400 + 3600;
+    window.fetch = overviewFetch(window, {
+      company: companyFixture({
+        status: 'PENDING_DELETION',
+        deletion: {
+          status: 'PENDING_DELETION',
+          export_status: 'READY',
+          export_available: true,
+          export_filename: 'nightowl-bakery-export.pdf.zip',
+          email_status: 'NOT_CONFIGURED',
+          purge_after: purgeAfter
+        }
+      })
+    });
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+    const root = window.document.querySelector('[data-company-overview]');
+    const banner = root.querySelector('.zc-deletion-banner');
+    assert.ok(banner, 'deletion banner rendered');
+    assert.ok(banner.textContent.includes('Waiting for the export to be downloaded'), 'honest countdown without email');
+    assert.ok(banner.textContent.includes('Waiting for the recovery window'), 'real deletion status');
+
+    let opened = null;
+    window.CompanySetupDelete = { open: (opts) => { opened = opts; } };
+    banner.querySelector('[data-overview-action="download"]').click();
+    assert.ok(opened, 'download action opened the wizard');
+    assert.strictEqual(opened.startAt, 'export');
+    assert.strictEqual(opened.companyId, 'comp_1');
+
+    overview.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('overview survives a failing secondary panel without inventing data', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    window.fetch = overviewFetch(window, { sourcesFails: true });
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+    const root = window.document.querySelector('[data-company-overview]');
+    assert.strictEqual(overview.partialError, true);
+    assert.ok(root.textContent.includes('Some secondary details could not be loaded'));
+    assert.ok(root.textContent.includes('No source catalogue state has been recorded.'));
+    overview.destroy();
+    dom.window.close();
+  });
+
+  function editFetch(window, options) {
+    const opts = options || {};
+    const company = opts.company || companyFixture();
+    return (url, init) => {
+      const method = (init && init.method) || 'GET';
+      if (url === '/api/v1/companies/comp_1' && method === 'GET') return jsonResponse(company);
+      if (url === '/api/v1/companies/comp_1' && method === 'PATCH') {
+        opts.patchCalls.push(JSON.parse(init.body));
+        if (opts.patchResponse) return opts.patchResponse;
+        return jsonResponse(Object.assign({}, company, JSON.parse(init.body)));
+      }
+      if (url === '/api/v1/companies/comp_1/connections') return jsonResponse({ connections: [] });
+      if (url === '/api/v1/companies/sources/catalogue') {
+        return jsonResponse({ sources: [{ id: 'accounting', name: 'Accounting and books' }] });
+      }
+      return jsonResponse({}, 404);
+    };
+  }
+
+  await testAsync('edit prefills real facts and rejects an empty name locally', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const edit = loadEdit(window);
+    const patchCalls = [];
+    window.fetch = editFetch(window, { patchCalls });
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+
+    edit.render('view', 'comp_1');
+    await settle(() => !edit.loading, 'edit load');
+    const root = window.document.querySelector('[data-company-edit]');
+    assert.ok(root, 'edit page rendered');
+    assert.strictEqual(window.document.getElementById('zcField-name').value, 'Nightowl Bakery');
+    assert.strictEqual(window.document.getElementById('zcField-owner_email').value, 'aarti@nightowl.example');
+    assert.strictEqual(window.document.getElementById('zcField-revenue_amount').value, '4800000');
+
+    setField(window, 'name', '');
+    window.document.getElementById('zcEditSave').click();
+    await settle(() => !edit.saving, 'edit save');
+    assert.strictEqual(patchCalls.length, 0, 'no request for an invalid form');
+    assert.ok(edit.errors.name);
+    const rerendered = window.document.querySelector('[data-company-edit]');
+    assert.ok(rerendered.textContent.includes('Enter the company name.'));
+    assert.strictEqual(navigations.length, 0);
+    dom.window.close();
+  });
+
+  await testAsync('edit sends cleared optional fields as empty and goes back on success', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const edit = loadEdit(window);
+    const patchCalls = [];
+    window.fetch = editFetch(window, { patchCalls });
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+    const toasts = [];
+    window.showToast = (message, tone) => toasts.push({ message, tone });
+
+    edit.render('view', 'comp_1');
+    await settle(() => !edit.loading, 'edit load');
+    setField(window, 'title', '');
+    setField(window, 'setup_notes', '');
+    setField(window, 'revenue_amount', '');
+    await edit.save();
+    await settle(() => navigations.length > 0, 'edit navigation');
+
+    assert.strictEqual(patchCalls.length, 1);
+    assert.strictEqual(patchCalls[0].title, '', 'cleared title is sent, not silently kept');
+    assert.strictEqual(patchCalls[0].setup_notes, '');
+    assert.strictEqual(patchCalls[0].revenue.amount, null);
+    assert.ok(navigations[0].endsWith('/company/comp_1/overview'));
+    assert.ok(toasts.some((toast) => toast.tone === 'success'));
+    dom.window.close();
+  });
+
+  await testAsync('edit keeps the form open and maps a duplicate name to the name field', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const edit = loadEdit(window);
+    const patchCalls = [];
+    window.fetch = editFetch(window, {
+      patchCalls,
+      patchResponse: jsonResponse({ error: 'exists', code: 'DUPLICATE_COMPANY_NAME' }, 409)
+    });
+    const navigations = [];
+    window.navigateTo = (path) => navigations.push(path);
+
+    edit.render('view', 'comp_1');
+    await settle(() => !edit.loading, 'edit load');
+    setField(window, 'name', 'Nightowl Bakery Two');
+    await edit.save();
+    await settle(() => !edit.saving, 'edit save');
+
+    assert.strictEqual(patchCalls.length, 1);
+    assert.ok(/already exists/i.test(edit.errors.name));
+    assert.strictEqual(navigations.length, 0);
+    const root = window.document.querySelector('[data-company-edit]');
+    assert.ok(root.textContent.includes('already exists'));
+    assert.strictEqual(window.document.getElementById('zcField-name').getAttribute('aria-invalid'), 'true');
+    dom.window.close();
+  });
+
+  function planFixture(overrides) {
+    return Object.assign({
+      company_id: 'comp_1',
+      company_name: 'Nightowl Bakery',
+      removal_summary: {
+        will_remove: { departments: 2, employees: 7, workflows: 3, connections: 1, files: 4, approvals: 5 },
+        will_keep: ['a minimal audit record of the deletion'],
+        will_stop: ['running workflows']
+      },
+      recovery_days: 7,
+      mfa_required: false,
+      two_step_configured: true,
+      email_available: false,
+      email_recipient: '',
+      export_format: 'PDF, split into numbered parts and zipped when needed'
+    }, overrides || {});
+  }
+
+  function deleteFetch(window, options) {
+    const opts = options || {};
+    const state = { posts: [], deletion: null };
+    state.fetch = (url, init) => {
+      const method = (init && init.method) || 'GET';
+      if (method !== 'GET') state.posts.push({ url, method, body: init.body ? JSON.parse(init.body) : null });
+      if (url === '/api/v1/companies/comp_1') return jsonResponse(companyFixture());
+      if (url === '/api/v1/companies/comp_1/deletion') return jsonResponse({ deletion: state.deletion });
+      if (url === '/api/v1/companies/comp_1/delete/plan') return jsonResponse(opts.plan || planFixture());
+      if (url === '/api/v1/companies/comp_1/delete/request' && method === 'POST') {
+        state.deletion = { status: 'AWAITING_NAME', purge_after: 0 };
+        return jsonResponse(state.deletion, 201);
+      }
+      if (url === '/api/v1/companies/comp_1/delete/confirm-name' && method === 'POST') {
+        state.deletion = { status: 'AWAITING_IDENTITY' };
+        return jsonResponse(state.deletion);
+      }
+      if (url === '/api/v1/companies/comp_1/delete/confirm-identity' && method === 'POST') {
+        if (opts.identityResponse) return opts.identityResponse(state);
+        return jsonResponse({ error: 'No verifier', code: 'TWO_STEP_NOT_CONFIGURED' }, 501);
+      }
+      if (url === '/api/v1/companies/comp_1/delete/cancel' && method === 'POST') {
+        state.deletion = null;
+        return jsonResponse({ cancelled: true, company_status: 'ONBOARDING' });
+      }
+      return jsonResponse({}, 404);
+    };
+    return state;
+  }
+
+  await testAsync('delete wizard shows real counts and refuses a wrong company name offline', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const state = deleteFetch(window);
+    window.fetch = state.fetch;
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+
+    const sheet = window.document.querySelector('.zc-delete-sheet');
+    assert.strictEqual(sheet.getAttribute('role'), 'dialog');
+    assert.strictEqual(sheet.getAttribute('aria-modal'), 'true');
+    assert.ok(sheet.textContent.includes('What will be removed'));
+    assert.ok(sheet.textContent.includes('7 days'), 'real recovery window');
+    assert.strictEqual(wizard.step, 'what');
+
+    sheet.querySelector('[data-delete-action="request"]').click();
+    await settle(() => wizard.step === 'name', 'delete name step');
+
+    const nameInput = window.document.getElementById('zcDeleteName');
+    nameInput.value = 'Nightowl Bakery Ltd';
+    nameInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const continueButton = window.document.querySelector('[data-delete-action="name-continue"]');
+    assert.strictEqual(continueButton.disabled, true, 'a wrong name cannot be submitted by click');
+
+    // Even if the click guard is bypassed, the module refuses before the server.
+    wizard.nameInput = 'Nightowl Bakery Ltd';
+    await wizard.confirmName();
+    await settle(() => !!wizard.error, 'name mismatch');
+    assert.strictEqual(wizard.error.code, 'NAME_MISMATCH');
+    assert.strictEqual(state.posts.filter((post) => post.url.endsWith('/confirm-name')).length, 0, 'server never sees a wrong name');
+
+    const corrected = window.document.getElementById('zcDeleteName');
+    corrected.value = 'Nightowl Bakery';
+    corrected.dispatchEvent(new window.Event('input', { bubbles: true }));
+    window.document.querySelector('[data-delete-action="name-continue"]').click();
+    await settle(() => wizard.step === 'identity', 'identity step');
+    assert.strictEqual(state.posts.filter((post) => post.url.endsWith('/confirm-name')).length, 1);
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('delete stops honestly when no two-step verifier exists', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const state = deleteFetch(window, {
+      plan: planFixture({ mfa_required: true, two_step_configured: false })
+    });
+    window.fetch = state.fetch;
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+    assert.ok(window.document.querySelector('.zc-delete-sheet').textContent.includes('no authenticator is configured'));
+
+    wizard.deletion = { status: 'AWAITING_IDENTITY' };
+    wizard.step = 'identity';
+    wizard._render();
+    wizard.password = 'correct horse';
+    const password = window.document.getElementById('zcDeletePassword');
+    password.value = 'correct horse';
+    password.dispatchEvent(new window.Event('input', { bubbles: true }));
+    window.document.querySelector('[data-delete-action="identity-confirm"]').click();
+    await settle(() => !!wizard.error, 'identity error');
+
+    assert.strictEqual(wizard.error.code, 'TWO_STEP_NOT_CONFIGURED');
+    assert.ok(/no verifier|no authenticator/i.test(wizard.error.message));
+    assert.ok(/Nothing was deleted/i.test(wizard.error.message));
+    assert.strictEqual(wizard.step, 'identity', 'never advances past the missing verifier');
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('delete downloads the real export, never fakes email, and can be cancelled', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const purgeAfter = Math.floor(Date.now() / 1000) + 7 * 86400;
+    const deletion = {
+      status: 'PENDING_DELETION',
+      export_status: 'READY',
+      export_available: true,
+      export_filename: 'nightowl-bakery-export.pdf.zip',
+      export_size_bytes: 204800,
+      export_parts: 3,
+      export_sha256: 'abcdef0123456789abcdef0123456789',
+      export_download_path: '/api/v1/companies/comp_1/export',
+      email_status: 'NOT_CONFIGURED',
+      email_recipient: '',
+      purge_after: purgeAfter,
+      purge_blocked_reason: 'WAITING_FOR_DOWNLOAD',
+      recovery_days: 7
+    };
+    const state = deleteFetch(window, {
+      identityResponse: () => jsonResponse({
+        deletion,
+        export: { status: 'READY', filename: deletion.export_filename, message: 'The export is ready.' }
+      })
+    });
+    state.deletion = deletion;
+    window.fetch = (url, init) => {
+      if (url === '/api/v1/companies/comp_1/export') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          blob: async () => new window.Blob(['%PDF-1.4'])
+        });
+      }
+      return state.fetch(url, init);
+    };
+    window.URL.createObjectURL = () => 'blob:mock-export';
+    window.URL.revokeObjectURL = () => {};
+    window.HTMLAnchorElement.prototype.click = function click() {};
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+    assert.strictEqual(wizard.step, 'recovery', 'an existing request resumes at its real step');
+
+    const sheet = () => window.document.querySelector('.zc-delete-sheet');
+    assert.ok(sheet().textContent.includes('nightowl-bakery-export.pdf.zip'));
+    assert.ok(sheet().textContent.includes('200 KB'));
+    assert.ok(sheet().textContent.includes('3'));
+    assert.ok(sheet().textContent.includes('Email is not configured'));
+    assert.ok(sheet().textContent.includes('Purge is waiting for the export download'));
+
+    sheet().querySelector('[data-delete-action="download"]').click();
+    await settle(() => !!wizard.notice, 'download');
+    assert.ok(wizard.notice.includes('nightowl-bakery-export.pdf.zip'));
+    assert.ok(!wizard.notice.toLowerCase().includes('emailed'));
+
+    sheet().querySelector('[data-delete-action="cancel"]').click();
+    await settle(() => wizard.step === 'done', 'cancel');
+    assert.strictEqual(wizard.cancelled, true);
+    assert.ok(state.posts.some((post) => post.url.endsWith('/delete/cancel')));
+    assert.ok(sheet().textContent.includes('Deletion cancelled'));
+    assert.ok(sheet().textContent.includes('No company data was removed'));
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('delete never pretends a failed export succeeded', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const state = deleteFetch(window, {
+      identityResponse: () => jsonResponse({
+        deletion: { status: 'PENDING_DELETION', export_status: 'FAILED', export_available: false, purge_blocked_reason: 'EXPORT_FAILED' },
+        export: { status: 'FAILED', message: 'The export could not be generated. Nothing has been purged.' }
+      })
+    });
+    window.fetch = state.fetch;
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+    wizard.deletion = { status: 'AWAITING_IDENTITY' };
+    wizard.step = 'identity';
+    wizard._render();
+    const password = window.document.getElementById('zcDeletePassword');
+    password.value = 'correct horse';
+    password.dispatchEvent(new window.Event('input', { bubbles: true }));
+    window.document.querySelector('[data-delete-action="identity-confirm"]').click();
+    await settle(() => wizard.step === 'export', 'failed export step');
+
+    const sheet = window.document.querySelector('.zc-delete-sheet');
+    assert.ok(sheet.textContent.includes('The export failed, so nothing was purged'));
+    assert.ok(sheet.querySelector('[data-delete-action="export-retry"]'));
+    assert.strictEqual(sheet.querySelector('[data-delete-action="download"]'), null, 'no download for a missing file');
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('stage 5 wiring is present in the shell, router and scripts', async () => {
+    const html = read('web/index.html');
+    const app = read('web/app.js');
+    const workspace = read('web/company_workspace.js');
+    assert.ok(html.includes('company_setup_overview.js'));
+    assert.ok(html.includes('company_setup_edit.js'));
+    assert.ok(html.includes('company_setup_delete.js'));
+    assert.ok(html.indexOf('company_setup_overview.js') < html.indexOf('<script src="app.js">'), 'modules load before the router');
+    assert.ok(app.includes('/^\\/company\\/([^/]+)\\/overview\\/?$/'));
+    assert.ok(app.includes('/^\\/company\\/([^/]+)\\/edit\\/?$/'));
+    assert.ok(workspace.includes("if (tab === 'overview')"));
+    assert.ok(workspace.includes('/edit'));
+    assert.ok(!app.includes('comp_primary'), 'no legacy primary-company fallback in the router');
+  });
+
   console.log(`\n${passed} company setup UI checks passed.`);
 })().catch((err) => {
   console.error(err);

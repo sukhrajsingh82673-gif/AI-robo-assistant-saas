@@ -2153,3 +2153,946 @@ body.zc-sheet-open {
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Stage 5 — overview, edit, protected delete
+   Apple restraint again: one accent, quiet separators, 44pt targets,
+   real focus rings, logical properties so RTL needs no duplicate rules.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Overview
+   -------------------------------------------------------------------------- */
+.zc-overview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-4);
+}
+
+.zc-overview-heading {
+  min-width: 0;
+}
+
+.zc-overview-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.zc-overview-title-row .zc-flow-title {
+  margin: 0;
+}
+
+.zc-overview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: var(--s-2) 0 0;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.zc-overview-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 0 0 auto;
+}
+
+.zc-readonly-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.zc-menu-wrap {
+  position: relative;
+}
+
+.zc-overview-menu-button {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.zc-menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 190px;
+  padding: 5px;
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.zc-menu[hidden] {
+  display: none;
+}
+
+.zc-menu-item {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: calc(var(--r-md) - 3px);
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.zc-menu-item:hover,
+.zc-menu-item:focus-visible {
+  background: var(--surface-2);
+}
+
+.zc-menu-item-danger {
+  color: var(--red);
+}
+
+.zc-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+
+.zc-overview-card {
+  padding: var(--s-5);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.zc-overview-card-wide {
+  grid-column: 1 / -1;
+}
+
+.zc-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.zc-overview-list > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.7fr) minmax(0, 1.3fr);
+  gap: var(--s-3);
+  padding: 9px 0;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.zc-overview-list > div:last-child {
+  border-bottom: none;
+}
+
+.zc-overview-list dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.zc-overview-list dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+
+.zc-overview-list a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.zc-overview-description {
+  margin: var(--s-3) 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--label-2);
+  white-space: pre-wrap;
+}
+
+.zc-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.zc-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.zc-metric-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--label-3);
+}
+
+.zc-metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.zc-metric-value small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.zc-metric-note {
+  font-size: 11.5px;
+  color: var(--label-2);
+}
+
+.zc-overview-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+
+.zc-overview-percent {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.zc-overview-phases {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--s-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zc-overview-phase {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: var(--s-2);
+  align-items: center;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--label-2);
+}
+
+.zc-overview-phase-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--separator);
+}
+
+.zc-overview-phase.zc-phase-done .zc-overview-phase-dot,
+.zc-overview-phase.zc-phase-done_with_gaps .zc-overview-phase-dot {
+  background: var(--green);
+}
+
+.zc-overview-phase.zc-phase-running .zc-overview-phase-dot {
+  background: var(--accent);
+}
+
+.zc-overview-phase.zc-phase-failed .zc-overview-phase-dot {
+  background: var(--red);
+}
+
+.zc-overview-phase-state {
+  font-size: 11px;
+  color: var(--label-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.zc-overview-subtitle {
+  margin: var(--s-4) 0 var(--s-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--label);
+}
+
+.zc-overview-sources,
+.zc-overview-connections,
+.zc-overview-legal,
+.zc-overview-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zc-overview-source,
+.zc-overview-connections li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--separator);
+  font-size: 13px;
+  color: var(--label);
+}
+
+.zc-overview-source:last-child,
+.zc-overview-connections li:last-child {
+  border-bottom: none;
+}
+
+.zc-overview-source-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zc-overview-connection-status {
+  font-size: 11.5px;
+  color: var(--label-2);
+}
+
+.zc-overview-legal li {
+  padding: 9px 0;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.zc-overview-legal li:last-child {
+  border-bottom: none;
+}
+
+.zc-overview-legal-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.zc-overview-legal-status {
+  font-size: 11.5px;
+  color: var(--label-2);
+}
+
+.zc-overview-legal-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--label-3);
+}
+
+.zc-overview-activity li {
+  display: flex;
+  gap: var(--s-3);
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.zc-overview-activity li:last-child {
+  border-bottom: none;
+}
+
+.zc-overview-activity-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.zc-overview-activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.zc-overview-activity-action {
+  font-size: 13px;
+  color: var(--label);
+}
+
+.zc-overview-activity-meta {
+  font-size: 11.5px;
+  color: var(--label-3);
+}
+
+.zc-deletion-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  padding: var(--s-4);
+  border: 0.5px solid rgba(255, 59, 48, 0.28);
+  border-radius: var(--r-lg);
+  background: var(--red-tint);
+}
+
+.zc-deletion-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--label);
+}
+
+.zc-deletion-countdown {
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.zc-deletion-banner-actions {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   2. Edit
+   -------------------------------------------------------------------------- */
+.zc-edit-type {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.zc-edit-type .zc-section-note {
+  margin: 0;
+}
+
+.zc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--label-3) 50%),
+    linear-gradient(135deg, var(--label-3) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-inline-end: 34px;
+}
+
+[dir='rtl'] .zc-select {
+  background-position: 18px 50%, 13px 50%;
+}
+
+.zc-field-row-three {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+}
+
+.zc-error-list {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.zc-edit-connections .zc-form-footnote {
+  margin-top: var(--s-3);
+}
+
+.zc-edit-connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 var(--s-3);
+  padding: 0;
+  list-style: none;
+}
+
+.zc-edit-connection-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 9px 0;
+  border-bottom: 0.5px solid var(--separator);
+  font-size: 13px;
+}
+
+.zc-edit-connection-list li:last-child {
+  border-bottom: none;
+}
+
+.zc-edit-connection-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--label);
+}
+
+.zc-link-danger {
+  color: var(--red);
+}
+
+.zc-connection-add-row {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.zc-connection-add-row .zc-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. Protected deletion sheet
+   -------------------------------------------------------------------------- */
+.zc-delete-overlay {
+  z-index: 9999;
+}
+
+.zc-delete-sheet {
+  width: 100%;
+  max-width: 580px;
+  max-height: min(92vh, 820px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  border: 0.5px solid var(--separator);
+  box-shadow: var(--shadow-4);
+  animation: zc-dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.zc-delete-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-5) var(--s-2);
+  flex: 0 0 auto;
+}
+
+.zc-delete-title {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+
+.zc-delete-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 var(--s-5) var(--s-3);
+  list-style: none;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.zc-delete-steps::-webkit-scrollbar {
+  display: none;
+}
+
+.zc-delete-steps li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.zc-delete-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--label-2);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.zc-delete-steps li.is-current {
+  color: var(--label);
+}
+
+.zc-delete-steps li.is-current .zc-delete-step-dot {
+  background: var(--label);
+  color: var(--surface);
+}
+
+.zc-delete-steps li.is-done .zc-delete-step-dot {
+  background: var(--green-tint);
+  color: var(--green);
+}
+
+.zc-delete-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zc-delete-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--s-5) var(--s-5);
+}
+
+.zc-delete-lead {
+  margin: 0 0 var(--s-4);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--label);
+}
+
+.zc-delete-section {
+  margin-bottom: var(--s-4);
+}
+
+.zc-delete-section h3 {
+  margin: 0 0 var(--s-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--label);
+}
+
+.zc-delete-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--separator);
+}
+
+.zc-delete-counts li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: 10px 12px;
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--label-2);
+}
+
+.zc-delete-counts strong {
+  font-size: 15px;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.zc-delete-list {
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--label-2);
+}
+
+.zc-delete-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: var(--s-3) 0;
+}
+
+.zc-delete-facts > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.3fr);
+  gap: var(--s-3);
+  padding: 7px 0;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.zc-delete-facts > div:last-child {
+  border-bottom: none;
+}
+
+.zc-delete-facts dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.zc-delete-facts dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+
+.zc-mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+}
+
+.zc-delete-name {
+  margin: 0 0 var(--s-3);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+
+.zc-delete-export-card {
+  padding: var(--s-4);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.zc-delete-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.zc-delete-email-status {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--label);
+}
+
+.zc-delete-window {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--label);
+}
+
+.zc-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-5) var(--s-5);
+  flex: 0 0 auto;
+  border-top: 0.5px solid var(--separator);
+  background: var(--surface);
+}
+
+.zc-delete-body .zc-delete-actions {
+  padding: var(--s-3) 0 0;
+  border-top: none;
+}
+
+.zc-button-danger {
+  background: var(--red);
+  color: #FFFFFF;
+}
+
+.zc-button-danger:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.zc-delete-done {
+  padding: var(--s-3) 0 var(--s-4);
+}
+
+.zc-delete-done-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--s-3);
+  border-radius: 50%;
+  background: var(--green-tint);
+  color: var(--green);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.zc-delete-done-cancel {
+  background: var(--surface-2);
+  color: var(--label-2);
+}
+
+/* --------------------------------------------------------------------------
+   4. Phone: bottom sheet, one column, 44pt controls
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .zc-overview-header {
+    flex-direction: column;
+  }
+
+  .zc-overview-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .zc-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zc-overview-card-wide {
+    grid-column: auto;
+  }
+
+  .zc-overview-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .zc-deletion-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .zc-field-row,
+  .zc-field-row-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zc-connection-add-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zc-connection-add-row .zc-button {
+    width: 100%;
+  }
+
+  .zc-delete-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .zc-delete-sheet {
+    max-width: none;
+    max-height: 94vh;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    border-bottom: none;
+    animation: zc-sheet-up 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .zc-delete-head {
+    padding-bottom: var(--s-1);
+  }
+
+  .zc-delete-title {
+    font-size: 19px;
+  }
+
+  .zc-delete-step-label {
+    display: none;
+  }
+
+  .zc-delete-steps {
+    gap: 6px;
+    padding-bottom: var(--s-4);
+  }
+
+  .zc-delete-steps li {
+    flex: 1 1 0;
+  }
+
+  .zc-delete-step-dot {
+    width: 26px;
+    height: 26px;
+    margin: 0 auto;
+  }
+
+  .zc-delete-counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zc-delete-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .zc-delete-actions .zc-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .zc-overview-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zc-overview-list > div,
+  .zc-delete-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .zc-delete-counts li {
+    padding: 9px 10px;
+  }
+
+  .zc-delete-body,
+  .zc-delete-head,
+  .zc-delete-actions {
+    padding-inline: var(--s-4);
+  }
+
+  .zc-delete-steps {
+    padding-inline: var(--s-4);
+  }
+}
+
+@keyframes zc-sheet-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zc-delete-sheet,
+  .zc-menu {
+    animation: none;
+  }
+}
