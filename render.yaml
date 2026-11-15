@@ -11,7 +11,7 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
-    branch: engineering/production-readiness-gap-closure
+    branch: ui-redesign
     healthCheckPath: /readyz
     autoDeploy: true
     envVars:

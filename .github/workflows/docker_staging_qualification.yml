@@ -2,7 +2,7 @@ name: Docker Staging CI Qualification Pipeline
 
 on:
   push:
-    branches: [ main, engineering/*, release/* ]
+    branches: [ main, ui-redesign, engineering/*, release/* ]
   pull_request:
     branches: [ main, engineering/* ]
   workflow_dispatch:

@@ -650,6 +650,11 @@ a { color: var(--ura-accent); }
    Mobile tab bar and drawer
    -------------------------------------------------------------------------- */
 .ura-tabbar { display: none; }
+/* The URA tab bar replaces the legacy phone bar; keep the markup for the
+   assistant tests but never show two bottom bars at once. */
+@media (max-width: 860px) {
+  .mobile-bottom-nav { display: none !important; }
+}
 @media (max-width: 860px) {
   .ura-sidebar {
     inset-block: 10px;

@@ -2,7 +2,7 @@ name: ZONATA Enterprise CI/CD & Open-Source Qualification Pipeline
 
 on:
   push:
-    branches: [ main, release/* ]
+    branches: [ main, ui-redesign, release/* ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:

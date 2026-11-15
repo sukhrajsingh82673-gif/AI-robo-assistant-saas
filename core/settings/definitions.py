@@ -336,6 +336,11 @@ SETTINGS_DEFINITIONS = [
         "options": ["Asia/Kolkata", "UTC", "America/New_York", "Europe/London", "Asia/Dubai", "Asia/Singapore", "America/Los_Angeles", "Asia/Tokyo"],
         "desc": "Global operating timezones governing inter-company operations, reporting, and dispatch."
     },
+    {
+        "id": "company_delete_recovery_days", "category": "company", "name": "Company Deletion Recovery Window (Days)", "type": "number",
+        "default": 7, "scope": "Company", "editable_by": "OWNER", "risk": "HIGH", "min": 0, "max": 90, "unit": "days",
+        "desc": "How long a deleted company can be restored before its data is purged. Zero means purge as soon as the protected export has been delivered or downloaded. The owner or an allowed company admin can cancel inside this window."
+    },
 
     # --- 4. Organization ---
     {

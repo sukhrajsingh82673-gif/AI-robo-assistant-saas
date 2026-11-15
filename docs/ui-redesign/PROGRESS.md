@@ -324,3 +324,26 @@ Chromium, Playwright or browser binary, so light/dark screenshots and the
 Playwright run of the same journey could not be produced. The jsdom runner is
 the runnable fallback in the repo; the browser pass remains an environment
 gap, not a code gap.
+
+---
+
+## Company setup — Stage 2 (switcher, Add page, i18n)
+
+Stage 2 of the separate company-setup program landed on the same branch. It
+adds `web/i18n.js`, `web/company_setup_switcher.js`,
+`web/company_setup_add.js` and `web/company_setup.css`, and rewires the shell,
+router, company context, entry flows, overview empty state and assistant
+intent shortcut. The switcher now shows the current company first, has a real
+empty state, keeps Add last, and becomes a bottom sheet on phones. `/company/add`
+is a new route with the two-card choice, a help panel and an agent-disabled
+state. Arabic switches the document to RTL. The fabricated
+`comp_primary / ZONATA Technologies` fallbacks are gone from these surfaces.
+
+**Gates.** `npm run typecheck` (65 files), `npm run lint`,
+`npm run test:company` (45 pytest + 16 jsdom/static checks) and
+`npm run test:assistant` (79 pytest + 41 + 29 + 12 checks) all pass.
+
+**Environment gap unchanged.** There is still no Chromium/Playwright here, so
+the 360px/RTL visual pass and screenshots for these new surfaces remain
+pending a real browser. jsdom covers ordering, empty state, keyboard model,
+permission gate, language switching and currency formatting.

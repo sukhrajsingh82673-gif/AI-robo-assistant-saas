@@ -6,7 +6,7 @@
   <title>URA — Universal Company OS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="design_tokens.css" />
   <link rel="stylesheet" href="components.css" />
   <link rel="stylesheet" href="app_shell.css" />
@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="ura_assistant.css" />
   <link rel="stylesheet" href="settings_v2.css" />
   <link rel="stylesheet" href="ura_ui.css" />
+  <link rel="stylesheet" href="company_setup.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230071e3'/><text x='50%' y='68%' font-size='60' font-weight='800' fill='white' text-anchor='middle'>U</text></svg>" />
 </head>
 <body>
@@ -52,203 +53,8 @@
       </div>
 
       <!-- Navigation Menu: Complete Company Operations & Platform Control -->
-      <nav class="sidebar-nav">
-        <div class="nav-section-label">Company Operating System</div>
-
-        <button class="nav-item active" data-nav="overview" id="navItemOverview">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          </div>
-          <span class="nav-label">Home</span>
-        </button>
-
-        <button class="nav-item" data-nav="coworker" id="navItemCoworker">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          </div>
-          <span class="nav-label">Coworker 2.0</span>
-          <span class="nav-pill" style="background:#10b981; color:white;">EXEC</span>
-        </button>
-
-        <button class="nav-item" data-nav="missions" id="navItemWork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <span class="nav-label">Work & Missions</span>
-        </button>
-
-        <button class="nav-item" data-nav="schedule" id="navItemSchedule">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <span class="nav-label">Schedule</span>
-        </button>
-
-        <button class="nav-item" data-nav="operations" id="navItemOperations">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-          </div>
-          <span class="nav-label">Operations</span>
-        </button>
-
-        <button class="nav-item" data-nav="customers" id="navItemCustomers">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-          </div>
-          <span class="nav-label">Customers / CRM</span>
-        </button>
-
-        <button class="nav-item" data-nav="finance" id="navItemFinance">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <span class="nav-label">Finance & GL</span>
-        </button>
-
-        <button class="nav-item" data-nav="people" id="navItemPeople">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <span class="nav-label">People & HR</span>
-        </button>
-
-        <button class="nav-item" data-nav="records" id="navItemRecords">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <span class="nav-label">Records</span>
-          <span class="nav-pill" style="background:#0ea5e9; color:white;">Ledger</span>
-        </button>
-
-        <button class="nav-item" data-nav="files" id="navItemFiles">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <span class="nav-label">Files & Docs</span>
-        </button>
-
-        <button class="nav-item" data-nav="reports" id="navItemReports">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </div>
-          <span class="nav-label">Reports & BI</span>
-        </button>
-
-        <button class="nav-item" data-nav="agent-factory" id="navItemAgentFactory">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          </div>
-          <span class="nav-label">Agent Factory</span>
-          <span class="nav-pill" style="background:#8b5cf6; color:white;">True</span>
-        </button>
-
-        <button class="nav-item" data-nav="integrations" id="navItemIntegrations">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          </div>
-          <span class="nav-label">Integrations</span>
-        </button>
-
-        <button class="nav-item" data-nav="approvals" id="navItemApprovals">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">Approvals</span>
-        </button>
-
-        <button class="nav-item" data-nav="activity" id="navItemActivity">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </div>
-          <span class="nav-label">Activity</span>
-        </button>
-
-        <button class="nav-item" data-nav="governance" id="navItemGovernance">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">Governance</span>
-          <span class="nav-pill" style="background:#10b981; color:white;">HOST</span>
-        </button>
-
-        <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
-
-        <button class="nav-item" data-nav="ceo-records" id="navItemCeo">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <span class="nav-label">AI CEO Records</span>
-        </button>
-
-        <button class="nav-item" data-nav="workforce" id="navItemWorkforce">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
-          </div>
-          <span class="nav-label">AI Workforce</span>
-        </button>
-
-        <button class="nav-item" data-nav="company" id="navItemCompany">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
-          </div>
-          <span class="nav-label">Company & Org</span>
-        </button>
-
-        <button class="nav-item" data-nav="terminal" id="navItemTerminal">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          </div>
-          <span class="nav-label">Governed Terminal</span>
-        </button>
-
-        <button class="nav-item" data-nav="workflows" id="navItemWorkflows">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </div>
-          <span class="nav-label">Workflows</span>
-        </button>
-
-        <button class="nav-item" data-nav="agent-network" id="navItemAgentNetwork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <span class="nav-label">Agent Network</span>
-        </button>
-
-        <button class="nav-item" data-nav="mcp-network" id="navItemMcpNetwork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </div>
-          <span class="nav-label">MCP Network</span>
-        </button>
-
-        <button class="nav-item" data-nav="openhands-execution" id="navItemOpenHands">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          </div>
-          <span class="nav-label">Agent Execution</span>
-        </button>
-
-        <button class="nav-item" data-nav="browser-execution" id="navItemBrowserExecution">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <span class="nav-label">Browser Use</span>
-        </button>
-
-        <button class="nav-item" data-nav="temporal-durable" id="navItemTemporalDurable">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <span class="nav-label">Durable Temporal</span>
-        </button>
-
-        <button class="nav-item" data-nav="trustgraph" id="navItemTrustGraph">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">TrustGraph</span>
-        </button>
+      <!-- Navigation is rendered from the URA screen registry -->
+      <nav class="sidebar-nav" id="uraNav"></nav>
 
       <div class="ura-sidebar-footer" id="uraSidebarFooter"></div>
     </aside>
@@ -412,7 +218,11 @@
     </button>
   </nav>
 
+  <!-- URA mobile tab bar (rendered by ura_shell.js) -->
+  <nav class="ura-tabbar" id="uraTabbar"></nav>
+
   <!-- Reconstructed Subsystem Scripts -->
+  <script src="i18n.js"></script>
   <script src="company_context.js"></script>
   <script src="company_workspace.js"></script>
   <script src="ai_ceo_workspace.js"></script>
@@ -466,6 +276,15 @@
   <script src="app_shell.js"></script>
   <script src="entry_flows.js"></script>
   <script src="design_preview_workspace.js"></script>
+  <!-- Company setup: switcher + Add page (before the app router) -->
+  <script src="company_setup_switcher.js"></script>
+  <script src="company_setup_add.js"></script>
+  <script src="company_setup_create.js"></script>
+  <script src="company_setup_existing.js"></script>
+  <script src="company_setup_progress.js"></script>
+  <script src="company_setup_overview.js"></script>
+  <script src="company_setup_edit.js"></script>
+  <script src="company_setup_delete.js"></script>
   <!-- Application Script -->
   <script src="app.js"></script>
   <!-- URA UI layer: core, settings, screens, shell -->

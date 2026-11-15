@@ -730,7 +730,17 @@
     setInterval(loadNotifications, 60000);
 
     var chip = document.getElementById('companyChipBtn');
-    if (chip) chip.addEventListener('click', function (e) { e.preventDefault(); openCompanyMenu(chip); });
+    if (chip) chip.addEventListener('click', function (e) {
+      e.preventDefault();
+      // One switcher for the whole app: the company setup switcher owns
+      // listing, selecting and adding companies. The local menu is only a
+      // fallback when that layer has not loaded.
+      if (window.CompanySetupSwitcher && typeof window.CompanySetupSwitcher.open === 'function') {
+        window.CompanySetupSwitcher.open();
+        return;
+      }
+      openCompanyMenu(chip);
+    });
 
     var menu = document.getElementById('menuToggleBtn');
     if (menu) menu.addEventListener('click', function (e) { e.preventDefault(); toggleDrawer(); });

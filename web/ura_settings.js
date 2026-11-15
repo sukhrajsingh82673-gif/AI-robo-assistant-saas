@@ -151,8 +151,9 @@
       suggest: function () { return s(false, 'Security detail belongs in its own screen unless you must forward it.'); } },
 
     // Security and privacy
-    { key: 'twofa', cat: 'security', label: 'Two-step sign-in', hint: 'Requires a second check when signing in.', type: 'switch',
-      suggest: function () { return s(true, 'A second check is the cheapest protection for an owner account.'); } },
+    // Two-step is not a local preference: it is a real authenticator enrollment
+    // managed by the server. It is shown on the Security screen and set up in
+    // the deletion sheet, so there is no local switch here that could claim it.
     { key: 'session', cat: 'security', label: 'Stay signed in', hint: 'How long a session lasts before it asks again.', type: 'seg',
       options: [['15m', '15 min'], ['1h', '1 hour'], ['8h', '8 hours'], ['never', 'Until I sign out']],
       suggest: function () { return s('1h', 'One hour balances safety with not interrupting your work.'); } },

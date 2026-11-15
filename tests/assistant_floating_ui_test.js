@@ -19,6 +19,7 @@ const app = read('web/app.js');
 const index = read('web/index.html');
 const css = read('web/ura_assistant.css');
 const styles = read('web/styles.css');
+const screens = read('web/ura_screens.js');
 let passed = 0;
 
 function test(name, fn) {
@@ -36,7 +37,8 @@ test('exactly one assistant mount and no full-page assistant view', () => {
 });
 
 test('the Co-worker screen, route, nav and renderer are preserved', () => {
-  assert.ok(index.includes('data-nav="coworker"'));
+  assert.ok(index.includes('id="uraNav"'), 'the URA shell renders navigation from the registry');
+  assert.ok(screens.includes("id: 'coworker'"), 'the Co-worker stays in the nav registry');
   assert.ok(index.includes('id="view-coworker"'));
   assert.ok(index.includes('assistant_coworker_workspace.js'));
   assert.ok(index.includes('apple_coworker_assistant.js'));
@@ -50,7 +52,7 @@ test('AI CEO chat is gone and legacy CEO links open the assistant', () => {
   assert.ok(!index.includes('ceoChatFeedback'));
   assert.ok(app.includes("cleanPath.startsWith('/ceo')"));
   assert.ok(app.includes('window.URAAssistant.open({ focus'));
-  assert.ok(index.includes('data-nav="ceo-records"'));
+  assert.ok(index.includes('id="view-ceo-records"'), 'the CEO records screen container still exists');
   assert.ok(app.includes("cleanPath.startsWith('/company/ceo-records')"));
   assert.ok(app.includes("render('view-ceo-records')"));
 });

@@ -161,7 +161,8 @@ Categories, keys, defaults and the suggestion logic:
 - `repFreq` (daily | weekly | monthly), `repEmail`, `repProfit`, `repSales`, `repSec` (switches). Defaults: weekly, owner email, profit on, sales on, security off.
 
 **Security and privacy**
-- `twofa` (suggest on), `session` (15m | 1h | 8h | never, suggest 1h), `audit` (30 | 90 | 365 days, suggest 365), `region` (data location, suggest the active company's region), `terminalOn` (default on).
+- `session` (15m | 1h | 8h | never, suggest 1h), `audit` (30 | 90 | 365 days, suggest 365), `region` (data location, suggest the active company's region), `terminalOn` (default on).
+- Two-step sign-in is **not** a local preference. Since Stage 7 it is a real TOTP enrollment per account (`/api/auth/two-step/*`), shown from server state on the Security screen and set up in the company-deletion identity step. Do not add a local switch for it.
 
 **Menu and team**
 - Show or hide each menu screen (Settings and Overview cannot be hidden). Invite, edit role and remove teammates (owner, admin, member, viewer) through sheets.
@@ -176,7 +177,7 @@ Implement these as real, tested rules, not per-screen hacks:
 4. **Approvals rule** (`needsOwner`): an item needs the owner when its risk level is above the autonomy level (ask = -1, balanced = 0, auto = 1, with low = 0, medium = 1, high = 2), or its amount is above `payLimit`, or its kind is `cowork`. The Approvals list, the sidebar badge, the Overview "Decisions waiting" and the bell all use this one function. In the sample data: ask me first gives 6 waiting, balanced 4, mostly autonomous 3.
 5. **Notifications:** the bell and badge show only enabled categories. Quiet hours hide the badge.
 6. **Reports:** the Reports screen and its "Next report" line use frequency, recipient and included sections.
-7. **Security score** (`secScore`): 58 + 14 if two-step sign-in + session (15m +8, 1h +6, 8h +2, never -8) + audit retention (30 days +1, 90 days +4, 365 days +7) - 6 for each open finding + 3 if the data region matches the company's region, clamped 8 to 100. The Security screen updates live when these settings change.
+7. **Security score** (`secScore`): 58 + 14 only when the server reports this account's two-step enrollment + session (15m +8, 1h +6, 8h +2, never -8) + audit retention (30 days +1, 90 days +4, 365 days +7) - 6 for each open finding + 3 if the data region matches the company's region, clamped 8 to 100. The Security screen updates live when these settings change; two-step comes from `/api/auth/two-step/status`, never from a local toggle.
 8. **Terminal:** off hides it from the menu and the palette, and opening it directly shows the "hidden" card.
 9. **Menu and team:** hidden screens disappear from the menu, tabs and palette.
 10. **CEO tone and hours:** `tone` changes CEO replies; `hours` changes the status pill text.

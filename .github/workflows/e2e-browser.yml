@@ -2,7 +2,7 @@ name: ZONATA Public GA — Playwright Browser End-to-End Qualification Suite
 
 on:
   push:
-    branches: [ main, engineering/production-readiness-gap-closure ]
+    branches: [ main, ui-redesign, engineering/production-readiness-gap-closure ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:

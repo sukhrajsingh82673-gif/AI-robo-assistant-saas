@@ -213,6 +213,9 @@ ThemeManager.apply();
 document.addEventListener('DOMContentLoaded', async () => {
   ThemeManager.init();
   await loadStoredSession();
+  if (window.I18n && window.I18n.loadPreferences) {
+    await window.I18n.loadPreferences();
+  }
   loadData();
   setupEventListeners();
   renderApp();
@@ -435,6 +438,7 @@ async function syncWithBackend() {
         localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
         populateGlobalCompanySelector();
         updateBreadcrumbs();
+        syncCompanySurfaces();
         renderActiveNavView();
       }
     }
@@ -458,15 +462,40 @@ function populateGlobalCompanySelector() {
   const sel = document.getElementById('globalCompanySelector');
   if (!sel) return;
   const currentVal = state.activeCompanyId || '';
-  
-  let optionsHtml = `<option value="">All Companies (Group Portfolio)</option>`;
+
   const deduped = sanitizeCompanies(state.companies);
-  deduped.forEach(c => {
+  if (!deduped.length) {
+    // No fabricated company: give the dropdown a truthful empty state.
+    sel.innerHTML = `<option value="">No company yet — add one</option>`;
+    return;
+  }
+
+  // Current company first, then the rest in their existing order.
+  const active = deduped.find(c => c.id === currentVal);
+  const ordered = active ? [active].concat(deduped.filter(c => c.id !== active.id)) : deduped;
+
+  let optionsHtml = `<option value="">All Companies (Group Portfolio)</option>`;
+  ordered.forEach(c => {
     const isSelected = c.id === currentVal ? 'selected' : '';
-    optionsHtml += `<option value="${c.id}" ${isSelected}>${c.name}</option>`;
+    const label = active && c.id === active.id ? `${c.name} (current)` : c.name;
+    optionsHtml += `<option value="${escapeHtml(c.id)}" ${isSelected}>${escapeHtml(label)}</option>`;
   });
   sel.innerHTML = optionsHtml;
 }
+
+/**
+ * Keep the sidebar switcher, the topbar dropdown and the assistant chip in
+ * sync with the canonical company list. Never invents a company.
+ */
+function syncCompanySurfaces() {
+  if (window.CompanySetupSwitcher && typeof window.CompanySetupSwitcher.syncSidebar === 'function') {
+    window.CompanySetupSwitcher.syncSidebar();
+  }
+  if (window.URAAssistant && typeof window.URAAssistant.refreshContext === 'function') {
+    window.URAAssistant.refreshContext();
+  }
+}
+window.syncCompanySurfaces = syncCompanySurfaces;
 
 function handleGlobalCompanyContextChange(companyId) {
   state.activeCompanyId = companyId || null;
@@ -475,9 +504,7 @@ function handleGlobalCompanyContextChange(companyId) {
   }
   populateGlobalCompanySelector();
   updateBreadcrumbs();
-  if (window.URAAssistant && window.URAAssistant.refreshContext) {
-    window.URAAssistant.refreshContext();
-  }
+  syncCompanySurfaces();
   
   const comp = state.companies.find(c => c.id === companyId);
   const label = comp ? comp.name : 'All Companies (Group Portfolio)';
@@ -750,6 +777,7 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/trustgraph')) navKey = 'trustgraph';
+  else if (cleanPath === '/company/add' || cleanPath === '/company/add/') navKey = 'company';
   else if (cleanPath.startsWith('/company')) navKey = 'company';
   else if (cleanPath.startsWith('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/tasks')) navKey = 'tasks';
@@ -797,6 +825,9 @@ function handleRoute(path) {
   }
 
   try {
+    if (window.CompanySetupProgress && !/^\/company\/[^/]+\/build\/?$/.test(cleanPath)) {
+      window.CompanySetupProgress.destroy();
+    }
     if (navKey === 'overview') {
       if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
         window.OverviewWorkspace.render('view-overview');
@@ -842,7 +873,23 @@ function handleRoute(path) {
       window.MeetingRoomWorkspace.render('view-meeting');
     } else if (navKey === 'plugins' && window.PluginsWorkspace) {
       window.PluginsWorkspace.render('view-plugins');
+    } else if (navKey === 'company' && (cleanPath === '/company/add' || cleanPath === '/company/add/') && window.CompanySetupAdd) {
+      window.CompanySetupAdd.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/create' || cleanPath === '/company/create/') && window.CompanySetupCreate) {
+      window.CompanySetupCreate.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/existing' || cleanPath === '/company/existing/') && window.CompanySetupExisting) {
+      window.CompanySetupExisting.render('view-company');
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/build\/?$/.test(cleanPath) && window.CompanySetupProgress) {
+      const buildMatch = cleanPath.match(/^\/company\/([^/]+)\/build\/?$/);
+      window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/overview\/?$/.test(cleanPath) && window.CompanySetupOverview) {
+      const overviewMatch = cleanPath.match(/^\/company\/([^/]+)\/overview\/?$/);
+      window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/edit\/?$/.test(cleanPath) && window.CompanySetupEdit) {
+      const editMatch = cleanPath.match(/^\/company\/([^/]+)\/edit\/?$/);
+      window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
     } else if (navKey === 'company' && window.CompanyWorkspace) {
+      if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
       window.CompanyWorkspace.render(cleanPath);
     } else if (navKey === 'organization' && window.OrgWorkspace) {
       window.OrgWorkspace.render('view-organization', cleanPath);
@@ -938,6 +985,27 @@ function setupEventListeners() {
   const searchDropdown = document.getElementById('commandPaletteResults');
   let searchDebounceTimer = null;
   if (searchInput) {
+    const companyPaletteRows = `
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+           onclick="if(window.CompanySetupSwitcher){window.CompanySetupSwitcher.open();} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">🔀</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Switch company</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Change the operating context</div>
+        </div>
+      </div>
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+           onclick="if(window.navigateTo){window.navigateTo('/company/add');} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">➕</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Add company</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Create new or connect an existing business</div>
+        </div>
+      </div>`;
     const assistantPaletteRow = `
       <div class="search-result-item" role="button" tabindex="0"
            style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
@@ -948,9 +1016,10 @@ function setupEventListeners() {
           <div style="font-size:11.5px; color:var(--text-secondary);">Open URA Assistant · Ctrl/Cmd+J</div>
         </div>
       </div>`;
+    const defaultPaletteRows = companyPaletteRows + assistantPaletteRow;
     searchInput.addEventListener('focus', () => {
       if (searchDropdown && !searchInput.value.trim()) {
-        searchDropdown.innerHTML = assistantPaletteRow;
+        searchDropdown.innerHTML = defaultPaletteRows;
         searchDropdown.style.display = 'block';
       }
     });
@@ -959,7 +1028,7 @@ function setupEventListeners() {
       clearTimeout(searchDebounceTimer);
       if (!q || q.length < 2) {
         if (searchDropdown) {
-          searchDropdown.innerHTML = assistantPaletteRow;
+          searchDropdown.innerHTML = defaultPaletteRows;
           searchDropdown.style.display = 'block';
         }
         return;
@@ -1100,6 +1169,7 @@ function renderApp() {
 
     populateGlobalCompanySelector();
     updateBreadcrumbs();
+    syncCompanySurfaces();
 
     // Preserve URL hash route on load/refresh to prevent unwanted redirection to overview
     const initialHash = window.location.hash ? window.location.hash.slice(1).replace(/^\/+/, '/') : '';
@@ -1759,8 +1829,37 @@ function drawOverviewActivityChart() {
 // ==========================================================================
 function renderCompanySection() {
   const currentRoute = (window.location.hash.slice(1) || '/company');
+  const route = currentRoute.startsWith('/company') ? currentRoute : '/company';
+  if (route === '/company/add' || route === '/company/add/') {
+    if (window.CompanySetupAdd) window.CompanySetupAdd.render('view-company');
+    return;
+  }
+  if (route === '/company/create' || route === '/company/create/') {
+    if (window.CompanySetupCreate) window.CompanySetupCreate.render('view-company');
+    return;
+  }
+  if (route === '/company/existing' || route === '/company/existing/') {
+    if (window.CompanySetupExisting) window.CompanySetupExisting.render('view-company');
+    return;
+  }
+  const buildMatch = route.match(/^\/company\/([^/]+)\/build\/?$/);
+  if (buildMatch && window.CompanySetupProgress) {
+    window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    return;
+  }
+  const overviewMatch = route.match(/^\/company\/([^/]+)\/overview\/?$/);
+  if (overviewMatch && window.CompanySetupOverview) {
+    window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    return;
+  }
+  const editMatch = route.match(/^\/company\/([^/]+)\/edit\/?$/);
+  if (editMatch && window.CompanySetupEdit) {
+    window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
+    return;
+  }
+  if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
   if (window.CompanyWorkspace) {
-    window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
+    window.CompanyWorkspace.render(route);
   }
 }
 
