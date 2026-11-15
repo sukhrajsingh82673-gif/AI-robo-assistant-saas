@@ -465,9 +465,12 @@
     applyScopeUi() {
       const label = document.getElementById('uraScopeLabel');
       if (label) label.textContent = this.scope === 'COMPANY' ? 'Company' : 'Personal';
-      this.root.querySelectorAll('[data-scope]').forEach((btn) => {
-        btn.setAttribute('aria-pressed', String(btn.dataset.scope === this.scope));
-      });
+      // The app shell may refresh context before the assistant window mounts.
+      if (this.root) {
+        this.root.querySelectorAll('[data-scope]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.scope === this.scope));
+        });
+      }
       const lock = document.getElementById('uraCompanyLock');
       if (lock) lock.hidden = this.companyGranted || this.scope !== 'COMPANY';
       this.renderPermissionBanner();

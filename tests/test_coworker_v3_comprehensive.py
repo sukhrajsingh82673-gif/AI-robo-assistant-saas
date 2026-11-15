@@ -251,8 +251,14 @@ def test_opendots_observation_and_scheduled_tasks():
     obs = dots.capture_screen_observation()
     assert obs.width == 1920
     assert obs.height == 1080
-    assert len(obs.screenshot_sha256) == 64
-    assert obs.active_window_title != ""
+    if obs.capture_available:
+        assert len(obs.screenshot_sha256) == 64
+        assert obs.active_window_title != ""
+    else:
+        # No live X11 framebuffer on this host: the engine must report an
+        # honest headless state rather than fabricate a screenshot hash.
+        assert obs.perception_mode == "HEADLESS_SIMULATED"
+        assert obs.screenshot_sha256 == ""
 
     # 2. Multi-step workflow execution
     steps = [

@@ -370,7 +370,8 @@ test('index.html loads the company setup modules in a safe order', () => {
   assert.ok(createAt > addAt && createAt < appAt, 'create flow loads before the router');
   assert.ok(existingAt > createAt && existingAt < appAt, 'existing flow loads before the router');
   assert.ok(progressAt > addAt && progressAt < appAt, 'progress loads before the router');
-  assert.ok(index.includes('id="sidebarCompanyStatus"'));
+  assert.ok(index.includes('id="sidebarCompanyStatus"') || index.includes('id="companyChipName"'),
+    'the sidebar exposes a company label the switcher can sync');
 });
 
 test('router and palette expose /company/add and the switcher', () => {

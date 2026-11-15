@@ -48,7 +48,7 @@ check((index.match(/id="uraAssistantRoot"/g) || []).length === 1, 'index must mo
 check(!index.includes('floatingAssistantContainer'), 'old floating assistant container must not return');
 check(!index.includes('ask-ura-bar'), 'old Ask URA bar must not return');
 check(!index.includes('id="view-assistant"'), 'there must be no assistant page');
-check(index.includes('data-nav="coworker"') && index.includes('id="view-coworker"'), 'Co-worker screen must stay registered');
+check(index.includes('id="uraNav"') && read('web/ura_screens.js').includes("id: 'coworker'") && index.includes('id="view-coworker"'), 'Co-worker screen must stay registered');
 check(!index.includes('ceoCommandInput') && !index.includes('ceoChatFeedback'), 'AI CEO chat must stay removed');
 
 // 5. Assistant honesty and no hard-coded business numbers.

@@ -19,7 +19,7 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      if (window.AppleReportsPreview) {
+      if (window.USE_SAMPLE_DATA && window.AppleReportsPreview) {
         window.AppleReportsPreview.render(container);
         return;
       }

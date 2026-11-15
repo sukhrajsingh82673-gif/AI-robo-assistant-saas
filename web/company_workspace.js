@@ -237,8 +237,10 @@ const CompanyWorkspace = (function() {
   // ------------------------------------------------------------------------
   // ROUTER
   // ------------------------------------------------------------------------
-  function render(route) {
-    const container = document.getElementById('view-company');
+  function render(route, containerOrId) {
+    const container = typeof containerOrId === 'string'
+      ? document.getElementById(containerOrId)
+      : (containerOrId || document.getElementById('view-company'));
     if (!container) return;
 
     if (route === '/company' || route === '/company/') {

@@ -12,7 +12,8 @@ import tempfile
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
-sys.path.insert(0, "/roboassistant")
+
+from workloads.paths import sandbox_artifact
 
 from core.models import AuthorityLevel, MissionStatus, EvidenceStatus, HostType, ActionContract
 from core.evidence_ledger import EvidenceLedger
@@ -225,12 +226,12 @@ class TestRoboAssistantValidationMatrix(unittest.TestCase):
         Assert that physical files exist, hashes match, and the Merkle chain is unbroken.
         """
         expected_files = [
-            "/roboassistant/storage/sandbox/hospitality_night_audit.json",
-            "/roboassistant/storage/sandbox/mfg_corrective_plan.json",
-            "/roboassistant/storage/sandbox/saas_retention_campaign.json",
-            "/roboassistant/storage/sandbox/file_cleanup_manifest.json",
-            "/roboassistant/storage/sandbox/universal_database_analysis.json",
-            "/roboassistant/storage/sandbox/universal_analytics.db"
+            sandbox_artifact("hospitality_night_audit.json"),
+            sandbox_artifact("mfg_corrective_plan.json"),
+            sandbox_artifact("saas_retention_campaign.json"),
+            sandbox_artifact("file_cleanup_manifest.json"),
+            sandbox_artifact("universal_database_analysis.json"),
+            sandbox_artifact("universal_analytics.db"),
         ]
 
         for path in expected_files:

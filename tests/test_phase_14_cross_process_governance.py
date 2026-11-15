@@ -20,6 +20,7 @@ import signal
 import tempfile
 import unittest
 import multiprocessing as mp
+from queue import Empty
 from typing import Dict, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,10 +94,54 @@ def _mp_worker_release(db_path: str, reservation_id: str, queue: Any):
         queue.put({"pid": pid, "success": False, "reason": "ERROR", "error": f"{type(e).__name__}: {e}"})
 
 
+def _join_workers(processes, timeout: float = 10.0):
+    """Join workers within a single shared deadline, then stop stragglers.
+
+    Joining each process with its own timeout multiplied the worst case by the
+    worker count; the deadline here is global. Anything still alive is
+    terminated so the suite cannot leave orphaned writers behind the shared DB.
+    """
+    deadline = time.time() + timeout
+    for p in processes:
+        p.join(timeout=max(0.0, deadline - time.time()))
+    stragglers = [p for p in processes if p.is_alive()]
+    for p in stragglers:
+        p.terminate()
+    for p in processes:
+        p.join(timeout=5.0)
+        if p.is_alive():
+            p.kill()
+    return stragglers
+
+
+def _collect_results(queue, expected: int, timeout: float = 10.0):
+    """Drain up to ``expected`` worker results without blocking indefinitely.
+
+    A bare ``queue.get()`` waits forever when a worker dies before reporting,
+    which previously stalled CI until the job timeout. Bounded reads turn that
+    into a normal test failure that reports how many workers answered.
+    """
+    results = []
+    deadline = time.time() + timeout
+    while len(results) < expected:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        try:
+            results.append(queue.get(timeout=remaining))
+        except Empty:
+            break
+    return results
+
+
 class TestPhase14CrossProcessGovernance(unittest.TestCase):
     def setUp(self):
         self.orig_db_path = db.db_path
-        self.ctx = mp.get_context("fork")
+        # "spawn" starts a clean interpreter per worker. "fork" copies the
+        # parent's lock state, so a worker can inherit an import/runtime lock
+        # held by a background thread left over from an earlier suite and
+        # deadlock before it ever reports a result.
+        self.ctx = mp.get_context("spawn")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "cross_process_governance.db")
         configure_isolated_test_db(self.db_path)
@@ -154,14 +199,14 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
         for p in processes:
             p.start()
 
-        for p in processes:
-            p.join(timeout=10)
+        stragglers = _join_workers(processes)
+        results = _collect_results(queue, 20)
 
-        results = []
-        while not queue.empty():
-            results.append(queue.get())
-
-        self.assertEqual(len(results), 20, f"Expected 20 results, received {len(results)}")
+        self.assertEqual(
+            len(results), 20,
+            f"Expected 20 results, received {len(results)} "
+            f"({len(stragglers)} worker(s) terminated without reporting)"
+        )
 
         # Verify multiple distinct PIDs were spawned
         pids = {r["pid"] for r in results}
@@ -213,10 +258,14 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
 
         for p in processes:
             p.start()
-        for p in processes:
-            p.join(timeout=10)
+        stragglers = _join_workers(processes)
 
-        results = [queue.get() for _ in range(15)]
+        results = _collect_results(queue, 15)
+        self.assertEqual(
+            len(results), 15,
+            f"Expected 15 results, received {len(results)} "
+            f"({len(stragglers)} worker(s) terminated without reporting)"
+        )
         successes = [r for r in results if r.get("success")]
         exhausted = [r for r in results if not r.get("success") and r.get("reason") == "EXHAUSTED"]
 
@@ -273,10 +322,14 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
 
         for p in processes:
             p.start()
-        for p in processes:
-            p.join(timeout=10)
+        stragglers = _join_workers(processes)
 
-        results = [queue.get() for _ in range(6)]
+        results = _collect_results(queue, 6)
+        self.assertEqual(
+            len(results), 6,
+            f"Expected 6 results, received {len(results)} "
+            f"({len(stragglers)} worker(s) terminated without reporting)"
+        )
         for r in results:
             self.assertTrue(r.get("success"), f"Cross-process operation failed: {r}")
 
@@ -323,10 +376,14 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
 
         for p in processes:
             p.start()
-        for p in processes:
-            p.join(timeout=10)
+        stragglers = _join_workers(processes)
 
-        results = [queue.get() for _ in range(10)]
+        results = _collect_results(queue, 10)
+        self.assertEqual(
+            len(results), 10,
+            f"Expected 10 results, received {len(results)} "
+            f"({len(stragglers)} worker(s) terminated without reporting)"
+        )
         successes = [r for r in results if r.get("success")]
         already_settled = [r for r in results if not r.get("success") and r.get("reason") == "ALREADY_SETTLED_OR_EXPIRED"]
 
@@ -370,10 +427,14 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
 
         for p in processes:
             p.start()
-        for p in processes:
-            p.join(timeout=10)
+        stragglers = _join_workers(processes)
 
-        results = [queue.get() for _ in range(10)]
+        results = _collect_results(queue, 10)
+        self.assertEqual(
+            len(results), 10,
+            f"Expected 10 results, received {len(results)} "
+            f"({len(stragglers)} worker(s) terminated without reporting)"
+        )
         frozen_rejections = [r for r in results if not r.get("success") and r.get("reason") == "FROZEN"]
 
         self.assertEqual(len(frozen_rejections), 10, f"All 10 OS processes must fail closed with FROZEN rejection")

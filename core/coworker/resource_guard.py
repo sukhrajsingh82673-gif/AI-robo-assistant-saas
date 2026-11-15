@@ -23,6 +23,25 @@ from .contracts_v2 import (
     CleanupManifestRecord, CleanupResourceType, CleanupStatus
 )
 from .db_store_v2 import CoworkerDbStoreV2
+from core.paths import CANONICAL_ROOT, REPO_ROOT
+
+
+def _protected_roots() -> set:
+    """Protected trees for both this checkout and the canonical host path."""
+    roots = {CANONICAL_ROOT, REPO_ROOT}
+    protected = set()
+    for root in roots:
+        protected.update({
+            os.path.join(root, "storage"),
+            os.path.join(root, "storage", "evidence"),
+            os.path.join(root, "storage", "database"),
+            os.path.join(root, "core"),
+            os.path.join(root, "web"),
+            os.path.join(root, "tests"),
+            os.path.join(root, "docs"),
+        })
+    protected.update({"/etc", "/root/.ssh", os.path.expanduser("~/.ssh")})
+    return protected
 
 
 @dataclass
@@ -44,17 +63,7 @@ class ResourceGuardEngine:
     and enforces safe cleanup policies without deleting company deliverables.
     """
 
-    PROTECTED_DIRECTORIES = {
-        "/root/roboassistant/storage",
-        "/root/roboassistant/storage/evidence",
-        "/root/roboassistant/storage/database",
-        "/root/roboassistant/core",
-        "/root/roboassistant/web",
-        "/root/roboassistant/tests",
-        "/root/roboassistant/docs",
-        "/etc",
-        "/root/.ssh",
-    }
+    PROTECTED_DIRECTORIES = _protected_roots()
 
     PROTECTED_FILE_EXTENSIONS = {
         ".db", ".sqlite", ".sqlite3", ".jsonl", ".key", ".pem", ".env", ".bak"
@@ -271,12 +280,13 @@ class ResourceGuardEngine:
             return True
 
         # Check root workspace safety
-        if norm in ("/", "/root", "/root/roboassistant", "/tmp"):
+        if norm in ("/", "/root", CANONICAL_ROOT, REPO_ROOT, "/tmp"):
             return True
 
         # Check repository source files (e.g. api_server.py, README.md)
-        if norm.startswith("/root/roboassistant") and not norm.startswith("/tmp"):
-            return True
+        for root in (CANONICAL_ROOT, REPO_ROOT):
+            if norm == root or norm.startswith(root + os.sep):
+                return True
 
         return False
 

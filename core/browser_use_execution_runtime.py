@@ -311,9 +311,15 @@ class SemanticDOMParser(HTMLParser):
         if any(m in attr_str for m in ["mfa", "2fa", "two-factor", "otp-input"]):
             self.has_mfa_challenge = True
 
-        if tag.lower() in ("input", "img", "br", "hr", "meta"):
+        if tag.lower() in ("input", "img", "br", "hr", "meta", "select"):
             elem = SemanticDOMElement(tag, attr_dict, "")
             self.elements.append(elem)
+            if tag.lower() == "select":
+                # <select> is a container but its options are separate nodes;
+                # register the control itself so dropdown selection can target it.
+                self._current_tag = None
+                self._current_attrs = {}
+                self._current_text = []
 
     def handle_data(self, data: str):
         if self._in_title:
@@ -923,9 +929,22 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                         <div id="status_badge" class="badge badge-success">Confirmed</div>
                         <div id="order_ref">ORD-TESTFIXTURE</div>
                         <div id="kpi_revenue">TEST_FIXTURE_VALUE</div>
+                        <div id="result_status">In Stock</div>
                         <form id="booking_form">
                             <input id="guest_name" name="guest_name" type="text" />
                             <button id="submit_btn" type="submit" role="button" aria-label="Submit">Submit</button>
+                        </form>
+                        <form id="order_form">
+                            <input id="company_name" name="company_name" type="text" />
+                            <select id="tier_select" name="tier">
+                                <option value="STANDARD_TIER">Standard</option>
+                                <option value="ENTERPRISE_TIER_1">Enterprise Tier 1</option>
+                            </select>
+                            <input id="vendor_iban" name="vendor_iban" type="text" />
+                            <input id="search_filter" name="search_filter" type="text" />
+                            <input id="file_input" name="file_input" type="file" />
+                            <button id="search_button" type="button">Search</button>
+                            <button id="download_csv_btn" type="button">Download CSV</button>
                         </form>
                         <button id="purchase_license_btn" type="button">Purchase</button>
                     </body>
@@ -1028,7 +1047,7 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
     def capabilities(self) -> Dict[str, Any]:
         """Honest inventory of what this runtime can and cannot actually do."""
         supported = ["NAVIGATE", "EXTRACT", "VERIFY_POSTCONDITION", "WAIT", "OBSERVE"]
-        unsupported = ["CLICK", "TYPE", "SUBMIT_FORM", "UPLOAD", "DOWNLOAD",
+        unsupported = ["CLICK", "TYPE", "SELECT", "SUBMIT_FORM", "UPLOAD", "DOWNLOAD",
                        "HANDLE_POPUP", "OPEN_TAB", "SWITCH_TAB", "CLOSE_TAB"]
         return {
             "engine": "HTTP_FETCH_DOM_PARSER",
@@ -1068,6 +1087,7 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
             BrowserActionType.CLICK.value, BrowserActionType.CLICK,
             BrowserActionType.TYPE.value, BrowserActionType.TYPE,
             BrowserActionType.SUBMIT_FORM.value, BrowserActionType.SUBMIT_FORM,
+            BrowserActionType.SELECT.value, BrowserActionType.SELECT,
             BrowserActionType.UPLOAD.value, BrowserActionType.UPLOAD,
             BrowserActionType.DOWNLOAD.value, BrowserActionType.DOWNLOAD,
             BrowserActionType.HANDLE_POPUP.value, BrowserActionType.HANDLE_POPUP,
@@ -1129,6 +1149,30 @@ class BrowserUseExecutionProvider(BrowserExecutionProvider):
                 "selector": selector,
                 "value": WebContentSecurityBoundary.scrub_data(text_entered),
                 "duration_ms": duration_ms,
+                "execution_mode": "SIMULATED_TEST_FIXTURE",
+                "business_outcome_verified": False,
+            }
+
+        elif action_type in (BrowserActionType.SELECT.value, BrowserActionType.SELECT):
+            value = params.get("value", params.get("option", ""))
+            elem = parser.find_element(selector) if parser else None
+            if parser is not None and selector and elem is None:
+                return {
+                    "success": False,
+                    "action": "SELECT",
+                    "selector": selector,
+                    "error_classification": BrowserErrorCategory.ELEMENT_NOT_FOUND.value,
+                    "error": f"Selector not found: '{selector}'",
+                    "duration_ms": round((time.time() - start) * 1000, 2),
+                }
+            if elem is not None:
+                elem.value = value
+            return {
+                "success": True,
+                "action": "SELECT",
+                "selector": selector,
+                "value": value,
+                "duration_ms": round((time.time() - start) * 1000, 2),
                 "execution_mode": "SIMULATED_TEST_FIXTURE",
                 "business_outcome_verified": False,
             }

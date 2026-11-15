@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZONATA — Universal AI Company OS</title>
+  <title>URA — Universal Company OS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,8 +13,9 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="ura_assistant.css" />
   <link rel="stylesheet" href="settings_v2.css" />
+  <link rel="stylesheet" href="ura_ui.css" />
   <link rel="stylesheet" href="company_setup.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50%' y='68%' font-size='60' font-weight='800' fill='white' text-anchor='middle'>Z</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230071e3'/><text x='50%' y='68%' font-size='60' font-weight='800' fill='white' text-anchor='middle'>U</text></svg>" />
 </head>
 <body>
 
@@ -29,315 +30,76 @@
   </div>
 
   <!-- ========================================================================
-       2. MAIN SAAS SHELL (Post-Authentication)
+       2. MAIN SHELL (Post-Authentication)
        ======================================================================== -->
-  <div id="appShell" style="display:none;">
+  <div id="appShell" class="ura-shell" style="display:none;">
 
-    <!-- Left Sidebar Navigation -->
-    <aside class="apple-sidebar app-sidebar" id="appSidebar">
-      <div class="sidebar-brand">
-        <div class="brand-monogram">
-          <span class="monogram-letter">Z</span>
-        </div>
-        <div class="brand-meta sidebar-hide-on-collapse">
-          <span class="brand-title">ZONATA</span>
-          <span class="brand-subtitle">AI Company OS</span>
-        </div>
-        <button class="sidebar-close-btn" onclick="toggleSidebarDrawer(false)" title="Close Navigation">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <!-- Floating, translucent sidebar -->
+    <aside class="ura-sidebar" id="appSidebar" aria-label="Main navigation">
+      <div class="ura-sidebar-top">
+        <button class="ura-company-chip" id="companyChipBtn" type="button" aria-label="Switch company">
+          <span class="ura-company-avatar" id="companyChipAvatar">U</span>
+          <span class="ura-company-meta">
+            <span class="ura-company-name" id="companyChipName">Loading…</span>
+            <span class="ura-company-sub" id="companyChipSub">—</span>
+          </span>
+          <span class="ura-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
         </button>
-      </div>
-
-      <!-- Apple Company Switcher -->
-      <div class="apple-company-switcher" onclick="AppShell.openCompanySwitcher()" title="Switch Company Context">
-        <div id="sidebarCompanyTile">
-          <div class="ura-app-tile" style="width:34px; height:34px; border-radius:8px; background:linear-gradient(180deg, #0071E3 0%, #0051A8 100%); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-1);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.75"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="2"/></svg>
-          </div>
-        </div>
-        <div class="company-meta-box sidebar-hide-on-collapse">
-          <span class="company-name-text" id="sidebarCompanyName" data-i18n="company.switcher.empty.sidebar">No company yet</span>
-          <div class="company-status-row">
-            <span class="status-dot-active" data-tone="neutral"></span>
-            <span id="sidebarCompanyStatus" data-i18n="company.switcher.empty.status">Add a company to begin</span>
-          </div>
-        </div>
-        <button class="btn-apple-icon sidebar-hide-on-collapse" title="Switch Company" style="width:24px; height:24px; border:none; background:transparent;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <button class="ura-icon-btn ura-sidebar-close" type="button" aria-label="Close menu" onclick="URAShell.closeDrawer()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
       <!-- Navigation Menu: Complete Company Operations & Platform Control -->
-      <nav class="sidebar-nav">
-        <div class="nav-section-label">Company Operating System</div>
+      <!-- Navigation is rendered from the URA screen registry -->
+      <nav class="sidebar-nav" id="uraNav"></nav>
 
-        <button class="nav-item active" data-nav="overview" id="navItemOverview">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          </div>
-          <span class="nav-label">Home</span>
-        </button>
-
-        <button class="nav-item" data-nav="coworker" id="navItemCoworker">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          </div>
-          <span class="nav-label">Coworker 2.0</span>
-          <span class="nav-pill" style="background:#10b981; color:white;">EXEC</span>
-        </button>
-
-        <button class="nav-item" data-nav="missions" id="navItemWork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <span class="nav-label">Work & Missions</span>
-        </button>
-
-        <button class="nav-item" data-nav="schedule" id="navItemSchedule">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <span class="nav-label">Schedule</span>
-        </button>
-
-        <button class="nav-item" data-nav="operations" id="navItemOperations">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-          </div>
-          <span class="nav-label">Operations</span>
-        </button>
-
-        <button class="nav-item" data-nav="customers" id="navItemCustomers">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-          </div>
-          <span class="nav-label">Customers / CRM</span>
-        </button>
-
-        <button class="nav-item" data-nav="finance" id="navItemFinance">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <span class="nav-label">Finance & GL</span>
-        </button>
-
-        <button class="nav-item" data-nav="people" id="navItemPeople">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <span class="nav-label">People & HR</span>
-        </button>
-
-        <button class="nav-item" data-nav="records" id="navItemRecords">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <span class="nav-label">Records</span>
-          <span class="nav-pill" style="background:#0ea5e9; color:white;">Ledger</span>
-        </button>
-
-        <button class="nav-item" data-nav="files" id="navItemFiles">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <span class="nav-label">Files & Docs</span>
-        </button>
-
-        <button class="nav-item" data-nav="reports" id="navItemReports">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </div>
-          <span class="nav-label">Reports & BI</span>
-        </button>
-
-        <button class="nav-item" data-nav="agent-factory" id="navItemAgentFactory">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          </div>
-          <span class="nav-label">Agent Factory</span>
-          <span class="nav-pill" style="background:#8b5cf6; color:white;">True</span>
-        </button>
-
-        <button class="nav-item" data-nav="integrations" id="navItemIntegrations">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          </div>
-          <span class="nav-label">Integrations</span>
-        </button>
-
-        <button class="nav-item" data-nav="approvals" id="navItemApprovals">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">Approvals</span>
-        </button>
-
-        <button class="nav-item" data-nav="activity" id="navItemActivity">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </div>
-          <span class="nav-label">Activity</span>
-        </button>
-
-        <button class="nav-item" data-nav="governance" id="navItemGovernance">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">Governance</span>
-          <span class="nav-pill" style="background:#10b981; color:white;">HOST</span>
-        </button>
-
-        <div class="nav-section-label" style="margin-top: 14px;">Platform Control</div>
-
-        <button class="nav-item" data-nav="ceo-records" id="navItemCeo">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <span class="nav-label">AI CEO Records</span>
-        </button>
-
-        <button class="nav-item" data-nav="workforce" id="navItemWorkforce">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
-          </div>
-          <span class="nav-label">AI Workforce</span>
-        </button>
-
-        <button class="nav-item" data-nav="company" id="navItemCompany">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
-          </div>
-          <span class="nav-label">Company & Org</span>
-        </button>
-
-        <button class="nav-item" data-nav="terminal" id="navItemTerminal">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          </div>
-          <span class="nav-label">Governed Terminal</span>
-        </button>
-
-        <button class="nav-item" data-nav="workflows" id="navItemWorkflows">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </div>
-          <span class="nav-label">Workflows</span>
-        </button>
-
-        <button class="nav-item" data-nav="agent-network" id="navItemAgentNetwork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <span class="nav-label">Agent Network</span>
-        </button>
-
-        <button class="nav-item" data-nav="mcp-network" id="navItemMcpNetwork">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </div>
-          <span class="nav-label">MCP Network</span>
-        </button>
-
-        <button class="nav-item" data-nav="openhands-execution" id="navItemOpenHands">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          </div>
-          <span class="nav-label">Agent Execution</span>
-        </button>
-
-        <button class="nav-item" data-nav="browser-execution" id="navItemBrowserExecution">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <span class="nav-label">Browser Use</span>
-        </button>
-
-        <button class="nav-item" data-nav="temporal-durable" id="navItemTemporalDurable">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <span class="nav-label">Durable Temporal</span>
-        </button>
-
-        <button class="nav-item" data-nav="trustgraph" id="navItemTrustGraph">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <span class="nav-label">TrustGraph</span>
-        </button>
-
-        <button class="nav-item" data-nav="settings" id="navItemSettings">
-          <div class="nav-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </div>
-          <span class="nav-label">Settings & Admin</span>
-        </button>
-      </nav>
-
-      <!-- Sidebar Host Profile Card -->
-      <div class="sidebar-footer">
-        <div class="host-profile-card">
-          <div class="host-avatar" id="hostAvatarLetter">S</div>
-          <div class="host-meta">
-            <div class="host-name" id="hostNameDisplay">Sukhraj Singh</div>
-            <div class="host-role-badge">
-              <span class="pulse-indicator"></span>
-              <span>Host Online • tnt_primary</span>
-            </div>
-          </div>
-          <button class="host-action-btn" id="signOutBtn" title="Sign Out of Session">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-          </button>
-        </div>
-      </div>
+      <div class="ura-sidebar-footer" id="uraSidebarFooter"></div>
     </aside>
 
-    <!-- Main Workspace Container -->
-    <div class="app-workspace">
-
-      <!-- Top Command Bar -->
-      <header class="app-topbar">
-        <div class="topbar-left">
-          <button class="topbar-menu-toggle" id="menuToggleBtn" onclick="toggleSidebarDrawer()" title="Toggle Navigation Menu">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <!-- Main column -->
+    <div class="ura-main">
+      <header class="ura-topbar">
+        <div class="ura-topbar-left">
+          <button class="ura-icon-btn" id="menuToggleBtn" type="button" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
-          <button class="btn-apple-icon spring-press" onclick="AppShell.toggleSidebarCollapse()" title="Toggle Sidebar Icon Rail" style="margin-right:6px; display:inline-flex;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <button class="ura-icon-btn" id="railToggleBtn" type="button" aria-label="Collapse sidebar to icons">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
           </button>
-
-          <!-- Contextual Breadcrumbs -->
-          <nav class="topbar-breadcrumbs" id="topbarBreadcrumbs" aria-label="Breadcrumb">
-            <span class="breadcrumb-item root">ZONATA</span>
+          <nav class="ura-breadcrumbs" id="topbarBreadcrumbs" aria-label="Breadcrumb">
+            <span class="breadcrumb-item root">Workspace</span>
             <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-item active" id="breadcrumbActive">Overview</span>
+            <span class="breadcrumb-item active">Overview</span>
           </nav>
         </div>
 
-        <!-- Universal Command & Search Bar -->
-        <div class="topbar-center">
-          <div class="command-search-wrapper" style="position:relative;">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="globalSearchInput" class="command-search-input" placeholder="Search companies, records, files, reports, agents... (⌘K)" autocomplete="off" />
-            <kbd class="shortcut-badge">⌘K</kbd>
-            <div id="commandPaletteResults" class="command-palette-dropdown" style="display:none;"></div>
-          </div>
-        </div>
+        <div class="ura-topbar-right">
+          <button class="ura-search-btn" id="uraSearchBtn" type="button" aria-label="Search pages, companies, actions and settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Search or jump to…</span>
+            <span class="ura-kbd">⌘K</span>
+          </button>
 
-        <!-- Topbar Controls: Context Switcher, Status, Theme, Notifications -->
-        <div class="topbar-right">
-          <!-- Global Company Context Switcher -->
-          <div class="company-context-selector-wrapper" title="Active Company Operating Context">
-            <svg class="context-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 7h4v14h-4z"/></svg>
-            <select id="globalCompanySelector" class="company-context-select" onchange="handleGlobalCompanyContextChange(this.value)">
-              <!-- Populated dynamically without duplicates -->
-            </select>
-          </div>
+          <select id="globalCompanySelector" class="ura-company-select" aria-label="Active company" onchange="handleGlobalCompanyContextChange(this.value)"></select>
 
-          <!-- Autonomous System Status Indicator -->
-          <div class="status-indicator-pill" title="ZONATA Autonomous Execution Engine Status">
-            <span class="status-pulse-dot"></span>
-            <span class="status-text">Kernel Active</span>
-          </div>
+          <button class="ura-status-pill" id="uraStatusPill" type="button" aria-label="CEO status">
+            <span class="ura-status-dot"></span>
+            <span id="uraStatusText">24/7 watch</span>
+          </button>
+
+          <span class="ura-clock" id="uraClock" aria-label="Company clock"></span>
+
+          <button class="ura-icon-btn ura-bell" id="uraBellBtn" type="button" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="ura-badge" id="uraBellBadge" style="display:none;"></span>
+          </button>
+
+          <button class="ura-icon-btn" id="uraHelpBtn" type="button" aria-label="Help">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
 
           <!-- URA Assistant trigger -->
           <button class="topbar-icon-btn" id="uraTopbarTrigger" onclick="window.URAAssistant && window.URAAssistant.toggle()" title="Open URA Assistant (Ctrl/Cmd+J)" aria-label="Open URA Assistant">
@@ -350,22 +112,27 @@
             <span class="topbar-notification-badge" id="topbarNotificationBadge" style="display:none;"></span>
           </button>
 
-          <!-- Day/Night Automatic Theme Toggle (Light / Dark / Auto) -->
-          <button class="topbar-icon-btn" id="themeToggleBtn" title="Theme Mode (Light / Dark / Auto)">
-            <svg id="themeToggleIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <button class="ura-icon-btn" id="uraProfileBtn" type="button" aria-label="Your profile">
+            <span class="ura-avatar" id="uraProfileAvatar">O</span>
           </button>
+
+          <!-- Kept for the legacy session controller; the profile menu owns the visible control. -->
+          <button id="signOutBtn" type="button" style="display:none;" aria-hidden="true" tabindex="-1"></button>
+          <span id="hostNameDisplay" style="display:none;"></span>
+          <span id="hostAvatarLetter" style="display:none;"></span>
+          <span id="hostEmailDisplay" style="display:none;"></span>
         </div>
       </header>
 
-      <!-- Scrollable Workspace Views Container -->
-      <main class="workspace-content">
-        <div class="workspace-inner">
+      <main class="ura-workspace">
+        <div class="ura-screen-root" id="uraScreenRoot">
           <section id="view-overview" class="view-section active"></section>
           <section id="view-coworker" class="view-section"></section>
           <section id="view-missions" class="view-section"></section>
           <section id="view-work" class="view-section"></section>
           <section id="view-schedule" class="view-section"></section>
           <section id="view-operations" class="view-section"></section>
+          <section id="view-technology" class="view-section"></section>
           <section id="view-customers" class="view-section"></section>
           <section id="view-finance" class="view-section"></section>
           <section id="view-people" class="view-section"></section>
@@ -377,6 +144,7 @@
           <section id="view-approvals" class="view-section"></section>
           <section id="view-activity" class="view-section"></section>
           <section id="view-governance" class="view-section"></section>
+          <section id="view-security" class="view-section"></section>
           <section id="view-company" class="view-section"></section>
           <section id="view-organization" class="view-section"></section>
           <section id="view-ceo" class="view-section"></section>
@@ -421,7 +189,7 @@
   </div>
 
   <!-- Toast Notification Container -->
-  <div id="toastContainer"></div>
+  <div id="toastContainer" role="status" aria-live="polite"></div>
 
   <!-- URA Assistant is the only assistant surface (launcher + window) -->
   <div id="uraAssistantRoot"></div>
@@ -449,6 +217,9 @@
       <span>Menu</span>
     </button>
   </nav>
+
+  <!-- URA mobile tab bar (rendered by ura_shell.js) -->
+  <nav class="ura-tabbar" id="uraTabbar"></nav>
 
   <!-- Reconstructed Subsystem Scripts -->
   <script src="i18n.js"></script>
@@ -516,5 +287,10 @@
   <script src="company_setup_delete.js"></script>
   <!-- Application Script -->
   <script src="app.js"></script>
+  <!-- URA UI layer: core, settings, screens, shell -->
+  <script src="ura_core.js"></script>
+  <script src="ura_settings.js"></script>
+  <script src="ura_screens.js"></script>
+  <script src="ura_shell.js"></script>
 </body>
 </html>

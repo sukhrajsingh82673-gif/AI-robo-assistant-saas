@@ -444,6 +444,22 @@
           dot.setAttribute('data-tone', company ? statusMeta(company.status).tone : 'neutral');
         }
       }
+      // The URA shell uses its own chip. Keep it on the same source of truth so
+      // the sidebar never shows two different companies.
+      const chipName = document.getElementById('companyChipName');
+      const chipSub = document.getElementById('companyChipSub');
+      const chipAvatar = document.getElementById('companyChipAvatar');
+      if (chipName) {
+        chipName.textContent = company ? company.name : t('company.switcher.empty.sidebar');
+      }
+      if (chipSub) {
+        chipSub.textContent = company
+          ? (company.industry || statusLabel(company.status))
+          : t('company.switcher.empty.status');
+      }
+      if (chipAvatar) {
+        chipAvatar.textContent = company ? String(company.name).charAt(0).toUpperCase() : 'U';
+      }
     }
 
     /**

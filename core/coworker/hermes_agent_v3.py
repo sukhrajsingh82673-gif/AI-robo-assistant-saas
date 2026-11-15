@@ -630,8 +630,17 @@ class HermesProcessManager:
         self.restarts_count: int = 0
         self.process_mode: str = "IN_PROCESS"
         import shutil
-        self.hermes_cli_path: Optional[str] = shutil.which("hermes") or (
-            "/usr/local/bin/hermes" if os.path.exists("/usr/local/bin/hermes") else None
+        # Resolve the CLI portably: PATH first, then common install prefixes.
+        self.hermes_cli_path: Optional[str] = shutil.which("hermes") or next(
+            (
+                p for p in (
+                    os.path.expanduser("~/.local/bin/hermes"),
+                    os.path.expanduser("~/bin/hermes"),
+                    "/usr/local/bin/hermes",
+                    "/usr/bin/hermes",
+                ) if os.path.exists(p)
+            ),
+            None,
         )
         self.hermes_cli_available: bool = self.hermes_cli_path is not None
         self.hermes_cli_version: Optional[str] = None
@@ -757,7 +766,7 @@ class HermesProcessManager:
                 "success": False,
                 "executed": False,
                 "error": "HERMES_CLI_UNAVAILABLE",
-                "reason": "Host executable 'hermes' was not found in PATH (/usr/local/bin/hermes)."
+                "reason": "Host executable 'hermes' was not found on PATH or in a known install location."
             }
         cmd = [self.hermes_cli_path]
         if options:

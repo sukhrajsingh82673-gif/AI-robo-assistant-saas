@@ -66,18 +66,29 @@ def test_scenario_1_hermes_cli_and_real_delegation_pipeline():
     pm = HermesProcessManager(session_store=store)
 
     try:
-        # 1. Verify host CLI detection
+        # 1. Verify host CLI detection honestly. The optional Hermes binary is
+        #    not installed on every host/CI runner; when absent the manager must
+        #    report unavailability instead of pretending it is present.
         health = pm.get_health_status()
-        assert health["hermes_cli_available"] is True
-        assert health["hermes_cli_path"] == "/usr/local/bin/hermes"
-        assert health["hermes_cli_version"] is not None
-        assert "hermes" in health["hermes_cli_version"].lower()
+        expected_hermes = shutil.which("hermes")
+        if expected_hermes is None:
+            assert health["hermes_cli_available"] is False
+            assert health["hermes_cli_path"] is None
+            unavailable = pm.execute_hermes_cli("", options=["--version"])
+            assert unavailable["executed"] is False
+            assert unavailable["error"] == "HERMES_CLI_UNAVAILABLE"
+        else:
+            assert health["hermes_cli_available"] is True
+            # Compare against the host's resolved binary, never a hard-coded prefix.
+            assert health["hermes_cli_path"] == expected_hermes
+            assert health["hermes_cli_version"] is not None
+            assert "hermes" in health["hermes_cli_version"].lower()
 
-        # 2. Invoke real CLI execution
-        cli_res = pm.execute_hermes_cli("", options=["--version"])
-        assert cli_res["success"] is True
-        assert cli_res["executed"] is True
-        assert cli_res["returncode"] == 0
+            # 2. Invoke real CLI execution
+            cli_res = pm.execute_hermes_cli("", options=["--version"])
+            assert cli_res["success"] is True
+            assert cli_res["executed"] is True
+            assert cli_res["returncode"] == 0
 
         # 3. Setup 3-stage subagent delegation runtime
         delegation_history = []
@@ -164,13 +175,21 @@ def test_scenario_2_opencode_real_cli_and_controlled_defect_repair():
 
         engine = OpenCodeEngine(repo_root=test_repo_dir)
 
-        # 2. Verify OpenCode real CLI availability
-        assert engine.opencode_cli_available is True
-        assert engine.opencode_cli_path == "/usr/local/bin/opencode"
-        cli_res = engine.execute_opencode_cli(["--version"], cwd=test_repo_dir)
-        assert cli_res["success"] is True
-        assert cli_res["executed"] is True
-        assert "opencode" in cli_res["stdout"].lower() or cli_res["returncode"] == 0
+        # 2. Verify OpenCode real CLI availability against the host's resolved
+        #    binary instead of a machine-specific absolute path.
+        expected_opencode = shutil.which("opencode")
+        if expected_opencode is None:
+            assert engine.opencode_cli_available is False
+            missing = engine.execute_opencode_cli(["--version"], cwd=test_repo_dir)
+            assert missing["executed"] is False
+            assert missing["error"] == "OPENCODE_CLI_UNAVAILABLE"
+        else:
+            assert engine.opencode_cli_available is True
+            assert engine.opencode_cli_path == expected_opencode
+            cli_res = engine.execute_opencode_cli(["--version"], cwd=test_repo_dir)
+            assert cli_res["success"] is True
+            assert cli_res["executed"] is True
+            assert "opencode" in cli_res["stdout"].lower() or cli_res["returncode"] == 0
 
         # 3. Execute 7-stage autonomous repair loop with Ralph Loop
         def automated_repair(mission: OpenCodeMission):

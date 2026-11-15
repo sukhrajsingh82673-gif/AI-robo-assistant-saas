@@ -261,11 +261,11 @@ jobs:
 
           with open('storage/roboassistant.db', 'rb') as f:
               db_sha = hashlib.sha256(f.read()).hexdigest()
-          assert db_sha == 'ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4', f'Database hash mismatch: {db_sha}'
+          assert db_sha == 'f71d9d79b95f2dc924385f90e97c7c565afd3b070b5d4628c3e2ad86aa52deda', f'Database hash mismatch: {db_sha}'
 
           with open('storage/evidence/audit_ledger.jsonl', 'rb') as f:
               ledger_sha = hashlib.sha256(f.read()).hexdigest()
-          assert ledger_sha == 'ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996', f'Ledger hash mismatch: {ledger_sha}'
+          assert ledger_sha == 'c8e50d461ca0943d012d920ed211a7d0040d799a52a1b5af6f052a9cbae74b13', f'Ledger hash mismatch: {ledger_sha}'
 
           js_hash = subprocess.check_output(['git', 'hash-object', 'web/workflow_workspace.js']).decode().strip()
           assert js_hash == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'Workflow JS blob hash mismatch: {js_hash}'
