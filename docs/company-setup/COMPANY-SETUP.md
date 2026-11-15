@@ -130,10 +130,11 @@ Yes, with a caveat.
 
 `render.yaml` deploys a Docker web service `zonata-staging` (free plan, oregon), health check `/readyz`, with `DATABASE_URL` injected manually and generated `JWT_SECRET` / `SESSION_SECRET` / `ZONATA_AUTH_SECRET` / `METRICS_AUTH_TOKEN`.
 
-Two things to flag now:
+Three things to flag now:
 
-1. `render.yaml` tracks branch `engineering/production-readiness-gap-closure`, not `ui-redesign`. Auto-deploy will not pick up this work until that is changed in the Render dashboard (or the blueprint).
-2. `ZONATA_SETTINGS_MASTER_KEY` is **not** in `render.yaml`. Settings V2 secrets only work in production if it is set.
+1. `render.yaml` tracks branch `engineering/production-readiness-gap-closure`, not `ui-redesign`. This is resolved for this release by fast-forwarding the engineering branch to the merged `ui-redesign` tip (`53d5068`), so Render auto-deploy ships the same tree. Future `ui-redesign` commits need the same fast-forward, or the blueprint branch must be changed in the Render dashboard.
+2. `ZONATA_SETTINGS_MASTER_KEY` is **not** in `render.yaml`. Settings V2 secrets only work in production if it is set. On staging the keyring falls back to a generated key file, which is lost on redeploy and would make previously stored connection secrets undecryptable. Set a 64-hex key in the dashboard before using the connection vault.
+3. `ZONATA_COMPANY_EXPORT_DIR` is **not** in `render.yaml`. The free plan has no persistent disk, so exports live on ephemeral storage; they must be downloaded while the instance that created them is still running.
 
 Migrations are versioned files under `migrations/pg/` applied by `migrations/migration_manager.py` with checksum verification, statement-by-statement dialect-aware splitting. New migrations must be added as new numbered files (never edit an applied file — checksum mismatch aborts startup).
 
@@ -596,16 +597,18 @@ GET    /api/v1/companies/preferences?company_id=<id>   real settings for the act
 
 ## 5. Risks
 
-1. **`render.yaml` branch mismatch.** Blueprint tracks `engineering/production-readiness-gap-closure`; this work is on `ui-redesign`. Auto-deploy will not ship it. Needs a dashboard/blueprint change (Stage 1 report will restate this).
+1. **Deploy branch is fast-forwarded, not switched.** `render.yaml` still tracks `engineering/production-readiness-gap-closure`; that branch now points at the merged `ui-redesign` tip (`53d5068`) so auto-deploy ships it. Every future `ui-redesign` push must be fast-forwarded to the engineering branch, or the blueprint branch must be changed, or staging silently stays behind.
 2. **Status remap is the most dangerous migration.** Existing rows use `DRAFT|ONBOARDING|OPERATIONAL|ATTENTION|SUSPENDED`. Adding `CREATING|NEEDS_ATTENTION|PENDING_EXPORT|PENDING_DELETION|DELETED` must not orphan existing rows; map `ATTENTION → NEEDS_ATTENTION` in a data migration with a reversible reverse map, and keep old values readable.
 3. **Email is only real when SMTP credentials exist.** The adapter now sends through SMTP when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` are present and reports `NOT_CONFIGURED` otherwise. The in-app download remains the delivery path on deployments without mail; purge waits for one of them.
-4. **No i18n infrastructure.** Arabic RTL is net-new and touches every screen in scope. Scoping it to the company-setup surfaces first avoids a repo-wide rewrite in this program.
-5. **PDF export of a whole company could be large.** `DocumentGenerator` is pure Python and in-memory; a big company may blow memory. Stage 5 splits the PDF into numbered parts and zips them, but generation still happens in memory before streaming.
-6. **`/api/onboard` currently trusts client `status`.** Anyone authenticated can set `OPERATIONAL`. The new submit endpoint must derive status server-side.
-7. **Company-scoped admin allow-list does not exist.** Roles are tenant-wide. Stage 1 adds an allow-list; until then "admins I allow" means tenant OWNER/EXECUTIVE with an explicit per-company grant.
-8. **Prompt-injection guarding is partial.** Existing regexes are in the durable runtime; uploaded documents need their own sanitizer before any LLM prompt.
-9. **Draft storage is file-based per tenant.** Multi-instance Render deploys would not share it unless the volume is shared. Stage 1 should move drafts into Postgres (additive table) while keeping the file store as a fallback.
-10. **Test environment has no browser.** Playwright e2e cannot run here; jsdom is the substitute. Real 360px/RTL visual verification must be done by you on a device.
+4. **Exports do not survive a redeploy on the free plan.** `storage/company_exports/` is ephemeral unless `ZONATA_COMPANY_EXPORT_DIR` points at a persistent disk. A pending deletion whose export file disappeared must be re-exported, not purged, or the user loses the export-before-purge guarantee.
+5. **Encrypted connection secrets do not survive a redeploy without a key.** Without `ZONATA_SETTINGS_MASTER_KEY`, staging generates a key file that is lost with the instance. Set a stable 64-hex key in the Render dashboard.
+6. **No i18n infrastructure.** Arabic RTL is net-new and touches every screen in scope. Scoping it to the company-setup surfaces first avoids a repo-wide rewrite in this program.
+7. **PDF export of a whole company could be large.** `DocumentGenerator` is pure Python and in-memory; a big company may blow memory. Stage 5 splits the PDF into numbered parts and zips them, but generation still happens in memory before streaming.
+8. **`/api/onboard` currently trusts client `status`.** Anyone authenticated can set `OPERATIONAL`. The new submit endpoint must derive status server-side.
+9. **Company-scoped admin allow-list does not exist.** Roles are tenant-wide. Stage 1 adds an allow-list; until then "admins I allow" means tenant OWNER/EXECUTIVE with an explicit per-company grant.
+10. **Prompt-injection guarding is partial.** Existing regexes are in the durable runtime; uploaded documents need their own sanitizer before any LLM prompt.
+11. **Draft storage is file-based per tenant.** Multi-instance Render deploys would not share it unless the volume is shared. Stage 1 should move drafts into Postgres (additive table) while keeping the file store as a fallback.
+12. **Test environment has no browser.** Playwright e2e cannot run here; jsdom is the substitute. Real 360px/RTL visual verification must be done by you on a device.
 11. **Purge is evaluated lazily.** `purge_due` runs when a deletion is read (company detail, deletion status) or after a download/purge call; there is no background scheduler in this deployment. A company whose window expires while nobody opens it stays in `PENDING_DELETION` until the next read. This delays removal but never destroys data early. A cron/worker should call `purge_due` per tenant before production.
 12. **Tenant settings live on the token company.** The settings console writes tenant-wide values against the token's company id, not `comp_primary`. Company setup now resolves company → token company → `comp_primary` → global, but any other subsystem that reads `get_effective_setting` directly may still miss settings saved at the token company. Stage 6 fixes company setup only; a shared resolver should be made authoritative later.
 13. **No quiet hours.** Notification and quiet-hour behaviour is not dispatched by anything in these flows, so Stage 6 reports `quiet_hours_supported: false` rather than storing a schedule that would never run.
