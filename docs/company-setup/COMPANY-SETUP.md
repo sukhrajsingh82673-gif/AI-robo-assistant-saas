@@ -132,7 +132,7 @@ Yes, with a caveat.
 
 Three things to flag now:
 
-1. `render.yaml` tracks branch `engineering/production-readiness-gap-closure`, not `ui-redesign`. This is resolved for this release by fast-forwarding the engineering branch to the merged `ui-redesign` tip (`53d5068`), so Render auto-deploy ships the same tree. Future `ui-redesign` commits need the same fast-forward, or the blueprint branch must be changed in the Render dashboard.
+1. `render.yaml` now tracks `ui-redesign`, so pushes to this branch deploy directly and the manual fast-forward is no longer required. `engineering/production-readiness-gap-closure` remains a mirror; Render only follows `ui-redesign`.
 2. `ZONATA_SETTINGS_MASTER_KEY` is **not** in `render.yaml`. Settings V2 secrets only work in production if it is set. On staging the keyring falls back to a generated key file, which is lost on redeploy and would make previously stored connection secrets undecryptable. Set a 64-hex key in the dashboard before using the connection vault.
 3. `ZONATA_COMPANY_EXPORT_DIR` is **not** in `render.yaml`. The free plan has no persistent disk, so exports live on ephemeral storage; they must be downloaded while the instance that created them is still running.
 
@@ -597,7 +597,7 @@ GET    /api/v1/companies/preferences?company_id=<id>   real settings for the act
 
 ## 5. Risks
 
-1. **Deploy branch is fast-forwarded, not switched.** `render.yaml` still tracks `engineering/production-readiness-gap-closure`; that branch now points at the merged `ui-redesign` tip (`53d5068`) so auto-deploy ships it. Every future `ui-redesign` push must be fast-forwarded to the engineering branch, or the blueprint branch must be changed, or staging silently stays behind.
+1. **Deploy branch switched in the blueprint, not yet in the dashboard.** `render.yaml` now tracks `ui-redesign`; a Render blueprint sync is still required for the running service to follow it. Until then the service keeps deploying `engineering/production-readiness-gap-closure` (a mirror of the same commits).
 2. **Status remap is the most dangerous migration.** Existing rows use `DRAFT|ONBOARDING|OPERATIONAL|ATTENTION|SUSPENDED`. Adding `CREATING|NEEDS_ATTENTION|PENDING_EXPORT|PENDING_DELETION|DELETED` must not orphan existing rows; map `ATTENTION → NEEDS_ATTENTION` in a data migration with a reversible reverse map, and keep old values readable.
 3. **Email is only real when SMTP credentials exist.** The adapter now sends through SMTP when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` are present and reports `NOT_CONFIGURED` otherwise. The in-app download remains the delivery path on deployments without mail; purge waits for one of them.
 4. **Exports do not survive a redeploy on the free plan.** `storage/company_exports/` is ephemeral unless `ZONATA_COMPANY_EXPORT_DIR` points at a persistent disk. A pending deletion whose export file disappeared must be re-exported, not purged, or the user loses the export-before-purge guarantee.
