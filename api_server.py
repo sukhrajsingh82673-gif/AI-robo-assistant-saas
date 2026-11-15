@@ -6502,7 +6502,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not company_id:
                 self._send_json({"error": "Verified company context required"}, status=400)
                 return
-            from core.settings_service import settings_service
             actor = str(auth_context.get("user_id") or "assistant")
             role = str(auth_context.get("role") or "OWNER").upper()
             for key, value in (
@@ -6618,7 +6617,6 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not allowed:
                 self._send_json({"error": message, "code": code or "PERMISSION_REQUIRED"}, status=403)
                 return
-            from core.settings_service import settings_service
             from core.ura_assistant_meetings import RECORDING_SETTING, recording_notice
             res = settings_service.update_single_setting(
                 tenant_id, company_id, RECORDING_SETTING, bool(req_data.get("enabled")),

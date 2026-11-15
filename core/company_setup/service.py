@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import os
 import re
 import shutil
@@ -130,7 +131,13 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
 
 
 def _clean_text(value: Any, max_len: int = MAX_TEXT, strip_angles: bool = False) -> str:
-    text = str(value or "")
+    if value is None or isinstance(value, bool):
+        return ""
+    if not isinstance(value, (str, int, float)):
+        # Objects, arrays and other JSON shapes are not text; never store their
+        # Python representation as if the user had typed it.
+        return ""
+    text = str(value)
     text = CONTROL_CHARS_RE.sub("", text).strip()
     if strip_angles:
         text = text.replace("<", "").replace(">", "")
@@ -144,10 +151,13 @@ def _validate_email(value: str) -> bool:
 class CompanySetupService:
     """All company setup operations for a single tenant."""
 
-    def __init__(self, tenant_id: str):
+    def __init__(self, tenant_id: str, tenant_scope_id: Optional[str] = None):
         if not tenant_id:
             raise CompanySetupError("TENANT_REQUIRED", "tenant_id is required", status=401)
         self.tenant_id = tenant_id
+        # The company that owns tenant-wide settings in the settings console
+        # (the token's company). Company-specific overrides still win.
+        self.tenant_scope_id = tenant_scope_id
         ensure_schema()
 
     # ------------------------------------------------------------------ utils
@@ -208,6 +218,10 @@ class CompanySetupService:
         """Public, permission-checked company read used by thin routes."""
         assert_can_view(principal, self.tenant_id)
         return self._require_company(company_id, include_deleted=include_deleted)
+
+    def company_exists(self, company_id: str) -> bool:
+        """Tenant-scoped existence check (never reveals another tenant)."""
+        return self._fetch_company_row(company_id) is not None
 
     # --------------------------------------------------------------- mapping
     def _serialize(self, record: Dict[str, Any]) -> Dict[str, Any]:
@@ -334,6 +348,160 @@ class CompanySetupService:
             "manage_settings": perms.can_manage_settings(principal),
         }
 
+    # ----------------------------------------------------------- preferences
+    def _effective(self, company_id: str, key: str, default: Any = None) -> Any:
+        """Read one effective enterprise setting for this tenant/company.
+
+        Resolution order: the company's own override, then the tenant's
+        settings scope (the token company that the settings console writes to),
+        then the tenant primary store, then the global store/schema default.
+        Any failure falls back to the supplied default so a settings outage can
+        never block company setup.
+        """
+        scopes: List[str] = []
+        for scope in (company_id, self.tenant_scope_id, "comp_primary"):
+            if scope and scope not in scopes:
+                scopes.append(scope)
+        try:
+            with db.get_connection() as conn:
+                for scope in scopes:
+                    row = conn.execute(
+                        "SELECT setting_value_json FROM enterprise_settings "
+                        "WHERE tenant_id = ? AND company_id = ? AND setting_key = ?",
+                        (self.tenant_id, scope, key),
+                    ).fetchone()
+                    if row:
+                        raw = row[0]
+                        try:
+                            return json.loads(raw)
+                        except Exception:
+                            return raw
+        except Exception:
+            pass
+        try:
+            from core.settings_service import settings_service
+
+            return settings_service.get_effective_setting(
+                self.tenant_id, "comp_primary", key, default
+            )
+        except Exception:
+            return default
+
+    @staticmethod
+    def _currency_meta(label: Any) -> Dict[str, str]:
+        """Turn a ``comp_base_currency`` label into a code, symbol and name."""
+        text = str(label or "").strip() or "INR (₹)"
+        code = (text.split()[0] or "INR").upper()
+        symbol = ""
+        if "(" in text and ")" in text:
+            symbol = text[text.index("(") + 1:text.rindex(")")].strip()
+        names = {
+            "INR": "Indian Rupee",
+            "USD": "US Dollar",
+            "EUR": "Euro",
+            "GBP": "British Pound",
+            "AED": "UAE Dirham",
+            "SGD": "Singapore Dollar",
+            "JPY": "Japanese Yen",
+        }
+        return {"code": code, "symbol": symbol or code, "name": names.get(code, code)}
+
+    @staticmethod
+    def _timezone_list(value: Any) -> List[str]:
+        if isinstance(value, (list, tuple)):
+            items = [str(item).strip() for item in value]
+        elif isinstance(value, str):
+            items = [part.strip() for part in value.split(",")]
+        else:
+            items = []
+        return [item for item in items if item]
+
+    def preferences(self, principal: Principal, company_id: Optional[str] = None) -> Dict[str, Any]:
+        """Real, tenant/company-scoped preferences consumed by the UI runtime.
+
+        This endpoint does not invent capabilities. It reports the effective
+        values of settings that already exist, plus honest flags for features
+        that are not wired (quiet hours, a two-step verifier).
+        """
+        assert_can_view(principal, self.tenant_id)
+        if company_id:
+            self._require_company(company_id)
+            scope_id = company_id
+        else:
+            # No active company: resolve the tenant-level preference store.
+            scope_id = self.tenant_scope_id or "comp_primary"
+
+        locale = str(self._effective(scope_id, "loc_base_locale", "en-IN") or "en-IN")
+        language = "ar" if locale.lower().startswith("ar") else "en"
+        number_label = str(
+            self._effective(scope_id, "loc_number_format", "1,00,000.00 (Indian Lakh/Crore)")
+        )
+        number_formats = {
+            "1,00,000.00 (Indian Lakh/Crore)": "indian",
+            "100,000.00 (International Standard)": "international",
+            "100.000,00 (Continental European)": "continental",
+        }
+        display_label = str(self._effective(scope_id, "loc_currency_display", "Symbol (₹)"))
+        display_formats = {
+            "Symbol (₹)": "symbol",
+            "ISO Code (INR)": "iso",
+            "Full Name (Indian Rupee)": "name",
+        }
+        currency = self._currency_meta(self._effective(scope_id, "comp_base_currency", "INR (₹)"))
+        timezones = self._timezone_list(
+            self._effective(scope_id, "comp_operating_timezones", ["Asia/Kolkata", "UTC"])
+        ) or ["Asia/Kolkata"]
+        assistant_scope = str(self._effective(scope_id, "assistant_default_scope", "PERSONAL") or "PERSONAL")
+        recovery_days = self._recovery_days(scope_id)
+        mfa_required = self._mfa_required(scope_id)
+
+        return {
+            "tenant_id": self.tenant_id,
+            "company_id": company_id,
+            "language": language,
+            "locale": locale,
+            "direction": "rtl" if language == "ar" else "ltr",
+            "number_format": {
+                "id": number_formats.get(number_label, "indian"),
+                "label": number_label,
+            },
+            "currency": {
+                **currency,
+                "display": display_formats.get(display_label, "symbol"),
+                "display_label": display_label,
+            },
+            "default_currency": currency["code"],
+            "country": self._locale_country(locale),
+            "timezone": timezones[0],
+            "timezones": timezones,
+            "assistant": {"default_scope": assistant_scope},
+            "recovery_days": recovery_days,
+            "mfa_required": mfa_required,
+            "two_step_configured": False,
+            "quiet_hours": None,
+            "quiet_hours_supported": False,
+        }
+
+    def _preference_defaults(self) -> Dict[str, str]:
+        """Server-side defaults used when a company payload omits currency/timezone."""
+        scope_id = self.tenant_scope_id or "comp_primary"
+        currency = self._currency_meta(self._effective(scope_id, "comp_base_currency", "INR (₹)"))
+        timezones = self._timezone_list(
+            self._effective(scope_id, "comp_operating_timezones", ["Asia/Kolkata", "UTC"])
+        ) or ["Asia/Kolkata"]
+        return {"currency": currency["code"], "timezone": timezones[0]}
+
+    @staticmethod
+    def _locale_country(locale: Any) -> str:
+        parts = str(locale or "").replace("_", "-").split("-")
+        if len(parts) > 1 and len(parts[1]) == 2 and parts[1].isalpha():
+            return parts[1].upper()
+        return "IN"
+
+    def _default_country(self) -> str:
+        scope_id = self.tenant_scope_id or "comp_primary"
+        return self._locale_country(self._effective(scope_id, "loc_base_locale", "en-IN"))
+
     # -------------------------------------------------------------- creation
     def _validate_company_payload(
         self,
@@ -391,7 +559,7 @@ class CompanySetupService:
                 add_error("country", "REQUIRED", "Country is required")
             if not industry:
                 add_error("industry", "REQUIRED", "Industry is required")
-        clean["country"] = country or "IN"
+        clean["country"] = country or self._default_country()
         clean["industry"] = industry or "General Business"
 
         website = _clean_text(payload.get("website"), 2048)
@@ -420,7 +588,10 @@ class CompanySetupService:
         if budget_raw not in (None, ""):
             try:
                 budget_amount = float(budget_raw)
-                if budget_amount < 0:
+                if not math.isfinite(budget_amount):
+                    add_error("budget.amount", "INVALID_AMOUNT", "Budget must be a finite number")
+                    budget_amount = None
+                elif budget_amount < 0:
                     add_error("budget.amount", "INVALID_AMOUNT", "Budget cannot be negative")
             except (TypeError, ValueError):
                 add_error("budget.amount", "INVALID_AMOUNT", "Budget must be a number")
@@ -460,7 +631,10 @@ class CompanySetupService:
         if amount_raw not in (None, ""):
             try:
                 amount = float(amount_raw)
-                if amount < 0:
+                if not math.isfinite(amount):
+                    add_error("revenue.amount", "INVALID_AMOUNT", "Revenue must be a finite number")
+                    amount = None
+                elif amount < 0:
                     add_error("revenue.amount", "INVALID_AMOUNT", "Revenue cannot be negative")
             except (TypeError, ValueError):
                 add_error("revenue.amount", "INVALID_AMOUNT", "Revenue must be a number")
@@ -537,7 +711,8 @@ class CompanySetupService:
 
         company_id = f"comp_{uuid.uuid4().hex[:12]}"
         now = _now()
-        currency = values.get("revenue_currency") or "INR"
+        defaults = self._preference_defaults()
+        currency = values.get("revenue_currency") or defaults["currency"]
         with db.get_connection() as conn:
             conn.execute(
                 """
@@ -560,7 +735,7 @@ class CompanySetupService:
                     company_type,
                     CompanyStatus.DRAFT,
                     currency,
-                    values.get("timezone") or "Asia/Kolkata",
+                    values.get("timezone") or defaults["timezone"],
                     values.get("revenue_amount") or 0.0,
                     0.0,
                     0.0,
@@ -651,6 +826,7 @@ class CompanySetupService:
                 )
 
         now = _now()
+        defaults = self._preference_defaults()
         build = self.get_build(company_id)
         build_running = bool(build and build.get("phase_state") == "RUNNING")
         changed = []
@@ -677,8 +853,8 @@ class CompanySetupService:
                     values.get("industry") or record.get("industry") or "General Business",
                     values.get("website") or "",
                     values.get("business_model") or "",
-                    values.get("revenue_currency") or record.get("currency") or "INR",
-                    values.get("timezone") or record.get("timezone") or "Asia/Kolkata",
+                    values.get("revenue_currency") or record.get("currency") or defaults["currency"],
+                    values.get("timezone") or record.get("timezone") or defaults["timezone"],
                     values.get("revenue_amount") if values.get("revenue_amount") is not None else 0.0,
                     values.get("revenue_amount"),
                     values.get("revenue_currency") or "",
@@ -1772,19 +1948,13 @@ class CompanySetupService:
     # --------------------------------------------------------------- deletion
     def _mfa_required(self, company_id: str) -> bool:
         try:
-            from core.settings_service import settings_service
-
-            return bool(settings_service.get_effective_setting(self.tenant_id, company_id, "sec_require_mfa", False))
+            return bool(self._effective(company_id, "sec_require_mfa", False))
         except Exception:
             return False
 
     def _recovery_days(self, company_id: str) -> int:
         try:
-            from core.settings_service import settings_service
-
-            value = settings_service.get_effective_setting(
-                self.tenant_id, company_id, "company_delete_recovery_days", 7
-            )
+            value = self._effective(company_id, "company_delete_recovery_days", 7)
             days = int(value)
         except Exception:
             days = 7

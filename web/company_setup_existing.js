@@ -104,16 +104,17 @@
   }
 
   function emptyData() {
+    const prefs = window.ZONATA_PREFERENCES || {};
     return {
       name: '',
       title: '',
       description: '',
       industry: '',
-      country: 'IN',
+      country: prefs.country || 'IN',
       website: '',
       business_model: '',
       revenue_amount: '',
-      revenue_currency: 'INR',
+      revenue_currency: prefs.default_currency || 'INR',
       revenue_period: 'ANNUAL',
       owner_name: '',
       owner_email: '',

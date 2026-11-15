@@ -22,7 +22,7 @@ Rules of engagement for this program:
 | 3 | Create new company (form, review, build workflow) | **Complete** |
 | 4 | Add existing company (form, connections, ingestion shell, diagnosis) | **Complete** |
 | 5 | Overview, edit, protected delete + export | **Complete** |
-| 6 | Settings wiring, tests, abuse tests, hardening | Not started |
+| 6 | Settings wiring, tests, abuse tests, hardening | **Complete** |
 
 ---
 
@@ -250,6 +250,7 @@ Implemented in Stage 1 (`core/company_setup/api.py`). The tenant always comes fr
 
 ```
 GET    /api/v1/companies                          list (paginated, filter, search)
+GET    /api/v1/companies/preferences              real tenant/company settings for the UI
 POST   /api/v1/companies                          create draft
 GET    /api/v1/companies/drafts                   list my drafts
 POST   /api/v1/companies/drafts                   autosave (create or update)
@@ -552,6 +553,47 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 
 ---
 
+## 4g. Stage 6 — settings wiring, tests, hardening
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `tests/test_company_setup_preferences.py` | 11 tests: default preferences, tenant and company overrides, API wrapping, guessed-company `404`, currency/timezone/country defaults, explicit payload wins, non-finite amounts, non-object body rejection. |
+| `tests/test_company_setup_abuse.py` | 19 tests (8 subtests): cross-tenant reads/writes/delete/export, guessed ids, script tags, object type confusion, SQL-injection-like search, pagination clamping, double submit, oversized/malformed/traversal-duplicate uploads, prompt injection, deletion step skipping, agent delete denial, audit credential leakage, foreign preferences. |
+| `tests/company_setup_ui_test.js` | 7 new checks: number/currency display, local language precedence, live preference loading, escaped hostile text, 360px/RTL/bottom-sheet CSS, create→submit→overview→edit journey, boot/API wiring. |
+
+**Touched:** `core/company_setup/service.py` (`preferences()`, `_effective()` scope resolution, `_currency_meta`, `_timezone_list`, `_locale_country`, server defaults for create/update, finite-number checks, text type hardening), `core/company_setup/api.py` (`GET /preferences`, non-object body `400 INVALID_BODY`, tenant-scope construction), `api_server.py` (removed two local `settings_service` imports that made `/api/settings` writes raise `UnboundLocalError`), `web/i18n.js` (`configure`, `loadPreferences`, `getPreferences`, number-format and currency-display modes), `web/app.js` (boot-time preference loading), `web/company_setup_create.js` / `web/company_setup_existing.js` (currency/country defaults), `web/company_setup_overview.js` / `edit.js` / `delete.js` (company-specific preference load), `package.json`, tracker.
+
+**Route added**
+
+```text
+GET    /api/v1/companies/preferences?company_id=<id>   real settings for the active company
+```
+
+**Behaviour delivered**
+
+1. Real settings now change the app. `loc_base_locale` drives language/direction (Arabic RTL), `loc_number_format` drives Indian lakh/crore, international or continental grouping, `loc_currency_display` drives symbol, ISO or full-name money, `comp_base_currency` drives the default currency, `comp_operating_timezones` the default timezone and `company_delete_recovery_days` the deletion window. `sec_require_mfa` and the assistant default scope are reported with honest capability flags.
+2. New and updated companies inherit the configured currency, timezone and country when the form omits them; an explicit value always wins and an existing company is never rewritten by a setting change.
+3. Settings saved in the settings console at the token company are visible to every company. Resolution order is company override → tenant settings scope → tenant primary → global/schema default. A live smoke proved an Arabic + AED + Dubai setting reached both preferences and a newly created company.
+4. The UI applies server preferences at boot and on company pages, but an explicit local language choice is never overwritten. Number and currency formatting follow the server setting.
+5. `GET /preferences` is tenant-scoped. An explicit guessed or foreign `company_id` returns `404`; the endpoint never silently falls back to another tenant.
+6. API hardening: non-object JSON bodies return `400 INVALID_BODY`; object/array values are never stringified into text fields; `NaN`/`Infinity` amounts are rejected; pagination is clamped; search stays parameterised.
+7. Abuse suite covers cross-tenant get/update/submit/connections/plan/request/export/audit (`404`), guessed ids, deletion step skipping and wrong names, agent deletion denial, upload limits/type/traversal/duplicates, prompt-injection flagging, double submit (`409 ALREADY_SUBMITTED`) and audit scrubbing (passwords and two-step codes never appear).
+8. UI checks cover the create→submit→overview→edit journey, escaped `<script>`/`onerror` text, 360px-safe CSS, RTL sheet rules, reduced motion and visible keyboard focus.
+9. Fixed a real settings-write defect: two function-local imports made `POST /api/settings` raise `UnboundLocalError` on every write. Settings writes now return `200` and take effect.
+
+**Gates:** `npm run typecheck` (71 JS files), `npm run lint`, `npm run test:company` (113 pytest across 6 files + 48 jsdom/static checks), `npm run test:assistant` (79 pytest + 41 UI + 29 jsdom + 12 journey). Live strict-auth smoke: preferences defaults, non-object body `400`, tenant settings change → Arabic/AED/Dubai, new-company defaults, recovery `0`, MFA off/plan honesty.
+
+**Honest limits**
+
+- There is no quiet-hours setting in this codebase and no notification dispatcher in these flows. The endpoint returns `quiet_hours: null` and `quiet_hours_supported: false` instead of pretending a schedule is enforced.
+- `two_step_configured` is always `false` until a real TOTP/WebAuthn verifier exists; deletion still stops honestly at `501 TWO_STEP_NOT_CONFIGURED` when MFA is required.
+- Preferences are fetched with the normal authenticated `fetch`; on a cold offline start the UI keeps its local defaults until the request succeeds.
+- No browser is available, so the 360px/RTL checks are DOM/CSS assertions, not screenshots.
+
+---
+
 ## 5. Risks
 
 1. **`render.yaml` branch mismatch.** Blueprint tracks `engineering/production-readiness-gap-closure`; this work is on `ui-redesign`. Auto-deploy will not ship it. Needs a dashboard/blueprint change (Stage 1 report will restate this).
@@ -565,6 +607,8 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 9. **Draft storage is file-based per tenant.** Multi-instance Render deploys would not share it unless the volume is shared. Stage 1 should move drafts into Postgres (additive table) while keeping the file store as a fallback.
 10. **Test environment has no browser.** Playwright e2e cannot run here; jsdom is the substitute. Real 360px/RTL visual verification must be done by you on a device.
 11. **Purge is evaluated lazily.** `purge_due` runs when a deletion is read (company detail, deletion status) or after a download/purge call; there is no background scheduler in this deployment. A company whose window expires while nobody opens it stays in `PENDING_DELETION` until the next read. This delays removal but never destroys data early. A cron/worker should call `purge_due` per tenant before production.
+12. **Tenant settings live on the token company.** The settings console writes tenant-wide values against the token's company id, not `comp_primary`. Company setup now resolves company → token company → `comp_primary` → global, but any other subsystem that reads `get_effective_setting` directly may still miss settings saved at the token company. Stage 6 fixes company setup only; a shared resolver should be made authoritative later.
+13. **No quiet hours.** Notification and quiet-hour behaviour is not dispatched by anything in these flows, so Stage 6 reports `quiet_hours_supported: false` rather than storing a schedule that would never run.
 
 ---
 
@@ -602,6 +646,8 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 | Object storage backend (S3/MinIO) | `ObjectStorageService` backend swap | File metadata is recorded (`stored: false`); `company_files.storage_key` stays empty | 4/6 | Metadata only — bytes not stored |
 | Company Build / Onboarding execution | `DurableWorkflowRuntime` graph | NEW: 7-phase build. EXISTING: 6-phase onboarding. Both real, both honest about null-adapter gaps | 3/4 | Real graphs; provider phases skipped with reasons |
 | Browser e2e / screenshots | Playwright runner | No (no Chromium in this environment); jsdom contract + journey tests stand in | 6 | Not available |
+| Quiet hours / notification scheduling | Notification policy engine | No dispatcher in these flows; preferences report `quiet_hours: null` and `quiet_hours_supported: false` | 6 | Unavailable — no schedule is stored or claimed |
+| Real browser preference pass | `GET /api/v1/companies/preferences` | Preferences, number/currency formatting, RTL, server defaults and local-language precedence are real and tested | 6 | Real |
 
 ---
 
@@ -664,3 +710,15 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Gates: typecheck 71 JS files, lint, `npm run test:company` (83 pytest across 4 files + 41 jsdom/static), `npm run test:assistant`.
 - Honest limits: deletion stops at `501` while `sec_require_mfa` is true and no TOTP verifier exists; SMTP is real only when configured; the PDF uses built-in fonts and reports replaced characters; purge is evaluated lazily (no background scheduler); no browser visual/RTL pass here.
 - Waiting for "continue" before Stage 6.
+
+### Stage 6 — settings wiring, tests, hardening
+- Added tenant/company-scoped `GET /api/v1/companies/preferences` and the `CompanySetupService.preferences()` resolver. It reports real locale, language/direction, number format, currency code/symbol/name/display, default currency, timezone, recovery window, MFA state and assistant default scope, with honest nulls for quiet hours and two-step verification.
+- Wired real settings into creation and editing: currency, timezone and country defaults come from `comp_base_currency`, `comp_operating_timezones` and `loc_base_locale`; explicit payload values win and existing records keep their own values.
+- Fixed tenant settings scope: settings written by the settings console at the token company now resolve for every company (company override → token company → `comp_primary` → global/schema). Live smoke: Arabic + AED + Dubai settings reached preferences and a new company.
+- `web/i18n.js` gained `configure`, `loadPreferences`, `getPreferences`, Indian/international/continental grouping and symbol/ISO/full-name currency display. The app applies server preferences at boot and on company pages without overriding an explicit local language choice.
+- Hardened input: non-object bodies `400 INVALID_BODY`, no object/array stringification into text, finite-number checks for budget/revenue, parameterised search, clamped pagination.
+- Added `tests/test_company_setup_preferences.py` (11) and `tests/test_company_setup_abuse.py` (19, 8 subtests); extended `tests/company_setup_ui_test.js` to 48 checks with a create→submit→overview→edit journey, XSS escaping, RTL/360px CSS and preference loading.
+- Fixed `POST /api/settings` raising `UnboundLocalError` because two function-local imports shadowed the module-level settings service. Settings writes now succeed and take effect.
+- Gates: typecheck 71 JS files, lint, 113 company pytest across 6 files, 48 company UI checks, assistant 79 pytest + 41 UI + 29 jsdom + 12 journey.
+- Honest limits: no quiet-hours engine exists; no TOTP verifier; jsdom stands in for a browser; other subsystems still read settings through the older resolver.
+- End of the Company Setup program (stages 0–6).

@@ -207,6 +207,9 @@ ThemeManager.apply();
 document.addEventListener('DOMContentLoaded', async () => {
   ThemeManager.init();
   await loadStoredSession();
+  if (window.I18n && window.I18n.loadPreferences) {
+    await window.I18n.loadPreferences();
+  }
   loadData();
   setupEventListeners();
   renderApp();

@@ -151,6 +151,9 @@
     }
 
     async _load() {
+      if (window.I18n && window.I18n.loadPreferences) {
+        try { await window.I18n.loadPreferences(this.companyId); } catch (err) { /* defaults stay */ }
+      }
       const base = `/api/v1/companies/${encodeURIComponent(this.companyId)}`;
       const [company, connections, catalogue] = await Promise.all([
         this._get(base),

@@ -78,12 +78,17 @@ class CompanySetupAPI:
         if not principal.tenant_id:
             return 401, {"error": "Unauthorized", "code": "TENANT_REQUIRED"}
 
-        service = CompanySetupService(principal.tenant_id)
+        if body is None:
+            body = {}
+        if not isinstance(body, dict):
+            return 400, {"error": "Request body must be a JSON object", "code": "INVALID_BODY"}
+
+        service = CompanySetupService(principal.tenant_id, tenant_scope_id=principal.company_id)
         segments = [seg for seg in path[len(BASE):].split("/") if seg]
         method = method.upper()
 
         try:
-            return self._route(method, segments, query_params, body or {}, principal, service)
+            return self._route(method, segments, query_params, body or {}, principal, service, default_company_id)
         except CompanySetupError as exc:
             return exc.status, exc.to_dict()
         except PermissionDenied as exc:
@@ -110,6 +115,7 @@ class CompanySetupAPI:
         body: Dict[str, Any],
         principal: Principal,
         service: CompanySetupService,
+        default_company_id: Optional[str] = None,
     ) -> Tuple[int, Any]:
         # Collection + drafts
         if not segments:
@@ -127,6 +133,15 @@ class CompanySetupAPI:
             return 405, {"error": "Method not allowed", "code": "METHOD_NOT_ALLOWED"}
 
         head = segments[0]
+
+        if head == "preferences" and len(segments) == 1 and method == "GET":
+            requested = _q(query, "company_id")
+            company_id = requested or default_company_id
+            if requested and not service.company_exists(requested):
+                return 404, {"error": "Company not found", "code": "COMPANY_NOT_FOUND"}
+            if company_id and not service.company_exists(company_id):
+                company_id = None
+            return 200, {"preferences": service.preferences(principal, company_id)}
 
         if head == "sources" and len(segments) == 2 and segments[1] == "catalogue" and method == "GET":
             from core.company_setup import sources as source_module

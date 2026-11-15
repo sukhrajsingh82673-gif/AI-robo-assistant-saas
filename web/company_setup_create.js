@@ -80,6 +80,7 @@
   }
 
   function emptyData() {
+    const prefs = window.ZONATA_PREFERENCES || {};
     return {
       name: '',
       title: '',
@@ -89,12 +90,12 @@
       owner_name: '',
       owner_email: '',
       owner_role: '',
-      country: 'IN',
+      country: prefs.country || 'IN',
       industry: '',
       website: '',
       target_customers: '',
       budget_amount: '',
-      budget_currency: 'INR',
+      budget_currency: prefs.default_currency || 'INR',
       timeline: '',
       setup_notes: '',
       assets: ''

@@ -22,6 +22,16 @@
   const STORAGE_KEY = 'zonata_language';
   const SUPPORTED = ['en', 'ar'];
 
+  // Formatting preferences. They mirror real server settings; nothing here is
+  // enabled unless the server reports it.
+  let numberFormat = 'indian';       // indian | international | continental
+  let currencyDisplay = 'symbol';    // symbol | iso | name
+  let activeLocale = null;
+  const CURRENCY_NAMES = {
+    INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound',
+    AED: 'UAE Dirham', SGD: 'Singapore Dollar', JPY: 'Japanese Yen'
+  };
+
   const DICTIONARIES = {
     en: {
       'common.cancel': 'Cancel',
@@ -1352,14 +1362,104 @@
   }
 
   function locale() {
+    if (activeLocale) return activeLocale;
     return language === 'ar' ? 'ar-IN' : 'en-IN';
+  }
+
+  function numberLocale() {
+    if (numberFormat === 'international') return 'en-US';
+    if (numberFormat === 'continental') return 'de-DE';
+    return language === 'ar' ? 'ar-IN' : 'en-IN';
+  }
+
+  function currencyName(code) {
+    const key = String(code || '').toUpperCase();
+    if (CURRENCY_NAMES[key]) return CURRENCY_NAMES[key];
+    try {
+      const names = new Intl.DisplayNames([locale()], { type: 'currency' });
+      return names.of(key) || key;
+    } catch (err) {
+      return key;
+    }
+  }
+
+  /**
+   * Apply real server preferences without overriding an explicit language
+   * choice the person already made in this browser.
+   */
+  function configure(options) {
+    const opts = options || {};
+    if (opts.locale) activeLocale = String(opts.locale);
+    if (opts.numberFormat) {
+      const raw = String(opts.numberFormat).toLowerCase();
+      if (raw === 'continental' || raw.indexOf('100.000') === 0) numberFormat = 'continental';
+      else if (raw === 'international' || raw.indexOf('100,000') === 0) numberFormat = 'international';
+      else if (raw === 'indian' || raw.indexOf('1,00,000') === 0) numberFormat = 'indian';
+    }
+    if (opts.currencyDisplay) {
+      const raw = String(opts.currencyDisplay).toLowerCase();
+      if (raw === 'iso' || raw.indexOf('iso code') === 0) currencyDisplay = 'iso';
+      else if (raw === 'name' || raw === 'full' || raw.indexOf('full name') === 0) currencyDisplay = 'name';
+      else if (raw === 'symbol' || raw.indexOf('symbol') === 0) currencyDisplay = 'symbol';
+    }
+
+    if (opts.language && !readStoredLanguage()) {
+      setLanguage(opts.language, { announce: false });
+    } else {
+      const html = document.documentElement;
+      if (html) {
+        html.setAttribute('lang', language);
+        html.setAttribute('dir', dirFor(language));
+      }
+      apply(document);
+    }
+
+    document.dispatchEvent(new CustomEvent('zonata:preferenceschange', {
+      detail: getPreferences()
+    }));
+    return getPreferences();
+  }
+
+  function getPreferences() {
+    return {
+      language,
+      locale: activeLocale,
+      numberFormat,
+      currencyDisplay,
+      direction: dirFor(language)
+    };
+  }
+
+  /** Load and apply the tenant/company preferences from the real API. */
+  async function loadPreferences(companyId) {
+    if (typeof fetch !== 'function') return null;
+    const query = companyId ? `?company_id=${encodeURIComponent(companyId)}` : '';
+    try {
+      const res = await fetch(`/api/v1/companies/preferences${query}`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!res || !res.ok) return null;
+      const data = await res.json();
+      const prefs = data && data.preferences ? data.preferences : data;
+      if (!prefs) return null;
+      window.ZONATA_PREFERENCES = prefs;
+      configure({
+        language: prefs.language,
+        locale: prefs.locale,
+        numberFormat: prefs.number_format && prefs.number_format.id,
+        currencyDisplay: prefs.currency && prefs.currency.display
+      });
+      return prefs;
+    } catch (err) {
+      return null;
+    }
   }
 
   function formatNumber(value, options) {
     const n = Number(value);
     const safe = Number.isFinite(n) ? n : 0;
     try {
-      return new Intl.NumberFormat(locale(), options || {}).format(safe);
+      return new Intl.NumberFormat(numberLocale(), options || {}).format(safe);
     } catch (err) {
       return String(safe);
     }
@@ -1375,12 +1475,21 @@
       return formatCompactCurrency(safe, code);
     }
 
+    const display = opts.display || currencyDisplay;
+    const maximumFractionDigits = opts.maximumFractionDigits === undefined ? 0 : opts.maximumFractionDigits;
+    const minimumFractionDigits = opts.minimumFractionDigits === undefined ? 0 : opts.minimumFractionDigits;
+
+    if (display === 'iso' || display === 'name') {
+      const prefix = display === 'name' ? currencyName(code) : code;
+      return `${prefix} ${formatNumber(safe, { maximumFractionDigits, minimumFractionDigits })}`;
+    }
+
     try {
-      return new Intl.NumberFormat(locale(), {
+      return new Intl.NumberFormat(numberLocale(), {
         style: 'currency',
         currency: code,
-        maximumFractionDigits: opts.maximumFractionDigits === undefined ? 0 : opts.maximumFractionDigits,
-        minimumFractionDigits: opts.minimumFractionDigits === undefined ? 0 : opts.minimumFractionDigits
+        maximumFractionDigits,
+        minimumFractionDigits
       }).format(safe);
     } catch (err) {
       return `${code} ${formatNumber(safe, opts)}`;
@@ -1389,7 +1498,7 @@
 
   function currencySymbol(code) {
     try {
-      const parts = new Intl.NumberFormat(locale(), { style: 'currency', currency: code, maximumFractionDigits: 0 })
+      const parts = new Intl.NumberFormat(numberLocale(), { style: 'currency', currency: code, maximumFractionDigits: 0 })
         .formatToParts(0);
       const symbol = parts.find((part) => part.type === 'currency');
       return symbol ? symbol.value : code;
@@ -1454,6 +1563,9 @@
     t,
     apply,
     init,
+    configure,
+    loadPreferences,
+    getPreferences,
     setLanguage,
     getLanguage,
     getDir,

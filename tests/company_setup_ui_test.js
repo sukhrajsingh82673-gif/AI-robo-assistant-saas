@@ -1528,6 +1528,210 @@ test('existing flow renders the business, revenue and role fields', () => {
     assert.ok(!app.includes('comp_primary'), 'no legacy primary-company fallback in the router');
   });
 
+  // ---------------------------------------------------------------- Stage 6
+  // Real settings wiring, formatting, RTL, XSS escaping and 360px rules.
+
+  test('Stage 6 preferences change grouping, currency display and RTL', () => {
+    const dom = makeDom();
+    const { window } = dom;
+    loadI18n(window);
+    const I18n = window.I18n;
+
+    I18n.configure({
+      language: 'en',
+      locale: 'en-IN',
+      numberFormat: 'indian',
+      currencyDisplay: 'symbol'
+    });
+    assert.strictEqual(I18n.formatNumber(1200000), '12,00,000');
+    assert.strictEqual(I18n.formatCurrency(1200000, 'INR'), '₹12,00,000');
+
+    I18n.configure({ numberFormat: 'international', currencyDisplay: 'iso' });
+    assert.strictEqual(I18n.formatNumber(1200000), '1,200,000');
+    assert.strictEqual(I18n.formatCurrency(1200000, 'INR'), 'INR 1,200,000');
+
+    I18n.configure({ numberFormat: 'continental', currencyDisplay: 'name' });
+    assert.strictEqual(I18n.formatNumber(1200000), '1.200.000');
+    assert.strictEqual(I18n.formatCurrency(1200000, 'INR'), 'Indian Rupee 1.200.000');
+
+    // Indian compact notation still works after reconfiguration.
+    I18n.configure({ numberFormat: 'indian' });
+    assert.strictEqual(I18n.formatCurrency(12500000, 'INR', { compact: true }), '₹1.3Cr');
+  });
+
+  test('Stage 6 server language never overrides an explicit local choice', () => {
+    const dom = makeDom();
+    const { window } = dom;
+    loadI18n(window);
+    window.localStorage.setItem('zonata_language', 'ar');
+    window.I18n.init();
+    assert.strictEqual(window.I18n.getLanguage(), 'ar');
+    window.I18n.configure({ language: 'en', locale: 'en-IN' });
+    assert.strictEqual(window.I18n.getLanguage(), 'ar', 'local choice wins');
+    assert.strictEqual(window.document.documentElement.getAttribute('dir'), 'rtl');
+  });
+
+  await testAsync('Stage 6 loads preferences from the real endpoint', async () => {
+    const dom = makeDom();
+    const { window } = dom;
+    loadI18n(window);
+    window.localStorage.removeItem('zonata_language');
+    let called = null;
+    window.fetch = (url) => {
+      called = url;
+      return jsonResponse({
+        preferences: {
+          language: 'ar',
+          locale: 'ar-AE',
+          direction: 'rtl',
+          number_format: { id: 'continental' },
+          currency: { code: 'AED', display: 'iso' },
+          default_currency: 'AED',
+          country: 'AE',
+          timezone: 'Asia/Dubai'
+        }
+      });
+    };
+    const prefs = await window.I18n.loadPreferences('comp_9');
+    assert.ok(called.includes('/api/v1/companies/preferences'));
+    assert.ok(called.includes('company_id=comp_9'));
+    assert.strictEqual(prefs.default_currency, 'AED');
+    assert.strictEqual(window.ZONATA_PREFERENCES.country, 'AE');
+    assert.strictEqual(window.I18n.getLanguage(), 'ar');
+    assert.strictEqual(window.document.documentElement.getAttribute('dir'), 'rtl');
+    assert.strictEqual(window.I18n.getPreferences().numberFormat, 'continental');
+  });
+
+  await testAsync('Stage 6 overview escapes hostile text instead of executing it', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const overview = loadOverview(window);
+    window.fetch = overviewFetch(window, {
+      company: companyFixture({
+        name: '<img src=x onerror=alert(1)>Nightowl',
+        title: '<script>alert(2)</script>',
+        description: '<script>alert(3)</script> A bakery description that is long enough.'
+      })
+    });
+    window.navigateTo = () => {};
+
+    overview.render('view', 'comp_1');
+    await settle(() => !overview.loading, 'overview load');
+
+    const root = window.document.querySelector('[data-company-overview]');
+    assert.strictEqual(root.querySelector('script'), null, 'no executable script element');
+    assert.strictEqual(root.querySelector('img'), null, 'no injected image element');
+    assert.ok(root.innerHTML.includes('&lt;script&gt;'), 'markup is escaped, not stripped from view');
+    assert.ok(root.textContent.includes('<script>alert(2)</script>'), 'text is still readable');
+
+    overview.destroy();
+    dom.window.close();
+  });
+
+  test('Stage 6 360px, RTL and bottom-sheet rules are real CSS', () => {
+    const css = read('web/company_setup.css');
+    assert.ok(css.includes('@media (max-width: 380px)'), '360px-safe breakpoint');
+    assert.ok(css.includes('.zc-sheet {'), 'bottom sheet styles exist');
+    assert.ok(css.includes('border-radius: var(--r-2xl) var(--r-2xl) 0 0'), 'sheet sits on the bottom edge');
+    assert.ok(css.includes("html[dir='rtl'] .zc-sheet"), 'RTL sheet positioning exists');
+    assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'reduced motion is honoured');
+    assert.ok(css.includes(':focus-visible'), 'keyboard focus is visible');
+  });
+
+  await testAsync('Stage 6 journey: create, submit, overview, edit and save', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    window.scrollTo = () => {};
+    window.showToast = () => {};
+    loadI18n(window);
+
+    const calls = [];
+    let created = false;
+    let saved = false;
+    const createdCompany = companyFixture({
+      id: 'comp_e2e',
+      type: 'NEW',
+      name: 'Journey Co',
+      title: 'A company driven through the whole journey',
+      description: 'A company created by the end-to-end test to prove the flow is real.',
+      status: 'CREATING'
+    });
+    window.fetch = (url, init) => {
+      const method = (init && init.method) || 'GET';
+      calls.push(`${method} ${url}`);
+      if (url === '/api/v1/companies' && method === 'POST') {
+        created = true;
+        return jsonResponse(createdCompany, 201);
+      }
+      if (url === '/api/v1/companies/comp_e2e/submit' && method === 'POST') {
+        return jsonResponse({ workflow_started: true }, 202);
+      }
+      if (url.startsWith('/api/v1/companies/drafts')) return jsonResponse({}, 200);
+      if (url.includes('/preferences')) return jsonResponse({ preferences: {} });
+      if (url === '/api/v1/companies/comp_e2e' && method === 'GET') return jsonResponse(createdCompany);
+      if (url === '/api/v1/companies/comp_e2e' && method === 'PATCH') {
+        saved = true;
+        return jsonResponse(Object.assign({}, createdCompany, { title: 'Updated journey title' }));
+      }
+      if (url === '/api/v1/companies/comp_e2e/connections') return jsonResponse({ connections: [] });
+      if (url === '/api/v1/companies/sources/catalogue') return jsonResponse({ sources: [] });
+      if (url.endsWith('/sources')) return jsonResponse({ sources: [] });
+      if (url.endsWith('/readiness')) return jsonResponse({ score: 0, counts: {} });
+      if (url.endsWith('/legal')) return jsonResponse({ legal_items: [] });
+      if (url.includes('/audit?limit=12')) return jsonResponse({ events: [] });
+      if (url.endsWith('/files')) return jsonResponse({ total: 0, files: [] });
+      return jsonResponse({}, 404);
+    };
+
+    let navigated = null;
+    window.navigateTo = (path) => { navigated = path; };
+
+    const create = loadCreateFlow(window);
+    create.render('view');
+    setField(window, 'name', 'Journey Co');
+    setField(window, 'title', 'A company driven through the whole journey');
+    setField(window, 'description', 'A company created by the end-to-end test to prove the flow is real.');
+    setField(window, 'owner_name', 'Journey Owner');
+    setField(window, 'industry', 'Software');
+    window.document.getElementById('zcCreateForm')
+      .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    assert.strictEqual(create.step, 'review', 'valid form reaches review');
+    window.document.getElementById('zcCreateSubmit').click();
+    await settle(() => created && navigated, 'create submit');
+    assert.strictEqual(navigated, '/company/comp_e2e/build');
+
+    const overview = loadOverview(window);
+    overview.render('view', 'comp_e2e');
+    await settle(() => !overview.loading, 'overview load');
+    assert.ok(window.document.querySelector('[data-company-overview]').textContent.includes('Journey Co'));
+
+    const edit = loadEdit(window);
+    edit.render('view', 'comp_e2e');
+    await settle(() => !edit.loading, 'edit load');
+    setField(window, 'title', 'Updated journey title');
+    window.document.getElementById('zcEditSave').click();
+    await settle(() => saved && navigated === '/company/comp_e2e/overview', 'edit save');
+    assert.ok(saved, 'PATCH was sent');
+    assert.strictEqual(navigated, '/company/comp_e2e/overview');
+
+    assert.ok(calls.some((call) => call === 'POST /api/v1/companies'), 'company created');
+    assert.ok(calls.some((call) => call === 'POST /api/v1/companies/comp_e2e/submit'), 'company submitted');
+    overview.destroy();
+    dom.window.close();
+  });
+
+  await testAsync('Stage 6 wiring is present in the boot path and API', async () => {
+    const app = read('web/app.js');
+    const i18n = read('web/i18n.js');
+    const api = read('core/company_setup/api.py');
+    assert.ok(app.includes('I18n.loadPreferences'), 'boot applies server preferences');
+    assert.ok(i18n.includes('function configure'), 'runtime is configurable');
+    assert.ok(i18n.includes('function loadPreferences'), 'runtime can load real preferences');
+    assert.ok(api.includes('head == "preferences"'), 'preferences route exists');
+    assert.ok(api.includes('INVALID_BODY'), 'non-object bodies are rejected');
+  });
+
   console.log(`\n${passed} company setup UI checks passed.`);
 })().catch((err) => {
   console.error(err);
