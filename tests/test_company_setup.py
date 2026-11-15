@@ -441,7 +441,7 @@ class TestDeletionFlow(CompanySetupTestBase):
         finally:
             self.service._mfa_required = original
 
-    def test_mfa_enabled_is_honest_not_bypassed(self):
+    def test_mfa_enabled_without_enrollment_is_refused_honestly(self):
         company = self.make_company()
         original_mfa = self.service._mfa_required
         original_verify = self.service._verify_owner_password
@@ -451,16 +451,17 @@ class TestDeletionFlow(CompanySetupTestBase):
             self.service.request_deletion(self.owner_principal(), company["id"])
             self.service.confirm_delete_name(self.owner_principal(), company["id"], company["name"])
 
-            # With no verifier wired, both a missing and a dummy code must be
-            # refused with the same honest 501. Neither may imply an authenticator
-            # exists or that a code would help.
+            # The TOTP verifier is real, but this account never enrolled. A
+            # missing code and a dummy code must both be refused with the same
+            # enrollment instruction; neither may imply a code would work.
             for extra in ({}, {"two_step_code": "123456"}):
                 with self.assertRaises(CompanySetupError) as ctx:
                     self.service.confirm_delete_identity(
                         self.owner_principal(), company["id"], password="correct horse battery", **extra
                     )
-                self.assertEqual(ctx.exception.code, "TWO_STEP_NOT_CONFIGURED")
-                self.assertEqual(ctx.exception.status, 501)
+                self.assertEqual(ctx.exception.code, "TWO_STEP_NOT_ENROLLED")
+                self.assertEqual(ctx.exception.status, 409)
+                self.assertTrue(ctx.exception.detail.get("enrollment_required"))
         finally:
             self.service._mfa_required = original_mfa
             self.service._verify_owner_password = original_verify

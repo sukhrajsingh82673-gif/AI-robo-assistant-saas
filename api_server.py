@@ -705,6 +705,166 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Fail closed to the token's own company.
         return token_company or f"comp_{tenant_id}"
 
+    # ------------------------------------------------- two-step (TOTP) helpers
+    def _verify_account_password(self, user_id: str, password: str) -> bool:
+        """Re-authenticate the signed-in account for a sensitive change."""
+        from core.auth import verify_password
+
+        if not user_id or not password:
+            return False
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT password_hash, salt FROM auth_credentials WHERE user_id = ?",
+                    (user_id,),
+                ).fetchone()
+        except Exception:
+            return False
+        if not row:
+            return False
+        try:
+            return bool(verify_password(str(password), row["salt"], row["password_hash"]))
+        except Exception:
+            return False
+
+    def _account_email(self, user_id: str) -> str:
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT email FROM users WHERE user_id = ?", (user_id,)
+                ).fetchone()
+            return str(row["email"]) if row else ""
+        except Exception:
+            return ""
+
+    def _two_step_audit(self, auth_context: Dict[str, Any], action: str, detail: Dict[str, Any]) -> bool:
+        """Append a scrubbed audit record; report honestly if it could not be written."""
+        try:
+            from core.company_setup.audit import record_event
+            from core.company_setup.schema import ensure_schema
+
+            ensure_schema()
+            record_event(
+                auth_context.get("tenant_id") or "",
+                auth_context.get("company_id"),
+                auth_context.get("user_id") or "",
+                auth_context.get("role") or "",
+                action,
+                detail,
+            )
+            return True
+        except Exception:
+            return False
+
+    def _handle_two_step(self, action: str, body: Dict[str, Any], auth_context: Dict[str, Any]) -> None:
+        """Enrollment and management of the account's own TOTP secret.
+
+        Setup and disable require the signed-in password; disable also requires
+        a current code so a stolen session alone cannot turn protection off.
+        """
+        from core.auth import RateLimiter
+        from core.two_step import TwoStepError, TwoStepService
+
+        user_id = str(auth_context.get("user_id") or "")
+        if not user_id:
+            self._send_json({"error": "Unauthorized", "code": "ACCOUNT_REQUIRED"}, status=401)
+            return
+
+        allowed, retry_after = RateLimiter.is_allowed(
+            f"two_step_{action}:{user_id}", max_requests=10, window_seconds=60.0
+        )
+        if not allowed:
+            self._send_json(
+                {
+                    "error": "Too Many Requests",
+                    "code": "TWO_STEP_RATE_LIMITED",
+                    "detail": f"Try again in {retry_after}s.",
+                    "retry_after": retry_after,
+                },
+                status=429,
+            )
+            return
+
+        service = TwoStepService()
+        password = str(body.get("password") or "")
+        code = str(body.get("code") or body.get("two_step_code") or "").strip()
+
+        try:
+            if action == "setup":
+                if not self._verify_account_password(user_id, password):
+                    self._send_json(
+                        {"error": "Forbidden", "code": "INVALID_PASSWORD", "detail": "Password is incorrect"},
+                        status=403,
+                    )
+                    return
+                started = service.begin_enrollment(
+                    user_id, str(auth_context.get("tenant_id") or ""), self._account_email(user_id)
+                )
+                audited = self._two_step_audit(auth_context, "account.two_step_started", {"method": "TOTP"})
+                self._send_json(
+                    {
+                        "success": True,
+                        "pending": True,
+                        "method": "TOTP",
+                        "secret": started["secret"],
+                        "otpauth_uri": started["otpauth_uri"],
+                        "issuer": started["issuer"],
+                        "audited": audited,
+                    }
+                )
+                return
+
+            if action == "enable":
+                if not code:
+                    self._send_json(
+                        {"error": "Bad Request", "code": "TWO_STEP_REQUIRED", "detail": "Enter the code from your authenticator"},
+                        status=400,
+                    )
+                    return
+                service.confirm_enrollment(user_id, code)
+                audited = self._two_step_audit(auth_context, "account.two_step_enrolled", {"method": "TOTP"})
+                self._send_json({"success": True, "enabled": True, "method": "TOTP", "audited": audited})
+                return
+
+            if action == "disable":
+                if not self._verify_account_password(user_id, password):
+                    self._send_json(
+                        {"error": "Forbidden", "code": "INVALID_PASSWORD", "detail": "Password is incorrect"},
+                        status=403,
+                    )
+                    return
+                if service.enrolled(user_id):
+                    if not code:
+                        self._send_json(
+                            {"error": "Bad Request", "code": "TWO_STEP_REQUIRED", "detail": "Enter a current code to turn off two-step"},
+                            status=400,
+                        )
+                        return
+                    ok, reason = service.verify_code(user_id, code)
+                    if not ok:
+                        if reason == "TWO_STEP_LOCKED":
+                            self._send_json(
+                                {"error": "Too Many Requests", "code": "TWO_STEP_LOCKED", "detail": "Too many incorrect codes. Try again shortly."},
+                                status=429,
+                            )
+                        else:
+                            self._send_json(
+                                {"error": "Forbidden", "code": "INVALID_TWO_STEP_CODE", "detail": "That code is not valid"},
+                                status=403,
+                            )
+                        return
+                service.disable(user_id)
+                audited = self._two_step_audit(auth_context, "account.two_step_disabled", {})
+                self._send_json({"success": True, "enabled": False, "audited": audited})
+                return
+
+            self._send_json({"error": "Not Found", "code": "UNKNOWN_TWO_STEP_ACTION"}, status=404)
+        except TwoStepError as err:
+            self._send_json(
+                {"error": "Two-step", "code": err.code, "detail": err.message, **err.detail},
+                status=err.status,
+            )
+
     def _settings_principal(self, auth_context: Dict[str, Any]):
         from core.settings.rbac import Principal
         return Principal.from_auth_context(auth_context)
@@ -1343,6 +1503,14 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"authenticated": True, "context": ctx})
             except AuthExceptions.AuthenticationError as e:
                 self._send_json({"authenticated": False, "error": str(e)}, status=401)
+            return
+
+        # The account's own two-step state (never another account's).
+        if path == "/api/auth/two-step/status":
+            from core.two_step import TwoStepService
+
+            state = TwoStepService().status(str(auth_context.get("user_id") or ""))
+            self._send_json({"success": True, **state})
             return
 
         # Milestone J: Tenant Concurrency Leases Inspection
@@ -4407,6 +4575,11 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if not self._enforce_tenant_fairness(path, "POST", auth_context=auth_context):
+            return
+
+        # Two-step (TOTP) enrollment and management for the signed-in account.
+        if path.startswith("/api/auth/two-step/"):
+            self._handle_two_step(path.rstrip("/").rsplit("/", 1)[-1], req_data, auth_context)
             return
 
         # Company Setup API (tenant-scoped lifecycle, drafts, deletion steps).

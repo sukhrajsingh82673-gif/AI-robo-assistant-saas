@@ -1321,6 +1321,20 @@ test('existing flow renders the business, revenue and role fields', () => {
         state.deletion = { status: 'AWAITING_IDENTITY' };
         return jsonResponse(state.deletion);
       }
+      if (url === '/api/auth/two-step/setup' && method === 'POST') {
+        if (opts.setupResponse) return opts.setupResponse(state);
+        return jsonResponse({
+          success: true,
+          pending: true,
+          method: 'TOTP',
+          secret: 'JBSWY3DPEHPK3PXP',
+          otpauth_uri: 'otpauth://totp/ZONATA:owner?secret=JBSWY3DPEHPK3PXP&issuer=ZONATA'
+        });
+      }
+      if (url === '/api/auth/two-step/enable' && method === 'POST') {
+        if (opts.enableResponse) return opts.enableResponse(state);
+        return jsonResponse({ success: true, enabled: true, method: 'TOTP' });
+      }
       if (url === '/api/v1/companies/comp_1/delete/confirm-identity' && method === 'POST') {
         if (opts.identityResponse) return opts.identityResponse(state);
         return jsonResponse({ error: 'No verifier', code: 'TWO_STEP_NOT_CONFIGURED' }, 501);
@@ -1408,6 +1422,104 @@ test('existing flow renders the business, revenue and role fields', () => {
     assert.ok(/no verifier|no authenticator/i.test(wizard.error.message));
     assert.ok(/Nothing was deleted/i.test(wizard.error.message));
     assert.strictEqual(wizard.step, 'identity', 'never advances past the missing verifier');
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('delete enrolls a real authenticator before asking for a code', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const state = deleteFetch(window, {
+      plan: planFixture({ mfa_required: true, two_step_configured: true, two_step_enrolled: false }),
+      identityResponse: () => jsonResponse({
+        deletion: { status: 'PENDING_DELETION' },
+        export: { status: 'READY', message: 'The export is ready.' }
+      })
+    });
+    window.fetch = state.fetch;
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+    wizard.deletion = { status: 'AWAITING_IDENTITY' };
+    wizard.step = 'identity';
+    wizard._render();
+
+    assert.ok(wizard.root.textContent.includes('Turn on two-step verification'));
+    const start = wizard.root.querySelector('[data-delete-action="two-step-start"]');
+    assert.strictEqual(start.disabled, true, 'setup needs the password first');
+
+    const password = window.document.getElementById('zcDeletePassword');
+    password.value = 'correct horse';
+    password.dispatchEvent(new window.Event('input', { bubbles: true }));
+    wizard.root.querySelector('[data-delete-action="two-step-start"]').click();
+    await settle(() => !!wizard.enroll, 'two-step setup');
+
+    const setupPost = state.posts.find((post) => post.url === '/api/auth/two-step/setup');
+    assert.ok(setupPost, 'setup is a real server call');
+    assert.strictEqual(setupPost.body.password, 'correct horse');
+    assert.ok(window.document.getElementById('zcEnrollSecret').textContent.includes('JBSWY3DPEHPK3PXP'));
+    assert.ok(wizard.root.textContent.includes('otpauth://totp/'));
+
+    const enrollCode = window.document.getElementById('zcEnrollCode');
+    enrollCode.value = '123456';
+    enrollCode.dispatchEvent(new window.Event('input', { bubbles: true }));
+    wizard.root.querySelector('[data-delete-action="two-step-enable"]').click();
+    await settle(() => wizard.plan.two_step_enrolled === true, 'two-step enable');
+
+    const enablePost = state.posts.find((post) => post.url === '/api/auth/two-step/enable');
+    assert.ok(enablePost, 'enable is a real server call');
+    assert.strictEqual(enablePost.body.code, '123456');
+    assert.ok(/Two-step verification is on/i.test(wizard.notice || ''));
+    assert.ok(window.document.getElementById('zcDeleteCode'), 'code field appears after enrollment');
+
+    const confirm = () => wizard.root.querySelector('[data-delete-action="identity-confirm"]');
+    assert.strictEqual(confirm().disabled, true, 'the code cannot be skipped');
+    const code = window.document.getElementById('zcDeleteCode');
+    code.value = '654321';
+    code.dispatchEvent(new window.Event('input', { bubbles: true }));
+    assert.strictEqual(confirm().disabled, false);
+    confirm().click();
+    await settle(() => wizard.step === 'recovery', 'identity with code');
+
+    const identityPost = state.posts.find((post) => post.url.endsWith('/confirm-identity'));
+    assert.strictEqual(identityPost.body.two_step_code, '654321');
+    wizard.close(false);
+    dom.window.close();
+  });
+
+  await testAsync('delete maps a missing enrollment back to the setup panel', async () => {
+    const dom = makeDom('<div id="view"></div>');
+    const { window } = dom;
+    loadI18n(window);
+    const wizard = loadDelete(window);
+    const state = deleteFetch(window, {
+      plan: planFixture({ mfa_required: true, two_step_configured: true, two_step_enrolled: true }),
+      identityResponse: () => jsonResponse({ error: 'Two-step', code: 'TWO_STEP_NOT_ENROLLED' }, 409)
+    });
+    window.fetch = state.fetch;
+    window.navigateTo = () => {};
+
+    wizard.open({ companyId: 'comp_1', companyName: 'Nightowl Bakery' });
+    await settle(() => !!window.document.querySelector('.zc-delete-sheet') && !wizard.loading, 'delete load');
+    wizard.deletion = { status: 'AWAITING_IDENTITY' };
+    wizard.step = 'identity';
+    wizard._render();
+
+    const password = window.document.getElementById('zcDeletePassword');
+    password.value = 'correct horse';
+    password.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const code = window.document.getElementById('zcDeleteCode');
+    code.value = '111111';
+    code.dispatchEvent(new window.Event('input', { bubbles: true }));
+    wizard.root.querySelector('[data-delete-action="identity-confirm"]').click();
+    await settle(() => !!wizard.error, 'stale enrollment error');
+
+    assert.strictEqual(wizard.error.code, 'TWO_STEP_NOT_ENROLLED');
+    assert.strictEqual(wizard.plan.two_step_enrolled, false, 'the server truth wins');
+    assert.ok(wizard.root.textContent.includes('Turn on two-step verification'));
     wizard.close(false);
     dom.window.close();
   });

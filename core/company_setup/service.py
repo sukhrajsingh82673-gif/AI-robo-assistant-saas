@@ -477,7 +477,8 @@ class CompanySetupService:
             "assistant": {"default_scope": assistant_scope},
             "recovery_days": recovery_days,
             "mfa_required": mfa_required,
-            "two_step_configured": False,
+            "two_step_configured": True,
+            "two_step_enrolled": None,
             "quiet_hours": None,
             "quiet_hours_supported": False,
         }
@@ -1952,6 +1953,17 @@ class CompanySetupService:
         except Exception:
             return False
 
+    def _two_step_enrolled(self, user_id: str) -> bool:
+        """Whether this account has a confirmed TOTP secret, not just a setting."""
+        if not user_id:
+            return False
+        try:
+            from core.two_step import TwoStepService
+
+            return TwoStepService().enrolled(user_id)
+        except Exception:
+            return False
+
     def _recovery_days(self, company_id: str) -> int:
         try:
             value = self._effective(company_id, "company_delete_recovery_days", 7)
@@ -1988,12 +2000,13 @@ class CompanySetupService:
         visible = local[:1]
         return f"{visible}{'*' * max(1, len(local) - 1)}@{domain}"
 
-    def _deletion_payload(self, record: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _deletion_payload(self, record: Optional[Dict[str, Any]], principal: Optional[Principal] = None) -> Optional[Dict[str, Any]]:
         if not record:
             return None
         export_status = record.get("export_status")
         export_available = export_status in ("READY", "EMAILED") and bool(record.get("export_ref"))
         status = str(record.get("status") or "")
+        enrolled = self._two_step_enrolled(principal.user_id) if principal else None
         return {
             "request_id": record["request_id"],
             "company_id": record["company_id"],
@@ -2018,7 +2031,8 @@ class CompanySetupService:
             "purge_blocked_reason": record.get("purge_blocked_reason"),
             "recovery_days": record.get("recovery_days"),
             "mfa_required": self._mfa_required(record["company_id"]),
-            "two_step_configured": False,
+            "two_step_configured": True,
+            "two_step_enrolled": enrolled,
             "can_cancel": status in ("AWAITING_NAME", "AWAITING_IDENTITY", "EXPORTING", "PENDING_DELETION"),
             "created_at": record.get("created_at"),
             "updated_at": record.get("updated_at"),
@@ -2069,7 +2083,8 @@ class CompanySetupService:
             "removal_summary": self._removal_summary(company_id),
             "recovery_days": self._recovery_days(company_id),
             "mfa_required": self._mfa_required(company_id),
-            "two_step_configured": False,
+            "two_step_configured": True,
+            "two_step_enrolled": self._two_step_enrolled(principal.user_id),
             "email_available": bool(verified and recipient),
             "email_recipient": self._mask_email(recipient) if verified and recipient else "",
             "export_format": "PDF, split into numbered parts and zipped when needed",
@@ -2083,7 +2098,7 @@ class CompanySetupService:
         if normalize_status(record["status"]) in (CompanyStatus.PENDING_EXPORT, CompanyStatus.PENDING_DELETION):
             existing = self._deletion_row(company_id)
             if existing:
-                return self._deletion_payload(existing)
+                return self._deletion_payload(existing, principal)
             raise CompanySetupError(
                 "DELETION_ALREADY_STARTED",
                 "This company is already in the deletion workflow",
@@ -2092,7 +2107,7 @@ class CompanySetupService:
 
         existing = self._deletion_row(company_id)
         if existing:
-            return self._deletion_payload(existing)
+            return self._deletion_payload(existing, principal)
 
         now = _now()
         request_id = f"del_{uuid.uuid4().hex[:12]}"
@@ -2134,7 +2149,7 @@ class CompanySetupService:
             "company.delete.requested",
             {"request_id": request_id, "removal_summary": summary},
         )
-        return self._deletion_payload(self._deletion_row(company_id))
+        return self._deletion_payload(self._deletion_row(company_id), principal)
 
     def _require_deletion(self, company_id: str) -> Dict[str, Any]:
         record = self._deletion_row(company_id)
@@ -2238,7 +2253,7 @@ class CompanySetupService:
             "company.delete.name_confirmed",
             {"request_id": request["request_id"], "mfa_required": mfa},
         )
-        return self._deletion_payload(self._deletion_row(company_id)) or {}
+        return self._deletion_payload(self._deletion_row(company_id), principal) or {}
 
     def confirm_delete_identity(
         self,
@@ -2264,14 +2279,39 @@ class CompanySetupService:
             raise CompanySetupError("INVALID_PASSWORD", "Password is incorrect", status=403)
 
         if self._mfa_required(company_id):
-            # No real TOTP verifier is wired yet. Never accept a dummy code and
-            # never say "enter a code" when nothing could verify it: 501 is the
-            # honest answer whether or not a code was supplied.
-            raise CompanySetupError(
-                "TWO_STEP_NOT_CONFIGURED",
-                "Two-step verification is enabled but no verifier is configured on this deployment",
-                status=501,
-            )
+            from core.two_step import TwoStepError, TwoStepService
+
+            verifier = TwoStepService()
+            delivered = str(two_step_code or "").strip()
+            if not verifier.enrolled(principal.user_id):
+                raise CompanySetupError(
+                    "TWO_STEP_NOT_ENROLLED",
+                    "Two-step verification is required. Set it up before deleting this company.",
+                    status=409,
+                    detail={"enrollment_required": True, "settings_path": "/settings/security"},
+                )
+            if not delivered:
+                raise CompanySetupError(
+                    "TWO_STEP_REQUIRED",
+                    "Enter the current code from your authenticator app",
+                    status=400,
+                )
+            try:
+                ok, reason = verifier.verify_code(principal.user_id, delivered)
+            except TwoStepError as err:
+                raise CompanySetupError(err.code, err.message, status=err.status, detail=err.detail)
+            if not ok:
+                if reason == "TWO_STEP_LOCKED":
+                    raise CompanySetupError(
+                        "TWO_STEP_LOCKED",
+                        "Too many incorrect codes. Try again shortly.",
+                        status=429,
+                    )
+                raise CompanySetupError(
+                    "INVALID_TWO_STEP_CODE",
+                    "That two-step code is not valid",
+                    status=403,
+                )
 
         previous_status = normalize_status(record["status"])
         target = validate_transition(previous_status, CompanyStatus.PENDING_EXPORT)
@@ -2314,7 +2354,7 @@ class CompanySetupService:
                 {"request_id": request["request_id"], "error_type": type(exc).__name__},
             )
             return {
-                "deletion": self._deletion_payload(self._deletion_row(company_id)),
+                "deletion": self._deletion_payload(self._deletion_row(company_id), principal),
                 "export": {
                     "status": "FAILED",
                     "message": "The export could not be generated. Nothing has been purged.",
@@ -2558,7 +2598,7 @@ class CompanySetupService:
                 reason="IMMEDIATE_WINDOW_AFTER_EMAIL",
             )
 
-        payload = self._deletion_payload(self._deletion_row(company_id) or self._latest_deletion(company_id))
+        payload = self._deletion_payload(self._deletion_row(company_id) or self._latest_deletion(company_id), principal)
         return {
             "deletion": payload,
             "export": {

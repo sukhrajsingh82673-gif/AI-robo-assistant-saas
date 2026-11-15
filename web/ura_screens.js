@@ -818,7 +818,15 @@
     var findings = [];
     try { findings = (await fetchCoworkerApprovals()).map(normalizeApproval).filter(function (a) { return C.riskLevel(a) === 2; }); }
     catch (e) { findings = []; }
-    var score = C.secScore(settings, findings.length, region);
+    var twoStep = { enabled: false, available: false };
+    try {
+      var stepRes = await fetch('/api/auth/two-step/status');
+      if (stepRes.ok) {
+        var stepData = await stepRes.json();
+        twoStep = { enabled: !!stepData.enabled, pending: !!stepData.pending, available: true };
+      }
+    } catch (e) { twoStep = { enabled: false, available: false }; }
+    var score = C.secScore(settings, findings.length, region, twoStep.enabled);
     var tone = score >= 80 ? 'good' : (score >= 60 ? 'warn' : 'bad');
     var ring = 2 * Math.PI * 54;
     var dash = ring * (score / 100);
@@ -837,7 +845,9 @@
           '<button class="ura-btn small plain" type="button" data-go="/settings/security">Review settings</button></div>' +
         '</div></div>' +
       '<div class="ura-card"><h2 style="margin:0 0 8px;font-size:1rem;">Checks</h2>' + [
-        ['Two-step sign-in', settings.twofa, settings.twofa ? 'On' : 'Off — turn on in Security settings'],
+        ['Two-step sign-in', twoStep.enabled, twoStep.available
+          ? (twoStep.enabled ? 'On for this account' : 'Off — set it up when deleting a company or from the deletion sheet')
+          : 'Status unavailable from this deployment'],
         ['Session length', settings.session !== 'never', settings.session === 'never' ? 'Until sign out' : 'Ends after ' + settings.session],
         ['Audit retention', true, settings.audit + ' days'],
         ['Data region', !!region, region ? 'Company region: ' + region : 'Company region not stored'],
@@ -855,7 +865,7 @@
       }).join('') : emptyCard('No high-risk findings', 'High-risk approvals appear here. Run a scan to check again.')) +
     '</div>' +
     '<div class="ura-suggest" style="margin-top:12px;">' + icon('info') +
-      '<span><b>What is real here:</b> the score and checks come from your saved settings; findings come from pending high-risk approvals. The app does not invent a scan result.</span></div>';
+      '<span><b>What is real here:</b> two-step comes from your account\'s authenticator enrollment, the other checks and the score come from your saved settings, and findings come from pending high-risk approvals. The app does not invent a scan result.</span></div>';
   }
 
   // ---------------------------------------------------------------------------

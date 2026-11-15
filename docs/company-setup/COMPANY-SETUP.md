@@ -1,4 +1,4 @@
-# ZONATA — Company Setup Program (Stages 0–6)
+# ZONATA — Company Setup Program (Stages 0–7)
 
 Living tracker. Updated at the end of every stage.
 Branch: `ui-redesign` · Base commit at Stage 0: `cbff16b`
@@ -23,6 +23,7 @@ Rules of engagement for this program:
 | 4 | Add existing company (form, connections, ingestion shell, diagnosis) | **Complete** |
 | 5 | Overview, edit, protected delete + export | **Complete** |
 | 6 | Settings wiring, tests, abuse tests, hardening | **Complete** |
+| 7 | Real TOTP two-step verification (enrollment, deletion gate, status) | **Complete** |
 
 ---
 
@@ -268,13 +269,22 @@ DELETE /api/v1/companies/<id>/connections/<cid>   disconnect + revoke secret
 GET    /api/v1/companies/<id>/deletion            current deletion request
 POST   /api/v1/companies/<id>/delete/request      step 1: what will happen
 POST   /api/v1/companies/<id>/delete/confirm-name step 2: exact name
-POST   /api/v1/companies/<id>/delete/confirm-identity step 3: password (+ 2FA when enabled)
+POST   /api/v1/companies/<id>/delete/confirm-identity step 3: password + current TOTP code when MFA is on
 POST   /api/v1/companies/<id>/delete/cancel       cancel until purge
 GET    /api/v1/companies/<id>/export              download (Stage 5; 409 until an export exists)
 GET    /api/v1/companies/<id>/audit               recent company audit events
 GET    /api/v1/companies/<id>/admins              per-company admin allow-list
 POST   /api/v1/companies/<id>/admins              owner grants an admin
 DELETE /api/v1/companies/<id>/admins/<user_id>    owner revokes an admin
+```
+
+Account-level two-step routes (Stage 7, authenticated account only, never another account):
+
+```text
+GET    /api/auth/two-step/status    this account's enabled/pending state
+POST   /api/auth/two-step/setup     password re-auth → pending secret + otpauth URI
+POST   /api/auth/two-step/enable    confirm a code → enabled
+POST   /api/auth/two-step/disable   password + current code → removed
 ```
 
 Legacy `/api/companies`, `/api/companies/<id>/draft|activate`, `/api/onboard` stay working unchanged in Stage 1 (deprecated, removed in Stage 6 if unused). The new API is mounted in `api_server.py` for GET/POST/PATCH/PUT/DELETE and reuses the existing token auth, tenant fairness and rate limiting.
@@ -347,7 +357,7 @@ Planned for later stages:
 3. Agents (`SYSTEM_AGENT`, `AI_AGENT`, `agent_*` ids) can save drafts but are denied create-final, update, submit, settings, connect and delete. Delete is denied even when an agent is mistakenly granted.
 4. A newly created company is always `DRAFT`. Submission derives the status from type: `NEW → CREATING`, `EXISTING → ONBOARDING`. The build/onboarding run is created with phase `INTAKE` / `CONNECT_VERIFY`, `phase_state = PENDING`, progress 0 — real state, no fake progress.
 5. Duplicate names are blocked with `409 DUPLICATE_COMPANY_NAME` unless the caller passes `allow_duplicate: true` (explicit override; the UI will surface it as a warning).
-6. Deletion is a three-step state machine: `request` (removal summary) → `confirm-name` (exact match) → `confirm-identity` (password; 2FA when enabled) → `AWAITING_EXPORT`/`EXPORTING`. With MFA enabled and no verifier configured the endpoint returns `501 TWO_STEP_NOT_CONFIGURED` rather than accepting a dummy code.
+6. Deletion is a three-step state machine: `request` (removal summary) → `confirm-name` (exact match) → `confirm-identity` (password, then a real TOTP code when MFA is required) → `AWAITING_EXPORT`/`EXPORTING`. The verifier is real RFC 6238: an account without an enrollment is told to enroll (`409 TWO_STEP_NOT_ENROLLED`), a missing code is `400 TWO_STEP_REQUIRED`, a wrong code `403 INVALID_TWO_STEP_CODE`, and five wrong codes lock for five minutes (`429 TWO_STEP_LOCKED`). A dummy code is never accepted.
 7. Connection secrets go through the existing `SettingsSecretVault` (AES-GCM) and are revoked on disconnect; only read-only scopes are accepted in this stage.
 
 **Honest limitations left for later stages**
@@ -536,7 +546,7 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 3. Only the owner or a granted admin sees Edit/Delete; an agent sees "View only" and no menu. The server repeats every permission check.
 4. Delete is deliberately multi-step. `GET /delete/plan` is non-mutating and returns real removal counts, the configured recovery window, MFA state and whether email can actually be delivered.
 5. The exact company name is compared by the client and again by the server; a wrong name cannot advance.
-6. Identity always requires the signed-in account password. When two-step is required but no verifier exists, the server returns `501 TWO_STEP_NOT_CONFIGURED` and the UI says so; it never skips the requirement.
+6. Identity always requires the signed-in account password. When MFA is required the server also verifies a real TOTP code; an account that has not enrolled is shown an in-sheet enrollment step (secret + `otpauth://` link, confirm code) instead of a dead end. The requirement is never skipped.
 7. After identity, the export is written before anything is removed: PDF (split + zipped when needed), JSON sidecar and manifest. A failed export is shown as failed and blocks purge.
 8. Delivery is honest. Email is attempted only for a verified account email and only when SMTP is configured. Otherwise the in-app download is the delivery path; purge waits for an email `SENT` or a confirmed download.
 9. The recovery window defaults to 7 days (`0` = immediate). The wizard and overview show the real countdown; cancel restores the company's exact previous status and writes an audit event.
@@ -547,7 +557,7 @@ GET  /api/v1/companies/comp_does_not_exist      -> 404
 
 **Honest limits**
 
-- `sec_require_mfa` defaults to true and this deployment has no TOTP verifier, so real deletion stops at `501 TWO_STEP_NOT_CONFIGURED`. The UI reports it; it does not bypass it.
+- `sec_require_mfa` defaults to true. Since Stage 7 the verifier is real, so deletion either accepts a valid TOTP code or stops with an honest enrollment instruction; it never bypasses the requirement.
 - SMTP is only real when credentials are supplied; without them email status is `NOT_CONFIGURED` and the download is used.
 - The PDF is intentionally plain: text, rules and page numbers, no layout engine or embedded fonts beyond the built-in set. Non-Latin glyphs that the built-in font cannot represent are replaced and force the ZIP report to say so.
 - No Chromium/Playwright here: no screenshots, no true 360px render and no visual RTL pass; jsdom covers behaviour and static wiring.
@@ -589,9 +599,57 @@ GET    /api/v1/companies/preferences?company_id=<id>   real settings for the act
 **Honest limits**
 
 - There is no quiet-hours setting in this codebase and no notification dispatcher in these flows. The endpoint returns `quiet_hours: null` and `quiet_hours_supported: false` instead of pretending a schedule is enforced.
-- `two_step_configured` is always `false` until a real TOTP/WebAuthn verifier exists; deletion still stops honestly at `501 TWO_STEP_NOT_CONFIGURED` when MFA is required.
+- `two_step_configured` reports `true` (the verifier exists) and `two_step_enrolled` reports the signed-in account's real enrollment. Since Stage 7 deletion accepts a real TOTP code or returns a specific enrollment/requirement error; it never accepts a dummy code.
 - Preferences are fetched with the normal authenticated `fetch`; on a cold offline start the UI keeps its local defaults until the request succeeds.
 - No browser is available, so the 360px/RTL checks are DOM/CSS assertions, not screenshots.
+
+---
+
+## 4h. Stage 7 — real TOTP two-step verification
+
+The last honest gap in Stage 5 was two-step: `sec_require_mfa` defaults to true but no verifier existed, so deletion stopped with `501 TWO_STEP_NOT_CONFIGURED`. Stage 7 replaces that refusal with a real verifier.
+
+**New code**
+
+| File | Purpose |
+|---|---|
+| `core/two_step.py` | RFC 6238 TOTP (HMAC-SHA1, 6 digits, 30-second period, ±1 step). Secrets are generated with `os.urandom(20)`, shown once at enrollment, and stored AES-GCM-encrypted under a key derived from `ZONATA_AUTH_SECRET`. Replay guard (`last_used_step`), 5-failure lockout for 300 s, explicit pending → confirmed enrollment. |
+| `migrations/pg/0012_user_two_step.sql` | Additive `user_two_step` table (one row per account) plus tenant index. Created on demand in tests, so SQLite suites need no migration run. |
+| `migrations/rollback/pg/0012_user_two_step_rollback.sql` | Manual reverse migration (destroys enrollments; never auto-applied). |
+| `tests/test_two_step.py` | 11 tests: RFC 6238 vectors, otpauth URI, no plaintext storage, enrollment confirmation, ±1 window, replay refusal, lockout/expiry, key-rotation fail-closed, disable, plan honesty, deletion with/without code, password-before-code ordering. |
+| `tests/company_setup_ui_test.js` | 2 new checks: enrollment panel posts real setup/enable calls and then requires the code; a stale `TWO_STEP_NOT_ENROLLED` response reopens the setup panel. |
+
+**Touched:** `core/company_setup/service.py` (`_two_step_enrolled`, `two_step_configured: true`, `two_step_enrolled` in plan/payload, real verification and error codes replacing the `501`), `api_server.py` (account routes, password re-auth, per-account rate limit, audit), `web/company_setup_delete.js` (enrollment sub-panel, code-required guard, new error mapping), `web/i18n.js` (English + Arabic), `web/company_setup.css`, `web/ura_screens.js` (Security posture reads the real account state), `web/ura_settings.js` (fake local "two-step" switch removed), `web/ura_core.js` (score credits two-step only when the server says enrolled), `package.json`, tracker.
+
+**Routes added**
+
+```text
+GET    /api/auth/two-step/status    current account's enabled/pending state
+POST   /api/auth/two-step/setup     password re-auth → pending secret + otpauth URI
+POST   /api/auth/two-step/enable    confirm a code → enabled
+POST   /api/auth/two-step/disable   password + current code → removed
+```
+
+**Behaviour delivered**
+
+1. Enrollment is explicit. `setup` returns a one-time secret and `otpauth://` link; nothing is "on" until `enable` proves a code. The secret is never stored or logged in plaintext.
+2. Deletion requires a real code when `sec_require_mfa` is on. The server checks the password first, then the code. A missing enrollment returns `409 TWO_STEP_NOT_ENROLLED` with `enrollment_required`; a missing code `400 TWO_STEP_REQUIRED`; a wrong code `403 INVALID_TWO_STEP_CODE`; five failures `429 TWO_STEP_LOCKED`.
+3. Codes are single-use. The step used at enrollment or deletion cannot be replayed for another sensitive action. The ±1 period window tolerates small clock skew.
+4. The deletion sheet enrolls in place when needed: password → setup (secret + link) → confirm code → the identity step then asks for the next code. The UI says explicitly that each code works once.
+5. The Security screen now reports this account's real enrollment from the server, and the local-only "two-step sign-in" switch (which changed nothing) was removed so the app cannot claim protection it does not have.
+6. Enrollment, enable and disable are audited (`account.two_step_started|enrolled|disabled`) with secrets and codes scrubbed. Responses report `audited: true|false` honestly if the audit write ever fails.
+7. The derived storage key is separate from the token-signing key. Rotating `ZONATA_AUTH_SECRET` fails closed with `503 TWO_STEP_KEY_UNAVAILABLE` and requires re-enrollment rather than silently accepting or mis-decrypting.
+8. Live strict-auth smoke: register → status → wrong password `403` → setup → wrong code `403` → enable → plan `two_step_enrolled: true` → deletion without code `400` → deletion with code → `PENDING_DELETION` with a ready export → disable guards (`403`/`400`/`403`).
+
+**Gates:** `python3 -m pytest tests/test_two_step.py -q` (11 passed), company suites (46 + 11 + 19 + 15), `node tests/company_setup_ui_test.js` (50 checks), `npm run typecheck` (76 files), `npm run lint`, assistant UI/jsdom/e2e (41 + 29 + 12), `npm run test:ui`.
+
+**Honest limits**
+
+- Login-time MFA is still **not** enforced. `sec_require_mfa` describes "all administrative logins", but this verifier currently gates the deletion identity step only. The description is now closer to reality but still over-broad; wiring it into `/api/auth/login` is a separate change with session-challenge design.
+- No SMS, WebAuthn/passkey or recovery codes. Those are separate providers; lost-device recovery is an operator action today.
+- The `otpauth://` link is displayed as selectable text, not a QR image, because no QR library is bundled. The setup key works in any authenticator.
+- The secret is shown once by the server response and never re-readable through the API.
+- Rotating `ZONATA_AUTH_SECRET` invalidates every enrollment (the key ID no longer matches). That is deliberate and fails closed, but it means a rotation needs a re-enrollment plan.
 
 ---
 
@@ -612,6 +670,9 @@ GET    /api/v1/companies/preferences?company_id=<id>   real settings for the act
 11. **Purge is evaluated lazily.** `purge_due` runs when a deletion is read (company detail, deletion status) or after a download/purge call; there is no background scheduler in this deployment. A company whose window expires while nobody opens it stays in `PENDING_DELETION` until the next read. This delays removal but never destroys data early. A cron/worker should call `purge_due` per tenant before production.
 12. **Tenant settings live on the token company.** The settings console writes tenant-wide values against the token's company id, not `comp_primary`. Company setup now resolves company → token company → `comp_primary` → global, but any other subsystem that reads `get_effective_setting` directly may still miss settings saved at the token company. Stage 6 fixes company setup only; a shared resolver should be made authoritative later.
 13. **No quiet hours.** Notification and quiet-hour behaviour is not dispatched by anything in these flows, so Stage 6 reports `quiet_hours_supported: false` rather than storing a schedule that would never run.
+14. **Two-step protects deletion, not sign-in.** `sec_require_mfa` says "all administrative logins", but Stage 7 wires TOTP into the deletion identity step only. Enforcing it at `/api/auth/login` needs a session-challenge flow and is the next security gap.
+15. **Rotating `ZONATA_AUTH_SECRET` invalidates every TOTP enrollment.** The secret is encrypted under a derived key and the stored `key_id` must match. Rotation fails closed with `503 TWO_STEP_KEY_UNAVAILABLE`; users must re-enroll. Plan rotation with a re-enrollment window, or add key-versioned decryption first.
+16. **Lost authenticator has no self-service recovery.** `disable` needs the password and a current code; without the device an operator must clear the `user_two_step` row. Recovery codes are not implemented and are not claimed.
 
 ---
 
@@ -641,7 +702,7 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 | Legal document generator | `LegalPackAdapter` | Local draft checklist and legal items only; no external generator | 3 | Draft: verify with a qualified professional |
 | Email delivery (export, first report) | `ExportEmailAdapter` (Null + SMTP) | SMTP sends are real when `ZONATA_SMTP_USERNAME` / `ZONATA_SMTP_PASSWORD` are set; otherwise `NOT_CONFIGURED` and the in-app download is used | 5 | Real when configured; otherwise not configured |
 | Company export PDF/ZIP | `core/company_setup/export.py` | Real native PDF (split into numbered parts when needed), ZIP with JSON sidecar and SHA-256 manifest, integrity checked before serving | 5 | Real |
-| Two-step code verification | TOTP verifier | No (`501 TWO_STEP_NOT_CONFIGURED`); even a correctly shaped code is refused, never accepted from a dummy | 5 | Not configured |
+| Two-step code verification | `core/two_step.py` (TOTP, RFC 6238) | Real: HMAC-SHA1, 6 digits, 30 s, ±1 step, AES-GCM at rest, replay guard, 5-failure lockout. Enrollment is explicit and deletion is gated on it. Login-time enforcement is still not wired (deletion only) | 7 | Real |
 | OAuth / read-only API connections (accounting, banking, payments, commerce, CRM, workspace, communications) | `ConnectionAdapter` per provider in `core/company_setup/connections.py` | Connection and skip records are real; every adapter is null (`available: false`, `verified: false`, nothing read) | 4 | Unavailable — not simulated |
 | DNS/domain ownership verification | `OwnershipVerifier` in `core/company_setup/connections.py` | Request/confirm return `501 VERIFICATION_NOT_CONFIGURED`; no token is accepted | 4 | Not configured |
 | Malware scanning of uploads | `ScanAdapter` | Metadata validation, type/size allow-list, SHA-256 duplicate refusal and prompt-injection flagging are real; bytes are not stored and no AV engine runs | 4 | Unscanned — no bytes stored |
@@ -706,12 +767,12 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Added `core/company_setup/export.py`, `core/company_setup/email_adapter.py`, `web/company_setup_overview.js`, `web/company_setup_edit.js`, `web/company_setup_delete.js`, migration `0011` (+ manual rollback) and `tests/test_company_deletion_export.py`.
 - Overview replaced the legacy telemetry pane: real identity, four key numbers, build/onboarding progress, sources and connections, legal drafts, audit trail, a deletion banner and one keyboard-accessible Edit/Delete menu. A failing secondary panel yields a partial-data notice, not invented values.
 - Edit shows the recorded facts, validates on the client and again on the server, clears optional fields honestly, maps duplicate names to the name field, and can add/remove read-only connections.
-- Delete is a five-step protected sheet: real plan counts, exact company name, signed-in password (+2FA when configured), export, recovery window. Wrong names never reach the server; a missing verifier returns `501 TWO_STEP_NOT_CONFIGURED` and stops the flow.
+- Delete is a five-step protected sheet: real plan counts, exact company name, signed-in password + real TOTP code when MFA is on, export, recovery window. Wrong names never reach the server; an account without enrollment is guided through setup and stopped until it completes.
 - Export is real: native multi-page PDF, numbered splits and ZIP when needed, JSON sidecar, SHA-256 manifest and an integrity check before serving. Email sends only through configured SMTP for a verified account email; otherwise the in-app download is the delivery path.
 - Purge waits for email `SENT` or a confirmed download and the recovery window (default 7 days, `0` = immediate). Cancel restores the exact previous status. Purge keeps `companies`, `company_audit_events` and `company_deletion_requests`, nulls sensitive fields and writes the final audit record.
 - Routes: `/company/<id>/overview`, `/company/<id>/edit`; Overview tab and "Reconfigure Profile" now point at them.
 - Gates: typecheck 71 JS files, lint, `npm run test:company` (83 pytest across 4 files + 41 jsdom/static), `npm run test:assistant`.
-- Honest limits: deletion stops at `501` while `sec_require_mfa` is true and no TOTP verifier exists; SMTP is real only when configured; the PDF uses built-in fonts and reports replaced characters; purge is evaluated lazily (no background scheduler); no browser visual/RTL pass here.
+- Honest limits at that stage: deletion stopped at `501` while `sec_require_mfa` was true and no TOTP verifier existed (replaced in Stage 7); SMTP is real only when configured; the PDF uses built-in fonts and reports replaced characters; purge is evaluated lazily (no background scheduler); no browser visual/RTL pass here.
 - Waiting for "continue" before Stage 6.
 
 ### Stage 6 — settings wiring, tests, hardening
@@ -723,5 +784,14 @@ Answers assumed in Stage 1 are marked **[assumed]**; change them at any time, th
 - Added `tests/test_company_setup_preferences.py` (11) and `tests/test_company_setup_abuse.py` (19, 8 subtests); extended `tests/company_setup_ui_test.js` to 48 checks with a create→submit→overview→edit journey, XSS escaping, RTL/360px CSS and preference loading.
 - Fixed `POST /api/settings` raising `UnboundLocalError` because two function-local imports shadowed the module-level settings service. Settings writes now succeed and take effect.
 - Gates: typecheck 71 JS files, lint, 113 company pytest across 6 files, 48 company UI checks, assistant 79 pytest + 41 UI + 29 jsdom + 12 journey.
-- Honest limits: no quiet-hours engine exists; no TOTP verifier; jsdom stands in for a browser; other subsystems still read settings through the older resolver.
-- End of the Company Setup program (stages 0–6).
+- Honest limits: no quiet-hours engine exists; two-step had no verifier at that point (added in Stage 7); jsdom stands in for a browser; other subsystems still read settings through the older resolver.
+
+### Stage 7 — real TOTP two-step verification
+- Replaced `501 TWO_STEP_NOT_CONFIGURED` with a real RFC 6238 verifier: HMAC-SHA1, 6 digits, 30 s, ±1 step, AES-GCM at rest under a key derived from `ZONATA_AUTH_SECRET`, single-use steps, 5-failure/300 s lockout.
+- Enrollment is explicit and server-owned: `setup` (password re-auth) returns a one-time secret and `otpauth://` URI, `enable` requires proof of a code, `disable` requires the password and a current code. Status is per account.
+- Deletion identity now verifies a real code after the password: `409 TWO_STEP_NOT_ENROLLED` (with `enrollment_required`), `400 TWO_STEP_REQUIRED`, `403 INVALID_TWO_STEP_CODE`, `429 TWO_STEP_LOCKED`. A dummy code is never accepted.
+- The deletion sheet enrolls in place when the account has none, then asks for the next code; new errors are mapped in English and Arabic. Security posture reads real server state, and the fake local two-step switch was removed.
+- Added `migrations/pg/0012_user_two_step.sql` (+ rollback), `tests/test_two_step.py` (11), 2 new UI checks, and updated the MFA/preferences tests that expected the old refusal.
+- Gates: 11 two-step pytest, company 46 + 11 + 19 + 15, 50 company UI checks, typecheck 76 JS files, lint, assistant 41 + 29 + 12, `npm run test:ui`. Live strict-auth smoke covered register → setup → enable → deletion with/without a code → disable guards.
+- Honest limits: login-time MFA is not enforced yet (deletion only); no SMS/WebAuthn/recovery codes; no QR image; rotating `ZONATA_AUTH_SECRET` invalidates enrollments by design.
+- End of the Company Setup program (stages 0–7).

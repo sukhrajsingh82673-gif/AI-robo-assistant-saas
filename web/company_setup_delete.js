@@ -100,6 +100,8 @@
       this.nameInput = '';
       this.password = '';
       this.twoStep = '';
+      this.enroll = null;
+      this.enrollCode = '';
       this.completed = false;
       this.cancelled = false;
       this.cancelledStatus = '';
@@ -130,6 +132,8 @@
       this.nameInput = '';
       this.password = '';
       this.twoStep = '';
+      this.enroll = null;
+      this.enrollCode = '';
       this.completed = false;
       this.cancelled = false;
       this.cancelledStatus = '';
@@ -463,7 +467,9 @@
         </dl>
         ${plan.mfa_required ? `
           <div class="zc-inline-notice zc-inline-notice-warning" role="status">
-            ${escapeHtml(plan.two_step_configured ? t('company.delete.what.mfa') : t('company.delete.what.mfa_missing'))}
+            ${escapeHtml(!plan.two_step_configured
+              ? t('company.delete.what.mfa_missing')
+              : (plan.two_step_enrolled === false ? t('company.delete.what.mfa_setup') : t('company.delete.what.mfa')))}
           </div>
         ` : ''}
       `;
@@ -492,7 +498,10 @@
     _identityHtml() {
       const plan = this.plan || {};
       const mfaRequired = !!plan.mfa_required;
-      const twoStepConfigured = !!plan.two_step_configured;
+      const twoStepConfigured = plan.two_step_configured !== false;
+      const enrolled = plan.two_step_enrolled === true;
+      const needsCode = mfaRequired && twoStepConfigured && enrolled;
+      const canConfirm = !!this.password && (!needsCode || !!this.twoStep) && !this.busy;
       return `
         ${this._alertHtml()}
         <p class="zc-delete-lead">${escapeHtml(t('company.delete.identity.lead'))}</p>
@@ -503,21 +512,63 @@
             aria-describedby="zcDeletePasswordHint" />
           <p class="zc-field-hint" id="zcDeletePasswordHint">${escapeHtml(t('company.delete.identity.password_hint'))}</p>
         </div>
-        ${mfaRequired && twoStepConfigured ? `
+        ${needsCode ? `
           <div class="zc-field">
             <label class="zc-label" for="zcDeleteCode">${escapeHtml(t('company.delete.identity.code'))}</label>
             <input class="zc-input" id="zcDeleteCode" data-delete-field="code" type="text"
               value="${escapeHtml(this.twoStep)}" inputmode="numeric" autocomplete="one-time-code" />
           </div>
-        ` : ''}
-        ${mfaRequired ? `
-          <div class="zc-inline-notice zc-inline-notice-warning" role="status">
-            ${escapeHtml(twoStepConfigured ? t('company.delete.identity.mfa') : t('company.delete.identity.mfa_missing'))}
+          <div class="zc-inline-notice zc-inline-notice-muted" role="status">
+            ${escapeHtml(t('company.delete.identity.mfa'))}
           </div>
         ` : ''}
+        ${mfaRequired && !twoStepConfigured ? `
+          <div class="zc-inline-notice zc-inline-notice-warning" role="status">
+            ${escapeHtml(t('company.delete.identity.mfa_missing'))}
+          </div>
+        ` : ''}
+        ${mfaRequired && twoStepConfigured && !enrolled ? this._enrollHtml() : ''}
         <p class="zc-form-footnote">${escapeHtml(t('company.delete.identity.footnote'))}</p>
         <button type="button" class="zc-button zc-button-primary" data-delete-action="identity-confirm"
-          ${this.password && !this.busy ? '' : ' disabled'}>${escapeHtml(t('company.delete.identity.confirm'))}</button>
+          ${canConfirm ? '' : ' disabled'}>${escapeHtml(t('company.delete.identity.confirm'))}</button>
+      `;
+    }
+
+    _enrollHtml() {
+      if (!this.enroll) {
+        return `
+          <section class="zc-delete-section zc-delete-enroll">
+            <h3>${escapeHtml(t('company.delete.enroll.title'))}</h3>
+            <p class="zc-section-note">${escapeHtml(t('company.delete.enroll.lead'))}</p>
+            <button type="button" class="zc-button" data-delete-action="two-step-start"
+              ${this.password && !this.busy ? '' : ' disabled'}>${escapeHtml(t('company.delete.enroll.start'))}</button>
+            <p class="zc-form-footnote">${escapeHtml(t('company.delete.enroll.footnote'))}</p>
+          </section>
+        `;
+      }
+      return `
+        <section class="zc-delete-section zc-delete-enroll">
+          <h3>${escapeHtml(t('company.delete.enroll.title'))}</h3>
+          <p class="zc-section-note">${escapeHtml(t('company.delete.enroll.lead'))}</p>
+          <div class="zc-field">
+            <span class="zc-label">${escapeHtml(t('company.delete.enroll.secret'))}</span>
+            <code class="zc-mono zc-enroll-secret" id="zcEnrollSecret">${escapeHtml(this.enroll.secret)}</code>
+            <p class="zc-field-hint">${escapeHtml(t('company.delete.enroll.secret_hint'))}</p>
+          </div>
+          <div class="zc-field">
+            <span class="zc-label">${escapeHtml(t('company.delete.enroll.uri'))}</span>
+            <code class="zc-mono zc-enroll-uri">${escapeHtml(this.enroll.otpauth_uri)}</code>
+            <p class="zc-field-hint">${escapeHtml(t('company.delete.enroll.uri_hint'))}</p>
+          </div>
+          <div class="zc-field">
+            <label class="zc-label" for="zcEnrollCode">${escapeHtml(t('company.delete.enroll.code'))}</label>
+            <input class="zc-input" id="zcEnrollCode" data-delete-field="enroll-code" type="text"
+              value="${escapeHtml(this.enrollCode)}" inputmode="numeric" autocomplete="one-time-code" />
+          </div>
+          <button type="button" class="zc-button zc-button-primary" data-delete-action="two-step-enable"
+            ${this.enrollCode && !this.busy ? '' : ' disabled'}>${escapeHtml(t('company.delete.enroll.enable'))}</button>
+          <p class="zc-form-footnote">${escapeHtml(t('company.delete.enroll.waiting'))}</p>
+        </section>
       `;
     }
 
@@ -691,6 +742,8 @@
           else if (action === 'request') this.requestDeletion();
           else if (action === 'name-continue') this.confirmName();
           else if (action === 'identity-confirm') this.confirmIdentity();
+          else if (action === 'two-step-start') this.startTwoStep();
+          else if (action === 'two-step-enable') this.enableTwoStep();
           else if (action === 'export-retry') this.retryExport();
           else if (action === 'download') this.download();
           else if (action === 'purge') this.purgeNow();
@@ -718,12 +771,33 @@
         password.addEventListener('input', () => {
           this.password = password.value;
           const next = this.root.querySelector('[data-delete-action="identity-confirm"]');
-          if (next) next.disabled = !password.value;
+          if (next) {
+            const plan = this.plan || {};
+            const needsCode = !!(plan.mfa_required && plan.two_step_configured !== false && plan.two_step_enrolled === true);
+            next.disabled = !password.value || (needsCode && !this.twoStep);
+          }
+          const start = this.root.querySelector('[data-delete-action="two-step-start"]');
+          if (start) start.disabled = !password.value;
         });
       }
 
       const code = this.root.querySelector('#zcDeleteCode');
-      if (code) code.addEventListener('input', () => { this.twoStep = code.value; });
+      if (code) {
+        code.addEventListener('input', () => {
+          this.twoStep = code.value;
+          const next = this.root.querySelector('[data-delete-action="identity-confirm"]');
+          if (next) next.disabled = !this.password || !code.value;
+        });
+      }
+
+      const enrollCode = this.root.querySelector('#zcEnrollCode');
+      if (enrollCode) {
+        enrollCode.addEventListener('input', () => {
+          this.enrollCode = enrollCode.value;
+          const next = this.root.querySelector('[data-delete-action="two-step-enable"]');
+          if (next) next.disabled = !enrollCode.value;
+        });
+      }
     }
 
     // ---------------------------------------------------------------- actions
@@ -775,8 +849,58 @@
       this._render();
     }
 
-    async confirmIdentity() {
+    _needsCode() {
+      const plan = this.plan || {};
+      return !!(plan.mfa_required && plan.two_step_configured !== false && plan.two_step_enrolled === true);
+    }
+
+    async startTwoStep() {
       if (this.busy || !this.password) return;
+      this.busy = true;
+      this.error = null;
+      this.notice = null;
+      this._render();
+      const result = await this._send('POST', '/api/auth/two-step/setup', { password: this.password });
+      this.busy = false;
+      if (!result.ok) {
+        this._setError(result, t('company.delete.enroll.failed'));
+        this._render();
+        return;
+      }
+      this.enroll = {
+        secret: result.data.secret || '',
+        otpauth_uri: result.data.otpauth_uri || ''
+      };
+      this.enrollCode = '';
+      this._render();
+    }
+
+    async enableTwoStep() {
+      if (this.busy || !this.enrollCode) return;
+      this.busy = true;
+      this.error = null;
+      this.notice = null;
+      this._render();
+      const result = await this._send('POST', '/api/auth/two-step/enable', {
+        code: String(this.enrollCode || '').trim()
+      });
+      this.busy = false;
+      if (!result.ok) {
+        this.enrollCode = '';
+        this._setError(result, t('company.delete.enroll.failed'));
+        this._render();
+        return;
+      }
+      this.enroll = null;
+      this.enrollCode = '';
+      this.twoStep = '';
+      this.plan = Object.assign({}, this.plan, { two_step_configured: true, two_step_enrolled: true });
+      this.notice = t('company.delete.enroll.done');
+      this._render();
+    }
+
+    async confirmIdentity() {
+      if (this.busy || !this.password || (this._needsCode() && !this.twoStep)) return;
       this.busy = true;
       this.error = null;
       this._render();
@@ -786,12 +910,14 @@
         { password: this.password, two_step_code: this.twoStep || undefined }
       );
       this.busy = false;
-      this.password = '';
       if (!result.ok) {
+        const code = String((result.data && result.data.code) || '');
+        if (code === 'INVALID_TWO_STEP_CODE' || code === 'TWO_STEP_LOCKED') this.twoStep = '';
         this._setError(result, t('company.delete.error.identity'));
         this._render();
         return;
       }
+      this.password = '';
       this.deletion = result.data.deletion || this.deletion;
       if (result.data.purged) {
         this.completed = true;
@@ -954,6 +1080,23 @@
       }
       if (code === 'TWO_STEP_NOT_CONFIGURED') {
         this.error = { code, message: t('company.delete.error.mfa_missing') };
+        return;
+      }
+      if (code === 'TWO_STEP_NOT_ENROLLED') {
+        this.plan = Object.assign({}, this.plan, { two_step_configured: true, two_step_enrolled: false });
+        this.error = { code, message: t('company.delete.error.mfa_not_enrolled') };
+        return;
+      }
+      if (code === 'INVALID_TWO_STEP_CODE') {
+        this.error = { code, message: t('company.delete.error.code_wrong') };
+        return;
+      }
+      if (code === 'TWO_STEP_LOCKED') {
+        this.error = { code, message: t('company.delete.error.mfa_locked') };
+        return;
+      }
+      if (code === 'TWO_STEP_ALREADY_ENABLED') {
+        this.error = { code, message: t('company.delete.error.mfa_already') };
         return;
       }
       if (code === 'TWO_STEP_REQUIRED') {

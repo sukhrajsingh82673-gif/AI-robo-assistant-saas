@@ -195,7 +195,7 @@ The new registry keys in SPEC §8 are **new**. Only `theme` has a working equiva
 | AI CEO and autonomy | `autonomy`, `payLimit`, `hours`, `tone` | No rule engine. Pay limits exist as scattered form fields. |
 | Notifications | `n_approvals`, `n_security`, `n_reports`, `n_builds`, `quiet` | Bell has no popover and no category filtering. |
 | Reports | `repFreq`, `repEmail`, `repProfit`, `repSales`, `repSec` | Report UI exists; no schedule model in the UI. |
-| Security and privacy | `twofa`, `session`, `audit`, `region`, `terminalOn` | Enterprise Settings has related fields; not wired to the new UI or `secScore`. |
+| Security and privacy | `session`, `audit`, `region`, `terminalOn`; two-step via real TOTP enrollment | Enterprise Settings has related fields; two-step is now real server state (Stage 7); other keys not wired to the new UI or `secScore`. |
 | Menu and team | hidden screens, invite, role, remove | Roles exist in data; no menu-hiding or invite UI. |
 
 ### 4.5 Persistence decision (to be recorded in `DECISIONS.md`)

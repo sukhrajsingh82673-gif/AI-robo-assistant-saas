@@ -113,8 +113,9 @@ class TestPreferencesPayload(PreferencesTestBase):
         self.assertEqual(prefs["recovery_days"], 7)
         self.assertIsNone(prefs["quiet_hours"])
         self.assertFalse(prefs["quiet_hours_supported"])
-        # The honest flag: no verifier exists on this deployment.
-        self.assertFalse(prefs["two_step_configured"])
+        # The verifier is real; enrollment is per account and unknown here.
+        self.assertTrue(prefs["two_step_configured"])
+        self.assertIsNone(prefs["two_step_enrolled"])
 
     def test_tenant_settings_reach_company_preferences(self):
         self.set_setting("loc_base_locale", "ar-AE")

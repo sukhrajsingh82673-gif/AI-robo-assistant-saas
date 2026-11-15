@@ -509,10 +509,11 @@
     return ({ '30': 1, '90': 4, '365': 7 })[String(value)] || 0;
   }
 
-  function secScore(settings, openFindings, companyRegion) {
+  function secScore(settings, openFindings, companyRegion, twoStepEnabled) {
     var s = settings || readSettings();
     var score = 58;
-    if (s.twofa) score += 14;
+    // Two-step is credited only when the server says this account enrolled.
+    if (twoStepEnabled) score += 14;
     score += sessionScore(s.session);
     score += auditScore(s.audit);
     score -= 6 * Number(openFindings || 0);
