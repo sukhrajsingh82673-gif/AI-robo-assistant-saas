@@ -71,7 +71,7 @@ class KillSwitchGate:
 
             # Check matrix
             matrix = self.matrix or KillSwitchMatrix(tenant_id=tenant_id)
-            if matrix.is_killed(surface, target_id or "default"):
+            if matrix.is_activated(surface, target_id or "default"):
                 return GateResult(
                     passed=False,
                     gate_name="KillSwitchGate",
@@ -237,6 +237,11 @@ class AutonomyGate:
         is_reversible: bool = True,
         approval_verified: bool = False
     ) -> GateResult:
+        # Actions that are inherently irreversible
+        inherently_irreversible = {"finance.wire", "storage.delete", "db.drop", "hr.terminate"}
+        if action_name in inherently_irreversible:
+            is_reversible = False
+
         if autonomy_level == 0:
             return GateResult(
                 passed=False,
@@ -246,7 +251,7 @@ class AutonomyGate:
                 details={"shadow_mode": True}
             )
 
-        if autonomy_level == 1:
+        if autonomy_level == 1 and not approval_verified:
             return GateResult(
                 passed=False,
                 gate_name="AutonomyGate",
@@ -255,15 +260,15 @@ class AutonomyGate:
                 details={"suggest_mode": True}
             )
 
-        if autonomy_level == 2 and not approval_verified:
+        if autonomy_level == 2 and not is_reversible and not approval_verified:
             return GateResult(
                 passed=False,
                 gate_name="AutonomyGate",
                 code="AUTONOMY_L2_APPROVAL_REQUIRED",
-                reason="Process is at L2 (Act with approval). Independent approval record is required before execution."
+                reason="Process is at L2 (Act and notify). Irreversible action requires independent approval before execution."
             )
 
-        if autonomy_level == 3 and not is_reversible:
+        if autonomy_level == 3 and not is_reversible and not approval_verified:
             return GateResult(
                 passed=False,
                 gate_name="AutonomyGate",

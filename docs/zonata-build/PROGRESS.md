@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-2-foundations`  
+**Branch:** `zonata/stage-3-router-worker`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete
 
 ---
 
@@ -14,8 +14,8 @@
 | **Stage 0** | **Orientation & Baseline** | Read specifications, verify baseline test suites, initialize progress ledger | **COMPLETED** | Self (Stage 0 Entry) |
 | **Stage 1** | **Repository Audit** | Full codebase audit, Section 3 claim validation, gap analysis, license inventory | **COMPLETED** | Approved (`zonata/audit`) |
 | **Stage 2** | **Foundations** | Tenancy RLS verification, Merkle ledger, policy engine, kill switch, budget guards | **COMPLETED** | Verified (`zonata/stage-2-foundations`) |
-| **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | IN PROGRESS | Gate D3 |
-| **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | PENDING | Gate D4 |
+| **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | **COMPLETED** | Verified (`zonata/stage-3-router-worker`) |
+| **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | IN PROGRESS | Gate D4 |
 | **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | PENDING | Gate D5 |
 | **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | PENDING | Gate D6 |
 | **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | PENDING | Gate D7 |
@@ -105,7 +105,32 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 4. Decisions & Architectural Resolutions Log
+## 4. Stage 3 Router/Worker Runtime Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage3_router_worker.py -v`**
+  ```
+  tests/test_stage3_router_worker.py::test_stage3_structural_admission_and_rejection PASSED [ 16%]
+  tests/test_stage3_router_worker.py::test_stage3_executive_routing PASSED [ 33%]
+  tests/test_stage3_router_worker.py::test_stage3_observe_first_law_l4 PASSED [ 50%]
+  tests/test_stage3_router_worker.py::test_stage3_concurrency_reserved_human_slot PASSED [ 66%]
+  tests/test_stage3_router_worker.py::test_stage3_thread_subscription_and_followup PASSED [ 83%]
+  tests/test_stage3_router_worker.py::test_stage3_isolated_worker_execution_and_merkle_evidence PASSED [100%]
+  6 passed in 1.65s
+  Status: PASSED (exit code 0)
+  ```
+* **Architecture Verified:**
+  - Law L1 (Router/Worker): Single voice router dispatches to isolated worker sessions.
+  - Law L2 (Deterministic Gates): Admission, kill switch, charter, and budget gates checked before execution.
+  - Law L3 (Admission by Strength): Explicit accepted, Inferred governed by autonomy level, Not Admitted dropped before LLM calls.
+  - Law L4 (Observe First): L0 shadow mode records "would accept" without mutating side effects.
+  - Concurrency & Human Slot: Worker pool reserves 1 slot exclusively for human operators.
+  - Thread Subscriptions: Follow-up conversational turns route directly to existing worker sessions.
+  - Executive Routing: @CEO, @CFO, @CMO, @CTO, @COO, @CHRO, @CISO, @CLO routed to dedicated department heads.
+  - Database Tables: `af_work_items` and `af_thread_subscriptions`.
+
+---
+
+## 5. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
