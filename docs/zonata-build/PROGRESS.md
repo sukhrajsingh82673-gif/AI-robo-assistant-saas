@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-6-adapters-global`  
+**Branch:** `zonata/stage-7-kaizen-engine`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete, Stage 6 Real Adapters & Global Packs Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete, Stage 6 Real Adapters & Global Packs Complete, Stage 7 Kaizen & Evaluation Engine Complete
 
 ---
 
@@ -18,8 +18,8 @@
 | **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | **COMPLETED** | Verified (`zonata/stage-4-process-packs`) |
 | **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | **COMPLETED** | Verified (`zonata/stage-5-factory-integration`) |
 | **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | **COMPLETED** | Verified (`zonata/stage-6-adapters-global`) |
-| **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | IN PROGRESS | Gate D7 |
-| **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | PENDING | Gate D8 |
+| **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | **COMPLETED** | Verified (`zonata/stage-7-kaizen-engine`) |
+| **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | IN PROGRESS | Gate D8 |
 | **Stage 9** | **Pilot Deployment** | One real company, full L0 cycle, evidence-backed promotion to L1/L2 | PENDING | Gate D9 |
 
 ---
@@ -199,7 +199,24 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 8. Decisions & Architectural Resolutions Log
+## 8. Stage 7 Kaizen & Evaluation Engine Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage7_kaizen.py -v`**
+  ```
+  tests/test_stage7_kaizen.py::test_stage7_metrics_recording_and_aggregation PASSED [ 33%]
+  tests/test_stage7_kaizen.py::test_stage7_waste_detection_rules PASSED    [ 66%]
+  tests/test_stage7_kaizen.py::test_stage7_kaizen_proposal_and_shadow_comparison PASSED [100%]
+  3 passed in 0.78s
+  Status: PASSED (exit code 0)
+  ```
+* **Kaizen Engine Delivered:**
+  - `core/kaizen/metrics.py`: `KaizenMetricsStore` recording cycle times, FPY, unit cost, errors, and CSAT into `af_kaizen_metrics` and `af_waste_events`.
+  - `core/kaizen/waste_detector.py`: Automated discovery of the 6 Lean AI wastes (defects from Andon halts, rework from retries, waiting from latency, and excessive handoffs).
+  - `core/kaizen/optimizer.py`: `KaizenOptimizer` generating concrete improvement proposals from empirical bottlenecks and executing Shadow Mode side-by-side evaluations before promotion.
+
+---
+
+## 9. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
