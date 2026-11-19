@@ -1050,6 +1050,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
 
+        # ZONATA Agent Factory (Phase 2+)
+        if path.startswith("/api/v8/agent-factory/"):
+            from agent_factory.api.routes import AgentFactoryRouter
+            status, data, resp_headers = AgentFactoryRouter().dispatch("GET", path, dict(self.headers), b"", getattr(self, "_auth_context", None))
+            self._send_json(data, status=status, headers=resp_headers)
+            return
+
         # Standard Health & Liveness Endpoints (Public)
         if path == "/readyz":
             if not db.is_ready():
@@ -4200,6 +4207,13 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             req_data = json.loads(body.decode('utf-8'))
         except Exception:
             req_data = {}
+
+        # ZONATA Agent Factory (Phase 2+)
+        if path.startswith("/api/v8/agent-factory/"):
+            from agent_factory.api.routes import AgentFactoryRouter
+            status, data, resp_headers = AgentFactoryRouter().dispatch("POST", path, dict(self.headers), body, getattr(self, "_auth_context", None))
+            self._send_json(data, status=status, headers=resp_headers)
+            return
 
         # Route v2 Asynchronous Command & Dispatch Endpoints
         if path.startswith("/api/v2/"):

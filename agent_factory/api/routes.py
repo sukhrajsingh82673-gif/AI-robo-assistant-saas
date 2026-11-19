@@ -1,0 +1,323 @@
+"""
+ZONATA Agent Factory — API Layer (Phase 2 Foundation Routes)
+Mounted at /api/v8/agent-factory/...
+Implements RFC 9457 error contracts, idempotency, tenant validation, and evidence tracking.
+"""
+
+from __future__ import annotations
+import os
+import time
+import json
+import uuid
+import hashlib
+from typing import Dict, List, Optional, Any, Tuple
+
+from agent_factory.ports import Principal, Resource, Decision, EvidenceEvent
+from agent_factory.adapters.zonata import (
+    ZonataAuthorityAdapter, ZonataEvidenceAdapter,
+    ZonataKillSwitchAdapter, ZonataPolicyAdapter
+)
+from agent_factory.domain.transition import (
+    transition, TransitionContext, InvalidTransitionError, TransitionForbiddenError
+)
+from agent_factory.control.orchestrator import DbQueueOrchestrator
+
+# Feature Flag
+def is_af_enabled() -> bool:
+    return os.environ.get("AF_ENABLED", "1") in ("1", "true", "TRUE", "yes")
+
+
+class AgentFactoryRouter:
+    def __init__(self, db_conn_factory=None, ledger_file: Optional[str] = None):
+        self.db_conn_factory = db_conn_factory
+        self.authority = ZonataAuthorityAdapter()
+        self.evidence = ZonataEvidenceAdapter(ledger_file=ledger_file)
+        self.killswitch = ZonataKillSwitchAdapter()
+        self.policy = ZonataPolicyAdapter()
+        self.orchestrator = DbQueueOrchestrator(db_conn_factory=db_conn_factory)
+
+    def _get_connection(self):
+        if self.db_conn_factory:
+            return self.db_conn_factory()
+        from core.db import db
+        return db.get_connection()
+
+    def _error(self, code: str, title: str, status: int, detail: str, req_id: str) -> Dict[str, Any]:
+        return {
+            "type": f"https://zonata.ai/errors/{code.lower()}",
+            "title": title,
+            "status": status,
+            "code": code,
+            "detail": detail,
+            "correlation_id": req_id,
+            "errors": []
+        }
+
+    def dispatch(
+        self,
+        method: str,
+        path: str,
+        headers: Dict[str, str],
+        body_bytes: bytes,
+        auth_context: Optional[Dict[str, Any]] = None
+    ) -> Tuple[int, Dict[str, Any], Dict[str, str]]:
+        req_id = headers.get("X-Request-ID") or f"req_af_{uuid.uuid4().hex[:10]}"
+        res_headers = {"X-Request-ID": req_id}
+
+        # Health & Readiness routes do not require authentication or feature flags
+        if path in ("/api/v8/agent-factory/health", "/health"):
+            return 200, {
+                "status": "HEALTHY",
+                "service": "zonata.agent_factory",
+                "version": "1.0.0",
+                "af_enabled": is_af_enabled(),
+                "time": time.time()
+            }, res_headers
+
+        if path in ("/api/v8/agent-factory/ready", "/ready"):
+            return 200, {
+                "ready": True,
+                "af_enabled": is_af_enabled(),
+                "orchestrator": "DbQueueOrchestrator",
+                "sandbox_tiers_available": ["T0"],
+                "real_model_profile_required": False
+            }, res_headers
+
+        if not is_af_enabled():
+            return 503, self._error("AF-DISABLED", "Agent Factory Disabled", 503, "Feature flag AF_ENABLED is false", req_id), res_headers
+
+        # Authentication check
+        auth_context = auth_context or {}
+        tenant_id = auth_context.get("tenant_id") or headers.get("X-Tenant-ID")
+        principal_id = auth_context.get("user_id") or auth_context.get("principal_id") or headers.get("X-User-ID")
+        company_id = headers.get("X-Company-ID") or auth_context.get("company_id")
+
+        if not tenant_id or not principal_id:
+            return 401, self._error("AF-UNAUTHORIZED", "Unauthorized", 401, "Valid credentials required", req_id), res_headers
+
+        if not company_id:
+            return 404, self._error("AF-TENANT-MISMATCH", "Company Not Found", 404, "X-Company-ID header required", req_id), res_headers
+
+        principal = Principal(
+            principal_id=principal_id,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            kind="ai_employee" if "emp." in principal_id else "human_owner",
+            roles=["owner"] if "owner" in principal_id else ["employee"]
+        )
+
+        try:
+            body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+        except Exception:
+            return 400, self._error("AF-VALIDATION", "Invalid JSON", 400, "Request body must be valid JSON", req_id), res_headers
+
+        # ----------------- ROUTE 1: POST /requests -----------------
+        if method == "POST" and path == "/api/v8/agent-factory/requests":
+            idempotency_key = headers.get("Idempotency-Key")
+            if not idempotency_key:
+                return 400, self._error("AF-VALIDATION", "Missing Idempotency-Key", 400, "Idempotency-Key header is required", req_id), res_headers
+
+            mode = body.get("mode", "single")
+            nl = body.get("natural_language", "")
+            if len(nl) < 10 or len(nl) > 20000:
+                return 422, self._error("AF-VALIDATION", "Invalid Specification Length", 422, "natural_language must be 10-20000 characters", req_id), res_headers
+
+            budget_cap = body.get("budget_cap_usd", 10.0)
+            now = time.time()
+            request_id = f"req_af_{uuid.uuid4().hex[:12]}"
+
+            with self._get_connection() as conn:
+                # Check idempotency replay
+                cur = conn.execute("SELECT id, status, natural_language FROM af_request WHERE tenant_id = ? AND idempotency_key = ?", (tenant_id, idempotency_key))
+                existing = cur.fetchone()
+                if existing:
+                    if existing[2] == nl:
+                        res_headers["Idempotent-Replay"] = "true"
+                        return 200, {"request_id": existing[0], "status": existing[1], "replayed": True}, res_headers
+                    return 409, self._error("AF-IDEMPOTENCY-MISMATCH", "Idempotency Conflict", 409, "Different payload with same Idempotency-Key", req_id), res_headers
+
+                # Check killswitch
+                if self.killswitch.is_killed("TENANT", tenant_id, tenant_id):
+                    return 423, self._error("AF-KILLED", "Tenant Execution Killed", 423, "KillSwitch is active for this tenant", req_id), res_headers
+
+                # Compute risk tier
+                risk_tier = self.policy.evaluate_risk([], [], [])
+
+                # Insert request in initial state
+                conn.execute("""
+                    INSERT INTO af_request (
+                        id, tenant_id, company_id, requester_principal_id, requester_kind,
+                        mode, natural_language, status, risk_tier, budget_cap_usd,
+                        spent_usd, idempotency_key, correlation_id, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, 0.0, ?, ?, ?, ?)
+                """, (
+                    request_id, tenant_id, company_id, principal.principal_id, principal.kind,
+                    mode, nl, risk_tier, budget_cap, idempotency_key, req_id, now, now
+                ))
+
+                # Transition helper records evidence and lifecycle event
+                t_ctx = TransitionContext(
+                    tenant_id=tenant_id,
+                    principal=principal,
+                    conn=conn,
+                    authority_port=self.authority,
+                    evidence_port=self.evidence,
+                    killswitch_port=self.killswitch,
+                    meta={"correlation_id": req_id}
+                )
+                evidence_id = transition(
+                    t_ctx, "request", request_id, "ANALYSING",
+                    reason="Initial manufacturing intake",
+                    expect_from="REQUESTED",
+                    payload_hashes={"nl_sha256": hashlib.sha256(nl.encode()).hexdigest()}
+                )
+                conn.commit()
+
+            res_headers["X-Evidence-Id"] = evidence_id
+            res_headers["Location"] = f"/api/v8/agent-factory/requests/{request_id}"
+            return 202, {
+                "request_id": request_id,
+                "status": "ANALYSING",
+                "risk_tier": risk_tier,
+                "evidence_id": evidence_id
+            }, res_headers
+
+        # ----------------- ROUTE 2: GET /requests -----------------
+        if method == "GET" and path == "/api/v8/agent-factory/requests":
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, mode, status, risk_tier, budget_cap_usd, spent_usd, created_at FROM af_request WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50",
+                    (tenant_id,)
+                )
+                items = [
+                    {"id": r[0], "mode": r[1], "status": r[2], "risk_tier": r[3], "budget_cap_usd": r[4], "spent_usd": r[5], "created_at": r[6]}
+                    for r in cur.fetchall()
+                ]
+            return 200, {"items": items}, res_headers
+
+        # ----------------- ROUTE 2B: GET /requests/{id} -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/requests/"):
+            req_target_id = path.split("/")[-1]
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, mode, natural_language, status, risk_tier, budget_cap_usd, spent_usd, created_at, updated_at FROM af_request WHERE tenant_id = ? AND id = ?",
+                    (tenant_id, req_target_id)
+                )
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Request Not Found", 404, f"Request {req_target_id} not found", req_id), res_headers
+
+                # Also fetch lifecycle events
+                cur_lc = conn.execute(
+                    "SELECT from_state, to_state, actor, reason, evidence_ledger_id, created_at FROM af_lifecycle_event WHERE tenant_id = ? AND subject_id = ? ORDER BY id ASC",
+                    (tenant_id, req_target_id)
+                )
+                events = [
+                    {"from": r[0], "to": r[1], "actor": r[2], "reason": r[3], "evidence_ledger_id": r[4], "at": r[5]}
+                    for r in cur_lc.fetchall()
+                ]
+
+            return 200, {
+                "request_id": row[0],
+                "mode": row[1],
+                "natural_language": row[2],
+                "status": row[3],
+                "risk_tier": row[4],
+                "budget_cap_usd": row[5],
+                "spent_usd": row[6],
+                "created_at": row[7],
+                "updated_at": row[8],
+                "lifecycle_events": events
+            }, res_headers
+
+        # ----------------- ROUTE 12: GET /jobs/{id} -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/jobs/"):
+            build_id = path.split("/")[-1]
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, status, worker_id, sandbox_profile, tokens_in, tokens_out, cost_usd, started_at, finished_at, error FROM af_build WHERE tenant_id = ? AND id = ?",
+                    (tenant_id, build_id)
+                )
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Job Not Found", 404, f"Build job {build_id} not found", req_id), res_headers
+
+            return 200, {
+                "build_id": row[0],
+                "status": row[1],
+                "worker_id": row[2],
+                "sandbox_profile": row[3],
+                "tokens": {"in": row[4], "out": row[5]},
+                "cost_usd": row[6],
+                "started_at": row[7],
+                "finished_at": row[8],
+                "error": row[9]
+            }, res_headers
+
+        # ----------------- ROUTE 36: POST /kill -----------------
+        if method == "POST" and path == "/api/v8/agent-factory/kill":
+            scope = body.get("scope", "AGENT").upper()
+            target_id = body.get("target_id")
+            reason = body.get("reason", "Administrative emergency halt")
+            if not target_id:
+                return 400, self._error("AF-VALIDATION", "Missing target_id", 400, "target_id required for kill switch", req_id), res_headers
+
+            try:
+                from core.distributed_coordination import coordination
+                from core.killswitch_matrix import KillSwitchMatrix
+                coordination.set_killswitch_state(scope, target_id, True, reason)
+                ks = KillSwitchMatrix(tenant_id=tenant_id)
+                ks.activate(scope, target_id, reason=reason, activated_by=principal.principal_id)
+            except Exception as e:
+                return 500, self._error("AF-INTERNAL", "KillSwitch Failure", 500, str(e), req_id), res_headers
+
+            # Evidence append
+            ev_id = self.evidence.append_event(EvidenceEvent(
+                subject_kind="kill_switch",
+                subject_id=target_id,
+                event_type="kill_switch.activated",
+                actor=principal.principal_id,
+                payload_hashes={"scope": scope, "target_id": target_id, "reason": reason},
+                timestamp=time.time(),
+                tenant_id=tenant_id
+            ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 200, {
+                "killed": True,
+                "scope": scope,
+                "target_id": target_id,
+                "reason": reason,
+                "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 37: GET /quotas -----------------
+        if method == "GET" and path == "/api/v8/agent-factory/quotas":
+            period = time.strftime("%Y-%m")
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT metric, used, limit_value FROM af_quota_usage WHERE tenant_id = ? AND period = ?",
+                    (tenant_id, period)
+                )
+                quotas = {r[0]: {"used": r[1], "limit": r[2]} for r in cur.fetchall()}
+                if not quotas:
+                    quotas = {
+                        "builds": {"used": 0, "limit": 10},
+                        "agents_published": {"used": 0, "limit": 50},
+                        "cost_usd": {"used": 0.0, "limit": 25.0}
+                    }
+            return 200, {"tenant_id": tenant_id, "period": period, "quotas": quotas}, res_headers
+
+        # ----------------- ROUTE 38: GET /evidence/{id} -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/evidence/"):
+            ev_query_id = path.split("/")[-1]
+            try:
+                from core.evidence_ledger import EvidenceLedger
+                ledger = EvidenceLedger()
+                record = ledger.get_evidence(ev_query_id)
+                if not record:
+                    return 404, self._error("AF-NOT-FOUND", "Evidence Not Found", 404, f"Evidence {ev_query_id} not found", req_id), res_headers
+                return 200, record, res_headers
+            except Exception as e:
+                return 500, self._error("AF-INTERNAL", "Evidence Retrieval Error", 500, str(e), req_id), res_headers
+
+        return 404, self._error("AF-NOT-FOUND", "Endpoint Not Found", 404, f"Route {method} {path} not found", req_id), res_headers

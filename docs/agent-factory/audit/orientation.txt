@@ -1,0 +1,127 @@
+== git status ==
+## agent-factory/audit
+?? docs/agent-factory/
+
+== branches ==
+* agent-factory/audit
+  main
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/main
+
+== HEAD ==
+6003d16bb1ecfc4fbb436b2c2bde06367361cd64
+
+== log ==
+6003d16 Merge pull request #15 from sukhrajsingh82673-gif/ui-redesign
+fa6ffcb Merge pull request #14 from sukhrajsingh82673-gif/main
+db67e5a Merge pull request #13 from sukhrajsingh82673-gif/engineering/production-readiness-gap-closure
+0c8c072 Add real TOTP two-step verification and gate deletion on it
+253c272 Run CI gates on the ui-redesign deploy branch
+cf68264 Deploy staging from ui-redesign
+7a5a4d6 Document deployment fast-forward and staging env risks
+53d5068 Merge remote-tracking branch 'origin/ui-redesign' into ui-redesign
+ea953ff Wire real company settings, preferences and abuse tests (Stage 6)
+c6254fa Add company overview, edit and protected deletion with real export (Stage 5)
+74bbeef Merge pull request #10 from sukhrajsingh82673-gif/ui-redesign
+184e97a Merge branch 'main' into ui-redesign
+f6b11ee Add existing-company onboarding, sources and readiness (Stage 4)
+87db354 Add company create flow and real build workflow (Stage 3)
+5f4600a Company setup: stage 2 switcher, Add page, i18n and entry points
+4628ec2 Company setup: stage 1 data model, API and permissions
+0b12b2c Merge pull request #9 from sukhrajsingh82673-gif/fix/green-baseline
+cbff16b Assistant: stage 5 settings, suggestions and e2e journey
+b149289 Assistant: stage 4 meetings, briefs and live notes
+1f8dca6 Assistant: stage 3 background jobs and web research
+ed2638e Assistant: stage 2 streaming service, typed tools, scope gate, agents and memory
+2ec850c Assistant: stage 1 one draggable assistant shell
+219834e Assistant: keep the Co-worker and revise stage 0 plan
+a19b470 Assistant: stage 0 inventory and plan
+ca39f24 UI phase 1: rebuild the URA shell on a new ura_* layer
+d9555aa fix(ci): point Stage 4 at the real container build definitions
+1e9691d fix(ci): repair Stage 3-7 supply-chain and smoke gates
+a6b631d test(phase14): make cross-process governance suite fork-safe and bounded
+3b9c90a fix(portability): stop hard-coding the reference host path
+9778428 Merge pull request #8 from sukhrajsingh82673-gif/fix/green-baseline
+09e6ebd fix(ci): make fabric and browser qualification deterministic
+3ab0420 test(e2e): ignore navigation-aborted requests in Journey 10
+2357efe test(security): force no-engine condition in container fail-closed test
+932cd49 fix(ci): install pyyaml before validating Kubernetes manifests
+24f6adc fix(ci): restore green baseline with portable, honest qualification
+f652688 Merge pull request #7 from sukhrajsingh82673-gif/ui-redesign
+2874d48 Add UI redesign spec and prototype
+0ba7e79 Merge pull request #6 from sukhrajsingh82673-gif/feat/enterprise-settings-v2
+dcfa219 fix(assistant): replace fabricated ZONATA AI behaviour with verified or blocked states
+a12a65c feat(assistant): integrate ZONATA AI universal owner assistant & AI CEO gateway
+f0fe612 feat(settings): land on live controls and add PG schema runner
+e9d452e docs(settings): record default console routing and staging verification
+c81ac45 feat(web): make settings v2 console the default
+0fb2e53 docs(settings): record settings v2 console preview
+8a68ee1 test(web): cover settings v2 console contract
+36fb8f7 fix(settings): keep capabilities on section-scoped registry
+1d6a70e feat(web): mount settings v2 preview route
+79b0fa5 feat(web): add settings v2 console foundation
+bbc1253 feat(settings): expose caller capabilities and gate secret hints
+449f100 docs(settings): record phase 2 backend checkpoint
+
+== top-level ==
+total 881
+drwx------. 26 u0_a584 u0_a584   3488 Nov 19 14:21 .
+drwx------. 10 u0_a584 u0_a584   3488 Nov 19 14:33 ..
+-rw-------.  1 u0_a584 u0_a584    403 Nov 19 14:07 .dockerignore
+-rw-------.  1 u0_a584 u0_a584   1758 Nov 19 14:07 .env.production.example
+drwx------.  7 u0_a584 u0_a584   3488 Nov 19 15:45 .git
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:07 .github
+-rw-------.  1 u0_a584 u0_a584   1076 Nov 19 14:07 .gitignore
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:17 .pytest_cache
+-rw-------.  1 u0_a584 u0_a584   3652 Nov 19 14:07 AGENTS.md
+-rw-------.  1 u0_a584 u0_a584   1282 Nov 19 14:07 Dockerfile
+-rw-------.  1 u0_a584 u0_a584    894 Nov 19 14:07 GEMINI.md
+-rw-------.  1 u0_a584 u0_a584  12890 Nov 19 14:07 README.md
+-rw-------.  1 u0_a584 u0_a584   6695 Nov 19 14:07 THIRD_PARTY_LICENSES.md
+-rw-------.  1 u0_a584 u0_a584   6381 Nov 19 14:07 ZONATA_V10_RELEASE_EVIDENCE_MANIFEST.json
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:19 __pycache__
+-rw-------.  1 u0_a584 u0_a584  25857 Nov 19 14:07 anti-gravity-instructions.md
+-rw-------.  1 u0_a584 u0_a584 506657 Nov 19 14:07 api_server.py
+-rw-------.  1 u0_a584 u0_a584  18848 Nov 19 14:07 cli.py
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:07 config
+drwx------.  9 u0_a584 u0_a584  20480 Nov 19 14:16 core
+drwx------.  6 u0_a584 u0_a584   3488 Nov 19 14:07 deploy
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:07 docker
+-rw-------.  1 u0_a584 u0_a584    330 Nov 19 14:07 docker-compose.dev.yml
+-rw-------.  1 u0_a584 u0_a584  12506 Nov 19 14:07 docker-compose.prod.yml
+drwx------. 13 u0_a584 u0_a584   3488 Nov 19 15:41 docs
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:07 evals
+-rw-------.  1 u0_a584 u0_a584    113 Nov 19 14:07 hello.ts
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:07 independent_verification
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:07 k8s
+drwx------.  7 u0_a584 u0_a584   3488 Nov 19 14:17 migrations
+-rw-------.  1 u0_a584 u0_a584    704 Nov 19 14:07 neon.ts
+drwx------. 48 u0_a584 u0_a584   3488 Nov 19 14:16 node_modules
+-rw-------.  1 u0_a584 u0_a584   3467 Nov 19 14:07 openapi_v4.json
+-rw-------.  1 u0_a584 u0_a584   5846 Nov 19 14:07 openapi_v5.json
+-rw-------.  1 u0_a584 u0_a584   7920 Nov 19 14:07 openapi_v6.json
+-rw-------.  1 u0_a584 u0_a584   4846 Nov 19 14:07 openapi_v7.json
+-rw-------.  1 u0_a584 u0_a584  10115 Nov 19 14:07 openapi_v8.json
+drwx------.  2 u0_a584 u0_a584   3488 Nov 19 14:07 organization_qualification_evidence
+-rw-------.  1 u0_a584 u0_a584  28366 Nov 19 14:16 package-lock.json
+-rw-------.  1 u0_a584 u0_a584   1297 Nov 19 14:07 package.json
+-rw-------.  1 u0_a584 u0_a584   1140 Nov 19 14:07 playwright.config.ts
+-rw-------.  1 u0_a584 u0_a584   4114 Nov 19 14:07 production.env.example
+-rw-------.  1 u0_a584 u0_a584   1208 Nov 19 14:07 production_config_schema.json
+drwx------.  2 u0_a584 u0_a584   8192 Nov 19 14:07 production_readiness
+-rw-------.  1 u0_a584 u0_a584    112 Nov 19 14:07 pytest.ini
+-rw-------.  1 u0_a584 u0_a584   1995 Nov 19 14:07 render.yaml
+-rw-------.  1 u0_a584 u0_a584    297 Nov 19 14:07 requirements.txt
+-rwx------.  1 u0_a584 u0_a584   1060 Nov 19 14:07 run_local.sh
+-rw-------.  1 u0_a584 u0_a584  13744 Nov 19 14:07 run_production_reality_demonstrations.py
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:17 scratch
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:17 scripts
+-rwx------.  1 u0_a584 u0_a584    951 Nov 19 14:07 serve_web.py
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:07 src
+drwx------. 17 u0_a584 u0_a584   3488 Nov 19 15:39 storage
+-rw-------.  1 u0_a584 u0_a584     55 Nov 19 14:21 supplier_evaluation_report.json
+drwx------.  4 u0_a584 u0_a584  20480 Nov 19 14:16 tests
+drwx------.  2 u0_a584 u0_a584   4096 Nov 19 14:07 web
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:17 workloads
+drwx------.  3 u0_a584 u0_a584   3488 Nov 19 14:17 zonata
+-rw-------.  1 u0_a584 u0_a584   1791 Nov 19 14:07 zonata_daemon.py
