@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-3-router-worker`  
+**Branch:** `zonata/stage-4-process-packs`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete
 
 ---
 
@@ -15,8 +15,8 @@
 | **Stage 1** | **Repository Audit** | Full codebase audit, Section 3 claim validation, gap analysis, license inventory | **COMPLETED** | Approved (`zonata/audit`) |
 | **Stage 2** | **Foundations** | Tenancy RLS verification, Merkle ledger, policy engine, kill switch, budget guards | **COMPLETED** | Verified (`zonata/stage-2-foundations`) |
 | **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | **COMPLETED** | Verified (`zonata/stage-3-router-worker`) |
-| **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | IN PROGRESS | Gate D4 |
-| **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | PENDING | Gate D5 |
+| **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | **COMPLETED** | Verified (`zonata/stage-4-process-packs`) |
+| **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | IN PROGRESS | Gate D5 |
 | **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | PENDING | Gate D6 |
 | **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | PENDING | Gate D7 |
 | **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | PENDING | Gate D8 |
@@ -130,7 +130,30 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 5. Decisions & Architectural Resolutions Log
+## 5. Stage 4 Process Pack Framework Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage4_process_packs.py -v`**
+  ```
+  tests/test_stage4_process_packs.py::test_stage4_load_and_validate_all_three_packs PASSED [ 25%]
+  tests/test_stage4_process_packs.py::test_stage4_engine_end_to_end_execution PASSED [ 50%]
+  tests/test_stage4_process_packs.py::test_stage4_andon_stop_the_line_trigger PASSED [ 75%]
+  tests/test_stage4_process_packs.py::test_stage4_simulation_harness_scenarios PASSED [100%]
+  4 passed in 1.03s
+  Status: PASSED (exit code 0)
+  ```
+* **Process Packs Delivered:**
+  1. `packs/lead_to_cash/v1/pack.yaml`: Lead ingestion, BANT qualification, proposal pricing, MSA contracts, billing, and cash collection.
+  2. `packs/procure_to_pay/v1/pack.yaml`: Requisition intake, supplier matching, PO creation, approval gates, goods receipt, 3-way reconciliation, and payment disbursement.
+  3. `packs/support_to_resolution/v1/pack.yaml`: Ticket intake, sentiment triage, diagnostic extraction, solution synthesis, deterministic safety verification, and CSAT metrics.
+* **Core Capabilities Implemented:**
+  - `core/process_packs/schema.py`: Declarative SIPOC, Lean waste tags, Andon conditions, and Autonomy criteria.
+  - `core/process_packs/loader.py`: YAML loader, schema validator, and `af_process_packs` persistence.
+  - `core/process_packs/engine.py`: Stepwise runtime engine, deterministic Andon stop-the-line triggers, and Merkle ledger sealing (`af_process_instances`).
+  - `core/process_packs/simulator.py`: KPI simulation harness (FPY, cycle time, unit cost, error rates).
+
+---
+
+## 6. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
