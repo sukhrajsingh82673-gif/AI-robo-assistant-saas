@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-5-factory-integration`  
+**Branch:** `zonata/stage-6-adapters-global`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete, Stage 6 Real Adapters & Global Packs Complete
 
 ---
 
@@ -17,8 +17,8 @@
 | **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | **COMPLETED** | Verified (`zonata/stage-3-router-worker`) |
 | **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | **COMPLETED** | Verified (`zonata/stage-4-process-packs`) |
 | **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | **COMPLETED** | Verified (`zonata/stage-5-factory-integration`) |
-| **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | IN PROGRESS | Gate D6 |
-| **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | PENDING | Gate D7 |
+| **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | **COMPLETED** | Verified (`zonata/stage-6-adapters-global`) |
+| **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | IN PROGRESS | Gate D7 |
 | **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | PENDING | Gate D8 |
 | **Stage 9** | **Pilot Deployment** | One real company, full L0 cycle, evidence-backed promotion to L1/L2 | PENDING | Gate D9 |
 
@@ -173,7 +173,33 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 7. Decisions & Architectural Resolutions Log
+## 7. Stage 6 Real Adapters & Global Packs Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage6_adapters_global.py -v`**
+  ```
+  tests/test_stage6_adapters_global.py::test_stage6_payment_idempotency_and_evidence PASSED [ 20%]
+  tests/test_stage6_adapters_global.py::test_stage6_email_and_calendar_adapters PASSED [ 40%]
+  tests/test_stage6_adapters_global.py::test_stage6_crm_deduplication_and_s3_storage PASSED [ 60%]
+  tests/test_stage6_adapters_global.py::test_stage6_regional_india_gst_and_dpdp PASSED [ 80%]
+  tests/test_stage6_adapters_global.py::test_stage6_regional_us_sales_tax_and_hipaa PASSED [100%]
+  5 passed in 0.57s
+  Status: PASSED (exit code 0)
+  ```
+* **Adapters & Regions Delivered:**
+  - `core/adapters/ports.py`: Typed abstract contracts for Payment, Email, Calendar, CRM, and S3 Storage.
+  - `core/adapters/providers.py`: Production-ready and sandboxed implementations:
+    - `SandboxedPaymentAdapter`: DB-backed idempotency (`af_payment_transactions`) & Merkle evidence sealing.
+    - `TransactionalEmailAdapter`: Secure message sink with zero credential exposure.
+    - `CorporateCalendarAdapter`: Event scheduling and attendee conflict detection.
+    - `EnterpriseCRMAdapter`: Contact deduplication on normalized email (`af_crm_contacts`).
+    - `S3CompatibleStorageAdapter`: Cloudflare R2 / AWS S3 standard wrapper with local encrypted envelope storage.
+  - `packs/regions/india/v1/pack.yaml`: INR currency, GST tax engine (Intra-state CGST+SGST vs Inter-state IGST), and DPDP 2023 consent validation.
+  - `packs/regions/us/v1/pack.yaml`: USD currency, State Sales Tax nexus calculations, SOC 2 compliance events, and HIPAA PHI data sanitization.
+  - `core/region_packs/engine.py`: `RegionalComplianceEngine` tax calculation and regulatory governance.
+
+---
+
+## 8. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
