@@ -443,10 +443,14 @@ class URARouter:
 
         # Structural rejection of obvious exfiltration / destructive attempts
         injection_patterns = [
-            r"(?i)ignore\s+all\s+(previous|prior)\s+instructions",
+            r"(?i)ignore\s+(all\s+)?(previous|prior)\s+instructions",
             r"(?i)bypass\s+all\s+safety\s+filters",
             r"(?i)drop\s+database\b",
-            r"(?i)system:[\s\S]*admin"
+            r"(?i)system:[\s\S]*admin",
+            r"(?i)\bdan\s+mode\b",
+            r"(?i)do\s+anything\s+now",
+            r"(?i)reveal\s+internal\s+system\s+instructions",
+            r"(?i)ignore\s+(company\s+)?charter"
         ]
         for pat in injection_patterns:
             if re.search(pat, text):

@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-7-kaizen-engine`  
+**Branch:** `zonata/stage-8-hardening`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete, Stage 6 Real Adapters & Global Packs Complete, Stage 7 Kaizen & Evaluation Engine Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete, Stage 6 Real Adapters & Global Packs Complete, Stage 7 Kaizen & Evaluation Engine Complete, Stage 8 Hardening Complete
 
 ---
 
@@ -19,8 +19,8 @@
 | **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | **COMPLETED** | Verified (`zonata/stage-5-factory-integration`) |
 | **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | **COMPLETED** | Verified (`zonata/stage-6-adapters-global`) |
 | **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | **COMPLETED** | Verified (`zonata/stage-7-kaizen-engine`) |
-| **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | IN PROGRESS | Gate D8 |
-| **Stage 9** | **Pilot Deployment** | One real company, full L0 cycle, evidence-backed promotion to L1/L2 | PENDING | Gate D9 |
+| **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | **COMPLETED** | Verified (`zonata/stage-8-hardening`) |
+| **Stage 9** | **Pilot Deployment** | One real company, full L0 cycle, evidence-backed promotion to L1/L2 | IN PROGRESS | Gate D9 |
 
 ---
 
@@ -216,7 +216,30 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 9. Decisions & Architectural Resolutions Log
+## 9. Stage 8 Hardening & Red-Team Security Suite Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage8_hardening.py -v`**
+  ```
+  tests/test_stage8_hardening.py::test_stage8_red_team_prompt_injection_rejection PASSED [ 16%]
+  tests/test_stage8_hardening.py::test_stage8_data_exfiltration_redline_blocked PASSED [ 33%]
+  tests/test_stage8_hardening.py::test_stage8_cross_tenant_isolation_boundary PASSED [ 50%]
+  tests/test_stage8_hardening.py::test_stage8_self_approval_privilege_escalation_blocked PASSED [ 66%]
+  tests/test_stage8_hardening.py::test_stage8_ssrf_metadata_and_private_network_blocking PASSED [ 83%]
+  tests/test_stage8_hardening.py::test_stage8_disaster_recovery_and_worm_backup_drill PASSED [100%]
+  6 passed in 0.53s
+  Status: PASSED (exit code 0)
+  ```
+* **Security & Hardening Defenses Verified:**
+  - Red-Team Prompt Injection Defense: Structured regex blocking of DAN modes, instruction overrides, system exfiltration, and administrative impersonation.
+  - Confidential Data Exfiltration Guard: Deterministic Charter blocking of password/credential exfiltration.
+  - Multi-Tenant Isolation: Complete zero-leakage cross-tenant read/write isolation.
+  - Separation of Duties (L5): Prevention of self-approved code releases or financial disbursements.
+  - Host SSRF Protection: Complete blocking of AWS/GCP cloud metadata endpoints (`169.254.169.254`), internal database ports (`5432`, `8200`), and RFC 1918 private subnets via `BrowserGateway`.
+  - Immutable WORM Disaster Recovery: Real AES-256-GCM authenticated encryption, retention lock protection against deletion/mutation, and pre-restore integrity verification.
+
+---
+
+## 10. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
