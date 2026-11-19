@@ -25,6 +25,12 @@ from agent_factory.templates.loader import TemplateLoader, TemplateManifest
 from agent_factory.roles.requirement_analyst import RequirementAnalyst
 from agent_factory.spec.validator import SpecValidator
 from agent_factory.spec.calculator import compute_permission_profile
+from agent_factory.control.planner import (
+    plan, next_ready, propagate_failure, batch_verdict, compile_team_manifest, PlanError
+)
+from agent_factory.control.quotas import (
+    reserve_quota, release_quota, get_quota_status
+)
 
 # Feature Flag
 def is_af_enabled() -> bool:
@@ -441,6 +447,192 @@ class AgentFactoryRouter:
                 "version": ver,
                 "status": "PUBLISHED",
                 "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 7: POST /batches -----------------
+        if method == "POST" and path == "/api/v8/agent-factory/batches":
+            req_target_id = body.get("request_id")
+            if not req_target_id:
+                return 400, self._error("AF-VALIDATION", "Missing request_id", 400, "request_id is required", req_id), res_headers
+
+            release_policy = body.get("release_policy", "atomic_team")
+            items = body.get("items", [])
+            raw_edges = body.get("edges", [])
+
+            nodes = [it["agent_key"] for it in items if "agent_key" in it]
+            if not nodes or len(nodes) > 500:
+                return 422, self._error("AF-VALIDATION", "Invalid Agent Count", 422, "Batch must have between 1 and 500 agents", req_id), res_headers
+
+            edges = [(e[0], e[1], e[2]) for e in raw_edges]
+            try:
+                batch_plan = plan(nodes, edges, max_parallel=body.get("max_parallel", 4))
+            except PlanError as e:
+                return 422, self._error("AF-DAG-INVALID", "DAG Validation Failed", 422, str(e), req_id), res_headers
+
+            batch_id = f"bat_{uuid.uuid4().hex[:12]}"
+            manifest_json = json.dumps({"nodes": nodes, "edges": raw_edges, "plan": batch_plan})
+            manifest_sha256 = hashlib.sha256(manifest_json.encode()).hexdigest()
+            now = time.time()
+
+            with self._get_connection() as conn:
+                conn.execute("""
+                    INSERT INTO af_batch (
+                        id, tenant_id, company_id, request_id, release_policy,
+                        agent_count, waves, dependency_graph, manifest_sha256,
+                        status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PLANNED', ?, ?)
+                """, (
+                    batch_id, tenant_id, company_id, req_target_id, release_policy,
+                    len(nodes), len(batch_plan["waves"]), json.dumps(raw_edges),
+                    manifest_sha256, now, now
+                ))
+
+                for it in items:
+                    key = it["agent_key"]
+                    item_id = f"bit_{uuid.uuid4().hex[:12]}"
+                    req_spec_id = it.get("requirement_spec_id") or f"ars_stub_{key}"
+                    conn.execute("""
+                        INSERT INTO af_batch_item (
+                            id, tenant_id, batch_id, agent_key, role_title,
+                            requirement_spec_id, depends_on, wave, status, attempts
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)
+                    """, (
+                        item_id, tenant_id, batch_id, key, it.get("role_title", key),
+                        req_spec_id, json.dumps(batch_plan["requires"].get(key, [])),
+                        batch_plan["wave"].get(key, 0)
+                    ))
+                conn.commit()
+
+            ev_id = self.evidence.append_event(EvidenceEvent(
+                subject_kind="batch",
+                subject_id=batch_id,
+                event_type="batch.planned",
+                actor=principal.principal_id,
+                payload_hashes={"manifest_sha256": manifest_sha256, "agents": len(nodes)},
+                timestamp=now,
+                tenant_id=tenant_id
+            ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 202, {
+                "batch_id": batch_id,
+                "status": "PLANNED",
+                "waves": len(batch_plan["waves"]),
+                "agent_count": len(nodes),
+                "plan": batch_plan,
+                "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 8: GET /batches/{id} -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/batches/") and not path.endswith("/start") and not path.endswith("/cancel"):
+            batch_id = path.replace("/api/v8/agent-factory/batches/", "").split("/")[0]
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, status, release_policy, agent_count, waves, dependency_graph, created_at FROM af_batch WHERE tenant_id = ? AND id = ?",
+                    (tenant_id, batch_id)
+                )
+                b_row = cur.fetchone()
+                if not b_row:
+                    return 404, self._error("AF-NOT-FOUND", "Batch Not Found", 404, f"Batch {batch_id} not found", req_id), res_headers
+
+                cur_it = conn.execute(
+                    "SELECT agent_key, role_title, status, wave, attempts, last_error FROM af_batch_item WHERE tenant_id = ? AND batch_id = ?",
+                    (tenant_id, batch_id)
+                )
+                items = [
+                    {"agent_key": r[0], "role_title": r[1], "status": r[2], "wave": r[3], "attempts": r[4], "last_error": r[5]}
+                    for r in cur_it.fetchall()
+                ]
+
+            return 200, {
+                "batch_id": b_row[0],
+                "status": b_row[1],
+                "release_policy": b_row[2],
+                "agent_count": b_row[3],
+                "waves": b_row[4],
+                "items": items
+            }, res_headers
+
+        # ----------------- ROUTE 9: POST /batches/{id}/start -----------------
+        if method == "POST" and path.endswith("/start") and "/batches/" in path:
+            batch_id = path.replace("/api/v8/agent-factory/batches/", "").replace("/start", "")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, status, release_policy, dependency_graph FROM af_batch WHERE tenant_id = ? AND id = ?", (tenant_id, batch_id))
+                b_row = cur.fetchone()
+                if not b_row:
+                    return 404, self._error("AF-NOT-FOUND", "Batch Not Found", 404, f"Batch {batch_id} not found", req_id), res_headers
+
+                # Atomic Quota Reservation
+                if not reserve_quota(conn, tenant_id, "builds", amount=1.0):
+                    return 429, self._error("AF-QUOTA-EXCEEDED", "Build Quota Exceeded", 429, "Tenant monthly build quota limit reached", req_id), res_headers
+
+                # Update batch status to BUILDING
+                conn.execute("UPDATE af_batch SET status = 'BUILDING', updated_at = ? WHERE id = ?", (time.time(), batch_id))
+
+                # Fetch all items to compute next_ready
+                cur_it = conn.execute("SELECT agent_key, status, wave, depends_on FROM af_batch_item WHERE batch_id = ?", (batch_id,))
+                status_map = {}
+                p_requires = {}
+                p_wave = {}
+                for r in cur_it.fetchall():
+                    status_map[r[0]] = r[1]
+                    p_wave[r[0]] = r[2]
+                    p_requires[r[0]] = json.loads(r[3])
+
+                p_struct = {"requires": p_requires, "wave": p_wave, "max_parallel": 4}
+                ready_items = next_ready(p_struct, status_map)
+
+                for rk in ready_items:
+                    conn.execute("UPDATE af_batch_item SET status = 'BUILDING' WHERE batch_id = ? AND agent_key = ?", (batch_id, rk))
+
+                conn.commit()
+
+            return 200, {
+                "batch_id": batch_id,
+                "status": "BUILDING",
+                "ready_items": ready_items
+            }, res_headers
+
+        # ----------------- ROUTE 10: POST /batches/{id}/cancel -----------------
+        if method == "POST" and path.endswith("/cancel") and "/batches/" in path:
+            batch_id = path.replace("/api/v8/agent-factory/batches/", "").replace("/cancel", "")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, status FROM af_batch WHERE tenant_id = ? AND id = ?", (tenant_id, batch_id))
+                b_row = cur.fetchone()
+                if not b_row:
+                    return 404, self._error("AF-NOT-FOUND", "Batch Not Found", 404, f"Batch {batch_id} not found", req_id), res_headers
+
+                conn.execute("UPDATE af_batch SET status = 'CANCELLED', updated_at = ? WHERE id = ?", (time.time(), batch_id))
+                conn.execute("UPDATE af_batch_item SET status = 'KILLED' WHERE batch_id = ? AND status IN ('PENDING', 'READY', 'BUILDING')", (batch_id,))
+                conn.commit()
+
+            return 200, {"batch_id": batch_id, "status": "CANCELLED"}, res_headers
+
+        # ----------------- ROUTE 11: POST /batches/{id}/items/{key}/retry -----------------
+        if method == "POST" and "/items/" in path and path.endswith("/retry"):
+            parts = path.replace("/api/v8/agent-factory/batches/", "").split("/")
+            batch_id = parts[0]
+            agent_key = parts[2]
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, status, attempts FROM af_batch_item WHERE tenant_id = ? AND batch_id = ? AND agent_key = ?", (tenant_id, batch_id, agent_key))
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Batch Item Not Found", 404, f"Item {agent_key} not found", req_id), res_headers
+
+                attempts = row[2]
+                if attempts >= 3:
+                    return 409, self._error("AF-CONFLICT-STATE", "Max Retries Exceeded", 409, f"Item {agent_key} has exceeded 3 attempts", req_id), res_headers
+
+                conn.execute(
+                    "UPDATE af_batch_item SET status = 'PENDING', attempts = attempts + 1 WHERE id = ?",
+                    (row[0],)
+                )
+                conn.commit()
+
+            return 200, {
+                "batch_id": batch_id,
+                "agent_key": agent_key,
+                "status": "PENDING",
+                "attempt": attempts + 1
             }, res_headers
 
         # ----------------- ROUTE 12: GET /jobs/{id} -----------------
