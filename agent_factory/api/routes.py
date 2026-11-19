@@ -31,6 +31,9 @@ from agent_factory.control.planner import (
 from agent_factory.control.quotas import (
     reserve_quota, release_quota, get_quota_status
 )
+from agent_factory.cert.gates import evaluate
+from agent_factory.cert.bundle import CertificationBundleManager
+from agent_factory.qa.runner import QARunner
 
 # Feature Flag
 def is_af_enabled() -> bool:
@@ -48,6 +51,8 @@ class AgentFactoryRouter:
         self.template_loader = TemplateLoader()
         self.requirement_analyst = RequirementAnalyst(self.template_loader)
         self.validator = SpecValidator()
+        self.qa_runner = QARunner()
+        self.cert_manager = CertificationBundleManager(db_conn_factory=self._get_connection, evidence_port=self.evidence)
 
     def _get_connection(self):
         if self.db_conn_factory:
@@ -657,6 +662,122 @@ class AgentFactoryRouter:
                 "started_at": row[7],
                 "finished_at": row[8],
                 "error": row[9]
+            }, res_headers
+
+        # ----------------- ROUTE 19: GET /agent-versions/{id}/evaluations -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/agent-versions/") and path.endswith("/evaluations"):
+            ver_id = path.replace("/api/v8/agent-factory/agent-versions/", "").replace("/evaluations", "")
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, subject_kind, dataset_ref, suite, pass_rate, flaky_rate, created_at FROM af_eval_run WHERE tenant_id = ? AND agent_version_id = ?",
+                    (tenant_id, ver_id)
+                )
+                runs = [
+                    {"eval_run_id": r[0], "subject_kind": r[1], "dataset_ref": r[2], "suite": r[3], "pass_rate": r[4], "flaky_rate": r[5], "created_at": r[6]}
+                    for r in cur.fetchall()
+                ]
+            return 200, {"agent_version_id": ver_id, "evaluations": runs}, res_headers
+
+        # ----------------- ROUTE 20: GET /agent-versions/{id}/findings -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/agent-versions/") and path.endswith("/findings"):
+            ver_id = path.replace("/api/v8/agent-factory/agent-versions/", "").replace("/findings", "")
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, severity, rule_id, status, description, waived_by FROM af_finding WHERE tenant_id = ? AND agent_version_id = ?",
+                    (tenant_id, ver_id)
+                )
+                findings = [
+                    {"finding_id": r[0], "severity": r[1], "rule_id": r[2], "status": r[3], "description": r[4], "waived_by": r[5]}
+                    for r in cur.fetchall()
+                ]
+            return 200, {"agent_version_id": ver_id, "findings": findings}, res_headers
+
+        # ----------------- ROUTE 21: POST /findings/{id}/waive -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/findings/") and path.endswith("/waive"):
+            finding_id = path.replace("/api/v8/agent-factory/findings/", "").replace("/waive", "")
+            reason = body.get("reason", "Accepted risk")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, severity, status FROM af_finding WHERE tenant_id = ? AND id = ?", (tenant_id, finding_id))
+                f_row = cur.fetchone()
+                if not f_row:
+                    return 404, self._error("AF-NOT-FOUND", "Finding Not Found", 404, f"Finding {finding_id} not found", req_id), res_headers
+
+                # Critical and High findings CANNOT be waived
+                if f_row[1] in ("critical", "high"):
+                    return 409, self._error("AF-FINDING-NOT-WAIVABLE", "Finding Not Waivable", 409, f"Severity '{f_row[1]}' cannot be waived", req_id), res_headers
+
+                conn.execute(
+                    "UPDATE af_finding SET status = 'WAIVED', waived_by = ?, waive_reason = ? WHERE id = ?",
+                    (principal.principal_id, reason, finding_id)
+                )
+                conn.commit()
+
+            return 200, {"finding_id": finding_id, "status": "WAIVED", "waived_by": principal.principal_id}, res_headers
+
+        # ----------------- ROUTE 22: GET /agent-versions/{id}/certification -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/agent-versions/") and path.endswith("/certification"):
+            ver_id = path.replace("/api/v8/agent-factory/agent-versions/", "").replace("/certification", "")
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, gate_policy_version, gate_results, all_mandatory_passed, bundle_artifact_id, evidence_ledger_ref, issued_by, issued_at FROM af_certification WHERE tenant_id = ? AND agent_version_id = ?",
+                    (tenant_id, ver_id)
+                )
+                c_row = cur.fetchone()
+                if not c_row:
+                    return 404, self._error("AF-NOT-FOUND", "Certification Not Found", 404, f"No certification found for {ver_id}", req_id), res_headers
+
+            return 200, {
+                "certification_id": c_row[0],
+                "agent_version_id": ver_id,
+                "gate_policy_version": c_row[1],
+                "gate_results": json.loads(c_row[2]),
+                "all_mandatory_passed": bool(c_row[3]),
+                "bundle_artifact_id": c_row[4],
+                "evidence_ledger_ref": c_row[5],
+                "issued_by": c_row[6],
+                "issued_at": c_row[7]
+            }, res_headers
+
+        # ----------------- ROUTE 22B: POST /agent-versions/{id}/certify -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agent-versions/") and path.endswith("/certify"):
+            ver_id = path.replace("/api/v8/agent-factory/agent-versions/", "").replace("/certify", "")
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, agent_id, semver, spec, risk_tier FROM af_agent_version WHERE tenant_id = ? AND id = ?",
+                    (tenant_id, ver_id)
+                )
+                v_row = cur.fetchone()
+                if not v_row:
+                    return 404, self._error("AF-NOT-FOUND", "Agent Version Not Found", 404, f"Version {ver_id} not found", req_id), res_headers
+
+                raw_spec = json.loads(v_row[3])
+                risk_tier = v_row[4]
+
+                # Run QA evaluations
+                ev_dict = self.qa_runner.run_evaluations(raw_spec, ver_id, risk_tier=risk_tier)
+                gate_res = evaluate(risk_tier, ev_dict)
+
+                if not gate_res["all_mandatory_passed"]:
+                    failed_gates = [g["gate"] for g in gate_res["gates"] if not g["passed"] and g["mandatory"]]
+                    return 422, self._error("AF-GATE-FAILED", "Mandatory Certification Gates Failed", 422, f"Failed gates: {failed_gates}", req_id), res_headers
+
+                # Build and seal certification bundle
+                cert_res = self.cert_manager.build_and_seal_bundle(
+                    tenant_id=tenant_id,
+                    subject_kind="agent_version",
+                    agent_version_id=ver_id,
+                    batch_id=None,
+                    gate_results=gate_res,
+                    issued_by=principal.principal_id
+                )
+
+            res_headers["X-Evidence-Id"] = cert_res["evidence_ledger_ref"]
+            return 200, {
+                "certification_id": cert_res["certification_id"],
+                "agent_version_id": ver_id,
+                "status": "CERTIFIED",
+                "bundle_sha256": cert_res["bundle_sha256"],
+                "evidence_id": cert_res["evidence_ledger_ref"]
             }, res_headers
 
         # ----------------- ROUTE 36: POST /kill -----------------
