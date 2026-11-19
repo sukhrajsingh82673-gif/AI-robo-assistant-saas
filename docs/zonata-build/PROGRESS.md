@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/stage-4-process-packs`  
+**Branch:** `zonata/stage-5-factory-integration`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete, Stage 3 Router/Worker Runtime Complete, Stage 4 Process Pack Framework Complete, Stage 5 Agent Factory Integration Complete
 
 ---
 
@@ -16,8 +16,8 @@
 | **Stage 2** | **Foundations** | Tenancy RLS verification, Merkle ledger, policy engine, kill switch, budget guards | **COMPLETED** | Verified (`zonata/stage-2-foundations`) |
 | **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | **COMPLETED** | Verified (`zonata/stage-3-router-worker`) |
 | **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | **COMPLETED** | Verified (`zonata/stage-4-process-packs`) |
-| **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | IN PROGRESS | Gate D5 |
-| **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | PENDING | Gate D6 |
+| **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | **COMPLETED** | Verified (`zonata/stage-5-factory-integration`) |
+| **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | IN PROGRESS | Gate D6 |
 | **Stage 7** | **Kaizen & Evaluation Engine** | KPI store, waste detection, improvement proposals, shadow-mode comparison | PENDING | Gate D7 |
 | **Stage 8** | **Hardening** | Red-team injection suites, privilege escalation tests, backup/restore drill | PENDING | Gate D8 |
 | **Stage 9** | **Pilot Deployment** | One real company, full L0 cycle, evidence-backed promotion to L1/L2 | PENDING | Gate D9 |
@@ -153,7 +153,27 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 6. Decisions & Architectural Resolutions Log
+## 6. Stage 5 Agent Factory Integration Execution Evidence
+
+* **Command: `PYTHONPATH=. pytest tests/test_stage5_factory_integration.py -v`**
+  ```
+  tests/test_stage5_factory_integration.py::test_stage5_separation_of_duties_enforcement PASSED [ 25%]
+  tests/test_stage5_factory_integration.py::test_stage5_spec_compilation_and_governed_invariants PASSED [ 50%]
+  tests/test_stage5_factory_integration.py::test_stage5_process_pack_step_execution_with_agent PASSED [ 75%]
+  tests/test_stage5_factory_integration.py::test_stage5_quarantined_oss_import_t0_fail_closed PASSED [100%]
+  4 passed in 0.91s
+  Status: PASSED (exit code 0)
+  ```
+* **Integrations Implemented:**
+  - `core/factory_integration.py`: `FactoryIntegrationBridge` connects Process Packs with Agent Factory runtime.
+  - Separation of Duties (Law L5): Hardware- & DB-enforced check that Requester != Builder != Tester != Approver.
+  - Governed Execution: 100% of external tool/model calls wrapped with `GovernedCallContext`, KillSwitch checking, and limits.
+  - Sovereign T0 Quarantine: Untrusted OSS agents require isolated containers; under ARM64 T0 mode, requests fail-closed cleanly with `AF-SANDBOX-UNAVAILABLE`.
+  - Process Step Execution: `execute_agent_step` executes step tasks with compiled `zonata.agent/v1` agent graphs.
+
+---
+
+## 7. Decisions & Architectural Resolutions Log
 
 * **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
 * **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
