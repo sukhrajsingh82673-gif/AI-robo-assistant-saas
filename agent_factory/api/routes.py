@@ -38,6 +38,8 @@ from agent_factory.registry.release_manager import (
     ReleaseManager, SelfApprovalBlockedError, AtomicPublishFailedError
 )
 from agent_factory.registry.provisioner import WorkforceProvisioner
+from agent_factory.monitor.service import MonitoringService, MonitoringError
+from agent_factory.domain.lifecycle import LifecycleManager, LifecycleError, UpgradeRegressionError
 from agent_factory.adapters.fakes import FakeApprovalPort, FakeRuntimePort, FakeWorkforcePort
 
 # Feature Flag
@@ -72,6 +74,16 @@ class AgentFactoryRouter:
             db_conn_factory=self._get_connection,
             evidence_port=self.evidence,
             workforce_port=self.workforce
+        )
+        self.monitoring = MonitoringService(
+            db_conn_factory=self._get_connection,
+            evidence_port=self.evidence
+        )
+        self.lifecycle = LifecycleManager(
+            db_conn_factory=self._get_connection,
+            evidence_port=self.evidence,
+            authority_port=self.authority,
+            runtime_port=self.runtime
         )
 
     def _get_connection(self):
@@ -983,6 +995,109 @@ class AgentFactoryRouter:
                 return 200, rb_res, res_headers
             except Exception as e:
                 return 400, self._error("AF-ROLLBACK-ERROR", "Rollback Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 30: GET /agents/{id}/monitoring -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/monitoring"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/monitoring", "")
+            try:
+                mon_res = self.monitoring.get_monitoring_summary(tenant_id=tenant_id, agent_id=agt_id)
+                return 200, mon_res, res_headers
+            except Exception as e:
+                return 404, self._error("AF-NOT-FOUND", "Monitoring Not Found", 404, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 31: POST /agents/{id}/upgrades (Upgrade lane, AT-03) -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/upgrades"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/upgrades", "")
+            new_semver = body.get("new_semver", "1.1.0")
+            spec_delta = body.get("spec_delta") or body.get("delta") or {}
+            simulate_regression = body.get("simulate_regression", False)
+
+            try:
+                upg_res = self.lifecycle.upgrade_agent(
+                    tenant_id=tenant_id,
+                    company_id=company_id,
+                    agent_id=agt_id,
+                    new_semver=new_semver,
+                    spec_delta=spec_delta,
+                    initiated_by=principal.principal_id,
+                    simulate_regression=simulate_regression
+                )
+                res_headers["X-Evidence-Id"] = upg_res["evidence_id"]
+                return 201, upg_res, res_headers
+            except UpgradeRegressionError as e:
+                return 422, self._error("AF-G10-REGRESSION", "Upgrade Regression Detected", 422, str(e), req_id), res_headers
+            except Exception as e:
+                return 400, self._error("AF-UPGRADE-ERROR", "Upgrade Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 33: POST /agents/{id}/suspend (AT-18) -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/suspend"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/suspend", "")
+            reason = body.get("reason", "Operator suspend")
+            try:
+                susp_res = self.lifecycle.suspend_agent(
+                    tenant_id=tenant_id,
+                    agent_id=agt_id,
+                    reason=reason,
+                    initiated_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = susp_res["evidence_id"]
+                return 200, susp_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-LIFECYCLE-ERROR", "Suspend Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 34: POST /agents/{id}/resume -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/resume"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/resume", "")
+            try:
+                res_res = self.lifecycle.resume_agent(
+                    tenant_id=tenant_id,
+                    agent_id=agt_id,
+                    initiated_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = res_res["evidence_id"]
+                return 200, res_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-LIFECYCLE-ERROR", "Resume Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 35: POST /agents/{id}/retire -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/retire"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/retire", "")
+            reason = body.get("reason", "Decommissioned")
+            try:
+                ret_res = self.lifecycle.retire_agent(
+                    tenant_id=tenant_id,
+                    agent_id=agt_id,
+                    reason=reason,
+                    initiated_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = ret_res["evidence_id"]
+                return 200, ret_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-LIFECYCLE-ERROR", "Retire Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- FEEDBACK ROUTE: POST /agents/{id}/feedback -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/feedback"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/feedback", "")
+            ver_id = body.get("agent_version_id")
+            rating = body.get("rating", 5)
+            category = body.get("category", "quality")
+            comment = body.get("comment", "")
+            task_ref = body.get("task_ref")
+            try:
+                fb_res = self.monitoring.record_feedback(
+                    tenant_id=tenant_id,
+                    agent_id=agt_id,
+                    agent_version_id=ver_id,
+                    from_principal=principal.principal_id,
+                    rating=rating,
+                    category=category,
+                    comment=comment,
+                    task_ref=task_ref
+                )
+                res_headers["X-Evidence-Id"] = fb_res["evidence_id"]
+                return 201, fb_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-FEEDBACK-ERROR", "Feedback Recording Failed", 400, str(e), req_id), res_headers
 
         # ----------------- ROUTE 36: POST /kill -----------------
         if method == "POST" and path == "/api/v8/agent-factory/kill":

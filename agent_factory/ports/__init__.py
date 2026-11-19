@@ -86,6 +86,10 @@ class AuthorityPort(ABC):
         """Evaluate whether a principal has authority to perform action on resource."""
         pass
 
+    def revoke_principal_tokens(self, principal_id: str) -> bool:
+        """Revoke all active tokens and session grants for principal."""
+        return True
+
 
 class PolicyPort(ABC):
     @abstractmethod
@@ -196,6 +200,18 @@ class RuntimePort(ABC):
 
     def deploy(self, job: BuildJob, environment: str = "staging") -> Dict[str, Any]:
         return {"status": "ok", "environment": environment, "build_id": job.build_id}
+
+    def suspend_instance(self, agent_id: str) -> bool:
+        """Halt execution of active agent instances within <= 5s."""
+        return True
+
+    def resume_instance(self, agent_id: str) -> bool:
+        """Resume execution of agent instances."""
+        return True
+
+    def terminate_instance(self, agent_id: str) -> bool:
+        """Permanently stop agent instances."""
+        return True
 
 
 class SecretsPort(ABC):

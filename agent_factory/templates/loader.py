@@ -30,6 +30,13 @@ class TemplateManifest:
 
     def instantiate(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Merge base_spec with provided parameters to create a candidate zonata.agent/v1 spec."""
+        if self.parameters:
+            props = self.parameters.get("properties", self.parameters) if isinstance(self.parameters, dict) else {}
+            allowed = set(props.keys()) | {"name", "display_name", "version", "role_title", "mission"}
+            for k in params:
+                if k not in allowed:
+                    raise ValueError(f"AF-PARAM-SCHEMA: Parameter '{k}' outside template schema")
+
         spec = {
             "apiVersion": "zonata.agent/v1",
             "kind": "Agent",
