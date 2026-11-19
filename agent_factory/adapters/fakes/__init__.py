@@ -13,13 +13,16 @@ from agent_factory.ports import (
     AuthorityPort, PolicyPort, EvidenceLedgerPort, KillSwitchPort,
     CompanyKernelPort, ApprovalPort, WorkforcePort, RuntimePort,
     SecretsPort, IdentityPort, DlpPort, TelemetryPort,
-    Principal, Resource, Decision, EvidenceEvent
+    Principal, Resource, Decision, EvidenceEvent, BuildJob
 )
 
 
 class FakeAuthorityAdapter(AuthorityPort):
-    def __init__(self, default_allow: bool = True):
-        self.default_allow = default_allow
+    def __init__(self, default_allow: bool = True, allow_all: Optional[bool] = None):
+        if allow_all is not None:
+            self.default_allow = allow_all
+        else:
+            self.default_allow = default_allow
         self.deny_actions: set = set()
         self.calls: List[Dict[str, Any]] = []
 
@@ -57,6 +60,10 @@ class FakeEvidenceAdapter(EvidenceLedgerPort):
 class FakeKillSwitchAdapter(KillSwitchPort):
     def __init__(self):
         self.killed_targets: set = set()
+
+    @property
+    def killed_scopes(self) -> set:
+        return self.killed_targets
 
     def is_killed(self, scope: str, target_id: str, tenant_id: str) -> bool:
         return (scope, target_id) in self.killed_targets or ("GLOBAL", "SYSTEM") in self.killed_targets
@@ -117,3 +124,68 @@ class FakeCompanyAdapter(CompanyKernelPort):
 
     def validate_reporting_line(self, tenant_id: str, supervisor_id: str, subordinate_id: str) -> bool:
         return supervisor_id != subordinate_id
+
+
+class FakeWorkforceAdapter(WorkforcePort):
+    def __init__(self):
+        self.assignments: List[Dict[str, Any]] = []
+
+    def assign_agent(
+        self,
+        tenant_id: str,
+        company_id: str,
+        agent_id: str,
+        agent_version_id: str,
+        assignee_kind: str,
+        assignee_id: str,
+        assigned_by: str
+    ) -> str:
+        asgn_id = f"asgn_{uuid.uuid4().hex[:8]}"
+        self.assignments.append({
+            "id": asgn_id,
+            "tenant_id": tenant_id,
+            "agent_id": agent_id,
+            "agent_version_id": agent_version_id,
+            "assignee_kind": assignee_kind,
+            "assignee_id": assignee_id
+        })
+        return asgn_id
+
+
+class FakeRuntimeAdapter(RuntimePort):
+    def __init__(self):
+        self.deployments: List[Dict[str, Any]] = []
+
+    def deploy_agent(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        agent_version_id: str,
+        channel: str,
+        traffic_percent: int = 100
+    ) -> str:
+        dep_id = f"dep_{uuid.uuid4().hex[:8]}"
+        self.deployments.append({
+            "id": dep_id,
+            "tenant_id": tenant_id,
+            "agent_id": agent_id,
+            "agent_version_id": agent_version_id,
+            "channel": channel,
+            "traffic_percent": traffic_percent
+        })
+        return dep_id
+
+    def deploy(self, job: BuildJob, environment: str = "staging") -> Dict[str, Any]:
+        return {"status": "ok", "environment": environment, "build_id": job.build_id}
+
+
+# Port aliases
+FakeAuthorityPort = FakeAuthorityAdapter
+FakeEvidencePort = FakeEvidenceAdapter
+FakeKillSwitchPort = FakeKillSwitchAdapter
+FakePolicyPort = FakePolicyAdapter
+FakeApprovalPort = FakeApprovalAdapter
+FakeIdentityPort = FakeIdentityAdapter
+FakeCompanyPort = FakeCompanyAdapter
+FakeWorkforcePort = FakeWorkforceAdapter
+FakeRuntimePort = FakeRuntimeAdapter

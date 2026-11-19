@@ -15,16 +15,32 @@ class Principal:
     principal_id: str
     tenant_id: str
     company_id: str
-    kind: str  # human_owner, ai_employee, ai_ceo, factory_role, service
+    kind: str  # human_owner, ai_employee, ai_ceo, factory_role, service, agent
     roles: List[str]
 
 
-@dataclass(frozen=True)
 class Resource:
-    kind: str
-    id: str
-    tenant_id: str
-    meta: Dict[str, Any]
+    def __init__(
+        self,
+        resource_id: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        tenant_id: str = "",
+        meta: Optional[Dict[str, Any]] = None,
+        id: Optional[str] = None,
+        kind: Optional[str] = None
+    ):
+        self.resource_id = resource_id or id or ""
+        self.resource_type = resource_type or kind or ""
+        self.tenant_id = tenant_id
+        self.meta = meta or {}
+
+    @property
+    def id(self) -> str:
+        return self.resource_id
+
+    @property
+    def kind(self) -> str:
+        return self.resource_type
 
 
 @dataclass(frozen=True)
@@ -46,6 +62,16 @@ class EvidenceEvent:
     payload_hashes: Dict[str, str]
     timestamp: float
     tenant_id: str
+
+
+@dataclass
+class BuildJob:
+    build_id: str
+    request_id: str
+    tenant_id: str
+    agent_version_id: str
+    stages: List[str]
+    status: str
 
 
 class AuthorityPort(ABC):
@@ -167,6 +193,9 @@ class RuntimePort(ABC):
     ) -> str:
         """Mount compiled agent graph into execution runtime."""
         pass
+
+    def deploy(self, job: BuildJob, environment: str = "staging") -> Dict[str, Any]:
+        return {"status": "ok", "environment": environment, "build_id": job.build_id}
 
 
 class SecretsPort(ABC):
