@@ -34,6 +34,11 @@ from agent_factory.control.quotas import (
 from agent_factory.cert.gates import evaluate
 from agent_factory.cert.bundle import CertificationBundleManager
 from agent_factory.qa.runner import QARunner
+from agent_factory.registry.release_manager import (
+    ReleaseManager, SelfApprovalBlockedError, AtomicPublishFailedError
+)
+from agent_factory.registry.provisioner import WorkforceProvisioner
+from agent_factory.adapters.fakes import FakeApprovalPort, FakeRuntimePort, FakeWorkforcePort
 
 # Feature Flag
 def is_af_enabled() -> bool:
@@ -53,6 +58,21 @@ class AgentFactoryRouter:
         self.validator = SpecValidator()
         self.qa_runner = QARunner()
         self.cert_manager = CertificationBundleManager(db_conn_factory=self._get_connection, evidence_port=self.evidence)
+        self.approval = FakeApprovalPort()
+        self.runtime = FakeRuntimePort()
+        self.workforce = FakeWorkforcePort()
+        self.release_manager = ReleaseManager(
+            db_conn_factory=self._get_connection,
+            evidence_port=self.evidence,
+            approval_port=self.approval,
+            runtime_port=self.runtime,
+            workforce_port=self.workforce
+        )
+        self.provisioner = WorkforceProvisioner(
+            db_conn_factory=self._get_connection,
+            evidence_port=self.evidence,
+            workforce_port=self.workforce
+        )
 
     def _get_connection(self):
         if self.db_conn_factory:
@@ -779,6 +799,190 @@ class AgentFactoryRouter:
                 "bundle_sha256": cert_res["bundle_sha256"],
                 "evidence_id": cert_res["evidence_ledger_ref"]
             }, res_headers
+
+        # ----------------- ROUTE 23: POST /releases -----------------
+        if method == "POST" and path == "/api/v8/agent-factory/releases":
+            subject_kind = body.get("subject_kind", "agent_version")
+            subject_id = body.get("subject_id")
+            cert_id = body.get("certification_id")
+            channel = body.get("channel", "production")
+            if not subject_id or not cert_id:
+                return 400, self._error("AF-VALIDATION", "Missing Required Parameters", 400, "subject_id and certification_id required", req_id), res_headers
+
+            try:
+                res_obj = self.release_manager.submit_release(
+                    tenant_id=tenant_id,
+                    company_id=company_id,
+                    subject_kind=subject_kind,
+                    subject_id=subject_id,
+                    certification_id=cert_id,
+                    submitted_by=principal.principal_id,
+                    channel=channel
+                )
+                res_headers["X-Evidence-Id"] = res_obj["evidence_id"]
+                return 201, res_obj, res_headers
+            except Exception as e:
+                return 422, self._error("AF-RELEASE-ERROR", "Release Submission Failed", 422, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 24: POST /releases/{id}/decision -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/releases/") and path.endswith("/decision"):
+            rel_id = path.replace("/api/v8/agent-factory/releases/", "").replace("/decision", "")
+            decision = body.get("decision", "APPROVED")
+            try:
+                dec_res = self.release_manager.decide_release(
+                    tenant_id=tenant_id,
+                    release_id=rel_id,
+                    decision=decision,
+                    decided_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = dec_res["evidence_id"]
+                return 200, dec_res, res_headers
+            except SelfApprovalBlockedError as e:
+                return 403, self._error("AF-SELF-APPROVAL", "Self-Approval Forbidden", 403, str(e), req_id), res_headers
+            except Exception as e:
+                return 400, self._error("AF-RELEASE-ERROR", "Decision Error", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 25: POST /releases/{id}/publish -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/releases/") and path.endswith("/publish"):
+            rel_id = path.replace("/api/v8/agent-factory/releases/", "").replace("/publish", "")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, subject_kind, agent_version_id, batch_id, decision FROM af_release WHERE tenant_id = ? AND id = ?", (tenant_id, rel_id))
+                r_row = cur.fetchone()
+                if not r_row:
+                    return 404, self._error("AF-NOT-FOUND", "Release Not Found", 404, f"Release {rel_id} not found", req_id), res_headers
+                if r_row[4] != "APPROVED":
+                    return 400, self._error("AF-APPROVAL-REQUIRED", "Release Not Approved", 400, "Release must be APPROVED before publishing", req_id), res_headers
+
+            try:
+                if r_row[1] == "team":
+                    pub_res = self.release_manager.publish_atomic_team(
+                        tenant_id=tenant_id,
+                        company_id=company_id,
+                        release_id=rel_id,
+                        batch_id=r_row[3],
+                        published_by=principal.principal_id
+                    )
+                else:
+                    ver_id = r_row[2]
+                    now = time.time()
+                    with self._get_connection() as conn:
+                        conn.execute("UPDATE af_agent_version SET status = 'PUBLISHED' WHERE id = ?", (ver_id,))
+                        conn.execute("UPDATE af_release SET decision = 'APPROVED' WHERE id = ?", (rel_id,))
+                        # Update agent lifecycle to ACTIVE and active_version_id
+                        cur_v = conn.execute("SELECT agent_id FROM af_agent_version WHERE id = ?", (ver_id,))
+                        agt_id = cur_v.fetchone()[0]
+                        conn.execute("UPDATE af_agent SET active_version_id = ?, lifecycle = 'ACTIVE', updated_at = ? WHERE id = ?", (ver_id, now, agt_id))
+                        conn.commit()
+
+                    ev_id = self.evidence.append_event(EvidenceEvent(
+                        subject_kind="release",
+                        subject_id=rel_id,
+                        event_type="agent.published",
+                        actor=principal.principal_id,
+                        payload_hashes={"version_id": ver_id},
+                        timestamp=now,
+                        tenant_id=tenant_id
+                    ))
+                    pub_res = {"release_id": rel_id, "status": "PUBLISHED", "evidence_id": ev_id}
+
+                res_headers["X-Evidence-Id"] = pub_res["evidence_id"]
+                return 200, pub_res, res_headers
+            except AtomicPublishFailedError as e:
+                return 422, self._error("AF-PUBLISH-FAILED", "Atomic Publish Failed", 422, str(e), req_id), res_headers
+            except Exception as e:
+                return 500, self._error("AF-INTERNAL", "Publish Error", 500, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 26: GET /agents, GET /agents/{id}, /versions -----------------
+        if method == "GET" and path == "/api/v8/agent-factory/agents":
+            with self._get_connection() as conn:
+                cur = conn.execute(
+                    "SELECT id, slug, display_name, role_title, category, lifecycle, active_version_id, created_at FROM af_agent WHERE tenant_id = ? ORDER BY created_at DESC",
+                    (tenant_id,)
+                )
+                agents = [
+                    {"id": r[0], "slug": r[1], "display_name": r[2], "role_title": r[3], "category": r[4], "lifecycle": r[5], "active_version_id": r[6], "created_at": r[7]}
+                    for r in cur.fetchall()
+                ]
+            return 200, {"items": agents}, res_headers
+
+        if method == "GET" and path.startswith("/api/v8/agent-factory/agents/") and not path.endswith("/assignments") and not path.endswith("/rollback"):
+            parts = path.replace("/api/v8/agent-factory/agents/", "").split("/")
+            agt_id = parts[0]
+            with self._get_connection() as conn:
+                if len(parts) == 1:
+                    cur = conn.execute(
+                        "SELECT id, slug, display_name, role_title, category, lifecycle, active_version_id, created_at FROM af_agent WHERE tenant_id = ? AND id = ?",
+                        (tenant_id, agt_id)
+                    )
+                    r = cur.fetchone()
+                    if not r:
+                        return 404, self._error("AF-NOT-FOUND", "Agent Not Found", 404, f"Agent {agt_id} not found", req_id), res_headers
+                    return 200, {"id": r[0], "slug": r[1], "display_name": r[2], "role_title": r[3], "category": r[4], "lifecycle": r[5], "active_version_id": r[6], "created_at": r[7]}, res_headers
+                elif len(parts) == 2 and parts[1] == "versions":
+                    cur = conn.execute(
+                        "SELECT id, semver, status, risk_tier, created_at FROM af_agent_version WHERE tenant_id = ? AND agent_id = ? ORDER BY created_at DESC",
+                        (tenant_id, agt_id)
+                    )
+                    versions = [
+                        {"version_id": r[0], "semver": r[1], "status": r[2], "risk_tier": r[3], "created_at": r[4]}
+                        for r in cur.fetchall()
+                    ]
+                    return 200, {"agent_id": agt_id, "versions": versions}, res_headers
+
+        # ----------------- ROUTE 28: POST /agents/{id}/assignments -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/assignments"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/assignments", "")
+            ver_id = body.get("agent_version_id")
+            assignee_kind = body.get("assignee_kind", "department")
+            assignee_id = body.get("assignee_id")
+            if not ver_id or not assignee_id:
+                return 400, self._error("AF-VALIDATION", "Missing Parameters", 400, "agent_version_id and assignee_id required", req_id), res_headers
+
+            try:
+                asgn_res = self.provisioner.assign(
+                    tenant_id=tenant_id,
+                    company_id=company_id,
+                    agent_id=agt_id,
+                    agent_version_id=ver_id,
+                    assignee_kind=assignee_kind,
+                    assignee_id=assignee_id,
+                    assigned_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = asgn_res["evidence_id"]
+                return 200, asgn_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-PROVISION-ERROR", "Assignment Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 29: DELETE /assignments/{id} -----------------
+        if method == "DELETE" and path.startswith("/api/v8/agent-factory/assignments/"):
+            asgn_id = path.split("/")[-1]
+            try:
+                rev_res = self.provisioner.revoke(tenant_id=tenant_id, assignment_id=asgn_id, revoked_by=principal.principal_id)
+                res_headers["X-Evidence-Id"] = rev_res["evidence_id"]
+                return 200, rev_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-PROVISION-ERROR", "Revocation Failed", 400, str(e), req_id), res_headers
+
+        # ----------------- ROUTE 32: POST /agents/{id}/rollback -----------------
+        if method == "POST" and path.startswith("/api/v8/agent-factory/agents/") and path.endswith("/rollback"):
+            agt_id = path.replace("/api/v8/agent-factory/agents/", "").replace("/rollback", "")
+            target_ver_id = body.get("to_version") or body.get("target_version_id")
+            reason = body.get("reason", "Operator rollback")
+            if not target_ver_id:
+                return 400, self._error("AF-VALIDATION", "Missing Target Version", 400, "to_version is required for rollback", req_id), res_headers
+
+            try:
+                rb_res = self.release_manager.rollback_to_version(
+                    tenant_id=tenant_id,
+                    agent_id=agt_id,
+                    target_version_id=target_ver_id,
+                    reason=reason,
+                    initiated_by=principal.principal_id
+                )
+                res_headers["X-Evidence-Id"] = rb_res["evidence_id"]
+                return 200, rb_res, res_headers
+            except Exception as e:
+                return 400, self._error("AF-ROLLBACK-ERROR", "Rollback Failed", 400, str(e), req_id), res_headers
 
         # ----------------- ROUTE 36: POST /kill -----------------
         if method == "POST" and path == "/api/v8/agent-factory/kill":
