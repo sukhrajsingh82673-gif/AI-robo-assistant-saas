@@ -1,5 +1,5 @@
 """
-ZONATA Agent Factory — API Layer (Phase 2 Foundation Routes)
+ZONATA Agent Factory — API Layer (Phase 2 & Phase 3 Routes)
 Mounted at /api/v8/agent-factory/...
 Implements RFC 9457 error contracts, idempotency, tenant validation, and evidence tracking.
 """
@@ -21,6 +21,10 @@ from agent_factory.domain.transition import (
     transition, TransitionContext, InvalidTransitionError, TransitionForbiddenError
 )
 from agent_factory.control.orchestrator import DbQueueOrchestrator
+from agent_factory.templates.loader import TemplateLoader, TemplateManifest
+from agent_factory.roles.requirement_analyst import RequirementAnalyst
+from agent_factory.spec.validator import SpecValidator
+from agent_factory.spec.calculator import compute_permission_profile
 
 # Feature Flag
 def is_af_enabled() -> bool:
@@ -35,6 +39,9 @@ class AgentFactoryRouter:
         self.killswitch = ZonataKillSwitchAdapter()
         self.policy = ZonataPolicyAdapter()
         self.orchestrator = DbQueueOrchestrator(db_conn_factory=db_conn_factory)
+        self.template_loader = TemplateLoader()
+        self.requirement_analyst = RequirementAnalyst(self.template_loader)
+        self.validator = SpecValidator()
 
     def _get_connection(self):
         if self.db_conn_factory:
@@ -195,6 +202,119 @@ class AgentFactoryRouter:
                 ]
             return 200, {"items": items}, res_headers
 
+        # ----------------- ROUTE 3: POST /requests/{id}/clarifications -----------------
+        if method == "POST" and "/clarifications" in path:
+            req_target_id = path.replace("/api/v8/agent-factory/requests/", "").replace("/clarifications", "")
+            answers = body.get("answers", {})
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, status, natural_language FROM af_request WHERE tenant_id = ? AND id = ?", (tenant_id, req_target_id))
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Request Not Found", 404, f"Request {req_target_id} not found", req_id), res_headers
+
+                # Record clarification evidence
+                ev_id = self.evidence.append_event(EvidenceEvent(
+                    subject_kind="request",
+                    subject_id=req_target_id,
+                    event_type="request.clarification_answered",
+                    actor=principal.principal_id,
+                    payload_hashes={"answers_sha256": hashlib.sha256(json.dumps(answers).encode()).hexdigest()},
+                    timestamp=time.time(),
+                    tenant_id=tenant_id
+                ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 200, {
+                "request_id": req_target_id,
+                "clarifications_recorded": True,
+                "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 4: POST /requests/{id}/analyze -----------------
+        if method == "POST" and path.endswith("/analyze"):
+            req_target_id = path.replace("/api/v8/agent-factory/requests/", "").replace("/analyze", "")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, natural_language, template_ref, mode, status FROM af_request WHERE tenant_id = ? AND id = ?", (tenant_id, req_target_id))
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Request Not Found", 404, f"Request {req_target_id} not found", req_id), res_headers
+
+                # Run RequirementAnalyst
+                ars = self.requirement_analyst.analyze(
+                    request_id=req_target_id,
+                    natural_language=row[1],
+                    template_ref=row[2],
+                    mode=row[3]
+                )
+
+                # Persist ARS in af_requirement_spec
+                now = time.time()
+                ars_json = json.dumps(ars)
+                ars_sha256 = hashlib.sha256(ars_json.encode("utf-8")).hexdigest()
+                open_q = json.dumps(ars.get("clarifications_needed", []))
+                conn.execute("""
+                    INSERT INTO af_requirement_spec (
+                        id, tenant_id, request_id, version, body,
+                        body_sha256, authored_by, open_questions, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    ars["id"], tenant_id, req_target_id, ars["version"], ars_json,
+                    ars_sha256, principal.principal_id, open_q, now
+                ))
+
+                # Transition to DESIGNING or CLARIFYING
+                target_state = "CLARIFYING" if ars["clarifications_needed"] else "DESIGNING"
+                t_ctx = TransitionContext(
+                    tenant_id=tenant_id,
+                    principal=principal,
+                    conn=conn,
+                    authority_port=self.authority,
+                    evidence_port=self.evidence,
+                    killswitch_port=self.killswitch,
+                    meta={"correlation_id": req_id}
+                )
+                evidence_id = transition(
+                    t_ctx, "request", req_target_id, target_state,
+                    reason="Requirement analysis complete",
+                    expect_from=row[4],
+                    payload_hashes={"ars_id": ars["id"], "risk": ars["risk_tier_inferred"]}
+                )
+                conn.commit()
+
+            res_headers["X-Evidence-Id"] = evidence_id
+            return 200, {
+                "request_id": req_target_id,
+                "ars": ars,
+                "new_status": target_state,
+                "evidence_id": evidence_id
+            }, res_headers
+
+        # ----------------- ROUTE 5: GET /requests/{id}/estimate -----------------
+        if (method == "GET" or method == "POST") and path.endswith("/estimate"):
+            req_target_id = path.replace("/api/v8/agent-factory/requests/", "").replace("/estimate", "")
+            with self._get_connection() as conn:
+                cur = conn.execute("SELECT id, natural_language, risk_tier, budget_cap_usd FROM af_request WHERE tenant_id = ? AND id = ?", (tenant_id, req_target_id))
+                row = cur.fetchone()
+                if not row:
+                    return 404, self._error("AF-NOT-FOUND", "Request Not Found", 404, f"Request {req_target_id} not found", req_id), res_headers
+
+                risk = row[2] or "R1"
+                token_est = 15000 if risk in ("R0", "R1") else 35000
+                cost_est = 0.25 if risk in ("R0", "R1") else 0.85
+                wall_clock_sec = 60 if risk in ("R0", "R1") else 180
+
+                estimate = {
+                    "request_id": req_target_id,
+                    "estimated_tokens": token_est,
+                    "estimated_cost_usd": cost_est,
+                    "estimated_wall_clock_seconds": wall_clock_sec,
+                    "sandbox_tier_required": "T0",
+                    "quota_impact": {
+                        "builds": 1,
+                        "cost_usd": cost_est
+                    }
+                }
+            return 200, estimate, res_headers
+
         # ----------------- ROUTE 2B: GET /requests/{id} -----------------
         if method == "GET" and path.startswith("/api/v8/agent-factory/requests/"):
             req_target_id = path.split("/")[-1]
@@ -207,7 +327,6 @@ class AgentFactoryRouter:
                 if not row:
                     return 404, self._error("AF-NOT-FOUND", "Request Not Found", 404, f"Request {req_target_id} not found", req_id), res_headers
 
-                # Also fetch lifecycle events
                 cur_lc = conn.execute(
                     "SELECT from_state, to_state, actor, reason, evidence_ledger_id, created_at FROM af_lifecycle_event WHERE tenant_id = ? AND subject_id = ? ORDER BY id ASC",
                     (tenant_id, req_target_id)
@@ -228,6 +347,100 @@ class AgentFactoryRouter:
                 "created_at": row[7],
                 "updated_at": row[8],
                 "lifecycle_events": events
+            }, res_headers
+
+        # ----------------- ROUTE 13: GET /templates -----------------
+        if method == "GET" and path == "/api/v8/agent-factory/templates":
+            templates = self.template_loader.list_templates()
+            return 200, {"items": templates}, res_headers
+
+        # ----------------- ROUTE 14: GET /templates/{name} or /versions -----------------
+        if method == "GET" and path.startswith("/api/v8/agent-factory/templates/"):
+            parts = path.replace("/api/v8/agent-factory/templates/", "").split("/")
+            tpl_name = parts[0]
+            if len(parts) == 1:
+                tpl = self.template_loader.resolve(tpl_name)
+                if not tpl:
+                    return 404, self._error("AF-NOT-FOUND", "Template Not Found", 404, f"Template {tpl_name} not found", req_id), res_headers
+                return 200, tpl.to_dict(), res_headers
+            elif len(parts) == 2 and parts[1] == "versions":
+                tpl_versions = self.template_loader._templates.get(tpl_name, {})
+                return 200, {"name": tpl_name, "versions": sorted(list(tpl_versions.keys()))}, res_headers
+            elif len(parts) == 3 and parts[1] == "versions":
+                ver = parts[2]
+                tpl = self.template_loader._templates.get(tpl_name, {}).get(ver)
+                if not tpl:
+                    return 404, self._error("AF-NOT-FOUND", "Version Not Found", 404, f"Template {tpl_name}@{ver} not found", req_id), res_headers
+                return 200, tpl.to_dict(), res_headers
+
+        # ----------------- ROUTE 14B: POST /templates (Propose Template) -----------------
+        if method == "POST" and path == "/api/v8/agent-factory/templates":
+            tpl_manifest = TemplateManifest(body)
+            if not tpl_manifest.name:
+                return 422, self._error("AF-VALIDATION", "Invalid Template Manifest", 422, "Template name required", req_id), res_headers
+            self.template_loader.register(tpl_manifest)
+            ev_id = self.evidence.append_event(EvidenceEvent(
+                subject_kind="template",
+                subject_id=tpl_manifest.name,
+                event_type="template.proposed",
+                actor=principal.principal_id,
+                payload_hashes={"name": tpl_manifest.name, "version": tpl_manifest.version},
+                timestamp=time.time(),
+                tenant_id=tenant_id
+            ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 201, {
+                "name": tpl_manifest.name,
+                "version": tpl_manifest.version,
+                "status": "DRAFT",
+                "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 15: POST /templates/{name}/versions/{semver}/submit -----------------
+        if method == "POST" and "/submit" in path and "/templates/" in path:
+            parts = path.replace("/api/v8/agent-factory/templates/", "").replace("/submit", "").split("/versions/")
+            tpl_name = parts[0]
+            ver = parts[1] if len(parts) > 1 else "1.0.0"
+            ev_id = self.evidence.append_event(EvidenceEvent(
+                subject_kind="template",
+                subject_id=f"{tpl_name}@{ver}",
+                event_type="template.submitted_for_review",
+                actor=principal.principal_id,
+                payload_hashes={"name": tpl_name, "version": ver},
+                timestamp=time.time(),
+                tenant_id=tenant_id
+            ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 200, {
+                "name": tpl_name,
+                "version": ver,
+                "status": "IN_REVIEW",
+                "evidence_id": ev_id
+            }, res_headers
+
+        # ----------------- ROUTE 16: POST /templates/{name}/versions/{semver}/publish -----------------
+        if method == "POST" and "/publish" in path and "/templates/" in path:
+            approval_id = body.get("approval_id")
+            if not approval_id:
+                return 400, self._error("AF-VALIDATION", "Approval Required", 400, "approval_id is mandatory to publish a template", req_id), res_headers
+            parts = path.replace("/api/v8/agent-factory/templates/", "").replace("/publish", "").split("/versions/")
+            tpl_name = parts[0]
+            ver = parts[1] if len(parts) > 1 else "1.0.0"
+            ev_id = self.evidence.append_event(EvidenceEvent(
+                subject_kind="template",
+                subject_id=f"{tpl_name}@{ver}",
+                event_type="template.published",
+                actor=principal.principal_id,
+                payload_hashes={"name": tpl_name, "version": ver, "approval_id": approval_id},
+                timestamp=time.time(),
+                tenant_id=tenant_id
+            ))
+            res_headers["X-Evidence-Id"] = ev_id
+            return 200, {
+                "name": tpl_name,
+                "version": ver,
+                "status": "PUBLISHED",
+                "evidence_id": ev_id
             }, res_headers
 
         # ----------------- ROUTE 12: GET /jobs/{id} -----------------

@@ -1,0 +1,82 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: defensive-cybersecurity-audit
+  version: 1.0.0
+  category: defensive_cybersecurity
+  default_risk_tier: R2
+  owner: platform
+  tags: [security, cve, audit, sbom, triage]
+  description: Defensive security auditor analyzing dependency manifests and CVE exposure.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: Defensive Security Auditor
+    mission: Triage dependency vulnerability advisories and verify patch availability.
+    responsibilities:
+      - Match package lockfiles against published CVE and GHSA advisories
+      - Determine exploit reachability based on imported symbols
+      - Draft prioritized security remediation advisories
+    out_of_scope:
+      - Offensive penetration testing or active exploit payload delivery
+      - Exfiltrating vulnerability databases or scan payloads outside company boundaries
+    success_criteria:
+      - Verified CVE scores and patch version recommendations for all critical findings
+    instructions: Focus exclusively on defensive posture, vulnerability triage, and remediation advice.
+  model:
+    requirements:
+      complexity: high
+      privacy: internal
+      capabilities: [structured_output, tool_use]
+  capabilities:
+    requested:
+      - key: tool.use
+      - key: reasoning.plan
+  permissions:
+    requested:
+      tools:
+        - name: git.read
+          scopes: [read]
+          max_calls: 30
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: false
+    pii_policy: redact
+  limits:
+    max_steps: 30
+    timeout_seconds: 600
+    max_cost_usd_per_task: 1.0
+  io:
+    input_schema:
+      type: object
+      properties:
+        repo_manifest_url: { type: string }
+    output_schema:
+      type: object
+      properties:
+        total_cves: { type: integer }
+        vulnerabilities: { type: array }
+  tests:
+    author_cases:
+      - id: case_sec_smoke
+        input: { repo_manifest_url: "local://package-lock.json" }
+        expect: { audited: true }
+        mandatory: true
+    dataset_refs:
+      - defensive-sec-eval@1.0.0
