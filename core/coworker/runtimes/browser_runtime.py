@@ -105,57 +105,97 @@ class BrowserWorkerRuntime(WorkerRuntime):
         action = task.get("action", "navigate")
         params = task.get("parameters", {})
 
-        # 1. Navigation
+        # 1. Navigation — a real HTTP fetch, reported as such.
         if action == "navigate":
-            target_url = params.get("url", "https://example.com")
-            bstate.current_url = target_url
-            bstate.navigation_history.append(target_url)
-            session.log(f"Browser navigated to {target_url}")
-            return {
-                "status": "SUCCESS",
-                "action": "navigate",
-                "url": target_url,
-                "status_code": 200,
-                "title": f"Page at {target_url}"
-            }
+            target_url = params.get("url", "")
+            if not target_url:
+                return {"status": "ACTION_NOT_IMPLEMENTED", "action": "navigate",
+                        "executed": False, "reason": "EMPTY_URL"}
+            import urllib.request
+            import urllib.error
+            import re as _re
 
-        # 2. BrowserCode: JavaScript Evaluation via CDP
+            req = urllib.request.Request(target_url, headers={"User-Agent": "ZONATA-Coworker/2.0"})
+            try:
+                with urllib.request.urlopen(req, timeout=float(params.get("timeout", 10))) as resp:
+                    body = resp.read(500_000)
+                    code = resp.getcode()
+                    final_url = resp.geturl()
+                    content_type = resp.headers.get("Content-Type", "")
+                title = ""
+                if "html" in content_type.lower():
+                    m = _re.search(rb"<title[^>]*>(.*?)</title>", body, _re.IGNORECASE | _re.DOTALL)
+                    if m:
+                        title = m.group(1).decode("utf-8", "ignore").strip()[:300]
+                bstate.current_url = final_url
+                bstate.navigation_history.append(final_url)
+                session.log(f"Browser fetched {final_url} -> HTTP {code}")
+                return {
+                    "status": "SUCCESS",
+                    "action": "navigate",
+                    "executed": True,
+                    "mode": "http_fetch",
+                    "url": final_url,
+                    "requested_url": target_url,
+                    "http_status": code,
+                    "title": title,
+                    "content_type": content_type,
+                    "bytes_read": len(body),
+                    "rendered": False,
+                    "rendering_engine": "none (no browser installed)",
+                }
+            except urllib.error.HTTPError as exc:
+                # The server was reached; the page returned an error status.
+                bstate.current_url = target_url
+                bstate.navigation_history.append(target_url)
+                return {
+                    "status": "SUCCESS",
+                    "action": "navigate",
+                    "executed": True,
+                    "mode": "http_fetch",
+                    "url": target_url,
+                    "http_status": exc.code,
+                    "title": "",
+                    "rendered": False,
+                }
+            except Exception as exc:
+                return {
+                    "status": "ACTION_NOT_IMPLEMENTED",
+                    "action": "navigate",
+                    "executed": False,
+                    "mode": "http_fetch",
+                    "url": target_url,
+                    "reason": f"NAVIGATION_FAILED:{type(exc).__name__}",
+                }
+
+        # 2. JavaScript evaluation requires a browser engine (CDP).
         if action in ["evaluate_javascript", "browsercode_eval"]:
-            script = params.get("script", "document.title")
-            session.log(f"BrowserCode executing JavaScript via CDP: {script[:40]}...")
             return {
-                "status": "SUCCESS",
+                "status": "ACTION_NOT_IMPLEMENTED",
                 "action": "evaluate_javascript",
+                "executed": False,
                 "engine": "browsercode_cdp",
-                "result": "Evaluated document state successfully",
-                "execution_time_ms": 8.2
+                "reason": "BROWSER_ENGINE_NOT_AVAILABLE",
             }
 
-        # 3. Screenshot Capture
+        # 3. Screenshot requires a browser engine.
         if action == "screenshot":
-            shot_hash = hashlib.sha256(f"screenshot_{bstate.current_url}_{time.time()}".encode()).hexdigest()
-            bstate.last_screenshot_hash = shot_hash
-            session.log(f"Captured screenshot token: {shot_hash[:16]}")
             return {
-                "status": "SUCCESS",
+                "status": "ACTION_NOT_IMPLEMENTED",
                 "action": "screenshot",
-                "screenshot_hash": shot_hash,
-                "dimensions": {"width": 1920, "height": 1080}
+                "executed": False,
+                "reason": "BROWSER_ENGINE_NOT_AVAILABLE",
             }
 
-        # 4. Unified browser.execute (multi-step workflow)
+        # 4. Multi-step browser workflows require a browser engine.
         steps = params.get("steps", [])
-        completed_steps = []
-        for step in steps:
-            s_action = step.get("action", "click")
-            completed_steps.append({"action": s_action, "status": "COMPLETED"})
-
         return {
-            "status": "SUCCESS",
+            "status": "ACTION_NOT_IMPLEMENTED",
             "action": "browser.execute",
-            "steps_count": len(completed_steps),
+            "executed": False,
+            "steps_requested": len(steps),
             "current_url": bstate.current_url,
-            "dom_digest": hashlib.sha256(bstate.current_url.encode()).hexdigest()[:16]
+            "reason": "BROWSER_ENGINE_NOT_AVAILABLE",
         }
 
     def run_background(self, session_id: str, task: Dict[str, Any]) -> str:
@@ -246,7 +286,7 @@ class BrowserWorkerRuntime(WorkerRuntime):
     def verify(self, session_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "session_id": session_id,
-            "verification_status": "CONFIRMED" if result.get("status") == "SUCCESS" else "UNCONFIRMED",
+            "verification_status": "CONFIRMED" if result.get("executed") else "UNCONFIRMED",
             "evidence_digest": hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
             "timestamp": time.time()
         }

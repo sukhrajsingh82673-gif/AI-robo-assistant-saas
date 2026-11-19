@@ -147,8 +147,10 @@ class AICeoCoworkerBridge:
                 {"stage": 6, "name": "Cryptographic Evidence Sealing", "status": "PENDING"}
             ],
             "required_capabilities": required_caps,
-            "estimated_cost_usd": min(req.budget * 0.15, 12.5),
-            "estimated_duration_sec": 4.5
+            "budget_ceiling_usd": req.budget,
+            "estimated_cost_usd": None,
+            "estimated_duration_sec": None,
+            "estimation_note": "No cost or duration estimate is produced without a metered run."
         }
 
         # If policy boundary triggered, stop and return AWAITING_APPROVAL
@@ -159,8 +161,8 @@ class AICeoCoworkerBridge:
                 plan=plan,
                 execution_status="AWAITING_APPROVAL",
                 capabilities_used=required_caps,
-                workers_used=["governed_terminal_worker"],
-                nodes_used=["local_control_plane"],
+                workers_used=[],
+                nodes_used=[],
                 artifacts=[],
                 verification={"status": "PENDING_APPROVAL", "verified": False},
                 evidence=f"pending_app_{mission_id}",
@@ -171,17 +173,17 @@ class AICeoCoworkerBridge:
                 final_outcome={"message": "Approval required by Sovereign Authority before physical mutation"}
             )
 
-        # 4. Worker Allocation & Fleet Node Selection
-        workers_used = ["coworker_lead", "governed_terminal_worker", "verification_worker"]
-        nodes_used = ["local_control_plane"]
-
-        # Check if remote node required
-        if any("windows" in cap for cap in required_caps):
-            nodes_used.append("node_windows_fleet_01")
-        if any("mac" in cap for cap in required_caps):
-            nodes_used.append("node_macos_fleet_01")
-        if any("gpu" in cap for cap in required_caps):
-            nodes_used.append("node_gpu_cluster_01")
+        # 4. Worker Allocation & Fleet Node Selection (real registry only)
+        warnings: List[str] = []
+        registry = getattr(self.engine, "node_registry", None)
+        registered_nodes = sorted(getattr(registry, "_nodes", {}).keys()) if registry else []
+        nodes_used = registered_nodes
+        if not nodes_used:
+            warnings.append("No worker nodes are registered for this tenant; allocation is empty.")
+        workers_used = [
+            name for name in ("coworker_lead", "verification_worker")
+            if getattr(self.engine, "runtime_router", None) is not None
+        ]
 
         plan["stages"][2]["status"] = "COMPLETED"
         plan["stages"][3]["status"] = "IN_PROGRESS"
@@ -206,7 +208,12 @@ class AICeoCoworkerBridge:
             "capabilities_exercised": required_caps,
             "workers_allocated": workers_used,
             "nodes_participating": nodes_used,
-            "strategic_summary": f"Autonomous execution for objective: '{req.objective}' successfully completed. Business objectives verified.",
+            "record_type": "MISSION_PLAN_RECORD",
+            "strategic_summary": (
+                f"Execution plan recorded for objective: '{req.objective}'. "
+                "This record documents the plan and allocation; it is not proof that the "
+                "business objective was achieved."
+            ),
             "completed_at": time.time()
         }
 
@@ -231,28 +238,41 @@ class AICeoCoworkerBridge:
         evidence_content = f"{mission_id}:{req.tenant_id}:{file_sha}:{time.time()}"
         evidence_token = f"ev_merkle_{hashlib.sha256(evidence_content.encode()).hexdigest()[:16]}"
 
-        # Write to audit ledger
-        from core.evidence_ledger import get_default_ledger_path
-        audit_ledger_path = get_default_ledger_path()
+        # Write to canonical Evidence Ledger with proper cryptographic sealing
         try:
-            os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
-            with open(audit_ledger_path, "a", encoding="utf-8") as af:
-                af.write(json.dumps({
-                    "entry_id": f"aud_ceo_{uuid.uuid4().hex[:8]}",
-                    "mission_id": mission_id,
-                    "timestamp": time.time(),
-                    "action": "CEO_MISSION_COMPLETED",
-                    "evidence_id": evidence_token,
+            from core.evidence_ledger import EvidenceLedger
+            from core.models import PhysicalVerification
+            ledger = EvidenceLedger()
+            verifs = [
+                PhysicalVerification(
+                    check_type="sha256_match",
+                    target_path=deliverable_path,
+                    expected_val=file_sha,
+                    actual_val=file_sha,
+                    verified=independent_verified,
+                    details="CEO deliverable physical verification"
+                )
+            ]
+            pkg = ledger.seal_evidence(
+                action_id=f"act_ceo_{mission_id}",
+                mission_id=mission_id,
+                agent_id="agt_ai_ceo_v8",
+                verifications=verifs,
+                metadata={
+                    "action": "CEO_MISSION_PLAN_RECORD_SEALED",
                     "deliverable_sha256": file_sha,
-                    "verified": independent_verified
-                }) + "\n")
+                    "record_type": "MISSION_PLAN_RECORD",
+                    "objective_achieved": False,
+                }
+            )
+            evidence_token = pkg.evidence_id
         except Exception:
             pass
 
         plan["stages"][5]["status"] = "COMPLETED"
 
         duration = time.time() - start_time
-        actual_cost = round(plan["estimated_cost_usd"] * 0.85, 2)
+        warnings.append("Cost is not metered: no usage-meter reading is attached to this mission.")
 
         # 8. Executive Response to Brain
         artifacts = [{
@@ -261,7 +281,7 @@ class AICeoCoworkerBridge:
             "path": deliverable_path,
             "size_bytes": file_size,
             "sha256": file_sha,
-            "type": "BUSINESS_DELIVERABLE"
+            "type": "MISSION_PLAN_RECORD"
         }]
 
         verification = {
@@ -277,7 +297,12 @@ class AICeoCoworkerBridge:
 
         final_outcome = {
             "status": "SUCCESS" if independent_verified else "FAILED",
-            "message": f"Executive objective '{req.objective}' fulfilled. Deliverable report sealed.",
+            "message": (
+                f"Plan record for '{req.objective}' created and sealed. "
+                "This confirms the pipeline ran and the record exists on disk; it is not "
+                "proof that the business objective was achieved."
+            ),
+            "objective_achieved": False,
             "deliverable_file": deliverable_filename,
             "evidence_token": evidence_token
         }
@@ -292,9 +317,9 @@ class AICeoCoworkerBridge:
             artifacts=artifacts,
             verification=verification,
             evidence=evidence_token,
-            cost=actual_cost,
+            cost=0.0,
             duration=round(duration, 3),
-            warnings=[],
+            warnings=warnings,
             uncertainty=False,
             final_outcome=final_outcome
         )

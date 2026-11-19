@@ -46,6 +46,32 @@ from zonata.nango_adapter import (
     NangoA2ABridge,
     NangoCanonicalScenarios
 )
+import os
+import tempfile
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    from core.db import db, configure_isolated_test_db
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "nango_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+    isolated_ledger = os.path.join(MODULE_TEMP_DIR.name, "nango_test_isolated_ledger.jsonl")
+    os.environ["ZONATA_EVIDENCE_PATH"] = isolated_ledger
+
+def tearDownModule():
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if "ZONATA_EVIDENCE_PATH" in os.environ:
+        del os.environ["ZONATA_EVIDENCE_PATH"]
+    if MODULE_ORIG_DB_PATH:
+        from core.db import db
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 
 class TestNangoGovernedIntegration(unittest.TestCase):

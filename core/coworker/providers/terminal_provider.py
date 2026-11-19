@@ -18,6 +18,7 @@ Constitutional Invariants:
 from typing import Dict, List, Optional, Any, Tuple
 import os
 import sys
+import re
 import time
 import uuid
 import json
@@ -51,6 +52,27 @@ class TerminalProvider(CapabilityProvider):
         "curl -s http://* | bash",
         "curl -s https://* | bash",
         "wget -O- * | bash"
+    ]
+
+    # Credential-bearing paths a general-purpose agent must never read or copy.
+    SENSITIVE_PATH_PATTERNS = [
+        re.compile(r'(^|[\s/\'"=:(])\.env(\.[\w.-]+)?\b'),
+        re.compile(r'(?i)(^|[\s/])id_(rsa|dsa|ecdsa|ed25519)\b'),
+        re.compile(r'(?i)\.(pem|p12|pfx|key)\b'),
+        re.compile(r'(?i)\.git-credentials\b'),
+        re.compile(r'(?i)\.netrc\b'),
+        re.compile(r'(?i)\.aws/credentials\b'),
+        re.compile(r'(?i)\.npmrc\b'),
+        re.compile(r'(?i)(credentials|secrets?|service[_-]account)[\w.-]*\.json\b'),
+        re.compile(r'(?i)enterprise_settings\.json\b'),
+        re.compile(r'(?i)/etc/(shadow|gshadow|sudoers)\b'),
+    ]
+    SECRET_OUTPUT_PATTERNS = [
+        re.compile(r'(?i)(postgres(ql)?|mysql|mongodb(\+srv)?|redis)://[^\s:@/]+:[^\s@/]+@'),
+        re.compile(r'(?i)\b(DATABASE_URL|DIRECT_URL|API_KEY|SECRET|TOKEN|PASSWORD|ACCESS_KEY|PRIVATE_KEY)\b\s*[:=]\s*\S+'),
+        re.compile(r'ghp_[a-zA-Z0-9]{36}'),
+        re.compile(r'github_pat_[a-zA-Z0-9_]{82}'),
+        re.compile(r'sk-[a-zA-Z0-9]{32,}'),
     ]
 
     def __init__(self, workspace_root: Optional[str] = None):
@@ -128,12 +150,23 @@ class TerminalProvider(CapabilityProvider):
         return self._health == ProviderHealthStatus.AVAILABLE
 
     def _sanitize_command(self, command: str) -> Tuple[bool, Optional[str]]:
-        """Scans for destructive command sequences."""
+        """Scans for destructive command sequences and credential-bearing paths."""
+        for pat in self.SENSITIVE_PATH_PATTERNS:
+            if pat.search(command):
+                return False, ("Credential access blocked: command references a secret-bearing path. "
+                               "Secrets are never exposed to agents or terminals.")
         norm = " ".join(command.lower().split())
         for pat in self.FORBIDDEN_COMMAND_PATTERNS:
             if pat in norm:
                 return False, f"Prohibited dangerous command pattern detected: '{pat}'"
         return True, None
+
+    def _scrub(self, text: str) -> str:
+        """Redacts credential material from command output before it is returned or logged."""
+        scrubbed = text or ""
+        for pat in self.SECRET_OUTPUT_PATTERNS:
+            scrubbed = pat.sub("[REDACTED_SECRET]", scrubbed)
+        return scrubbed
 
     def _sanitize_path(self, target_path: str) -> str:
         """Resolves target path within workspace boundary."""
@@ -156,6 +189,20 @@ class TerminalProvider(CapabilityProvider):
                 error_message="Terminal execution engine is CRASHED",
                 duration_ms=(time.time() - start_time) * 1000
             )
+
+        # Path-level credential protection (file reads, logs, repos, cwd).
+        for _pk in ("path", "file_path", "log_file", "repo_path", "cwd"):
+            _pv = params.get(_pk)
+            if isinstance(_pv, str) and _pv:
+                for _pat in self.SENSITIVE_PATH_PATTERNS:
+                    if _pat.search(_pv):
+                        return ExecutionResult(
+                            provider_id=self._id, capability_id=capability, execution_id=exec_id,
+                            status="POLICY_DENIED",
+                            error_message=("Credential access blocked: target path is secret-bearing. "
+                                           "Secrets are never exposed to agents or terminals."),
+                            duration_ms=(time.time() - start_time) * 1000
+                        )
 
         try:
             # 1. Inspect Filesystem
@@ -282,8 +329,8 @@ class TerminalProvider(CapabilityProvider):
                 out = {
                     "command": cmd,
                     "exit_code": proc.returncode,
-                    "stdout": proc.stdout[:10000],
-                    "stderr": proc.stderr[:10000],
+                    "stdout": self._scrub(proc.stdout[:10000]),
+                    "stderr": self._scrub(proc.stderr[:10000]),
                     "cwd": cwd,
                     # Constitutional invariant: exit_code 0 != business success
                     "process_succeeded": proc.returncode == 0

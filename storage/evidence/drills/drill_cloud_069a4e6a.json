@@ -1,0 +1,49 @@
+{
+  "drill_id": "drill_cloud_069a4e6a",
+  "tenant_id": "tnt_disaster_recovery",
+  "timestamp_utc": "2026-10-17T11:34:43Z",
+  "execution_scope": "LOCAL_CRYPTOGRAPHIC_AND_STORAGE_MIRROR",
+  "cloud_provider_enforcement": "PENDING_AWS_S3_OBJECT_LOCK_API_VERIFICATION",
+  "stages": {
+    "snapshot_generation": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.081,
+      "snapshot_path": "/root/roboassistant/storage/backups/test_snap_drill_cloud_069a4e6a.db"
+    },
+    "offhost_s3_replication": {
+      "status": "SUCCESS_LOCAL_MIRROR",
+      "duration_seconds": 7.149,
+      "receipt_id": "rcpt_snap_54b07f38d1",
+      "remote_uri": "s3://zonata-backups/sqlite/snapshots/test_snap_drill_cloud_069a4e6a.db",
+      "mirror_path": "storage/offhost_s3_mirror/sqlite/snapshots/test_snap_drill_cloud_069a4e6a.db",
+      "sha256": "d39fa8477ed24b1d5466f835952eb381c1d05c7fc60820871f202fa5d4139577",
+      "retention_until": 1792841684.0878878
+    },
+    "worm_cryptographic_verification": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.002,
+      "verified": true,
+      "verification_tier": "LOCAL_AES_256_GCM_ENVELOPE_AND_MERKLE_PROOF",
+      "provider_retention_lock": "PENDING_AWS_S3_API"
+    },
+    "restoration_execution": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.032,
+      "target_path": "/root/roboassistant/storage/backups/recovery_target_drill_cloud_069a4e6a",
+      "database_integrity": "VERIFIED_OK",
+      "merkle_evidence_verified": true,
+      "tenant_isolation_verified": true
+    }
+  },
+  "verdict": "LOCAL_RESTORE_VERIFIED",
+  "metrics": {
+    "rto_seconds": 0.0321,
+    "rpo_seconds": 7.1631,
+    "total_drill_duration_seconds": 7.264,
+    "sla_target_rto_seconds": 900.0,
+    "sla_target_rpo_seconds": 60.0,
+    "rto_sla_met": true,
+    "rpo_sla_met": true,
+    "measurement_context": "Measured on local cryptographic envelope decryption, SHA-256 verification, and SQLite disk restoration from off-host mirror buffer. Does not measure AWS WAN download latency or AWS S3 Object Lock API enforcement."
+  }
+}

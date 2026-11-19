@@ -57,7 +57,17 @@
     }
 
     renderView(container) {
-      if (!this.financeData) return;
+      if (!this.financeData) {
+        container.innerHTML = `
+          <div style="padding:60px 24px; text-align:center; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; margin:40px auto; max-width:600px;">
+            <div style="font-size:36px; margin-bottom:12px;">💳</div>
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">Financial Layer Unavailable</h3>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:20px;">Could not connect to the statutory double-entry accounting engine.</p>
+            <button class="btn-primary" onclick="window.FinanceWorkspace.render()">Retry Connection</button>
+          </div>
+        `;
+        return;
+      }
       const s = this.financeData.summary || {};
       const coa = this.financeData.chart_of_accounts || [];
       const txs = this.financeData.recent_transactions || [];
@@ -155,13 +165,19 @@
                 </tr>
               </thead>
               <tbody>
-                ${coa.map(a => `
+                ${coa.length === 0 ? `
+                  <tr>
+                    <td colspan="6" style="text-align:center; padding:32px; color:var(--text-secondary);">
+                      No accounts configured in the Chart of Accounts.
+                    </td>
+                  </tr>
+                ` : coa.map(a => `
                   <tr>
                     <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">${a.code}</td>
                     <td style="font-weight:600; color:var(--text-primary);">${a.name}</td>
                     <td><span class="badge ${a.account_type==='ASSET'?'badge-emerald':a.account_type==='LIABILITY'?'badge-amber':a.account_type==='REVENUE'?'badge-blue':'badge-neutral'}">${a.account_type}</span></td>
                     <td style="color:var(--text-secondary);">${a.category}</td>
-                    <td style="font-weight:700; font-family:var(--font-mono);">${a.currency}${a.balance.toLocaleString()}</td>
+                    <td style="font-weight:700; font-family:var(--font-mono);">${a.currency}${(a.balance||0).toLocaleString()}</td>
                     <td style="color:var(--text-muted);">${a.currency}</td>
                   </tr>
                 `).join('')}
@@ -185,7 +201,13 @@
                 </tr>
               </thead>
               <tbody>
-                ${txs.map(t => `
+                ${txs.length === 0 ? `
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:36px; color:var(--text-secondary);">
+                      No transactions recorded yet in the General Ledger. Connect banking feeds or record manual entries.
+                    </td>
+                  </tr>
+                ` : txs.map(t => `
                   <tr>
                     <td style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">${t.transaction_id}</td>
                     <td>
@@ -194,12 +216,12 @@
                       </span>
                     </td>
                     <td style="font-weight:700; font-family:var(--font-mono); color:${t.tx_type==='CREDIT'?'var(--accent-emerald)':'var(--text-primary)'};">
-                      ${t.tx_type==='CREDIT'?'+':'-'}₹${t.amount.toLocaleString()}
+                      ${t.tx_type==='CREDIT'?'+':'-'}₹${(t.amount||0).toLocaleString()}
                     </td>
                     <td style="font-weight:600; color:var(--text-primary);">${t.entity_name}</td>
                     <td style="font-family:var(--font-mono); font-size:11.5px; color:var(--text-secondary);">${t.reference_no}</td>
                     <td><span class="badge badge-emerald">${t.status}</span></td>
-                    <td><span style="font-size:11px; font-family:var(--font-mono); color:var(--accent-emerald);">🔒 ${t.evidence_id}</span></td>
+                    <td><span style="font-size:11px; font-family:var(--font-mono); color:var(--accent-emerald);">🔒 ${t.evidence_id || 'PENDING'}</span></td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -222,12 +244,18 @@
                 </tr>
               </thead>
               <tbody>
-                ${exps.map(e => `
+                ${exps.length === 0 ? `
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:36px; color:var(--text-secondary);">
+                      No expense claims submitted yet. Click "+ Submit Expense Claim" to submit your first claim.
+                    </td>
+                  </tr>
+                ` : exps.map(e => `
                   <tr>
                     <td style="font-weight:600; color:var(--text-primary);">${e.claimant_name}</td>
                     <td><span class="badge" style="background:rgba(255,255,255,0.06);">${e.department}</span></td>
                     <td><span class="badge badge-blue">${e.category}</span></td>
-                    <td style="font-weight:700; font-family:var(--font-mono);">₹${e.amount.toLocaleString()}</td>
+                    <td style="font-weight:700; font-family:var(--font-mono);">₹${(e.amount||0).toLocaleString()}</td>
                     <td style="font-size:11px; color:var(--text-secondary);">${e.payment_mode}</td>
                     <td><span class="badge badge-emerald">${e.status}</span></td>
                     <td style="font-size:12px; color:var(--text-secondary); max-width:300px;">${e.description}</td>
@@ -239,25 +267,27 @@
         `;
       } else {
         // Overview Tab: Split view of banking pools & cash velocity
+        const cashAccounts = coa.filter(a => a.category === 'CASH' || a.category === 'BANK');
+
         return `
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;" class="enterprise-grid-3">
             <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; padding:20px;">
               <h3 style="font-size:15px; font-weight:700; margin-bottom:12px; color:var(--text-primary);">🏦 Connected Treasury & Cash Accounts</h3>
               <div style="display:flex; flex-direction:column; gap:10px;">
-                ${[
-                  { name: 'Operating Account (HDFC Treasury)', type: 'PRIMARY_CHECKING', bal: '₹4,620,000', icon: '🏛️' },
-                  { name: 'Stripe Gateway Escrow Settlement', type: 'PAYMENT_ESCROW', bal: '₹950,000', icon: '💳' },
-                  { name: 'On-Premises Operational Petty Cash', type: 'PETTY_CASH', bal: '₹185,000', icon: '💵' }
-                ].map(acc => `
+                ${cashAccounts.length === 0 ? `
+                  <div style="text-align:center; padding:28px 16px; color:var(--text-secondary); font-size:13px; background:rgba(0,0,0,0.15); border-radius:8px; border:1px dashed var(--border-color);">
+                    No connected treasury or cash accounts. Configure cash accounts in your Chart of Accounts.
+                  </div>
+                ` : cashAccounts.map(acc => `
                   <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:12px 14px; border-radius:8px; border:1px solid var(--border-color);">
                     <div style="display:flex; align-items:center; gap:10px;">
-                      <span style="font-size:18px;">${acc.icon}</span>
+                      <span style="font-size:18px;">${acc.category === 'CASH' ? '💵' : '🏛️'}</span>
                       <div>
                         <div style="font-size:13px; font-weight:600; color:var(--text-primary);">${acc.name}</div>
-                        <div style="font-size:11px; color:var(--text-muted);">${acc.type}</div>
+                        <div style="font-size:11px; color:var(--text-muted);">${acc.code} • ${acc.category}</div>
                       </div>
                     </div>
-                    <div style="font-weight:700; font-family:var(--font-mono); color:var(--accent-emerald);">${acc.bal}</div>
+                    <div style="font-weight:700; font-family:var(--font-mono); color:var(--accent-emerald);">${acc.currency}${(acc.balance||0).toLocaleString()}</div>
                   </div>
                 `).join('')}
               </div>
@@ -266,14 +296,18 @@
             <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; padding:20px;">
               <h3 style="font-size:15px; font-weight:700; margin-bottom:12px; color:var(--text-primary);">⚡ Recent Autonomous Ledger Reconciliations</h3>
               <div style="display:flex; flex-direction:column; gap:10px;">
-                ${txs.slice(0, 3).map(t => `
+                ${txs.length === 0 ? `
+                  <div style="text-align:center; padding:28px 16px; color:var(--text-secondary); font-size:13px; background:rgba(0,0,0,0.15); border-radius:8px; border:1px dashed var(--border-color);">
+                    No ledger reconciliations yet. New business activities will appear here in real time.
+                  </div>
+                ` : txs.slice(0, 5).map(t => `
                   <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:12px 14px; border-radius:8px; border:1px solid var(--border-color);">
                     <div>
                       <div style="font-size:13px; font-weight:600; color:var(--text-primary);">${t.entity_name}</div>
                       <div style="font-size:11px; color:var(--text-muted);">${t.reference_no} • ${t.category}</div>
                     </div>
                     <div style="font-weight:700; font-family:var(--font-mono); color:${t.tx_type==='CREDIT'?'var(--accent-emerald)':'var(--text-primary)'};">
-                      ${t.tx_type==='CREDIT'?'+':'-'}₹${t.amount.toLocaleString()}
+                      ${t.tx_type==='CREDIT'?'+':'-'}₹${(t.amount||0).toLocaleString()}
                     </div>
                   </div>
                 `).join('')}
@@ -291,11 +325,12 @@
     }
 
     openSubmitExpenseModal() {
+      const activeUser = (window.AppState && window.AppState.user && (window.AppState.user.name || window.AppState.user.username)) || '';
       const body = `
         <form onsubmit="window.FinanceWorkspace.submitExpense(event)" style="display:flex; flex-direction:column; gap:12px;">
           <div>
             <label class="form-label">Claimant Name *</label>
-            <input type="text" class="form-input" id="expClaimant" value="Sukhraj Singh" required />
+            <input type="text" class="form-input" id="expClaimant" value="${activeUser}" placeholder="Enter employee or claimant name" required />
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div>

@@ -28,7 +28,7 @@ import json
 import uuid
 import os
 
-from core.db import db
+from core.db import db, configure_isolated_test_db
 from core.models import EvidenceStatus
 from core.evidence_ledger import EvidenceLedger
 from core.approvals import ApprovalPipeline
@@ -62,6 +62,11 @@ from zonata.a2a_adapter import (
 class TestA2AInteroperability(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.test_db_path = configure_isolated_test_db()
+        import tempfile
+        cls.test_evidence_file = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False).name
+        os.environ["ZONATA_EVIDENCE_PATH"] = cls.test_evidence_file
+
         cls.tenant_id = "tnt_test_a2a"
         cls.company_id = "comp_test_a2a"
         cls.foreign_tenant = "tnt_foreign_a2a"
@@ -77,6 +82,15 @@ class TestA2AInteroperability(unittest.TestCase):
 
         cls.gateway = A2AGateway(cls.tenant_id, cls.company_id)
         cls.scenarios = A2ACanonicalScenarios(cls.tenant_id, cls.company_id)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "test_evidence_file") and os.path.exists(cls.test_evidence_file):
+            try:
+                os.remove(cls.test_evidence_file)
+            except OSError:
+                pass
+        os.environ.pop("ZONATA_EVIDENCE_PATH", None)
 
     def tearDown(self):
         # Guarantee KillSwitch is reset after tests
@@ -220,7 +234,13 @@ class TestA2AInteroperability(unittest.TestCase):
             data_classification=DataClassification.INTERNAL
         )
         self.assertIn("status", res)
-        self.assertIn(res["status"]["state"], (A2ATaskState.TASK_STATE_COMPLETED.value, A2ATaskState.TASK_STATE_WORKING.value))
+        self.assertIn(
+            res["status"]["state"],
+            (A2ATaskState.TASK_STATE_COMPLETED.value, A2ATaskState.TASK_STATE_WORKING.value,
+             A2ATaskState.TASK_STATE_FAILED.value),
+        )
+        if res["status"]["state"] == A2ATaskState.TASK_STATE_FAILED.value:
+            self.assertEqual(res.get("code"), "REMOTE_AGENT_UNREACHABLE")
 
     def test_12_policy_deny_blocked_agent(self):
         """Req 12: Blocked agent delegation is rejected by policy."""
@@ -290,8 +310,12 @@ class TestA2AInteroperability(unittest.TestCase):
             "agent_id": agent_id,
             "message": {"parts": [{"text": "Hello"}]}
         })
-        self.assertEqual(res["status"]["state"], A2ATaskState.TASK_STATE_COMPLETED.value)
-        self.assertTrue(len(res["history"]) > 0)
+        # No injected response and no real A2A server at that endpoint: the
+        # platform must report a genuine transport failure, never a fake reply.
+        self.assertEqual(res["status"]["state"], A2ATaskState.TASK_STATE_FAILED.value)
+        self.assertEqual(res.get("code"), "REMOTE_AGENT_UNREACHABLE")
+        self.assertEqual(res["artifacts"], [])
+        self.assertTrue(res.get("error"))
 
     def test_17_asynchronous_task_lifecycle(self):
         """Req 17: Asynchronous task persists in WORKING state and can be retrieved."""

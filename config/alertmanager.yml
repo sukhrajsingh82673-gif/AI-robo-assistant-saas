@@ -1,0 +1,19 @@
+# ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
+# Alertmanager Configuration — Production SRE Alert Dispatcher
+# Phase 8 Operational Alerting (BLK-05 Remediation)
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'tier']
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+  receiver: 'sre-operations-webhook'
+
+receivers:
+  - name: 'sre-operations-webhook'
+    webhook_configs:
+      - url: 'http://zonata-api:8080/api/telemetry/alerts/webhook'
+        send_resolved: true

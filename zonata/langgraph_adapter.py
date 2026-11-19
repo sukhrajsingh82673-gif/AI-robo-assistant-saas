@@ -61,6 +61,7 @@ class LangGraphWorkflowAdapter:
         self._register_loop_improvement_workflow()
         self._register_multimodal_hal_workflow()
         self._register_agency_swarm_workflow()
+        self._register_company_expense_approval_workflow()
 
     # =========================================================================
     # 1. CANONICAL WORKFLOW DEFINITIONS
@@ -71,32 +72,57 @@ class LangGraphWorkflowAdapter:
         builder = StateGraph()
 
         def parse_objective(state: Dict[str, Any]) -> Dict[str, Any]:
-            objective = state.get("objective", "Default task")
+            nested = state.get("inputs") if isinstance(state.get("inputs"), dict) else {}
+            objective = (
+                state.get("objective")
+                or state.get("task")
+                or state.get("prompt")
+                or nested.get("objective")
+                or nested.get("task")
+                or "Default task"
+            )
             return {
                 "parsed_task": f"Executing validated objective: {objective}",
+                "objective_source": "input",
                 "timestamp": time.time()
             }
 
         def execute_sandboxed_action(state: Dict[str, Any]) -> Dict[str, Any]:
             task = state.get("parsed_task")
-            # Deterministic sandboxed transformation
+            # This canonical workflow performs no external action. It only
+            # advances durable state and produces a deterministic digest so the
+            # checkpoint/evidence machinery can be exercised. The digest is
+            # state integrity, NOT proof that a business action happened.
             action_hash = hashlib.sha256(task.encode("utf-8")).hexdigest()
             return {
-                "action_result": f"Action complete for '{task}'",
+                "action_result": (
+                    "Workflow state advanced. No external or business action was executed "
+                    "by this node; this run validates orchestration, checkpointing and "
+                    "evidence sealing only."
+                ),
+                "action_scope": "STATE_ONLY",
                 "action_hash": action_hash,
+                "state_integrity_verified": True,
+                "business_outcome_verified": False,
                 "verified": True
             }
 
         def generate_evidence(state: Dict[str, Any]) -> Dict[str, Any]:
-            # Physical verification sealing
+            # Seals state integrity only. The expected and actual digests both
+            # originate from this run, so this is a self-consistency check and
+            # must never be presented as independent business verification.
             action_hash = state.get("action_hash", "none")
             verif = PhysicalVerification(
                 check_type="sha256_match",
-                target_path="virtual://workflow/action",
+                target_path="virtual://workflow/state",
                 expected_val=action_hash,
                 actual_val=action_hash,
                 verified=True,
-                details="Action output cryptographic digest verified"
+                details=(
+                    "Workflow STATE-INTEGRITY digest is self-consistent. "
+                    "No external resource was inspected and no business outcome "
+                    "was verified."
+                )
             )
             pkg = self.ledger.seal_evidence(
                 action_id=f"act_wf_{uuid.uuid4().hex[:6]}",
@@ -107,6 +133,8 @@ class LangGraphWorkflowAdapter:
             return {
                 "evidence_id": pkg.evidence_id,
                 "merkle_root": self.ledger.get_merkle_root(),
+                "verification_scope": "STATE_INTEGRITY_ONLY",
+                "business_outcome_verified": False,
                 "completed": True
             }
 
@@ -158,6 +186,186 @@ class LangGraphWorkflowAdapter:
             "risk_level": "SAFE"
         })
 
+    def _register_company_expense_approval_workflow(self):
+        """Workflow: real expense claim -> approval gate -> GL posting -> DB postcondition.
+
+        Unlike ``wf_canonical_approval`` (which only exercises the approval gate),
+        this workflow mutates the statutory ledger and then independently re-reads
+        the database. ``business_outcome_verified`` is true only when both the
+        expense row and the matching GL transaction exist with the expected amount.
+        """
+        from core.enterprise_finance import EnterpriseFinanceEngine
+        builder = StateGraph()
+
+        def validate_claim(state: Dict[str, Any]) -> Dict[str, Any]:
+            tenant_id = state.get("tenant_id")
+            company_id = state.get("company_id")
+            expense_id = state.get("expense_id")
+            if not tenant_id or not company_id:
+                raise ValueError("Workflow state is missing tenant/company scope.")
+            if not expense_id:
+                raise ValueError("Missing 'expense_id' input.")
+            with db.get_connection() as conn:
+                exp = conn.execute(
+                    "SELECT * FROM finance_expenses WHERE expense_id = ? AND tenant_id = ? AND company_id = ?",
+                    (expense_id, tenant_id, company_id),
+                ).fetchone()
+                if not exp:
+                    raise ValueError(f"Expense '{expense_id}' not found in this company.")
+                if exp["status"] != "SUBMITTED":
+                    raise ValueError(
+                        f"Expense '{expense_id}' is {exp['status']}; only SUBMITTED claims can be approved."
+                    )
+                code_map = {
+                    "SOFTWARE": "6020", "CLOUD": "6020", "PROCUREMENT": "5010",
+                    "SALARIES": "6010", "PAYROLL": "6010", "OFFICE": "6030",
+                    "TRAVEL": "6030", "MARKETING": "6030", "UTILITIES": "6030",
+                }
+                code = code_map.get(str(exp["category"]).upper(), "6030")
+                acct = conn.execute(
+                    "SELECT account_id, balance FROM finance_accounts "
+                    "WHERE tenant_id = ? AND company_id = ? AND code = ?",
+                    (tenant_id, company_id, code),
+                ).fetchone()
+            return {
+                "claim_validated": True,
+                "claim_amount": float(exp["amount"]),
+                "claim_category": exp["category"],
+                "claim_department": exp["department"],
+                "claimant_name": exp["claimant_name"],
+                "gl_account_code": code,
+                "gl_account_id": acct["account_id"] if acct else None,
+                "gl_balance_before": float(acct["balance"] or 0.0) if acct else None,
+                "validation_note": (
+                    "Claim exists in this tenant+company with status SUBMITTED; "
+                    "amount and GL account captured before approval."
+                ),
+            }
+
+        def approval_gate(state: Dict[str, Any]) -> Dict[str, Any]:
+            # Node body runs only after a human approval decision; the runtime
+            # pauses before reaching here otherwise.
+            approver = state.get("__approved_by__")
+            approval_id = state.get("__approval_id__")
+            if not approver or not approval_id:
+                raise ValueError("Approval gate reached without an authorised approval decision.")
+            with db.get_connection() as conn:
+                row = conn.execute(
+                    "SELECT status, decided_by FROM workflow_approvals WHERE approval_id = ?",
+                    (approval_id,),
+                ).fetchone()
+            if not row or row["status"] != "APPROVED" or row["decided_by"] != approver:
+                raise ValueError("Approval record does not match the resuming principal.")
+            return {"approval_verified": True, "approved_by": row["decided_by"]}
+
+        def post_to_gl(state: Dict[str, Any]) -> Dict[str, Any]:
+            tenant_id = state["tenant_id"]
+            company_id = state["company_id"]
+            engine = EnterpriseFinanceEngine(tenant_id=tenant_id)
+            res = engine.approve_expense(
+                state["expense_id"],
+                approver=state["__approved_by__"],
+                approver_role="EXECUTIVE",
+                company_id=company_id,
+            )
+            if not res.get("success"):
+                raise ValueError(f"GL posting refused: {res.get('error')} {res.get('detail', '')}".strip())
+            return {
+                "gl_post_status": res.get("status"),
+                "gl_transaction_reference": state["expense_id"],
+                "gl_amount": res.get("amount"),
+            }
+
+        def verify_business_outcome(state: Dict[str, Any]) -> Dict[str, Any]:
+            tenant_id = state["tenant_id"]
+            company_id = state["company_id"]
+            expense_id = state["expense_id"]
+            expected_amount = float(state.get("claim_amount") or 0.0)
+
+            with db.get_connection() as conn:
+                exp = conn.execute(
+                    "SELECT status, amount, approved_by, approved_at FROM finance_expenses "
+                    "WHERE expense_id = ? AND tenant_id = ? AND company_id = ?",
+                    (expense_id, tenant_id, company_id),
+                ).fetchone()
+                txn = conn.execute(
+                    "SELECT transaction_id, amount, account_id, status FROM finance_transactions "
+                    "WHERE tenant_id = ? AND company_id = ? AND reference_no = ?",
+                    (tenant_id, company_id, expense_id),
+                ).fetchone()
+                balance_after = None
+                if state.get("gl_account_id"):
+                    b = conn.execute(
+                        "SELECT balance FROM finance_accounts WHERE account_id = ? AND tenant_id = ? AND company_id = ?",
+                        (state["gl_account_id"], tenant_id, company_id),
+                    ).fetchone()
+                    balance_after = float(b["balance"] or 0.0) if b else None
+
+            expense_ok = bool(exp) and exp["status"] == "APPROVED" and exp["approved_by"]
+            txn_ok = bool(txn) and abs(float(txn["amount"]) - expected_amount) < 0.005
+            balance_ok = None
+            if state.get("gl_balance_before") is not None and balance_after is not None:
+                balance_ok = abs((balance_after - state["gl_balance_before"]) - expected_amount) < 0.005
+            business_ok = expense_ok and txn_ok and (balance_ok is not False)
+
+            verif = PhysicalVerification(
+                check_type="db_postcondition_match",
+                target_path=f"db://{tenant_id}/{company_id}/finance_transactions/{expense_id}",
+                expected_val=f"{expected_amount:.2f}",
+                actual_val=f"{float(txn['amount']):.2f}" if txn else "NO_ROW",
+                verified=business_ok,
+                details=(
+                    "Independent re-read of the statutory ledger after approval: "
+                    f"expense_status={exp['status'] if exp else 'MISSING'}, "
+                    f"approved_by={exp['approved_by'] if exp else None}, "
+                    f"gl_transaction={'FOUND' if txn else 'MISSING'}, "
+                    f"account_balance_delta_verified={balance_ok}."
+                ),
+            )
+            pkg = self.ledger.seal_evidence(
+                action_id=f"act_exp_{uuid.uuid4().hex[:6]}",
+                mission_id=state.get("mission_id") or f"mis_exp_{uuid.uuid4().hex[:6]}",
+                agent_id="agt_enterprise_finance",
+                verifications=[verif],
+                metadata={"tenant_id": tenant_id, "company_id": company_id},
+            )
+            return {
+                "expense_status": exp["status"] if exp else "MISSING",
+                "gl_transaction_id": txn["transaction_id"] if txn else None,
+                "gl_balance_after": balance_after,
+                "business_outcome_verified": business_ok,
+                "verification_scope": "BUSINESS_OUTCOME",
+                "evidence_id": pkg.evidence_id,
+                "merkle_root": self.ledger.get_merkle_root(),
+                "completed": True,
+            }
+
+        builder.add_node("validate_claim", validate_claim, node_type=NodeType.TRANSFORM)
+        builder.add_node(
+            "approval_gate",
+            approval_gate,
+            node_type=NodeType.APPROVAL,
+            requires_approval=True,
+            risk_level="HIGH",
+            metadata={"action_summary": "Approve expense claim and post to the general ledger"},
+        )
+        builder.add_node("post_to_gl", post_to_gl, node_type=NodeType.TOOL,
+                         retry_policy={"classification": RetryPolicyClassification.NO_AUTOMATIC_RETRY, "max_retries": 0})
+        builder.add_node("verify_business_outcome", verify_business_outcome, node_type=NodeType.VERIFICATION)
+
+        builder.add_edge("validate_claim", "approval_gate")
+        builder.add_edge("approval_gate", "post_to_gl")
+        builder.add_edge("post_to_gl", "verify_business_outcome")
+        builder.set_entry_point("validate_claim")
+        builder.set_finish_point("verify_business_outcome")
+
+        graph = builder.compile()
+        self.runtime.register_compiled_graph("wf_company_expense_approval", graph, {
+            "name": "Company Expense Approval & GL Posting",
+            "version": 1,
+            "risk_level": "HIGH"
+        })
+
     def _register_approval_workflow(self):
         """Workflow: Sensitive action requiring explicit ZONATA ApprovalEngine clearance."""
         builder = StateGraph()
@@ -171,13 +379,21 @@ class LangGraphWorkflowAdapter:
             }
 
         def execute_privileged(state: Dict[str, Any]) -> Dict[str, Any]:
-            # This node requires_approval = True
+            # This node requires_approval = True. It exercises the approval
+            # gate only: this canonical workflow holds no payment integration,
+            # so it must not claim that money moved.
             amount = state.get("amount", 1000)
             return {
-                "disbursed": True,
+                "disbursed": False,
+                "disbursement_executed": False,
                 "amount": amount,
-                "recipient": state.get("recipient", "supplier_acct_01"),
-                "executed_at": time.time()
+                "intended_recipient": state.get("recipient", "supplier_acct_01"),
+                "approval_gate_passed_at": time.time(),
+                "note": (
+                    "Approval gate cleared. No funds were transferred: this workflow "
+                    "has no payment connector, so the business outcome is NOT verified."
+                ),
+                "business_outcome_verified": False,
             }
 
         builder.add_node("assess_risk", assess_risk, node_type=NodeType.TRANSFORM)
@@ -301,11 +517,15 @@ class LangGraphWorkflowAdapter:
                 mission_objective=state.get("directive", "Analyze margins")
             )
             result = AgentWorkforceAdapter.execute_workforce(plan["workforce_id"])
+            # Report the workforce's own outcome. Never substitute a canned
+            # business result for what the squad actually produced.
             return {
                 "squad_name": squad_name,
                 "workforce_id": plan["workforce_id"],
-                "squad_completed": result.task_success if hasattr(result, "task_success") else True,
-                "summary": "Financial variance analyzed: margins stabilized at 38.4%"
+                "squad_completed": bool(getattr(result, "task_success", False)),
+                "workforce_status": getattr(result, "status", None),
+                "summary": getattr(result, "summary", None) or "Workforce returned no summary.",
+                "business_outcome_verified": bool(getattr(result, "business_outcome_verified", False)),
             }
 
         builder.add_node("ceo_decompose", ceo_decompose, node_type=NodeType.AGENT)
@@ -434,7 +654,7 @@ class LangGraphWorkflowAdapter:
         """TEST F: Simulated timeout on mutation -> AMBIGUOUS -> external reconciliation without auto-replay."""
         res = self.runtime.start_workflow(
             "wf_canonical_simple",
-            {"objective": "Payment transaction", "__simulate_ambiguous__": True},
+            {"objective": "Payment transaction", "simulate_ambiguous": True},
             {"company_id": company_id}
         )
 

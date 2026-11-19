@@ -9,11 +9,12 @@ Constitutional Invariants:
   EVIDENCE_GROUNDING (API returns cryptographic evidence references and audit receipts)
 """
 
+from __future__ import annotations
 import time
 import json
 import logging
 import uuid
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from core.db import db
 from core.ai_ceo_v8 import AICEOExecutiveOperatingLayer
@@ -362,6 +363,118 @@ class V8ApiHandler:
                 "industry": ind_str
             }, 200
 
+        # 17.1 ZONATA Autonomous Coworker 2.0 GET Endpoints (Autonomous, decoupled from CEO state)
+        elif path in ("/api/v2/coworker/status", "/api/v8/coworker/v2/status"):
+            from core.coworker import (
+                CoworkerLifecycleOrchestrator,
+                CoworkerV2Store,
+                EphemeralAgentFactoryV2,
+                DefensiveCybersecurityMonitor,
+                ResourceGuardEngine,
+                ComputerUseEngine,
+            )
+            store = CoworkerV2Store.get_instance()
+            tasks = store.list_tasks(limit=10)
+            active_task = next((t for t in tasks if t.status not in ("TERMINATED", "PAUSED")), None)
+            current_state = active_task.status if active_task else "IDLE"
+            
+            subworker_factory = EphemeralAgentFactoryV2.get_instance(store=store)
+            active_subworkers = subworker_factory.list_active_subworkers()
+            
+            defense_monitor = DefensiveCybersecurityMonitor.get_instance(store=store)
+            findings = defense_monitor.get_findings(limit=50)
+            
+            resource_guard = ResourceGuardEngine.get_instance(store=store)
+            res_check = resource_guard.check_storage_and_memory()
+            
+            computer_use = ComputerUseEngine.get_instance()
+            perception = computer_use.perception.observe_screen()
+            
+            return {
+                "success": True,
+                "version": "2.0.0",
+                "lifecycle_state": current_state,
+                "active_task_id": active_task.task_id if active_task else None,
+                "active_tasks_count": len([t for t in tasks if t.status not in ("TERMINATED", "PAUSED")]),
+                "total_tasks_recorded": len(tasks),
+                "active_subworkers_count": len(active_subworkers),
+                "active_subworkers": [s.to_dict() for s in active_subworkers],
+                "security_findings_count": len(findings),
+                "security_high_count": len([f for f in findings if f.severity in ("HIGH", "CRITICAL")]),
+                "resource_status": res_check,
+                "perception_status": {
+                    "active_app": perception.active_app,
+                    "window_title": perception.window_title,
+                    "resolution": perception.screen_resolution,
+                    "elements_detected": len(perception.interactive_elements),
+                    # True means the element tree is seeded, not scraped from a display.
+                    "synthetic": perception.synthetic,
+                    "verified": not perception.synthetic,
+                }
+            }, 200
+
+        elif path in ("/api/v2/coworker/missions", "/api/v8/coworker/v2/missions"):
+            from core.coworker import CoworkerV2Store
+            store = CoworkerV2Store.get_instance()
+            limit = int(query_params.get("limit", [50])[0] if isinstance(query_params.get("limit"), list) else query_params.get("limit", 50))
+            tasks = store.list_tasks(limit=limit)
+            return {
+                "success": True,
+                "count": len(tasks),
+                "missions": [t.to_dict() for t in tasks]
+            }, 200
+
+        elif path.startswith("/api/v2/coworker/missions/") or path.startswith("/api/v8/coworker/v2/missions/"):
+            from core.coworker import CoworkerV2Store
+            task_id = path.replace("/api/v8/coworker/v2/missions/", "").replace("/api/v2/coworker/missions/", "")
+            store = CoworkerV2Store.get_instance()
+            task = store.get_task(task_id)
+            if not task:
+                return {"success": False, "error": f"Mission not found: {task_id}"}, 404
+            transitions = store.get_task_transitions(task_id)
+            lease = store.get_active_lease(task_id)
+            return {
+                "success": True,
+                "mission": task.to_dict(),
+                "transitions": [tr.to_dict() for tr in transitions],
+                "lease": lease.to_dict() if lease else None
+            }, 200
+
+        elif path in ("/api/v2/coworker/subworkers", "/api/v8/coworker/v2/subworkers"):
+            from core.coworker import EphemeralAgentFactoryV2
+            factory = EphemeralAgentFactoryV2.get_instance()
+            subworkers = factory.list_active_subworkers()
+            return {
+                "success": True,
+                "count": len(subworkers),
+                "subworkers": [s.to_dict() for s in subworkers]
+            }, 200
+
+        elif path in ("/api/v2/coworker/security/patrol", "/api/v8/coworker/v2/security/patrol"):
+            from core.coworker import DefensiveCybersecurityMonitor
+            monitor = DefensiveCybersecurityMonitor.get_instance()
+            limit = int(query_params.get("limit", [100])[0] if isinstance(query_params.get("limit"), list) else query_params.get("limit", 100))
+            findings = monitor.get_findings(limit=limit)
+            return {
+                "success": True,
+                "count": len(findings),
+                "findings": [f.to_dict() for f in findings]
+            }, 200
+
+        elif path.startswith("/api/v2/coworker/evidence/") or path.startswith("/api/v8/coworker/v2/evidence/"):
+            from core.coworker import EvidenceAndReportingEngine
+            task_id = path.replace("/api/v8/coworker/v2/evidence/", "").replace("/api/v2/coworker/evidence/", "")
+            engine = EvidenceAndReportingEngine.get_instance()
+            entries = engine.get_task_ledger(task_id)
+            report = engine.get_report(task_id)
+            return {
+                "success": True,
+                "task_id": task_id,
+                "evidence_count": len(entries),
+                "evidence_entries": [e.to_dict() for e in entries],
+                "executive_report": report.to_dict() if report else None
+            }, 200
+
         ceo = cls.get_ceo(tenant_id, company_id)
 
         # 1. Executive State
@@ -624,6 +737,55 @@ class V8ApiHandler:
 
         elif path == "/api/v8/gemma/missions":
             msns = ceo.conversation_engine.mission_manager.list_missions()
+            return {"success": True, "missions": [m.to_dict() for m in msns]}, 200
+
+        # Enterprise AI Corporate Workforce GET Endpoints
+        elif path == "/api/v8/organization/roles":
+            from core.aic_organization_constitution import ExecutiveRoleRegistry
+            from dataclasses import asdict
+            roles = ExecutiveRoleRegistry.list_roles()
+            return {"success": True, "count": len(roles), "roles": [asdict(r) for r in roles]}, 200
+
+        elif path == "/api/v8/organization/departments":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_departments WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "departments": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/organization/positions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_positions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "positions": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/employees":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_employees WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "employees": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/requisitions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM workforce_requisitions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "requisitions": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/workforce/reviews":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM employee_performance_reviews WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "reviews": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/sop/definitions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM sop_definitions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "sops": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/agent-factory/capabilities":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM agent_capabilities WHERE tenant_id = ? AND is_active = 1", (tenant_id,)).fetchall()
+            return {"success": True, "capabilities": [dict(r) for r in rows]}, 200
+
+        elif path == "/api/v8/missions":
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM corporate_missions WHERE tenant_id = ? AND company_id = ?", (tenant_id, company_id)).fetchall()
+            return {"success": True, "missions": [dict(r) for r in rows]}, 200
+
         return None
 
     @classmethod
@@ -1175,6 +1337,105 @@ class V8ApiHandler:
             )
             return {"success": True, "simulation": sim_res, "simulation_only": True}, 200
 
+        # 17.1 ZONATA Autonomous Coworker 2.0 POST Endpoints (Autonomous, decoupled from CEO state)
+        elif path in ("/api/v2/coworker/missions", "/api/v8/coworker/v2/missions"):
+            from core.coworker import (
+                CoworkerLifecycleOrchestrator,
+                CoworkerV2Task,
+                TaskLifecycleState,
+                RiskLevel,
+            )
+            orchestrator = CoworkerLifecycleOrchestrator.get_instance()
+            objective = body.get("objective") or body.get("prompt") or "Autonomous Coworker Execution"
+            description = body.get("description", objective)
+            target_workspace = body.get("target_workspace")
+            risk_str = str(body.get("risk_level", "LOW")).upper()
+            try:
+                risk_lvl = RiskLevel(risk_str)
+            except Exception:
+                risk_lvl = RiskLevel.LOW
+            
+            task = orchestrator.create_task(
+                objective=objective,
+                description=description,
+                assigned_by="AI_CEO",
+                risk_level=risk_lvl,
+                target_workspace=target_workspace,
+                metadata=body.get("metadata", {})
+            )
+            
+            # If auto-advance requested
+            auto_advance = bool(body.get("auto_advance", True))
+            if auto_advance:
+                orchestrator.transition(task.task_id, TaskLifecycleState.TASK_ANALYSIS, actor="AI_CEO", reason="Commencing task analysis")
+            
+            return {
+                "success": True,
+                "mission_id": task.task_id,
+                "task_id": task.task_id,
+                "status": task.status.value,
+                "task": task.to_dict()
+            }, 201
+
+        elif (path.startswith("/api/v2/coworker/missions/") or path.startswith("/api/v8/coworker/v2/missions/")) and path.endswith("/control"):
+            from core.coworker import CoworkerLifecycleOrchestrator, TaskLifecycleState
+            prefix = "/api/v8/coworker/v2/missions/" if path.startswith("/api/v8/") else "/api/v2/coworker/missions/"
+            task_id = path[len(prefix):-len("/control")]
+            action = str(body.get("action", "PAUSE")).upper()
+            reason = body.get("reason", f"Control operation: {action}")
+            orchestrator = CoworkerLifecycleOrchestrator.get_instance()
+            
+            task = orchestrator.store.get_task(task_id)
+            if not task:
+                return {"success": False, "error": f"Mission not found: {task_id}"}, 404
+            
+            if action == "PAUSE":
+                t = orchestrator.pause_task(task_id, actor="OPERATOR", reason=reason)
+            elif action == "RESUME":
+                t = orchestrator.resume_task(task_id, actor="OPERATOR")
+            elif action in ("STOP", "ABORT", "TERMINATE"):
+                t = orchestrator.abort_task(task_id, actor="OPERATOR", reason=reason)
+            else:
+                return {"success": False, "error": f"Unsupported action: {action}"}, 400
+                
+            return {
+                "success": True,
+                "task_id": task_id,
+                "action": action,
+                "new_status": t.status.value
+            }, 200
+
+        elif path in ("/api/v2/coworker/security/patrol", "/api/v8/coworker/v2/security/patrol"):
+            from core.coworker import DefensiveCybersecurityMonitor
+            monitor = DefensiveCybersecurityMonitor.get_instance()
+            scan_path = body.get("scan_path")
+            findings = monitor.run_patrol_cycle(scan_path=scan_path)
+            return {
+                "success": True,
+                "findings_count": len(findings),
+                "findings": [f.to_dict() for f in findings],
+                "clean": len(findings) == 0
+            }, 200
+
+        elif path in ("/api/v2/coworker/computer-use/execute", "/api/v8/coworker/v2/computer-use/execute"):
+            from core.coworker import ComputerUseEngine, GUIActionPrimitive
+            engine = ComputerUseEngine.get_instance()
+            primitive_str = str(body.get("primitive", "OBSERVE")).upper()
+            params = body.get("params", {})
+            try:
+                prim = GUIActionPrimitive(primitive_str)
+            except Exception:
+                return {"success": False, "error": f"Invalid primitive: {primitive_str}"}, 400
+            
+            res = engine.execute_primitive(prim, **params)
+            return {
+                "success": res.success,
+                "action_id": res.action_id,
+                "execution_time_ms": res.execution_time_ms,
+                "output_data": res.output_data,
+                "error": res.error
+            }, (200 if res.success else 500)
+
         ceo = cls.get_ceo(tenant_id, company_id)
 
         # 1. Compile Objective
@@ -1476,5 +1737,67 @@ class V8ApiHandler:
             goal = body.get("goal", "Optimize revenue and operations")
             tick = ceo.conversation_engine.supervision_loop.advance_stage(owner_goal=goal)
             return {"success": True, "tick": tick.to_dict()}, 200
+
+        # Enterprise AI Corporate Workforce POST Endpoints
+        elif path == "/api/v8/kpi/anti-gaming/check":
+            from core.kpi_kra_engine import AntiGamingEngine
+            p_code = body.get("primary_code", "KPI_PRIMARY")
+            p_act = float(body.get("primary_actual", 100.0))
+            p_tgt = float(body.get("primary_target", 100.0))
+            c_code = body.get("counter_code", "KPI_COUNTER")
+            c_act = float(body.get("counter_actual", 100.0))
+            c_warn = float(body.get("counter_warning", 80.0))
+            weight = float(body.get("counter_weight", 0.5))
+
+            passed, score, reason = AntiGamingEngine.evaluate_pair(p_code, p_act, p_tgt, c_code, c_act, c_warn, weight)
+            return {"success": True, "anti_gaming_passed": passed, "anti_gaming_score": score, "reason": reason}, 200
+
+        elif path == "/api/v8/agent-factory/leases":
+            from core.agent_factory_v2 import AgentLeaseManager
+            action = body.get("action", "acquire")
+            if action == "acquire":
+                inst_id = body.get("instance_id")
+                emp_id = body.get("employee_id")
+                ttl = float(body.get("ttl_seconds", 300.0))
+                try:
+                    res = AgentLeaseManager.acquire_lease(tenant_id, company_id, inst_id, emp_id, ttl_seconds=ttl)
+                    return {"success": True, "lease": res}, 201
+                except Exception as exc:
+                    return {"success": False, "error": str(exc)}, 409
+            elif action == "release":
+                l_id = body.get("lease_id")
+                res = AgentLeaseManager.release_lease(l_id)
+                return {"success": True, "released": res}, 200
+            return {"error": f"Unknown lease action: {action}"}, 400
+
+        elif path == "/api/v8/security/dlp/inspect":
+            from core.dlp_engine import DataLossPreventionEngine, DLPViolationBlockedError
+            text = body.get("content", "")
+            dest = body.get("destination_classification", "CUSTOMER_SHAREABLE")
+            source = body.get("source_classification", "INTERNAL")
+            try:
+                res = DataLossPreventionEngine.inspect_and_filter(text, destination_classification=dest, source_classification=source)
+                return {"success": True, "dlp_result": res}, 200
+            except (DLPViolationBlockedError, PermissionError) as pe:
+                return {"success": False, "blocked": True, "error": str(pe)}, 403
+
+        elif path == "/api/v8/missions/collaborations":
+            now = time.time()
+            import uuid
+            collab_id = f"collab_{uuid.uuid4().hex[:10]}"
+            m_id = body.get("mission_id", f"msn_{uuid.uuid4().hex[:8]}")
+            init_dept = body.get("initiator_dept_id", "dept_ops")
+            tgt_dept = body.get("target_dept_id", "dept_fin")
+            deliv = body.get("deliverable", "Financial audit review")
+            with db.get_connection() as conn:
+                conn.execute("""
+                INSERT INTO cross_department_collaborations (
+                    collab_id, mission_id, tenant_id, company_id,
+                    initiator_dept_id, target_dept_id, deliverable_description,
+                    sla_turnaround_hours, shared_budget_usd, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 24.0, 0.0, 'REQUESTED', ?)
+                """, (collab_id, m_id, tenant_id, company_id, init_dept, tgt_dept, deliv, now))
+                conn.commit()
+            return {"success": True, "collab_id": collab_id, "status": "REQUESTED"}, 201
 
         return None

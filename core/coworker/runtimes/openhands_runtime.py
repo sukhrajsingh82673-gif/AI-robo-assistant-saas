@@ -98,6 +98,22 @@ class OpenHandsWorkerRuntime(WorkerRuntime):
         session.log(f"Submitted engineering mission: {mission.get('objective', 'Code Task')}")
         return mission_id
 
+    def _execution(self, session: RuntimeSession) -> Dict[str, Any]:
+        """Create (once per session) a governed OpenHands execution context."""
+        cached = getattr(self, "_executions", {}).get(session.session_id)
+        if cached:
+            return cached
+        created = self.gateway.create_execution(
+            agent_id=session.worker_id,
+            task_prompt=session.mission_id or "engineering task",
+            mission_id=session.mission_id,
+            task_id=session.execution_id,
+        )
+        if not hasattr(self, "_executions"):
+            self._executions = {}
+        self._executions[session.session_id] = created
+        return created
+
     def run_foreground(self, session_id: str, task: Dict[str, Any]) -> Dict[str, Any]:
         session = self.sessions.get(session_id)
         if not session:
@@ -110,38 +126,91 @@ class OpenHandsWorkerRuntime(WorkerRuntime):
         action = task.get("action", "code_edit")
         params = task.get("parameters", {})
 
-        # 1. Code Edit / File Generation
+        try:
+            execution = self._execution(session)
+        except Exception as exc:
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "action": action,
+                "executed": False,
+                "reason": f"OPENHANDS_EXECUTION_UNAVAILABLE:{exc}",
+            }
+
+        execution_id = execution["execution_id"]
+
+        # 1. Code Edit / File Generation — a real write inside the sandbox.
         if action in ["code_edit", "write_file"]:
-            file_name = params.get("file_name", "generated_patch.py")
-            content = params.get("content", "# Generated code\n")
-            session.log(f"OpenHands writing code file {file_name} ({len(content)} bytes)")
+            rel_path = params.get("file_name") or params.get("path")
+            content = params.get("content", "")
+            if not rel_path:
+                return {"status": "ACTION_NOT_IMPLEMENTED", "action": action,
+                        "executed": False, "reason": "MISSING_FILE_PATH"}
+            session.log(f"OpenHands writing {rel_path} ({len(content)} bytes)")
+            try:
+                written = self.gateway.write_file(execution_id, rel_path, content)
+            except Exception as exc:
+                return {"status": "ACTION_NOT_IMPLEMENTED", "action": action,
+                        "executed": False, "reason": f"WRITE_REJECTED:{exc}"}
             return {
                 "status": "SUCCESS",
                 "action": action,
-                "file": file_name,
-                "digest": hashlib.sha256(content.encode()).hexdigest(),
-                "execution_time_ms": 12.0
+                "executed": True,
+                "file": rel_path,
+                "safe_path": written.get("safe_path"),
+                "artifact_id": written.get("artifact_id"),
+                "digest": written.get("sha256_digest"),
             }
 
-        # 2. Test Execution
+        # 2. Test Execution — run the suite in the sandbox and report the exit code.
         if action == "run_test":
-            test_target = params.get("test_target", "tests/")
-            session.log(f"OpenHands executing tests: {test_target}")
+            target = params.get("test_target", "tests/")
+            command = params.get("command") or f"python3 -m pytest -q {target}"
+            session.log(f"OpenHands running tests: {command}")
+            try:
+                result = self.gateway.run_command(execution_id, command,
+                                                  timeout_seconds=int(params.get("timeout", 120)))
+            except Exception as exc:
+                return {"status": "ACTION_NOT_IMPLEMENTED", "action": action,
+                        "executed": False, "reason": f"TEST_COMMAND_REJECTED:{exc}"}
+            passed = result.get("exit_code") == 0
             return {
-                "status": "SUCCESS",
-                "tests_passed": True,
-                "target": test_target,
-                "verified": True
+                "status": "SUCCESS" if passed else "FAILED",
+                "action": action,
+                "executed": True,
+                "tests_passed": passed,
+                "target": target,
+                "command": command,
+                "exit_code": result.get("exit_code"),
+                "stdout_tail": (result.get("stdout") or "")[-2000:],
+                "stderr_tail": (result.get("stderr") or "")[-2000:],
+                "verified": passed,
+                "reason": None if passed else ((result.get("stderr") or "TEST_FAILED")[-500:]),
             }
 
-        # 3. Governed Terminal / Command
-        command = params.get("command", "git status")
-        session.log(f"OpenHands command execution request: {command}")
+        # 3. Governed Terminal / Command — actually executed via the gateway.
+        command = params.get("command")
+        if not command:
+            return {"status": "ACTION_NOT_IMPLEMENTED", "action": action,
+                    "executed": False, "reason": "MISSING_COMMAND"}
+        session.log(f"OpenHands command execution: {command}")
+        try:
+            result = self.gateway.run_command(execution_id, command,
+                                              timeout_seconds=int(params.get("timeout", 30)))
+        except Exception as exc:
+            return {"status": "ACTION_NOT_IMPLEMENTED", "action": action,
+                    "executed": False, "command": command,
+                    "reason": f"COMMAND_REJECTED:{exc}"}
+        succeeded = bool(result.get("success"))
         return {
-            "status": "SUCCESS",
+            "status": "SUCCESS" if succeeded else "FAILED",
+            "action": action,
+            "executed": True,
             "command": command,
-            "output": "Simulated governed workspace clean state",
-            "risk_class": CommandRiskClass.READ_ONLY.value
+            "exit_code": result.get("exit_code"),
+            "output": (result.get("stdout") or "")[-4000:],
+            "stderr": (result.get("stderr") or "")[-2000:],
+            "risk_class": CommandRiskClass.classify(command).value,
+            "reason": None if succeeded else ((result.get("stderr") or "COMMAND_FAILED")[-500:]),
         }
 
     def run_background(self, session_id: str, task: Dict[str, Any]) -> str:
@@ -237,7 +306,7 @@ class OpenHandsWorkerRuntime(WorkerRuntime):
     def verify(self, session_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "session_id": session_id,
-            "verification_status": "CONFIRMED" if result.get("status") == "SUCCESS" else "FAILED",
+            "verification_status": "CONFIRMED" if result.get("executed") else "FAILED",
             "artifact_hash": hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
             "timestamp": time.time()
         }

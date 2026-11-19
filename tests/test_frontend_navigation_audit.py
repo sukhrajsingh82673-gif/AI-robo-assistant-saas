@@ -2,9 +2,9 @@
 ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
 Frontend Navigation & Executive Workspace Automated Audit Test
 Validates:
-1. All 26 sidebar navigation items in web/index.html have corresponding <section id="view-..."> containers.
-2. All 26 routes are explicitly handled in web/app.js handleRoute() without falling back to 'overview'.
-3. All 26 views are handled in renderActiveNavView() in web/app.js.
+1. Every screen in the URA registry has a matching <section id="view-..."> container.
+2. Every URA screen has a route alias in the resolver and the wrapper is installed.
+3. Every URA screen has a renderer in the URA renderer registry.
 4. All referenced workspace JavaScript modules exist on disk and pass syntax validation.
 5. AIC CEO Workspace contains all 20 executive sections and zero ungrounded fabricated numbers.
 """
@@ -23,45 +23,54 @@ class TestFrontendNavigationAudit(unittest.TestCase):
             self.index_html = f.read()
         with open(os.path.join(WEB_DIR, "app.js"), "r", encoding="utf-8") as f:
             self.app_js = f.read()
+        with open(os.path.join(WEB_DIR, "ura_screens.js"), "r", encoding="utf-8") as f:
+            self.screens_js = f.read()
         with open(os.path.join(WEB_DIR, "ai_ceo_workspace.js"), "r", encoding="utf-8") as f:
             self.ceo_js = f.read()
 
+    def _registry(self):
+        """Return [(screen id, section id)] from the URA screen registry."""
+        return re.findall(
+            r"\{\s*id:\s*'([^']+)'[\s\S]*?section:\s*'([^']+)'\s*\}",
+            self.screens_js,
+        )
+
     def test_sidebar_nav_items_have_matching_section_containers(self):
-        nav_items = set(re.findall(r'data-nav="([^"]+)"', self.index_html))
-        self.assertGreaterEqual(len(nav_items), 26, f"Expected at least 26 nav items, found {len(nav_items)}")
+        registry = self._registry()
+        self.assertGreaterEqual(len(registry), 17, f"Expected the 17-screen URA registry, found {len(registry)}")
 
         view_sections = set(re.findall(r'id="view-([^"]+)"', self.index_html))
-
-        for item in nav_items:
+        for screen_id, section in registry:
             self.assertIn(
-                item,
+                section.replace("view-", "", 1),
                 view_sections,
-                f"Sidebar item data-nav='{item}' is missing container <section id='view-{item}'>"
+                f"URA screen '{screen_id}' is missing its container <section id='{section}'>",
             )
 
+        self.assertIn("settings", [screen_id for screen_id, _ in registry])
+
     def test_app_js_explicitly_routes_all_nav_items(self):
-        nav_items = set(re.findall(r'data-nav="([^"]+)"', self.index_html))
-        
-        # Verify handleRoute handles every nav item
-        for item in nav_items:
-            if item == 'overview':
+        registry = self._registry()
+        routes = dict(re.findall(r"'(/[^']*)':\s*'([^']+)'", self.screens_js))
+
+        self.assertIn("window.handleRoute = function", self.screens_js)
+        for screen_id, _section in registry:
+            if screen_id == "settings":
+                self.assertIn("clean === '/settings'", self.screens_js)
                 continue
-            pattern = rf"(?:startsWith|includes)\(['\"/]*{re.escape(item)}['\"/]*\)"
-            match = re.search(pattern, self.app_js)
-            self.assertTrue(
-                match is not None,
-                f"Route handler in app.js does not explicitly check for nav item: '{item}'"
+            self.assertIn(
+                screen_id,
+                routes.values(),
+                f"Route resolver has no alias for URA screen: '{screen_id}'",
             )
 
     def test_app_js_renderActiveNavView_handles_all_views(self):
-        nav_items = set(re.findall(r'data-nav="([^"]+)"', self.index_html))
-        
-        for item in nav_items:
-            pattern = rf"navKey\s*===?\s*['\"]{re.escape(item)}['\"]"
-            match = re.search(pattern, self.app_js)
-            self.assertTrue(
-                match is not None,
-                f"renderActiveNavView() in app.js is missing a case branch for: '{item}'"
+        registry = self._registry()
+        for screen_id, _section in registry:
+            self.assertRegex(
+                self.screens_js,
+                rf"['\"]?{re.escape(screen_id)}['\"]?:\s*render",
+                f"URA renderer registry is missing an entry for: '{screen_id}'",
             )
 
     def test_workspace_script_files_exist(self):

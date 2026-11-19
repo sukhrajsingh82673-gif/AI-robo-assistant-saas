@@ -1,0 +1,6 @@
+aws_region                 = "us-east-1"
+replica_region             = "us-west-2"
+environment                = "production"
+domain_name                = "app.yourdomain.com"
+primary_backup_bucket_name = "zonata-production-worm-backups-UNIQUE_ACCOUNT_SUFFIX"
+replica_backup_bucket_name = "zonata-production-worm-backups-crr-UNIQUE_ACCOUNT_SUFFIX"

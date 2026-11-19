@@ -76,6 +76,7 @@ class ConflictResolution(str, Enum):
     USE_B = "USE_B"
     ASK_CEO = "ASK_CEO"
     DISMISS = "DISMISS"
+    MERGE = "MERGE"
 
 
 class SecurityException(ValueError):
@@ -747,7 +748,8 @@ class StatefulAgentMemoryGateway:
         self,
         conflict_id: str,
         choice: str,
-        resolved_by: str = "AI_CEO"
+        resolved_by: str = "AI_CEO",
+        merged_content: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Resolves a memory conflict with options:
@@ -755,12 +757,14 @@ class StatefulAgentMemoryGateway:
         - USE_B: Record B remains active; Record A is marked superseded.
         - ASK_CEO: Marked as escalated to AI CEO decision queue.
         - DISMISS: Conflict dismissed without superseding.
+        - MERGE: Creates a synthesized merged record superseding both A and B.
         """
         valid_choices = {c.value for c in ConflictResolution}
         if choice not in valid_choices:
             raise ValueError(f"Invalid resolution choice '{choice}'. Allowed: {valid_choices}")
 
         now = time.time()
+        merged_record_id = None
         with db.get_connection() as conn:
             conf = conn.execute(
                 "SELECT * FROM stateful_memory_conflicts WHERE conflict_id = ? AND tenant_id = ?",
@@ -782,6 +786,31 @@ class StatefulAgentMemoryGateway:
                     "UPDATE stateful_memory_records SET superseded_by = ? WHERE record_id = ?",
                     (rec_b, rec_a)
                 )
+            elif choice == ConflictResolution.MERGE.value:
+                # Fetch row A details
+                row_a = conn.execute("SELECT * FROM stateful_memory_records WHERE record_id = ?", (rec_a,)).fetchone()
+                row_b = conn.execute("SELECT * FROM stateful_memory_records WHERE record_id = ?", (rec_b,)).fetchone()
+                
+                content_a = row_a["content"] if row_a else ""
+                content_b = row_b["content"] if row_b else ""
+                synth_content = merged_content or f"{content_a} | Synced with: {content_b}"
+                merged_record_id = f"smem_mrg_{uuid.uuid4().hex[:8]}"
+                scope = conf["scope"]
+                scope_id = conf["scope_id"]
+                memory_key = conf["memory_key"]
+
+                conn.execute("""
+                    INSERT INTO stateful_memory_records (
+                        record_id, tenant_id, scope, scope_id, memory_type, category,
+                        memory_key, content, source, confidence, version, superseded_by,
+                        expires_at, created_at, updated_at, metadata
+                    ) VALUES (?, ?, ?, ?, 'ARCHIVAL', 'FACT', ?, ?, 'SYNTHESIS:MERGE', 'VERIFIED', 1, NULL, NULL, ?, ?, ?)
+                """, (
+                    merged_record_id, self.tenant_id, scope, scope_id, memory_key,
+                    synth_content, now, now, json.dumps({"merged_from": [rec_a, rec_b]})
+                ))
+                # Mark both A and B superseded by the merged record
+                conn.execute("UPDATE stateful_memory_records SET superseded_by = ? WHERE record_id IN (?, ?)", (merged_record_id, rec_a, rec_b))
 
             new_status = "RESOLVED" if choice != ConflictResolution.ASK_CEO.value else "ESCALATED_TO_CEO"
             conn.execute(
@@ -794,13 +823,16 @@ class StatefulAgentMemoryGateway:
             )
             conn.commit()
 
-        return {
+        res_dict = {
             "conflict_id": conflict_id,
             "status": new_status,
             "resolution_choice": choice,
             "resolved_by": resolved_by,
             "resolved_at": now
         }
+        if merged_record_id:
+            res_dict["merged_record_id"] = merged_record_id
+        return res_dict
 
     # -----------------------------------------------------------------
     # Conversation Sessions & Recall Memory Compaction

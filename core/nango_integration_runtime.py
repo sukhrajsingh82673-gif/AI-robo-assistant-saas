@@ -137,6 +137,7 @@ class SecurityEventType(str, Enum):
     KILLSWITCH_ENGAGED = "KILLSWITCH_ENGAGED"
     UNAUTHORIZED_MUTATION = "UNAUTHORIZED_MUTATION"
     TOKEN_EXPIRED = "TOKEN_EXPIRED"
+    SSRF_ATTEMPT_BLOCKED = "SSRF_ATTEMPT_BLOCKED"
 
 
 class SecurityException(Exception):
@@ -203,6 +204,20 @@ class IntegrationSecurityBoundary:
     def generate_opaque_handle(cls, provider_id: str, company_id: str) -> str:
         h = hashlib.sha256(f"{provider_id}:{company_id}:{time.time()}:{uuid.uuid4()}".encode()).hexdigest()[:12]
         return f"cred_nango_{provider_id}_{h}"
+
+    @classmethod
+    def validate_safe_url(cls, url: str, allow_local_for_test: bool = False) -> Tuple[bool, Optional[str]]:
+        from core.connectors import SSRFValidator
+        return SSRFValidator.validate_url(url, allow_local_for_test)
+
+    @classmethod
+    def assert_safe_url(cls, url: str, allow_local_for_test: bool = False):
+        from core.connectors import SSRFValidator, SSRFSecurityViolation
+        try:
+            SSRFValidator.assert_safe_url(url, allow_local_for_test)
+        except SSRFSecurityViolation as e:
+            raise SecurityException(f"SSRF blocked: {str(e)}")
+
 
 
 # ============================================================================
@@ -334,10 +349,16 @@ class NangoAdapter(ExternalIntegrationProvider):
         res = self._execute_action_dispatch(connection, action, params, idempotency_key)
         if isinstance(res, dict):
             provider_id = connection.get("provider_id", "unknown")
-            res.setdefault("is_mock", True)
-            res.setdefault("execution_mode", "SIMULATED")
-            res.setdefault("adapter_type", "MOCK_ADAPTER")
-            res.setdefault("provenance", f"SYNTHETIC_{provider_id.upper()}_FIXTURE")
+            if res.get("is_mock") is False:
+                res.setdefault("adapter_type", "REAL_API_CLIENT")
+                res.setdefault("qualification_status", "IMPLEMENTED_UNVERIFIED")
+                res.setdefault("provenance", "LIVE_PROVIDER")
+            else:
+                res.setdefault("is_mock", True)
+                res.setdefault("execution_mode", "SIMULATED")
+                res.setdefault("adapter_type", "MOCK_ADAPTER")
+                res.setdefault("qualification_status", "MOCK_ONLY")
+                res.setdefault("provenance", f"SYNTHETIC_{provider_id.upper()}_FIXTURE")
         return res
 
     def _execute_action_dispatch(
@@ -398,6 +419,34 @@ class NangoAdapter(ExternalIntegrationProvider):
                 }
 
         elif provider_id == "stripe":
+            stripe_key = (
+                (connection.get("metadata") or {}).get("stripe_api_key") or
+                (connection.get("credentials") or {}).get("api_key") or
+                os.environ.get("STRIPE_API_KEY")
+            )
+            if stripe_key and (str(stripe_key).startswith("sk_test_") or str(stripe_key).startswith("sk_live_")):
+                from core.connectors import StripeIntegrationAdapter
+                stripe_adapter = StripeIntegrationAdapter(api_key=str(stripe_key))
+                if action == "CREATE_INVOICE":
+                    return stripe_adapter.create_invoice(
+                        customer_id=scrubbed_params.get("customer_id", "cus_default"),
+                        metadata={"idempotency_key": idempotency_key},
+                        idempotency_key=idempotency_key
+                    )
+                elif action in ("CREATE_CHARGE", "CREATE_PAYMENT_INTENT"):
+                    return stripe_adapter.create_payment_intent(
+                        amount=float(scrubbed_params.get("amount", 100.0)),
+                        currency=scrubbed_params.get("currency", "inr"),
+                        customer_id=scrubbed_params.get("customer_id"),
+                        idempotency_key=idempotency_key
+                    )
+                elif action == "REFUND_PAYMENT":
+                    return stripe_adapter.create_refund(
+                        payment_intent_id=scrubbed_params.get("payment_intent_id", "pi_test"),
+                        amount=float(scrubbed_params.get("amount", 100.0)) if "amount" in scrubbed_params else None,
+                        idempotency_key=idempotency_key
+                    )
+            # Simulated fallback when no live keys configured
             if action == "CREATE_INVOICE":
                 invoice_id = f"in_{uuid.uuid4().hex[:14]}"
                 return {
@@ -408,7 +457,7 @@ class NangoAdapter(ExternalIntegrationProvider):
                     "status": "draft",
                     "idempotency_key": idempotency_key
                 }
-            elif action == "CREATE_CHARGE":
+            elif action in ("CREATE_CHARGE", "CREATE_PAYMENT_INTENT"):
                 return {
                     "id": f"ch_{uuid.uuid4().hex[:14]}",
                     "amount": scrubbed_params.get("amount", 808500.0),
@@ -417,6 +466,25 @@ class NangoAdapter(ExternalIntegrationProvider):
                     "paid": True,
                     "idempotency_key": idempotency_key
                 }
+
+        elif provider_id == "razorpay":
+            key_id = (connection.get("metadata") or {}).get("key_id") or os.environ.get("RAZORPAY_KEY_ID")
+            key_secret = (connection.get("metadata") or {}).get("key_secret") or os.environ.get("RAZORPAY_KEY_SECRET")
+            if key_id and key_secret:
+                from core.connectors import RazorpayIntegrationAdapter
+                rzp_adapter = RazorpayIntegrationAdapter(key_id=str(key_id), key_secret=str(key_secret))
+                if action == "CREATE_ORDER":
+                    return rzp_adapter.create_order(
+                        amount=float(scrubbed_params.get("amount", 100.0)),
+                        currency=scrubbed_params.get("currency", "INR")
+                    )
+            return {
+                "id": f"order_{uuid.uuid4().hex[:12]}",
+                "amount": scrubbed_params.get("amount", 808500.0),
+                "currency": "INR",
+                "status": "created",
+                "idempotency_key": idempotency_key
+            }
 
         elif provider_id == "quickbooks":
             if action == "CREATE_INVOICE":
@@ -547,8 +615,14 @@ class NangoAdapter(ExternalIntegrationProvider):
         raw_payload: str,
         secret: str
     ) -> bool:
+        # Check Stripe signature format (t=...,v1=...)
+        stripe_sig = headers.get("Stripe-Signature")
+        if stripe_sig and ("t=" in stripe_sig or "v1=" in stripe_sig):
+            from core.connectors import StripeIntegrationAdapter
+            return StripeIntegrationAdapter().verify_webhook_signature(raw_payload, stripe_sig, secret)
+
         # Standard HMAC SHA256 signature verification
-        signature = headers.get("X-Nango-Signature") or headers.get("X-Hub-Signature-256") or headers.get("Stripe-Signature")
+        signature = headers.get("X-Nango-Signature") or headers.get("X-Hub-Signature-256") or headers.get("X-Razorpay-Signature") or headers.get("Stripe-Signature")
         if not signature:
             # Fail closed: reject unauthenticated webhooks missing cryptographic signature header
             return False
@@ -957,6 +1031,20 @@ class ExternalIntegrationGateway:
                 "connection_id": connection_id
             })
             raise SecurityException(f"Context Firewall blocked prompt injection attack: '{pattern}'.")
+
+        # SSRF and untrusted callback URL defense
+        if isinstance(params, dict):
+            for k, v in params.items():
+                if any(u in k.lower() for u in ["callback_url", "webhook_url", "target_url", "redirect_url", "redirect_uri"]) and isinstance(v, str):
+                    try:
+                        IntegrationSecurityBoundary.assert_safe_url(v)
+                    except Exception as ssrf_err:
+                        self._log_security_event(SecurityEventType.SSRF_ATTEMPT_BLOCKED, "CRITICAL", {
+                            "url": v,
+                            "field": k,
+                            "error": str(ssrf_err)
+                        })
+                        raise SecurityException(f"SSRF blocked: {str(ssrf_err)}")
 
         # Stage 5: Credential Sanitization
         scrubbed_params = IntegrationSecurityBoundary.scrub_dict(params)

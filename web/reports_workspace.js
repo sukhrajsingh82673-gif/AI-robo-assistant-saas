@@ -19,6 +19,11 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
+      if (window.USE_SAMPLE_DATA && window.AppleReportsPreview) {
+        window.AppleReportsPreview.render(container);
+        return;
+      }
+
       container.innerHTML = `
         <div style="padding:40px; text-align:center;">
           <div class="status-pulse-dot" style="margin:0 auto 12px; width:14px; height:14px;"></div>
@@ -96,6 +101,17 @@
             `).join('')}
           </div>
 
+          <!-- Content View: Empty State or 2-Column BI Split View -->
+          ${this.reports.length === 0 ? `
+            <div class="empty-state-card" style="padding:60px 24px; text-align:center; background:var(--bg-surface); border:1px dashed var(--border-color); border-radius:12px; margin-top:16px;">
+              <div style="font-size:36px; margin-bottom:12px;">📊</div>
+              <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">No Business Reports Generated Yet</h3>
+              <p style="font-size:13px; color:var(--text-secondary); max-width:480px; margin:0 auto 20px;">
+                Generate your first automated executive summary, audited financial statement, or custom BI query. Reports will analyze verified operational data in real time.
+              </p>
+              <button class="btn-primary" onclick="window.ReportsWorkspace.openCustomReportBuilder()">+ Build First Report</button>
+            </div>
+          ` : `
           <!-- 2-Column BI Layout: Left Report List + Right Active Report Viewer -->
           <div style="display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start;" class="reports-split-view">
             
@@ -212,6 +228,7 @@
               </div>
             `}
           </div>
+          `}
         </div>
       `;
     }

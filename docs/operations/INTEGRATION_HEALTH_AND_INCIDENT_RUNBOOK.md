@@ -41,7 +41,7 @@ Verifies all 18 connectors report `health_status: "HEALTHY"`.
 
 ## 2. Circuit Breaker Operations
 
-Each connector maintains an autonomous [`GovernedCircuitBreaker`](file:///root/roboassistant/core/automation_fabric/connector_registry.py#L39-L70):
+Each connector maintains an autonomous [`GovernedCircuitBreaker`](../../core/automation_fabric/connector_registry.py#L39-L70):
 - **Threshold:** 3–5 consecutive failures (configurable per connector).
 - **Behavior in OPEN state:** Immediately raises `CircuitBreakerTrippedError` without calling downstream systems, preventing cascading saturation.
 - **Cooldown:** 30 seconds.
@@ -80,7 +80,7 @@ curl -X POST http://127.0.0.1:8080/api/automation/killswitch \
 
 If a worker process terminates mid-execution:
 1. **Safe Queries (`get_*`, `list_*`):** Automatically rehydrated as safe completions without duplicate external execution.
-2. **Mutations (`create_*`, `post_*`):** Transitioned to `status: "UNKNOWN_OUTCOME"` with `reconciliation_required=True` in [`UnknownOutcomeEngine`](file:///root/roboassistant/core/unknown_outcome_engine.py).
+2. **Mutations (`create_*`, `post_*`):** Transitioned to `status: "UNKNOWN_OUTCOME"` with `reconciliation_required=True` in [`UnknownOutcomeEngine`](../../core/unknown_outcome_engine.py).
 3. **Operator Reconciliation:**
 ```bash
 curl -X POST http://127.0.0.1:8080/api/automation/executions/<execution_id>/reconcile \

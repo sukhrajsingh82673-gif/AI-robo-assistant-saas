@@ -20,6 +20,7 @@ import uuid
 import json
 import sqlite3
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -97,6 +98,7 @@ class BackgroundMissionDispatcher:
         else:
             self.db_path = db_path
         self._missions: Dict[str, BackgroundMission] = {}
+        self._exec_lock = threading.RLock()
 
         self._init_db()
         self._load_persisted_missions()
@@ -170,13 +172,30 @@ class BackgroundMissionDispatcher:
         try:
             with self._get_connection() as conn:
                 conn.execute("""
-                INSERT OR REPLACE INTO coworker_background_missions (
+                INSERT INTO coworker_background_missions (
                     mission_id, tenant_id, company_id, initiator, prompt,
                     status, progress_percent, current_stage, subworkers_json,
                     runtimes_json, deliverables_json, evidence_id,
                     notification_message, timeline_json, human_control,
                     created_at, updated_at, completed_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (mission_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    initiator = EXCLUDED.initiator,
+                    prompt = EXCLUDED.prompt,
+                    status = EXCLUDED.status,
+                    progress_percent = EXCLUDED.progress_percent,
+                    current_stage = EXCLUDED.current_stage,
+                    subworkers_json = EXCLUDED.subworkers_json,
+                    runtimes_json = EXCLUDED.runtimes_json,
+                    deliverables_json = EXCLUDED.deliverables_json,
+                    evidence_id = EXCLUDED.evidence_id,
+                    notification_message = EXCLUDED.notification_message,
+                    timeline_json = EXCLUDED.timeline_json,
+                    human_control = EXCLUDED.human_control,
+                    updated_at = EXCLUDED.updated_at,
+                    completed_at = EXCLUDED.completed_at
                 """, (
                     mission.mission_id, mission.tenant_id, mission.company_id,
                     mission.initiator, mission.prompt, mission.status,
@@ -276,49 +295,337 @@ class BackgroundMissionDispatcher:
 
     def execute_compound_mission_step(self, mission_id: str) -> Optional[BackgroundMission]:
         """
+        Serialized entry point for mission progression.
+
+        The autonomy supervisor and HTTP endpoints can ask for a step at the
+        same time; the RLock prevents two workers from advancing one mission
+        concurrently and double-writing deliverables/evidence.
+        """
+        with self._exec_lock:
+            return self._execute_compound_mission_step_unlocked(mission_id)
+
+    def _killswitch_blocks(self, mission: BackgroundMission) -> bool:
+        """Fail-closed governance gate evaluated before any mission work."""
+        try:
+            from ..killswitch_matrix import KillSwitchMatrix, KillSwitchLevel
+            ks = KillSwitchMatrix(mission.tenant_id)
+            return bool(
+                ks.is_activated(KillSwitchLevel.GLOBAL)
+                or ks.is_activated(KillSwitchLevel.TENANT, mission.tenant_id)
+                or ks.is_activated(KillSwitchLevel.COMPANY, mission.company_id)
+            )
+        except Exception:
+            return True
+
+    def _execute_compound_mission_step_unlocked(self, mission_id: str) -> Optional[BackgroundMission]:
+        """
         Executes real progression of the compound mission with real artifacts and SHA-256 evidence.
         """
         mission = self._missions.get(mission_id)
-        if not mission or mission.status in [MissionState.COMPLETED.value, MissionState.FAILED.value, MissionState.CANCELLED.value]:
+        if not mission or mission.status in [
+            MissionState.COMPLETED.value, MissionState.FAILED.value,
+            MissionState.CANCELLED.value, MissionState.BLOCKED.value,
+        ]:
             return mission
+
+        # Tenant isolation: a mission id is only addressable by its owner.
+        if mission.tenant_id != self.tenant_id or mission.company_id != self.company_id:
+            return None
 
         if mission.human_control:
             mission.add_timeline_event("PAUSED", "Execution paused under human operator takeover")
             return mission
 
+        # KillSwitch gate: no mission work may start while a global, tenant or
+        # company switch is engaged. Status is left untouched so work resumes
+        # automatically after the switch is disengaged.
+        if self._killswitch_blocks(mission):
+            now = time.time()
+            recent = any(
+                event.get("type") == "KILLSWITCH_HOLD"
+                and (now - float(event.get("timestamp") or 0)) < 300.0
+                for event in mission.timeline[-10:]
+            )
+            if not recent:
+                mission.add_timeline_event(
+                    "KILLSWITCH_HOLD",
+                    "Mission progression paused: KillSwitch engaged (GLOBAL/TENANT/COMPANY)",
+                    "WARNING",
+                )
+                self._persist_mission(mission)
+            return mission
+
         now = time.time()
 
-        # Stage 1: Research & Discovery
+        # Stage 1: Planning & synthesis (real model call, no fabricated claims)
         if mission.progress_percent < 45.0:
             mission.progress_percent = 50.0
-            mission.current_stage = "Web and repository intelligence collected; synthesizing findings"
-            mission.add_timeline_event("RESEARCH_COLLECTED", "Data aggregated via OpenClaw / Governed Terminal")
+            mission.current_stage = "Planning and drafting with the configured language model"
+            mission.add_timeline_event(
+                "PLAN_STARTED",
+                "Objective dispatched to the governed LLM runtime for decomposition and drafting"
+            )
+
+            from core.llm_runtime import llm_runtime
+            from core.ceo_chat import build_company_context
+            try:
+                company_ctx = build_company_context(mission.tenant_id, mission.company_id)
+            except Exception:
+                company_ctx = {}
+            mission._company_context = company_ctx
+            ctx_json = json.dumps(company_ctx, default=str)[:12000]
+            plan = llm_runtime.chat(
+                tenant_id=mission.tenant_id,
+                company_id=mission.company_id,
+                system=(
+                    "You are a governed AI operations worker inside a company operating system. "
+                    "Produce concrete, verifiable work — not claims. If you lack data, say exactly "
+                    "what is missing. Never invent figures, customers, or sources."
+                ),
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Objective: {mission.prompt}\n\n"
+                        f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n{ctx_json}\n\n"
+                        "Return a short execution plan (max 6 bullets), grounded in the context "
+                        "above, and list any data you would need from the company's connected "
+                        "systems. Quote real record ids and numbers; do not invent data."
+                    ),
+                }],
+                max_tokens=500,
+                temperature=0.2,
+                intent="mission_plan",
+            )
+            mission._plan = plan.content if not plan.degraded else ""
+            mission._plan_provider = plan.provider
+            mission._plan_degraded = plan.degraded
+            if plan.degraded:
+                mission.add_timeline_event(
+                    "MODEL_DEGRADED",
+                    "No language model was reachable; mission work cannot be completed honestly.",
+                    "WARNING"
+                )
+            else:
+                mission.add_timeline_event(
+                    "PLAN_READY",
+                    f"Plan drafted with {plan.provider}/{plan.model} ({int(plan.latency_ms)}ms)"
+                )
+
+            # Stage 1b: real delegated tool execution.
+            # Only runtimes that genuinely execute are delegated to. The HTTP/DOM
+            # browser runtime and computer-use runtime are deliberately excluded
+            # because they cannot perform interactions without a browser engine.
+            try:
+                from core.coworker.providers.terminal_provider import TerminalProvider
+                workspace_dir = os.path.join(
+                    os.path.dirname(os.path.abspath(self.db_path)),
+                    "workspaces",
+                    mission.tenant_id,
+                )
+                os.makedirs(workspace_dir, exist_ok=True)
+                provider = TerminalProvider(workspace_root=workspace_dir)
+                facts: Dict[str, Any] = {}
+                delegations = []
+                for cap, params in (
+                    ("terminal.inspect_filesystem", {"path": workspace_dir}),
+                    ("terminal.inspect_environment", {}),
+                ):
+                    started = time.time()
+                    exec_res = provider.execute(cap, params, {
+                        "tenant_id": mission.tenant_id,
+                        "company_id": mission.company_id,
+                        "mission_id": mission.mission_id,
+                        "agent_id": f"agt_coworker_{mission.mission_id[:8]}",
+                    })
+                    elapsed = round((time.time() - started) * 1000, 2)
+                    status = getattr(exec_res, "status", "FAILED")
+                    delegations.append({
+                        "capability": cap,
+                        "provider": getattr(exec_res, "provider_id", "provider_terminal"),
+                        "execution_id": getattr(exec_res, "execution_id", None),
+                        "status": status,
+                        "duration_ms": elapsed,
+                        "real_execution": True,
+                    })
+                    if status == "SUCCESS":
+                        out = getattr(exec_res, "output", None)
+                        facts[cap] = out
+                    else:
+                        facts[cap] = {
+                            "status": status,
+                            "error": getattr(exec_res, "error_message", None),
+                        }
+                    mission.add_timeline_event(
+                        "TOOL_DELEGATED",
+                        f"{cap} -> {status} ({elapsed}ms, provider_terminal)",
+                        "INFO" if status == "SUCCESS" else "WARNING",
+                    )
+
+                # Attribute a real, hashed result to the first sub-worker.
+                if mission.subworkers:
+                    try:
+                        from core.coworker.subworkers import SubWorkerCoordinator
+                        digest = hashlib.sha256(
+                            json.dumps(facts, sort_keys=True, default=str).encode()
+                        ).hexdigest()
+                        mission._delegation_digest = digest
+                        mission._tool_facts = facts
+                        mission.add_timeline_event(
+                            "DELEGATION_EVIDENCE",
+                            f"Delegated tool result digest {digest[:16]}… bound to {mission.subworkers[0]}",
+                        )
+                    except Exception:
+                        mission._tool_facts = facts
+                else:
+                    mission._tool_facts = facts
+                mission._delegations = delegations
+            except Exception as exc:
+                mission.add_timeline_event(
+                    "DELEGATION_SKIPPED",
+                    f"Real tool delegation unavailable: {type(exc).__name__}: {str(exc)[:160]}",
+                    "WARNING",
+                )
+                mission._tool_facts = {}
 
         # Stage 2: Deliverable Synthesis & File Write
         elif mission.progress_percent < 80.0:
             mission.progress_percent = 80.0
             mission.current_stage = "Writing verified deliverable report to company workspace"
 
+            if getattr(mission, "_plan_degraded", True):
+                mission.status = MissionState.BLOCKED.value
+                mission.current_stage = "BLOCKED — no language model provider is available"
+                mission.add_timeline_event(
+                    "MODEL_UNAVAILABLE",
+                    "Mission blocked instead of fabricating a deliverable. Configure an LLM provider in "
+                    "Settings → AI Models & Providers, or install the embedded model.",
+                    "ERROR"
+                )
+                mission.updated_at = time.time()
+                self._persist_mission(mission)
+                return mission
+
+            from core.llm_runtime import llm_runtime
+            from core.settings_service import settings_service
+
+            # Output budget is a governed setting, not a hard-coded constant.
+            try:
+                configured_max = settings_service.get_effective_setting(
+                    mission.tenant_id, mission.company_id, "llm_max_tokens", None
+                )
+            except Exception:
+                configured_max = None
+            try:
+                configured_max = int(configured_max) if configured_max else None
+                if configured_max is not None and configured_max <= 0:
+                    configured_max = None
+            except (TypeError, ValueError):
+                configured_max = None
+
+            system_prompt = (
+                "You are a governed AI worker. Write the requested deliverable in Markdown. "
+                "Be explicit about assumptions and missing data. Do not fabricate sources, "
+                "metrics, or customer names. Include a short 'Data gaps' section."
+            )
+            user_prompt = (
+                f"Objective: {mission.prompt}\n\n"
+                f"COMPANY CONTEXT (authoritative, tenant-scoped JSON):\n"
+                f"{json.dumps(getattr(mission, '_company_context', {}), default=str)[:12000]}\n\n"
+                f"Approved plan:\n{getattr(mission, '_plan', '')}\n\n"
+                f"VERIFIED TOOL OUTPUT (executed by the terminal provider, authoritative):\n"
+                f"{json.dumps(getattr(mission, '_tool_facts', {}), default=str)[:4000]}\n\n"
+                "Now produce the complete deliverable. Use the real record ids and numbers "
+                "from the context, show calculations, and mark anything not in the context "
+                "as a data gap."
+            )
+            draft = llm_runtime.chat(
+                tenant_id=mission.tenant_id,
+                company_id=mission.company_id,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=configured_max,
+                temperature=0.4,
+                intent="mission_deliverable",
+            )
+
+            # Bounded continuation: if the model stops because it hit the token
+            # ceiling, ask it to continue rather than silently shipping a cut-off
+            # document. Each continuation is logged; the total is capped.
+            try:
+                max_continuations = int(settings_service.get_effective_setting(
+                    mission.tenant_id, mission.company_id, "llm_mission_max_continuations", 2
+                ))
+            except Exception:
+                max_continuations = 2
+            max_continuations = max(0, min(max_continuations, 5))
+            continuations_used = 0
+            combined_content = draft.content or ""
+            while (
+                getattr(draft, "finish_reason", None) == "length"
+                and continuations_used < max_continuations
+                and not draft.degraded
+            ):
+                continuations_used += 1
+                mission.add_timeline_event(
+                    "DELIVERABLE_CONTINUATION",
+                    f"Model hit the token ceiling; requesting continuation {continuations_used}/{max_continuations}.",
+                    "INFO",
+                )
+                tail = combined_content[-4000:]
+                cont = llm_runtime.chat(
+                    tenant_id=mission.tenant_id,
+                    company_id=mission.company_id,
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_prompt},
+                        {"role": "assistant", "content": tail},
+                        {"role": "user", "content": (
+                            "Continue the deliverable from exactly where it stopped. "
+                            "Do not repeat earlier text, do not add a new introduction, "
+                            "and do not summarise. Resume mid-sentence if that is where "
+                            "the document ended."
+                        )},
+                    ],
+                    max_tokens=configured_max,
+                    temperature=0.4,
+                    intent="mission_deliverable_continuation",
+                )
+                if cont.degraded or not (cont.content or "").strip():
+                    break
+                combined_content += cont.content
+                draft = cont
+            if draft.degraded or not draft.content.strip():
+                mission.status = MissionState.BLOCKED.value
+                mission.current_stage = "BLOCKED — deliverable generation failed"
+                mission.add_timeline_event("DELIVERABLE_FAILED", "Model returned no usable content", "ERROR")
+                mission.updated_at = time.time()
+                self._persist_mission(mission)
+                return mission
+
             workspace_dir = os.path.join(
                 os.path.dirname(os.path.abspath(self.db_path)),
-                "workspaces"
+                "workspaces",
+                mission.tenant_id,
             )
             os.makedirs(workspace_dir, exist_ok=True)
-            deliverable_filename = f"mission_{mission.mission_id[:8]}_deliverable.json"
+            deliverable_filename = f"mission_{mission.mission_id[:8]}_deliverable.md"
             deliverable_path = os.path.join(workspace_dir, deliverable_filename)
 
-            report_data = {
-                "mission_id": mission.mission_id,
-                "objective": mission.prompt,
-                "tenant_id": mission.tenant_id,
-                "company_id": mission.company_id,
-                "runtimes_involved": mission.runtimes_used,
-                "subworkers_count": len(mission.subworkers),
-                "summary": f"Completed objective: '{mission.prompt}'. All operational assertions independently verified.",
-                "created_at": now
-            }
+            header = (
+                f"# Mission Deliverable\n\n"
+                f"- Mission: `{mission.mission_id}`\n"
+                f"- Tenant: `{mission.tenant_id}`\n"
+                f"- Company: `{mission.company_id}`\n"
+                f"- Objective: {mission.prompt}\n"
+                f"- Model: `{draft.provider}/{draft.model}`\n"
+                f"- Generated: {time.strftime('%Y-%m-%d %H:%M:%SZ', time.gmtime(now))}\n\n"
+                f"---\n\n"
+            )
+            truncated = getattr(draft, "finish_reason", None) == "length"
             with open(deliverable_path, "w", encoding="utf-8") as f:
-                json.dump(report_data, f, indent=2)
+                f.write(header + combined_content + "\n")
+                if truncated:
+                    f.write("\n<!-- DELIVERABLE_TRUNCATED: model hit max_tokens; content incomplete -->\n")
 
             with open(deliverable_path, "rb") as f:
                 post_sha = hashlib.sha256(f.read()).hexdigest()
@@ -328,6 +635,19 @@ class BackgroundMissionDispatcher:
                 "DELIVERABLE_WRITTEN",
                 f"Saved to {deliverable_path} (SHA-256: {post_sha[:16]}...)"
             )
+            if truncated:
+                mission.add_timeline_event(
+                    "DELIVERABLE_TRUNCATED",
+                    "Model still hit the token ceiling after "
+                    f"{continuations_used} continuation(s). The deliverable is incomplete and "
+                    "will not be sealed as verified.",
+                    "WARNING",
+                )
+            elif continuations_used:
+                mission.add_timeline_event(
+                    "DELIVERABLE_CONTINUATION_COMPLETE",
+                    f"Deliverable completed after {continuations_used} continuation(s).",
+                )
 
         # Stage 3: Verification & Tamper-Evident Evidence Ledger Recording
         else:
@@ -340,6 +660,32 @@ class BackgroundMissionDispatcher:
                 if not os.path.exists(d):
                     all_verified = False
                     break
+
+            truncated_marker = b"DELIVERABLE_TRUNCATED"
+            deliverable_truncated = False
+            if mission.deliverables:
+                try:
+                    with open(mission.deliverables[-1], "rb") as f:
+                        deliverable_truncated = truncated_marker in f.read()
+                except OSError:
+                    deliverable_truncated = False
+
+            if all_verified and mission.deliverables and deliverable_truncated:
+                mission.status = MissionState.UNCERTAIN.value
+                mission.progress_percent = 90.0
+                mission.current_stage = (
+                    "UNCERTAIN — deliverable was truncated at the model token limit; "
+                    "content is incomplete and was NOT sealed as verified"
+                )
+                mission.updated_at = time.time()
+                mission.add_timeline_event(
+                    "VERIFICATION_REFUSED",
+                    "Integrity hash would match an incomplete document, so verification was "
+                    "refused. Re-run with a larger output budget or split the objective.",
+                    "WARNING",
+                )
+                self._persist_mission(mission)
+                return mission
 
             if all_verified and mission.deliverables:
                 with open(mission.deliverables[-1], "rb") as f:
@@ -360,22 +706,34 @@ class BackgroundMissionDispatcher:
                     f"Cryptographic proof {mission.evidence_id} recorded into Evidence Ledger"
                 )
 
-                # Record into audit_ledger.jsonl if accessible
-                from core.evidence_ledger import get_default_ledger_path
-                audit_ledger_path = get_default_ledger_path()
+                # Record into the tenant-isolated Evidence Ledger.
                 try:
-                    os.makedirs(os.path.dirname(audit_ledger_path), exist_ok=True)
-                    audit_record = {
-                        "entry_id": f"aud_{uuid.uuid4().hex[:8]}",
-                        "mission_id": mission.mission_id,
-                        "timestamp": now,
-                        "action": "BACKGROUND_MISSION_COMPLETED",
-                        "evidence_id": mission.evidence_id,
-                        "deliverable_sha256": file_sha,
-                        "verified": True
-                    }
-                    with open(audit_ledger_path, "a", encoding="utf-8") as af:
-                        af.write(json.dumps(audit_record) + "\n")
+                    from core.evidence_ledger import EvidenceLedger
+                    from core.tenancy import tenant_ledger_path
+                    from core.models import PhysicalVerification
+                    ledger = EvidenceLedger(tenant_ledger_path(mission.tenant_id))
+                    verifs = [
+                        PhysicalVerification(
+                            check_type="sha256_match",
+                            target_path=mission.deliverables[-1],
+                            expected_val=file_sha,
+                            actual_val=file_sha,
+                            verified=True,
+                            details="Background deliverable SHA-256 verified"
+                        )
+                    ]
+                    ledger.seal_evidence(
+                        action_id=f"act_bg_{mission.mission_id}",
+                        mission_id=mission.mission_id,
+                        agent_id=getattr(mission, "assigned_agent", None) or "agt_bg_dispatcher",
+                        verifications=verifs,
+                        metadata={
+                            "action": "BACKGROUND_MISSION_COMPLETED",
+                            "deliverable_sha256": file_sha,
+                            "tenant_id": mission.tenant_id,
+                            "company_id": mission.company_id,
+                        }
+                    )
                 except Exception:
                     pass
             else:

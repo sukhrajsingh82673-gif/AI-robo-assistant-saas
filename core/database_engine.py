@@ -14,6 +14,12 @@ import logging
 from typing import Dict, List, Optional, Any, Tuple, Union, Callable
 from contextlib import contextmanager
 
+try:
+    from core.neon_env import load_neon_env
+    load_neon_env()
+except Exception:
+    pass
+
 logger = logging.getLogger("zonata.db")
 
 class DatabaseDialect:
@@ -58,8 +64,18 @@ class PooledConnection:
             return self.raw_conn.execute(sql, params)
         else:
             # PostgreSQL protocol simulation / driver execution
+            from core.db import normalize_sql_for_postgres
+            norm_sql = normalize_sql_for_postgres(sql)
+            if not norm_sql:
+                class DummyCursor:
+                    def fetchone(self): return None
+                    def fetchall(self): return []
+                    @property
+                    def rowcount(self): return 0
+                    def __iter__(self): return iter([])
+                return DummyCursor()
             cursor = self.raw_conn.cursor()
-            cursor.execute(sql, params)
+            cursor.execute(norm_sql, params)
             return cursor
 
     def commit(self):
@@ -79,6 +95,36 @@ class PooledConnection:
         except Exception:
             pass
 
+class DeferredPooledConnection:
+    """Proxy pooled connection returned during module import when live database is unreachable."""
+    def __init__(self, dialect: str, pool_type: str):
+        self.raw_conn = None
+        self.dialect = dialect
+        self.pool_type = pool_type
+        self.created_at = time.time()
+        self.last_used_at = time.time()
+        self.in_use = True
+        self.transaction_active = False
+
+    def execute(self, sql: str, params: Union[Tuple, List, Dict] = ()):
+        class DummyCursor:
+            def fetchone(self): return None
+            def fetchall(self): return []
+            @property
+            def rowcount(self): return 0
+            def __iter__(self): return iter([])
+        return DummyCursor()
+
+    def commit(self):
+        self.transaction_active = False
+
+    def rollback(self):
+        self.transaction_active = False
+
+    def close(self):
+        pass
+
+
 class DatabaseConnectionPool:
     """
     Production-grade multi-workload connection pool with admission control,
@@ -93,7 +139,8 @@ class DatabaseConnectionPool:
         connection_timeout: float = 30.0,
         idle_timeout: float = 300.0,
         max_lifetime: float = 3600.0,
-        pool_type: str = WorkloadType.CONTROL_PLANE
+        pool_type: str = WorkloadType.CONTROL_PLANE,
+        deferred_mode: bool = False
     ):
         self.dialect = dialect
         self.connection_factory = connection_factory
@@ -103,6 +150,7 @@ class DatabaseConnectionPool:
         self.idle_timeout = idle_timeout
         self.max_lifetime = max_lifetime
         self.pool_type = pool_type
+        self._deferred_import_mode = deferred_mode
 
         self._pool: List[PooledConnection] = []
         self._lock = threading.RLock()
@@ -110,8 +158,9 @@ class DatabaseConnectionPool:
         self._closed = False
         self._active_connections = 0
 
-        # Pre-warm minimum pool
-        self._prewarm()
+        # Pre-warm minimum pool only if not deferred
+        if not self._deferred_import_mode:
+            self._prewarm()
 
     def _prewarm(self):
         with self._lock:
@@ -125,8 +174,11 @@ class DatabaseConnectionPool:
                     logger.warning(f"Failed to prewarm pool connection: {e}")
                     break
 
-    def acquire(self, timeout: Optional[float] = None) -> PooledConnection:
+    def acquire(self, timeout: Optional[float] = None) -> Union[PooledConnection, DeferredPooledConnection]:
         """Acquire a verified connection from the pool with admission control."""
+        if self._deferred_import_mode:
+            return DeferredPooledConnection(self.dialect, self.pool_type)
+
         timeout = timeout or self.connection_timeout
         start_time = time.time()
 
@@ -172,8 +224,10 @@ class DatabaseConnectionPool:
 
                 self._cond.wait(timeout=min(remaining, 1.0))
 
-    def release(self, conn: PooledConnection):
+    def release(self, conn: Union[PooledConnection, DeferredPooledConnection]):
         """Release connection back to pool."""
+        if isinstance(conn, DeferredPooledConnection):
+            return
         with self._lock:
             if conn.transaction_active:
                 conn.rollback()
@@ -190,6 +244,20 @@ class DatabaseConnectionPool:
             self._pool.clear()
             self._active_connections = 0
             self._cond.notify_all()
+
+    def reset(self):
+        """Gracefully terminate existing connections and reset pool for new operations."""
+        with self._lock:
+            for conn in self._pool:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._pool.clear()
+            self._active_connections = 0
+            self._closed = False
+            self._cond.notify_all()
+
 
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
@@ -211,38 +279,49 @@ class DatabaseEngine:
     """
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv("DATABASE_URL", "")
-        if self.database_url.startswith("postgresql://") or self.database_url.startswith("postgres://"):
+        dialect_env = os.getenv("ZONATA_DB_DIALECT", "").lower()
+        app_env = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+
+        if not is_prod and (dialect_env == "sqlite" or bool(os.getenv("ZONATA_DB_PATH"))):
+            self.dialect = DatabaseDialect.SQLITE
+        elif (self.database_url and (self.database_url.startswith("postgresql://") or self.database_url.startswith("postgres://"))) or dialect_env == "postgresql":
             self.dialect = DatabaseDialect.POSTGRESQL
         else:
             self.dialect = DatabaseDialect.SQLITE
 
         self._custom_db_path = None
+        self._is_ready = (self.dialect == DatabaseDialect.SQLITE)
+        self._deferred_import_mode = (self.dialect == DatabaseDialect.POSTGRESQL)
 
-        # Initialize workload-separated pools
+        # Initialize workload-separated pools (serverless-optimized min_pool_size=1)
         self.pools: Dict[str, DatabaseConnectionPool] = {
             WorkloadType.CONTROL_PLANE: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=3,
+                min_pool_size=1,
                 max_pool_size=10,
                 connection_timeout=15.0,
-                pool_type=WorkloadType.CONTROL_PLANE
+                pool_type=WorkloadType.CONTROL_PLANE,
+                deferred_mode=self._deferred_import_mode
             ),
             WorkloadType.WRITE: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=5,
+                min_pool_size=1,
                 max_pool_size=20,
                 connection_timeout=30.0,
-                pool_type=WorkloadType.WRITE
+                pool_type=WorkloadType.WRITE,
+                deferred_mode=self._deferred_import_mode
             ),
             WorkloadType.READ: DatabaseConnectionPool(
                 dialect=self.dialect,
                 connection_factory=self._create_raw_connection,
-                min_pool_size=5,
+                min_pool_size=1,
                 max_pool_size=30,
                 connection_timeout=20.0,
-                pool_type=WorkloadType.READ
+                pool_type=WorkloadType.READ,
+                deferred_mode=self._deferred_import_mode
             )
         }
 
@@ -259,6 +338,10 @@ class DatabaseEngine:
     @db_path.setter
     def db_path(self, val: str):
         self._custom_db_path = os.path.abspath(val) if val else None
+        if hasattr(self, 'pools') and self.pools:
+            for p in self.pools.values():
+                p.reset()
+
 
     def _create_raw_connection(self) -> Any:
         """Create dialect-specific raw database connection."""
@@ -272,7 +355,8 @@ class DatabaseEngine:
             conn.execute("PRAGMA synchronous = NORMAL")
             return conn
         else:
-            # PostgreSQL connection via pg8000 / psycopg2 / psycopg if available
+            # PostgreSQL connection via psycopg2 or pg8000
+            from core.db import sanitize_db_url
             try:
                 import psycopg2
                 import psycopg2.extras
@@ -280,8 +364,45 @@ class DatabaseEngine:
                 conn.autocommit = False
                 return conn
             except ImportError:
-                # Fallback to pure-python or wrapper if pg driver not installed in sandbox
-                raise DatabaseException("PostgreSQL driver (psycopg2) not available. Set SQLITE_DB_PATH or install driver.")
+                pass
+            except Exception as e:
+                sanitized_url = sanitize_db_url(self.database_url or "")
+                sanitized_err = sanitize_db_url(str(e))
+                raise DatabaseException(f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}")
+
+            try:
+                termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
+                if os.path.exists(termux_site) and termux_site not in sys.path:
+                    sys.path.insert(0, termux_site)
+                import pg8000
+                import ssl
+                import urllib.parse
+                parsed = urllib.parse.urlsplit(self.database_url)
+                user = parsed.username or "postgres"
+                password = parsed.password or ""
+                host = parsed.hostname or "localhost"
+                port = parsed.port or 5432
+                database = parsed.path.lstrip("/") or "postgres"
+                ssl_ctx = None
+                if "sslmode=require" in self.database_url or "neon.tech" in (parsed.hostname or ""):
+                    ssl_ctx = ssl.create_default_context()
+                conn = pg8000.connect(
+                    user=user,
+                    password=password,
+                    host=host,
+                    port=port,
+                    database=database,
+                    ssl_context=ssl_ctx,
+                    timeout=int(os.environ.get("DATABASE_TIMEOUT", "60"))
+                )
+                conn.autocommit = False
+                return conn
+            except ImportError:
+                raise DatabaseException("PostgreSQL driver (psycopg2 or pg8000) not available. Set SQLITE_DB_PATH or install driver.")
+            except Exception as e:
+                sanitized_url = sanitize_db_url(self.database_url or "")
+                sanitized_err = sanitize_db_url(str(e))
+                raise DatabaseException(f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}")
 
     @contextmanager
     def connection(self, workload: str = WorkloadType.CONTROL_PLANE):
@@ -339,6 +460,50 @@ class DatabaseEngine:
                     f"Optimistic lock conflict on {table}. Expected version {expected_version}, but record was concurrently modified."
                 )
             return True
+
+    def is_ready(self) -> bool:
+        """Returns True if the database engine connection pool has been verified."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            return True
+        return bool(self._is_ready)
+
+    def verify_readiness(self) -> bool:
+        """Verifies genuine database connectivity across pools. Fails closed with sanitized error."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            self._is_ready = True
+            self._deferred_import_mode = False
+            for p in self.pools.values():
+                p._deferred_import_mode = False
+            return True
+
+        from core.db import sanitize_db_url
+        if not self.database_url:
+            raise DatabaseException("Database Readiness Error: DATABASE_URL is not configured.")
+
+        try:
+            raw = self._create_raw_connection()
+            try:
+                cur = raw.cursor()
+                cur.execute("SELECT 1")
+                res = cur.fetchone()
+                if not res or res[0] != 1:
+                    raise DatabaseException("Database ping returned invalid result.")
+            finally:
+                try:
+                    raw.close()
+                except Exception:
+                    pass
+            self._is_ready = True
+            self._deferred_import_mode = False
+            for p in self.pools.values():
+                p._deferred_import_mode = False
+                p._prewarm()
+            return True
+        except Exception as e:
+            self._is_ready = False
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
+            raise DatabaseException(f"Database Pool Readiness Verification Failed for '{sanitized_url}': {sanitized_err}")
 
     def health_check(self) -> Dict[str, Any]:
         """Perform active database ping across all pools."""

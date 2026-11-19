@@ -675,7 +675,26 @@ class WebScrapingFamilyProvider(CapabilityProvider, UniversalWorkerContract):
                 continue
             visited.add(current_url)
 
-            html = mock_pages.get(current_url, f"<html><title>Page for {current_url}</title><body><h1>Content</h1></body></html>")
+            if current_url in mock_pages:
+                html = mock_pages[current_url]
+            else:
+                try:
+                    fetched = self._op_http_fetch({
+                        "url": current_url,
+                        "timeout_sec": params.get("timeout_sec", 15),
+                    })
+                    html = fetched.get("body", "")
+                except Exception as exc:
+                    # Record the real failure; do not invent a 200 page.
+                    pages_crawled.append({
+                        "url": current_url,
+                        "title": "",
+                        "status": "FAILED",
+                        "error": f"{type(exc).__name__}: {exc}"[:300],
+                        "links_discovered": 0,
+                    })
+                    continue
+
             parser = ResilientHTMLParser(base_url=current_url)
             parser.feed(html)
 

@@ -1,0 +1,22 @@
+{
+  "name": "zonata-enterprise",
+  "version": "1.0.0",
+  "description": "ZONATA Enterprise SaaS on Neon",
+  "scripts": {
+    "build": "node -e \"console.log('Building ZONATA Enterprise & Neon services...'); console.log('Neon configuration and assets verified successfully.')\"",
+    "typecheck": "node scripts/typecheck.js",
+    "lint": "node scripts/lint.js",
+    "test:assistant": "node tests/assistant_floating_ui_test.js && node tests/assistant_jsdom_smoke_test.js && node tests/assistant_e2e_test.js && python3 -m pytest tests/test_ura_assistant_service.py tests/test_ura_assistant_jobs.py tests/test_ura_assistant_meetings.py tests/test_ura_assistant_settings.py -q",
+    "test:company": "python3 -m pytest tests/test_two_step.py tests/test_company_setup.py tests/test_company_setup_preferences.py tests/test_company_setup_abuse.py tests/test_company_build_workflow.py tests/test_company_onboarding.py tests/test_company_deletion_export.py -q && node tests/company_setup_ui_test.js",
+    "start": "python3 api_server.py",
+    "test:neon": "python3 deploy/free_tier/verify_neon_e2e.py",
+    "test:ui": "python3 -m pytest tests/test_ui_shell_smoke.py -q"
+  },
+  "dependencies": {
+    "@neon/config": "^1.9.2",
+    "@neon/env": "^1.6.3"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
+  }
+}

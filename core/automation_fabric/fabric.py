@@ -27,7 +27,10 @@ import hashlib
 import random
 import math
 import threading
+import logging
 from typing import Dict, Any, List, Optional, Tuple, Set
+
+logger = logging.getLogger("zonata.automation_fabric")
 
 from core.db import db
 from core.evidence_ledger import EvidenceLedger
@@ -280,15 +283,35 @@ class UniversalAutomationFabric:
             );
             CREATE INDEX IF NOT EXISTS idx_autosign_status ON automation_signing_keys(status);
             """)
-            try:
-                conn.execute("ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT")
-            except Exception:
-                pass
-            try:
-                conn.execute("ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT")
-            except Exception:
-                pass
-            conn.commit()
+            dialect = getattr(db, 'dialect', None)
+            dialect_value = str(getattr(dialect, 'value', dialect)).lower()
+            if dialect_value == 'postgresql':
+                try:
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS actor_role TEXT")
+                    conn.execute("ALTER TABLE automation_approvals ADD COLUMN IF NOT EXISTS receipt_signature TEXT")
+                    conn.commit()
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    logger.debug(f"Approval columns check: {e}")
+            else:
+                for stmt in (
+                    "ALTER TABLE automation_approvals ADD COLUMN actor_role TEXT",
+                    "ALTER TABLE automation_approvals ADD COLUMN receipt_signature TEXT",
+                ):
+                    try:
+                        conn.execute(stmt)
+                        conn.commit()
+                    except Exception:
+                        # Already-present column: roll back so the connection
+                        # stays usable (PostgreSQL aborts the transaction).
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                conn.commit()
 
     # =========================================================================
     # LEASE CONSUMPTION, REPLAY PREVENTION & REVOCATION
@@ -368,9 +391,13 @@ class UniversalAutomationFabric:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO automation_revoked_leases (
+                INSERT INTO automation_revoked_leases (
                     lease_id, tenant_id, reason, revoked_at
                 ) VALUES (?, ?, ?, ?)
+                ON CONFLICT (lease_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    reason = EXCLUDED.reason,
+                    revoked_at = EXCLUDED.revoked_at
             """, (lease_id, tenant_id, reason, now))
             conn.commit()
 
@@ -1756,6 +1783,12 @@ class UniversalAutomationFabric:
         self._worker_running = True
         self._worker_stop_event.clear()
 
+        # Ensure automation tables are initialized on live database
+        try:
+            self._init_automation_tables()
+        except Exception as e:
+            logger.warning(f"Could not initialize automation tables on worker start: {e}")
+
         # Startup crash recovery
         recovered = self._recover_crashed_executions_on_startup()
 
@@ -1787,22 +1820,30 @@ class UniversalAutomationFabric:
         Safely transitions them to RECOVERING so they are not silently lost or blindly replayed.
         """
         now = time.time()
-        with db.get_connection() as conn:
-            rows = conn.execute("""
-                SELECT execution_id FROM automation_executions
-                WHERE status IN ('RUNNING', 'CLAIMED')
-            """).fetchall()
-            for r in rows:
-                conn.execute("""
-                    UPDATE automation_executions
-                    SET status = 'RECOVERING',
-                        terminal_outcome = 'UNKNOWN_OUTCOME',
-                        error_message = 'Process terminated abnormally while in flight; safe recovery needed',
-                        updated_at = ?
-                    WHERE execution_id = ?
-                """, (now, r["execution_id"]))
-            conn.commit()
-            return len(rows)
+        try:
+            with db.get_connection() as conn:
+                rows = conn.execute("""
+                    SELECT execution_id FROM automation_executions
+                    WHERE status IN ('RUNNING', 'CLAIMED')
+                """).fetchall()
+                for r in rows:
+                    conn.execute("""
+                        UPDATE automation_executions
+                        SET status = 'RECOVERING',
+                            terminal_outcome = 'UNKNOWN_OUTCOME',
+                            error_message = 'Process terminated abnormally while in flight; safe recovery needed',
+                            updated_at = ?
+                        WHERE execution_id = ?
+                    """, (now, r["execution_id"]))
+                conn.commit()
+                return len(rows)
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            logger.warning(f"Could not recover crashed executions on startup: {e}")
+            return 0
 
     def submit_async_execution(
         self,

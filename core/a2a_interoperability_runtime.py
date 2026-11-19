@@ -34,6 +34,8 @@ import hmac
 import hashlib
 import ipaddress
 import urllib.parse
+import urllib.request
+import urllib.error
 from enum import Enum
 from typing import Dict, Any, List, Optional, Tuple, Iterator, Callable
 
@@ -620,12 +622,27 @@ class AgentDiscoveryService:
             for s in sanitized["skills"]:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO a2a_skills (
+                    INSERT INTO a2a_skills (
                         skill_id, agent_id, tenant_id, company_id, name,
                         description, tags, risk_level, permissions, approval_required,
                         evidence_required, timeout, budget, allowed_companies,
                         allowed_tenants, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (skill_id) DO UPDATE SET
+                        agent_id = EXCLUDED.agent_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        company_id = EXCLUDED.company_id,
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        tags = EXCLUDED.tags,
+                        risk_level = EXCLUDED.risk_level,
+                        permissions = EXCLUDED.permissions,
+                        approval_required = EXCLUDED.approval_required,
+                        evidence_required = EXCLUDED.evidence_required,
+                        timeout = EXCLUDED.timeout,
+                        budget = EXCLUDED.budget,
+                        allowed_companies = EXCLUDED.allowed_companies,
+                        allowed_tenants = EXCLUDED.allowed_tenants
                     """,
                     (
                         f"skill_{agent_id}_{s['id']}",
@@ -692,6 +709,82 @@ class A2AAgentInteropProvider(AgentInteropProvider):
         self.replay_protector = A2AReplayProtector()
         self.trust_service = AgentTrustService(tenant_id, company_id)
 
+    def _dispatch_remote(
+        self,
+        agent: Any,
+        agent_id: str,
+        task_id: str,
+        sanitized_parts: List[Dict[str, Any]],
+        data_classification: str,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Performs the real A2A ``message/send`` JSON-RPC round trip.
+
+        Returns ``(payload, error)``. ``error`` is populated whenever the remote
+        agent could not be reached or returned an unusable body; in that case no
+        response is fabricated.
+        """
+        endpoint = (agent["endpoint_url"] or "").strip()
+        if not endpoint:
+            return {}, "Agent has no endpoint_url configured."
+        is_valid, why = AgentCardSanitizer.validate_endpoint_url(
+            endpoint,
+            allow_test_loopback=(os.environ.get("ZONATA_TEST_MODE") == "1"),
+        )
+        if not is_valid:
+            return {}, f"Endpoint rejected by SSRF policy: {why}"
+        if urllib.parse.urlparse(endpoint).scheme not in ("http", "https"):
+            return {}, "Only http/https A2A endpoints are supported by this transport."
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": f"rpc_{uuid.uuid4().hex[:10]}",
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": A2ARole.ROLE_USER.value,
+                    "parts": sanitized_parts,
+                    "messageId": f"msg_{uuid.uuid4().hex[:10]}",
+                    "taskId": task_id,
+                },
+                "metadata": {
+                    "agentId": agent_id,
+                    "dataClassification": data_classification,
+                },
+            },
+        }
+        req = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "A2A-Version": "1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                raw = resp.read(2_000_000)
+        except urllib.error.HTTPError as exc:
+            return {}, f"Remote agent returned HTTP {exc.code}"
+        except Exception as exc:
+            return {}, f"{type(exc).__name__}: {exc}"
+
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return {}, "Remote agent returned a non-JSON body."
+        if not isinstance(data, dict):
+            return {}, "Remote agent returned an unexpected JSON shape."
+        if data.get("error"):
+            err = data["error"]
+            msg = err.get("message") if isinstance(err, dict) else str(err)
+            return {}, f"Remote agent JSON-RPC error: {msg}"
+        result = data.get("result", data)
+        if not isinstance(result, dict):
+            return {}, "Remote agent JSON-RPC result was not an object."
+        return result, None
+
     def send_message(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Executes an A2A v1.0 SendMessage interaction.
@@ -743,12 +836,30 @@ class A2AAgentInteropProvider(AgentInteropProvider):
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO a2a_tasks (
+                INSERT INTO a2a_tasks (
                     task_id, zonata_request_id, tenant_id, company_id, workspace_id,
                     mission_id, zonata_task_id, workflow_id, run_id, agent_id,
                     skill_id, requested_by, idempotency_key, a2a_state, zonata_state,
                     data_classification, cost_spent, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (task_id) DO UPDATE SET
+                    zonata_request_id = EXCLUDED.zonata_request_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    workspace_id = EXCLUDED.workspace_id,
+                    mission_id = EXCLUDED.mission_id,
+                    zonata_task_id = EXCLUDED.zonata_task_id,
+                    workflow_id = EXCLUDED.workflow_id,
+                    run_id = EXCLUDED.run_id,
+                    agent_id = EXCLUDED.agent_id,
+                    skill_id = EXCLUDED.skill_id,
+                    requested_by = EXCLUDED.requested_by,
+                    idempotency_key = EXCLUDED.idempotency_key,
+                    a2a_state = EXCLUDED.a2a_state,
+                    zonata_state = EXCLUDED.zonata_state,
+                    data_classification = EXCLUDED.data_classification,
+                    cost_spent = EXCLUDED.cost_spent,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     task_id,
@@ -791,29 +902,60 @@ class A2AAgentInteropProvider(AgentInteropProvider):
             )
             conn.commit()
 
-        # 7. Execute/Simulate Remote Interaction (with injection scanning on response)
-        mock_response = request.get("mock_response")
+        # 7. Dispatch to the real remote agent over A2A HTTP+JSON.
+        # Caller-injected responses are a test-only hook; production always
+        # performs a real network round trip and never invents a reply.
+        injected = request.get("mock_response")
+        if injected is not None and os.environ.get("ZONATA_TEST_MODE") != "1":
+            raise ValueError(
+                "Injected responses are only accepted in test mode (ZONATA_TEST_MODE=1)."
+            )
         start_t = time.time()
-
-        if mock_response:
-            resp_payload = mock_response
+        transport_error = None
+        transport = "injected" if injected else "a2a_http"
+        if injected is not None:
+            resp_payload = injected
         else:
-            # Standard simulated responsive agent output
-            resp_payload = {
-                "status": {"state": A2ATaskState.TASK_STATE_COMPLETED.value, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())},
-                "artifacts": [
-                    {
-                        "artifact_id": f"art_{uuid.uuid4().hex[:8]}",
-                        "name": "market_summary.json",
-                        "parts": [{"data": {"status": "SUCCESS", "records_processed": 42}, "mediaType": "application/json"}]
-                    }
-                ],
-                "history": [
-                    {"role": A2ARole.ROLE_AGENT.value, "parts": [{"text": "Processed task with certified output"}]}
-                ]
-            }
+            resp_payload, transport_error = self._dispatch_remote(
+                agent=agent,
+                agent_id=agent_id,
+                task_id=task_id,
+                sanitized_parts=sanitized_parts,
+                data_classification=request.get("data_classification", DataClassification.INTERNAL.value),
+            )
 
         elapsed_ms = (time.time() - start_t) * 1000.0
+
+        if transport_error:
+            elapsed_ms = round(elapsed_ms, 2)
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE a2a_tasks SET a2a_state = ?, zonata_state = ?, reconciliation_notes = ?, updated_at = ? WHERE task_id = ?",
+                    (
+                        A2ATaskState.TASK_STATE_FAILED.value,
+                        ZonataA2ATaskState.FAILED.value,
+                        f"Remote transport failed: {transport_error}",
+                        time.time(),
+                        task_id,
+                    ),
+                )
+                conn.commit()
+            self.trust_service.record_task_outcome(
+                agent_id, success=False, verified=False, latency_ms=elapsed_ms
+            )
+            return {
+                "id": task_id,
+                "status": {
+                    "state": A2ATaskState.TASK_STATE_FAILED.value,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+                },
+                "error": transport_error,
+                "code": "REMOTE_AGENT_UNREACHABLE",
+                "transport": transport,
+                "elapsed_ms": elapsed_ms,
+                "artifacts": [],
+                "history": [],
+            }
 
         # 8. Inspect Incoming Response for Injection / Malicious Payload
         raw_text_parts = []

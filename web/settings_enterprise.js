@@ -82,7 +82,7 @@ const EnterpriseSettings = (function() {
         { id: "ai_ceo", num: "05", name: "AI & AI CEO Governance", icon: SVG_ICONS.crown, desc: "Executive operating mode, 0-4 autonomy levels, spending limits, and cognition", scope: "Company", risk: "CRITICAL" },
         { id: "workforce", num: "06", name: "AI Workforce Governance", icon: SVG_ICONS.bot, desc: "Dynamic agent spawning limits, department budgets, and performance gates", scope: "Company", risk: "HIGH" },
         { id: "automation", num: "07", name: "Automation & Missions", icon: SVG_ICONS.repeat, desc: "Durable execution DAGs, mission triggers, retries, and outcome verification", scope: "Company", risk: "MEDIUM" },
-        { id: "ai_providers", num: "08", name: "Models & AI Providers", icon: SVG_ICONS.zap, desc: "Vertex AI, Gemini, Claude, OpenAI, local inference endpoints, and budget routing", scope: "Host", risk: "HIGH" }
+        { id: "ai_providers", num: "08", name: "Models & AI Providers", icon: SVG_ICONS.zap, desc: "Embedded free model, local Ollama, Gemini/Groq/OpenRouter free tiers, or a custom endpoint", scope: "Host", risk: "HIGH" }
       ]
     },
     {
@@ -237,6 +237,8 @@ const EnterpriseSettings = (function() {
 
   let authEnvironment = { environment: 'development', strict_auth: false, auth_mode: 'DEV_BOOTSTRAP' };
   let effectiveStateCache = {};
+  let liveSystemStatus = { llm: null, health: null };
+  let hubAuditEvents = [];
   let isInitialized = false;
   let collapsedPillars = new Set();
   let openShutters = new Set();
@@ -252,11 +254,14 @@ const EnterpriseSettings = (function() {
     setupKeyboardShortcuts();
     await fetchEnvironment();
     await fetchEffectiveState();
+    await Promise.all([fetchLiveSystemStatus(), fetchHubAuditEvents()]);
 
-    // Auto-render if currently on settings route or hash
+    // Auto-render only for legacy routes. The V2 console owns the default
+    // #/settings route, and legacy domain deep links stay legacy.
     const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
-    if (hash.startsWith('#/settings') || hash.startsWith('#settings')) {
-      const clean = hash.replace(/^#/, '');
+    const isConsole = /^#\/(workspace\/)?settings(\/)?$/.test(hash) || /^#\/(workspace\/)?settings-v2(\/|$)/.test(hash);
+    if (!isConsole && (hash.startsWith('#/settings') || hash.startsWith('#settings'))) {
+      const clean = hash.replace(/^#/, '').replace(/^\/(workspace\/)?settings-legacy/, '/settings');
       render(clean);
     }
   }
@@ -312,6 +317,31 @@ const EnterpriseSettings = (function() {
       }
     } catch (e) {
       console.warn('[Settings] Failed to fetch effective runtime state:', e);
+    }
+  }
+
+  async function fetchLiveSystemStatus() {
+    try {
+      const [llmRes, healthRes] = await Promise.all([
+        fetch('/api/llm/status'),
+        fetch('/healthz')
+      ]);
+      if (llmRes.ok) liveSystemStatus.llm = await llmRes.json();
+      if (healthRes.ok) liveSystemStatus.health = await healthRes.json();
+    } catch (e) {
+      console.warn('[Settings] Failed to fetch live system status:', e);
+    }
+  }
+
+  async function fetchHubAuditEvents() {
+    try {
+      const res = await fetch('/api/settings/audit?limit=3');
+      if (res.ok) {
+        const data = await res.json();
+        hubAuditEvents = Array.isArray(data.events) ? data.events : [];
+      }
+    } catch (e) {
+      console.warn('[Settings] Failed to fetch settings audit events:', e);
     }
   }
 
@@ -382,8 +412,8 @@ const EnterpriseSettings = (function() {
     }
 
     if (targetView === 'hub' || targetView === '/settings') {
-      if (window.location.hash !== '#/settings') {
-        window.location.hash = '#/settings';
+      if (window.location.hash !== '#/settings-legacy') {
+        window.location.hash = '#/settings-legacy';
       }
       activeView = 'hub';
       renderRoute();
@@ -464,6 +494,10 @@ const EnterpriseSettings = (function() {
               ${renderSearchBox()}
 
               <div class="meta-actions">
+                <a class="btn-subtle" href="#/settings" title="Open the rebuilt Settings V2 console">
+                  ${SVG_ICONS.sliders}
+                  <span>New console</span>
+                </a>
                 <button class="btn-subtle" onclick="EnterpriseSettings.toggleAuditDrawer()" title="View Global Evidence Audit Ledger">
                   ${SVG_ICONS.checkCircle}
                   <span>Ledger</span>
@@ -472,24 +506,24 @@ const EnterpriseSettings = (function() {
             </div>
           </header>
 
-          <!-- System Status Strip (6 Vitals Cards, Section 6 & 73) -->
+          <!-- System Status Strip (live values only; unknown state is shown as unknown) -->
           <section class="settings-vitals-strip">
             <div class="vital-status-card" onclick="EnterpriseSettings.navigateTo('security')">
               <div class="vital-icon-badge">${SVG_ICONS.lock}</div>
               <div class="vital-content">
                 <span class="vital-label">SECURITY</span>
-                <span class="vital-state"><span class="dot-green"></span>Protected</span>
-                <span class="vital-desc">MFA enforced • 0 critical security issues</span>
+                <span class="vital-state"><span class="${authEnvironment.strict_auth ? 'dot-green' : 'dot-amber'}"></span>${authEnvironment.strict_auth ? 'Strict auth' : 'Dev bootstrap'}</span>
+                <span class="vital-desc">${authEnvironment.strict_auth ? 'Strict authentication + MFA required' : 'MFA not enforced outside production'}</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
 
-            <div class="vital-status-card" onclick="EnterpriseSettings.navigateTo('ai_ceo')">
+            <div class="vital-status-card" onclick="EnterpriseSettings.navigateTo('ai_providers')">
               <div class="vital-icon-badge">${SVG_ICONS.crown}</div>
               <div class="vital-content">
-                <span class="vital-label">AI EXECUTIVE</span>
-                <span class="vital-state"><span class="dot-green"></span>Operational</span>
-                <span class="vital-desc">Level 3 Autonomy • Budget within limit</span>
+                <span class="vital-label">AI INFERENCE</span>
+                <span class="vital-state"><span class="${liveSystemStatus.llm ? (liveSystemStatus.llm.enabled ? 'dot-green' : 'dot-amber') : 'dot-amber'}"></span>${liveSystemStatus.llm ? (liveSystemStatus.llm.enabled ? 'Configured' : 'Disabled') : 'Unverified'}</span>
+                <span class="vital-desc">${liveSystemStatus.llm ? escapeHtml(liveSystemStatus.llm.configured_provider + ' • ' + (liveSystemStatus.llm.configured_model || 'default model')) : 'Provider status unavailable'}</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
@@ -498,8 +532,8 @@ const EnterpriseSettings = (function() {
               <div class="vital-icon-badge">${SVG_ICONS.link}</div>
               <div class="vital-content">
                 <span class="vital-label">INTEGRATIONS</span>
-                <span class="vital-state"><span class="dot-green"></span>Connected</span>
-                <span class="vital-desc">12 systems linked • Least-privilege sync</span>
+                <span class="vital-state"><span class="dot-amber"></span>Owner-configured</span>
+                <span class="vital-desc">No synthetic connectors; unconfigured providers report NOT_CONFIGURED</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
@@ -508,8 +542,8 @@ const EnterpriseSettings = (function() {
               <div class="vital-icon-badge">${SVG_ICONS.scale}</div>
               <div class="vital-content">
                 <span class="vital-label">GOVERNANCE</span>
-                <span class="vital-state"><span class="dot-green"></span>Enforced</span>
-                <span class="vital-desc">Constitutional kernel • Two-person rule active</span>
+                <span class="vital-state"><span class="${effectiveStateCache.emergency_quarantine && effectiveStateCache.emergency_quarantine.effective ? 'dot-red' : 'dot-green'}"></span>${effectiveStateCache.emergency_quarantine && effectiveStateCache.emergency_quarantine.effective ? 'Emergency stop' : 'Active'}</span>
+                <span class="vital-desc">${effectiveStateCache.ceo_autonomy ? escapeHtml(String(effectiveStateCache.ceo_autonomy.effective)) : 'Autonomy policy not loaded'}</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
@@ -518,8 +552,8 @@ const EnterpriseSettings = (function() {
               <div class="vital-icon-badge">${SVG_ICONS.hardDrive}</div>
               <div class="vital-content">
                 <span class="vital-label">BACKUP & DR</span>
-                <span class="vital-state"><span class="dot-green"></span>Healthy</span>
-                <span class="vital-desc">Last snapshot: 22m ago • RTO under 5m</span>
+                <span class="vital-state"><span class="dot-amber"></span>Verification pending</span>
+                <span class="vital-desc">Run a live drill to confirm snapshots on this host</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
@@ -528,14 +562,14 @@ const EnterpriseSettings = (function() {
               <div class="vital-icon-badge">${SVG_ICONS.card}</div>
               <div class="vital-content">
                 <span class="vital-label">COMPUTE BILLING</span>
-                <span class="vital-state"><span class="dot-green"></span>Active</span>
-                <span class="vital-desc">Enterprise tier • Monthly spend cap set</span>
+                <span class="vital-state"><span class="dot-green"></span>${effectiveStateCache.cost_spend_cap && effectiveStateCache.cost_spend_cap.runtime_status === 'ACTIVE' ? 'Cap active' : 'Not loaded'}</span>
+                <span class="vital-desc">${effectiveStateCache.cost_spend_cap ? 'Monthly cap: ' + escapeHtml(String(effectiveStateCache.cost_spend_cap.effective)) : 'Spend cap not loaded'}</span>
               </div>
               <span class="vital-arrow">Configure →</span>
             </div>
           </section>
 
-          <!-- Operational Attention Center (Section 83) -->
+          <!-- Operational Attention Center (live state only) -->
           <section class="settings-attention-center">
             <div class="attention-header">
               <span class="attention-icon">${SVG_ICONS.info}</span>
@@ -543,25 +577,26 @@ const EnterpriseSettings = (function() {
             </div>
             <div class="attention-items-grid">
               <div class="attention-item">
-                <span class="att-bullet dot-green"></span>
+                <span class="att-bullet ${liveSystemStatus.llm && liveSystemStatus.llm.enabled ? 'dot-green' : 'dot-amber'}"></span>
                 <div class="att-text">
-                  <strong>Inference Spend Verification:</strong> Monthly compute consumption currently at 28% of threshold ($28,000 / $100,000 limit).
+                  <strong>Inference Provider:</strong> ${liveSystemStatus.llm ? `${escapeHtml(liveSystemStatus.llm.configured_provider)} using ${escapeHtml(liveSystemStatus.llm.configured_model || 'the provider default model')}.` : 'Status could not be loaded.'}
+                  ${liveSystemStatus.llm && liveSystemStatus.llm.privacy_note ? `<br><span class="att-sub">${escapeHtml(liveSystemStatus.llm.privacy_note)}</span>` : ''}
                 </div>
-                <button class="att-btn" onclick="EnterpriseSettings.navigateTo('billing')">Adjust Cap →</button>
+                <button class="att-btn" onclick="EnterpriseSettings.navigateTo('ai_providers')">Configure →</button>
               </div>
               <div class="attention-item">
-                <span class="att-bullet dot-green"></span>
+                <span class="att-bullet ${liveSystemStatus.llm && liveSystemStatus.llm.configured_provider === 'embedded_free' ? 'dot-amber' : 'dot-green'}"></span>
                 <div class="att-text">
-                  <strong>API Credential Health:</strong> Primary Google Vertex / Gemini AI bearer token verified active with 100% SLA.
+                  <strong>Credential Posture:</strong> ${liveSystemStatus.llm ? (liveSystemStatus.llm.configured_provider === 'embedded_free' ? 'No key required (keyless free tier). Prompts leave this host. Install Ollama for fully local inference.' : 'A provider credential path is configured; run Test to verify it end-to-end.') : 'Credential status unavailable.'}
                 </div>
-                <button class="att-btn" onclick="EnterpriseSettings.navigateTo('ai_providers')">Inspect Vault →</button>
+                <button class="att-btn" onclick="EnterpriseSettings.runDiagnosticTest('llm')">Test Inference →</button>
               </div>
               <div class="attention-item">
-                <span class="att-bullet dot-green"></span>
+                <span class="att-bullet dot-amber"></span>
                 <div class="att-text">
-                  <strong>Disaster Recovery Drill:</strong> Automated SQLite WAL hot snapshot verified clean. SHA-256 integrity passed.
+                  <strong>Disaster Recovery:</strong> No snapshot time is invented here. Run the backup diagnostic to verify the live database file and WAL state.
                 </div>
-                <button class="att-btn" onclick="EnterpriseSettings.navigateTo('recovery')">Run Drill →</button>
+                <button class="att-btn" onclick="EnterpriseSettings.runDiagnosticTest('backup')">Run Drill →</button>
               </div>
             </div>
           </section>
@@ -599,31 +634,28 @@ const EnterpriseSettings = (function() {
             `).join('')}
           </section>
 
-          <!-- Recent Settings Activity Strip (Section 82) -->
+          <!-- Recent Settings Activity Strip (real audit rows only) -->
           <footer class="settings-recent-activity">
             <div class="activity-header">
               <span class="activity-title">Recent Settings Activity & Cryptographic Proofs</span>
               <button class="btn-link" onclick="EnterpriseSettings.toggleAuditDrawer()">View Full Audit Trail (${SVG_ICONS.chevronRight})</button>
             </div>
             <div class="activity-stream-row">
-              <div class="activity-chip">
-                <span class="act-dot green"></span>
-                <span class="act-actor">Sukhraj Singh (Host)</span>
-                <span class="act-action">MFA Policy enforced</span>
-                <span class="act-hash">SHA: 8f4a2...</span>
-              </div>
-              <div class="activity-chip">
-                <span class="act-dot green"></span>
-                <span class="act-actor">System Engine</span>
-                <span class="act-action">AI Spending Cap verified</span>
-                <span class="act-hash">SHA: 1c90e...</span>
-              </div>
-              <div class="activity-chip">
-                <span class="act-dot green"></span>
-                <span class="act-actor">Host Administrator</span>
-                <span class="act-action">SQLite Hot Snapshot executed</span>
-                <span class="act-hash">SHA: 77d2b...</span>
-              </div>
+              ${hubAuditEvents.length > 0 ? hubAuditEvents.map(ev => `
+                <div class="activity-chip">
+                  <span class="act-dot green"></span>
+                  <span class="act-actor">${escapeHtml(ev.actor || 'Unknown actor')}</span>
+                  <span class="act-action">${escapeHtml(ev.setting_id || ev.action || 'Settings mutation')}</span>
+                  <span class="act-hash">SHA: ${escapeHtml(String(ev.evidence_hash || 'UNAVAILABLE').slice(0, 12))}…</span>
+                </div>
+              `).join('') : `
+                <div class="activity-chip">
+                  <span class="act-dot amber"></span>
+                  <span class="act-actor">No mutations recorded</span>
+                  <span class="act-action">This environment is operating on baseline settings</span>
+                  <span class="act-hash">No evidence hash issued</span>
+                </div>
+              `}
             </div>
           </footer>
           </main>
@@ -675,7 +707,7 @@ const EnterpriseSettings = (function() {
           <main class="settings-configuration-main">
             <!-- Breadcrumbs Bar -->
             <div class="settings-breadcrumbs-row">
-              <a href="#/settings" onclick="EnterpriseSettings.navigateTo('hub')">Settings Home</a>
+              <a href="#/settings-legacy" onclick="EnterpriseSettings.navigateTo('hub')">Settings Home</a>
               <span class="crumb-sep">/</span>
               <span class="crumb-pillar">${escapeHtml(pillar.title)}</span>
               <span class="crumb-sep">/</span>
@@ -2427,7 +2459,10 @@ const EnterpriseSettings = (function() {
       host_emergency_stop: ['ProcessSupervisor', 'AgentBus', 'GovernedTerminal', 'BrowserRunner'],
       sec_require_mfa: ['UserManager', 'AuthEnforcer', 'SessionTokenStore'],
       ai_master_enablement: ['InferenceRouter', 'AgentFactory', 'CognitionLoop'],
-      ai_primary_provider: ['InferenceRouter', 'GeminiVertexConnector', 'ModelVault'],
+      ai_primary_provider: ['InferenceRouter', 'ModelVault', 'LLMRuntime'],
+      llm_provider: ['LLMRuntime', 'InferenceRouter', 'SettingsService'],
+      llm_model: ['LLMRuntime'],
+      llm_api_key: ['LLMRuntime', 'SecretVault'],
       term_execution_enabled: ['GovernedTerminalRuntime', 'NamespaceSandbox', 'ProcessLease'],
       browser_headless_mode: ['ChromiumSandbox', 'DOMAuditEngine', 'SSRFProtector'],
       audit_ledger_hashing: ['EvidenceLedger', 'MerkleTreeVerifier', 'IntegrityService'],
@@ -2442,7 +2477,8 @@ const EnterpriseSettings = (function() {
       'term_execution_enabled', 'recovery_cold_sync_enabled', 'webhook_verify_signatures',
       'mcp_allow_external_servers', 'a2a_inter_agent_auth', 'integ_least_privilege',
       'comm_smtp_server', 'notify_critical_sms', 'notify_escalation_sms_number',
-      'sec_require_mfa', 'diag_wal_auto_checkpoint', 'data_retention_days', 'api_rate_limit_per_minute'
+      'sec_require_mfa', 'diag_wal_auto_checkpoint', 'data_retention_days', 'api_rate_limit_per_minute',
+      'llm_provider', 'llm_model', 'llm_base_url', 'llm_api_key'
     ].includes(settingId);
   }
 
@@ -2451,7 +2487,7 @@ const EnterpriseSettings = (function() {
     if (settingId.includes('notify')) return 'notifications';
     if (settingId.includes('diag')) return 'diagnostics';
     if (settingId.includes('sec')) return 'security';
-    if (settingId.includes('ai') || settingId.includes('gemini')) return 'ai_provider';
+    if (settingId.includes('llm') || settingId.includes('ai') || settingId.includes('gemini')) return 'llm';
     if (settingId.includes('browser')) return 'browser';
     if (settingId.includes('term')) return 'terminal';
     if (settingId.includes('recovery')) return 'backup';

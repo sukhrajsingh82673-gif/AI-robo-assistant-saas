@@ -1,0 +1,72 @@
+name: ZONATA Public GA — Playwright Browser End-to-End Qualification Suite
+
+on:
+  push:
+    branches: [ main, ui-redesign, engineering/production-readiness-gap-closure ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target Deployment URL to probe'
+        required: true
+        default: 'https://zonata-staging.onrender.com'
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-e2e:
+    name: Execute Real Headless Chromium Browser E2E Journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (v20 LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Pinned Playwright & Test Runner
+        run: |
+          npm ci || npm install --no-audit
+          npm install --save-dev @playwright/test@1.48.2
+          npx playwright install --with-deps chromium
+
+      - name: Verify Staging Target Availability & Readiness
+        run: |
+          TARGET_URL="${{ github.event.inputs.target_url || 'https://zonata-staging.onrender.com' }}"
+          echo "Targeting deployment: $TARGET_URL"
+          echo "Probing canonical readiness endpoint ($TARGET_URL/readyz)..."
+          HTTP_STATUS=$(curl -s -o /tmp/readyz.json -w "%{http_code}" "$TARGET_URL/readyz" || echo "000")
+          echo "Readiness HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Target deployment is not healthy or unreachable. HTTP status $HTTP_STATUS"
+            cat /tmp/readyz.json || true
+            exit 1
+          fi
+          cat /tmp/readyz.json
+          echo "Tested Commit: $(jq -r '.commit // "unknown"' /tmp/readyz.json)"
+          echo "Release Scope: $(jq -r '.release_scope // "unknown"' /tmp/readyz.json)"
+
+      - name: Execute 12 Mandatory Public GA Browser Journeys
+        run: |
+          TARGET_URL="${{ github.event.inputs.target_url || 'https://zonata-staging.onrender.com' }}"
+          npx playwright test tests/e2e/test_user_journeys.spec.ts --project=chromium-desktop
+        env:
+          BASE_URL: ${{ github.event.inputs.target_url || 'https://zonata-staging.onrender.com' }}
+          CI: "true"
+
+      - name: Retain Browser E2E Evidence & Trace Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-browser-e2e-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 30

@@ -274,10 +274,20 @@ class EnterpriseTeamCatalog:
                 # Persist to database
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO employees (
+                    INSERT INTO employees (
                         agent_id, company_id, tenant_id, role, department, manager,
                         budget_limit, spending_limit, authority_ceiling, working_state, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (agent_id) DO UPDATE SET
+                        company_id = EXCLUDED.company_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        role = EXCLUDED.role,
+                        department = EXCLUDED.department,
+                        manager = EXCLUDED.manager,
+                        budget_limit = EXCLUDED.budget_limit,
+                        spending_limit = EXCLUDED.spending_limit,
+                        authority_ceiling = EXCLUDED.authority_ceiling,
+                        working_state = EXCLUDED.working_state
                     """,
                     (
                         contract.agent_id,

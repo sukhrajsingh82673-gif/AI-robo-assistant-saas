@@ -174,20 +174,29 @@ class OpenClawWorkerRuntime(WorkerRuntime):
                 "tenant_id": session.tenant_id,
                 "session_id": session.session_id
             })
-            return {
-                "status": "SUCCESS" if result.status == "SUCCESS" else "FAILURE",
+            executed = result.status == "SUCCESS"
+            token = None
+            if result.evidence and isinstance(result.evidence[0], dict):
+                token = result.evidence[0].get("execution_hash") or result.evidence[0].get("sha256")
+            out = {
+                "status": "SUCCESS" if executed else "FAILURE",
+                "executed": executed,
                 "output": result.output,
-                "evidence_token": result.evidence[0]["execution_hash"] if (result.evidence and "execution_hash" in result.evidence[0]) else "ev_claw_ok",
-                "execution_time_ms": result.duration_ms
+                "evidence_token": token,
+                "execution_time_ms": result.duration_ms,
             }
+            if not executed:
+                out["reason"] = result.error_message or "OPENCLAW_CAPABILITY_FAILED"
+            return out
 
-        # Route general OpenClaw agent delegation
-        session.log(f"OpenClaw autonomous agent executing task: {task.get('name', 'delegation')}")
+        # General OpenClaw agent delegation is not wired to an external agent
+        # runtime here, so it must refuse instead of claiming completion.
         return {
-            "status": "SUCCESS",
+            "status": "ACTION_NOT_IMPLEMENTED",
             "runtime": self.runtime_id(),
-            "plugin_used": "plugin_native_search",
-            "completed": True
+            "executed": False,
+            "completed": False,
+            "reason": "OPENCLAW_AGENT_RUNTIME_NOT_CONFIGURED",
         }
 
     def run_background(self, session_id: str, task: Dict[str, Any]) -> str:
@@ -281,7 +290,7 @@ class OpenClawWorkerRuntime(WorkerRuntime):
     def verify(self, session_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "session_id": session_id,
-            "verification_status": "CONFIRMED" if result.get("status") == "SUCCESS" else "UNCONFIRMED",
+            "verification_status": "CONFIRMED" if result.get("executed") else "UNCONFIRMED",
             "evidence_digest": hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
             "timestamp": time.time()
         }

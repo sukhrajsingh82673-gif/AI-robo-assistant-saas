@@ -90,6 +90,10 @@
     // 1. ASSISTANT VIEW (Natural Language Front Door)
     // =========================================================================
     async renderAssistant(containerId) {
+      if (window.USE_SAMPLE_DATA && window.AppleCoworkerAssistant) {
+        window.AppleCoworkerAssistant.render(containerId, 'company');
+        return;
+      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
@@ -320,14 +324,32 @@
       if (!el) return;
 
       const activeMission = this.missions.find(m => m.mission_id === this.currentMissionId) || this.missions[0];
+      // HUD values come from the live dashboard snapshot; unknown stays unknown.
+      const ac = (this.dashboard && this.dashboard.agent_cloud) || {};
+      const integ = ac.verified_integrations || {};
+      const cyber = ac.cybersecurity || {};
+      const cloudLabel = ac.catalog_status === 'ONLINE'
+        ? `${ac.total_registered_agents || 0} Registered (${ac.busy_agents || 0} Busy / ${ac.max_bounded_workers || 0} Pool)`
+        : 'Not initialized';
+      const cloudSub = ac.catalog_status === 'ONLINE'
+        ? `Queue depth ${ac.queue_depth || 0}`
+        : (ac.catalog_status || 'No agent cloud attached');
 
       el.innerHTML = `
         <div class="workspace-page-header">
           <div>
-            <h1 class="page-title">ZONATA Co-Worker Workspace</h1>
-            <p class="page-subtitle">Governed multi-capability autonomous workforce operating on your sovereign behalf.</p>
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:3px 10px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:16px; font-size:0.75rem; color:#6ee7b7; font-weight:700; margin-bottom:8px;">
+              <span>🤖 COWORKER 3.0 EXECUTIVE COCKPIT</span>
+              <span style="opacity:0.4;">|</span>
+              <span>👑 CEO-DIRECTED AUTONOMOUS OPERATOR</span>
+            </div>
+            <h1 class="page-title">ZONATA Autonomous Coworker 3.0</h1>
+            <p class="page-subtitle">Hermes session runtime, OpenCode Git worktree engine, catalogued Agent Cloud with bounded scheduling, X11 visual perception, and defensive cybersecurity patrols. Status values below are read live from the backend.</p>
           </div>
           <div class="header-actions">
+            <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.triggerSecurityPatrol()" title="Run immediate cybersecurity patrol">
+              🛡️ Security Patrol
+            </button>
             ${activeMission ? `
               <button class="btn btn-outline" onclick="window.AssistantCoworkerWorkspace.stepMission('${activeMission.mission_id}')">
                 ⚡ Advance Step
@@ -339,6 +361,38 @@
             <button class="btn btn-primary" onclick="window.navigateTo('/assistant')">
               + New Objective
             </button>
+          </div>
+        </div>
+
+        <!-- Coworker 3.0 Executive Reality & Fleet Telemetry HUD -->
+        <div class="coworker-reality-hud" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">☁️ Enterprise Agent Cloud</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#38bdf8; margin:6px 0 2px;">
+              ${cloudLabel}
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">${cloudSub}</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛠️ OpenCode & Hermes Engine</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#34d399; margin:6px 0 2px;">
+              Hermes: ${integ.hermes_runtime || 'UNKNOWN'}
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">OpenCode: ${integ.opencode_engine || 'UNKNOWN'}</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🖥️ OpenDots Perception</div>
+            <div style="font-size:0.85rem; font-weight:600; color:#cbd5e1; margin:6px 0 2px;">
+              ${integ.opendots_computer_use || 'UNKNOWN'}
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">Terminal: ${integ.terminal_sandboxed || 'UNKNOWN'}</div>
+          </div>
+          <div class="card" style="padding:14px; background:rgba(15,23,42,0.85); border:1px solid #334155; border-radius:10px;">
+            <div style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">🛡️ Cybersecurity Command</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#a78bfa; margin:6px 0 2px;">
+              ${cyber.threat_level || 'UNKNOWN'} · ${cyber.patrol_status || 'NOT_RUN'}
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">Critical ${cyber.critical_findings || 0} · High ${cyber.high_findings || 0}</div>
           </div>
         </div>
 
@@ -778,6 +832,10 @@
     // 5. UNIVERSAL LINUX TERMINAL VIEW (Section 35 Governed Execution Fabric)
     // =========================================================================
     async renderTerminal(containerId) {
+      if (window.AppleGovernedTerminal) {
+        window.AppleGovernedTerminal.render(containerId);
+        return;
+      }
       await this.init();
       const el = document.getElementById(containerId);
       if (!el) return;
@@ -1227,8 +1285,8 @@
             <div style="background:#090d16; border:1px solid #334155; border-radius:8px; padding:14px; margin-bottom:18px;">
               <div style="font-size:0.8rem; font-weight:600; color:#93c5fd; margin-bottom:6px;">⚡ Connect Any Machine to Fleet (Bootstrap Agent):</div>
               <div style="display:flex; gap:8px; align-items:center;">
-                <code style="flex:1; background:#020617; color:#38bdf8; padding:8px 12px; border-radius:6px; font-size:0.8rem; user-select:all; overflow-x:auto;">curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret</code>
-                <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText('curl -s http://localhost:8080/api/coworker/nodes/bootstrap.py | python3 - --join http://localhost:8080 --token zonata_fleet_shared_secret'); showToast('Bootstrap command copied!', 'info');">Copy</button>
+                <code id="fleetBootstrapCmd" style="flex:1; background:#020617; color:#38bdf8; padding:8px 12px; border-radius:6px; font-size:0.8rem; user-select:all; overflow-x:auto;">${(() => { const origin = window.location.origin; return `curl -s ${origin}/api/coworker/nodes/bootstrap.py | python3 - --join ${origin} --token <YOUR_FLEET_TOKEN>`; })()}</code>
+                <button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(document.querySelector('#fleetBootstrapCmd').innerText); showToast('Bootstrap command copied!', 'info');">Copy</button>
               </div>
             </div>
 
@@ -1246,15 +1304,12 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style="background:rgba(37,99,235,0.05);">
-                    <td><strong>control_plane_local</strong> <span class="badge badge-primary" style="font-size:0.65rem;">HOST</span></td>
-                    <td>LINUX_NODE</td>
-                    <td>linux</td>
-                    <td>aarch64</td>
-                    <td><span class="badge badge-success">HEALTHY</span></td>
-                    <td>17 Capabilities (Terminal, Hermes, OpenClaw, Workspace)</td>
-                    <td>Headless (Zero-Mock PRoot)</td>
-                  </tr>
+                  ${(this.nodes || []).length === 0 ? `
+                    <tr>
+                      <td colspan="7" style="text-align:center; color:#94a3b8; padding:18px;">
+                        No worker nodes registered. Register a node with the bootstrap command above.
+                      </td>
+                    </tr>` : ''}
                   ${(this.nodes || []).map(n => `
                     <tr>
                       <td><strong>${n.node_id}</strong></td>
@@ -1403,6 +1458,50 @@
 
     openScheduleModal() {
       window.navigateTo('/schedule');
+    }
+
+    async triggerSecurityPatrol() {
+      try {
+        const res = await fetch('/api/v2/coworker/security/patrol', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          alert(`Defensive Security Patrol executed successfully!\nTotal Findings: ${data.findings_count}\nClean Status: ${data.clean ? 'YES (All clear)' : 'NO (Review findings)'}`);
+          await this.refreshData();
+          this.renderCoworker('view-coworker');
+        } else {
+          alert('Failed to trigger security patrol');
+        }
+      } catch (e) {
+        alert('Error triggering security patrol: ' + e);
+      }
+    }
+
+    async dispatchCoworker2Mission(promptText) {
+      if (!promptText || !promptText.trim()) return;
+      try {
+        const res = await fetch('/api/v2/coworker/missions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            objective: promptText.trim(),
+            description: promptText.trim(),
+            risk_level: 'LOW',
+            auto_advance: true
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          alert(`Coworker 2.0 Mission created: ${data.task_id} (${data.status})`);
+          await this.refreshData();
+          this.renderCoworker('view-coworker');
+        }
+      } catch (e) {
+        console.error('Dispatch failed:', e);
+      }
     }
 
     // Helper functions

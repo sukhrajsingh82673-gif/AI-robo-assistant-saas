@@ -210,12 +210,16 @@ class UniversalWorkerAdapter(UniversalWorkerContract):
             res = self.provider.execute(capability, parameters, context)
             self.active_tasks[task_id] = {"capability": capability, "result": res}
             return res
+        # No execution backend: refuse. Returning SUCCESS here would let a
+        # worker with no provider appear to have performed work.
         return ExecutionResult(
             provider_id=self.metadata.worker_id,
             capability_id=capability,
             execution_id=f"ex_{uuid.uuid4().hex[:6]}",
-            status="SUCCESS",
-            output={"simulated": False, "task_id": task_id}
+            status="FAILED",
+            output={"executed": False, "reason": "NO_EXECUTION_BACKEND", "task_id": task_id},
+            confidence=0.0,
+            error_message="NO_EXECUTION_BACKEND",
         )
 
     def observe(self, task_id: str, execution_id: str) -> Dict[str, Any]:

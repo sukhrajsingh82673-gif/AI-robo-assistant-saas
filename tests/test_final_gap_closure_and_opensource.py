@@ -161,26 +161,64 @@ class TestComputerUseOpenSourceRouter(unittest.TestCase):
         self.assertIn("VISUAL_GROUNDING", caps)
         self.assertIn("GUI_MACRO_PLAYBACK", caps)
 
-        # Zero-Mock Truth: In headless Linux PRoot (no DISPLAY), physical clicks must report READY_FOR_REMOTE_NODE
+        # Honest contract: without a display or a remote node the click is NOT
+        # executed. A compiled dispatch spec is not an executed action.
         res = self.router.execute("MOUSE_CLICK", {"x": 500, "y": 300}, {})
-        self.assertEqual(res.status, "SUCCESS")
         if not self.router.has_physical_display:
+            self.assertEqual(res.status, "FAILED")
             self.assertEqual(res.output["status"], "READY_FOR_REMOTE_NODE")
-            self.assertIn("Host Linux container lacks DISPLAY server", res.output["reason"])
+            self.assertIn("was not executed", res.output["reason"])
             self.assertIn("action_intent", res.output)
+            self.assertEqual(res.confidence, 0.0)
+            self.assertEqual(res.evidence[0]["type"], "remote_dispatch_spec")
+        else:
+            self.assertEqual(res.status, "SUCCESS")
+            self.assertEqual(res.output["executed"], True)
+            self.assertEqual(res.output["mode"], "x11")
+
+        # Verification must refuse to certify an unexecuted action.
+        seal = self.router.verify("task_gui_0", res.execution_id, {"clicked": True})
+        if not self.router.has_physical_display:
+            self.assertEqual(seal.status, VerificationStatus.FAILED)
+            self.assertIn("not executed", seal.discrepancy_notes)
 
     def test_02_ui_tars_visual_grounding_routing(self):
+        # UI-TARS requires a configured inference endpoint. Without one the
+        # router must not invent a bounding box or a confidence score.
         res = self.router.execute("VISUAL_GROUNDING", {"target_description": "Search button"}, {})
-        self.assertEqual(res.status, "SUCCESS")
         self.assertEqual(res.output["engine"], "UI-TARS-VL")
-        self.assertEqual(res.output["target_description"], "Search button")
-        self.assertIn("bbox", res.output)
+        if self.router.ui_tars._integration_status == "UNAVAILABLE":
+            self.assertEqual(res.status, "FAILED")
+            self.assertFalse(res.output["executed"])
+            self.assertNotIn("bbox", res.output)
+            self.assertNotIn("grounding_confidence", res.output)
+        else:
+            self.assertEqual(res.status, "SUCCESS")
+            self.assertTrue(res.output["executed"])
 
     def test_03_openadapt_macro_playback(self):
-        res = self.router.execute("GUI_MACRO_PLAYBACK", {"macro_id": "booking_flow_recording", "event_count": 15}, {})
-        self.assertEqual(res.status, "SUCCESS")
+        # OpenAdapt is adapter-only here; it must report that, not a replay that
+        # never happened.
+        res = self.router.execute("GUI_MACRO_PLAYBACK",
+                                  {"macro_id": "booking_flow_recording", "event_count": 15}, {})
         self.assertEqual(res.output["engine"], "OpenAdapt-Playback")
-        self.assertEqual(res.output["events_replayed"], 15)
+        if self.router.openadapt._integration_status != "REAL_INTEGRATION":
+            self.assertEqual(res.status, "FAILED")
+            self.assertFalse(res.output["executed"])
+            self.assertNotIn("events_replayed", res.output)
+        else:
+            self.assertEqual(res.status, "SUCCESS")
+
+    def test_03b_application_launch_requires_policy_gateway(self):
+        res = self.router.execute("APPLICATION_LAUNCH", {"cmd": "xterm"}, {})
+        self.assertEqual(res.status, "FAILED")
+        self.assertEqual(res.output["status"], "ACTION_NOT_IMPLEMENTED")
+        self.assertEqual(res.output["reason"], "APP_LAUNCH_REQUIRES_POLICY_GATEWAY")
+
+    def test_03c_unknown_capability_is_refused(self):
+        res = self.router.execute("TELEPORT_MOUSE", {}, {})
+        self.assertEqual(res.status, "FAILED")
+        self.assertIn("UNSUPPORTED_CAPABILITY", res.error_message)
 
     def test_04_human_takeover_control_mode(self):
         # Human takes control

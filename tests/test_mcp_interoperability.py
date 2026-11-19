@@ -515,22 +515,66 @@ class TestMCPInteroperability(unittest.TestCase):
 
     def test_server_connection_test_and_refresh(self):
         endpoint = "https://testconn.test.internal/mcp"
+
+        def _mock(req):
+            if req.get("method") == "initialize":
+                return {"jsonrpc": "2.0", "id": req.get("id"), "result": {
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "mock", "version": "1.0.0"},
+                }}
+            if req.get("method") == "tools/list":
+                return {"jsonrpc": "2.0", "id": req.get("id"), "result": {"tools": [
+                    {"name": "get_summary", "description": "summary", "inputSchema": {"type": "object"}},
+                ]}}
+            if req.get("method") == "resources/list":
+                return {"jsonrpc": "2.0", "id": req.get("id"), "result": {"resources": [
+                    {"uri": "mcp://db/schema", "name": "schema", "mimeType": "application/json"},
+                ]}}
+            return {"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": -32601, "message": "nope"}}
+
+        StreamableHTTPTransport.register_mock_endpoint(endpoint, _mock)
         _, srv_id, _ = self.gateway.register_server(
             display_name="Connection Test Server", endpoint=endpoint, allow_test_loopback=True
         )
         test_res = self.gateway.test_server_connection(srv_id)
         self.assertTrue(test_res["success"])
         self.assertEqual(test_res["health_status"], "HEALTHY")
+        self.assertTrue(test_res["measured"])
+        self.assertIsInstance(test_res["latency_ms"], float)
 
+        self.gateway.set_server_trust(srv_id, MCPTrustState.TRUSTED)
         ref_res = self.gateway.refresh_server_capabilities(srv_id)
         self.assertTrue(ref_res["success"])
         self.assertIn("tools_count", ref_res)
+        self.assertEqual(ref_res["resources_discovery"], "LIVE_RESOURCES_LIST")
+        self.assertGreaterEqual(ref_res["newly_discovered_resources"], 1)
+        self.assertGreaterEqual(ref_res["resources_count"], 1)
+
+    def test_unreachable_server_reports_failure_without_fake_latency(self):
+        endpoint = "http://127.0.0.1:9/mcp"
+        _, srv_id, _ = self.gateway.register_server(
+            display_name="Dead Server", endpoint=endpoint, allow_test_loopback=True
+        )
+        res = self.gateway.test_server_connection(srv_id)
+        self.assertFalse(res["success"])
+        self.assertEqual(res["health_status"], "UNREACHABLE")
+        self.assertIsNone(res["latency_ms"])
+        self.assertEqual(self.gateway.get_server(srv_id)["health_status"], "UNREACHABLE")
 
     def test_resource_read_and_sanitization(self):
         endpoint = "https://res.test.internal/mcp"
+        StreamableHTTPTransport.register_mock_endpoint(
+            endpoint,
+            lambda req: {"jsonrpc": "2.0", "id": req.get("id"), "result": {"contents": [
+                {"uri": "mcp://database/schema", "mimeType": "application/json",
+                 "text": "{\"table\": \"crm_customers\", \"columns\": 20}"},
+            ]}},
+        )
         _, srv_id, _ = self.gateway.register_server(
             display_name="Resource Server", endpoint=endpoint, allow_test_loopback=True
         )
+        self.gateway.set_server_trust(srv_id, MCPTrustState.TRUSTED)
         res_id = self.gateway.register_resource(
             server_id=srv_id,
             uri="mcp://database/schema",
@@ -540,6 +584,21 @@ class TestMCPInteroperability(unittest.TestCase):
         read_res = self.gateway.read_resource(res_id)
         self.assertTrue(read_res["success"])
         self.assertIn("content", read_res)
+        self.assertEqual(read_res["source"], "LIVE_RESOURCES_READ")
+        self.assertTrue(read_res["read_verified"])
+        self.assertIn("crm_customers", json.dumps(read_res["content"]))
+
+    def test_resource_read_denied_for_untrusted_server(self):
+        endpoint = "https://res2.test.internal/mcp"
+        _, srv_id, _ = self.gateway.register_server(
+            display_name="Untrusted Resource Server", endpoint=endpoint, allow_test_loopback=True
+        )
+        res_id = self.gateway.register_resource(
+            server_id=srv_id, uri="mcp://database/secret", name="Secret Resource"
+        )
+        read_res = self.gateway.read_resource(res_id)
+        self.assertFalse(read_res["success"])
+        self.assertEqual(read_res["status"], MCPExecutionStatus.POLICY_DENIED.value)
 
     def test_execution_cancellation_and_verification(self):
         endpoint = "https://exec.test.internal/mcp"

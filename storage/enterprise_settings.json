@@ -148,5 +148,7 @@
     "Asia/Kolkata",
     "UTC"
   ],
-  "acc_display_name": "Verified AI Host"
+  "acc_display_name": "Verified AI Host",
+  "assistant_remember_conversations": true,
+  "assistant_meetings_enabled": true
 }

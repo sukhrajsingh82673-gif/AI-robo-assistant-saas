@@ -328,51 +328,54 @@ def main():
     print(f" -> PASSED ({dur_wf04:.2f}ms): 3 checkpoints persisted, lease expiration swept, recovered from step 2.")
 
     # -------------------------------------------------------------------------
-    # WF-05: Connector Behavior Against Synthetic Provider Fixtures
+    # WF-05: Connectors Refuse to Fabricate Data When Unconfigured
     # -------------------------------------------------------------------------
-    print("\n[WF-05] Connector Behavior Against Synthetic Provider Fixtures...")
+    print("\n[WF-05] Connectors Refuse to Fabricate Data When Unconfigured...")
     t0 = time.time()
     from core.connectors import HospitalityPMSConnector, AccountingConnector, PaymentGatewayConnector
 
     pms = HospitalityPMSConnector()
     pms.connect({"token_hash": "sim_pms_hash"})
     pms_res = pms.fetch_night_audit_records()
-    assert pms_res["is_mock"] is True
-    assert pms_res["execution_mode"] == "SIMULATED"
+    assert pms_res["is_mock"] is False
+    assert pms_res["code"] == "NOT_CONFIGURED"
+    assert pms_res["execution_mode"] == "DISCONNECTED"
     assert pms_res["verified"] is False
-    assert pms_res["provenance"] == "SYNTHETIC_PMS_FIXTURE"
+    assert pms_res["folios"] == []
 
     acc = AccountingConnector()
     acc.connect({"token_hash": "sim_acc_hash"})
     acc_res = acc.fetch_general_ledger()
-    assert acc_res["is_mock"] is True
-    assert acc_res["execution_mode"] == "SIMULATED"
+    assert acc_res["is_mock"] is False
+    assert acc_res["code"] == "NOT_CONFIGURED"
+    assert acc_res["execution_mode"] == "DISCONNECTED"
     assert acc_res["verified"] is False
-    assert acc_res["provenance"] == "SYNTHETIC_ACCOUNTING_FIXTURE"
+    assert acc_res["entries"] == []
 
     pay = PaymentGatewayConnector()
     pay.connect({"token_hash": "sim_pay_hash"})
     pay_res = pay.fetch_settlement_batch()
-    assert pay_res["is_mock"] is True
-    assert pay_res["execution_mode"] == "SIMULATED"
+    assert pay_res["is_mock"] is False
+    assert pay_res["code"] == "NOT_CONFIGURED"
+    assert pay_res["execution_mode"] == "DISCONNECTED"
     assert pay_res["verified"] is False
-    assert pay_res["provenance"] == "SYNTHETIC_PAYMENTS_FIXTURE"
+    assert pay_res["settlements"] == []
 
     dur_wf05 = (time.time() - t0) * 1000
     results["workflows"].append({
         "workflow_id": "WF-05",
-        "title": "Synthetic Connector Provenance",
-        "objective": "Verify PMS, Accounting, and Payment connectors stamp synthetic provenance and zero verified claims",
+        "title": "Unconfigured Connector Honesty",
+        "objective": "Verify PMS, Accounting, and Payment connectors refuse to fabricate data and report NOT_CONFIGURED",
         "status": "PASSED",
         "duration_ms": round(dur_wf05, 2),
         "details": {
-            "pms_folios": pms_res["folios_audited"],
-            "acc_entries": acc_res["accounts_reconciled"],
-            "all_simulated": True,
-            "zero_verified_claims": True
+            "pms_records": len(pms_res["folios"]),
+            "acc_entries": len(acc_res["entries"]),
+            "all_not_configured": True,
+            "zero_fabricated_values": True
         }
     })
-    print(f" -> PASSED ({dur_wf05:.2f}ms): All 3 connectors returned explicit SIMULATED mode and is_mock=True.")
+    print(f" -> PASSED ({dur_wf05:.2f}ms): All 3 unconfigured connectors reported NOT_CONFIGURED with empty payloads.")
 
     # -------------------------------------------------------------------------
     # WF-06: Evidence Creation, Sealing, Provenance & Ledger Integrity

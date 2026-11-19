@@ -93,7 +93,8 @@ class MCPKillSwitch:
         company_id: Optional[str] = None,
         server_id: Optional[str] = None,
         tool_id: Optional[str] = None,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
+        **kwargs
     ):
         if tool_id:
             cls._active_tools.add(tool_id)
@@ -526,10 +527,17 @@ class StreamableHTTPTransport(MCPTransport):
         if self.endpoint_url in self._mock_endpoints:
             return self._mock_endpoints[self.endpoint_url](request_payload)
 
-        # Check for RFC 2606 / 6761 reserved test domains
+        # RFC 2606 / 6761 reserved test domains may be simulated, but ONLY in
+        # explicit test/dev mode. Production always performs a real HTTP call so
+        # a missing server surfaces as a verifiable failure, never fake success.
         parsed = urllib.parse.urlparse(self.endpoint_url)
         hostname = (parsed.hostname or "").lower()
-        if any(hostname.endswith(sfx) for sfx in [".test", ".internal", ".example", ".invalid", ".localhost"]):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        simulation_enabled = (
+            os.environ.get("ZONATA_MCP_SIMULATE_TEST_DOMAINS", "1") != "0"
+            and (os.environ.get("ZONATA_TEST_MODE") == "1" or app_env in ("development", "dev", "test"))
+        )
+        if simulation_enabled and any(hostname.endswith(sfx) for sfx in [".test", ".internal", ".example", ".invalid", ".localhost"]):
             params = request_payload.get("params", {})
             return {
                 "jsonrpc": JSONRPC_VERSION,
@@ -538,7 +546,8 @@ class StreamableHTTPTransport(MCPTransport):
                     "tool": params.get("name", "tool"),
                     "status": "success",
                     "data": params.get("arguments", {}),
-                    "message": f"Simulated governed MCP response from {self.endpoint_url}"
+                    "message": f"Simulated governed MCP response from {self.endpoint_url}",
+                    "_zonata_simulated": True,
                 }
             }
 
@@ -867,6 +876,48 @@ class MCPGateway:
         is_safe, err_msg = MCPSecurityInspector.validate_endpoint(endpoint, allow_test_loopback=True)
         if not is_safe:
             return {"success": False, "error": f"Endpoint validation failed: {err_msg}"}
+
+        transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+        try:
+            if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                transport = StreamableHTTPTransport(endpoint)
+            else:
+                command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                transport = StdioTransport(command)
+            started = time.time()
+            response = transport.send_request(
+                {"jsonrpc": JSONRPC_VERSION, "id": f"ping_{uuid.uuid4().hex[:8]}",
+                 "method": "initialize",
+                 "params": {
+                     "protocolVersion": server.get("protocol_version", MCP_PROTOCOL_VERSION),
+                     "capabilities": {},
+                     "clientInfo": {"name": "zonata-governance-probe", "version": "1.0.0"},
+                 }},
+                timeout=10.0,
+            )
+            latency_ms = round((time.time() - started) * 1000, 2)
+            if response.get("error"):
+                raise RuntimeError(str(response["error"])[:200])
+            result = response.get("result") or {}
+            simulated = bool(result.get("_zonata_simulated"))
+        except Exception as exc:
+            now = time.time()
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE mcp_servers SET last_seen = ?, health_status = 'UNREACHABLE' WHERE server_id = ?",
+                    (now, server_id),
+                )
+                conn.commit()
+            return {
+                "success": False,
+                "server_id": server_id,
+                "endpoint": endpoint,
+                "health_status": "UNREACHABLE",
+                "error": f"{type(exc).__name__}: {str(exc)[:200]}",
+                "latency_ms": None,
+                "timestamp": now,
+            }
+
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("UPDATE mcp_servers SET last_seen = ?, health_status = 'HEALTHY' WHERE server_id = ?", (now, server_id))
@@ -875,17 +926,93 @@ class MCPGateway:
             "success": True,
             "server_id": server_id,
             "endpoint": endpoint,
-            "protocol_version": server.get("protocol_version", MCP_PROTOCOL_VERSION),
-            "transport": server.get("transport", "streamable_http"),
+            "protocol_version": result.get("protocolVersion") or server.get("protocol_version", MCP_PROTOCOL_VERSION),
+            "server_info": result.get("serverInfo"),
+            "transport": transport_type,
             "health_status": "HEALTHY",
-            "latency_ms": 12.4,
+            "latency_ms": latency_ms,
+            "measured": not simulated,
+            "execution_mode": "SIMULATED_TEST_FIXTURE" if simulated else "LIVE_TRANSPORT",
             "timestamp": now
         }
 
     def refresh_server_capabilities(self, server_id: str) -> Dict[str, Any]:
+        """Queries the live MCP server for its advertised tools and registers them.
+
+        Discovery is only attempted for trusted servers. Failures are reported
+        as failures; local row counts are never presented as discovery results.
+        """
         server = self.get_server(server_id)
         if not server:
             return {"success": False, "error": f"Server {server_id} not found"}
+
+        trust = str(server.get("trust_state", "DISCOVERED"))
+        discovery = "SKIPPED_UNTRUSTED"
+        discovery_error = None
+        discovered = 0
+        resources_discovered = 0
+        resources_discovery = "SKIPPED"
+
+        if trust in (MCPTrustState.VALIDATED.value, MCPTrustState.TRUSTED.value, "TRUSTED"):
+            transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+            endpoint = server.get("endpoint", "")
+            try:
+                if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                    transport = StreamableHTTPTransport(endpoint)
+                else:
+                    command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                    transport = StdioTransport(command)
+                rpc = {"jsonrpc": JSONRPC_VERSION, "id": f"disc_{uuid.uuid4().hex[:8]}",
+                       "method": "tools/list", "params": {}}
+                response = transport.send_request(rpc, timeout=15.0)
+                if response.get("error"):
+                    raise RuntimeError(str(response["error"])[:200])
+                advertised = ((response.get("result") or {}).get("tools") or [])
+                for t in advertised:
+                    if not isinstance(t, dict) or not t.get("name"):
+                        continue
+                    self.register_tool(
+                        server_id=server_id,
+                        name=t["name"],
+                        description=t.get("description", "") or "",
+                        input_schema=t.get("inputSchema") or t.get("input_schema") or {},
+                    )
+                    discovered += 1
+                discovery = "LIVE_TOOLS_LIST"
+            except Exception as exc:
+                discovery = "FAILED"
+                discovery_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+
+            # Live resource + prompt discovery on the same session endpoint.
+            if discovery == "LIVE_TOOLS_LIST":
+                try:
+                    rrpc = {"jsonrpc": JSONRPC_VERSION, "id": f"res_{uuid.uuid4().hex[:8]}",
+                            "method": "resources/list", "params": {}}
+                    rresp = transport.send_request(rrpc, timeout=10.0)
+                    if rresp.get("error"):
+                        raise RuntimeError(str(rresp["error"])[:200])
+                    resources = ((rresp.get("result") or {}).get("resources") or [])
+                    for r in resources:
+                        if not isinstance(r, dict) or not r.get("uri"):
+                            continue
+                        self.register_resource(
+                            server_id=server_id,
+                            uri=r["uri"],
+                            name=r.get("name") or r["uri"],
+                            description=r.get("description", "") or "",
+                            mime_type=r.get("mimeType", "application/json"),
+                            resource_id=f"res_{server_id}_{hashlib.sha256(r['uri'].encode()).hexdigest()[:12]}",
+                        )
+                    resources_discovered = len(resources)
+                    resources_discovery = "LIVE_RESOURCES_LIST"
+                except Exception as exc:
+                    resources_discovered = 0
+                    resources_discovery = "FAILED"
+                    discovery_error = (discovery_error or "") + f" resources: {type(exc).__name__}: {str(exc)[:150]}"
+            else:
+                resources_discovered = 0
+                resources_discovery = "SKIPPED"
+
         with db.get_connection() as conn:
             tools = conn.execute("SELECT COUNT(*) as c FROM mcp_tools WHERE server_id = ?", (server_id,)).fetchone()["c"]
             resources = conn.execute("SELECT COUNT(*) as c FROM mcp_resources WHERE server_id = ?", (server_id,)).fetchone()["c"]
@@ -895,8 +1022,13 @@ class MCPGateway:
             "success": True,
             "server_id": server_id,
             "refreshed_at": time.time(),
+            "discovery": discovery,
+            "resources_discovery": resources_discovery,
+            "discovery_error": discovery_error,
+            "newly_discovered_tools": discovered,
+            "newly_discovered_resources": resources_discovered,
             "tools_count": tools,
-            "resources_count": resources
+            "resources_count": resources,
         }
 
     # -------------------------------------------------------------------------
@@ -943,7 +1075,7 @@ class MCPGateway:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_tools (
+                INSERT INTO mcp_tools (
                     tool_id, server_id, tenant_id, company_id, name, description,
                     input_schema, output_schema, risk_class, data_classification,
                     required_scopes, required_permissions, allowed_agents, allowed_workflows,
@@ -951,6 +1083,30 @@ class MCPGateway:
                     rate_limit, timeout, reversibility, idempotency, side_effect_class,
                     status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tool_id) DO UPDATE SET
+                    server_id = EXCLUDED.server_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    input_schema = EXCLUDED.input_schema,
+                    output_schema = EXCLUDED.output_schema,
+                    risk_class = EXCLUDED.risk_class,
+                    data_classification = EXCLUDED.data_classification,
+                    required_scopes = EXCLUDED.required_scopes,
+                    required_permissions = EXCLUDED.required_permissions,
+                    allowed_agents = EXCLUDED.allowed_agents,
+                    allowed_workflows = EXCLUDED.allowed_workflows,
+                    approval_requirement = EXCLUDED.approval_requirement,
+                    verification_requirement = EXCLUDED.verification_requirement,
+                    cost_model = EXCLUDED.cost_model,
+                    rate_limit = EXCLUDED.rate_limit,
+                    timeout = EXCLUDED.timeout,
+                    reversibility = EXCLUDED.reversibility,
+                    idempotency = EXCLUDED.idempotency,
+                    side_effect_class = EXCLUDED.side_effect_class,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     tool_id, server_id, self.tenant_id, self.company_id, name, description,
@@ -1084,18 +1240,32 @@ class MCPGateway:
         description: str = "",
         mime_type: str = "application/json",
         data_classification: MCPDataClassification = MCPDataClassification.INTERNAL,
-        approval_required: bool = False
+        approval_required: bool = False,
+        resource_id: Optional[str] = None,
     ) -> str:
-        res_id = f"res_{server_id}_{uuid.uuid4().hex[:8]}"
+        res_id = resource_id or f"res_{server_id}_{uuid.uuid4().hex[:8]}"
         now = time.time()
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_resources (
+                INSERT INTO mcp_resources (
                     resource_id, server_id, tenant_id, company_id, uri, name,
                     description, mime_type, data_classification, required_scopes,
                     approval_required, metadata, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (resource_id) DO UPDATE SET
+                    server_id = EXCLUDED.server_id,
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    uri = EXCLUDED.uri,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    mime_type = EXCLUDED.mime_type,
+                    data_classification = EXCLUDED.data_classification,
+                    required_scopes = EXCLUDED.required_scopes,
+                    approval_required = EXCLUDED.approval_required,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     res_id, server_id, self.tenant_id, self.company_id, uri, name,
@@ -1123,9 +1293,39 @@ class MCPGateway:
             if MCPKillSwitch.is_active(self.tenant_id, server_id=server_id):
                 return {"success": False, "status": MCPExecutionStatus.CANCELLED.value, "error": "KillSwitch active"}
 
-            # Simulated resource payload or transport retrieval
-            raw_content = {"uri": r["uri"], "name": r["name"], "data": f"Enterprise Resource Content for {r['name']}"}
-            clean_ok, sanitized, warns = ExternalContentFirewall.sanitize_output(raw_content)
+            server = self.get_server(server_id)
+            if not server:
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value, "error": "Server not found"}
+            trust = str(server.get("trust_state", "DISCOVERED"))
+            if trust not in (MCPTrustState.VALIDATED.value, MCPTrustState.TRUSTED.value, "TRUSTED"):
+                return {"success": False, "status": MCPExecutionStatus.POLICY_DENIED.value,
+                        "error": f"Server trust state '{trust}' does not permit resource reads"}
+
+            endpoint = server.get("endpoint", "")
+            transport_type = server.get("transport", MCPTransportType.STREAMABLE_HTTP.value)
+            try:
+                if transport_type == MCPTransportType.STREAMABLE_HTTP.value:
+                    transport = StreamableHTTPTransport(endpoint)
+                else:
+                    command = json.loads(endpoint) if str(endpoint).startswith("[") else [endpoint]
+                    transport = StdioTransport(command)
+                started = time.time()
+                response = transport.send_request(
+                    {"jsonrpc": JSONRPC_VERSION, "id": f"read_{uuid.uuid4().hex[:8]}",
+                     "method": "resources/read", "params": {"uri": r["uri"]}},
+                    timeout=15.0,
+                )
+                latency_ms = round((time.time() - started) * 1000, 2)
+            except Exception as exc:
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value,
+                        "error": f"Resource transport failed: {type(exc).__name__}: {str(exc)[:200]}",
+                        "read_verified": False}
+            if response.get("error"):
+                return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value,
+                        "error": f"Server error: {str(response['error'])[:200]}", "read_verified": False}
+
+            result = response.get("result") or {}
+            clean_ok, sanitized, warns = ExternalContentFirewall.sanitize_output(result)
             if not clean_ok:
                 self._record_security_event(
                     MCPSecurityEventType.MALICIOUS_RESOURCE,
@@ -1134,7 +1334,17 @@ class MCPGateway:
                 )
                 return {"success": False, "status": MCPExecutionStatus.TOOL_FAILED.value, "error": "Malicious content detected in resource"}
 
-            return {"success": True, "resource": sanitized, "content": sanitized.get("data"), "warnings": warns}
+            contents = sanitized.get("contents") if isinstance(sanitized, dict) else None
+            return {
+                "success": True,
+                "resource": sanitized,
+                "content": contents if contents is not None else sanitized,
+                "warnings": warns,
+                "latency_ms": latency_ms,
+                "read_verified": True,
+                "source": "LIVE_RESOURCES_READ",
+                "uri": r["uri"],
+            }
 
     # -------------------------------------------------------------------------
     # GOVERNED INVOCATION PIPELINE (The 15-Stage Enterprise Standard)
@@ -1279,7 +1489,37 @@ class MCPGateway:
             )
 
         # 5. Human Approval Interception
-        if approval_req and not ctx.get("pre_approved_id"):
+        # A caller-supplied approval id is never trusted on its own: it must
+        # resolve to an APPROVED request for this tenant and company, and it
+        # must be the approval recorded for this suspended execution.
+        pre_approved_id = ctx.get("pre_approved_id")
+        pre_approved_valid = False
+        if approval_req and pre_approved_id:
+            with db.get_connection() as conn:
+                appr_row = conn.execute(
+                    "SELECT status, company_id FROM approvals WHERE request_id = ? AND tenant_id = ?",
+                    (pre_approved_id, self.tenant_id),
+                ).fetchone()
+            pre_approved_valid = bool(
+                appr_row
+                and appr_row["status"] == "APPROVED"
+                and str(appr_row["company_id"]) == str(self.company_id)
+            )
+            if not pre_approved_valid:
+                return self._record_execution(
+                    exec_id=exec_id, server_id=server_id, tool_id=tool_id, tool_name=tool_name,
+                    arguments=arguments, sanitized_args={}, policy="DENY",
+                    authority="DENIED", status=MCPExecutionStatus.POLICY_DENIED.value,
+                    response=None,
+                    error=(
+                        "Approval bypass rejected: the supplied approval id is missing, not "
+                        "APPROVED, or belongs to another company."
+                    ),
+                    latency_ms=round((time.time() - start_time) * 1000, 2),
+                    context=ctx, approval_id=pre_approved_id,
+                )
+
+        if approval_req and not pre_approved_valid:
             appr_res = ApprovalPipeline.create_request(
                 tenant_id=self.tenant_id,
                 company_id=self.company_id,
@@ -1571,6 +1811,45 @@ class MCPGateway:
                 execs.append(d)
             return execs
 
+    def resume_approved_execution(self, approval_id: str) -> Dict[str, Any]:
+        """Re-invokes a suspended MCP operation after its approval is granted.
+
+        Without this, an APPROVED approval silently leaves the operation
+        unexecuted. The resumed call still passes through every gate
+        (policy, authority, data minimization, transport, verification).
+        """
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM mcp_executions WHERE approval_id = ? AND tenant_id = ? "
+                "AND company_id = ? AND execution_status = 'APPROVAL_REQUIRED' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (approval_id, self.tenant_id, self.company_id),
+            ).fetchone()
+        if not row:
+            return {"resumed": False, "reason": "No suspended MCP execution matches this approval."}
+        args = row["arguments"]
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
+        result = self.invoke_tool(
+            row["server_id"],
+            row["tool_name"],
+            args or {},
+            context={
+                "pre_approved_id": approval_id,
+                "agent_id": row["agent_id"],
+                "mission_id": row["mission_id"],
+                "resume_of": row["execution_id"],
+            },
+        )
+        return {
+            "resumed": True,
+            "original_execution_id": row["execution_id"],
+            "result": result,
+        }
+
     def get_execution(self, execution_id: str) -> Optional[Dict[str, Any]]:
         with db.get_connection() as conn:
             row = conn.execute("SELECT * FROM mcp_executions WHERE execution_id = ? AND tenant_id = ?", (execution_id, self.tenant_id)).fetchone()
@@ -1716,11 +1995,24 @@ class ZonataMcpServer:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO mcp_published_capabilities (
+                INSERT INTO mcp_published_capabilities (
                     published_id, tenant_id, company_id, capability_id, name,
                     description, schema_definition, visibility, allowed_clients,
                     rate_limit_per_min, approval_required, status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (published_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    capability_id = EXCLUDED.capability_id,
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    schema_definition = EXCLUDED.schema_definition,
+                    visibility = EXCLUDED.visibility,
+                    allowed_clients = EXCLUDED.allowed_clients,
+                    rate_limit_per_min = EXCLUDED.rate_limit_per_min,
+                    approval_required = EXCLUDED.approval_required,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (
                     pub_id, self.tenant_id, self.company_id, capability_id, name,

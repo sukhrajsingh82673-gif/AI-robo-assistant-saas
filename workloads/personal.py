@@ -12,6 +12,7 @@ from core.models import (
 from core.workforce import DynamicAgentFactory
 from core.control_kernel import UniversalControlKernel
 from core.portfolio import OperatingContext
+from workloads.paths import sandbox_artifact
 
 def run_personal_file_hygiene(company: OperatingContext, kernel: UniversalControlKernel) -> Mission:
     mission = Mission(
@@ -37,7 +38,7 @@ def run_personal_file_hygiene(company: OperatingContext, kernel: UniversalContro
     mission.assigned_agents.append(specialist.agent_id)
     mission.status = MissionStatus.PLAN
 
-    sandbox_dir = "/roboassistant/storage/sandbox/personal_files"
+    sandbox_dir = sandbox_artifact("personal_files")
     quarantine_dir = os.path.join(sandbox_dir, "quarantine")
     os.makedirs(quarantine_dir, exist_ok=True)
 
@@ -53,7 +54,7 @@ def run_personal_file_hygiene(company: OperatingContext, kernel: UniversalContro
     with open(file2, "wb") as f: f.write(content_a)  # duplicate of file1
     with open(file3, "wb") as f: f.write(content_b)
 
-    output_manifest = "/roboassistant/storage/sandbox/file_cleanup_manifest.json"
+    output_manifest = sandbox_artifact("file_cleanup_manifest.json")
 
     action = ActionContract(
         action_id="ACT-PERS-004",

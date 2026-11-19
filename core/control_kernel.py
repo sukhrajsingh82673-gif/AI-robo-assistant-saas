@@ -153,17 +153,24 @@ class UniversalControlKernel:
                 else:
                     success = True
             else:
-                # Simulated remote host execution (Windows, macOS Studio, Android, iOS Remote)
-                # Still requires physical proof or self-tested boundary
-                success = True
-                exec_output = f"Executed remote action on {contract.host.value}"
+                # Remote hosts (Windows, macOS Studio, Android, iOS Remote) are not
+                # connected through this kernel. Reporting success here would be
+                # fabricated physical evidence, so the contract fails closed.
+                success = False
+                exec_output = (
+                    f"Remote host {contract.host.value} is not connected; "
+                    "no remote execution channel is available."
+                )
                 verifications.append(PhysicalVerification(
-                    check_type="remote_host_ack",
+                    check_type="remote_host_reachable",
                     target_path=contract.target,
                     expected_val="ACK",
-                    actual_val="ACK",
-                    verified=True,
-                    details=f"Host {contract.host.value} acknowledged contract {contract.action_id}"
+                    actual_val="NOT_CONNECTED",
+                    verified=False,
+                    details=(
+                        f"No execution channel is registered for host {contract.host.value}; "
+                        f"contract {contract.action_id} was not dispatched."
+                    )
                 ))
 
             # 4. Physical Truth Engine checks if expected output file is declared

@@ -22,8 +22,8 @@ class EvidenceLedgerAdapter:
     def __init__(self, tenant_id: str = "tnt_primary", ledger: Optional[EvidenceLedger] = None):
         self.tenant_id = tenant_id
         if ledger is None:
-            ledger_path = os.path.abspath(f"storage/evidence/audit_ledger_{tenant_id}.jsonl")
-            self.ledger = EvidenceLedger(ledger_path)
+            from ..tenancy import tenant_ledger_path
+            self.ledger = EvidenceLedger(tenant_ledger_path(tenant_id))
         else:
             self.ledger = ledger
 

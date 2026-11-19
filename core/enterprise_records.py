@@ -192,11 +192,27 @@ class EnterpriseRecordsEngine:
 
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_records (
+            INSERT INTO enterprise_records (
                 record_id, tenant_id, company_id, department, record_type,
                 title, status, actor_type, actor_name, amount, currency,
                 attributes, relations, evidence_id, notes, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (record_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                department = EXCLUDED.department,
+                record_type = EXCLUDED.record_type,
+                title = EXCLUDED.title,
+                status = EXCLUDED.status,
+                actor_type = EXCLUDED.actor_type,
+                actor_name = EXCLUDED.actor_name,
+                amount = EXCLUDED.amount,
+                currency = EXCLUDED.currency,
+                attributes = EXCLUDED.attributes,
+                relations = EXCLUDED.relations,
+                evidence_id = EXCLUDED.evidence_id,
+                notes = EXCLUDED.notes,
+                updated_at = EXCLUDED.updated_at
             """, (
                 rec_id, self.tenant_id, company_id, dept, rtype,
                 title, status, actor_type, actor_name, amount, currency,
@@ -213,7 +229,9 @@ class EnterpriseRecordsEngine:
                 return
 
         app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
-        clean_mode = (app_env in ("production", "prod")) or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) or (os.environ.get("ZONATA_CLEAN_STARTUP", "0").lower() in ("1", "true", "yes"))
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
         if clean_mode:
             return
 

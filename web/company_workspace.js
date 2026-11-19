@@ -237,14 +237,18 @@ const CompanyWorkspace = (function() {
   // ------------------------------------------------------------------------
   // ROUTER
   // ------------------------------------------------------------------------
-  function render(route) {
-    const container = document.getElementById('view-company');
+  function render(route, containerOrId) {
+    const container = typeof containerOrId === 'string'
+      ? document.getElementById(containerOrId)
+      : (containerOrId || document.getElementById('view-company'));
     if (!container) return;
 
     if (route === '/company' || route === '/company/') {
       renderCompanyManagementList(container);
     } else if (route === '/company/new' || route.includes('/onboarding')) {
-      if (!currentOnboarding.modeChosen) {
+      if (window.EntryFlows && window.EntryFlows.renderWelcome) {
+        window.EntryFlows.renderWelcome(container);
+      } else if (!currentOnboarding.modeChosen) {
         renderModeSelection(container);
       } else {
         renderOnboardingWorkspace(container);
@@ -1908,7 +1912,7 @@ const CompanyWorkspace = (function() {
 
             <!-- Top Actions -->
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn-secondary" onclick="window.navigateTo('/company/new')">
+              <button class="btn-secondary" onclick="window.navigateTo('/company/${encodeURIComponent(company.id)}/edit')">
                 Reconfigure Profile
               </button>
               <button class="btn-secondary" onclick="window.navigateTo('/settings/integrations')">
@@ -2874,6 +2878,10 @@ const CompanyWorkspace = (function() {
 
   function setSubtab(tab, cid) {
     activeCompanySubtab = tab;
+    if (tab === 'overview') {
+      window.navigateTo(`/company/${cid}/overview`);
+      return;
+    }
     render(`/company/${cid}/${tab}`);
   }
 

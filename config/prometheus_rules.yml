@@ -1,0 +1,138 @@
+# ZONATA UNIVERSAL AI COMPANY OPERATING SYSTEM
+# Prometheus Alerting Rules & SRE Service Level Objectives
+# Phase 8 Production Qualification (BLK-05 Remediation)
+
+groups:
+  - name: zonata_platform_alerts
+    rules:
+      - alert: DatabaseServiceDown
+        expr: zonata_db_connected == 0 or up{job="zonata-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: database
+        annotations:
+          summary: "ZONATA primary database or API service is unreachable"
+          description: "Database connection probe failed or zonata-api container is down for more than 1 minute."
+          runbook_url: "https://docs.zonata.internal/runbooks/db-service-down"
+
+      - alert: DatabaseConnectionPoolSaturated
+        expr: (zonata_db_pool_active_connections / zonata_db_pool_max_connections) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+          tier: database
+        annotations:
+          summary: "Database connection pool utilization exceeded 85%"
+          description: "Active database connections near pool capacity limit (utilization > 85%)."
+          runbook_url: "https://docs.zonata.internal/runbooks/db-pool-saturation"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: (zonata_db_pool_active_connections / zonata_db_pool_max_connections) >= 1.0
+        for: 30s
+        labels:
+          severity: critical
+          tier: database
+        annotations:
+          summary: "Database connection pool is completely exhausted"
+          description: "All database connections are checked out. Incoming queries are blocking or timing out."
+          runbook_url: "https://docs.zonata.internal/runbooks/db-pool-exhausted"
+
+      - alert: PostgresWalArchivingFailed
+        expr: rate(zonata_wal_archive_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          tier: storage
+        annotations:
+          summary: "Continuous WAL archiving or off-host backup sync failure"
+          description: "PostgreSQL WAL archiving or off-host S3 replication encounters failures. Recovery Point Objective (RPO) is at risk."
+          runbook_url: "https://docs.zonata.internal/runbooks/wal-archiving-failed"
+
+      - alert: HighHttp5xxErrorRate
+        expr: (rate(zonata_api_errors_total[5m]) / rate(zonata_api_requests_total[5m])) > 0.01
+        for: 3m
+        labels:
+          severity: critical
+          tier: api
+        annotations:
+          summary: "HTTP 5xx error rate exceeded 1% over 5m window"
+          description: "Current error rate exceeds 1%. Platform SLA target is 99.9% availability."
+          runbook_url: "https://docs.zonata.internal/runbooks/http-error-rate-spike"
+
+      - alert: ApiLatencyP95SlaBreach
+        expr: zonata_api_latency_ms{quantile="0.95"} > 500
+        for: 5m
+        labels:
+          severity: warning
+          tier: api
+        annotations:
+          summary: "API p95 latency exceeded 500ms SLA target"
+          description: "p95 API response time exceeded 500ms for more than 5 minutes."
+          runbook_url: "https://docs.zonata.internal/runbooks/latency-sla-breach"
+
+      - alert: HighDiskUtilizationWarning
+        expr: zonata_disk_utilization_pct > 85
+        for: 5m
+        labels:
+          severity: warning
+          tier: infrastructure
+        annotations:
+          summary: "Disk storage space utilization exceeded 85%"
+          description: "Storage volume utilization is above 85%."
+          runbook_url: "https://docs.zonata.internal/runbooks/disk-space-warning"
+
+      - alert: CriticalDiskUtilization
+        expr: zonata_disk_utilization_pct > 95
+        for: 1m
+        labels:
+          severity: critical
+          tier: infrastructure
+        annotations:
+          summary: "Disk storage space critically low (>95%)"
+          description: "Storage volume utilization is above 95%. Imminent risk of database write freeze."
+          runbook_url: "https://docs.zonata.internal/runbooks/disk-space-critical"
+
+      - alert: WorkerCrashLoopDetected
+        expr: rate(zonata_worker_crash_loops_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          tier: worker
+        annotations:
+          summary: "Background worker container crash loop detected"
+          description: "Worker processes are crashing and restarting repeatedly."
+          runbook_url: "https://docs.zonata.internal/runbooks/worker-crash-loop"
+
+      - alert: AuthenticationAnomalySpike
+        expr: rate(zonata_auth_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          tier: security
+        annotations:
+          summary: "High rate of authentication failures detected"
+          description: "Authentication failures exceeding 10/sec over 5m window. Potential credential stuffing or brute force event."
+          runbook_url: "https://docs.zonata.internal/runbooks/auth-anomaly-spike"
+
+      - alert: OutboxQueueStalled
+        expr: zonata_outbox_queue_depth > 100
+        for: 5m
+        labels:
+          severity: warning
+          tier: worker
+        annotations:
+          summary: "Transactional outbox queue depth exceeded 100 messages for 5 minutes"
+          description: "Pending asynchronous tasks or integration events are stalling in the outbox queue."
+          runbook_url: "https://docs.zonata.internal/runbooks/outbox-queue-stalled"
+
+      - alert: ExecutiveIncidentActive
+        expr: zonata_active_incidents > 0
+        for: 1m
+        labels:
+          severity: warning
+          tier: governance
+        annotations:
+          summary: "Unresolved executive incident detected in governance layer"
+          description: "Unresolved executive incidents require AI CEO or Human Owner intervention."
+          runbook_url: "https://docs.zonata.internal/runbooks/executive-incidents"

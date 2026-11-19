@@ -23,9 +23,22 @@ const ToolsFactory = (function() {
     permissions: ['Filesystem read', 'Network access'],
     specText: '',
     strategyEval: null,
+    discovery: null,
+    discoveryError: null,
+    sourceCode: '',
     testResults: [],
+    buildError: null,
     builtTool: null
   };
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // Discovery state
   let discoveryQuery = '';
@@ -52,8 +65,10 @@ const ToolsFactory = (function() {
   // ------------------------------------------------------------------------
   // ROUTE RENDERER
   // ------------------------------------------------------------------------
-  async function render(route) {
-    const container = document.getElementById('view-tools');
+  async function render(route, containerOrId) {
+    const container = typeof containerOrId === 'string'
+      ? document.getElementById(containerOrId)
+      : (containerOrId || document.getElementById('view-tools'));
     if (!container) return;
 
     if (toolsList.length === 0) {
@@ -223,6 +238,16 @@ const ToolsFactory = (function() {
   }
 
   function renderResolutionResult(container, data, origQuery) {
+    const steps = data.evaluation_steps || [];
+    const candidates = data.candidates || [];
+    const blocked = data.blocked_candidates || [];
+    const stepColor = (st) => {
+      if (st === 'AVAILABLE' || st === 'MATCHED' || st === 'COMPLETED') return 'var(--accent-emerald)';
+      if (st === 'NO_MATCH' || st === 'SKIPPED') return 'var(--text-muted)';
+      return 'var(--accent-amber)';
+    };
+    const statusColor = (st) => st === 'AVAILABLE' ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+
     container.innerHTML = `
       <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
         <div style="font-size:12px; text-transform:uppercase; color:var(--accent-blue); font-weight:700; margin-bottom:10px;">
@@ -230,18 +255,19 @@ const ToolsFactory = (function() {
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
-          ${(data.evaluation_steps || []).map(s => `
+          ${steps.map(st => `
             <div class="resolution-step-box">
-              <span>${s.step}</span>
-              <span class="resolution-step-status" style="color:${s.status==='COMPLETED'?'var(--accent-emerald)':'var(--accent-blue)'};">${s.status}</span>
+              <span>${st.step}</span>
+              <span class="resolution-step-status" style="color:${stepColor(st.status)};">${st.status}</span>
             </div>
+            <div style="font-size:11.5px; color:var(--text-muted); padding:0 10px 4px;">${st.detail || ''}</div>
           `).join('')}
         </div>
 
         ${data.found && data.capability ? `
           <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
             <div style="font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-              <span>✓ Existing Capability Found</span>
+              <span>✓ Usable Capability Found</span>
               <span class="badge badge-emerald">${data.capability.status}</span>
             </div>
             <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
@@ -250,19 +276,52 @@ const ToolsFactory = (function() {
             <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
               Source: ${data.capability.source} • Permission: ${data.capability.permission}
             </div>
-            <div style="margin-top:12px; display:flex; gap:8px;">
-              <button class="btn-primary" style="font-size:12px; padding:6px 14px;" onclick="showToast('Assigned capability to active mission.', 'success')">
-                ${data.capability.action || 'Use capability'}
+            <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
+              ${data.capability.detail || ''}
+            </div>
+          </div>
+        ` : ''}
+
+        ${blocked.length > 0 ? `
+          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:700; color:var(--text-primary);">
+              ${data.found ? 'Other matching capabilities are not ready' : 'Matching capabilities exist but are not usable'}
+            </div>
+            <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+              ${data.reason || ''}
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+              ${blocked.map(c => `
+                <div style="background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px;">
+                  <div style="display:flex; justify-content:space-between; gap:8px;">
+                    <strong style="font-size:12.5px;">${c.name}</strong>
+                    <span style="font-size:11px; font-weight:700; color:${statusColor(c.status)};">${c.status}</span>
+                  </div>
+                  <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">${c.detail || ''}</div>
+                  ${(c.required_prerequisites && c.required_prerequisites.length) ? `
+                    <div style="font-size:11.5px; color:var(--text-secondary); margin-top:4px;">
+                      Required: <code style="font-family:var(--font-mono);">${c.required_prerequisites.join(', ')}</code>
+                    </div>
+                  ` : ''}
+                  <div style="font-size:11.5px; color:var(--accent-blue); margin-top:4px;">${c.action || ''}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div style="margin-top:12px;">
+              <button class="btn-secondary" style="font-size:12px; padding:6px 14px;" onclick="window.navigateTo('/settings')">
+                Open Integration Settings →
               </button>
             </div>
           </div>
-        ` : `
+        ` : ''}
+
+        ${!data.found && blocked.length === 0 ? `
           <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
             <div style="font-size:13px; font-weight:700; color:var(--text-primary);">
-              No Existing Capability Directly Satisfies This Request
+              No Registered Capability Satisfies This Request
             </div>
             <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
-              ZONATA evaluated connected integrations, browser automation, and host OS commands. To satisfy this requirement, launch the Tool Factory to build, sandbox-test, and register a new tool.
+              ${data.reason || 'Nothing in the local registry, connector registry, or installed runtimes matched.'}
             </div>
             <div style="margin-top:12px;">
               <button class="btn-primary" style="font-size:12px; padding:7px 16px;" onclick="ToolsFactory.startToolBuilderFromQuery('${encodeURIComponent(origQuery)}')">
@@ -270,7 +329,7 @@ const ToolsFactory = (function() {
               </button>
             </div>
           </div>
-        `}
+        ` : ''}
       </div>
     `;
   }
@@ -350,39 +409,71 @@ const ToolsFactory = (function() {
         `;
 
       case 2:
+        const disc = builderState.discovery;
+        const discCandidates = disc ? (disc.candidates || []) : [];
+        const discBlocked = disc ? (disc.blocked_candidates || []) : [];
         return `
           <div class="onboarding-section-header">
             <h3 class="onboarding-section-title">Step 2 — Tool Source Strategy Evaluation</h3>
-            <p class="onboarding-section-subtitle">Structured evaluation of execution pathways before synthesizing new code.</p>
+            <p class="onboarding-section-subtitle">Live discovery against this deployment's registry, connectors, and installed runtimes.</p>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-            <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <strong>1. Existing ZONATA Capability</strong>
-                <div style="font-size:11.5px; color:var(--text-secondary);">Searched CapabilityRegistry. No single tool satisfies combined workflow.</div>
-              </div>
-              <span class="badge badge-purple">EVALUATED</span>
+          ${builderState.discoveryError ? `
+            <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:var(--text-secondary);">
+              ${escapeHtml(builderState.discoveryError)} Re-run discovery before building a new tool.
             </div>
-            <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <strong>2. Connected Integration (AccountingConnector)</strong>
-                <div style="font-size:11.5px; color:var(--text-secondary);">Gateway available; requires orchestration wrapper for batch operations.</div>
-              </div>
-              <span class="badge badge-emerald">AVAILABLE</span>
+          ` : ''}
+
+          ${!disc ? `
+            <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); font-size:12.5px; color:var(--text-secondary);">
+              Running discovery…
             </div>
-            <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <strong>3. Build Strategy: Sandboxed Python 3 Orchestrator</strong>
-                <div style="font-size:11.5px; color:var(--text-secondary);">Synthesize dedicated governed tool with strict transactional authority.</div>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+              ${discCandidates.length === 0 && discBlocked.length === 0 ? `
+                <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                  <strong>No existing capability matched</strong>
+                  <div style="font-size:11.5px; color:var(--text-secondary);">
+                    ${escapeHtml(disc.reason || 'Nothing in the local registry, connector registry, or installed runtimes matched.')}
+                  </div>
+                </div>
+              ` : ''}
+              ${discCandidates.map(c => `
+                <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                  <div>
+                    <strong>${escapeHtml(c.name)}</strong>
+                    <div style="font-size:11.5px; color:var(--text-secondary);">${escapeHtml(c.detail || c.capability || '')}</div>
+                  </div>
+                  <span class="badge ${c.status === 'AVAILABLE' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(c.status)}</span>
+                </div>
+              `).join('')}
+              ${discBlocked.map(c => `
+                <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                  <div>
+                    <strong>${escapeHtml(c.name)}</strong>
+                    <div style="font-size:11.5px; color:var(--text-secondary);">${escapeHtml(c.detail || '')}</div>
+                    ${(c.required_prerequisites && c.required_prerequisites.length) ? `<div style="font-size:11.5px; color:var(--text-muted);">Requires: ${escapeHtml(c.required_prerequisites.join(', '))}</div>` : ''}
+                  </div>
+                  <span class="badge badge-amber">${escapeHtml(c.status)}</span>
+                </div>
+              `).join('')}
+              <div style="background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <strong>Platform recommendation</strong>
+                  <div style="font-size:11.5px; color:var(--text-secondary);">
+                    ${disc.recommendation === 'USE_EXISTING' ? 'Use the existing capability rather than duplicating it.' :
+                      disc.recommendation === 'CONFIGURE_EXISTING' ? 'Configure the matching connector before building anything new.' :
+                      'No usable capability exists; a new governed tool is the only path forward.'}
+                  </div>
+                </div>
+                <span class="badge badge-blue">${escapeHtml(disc.recommendation || 'UNKNOWN')}</span>
               </div>
-              <span class="badge badge-blue">RECOMMENDED</span>
             </div>
-          </div>
+          `}
 
           <div style="display:flex; justify-content:space-between;">
             <button class="btn-secondary" onclick="ToolsFactory.setBuilderStep(1)">← Back</button>
-            <button class="btn-primary" onclick="ToolsFactory.advanceToBuildPlan()">Approve Strategy & Compile Build Plan →</button>
+            <button class="btn-primary" onclick="ToolsFactory.advanceToBuildPlan()">Continue to Build Plan →</button>
           </div>
         `;
 
@@ -399,12 +490,12 @@ const ToolsFactory = (function() {
               <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-top:2px;">Python 3 (Sandboxed Process)</div>
             </div>
             <div style="background:var(--bg-input); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
-              <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Required Permissions</div>
-              <div style="font-size:13px; font-weight:600; color:var(--accent-blue); margin-top:2px;">Filesystem Read, Accounting Gateway</div>
+              <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Declared Permissions</div>
+              <div style="font-size:13px; font-weight:600; color:var(--accent-blue); margin-top:2px;">${escapeHtml((builderState.permissions || []).join(', ') || 'None declared')}</div>
             </div>
             <div style="background:var(--bg-input); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
               <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Rollback Procedure</div>
-              <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-top:2px;">Idempotent Ledger Undo Handlers</div>
+              <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-top:2px;">Not defined until the tool has real side effects</div>
             </div>
             <div style="background:var(--bg-input); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
               <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Authority Ceiling</div>
@@ -414,7 +505,7 @@ const ToolsFactory = (function() {
 
           <div style="display:flex; justify-content:space-between;">
             <button class="btn-secondary" onclick="ToolsFactory.setBuilderStep(2)">← Back</button>
-            <button class="btn-primary" onclick="ToolsFactory.advanceToSpec()">Review Spec & Execute Verification →</button>
+            <button class="btn-primary" onclick="ToolsFactory.setBuilderStep(5)">Review Spec &amp; Execute Verification →</button>
           </div>
         `;
 
@@ -423,54 +514,79 @@ const ToolsFactory = (function() {
         return `
           <div class="onboarding-section-header">
             <h3 class="onboarding-section-title">Step 5 — Sandboxed Verification Pipeline</h3>
-            <p class="onboarding-section-subtitle">A tool cannot become active without passing unit, security, and runtime assertions.</p>
+            <p class="onboarding-section-subtitle">The Tool Factory runs a real AST security scan and registers the package. Nothing is marked verified until those checks actually run.</p>
           </div>
+
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label">Tool implementation (Python source) *</label>
+            <textarea class="form-input" rows="10" id="bfSource" placeholder="def run(inputs):&#10;    # Return a JSON-serialisable result.&#10;    return {&quot;ok&quot;: True}"
+              style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(builderState.sourceCode || '')}</textarea>
+            <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
+              Disallowed imports (os, subprocess, socket, ctypes, pty) and dynamic calls (eval, exec, __import__, compile, open) are rejected by the AST scanner.
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-bottom:16px;">
+            <button class="btn-primary" onclick="ToolsFactory.runVerification()">
+              Run Security Scan & Register
+            </button>
+          </div>
+
+          ${builderState.buildError ? `
+            <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:var(--text-secondary);">
+              <strong style="color:var(--accent-rose);">${escapeHtml(builderState.buildError.code || 'BUILD_FAILED')}</strong> —
+              ${escapeHtml(builderState.buildError.detail || builderState.buildError.error || '')}
+            </div>
+          ` : ''}
 
           <div class="testing-pipeline-grid">
             ${(builderState.testResults.length > 0 ? builderState.testResults : [
-              { stage: 'Build', status: 'Passed', detail: 'Tool specification compiled.' },
-              { stage: 'Unit test', status: 'Passed', detail: 'Schema contracts validated.' },
-              { stage: 'Integration test', status: 'Passed', detail: 'Sandbox subprocess execution verified.' },
-              { stage: 'Security validation', status: 'Passed', detail: 'Zero secret leakage verified.' },
-              { stage: 'Permission validation', status: 'Passed', detail: 'Boundaries enforced.' },
-              { stage: 'Runtime validation', status: 'Passed', detail: 'Host execution passed.' },
-              { stage: 'Postcondition verification', status: 'Passed', detail: 'SHA-256 evidence signed.' },
-              { stage: 'Registration', status: 'Passed', detail: 'Ready for production registry.' }
+              { stage: 'Static security scan', status: 'NOT_RUN', detail: 'Provide source code and run verification.' },
+              { stage: 'Sandbox policy', status: 'NOT_RUN', detail: 'Applied only after the scan passes.' },
+              { stage: 'Code signature', status: 'NOT_RUN', detail: 'Generated on registration.' },
+              { stage: 'Registry write', status: 'NOT_RUN', detail: 'No package registered yet.' }
             ]).map(r => `
               <div class="pipeline-stage-card">
                 <div class="pipeline-stage-title">
-                  <span>${r.stage}</span>
-                  <span class="badge ${r.status==='Passed'?'badge-emerald':'badge-amber'}">${r.status}</span>
+                  <span>${escapeHtml(r.stage)}</span>
+                  <span class="badge ${r.status === 'Passed' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(r.status)}</span>
                 </div>
-                <div style="font-size:11.5px; color:var(--text-secondary);">${r.detail}</div>
+                <div style="font-size:11.5px; color:var(--text-secondary);">${escapeHtml(r.detail || '')}</div>
               </div>
             `).join('')}
           </div>
 
           <div style="display:flex; justify-content:space-between; margin-top:20px;">
             <button class="btn-secondary" onclick="ToolsFactory.setBuilderStep(3)">← Back</button>
-            <button class="btn-primary" onclick="ToolsFactory.executeRegistration()">
-              Register Verified Capability →
+            <button class="btn-primary" onclick="ToolsFactory.executeRegistration()" ${builderState.builtTool ? '' : 'disabled'}>
+              Continue to Registration →
             </button>
           </div>
         `;
 
       case 6:
+        const t = builderState.builtTool || {};
         return `
           <div class="onboarding-section-header">
-            <h3 class="onboarding-section-title">Step 6 — Capability Registration Complete</h3>
-            <p class="onboarding-section-subtitle">This tool is now part of the ZONATA OS capability layer.</p>
+            <h3 class="onboarding-section-title">Step 6 — Tool Registered</h3>
+            <p class="onboarding-section-subtitle">The package passed the static security scan and is now in this tenant's tool registry.</p>
           </div>
 
           <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:20px; margin-bottom:20px;">
             <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">
-              ${builderState.builtTool ? builderState.builtTool.name : 'Invoice Reconciliation Bot'}
+              ${escapeHtml(t.name || 'Unnamed tool')}
             </div>
             <div style="font-size:12.5px; color:var(--accent-emerald); font-weight:600; margin-bottom:12px;">
-              ● Registered & Verified
+              ● Registered — not yet executed
             </div>
-            <p style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
-              Autonomous AI employees in your workforce can now utilize this tool within authorized mission budgets.
+            <div style="font-size:12px; color:var(--text-secondary); line-height:1.6;">
+              Tool ID: <code style="font-family:var(--font-mono);">${escapeHtml(t.id || '—')}</code><br>
+              Version: ${escapeHtml(t.version || '—')} • Risk class: ${escapeHtml(t.risk_class || '—')}<br>
+              Signature: <code style="font-family:var(--font-mono);">${escapeHtml(t.signature || '—')}</code>
+            </div>
+            <p style="font-size:12.5px; color:var(--text-muted); line-height:1.5; margin-top:12px;">
+              Registration proves the package passed static inspection. It does not prove runtime behaviour:
+              run the tool under a governed ActionContract to produce execution evidence.
             </p>
           </div>
 
@@ -478,6 +594,7 @@ const ToolsFactory = (function() {
             Return to Tools Registry
           </button>
         `;
+
     }
   }
 
@@ -542,7 +659,7 @@ const ToolsFactory = (function() {
             </div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px;">
               <span>Health Status:</span>
-              <strong style="color:var(--accent-emerald);">${tool.health || 'Healthy'}</strong>
+              <strong style="color:${['Healthy','Registered'].includes(tool.health) ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">${escapeHtml(tool.health || 'Unknown')}</strong>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px;">
               <span>Last Cryptographic Check:</span>
@@ -558,7 +675,7 @@ const ToolsFactory = (function() {
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
           Disabling this capability will prevent all AI workforce members from invoking it during automated mission executions.
         </p>
-        <button class="btn-secondary" style="color:var(--accent-rose); border-color:var(--accent-rose); font-size:12px;" onclick="showToast('Tool disabled from active capability registry.', 'warning')">
+        <button class="btn-secondary" style="color:var(--accent-rose); border-color:var(--accent-rose); font-size:12px;" onclick="ToolsFactory.disableTool('${tool.id}')">
           Disable Tool
         </button>
       </div>
@@ -573,12 +690,37 @@ const ToolsFactory = (function() {
     render('/tools/factory');
   }
 
-  function advanceToStrategy() {
-    const req = document.getElementById('bfReq')?.value || '';
-    const name = document.getElementById('bfName')?.value || 'Custom Tool';
+  async function advanceToStrategy() {
+    const req = (document.getElementById('bfReq')?.value || '').trim();
+    const name = (document.getElementById('bfName')?.value || '').trim();
+    const cat = document.getElementById('bfCat')?.value || 'Custom Automation';
+    if (!req) {
+      showToast('Describe the functional requirement first.', 'warning');
+      return;
+    }
     builderState.requirement = req;
-    builderState.builtTool = { name };
+    builderState.purpose = req;
+    builderState.category = cat;
+    builderState.builtTool = { name: name || 'Custom Tool' };
+    builderState.discovery = null;
+    builderState.discoveryError = null;
     builderState.step = 2;
+    render('/tools/factory');
+
+    try {
+      const res = await fetch('/api/tools/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requirement: req })
+      });
+      if (res.ok) {
+        builderState.discovery = await res.json();
+      } else {
+        builderState.discoveryError = `Discovery failed with HTTP ${res.status}.`;
+      }
+    } catch (e) {
+      builderState.discoveryError = `Discovery request failed: ${e.message}`;
+    }
     render('/tools/factory');
   }
 
@@ -587,36 +729,82 @@ const ToolsFactory = (function() {
     render('/tools/factory');
   }
 
-  async function advanceToSpec() {
-    builderState.step = 5;
+  async function runVerification() {
+    const source = (document.getElementById('bfSource')?.value || '').trim();
+    builderState.sourceCode = source;
+    builderState.buildError = null;
+
+    if (!source) {
+      builderState.buildError = {
+        code: 'MISSING_SOURCE_CODE',
+        detail: 'Enter the Python implementation before running verification.'
+      };
+      builderState.testResults = [{
+        stage: 'Static security scan',
+        status: 'NOT_RUN',
+        detail: 'No source code was supplied.'
+      }];
+      render('/tools/factory');
+      return;
+    }
+
+    builderState.testResults = [{
+      stage: 'Static security scan',
+      status: 'Running',
+      detail: 'Submitting source code to the Tool Factory AST scanner…'
+    }];
     render('/tools/factory');
-    // Call backend build endpoint to execute assertions
+
     try {
       const res = await fetch('/api/tools/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: builderState.builtTool ? builderState.builtTool.name : 'Custom Tool',
+          name: (builderState.builtTool && builderState.builtTool.name) || 'Custom Tool',
           purpose: builderState.requirement,
           category: builderState.category,
-          permissions: builderState.permissions
+          risk_class: 'LOW_RISK',
+          permissions: builderState.permissions,
+          source_code: source
         })
       });
+      const json = await res.json();
+      builderState.testResults = json.test_results || [];
       if (res.ok) {
-        const json = await res.json();
-        builderState.testResults = json.test_results || [];
         builderState.builtTool = json.tool;
+        builderState.buildError = null;
+        showToast('Tool registered in the tenant tool registry.', 'success');
         await fetchTools();
-        render('/tools/factory');
+      } else {
+        builderState.buildError = {
+          code: json.code || ('HTTP_' + res.status),
+          detail: json.detail || json.error || 'The tool was rejected.'
+        };
+        if (!builderState.testResults.length) {
+          builderState.testResults = [{
+            stage: 'Static security scan',
+            status: 'Failed',
+            detail: (json.violations || []).join('; ') || 'Rejected.'
+          }];
+        }
       }
-    } catch(e) {
-      console.log('Build error:', e);
+    } catch (e) {
+      builderState.buildError = { code: 'NETWORK_ERROR', detail: e.message };
+      builderState.testResults = [{
+        stage: 'Static security scan',
+        status: 'Failed',
+        detail: 'The build request could not be completed: ' + e.message
+      }];
     }
+    render('/tools/factory');
   }
 
   function executeRegistration() {
+    if (!builderState.builtTool || !builderState.builtTool.id) {
+      showToast('Run verification first — nothing has been registered yet.', 'warning');
+      return;
+    }
     builderState.step = 6;
-    showToast('Tool successfully registered into Capability Registry!', 'success');
     render('/tools/factory');
   }
 
@@ -636,8 +824,44 @@ const ToolsFactory = (function() {
     }
   }
 
-  function testToolProbe(toolId) {
-    showToast(`Sandbox probe passed for ${toolId}: 0 errors.`, 'success');
+  async function disableTool(toolId) {
+    try {
+      const res = await fetch(`/api/tools/${encodeURIComponent(toolId)}/disable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const json = await res.json();
+      if (res.ok) {
+        showToast(`${toolId} revoked from the tenant registry.`, 'success');
+        await fetchTools();
+        render('/tools');
+      } else {
+        showToast(json.detail || json.error || 'Disable failed.', 'warning');
+      }
+    } catch (e) {
+      showToast(`Disable request failed: ${e.message}`, 'error');
+    }
+  }
+
+  async function testToolProbe(toolId) {
+    try {
+      const res = await fetch(`/api/tools/${encodeURIComponent(toolId)}/probe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const json = await res.json();
+      if (res.ok && json.status === 'PASSED') {
+        showToast(`${toolId}: ${json.detail}`, 'success');
+      } else if (res.ok) {
+        showToast(`${toolId}: ${json.detail || json.status}`, 'warning');
+      } else {
+        showToast(`${toolId}: ${json.detail || json.error || 'probe failed'}`, 'error');
+      }
+    } catch (e) {
+      showToast(`Probe request failed: ${e.message}`, 'error');
+    }
   }
 
   function handleSearch(val) {
@@ -658,9 +882,10 @@ const ToolsFactory = (function() {
     setBuilderStep,
     advanceToStrategy,
     advanceToBuildPlan,
-    advanceToSpec,
+    runVerification,
     executeRegistration,
     testToolProbe,
+    disableTool,
     handleSearch,
     handleCategoryFilter
   };

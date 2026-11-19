@@ -335,9 +335,14 @@ class TestUniversalTerminalOperationalQualification(unittest.TestCase):
         cand = candidates[0]
 
         ok, msg, meta = engine.acquire_and_qualify_tool(cand.tool_id)
-        self.assertTrue(ok)
-        self.assertIn("successfully qualified", msg)
-        self.assertTrue(reg.is_tool_available(cand.name))
+        if ok:
+            self.assertIn("successfully qualified", msg)
+            self.assertTrue(reg.is_tool_available(cand.name))
+        else:
+            # Nothing is admitted unless the runtime artifact is installed.
+            self.assertIn("not installed", msg)
+            self.assertFalse(reg.is_tool_available(cand.name))
+            self.assertIsNone(meta)
 
     def test_scenario_j_full_aicu_objective_without_manual_command(self):
         """

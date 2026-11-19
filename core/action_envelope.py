@@ -4,13 +4,17 @@ Canonical ActionEnvelope Protocol & Asynchronous Command Architecture
 Defines the universal envelope consumed by all execution subsystems (MCP, A2A, Nango, Browser, OpenHands, HAL).
 """
 
+import os
 import time
 import json
 import uuid
 import hashlib
 import threading
+import logging
 from typing import Dict, Optional, Any
 from dataclasses import dataclass, asdict
+
+logger = logging.getLogger("zonata.action_envelope")
 
 class RiskClass:
     READ_ONLY = "READ_ONLY"
@@ -115,7 +119,8 @@ class ActionEnvelope:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ActionEnvelope':
-        return cls(**data)
+        filtered = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        return cls(**filtered)
 
 
 class AsynchronousCommandBus:
@@ -126,10 +131,67 @@ class AsynchronousCommandBus:
     """
     def __init__(self):
         self._claim_lock = threading.RLock()
+        self._stop_event = threading.Event()
         self._init_db()
+
+    def stop(self):
+        """Signals background worker to stop gracefully."""
+        self._stop_event.set()
+
+    def reset_worker(self):
+        """Resets stop event to allow starting/restarting worker."""
+        self._stop_event.clear()
+
+    def recover_interrupted_jobs(self, timeout_seconds: float = 300.0) -> int:
+        """
+        Detects actions left in ASSIGNED status from an interrupted worker,
+        sleep cycle, crash, or restart.
+        Safely transitions them back to QUEUED or marks FAILED if retry limit (3) exceeded.
+        """
+        from core.database_engine import engine, WorkloadType
+        now = time.time()
+        cutoff = now - timeout_seconds
+        recovered_count = 0
+        with engine.transaction(workload=WorkloadType.WRITE) as conn:
+            cursor = conn.execute("""
+                SELECT action_id, envelope_payload, updated_at
+                FROM async_command_queue
+                WHERE status = 'ASSIGNED' AND updated_at < ?
+            """, (cutoff,))
+            rows = cursor.fetchall()
+            for row in rows:
+                action_id = row[0]
+                try:
+                    payload = json.loads(row[1]) if isinstance(row[1], str) else (row[1] or {})
+                except Exception:
+                    payload = {}
+                retry_count = payload.get("_retry_count", 0) + 1
+                payload["_retry_count"] = retry_count
+
+                if retry_count > 3:
+                    conn.execute("""
+                        UPDATE async_command_queue
+                        SET status = 'FAILED', error_message = 'Action exceeded maximum retry attempts (3) after worker interruption or sleep cycle', updated_at = ?, completed_at = ?
+                        WHERE action_id = ?
+                    """, (now, now, action_id))
+                    logger.warning(f"Action '{action_id}' marked FAILED: exceeded retry limit after worker interruption.")
+                else:
+                    conn.execute("""
+                        UPDATE async_command_queue
+                        SET status = 'QUEUED', worker_id = NULL, envelope_payload = ?, updated_at = ?
+                        WHERE action_id = ?
+                    """, (json.dumps(payload), now, action_id))
+                    logger.info(f"Action '{action_id}' recovered back to QUEUED (Attempt {retry_count}/3).")
+                    recovered_count += 1
+        return recovered_count
 
     def _init_db(self):
         from core.database_engine import engine, WorkloadType
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+        if engine.dialect == "sqlite" and os.path.abspath(engine.db_path) == protected_db and os.path.exists(protected_db):
+            # Protected baseline database — never mutate or execute schema scripts automatically
+            return
         with engine.transaction(workload=WorkloadType.CONTROL_PLANE) as conn:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS async_command_queue (
@@ -260,15 +322,39 @@ class AsynchronousCommandBus:
             }
 
     def run_worker(self, worker_id: Optional[str] = None, poll_interval: float = 0.5, max_iterations: Optional[int] = None):
-        """Run continuous asynchronous worker processing loop."""
+        """Run continuous asynchronous worker processing loop with crash recovery and graceful shutdown."""
         from core.action_gateway import ZonataActionGateway
         worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
         iterations = 0
         logger.info(f"Asynchronous worker '{worker_id}' started.")
-        while True:
+
+        if self._stop_event.is_set():
+            logger.info(f"Worker '{worker_id}' stop event already set; aborting loop.")
+            return
+
+        # On worker startup: immediately recover any orphaned jobs left in flight
+        try:
+            recovered = self.recover_interrupted_jobs(timeout_seconds=0.0)
+            if recovered > 0:
+                logger.info(f"Worker startup recovered {recovered} interrupted actions.")
+        except Exception as rec_err:
+            logger.warning(f"Could not perform startup job recovery: {rec_err}")
+
+        last_recovery_check = time.time()
+        while not self._stop_event.is_set():
             if max_iterations is not None and iterations >= max_iterations:
                 break
             iterations += 1
+
+            # Periodic sweep for orphaned jobs every 60 seconds
+            now = time.time()
+            if now - last_recovery_check > 60.0:
+                last_recovery_check = now
+                try:
+                    self.recover_interrupted_jobs(timeout_seconds=300.0)
+                except Exception:
+                    pass
+
             try:
                 envelope = self.fetch_next(worker_id=worker_id)
                 if envelope:
@@ -279,10 +365,11 @@ class AsynchronousCommandBus:
                     except Exception as exec_err:
                         self.mark_failed(envelope.action_id, str(exec_err))
                 else:
-                    time.sleep(poll_interval)
+                    self._stop_event.wait(timeout=poll_interval)
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
-                time.sleep(poll_interval)
+                self._stop_event.wait(timeout=poll_interval)
+        logger.info(f"Asynchronous worker '{worker_id}' gracefully stopped.")
 
 # Global asynchronous command bus instance
 command_bus = AsynchronousCommandBus()

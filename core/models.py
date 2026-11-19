@@ -10,6 +10,15 @@ import time
 import uuid
 
 class AuthorityLevel(str, Enum):
+    """
+    Action-authority classification for a single action: how much human
+    involvement the action needs.
+
+    Naming hazard: `core.aic_ceo_constitution.AuthorityLevel` is a *different*
+    enum (actor hierarchy: owner → board → CEO → … → tool). This one answers
+    "may this action run unattended?", the other answers "who is asking?".
+    Never substitute one for the other.
+    """
     SANDBOXED_READ_ONLY = "SANDBOXED_READ_ONLY"
     AUTOMATIC_IDEMPOTENT = "AUTOMATIC_IDEMPOTENT"
     ASK_ME = "ASK_ME"
@@ -107,6 +116,14 @@ class EvidencePackage:
     merkle_index: int
     execution_classification: str = "LIVE"
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def merkle_root(self) -> str:
+        return self.sha256_digest
+
+    @property
+    def package_id(self) -> str:
+        return self.evidence_id
 
 @dataclass
 class DataSource:

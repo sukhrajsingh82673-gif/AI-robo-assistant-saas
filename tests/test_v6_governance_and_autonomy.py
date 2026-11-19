@@ -8,8 +8,16 @@ import uuid
 from core.autonomy_governor import autonomy_governor, AutonomyLevel, AutonomyViolationError
 from core.model_router_v6 import model_router_v6
 from core.diagnostics_bundle import diagnostics_generator
+from core.evidence_service import evidence_service
+from core.db import configure_isolated_test_db
 
 class TestV6GovernanceAndAutonomy(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configure_isolated_test_db()
+        autonomy_governor._init_db()
+        evidence_service._init_db()
+
     def setUp(self):
         self.tenant_id = f"tnt_v6_gov_{uuid.uuid4().hex[:6]}"
         self.emp_parent = f"emp_parent_{uuid.uuid4().hex[:6]}"

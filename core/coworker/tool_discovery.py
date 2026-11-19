@@ -220,24 +220,34 @@ class ToolDiscoveryEngine:
         if not dep_ok:
             return False, candidate, f"Dependency check failed: {dep_msg}"
 
-        # 4. Security Audit (AST)
-        code_to_audit = sample_code or f"# Validated wrapper for {candidate.name}\nimport sys\ndef run():\n    return '{candidate.name} verified'\n"
-        sec_ok, sec_issues = self.security_audit_code(code_to_audit)
-        if not sec_ok:
-            candidate.admission_status = "REJECTED"
-            candidate.rejection_reason = f"Security audit failed: {'; '.join(sec_issues)}"
+        # 4. Security Audit (AST) — audit only real source, never a fabricated wrapper
+        if sample_code:
+            code_to_audit = sample_code
+            sec_ok, sec_issues = self.security_audit_code(code_to_audit)
+            if not sec_ok:
+                candidate.admission_status = "REJECTED"
+                candidate.rejection_reason = f"Security audit failed: {'; '.join(sec_issues)}"
+                return False, candidate, candidate.rejection_reason
+            candidate.admission_status = "SECURITY_VERIFIED"
+            verification_mode = "SOURCE_AUDITED"
+        else:
+            verification_mode = "RUNTIME_DEPENDENCY_CHECK"
+
+        # 5. Sandbox availability test — a real import probe, not an assumed pass
+        import importlib.util as _ilu
+        module_name = (candidate.name or "").replace("-", "_").split("[")[0]
+        module_present = bool(module_name) and _ilu.find_spec(module_name) is not None
+        candidate.sandbox_verified = module_present
+        if not module_present:
+            candidate.admission_status = "BLOCKED_EXTERNAL_DEPENDENCY"
+            candidate.rejection_reason = (
+                f"Runtime dependency '{module_name}' is not installed on this host; "
+                "the tool cannot be executed or tested."
+            )
             return False, candidate, candidate.rejection_reason
 
-        candidate.admission_status = "SECURITY_VERIFIED"
-
-        # 5. Sandbox Install & Test (Mock isolated run)
-        sandbox_passed = True  # Simulated sandboxed isolated verification
-        if not sandbox_passed:
-            candidate.admission_status = "REJECTED"
-            candidate.rejection_reason = "Sandbox execution test failed"
-            return False, candidate, candidate.rejection_reason
-
-        # 6. Qualify
+        # 6. Qualify — capabilities are registered but their execution has not
+        # been exercised, so the honest ceiling is PARTIALLY_QUALIFIED.
         candidate.admission_status = "QUALIFIED"
 
         # 7. Admit & Register Capabilities
@@ -262,7 +272,7 @@ class ToolDiscoveryEngine:
                     requires_verification=True,
                     cost_class=CostClass.FREE,
                     latency_class=LatencyClass.FAST,
-                    qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED
+                    qualification_status=QualificationStatus.PARTIALLY_QUALIFIED
                 )
                 capability_registry.register(new_def)
 
@@ -274,7 +284,10 @@ class ToolDiscoveryEngine:
             "commit": candidate.commit,
             "license": candidate.license,
             "timestamp": time.time(),
-            "digest": hashlib.sha256(f"{candidate.tool_id}_{candidate.version}_{candidate.commit}".encode()).hexdigest()
+            "digest": hashlib.sha256(f"{candidate.tool_id}_{candidate.version}_{candidate.commit}".encode()).hexdigest(),
+            "verification_mode": verification_mode,
+            "dependency_import_verified": module_present,
+            "capability_execution_tested": False,
         }
         self._audit_log.append(receipt)
 

@@ -28,6 +28,7 @@ import json
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple, Set
 from dataclasses import dataclass, field, asdict
+from core.paths import get_repo_root
 
 from core.automation_fabric.contracts import (
     ActionRiskLevel, TerminalOutcome, IndependentVerificationResult
@@ -160,7 +161,7 @@ class SoftwareEngineeringAgent(BaseSpecialistAgent):
         )
 
     def execute_task(self, task: AgentDelegationTask) -> Dict[str, Any]:
-        repo_path = task.parameters.get("repo_path", "/root/roboassistant")
+        repo_path = task.parameters.get("repo_path") or get_repo_root()
         return {
             "status": "ENGINEERING_TASK_COMPLETED",
             "files_analyzed": ["core/automation_fabric", "api_server.py"],

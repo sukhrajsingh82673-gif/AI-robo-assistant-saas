@@ -196,11 +196,22 @@ class AgentEvaluationRegistry:
 
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO immutable_agent_packages (
+            INSERT INTO immutable_agent_packages (
                 package_id, tenant_id, company_id, template_id, agent_version,
                 prompt_hash, model_version, tool_package_hashes, policy_version,
                 composite_package_hash, certified_for_production, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (package_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                template_id = EXCLUDED.template_id,
+                agent_version = EXCLUDED.agent_version,
+                prompt_hash = EXCLUDED.prompt_hash,
+                model_version = EXCLUDED.model_version,
+                tool_package_hashes = EXCLUDED.tool_package_hashes,
+                policy_version = EXCLUDED.policy_version,
+                composite_package_hash = EXCLUDED.composite_package_hash,
+                certified_for_production = EXCLUDED.certified_for_production
             """, (
                 pkg.package_id, pkg.tenant_id, pkg.company_id, pkg.template_id,
                 pkg.agent_version, pkg.prompt_hash, pkg.model_version,

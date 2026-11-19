@@ -22,6 +22,32 @@ import time
 import os
 import json
 import hashlib
+from unittest.mock import patch
+
+from core.llm_runtime import LLMResult
+
+
+def _deterministic_chat(self, tenant_id, company_id, messages, system=None,
+                        max_tokens=None, temperature=None, intent="general"):
+    """In-process LLM double: deterministic text, no network, no fabrication."""
+    objective = ""
+    for m in (messages or []):
+        if m.get("role") == "user":
+            objective = str(m.get("content", ""))[:400]
+            break
+    return LLMResult(
+        content=(
+            "## Execution Plan\n"
+            "- Review the stated objective and available tenant data.\n"
+            "- Identify missing data sources explicitly.\n\n"
+            "## Deliverable\n"
+            f"Objective: {objective}\n\n"
+            "## Data gaps\n"
+            "- Deterministic test double; no external sources were queried."
+        ),
+        provider="test_stub", model="deterministic-test", degraded=False,
+        latency_ms=0.5,
+    )
 
 from core.coworker import (
     UniversalCoworkerEngine, CapabilityRegistry,
@@ -38,7 +64,15 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
 
     def setUp(self):
         self.tenant_id = f"tnt_test_{int(time.time()*1000)}"
+        self._llm_patcher = patch("core.llm_runtime.LLMRuntime.chat", _deterministic_chat)
+        self._llm_patcher.start()
         self.engine = UniversalCoworkerEngine(self.tenant_id)
+
+    def tearDown(self):
+        try:
+            self._llm_patcher.stop()
+        except Exception:
+            pass
 
     # 1. Multi-Runtime Router Intelligent Selection
     def test_01_runtime_router_specialized_selection(self):
@@ -153,7 +187,11 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
             provider_version="0.9.4"
         )
         res = mcp_adapter.execute_mcp_tool("filesystem", "read_file", {"path": "/tmp/test"}, session)
-        self.assertEqual(res.get("status"), "SUCCESS")
+        # The tool is not registered with the MCP gateway on this host, so the
+        # adapter must refuse rather than fabricate a successful tool call.
+        self.assertEqual(res.get("status"), "ACTION_NOT_IMPLEMENTED")
+        self.assertEqual(res.get("reason"), "MCP_SERVER_NOT_REGISTERED")
+        self.assertFalse(res.get("executed"))
 
         # Test forbidden tool call
         forbidden_res = mcp_adapter.execute_mcp_tool("database", "drop_table", {}, session)
@@ -183,21 +221,49 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
         )
         self.assertTrue(oh_rt.start_session(session))
 
-        # Test code write task
+        # Code write must land in the governed workspace, not just return a digest.
         res_code = oh_rt.run_foreground(session.session_id, {
             "action": "code_edit",
             "parameters": {"file_name": "calc.py", "content": "def add(a, b): return a + b\n"}
         })
         self.assertEqual(res_code.get("status"), "SUCCESS")
+        self.assertTrue(res_code.get("executed"))
         self.assertIsNotNone(res_code.get("digest"))
+        self.assertTrue(os.path.exists(res_code.get("safe_path")))
+        with open(res_code["safe_path"]) as fh:
+            self.assertIn("def add(a, b)", fh.read())
 
-        # Test test run task
+        # Write a real test, then run it in the sandbox and check the exit code.
+        res_testfile = oh_rt.run_foreground(session.session_id, {
+            "action": "write_file",
+            "parameters": {
+                "file_name": "tests/test_calc.py",
+                "content": "import sys; sys.path.insert(0, '.')\nfrom calc import add\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+            }
+        })
+        self.assertEqual(res_testfile.get("status"), "SUCCESS")
+
         res_test = oh_rt.run_foreground(session.session_id, {
             "action": "run_test",
             "parameters": {"test_target": "tests/test_calc.py"}
         })
-        self.assertEqual(res_test.get("status"), "SUCCESS")
-        self.assertTrue(res_test.get("tests_passed"))
+        if res_test.get("status") == "SUCCESS":
+            self.assertTrue(res_test.get("tests_passed"))
+            self.assertEqual(res_test.get("exit_code"), 0)
+        else:
+            # No container sandbox on this host: the gateway refuses to run
+            # commands on the bare host, and the runtime must report that.
+            self.assertEqual(res_test.get("status"), "FAILED")
+            self.assertFalse(res_test.get("tests_passed"))
+            self.assertIn("sandbox", (res_test.get("reason") or "").lower())
+
+        # A failing command must not be reported as success either.
+        res_bad = oh_rt.run_foreground(session.session_id, {
+            "action": "run_test",
+            "parameters": {"test_target": "tests/does_not_exist.py"}
+        })
+        self.assertEqual(res_bad.get("status"), "FAILED")
+        self.assertFalse(res_bad.get("tests_passed"))
 
     # 6. OpenClaw Autonomous Agent Daemon & ClawHub Plugins
     def test_06_openclaw_agent_and_clawhub_plugins(self):
@@ -230,11 +296,21 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
         )
         self.assertTrue(claw_rt.start_session(session))
 
+        # No search backend is configured, so the capability must refuse rather
+        # than invent supplier rows.
         res_search = claw_rt.run_foreground(session.session_id, {
             "action": "search",
             "parameters": {"query": "enterprise procurement software"}
         })
-        self.assertEqual(res_search.get("status"), "SUCCESS")
+        self.assertEqual(res_search.get("status"), "FAILURE")
+        self.assertFalse(res_search.get("executed"))
+        self.assertEqual(res_search.get("reason"), "SEARCH_ENDPOINT_NOT_CONFIGURED")
+        self.assertEqual(res_search.get("evidence_token"), None)
+
+        # Unknown agent delegation must refuse too.
+        res_agent = claw_rt.run_foreground(session.session_id, {"action": "delegate"})
+        self.assertEqual(res_agent.get("status"), "ACTION_NOT_IMPLEMENTED")
+        self.assertEqual(res_agent.get("reason"), "OPENCLAW_AGENT_RUNTIME_NOT_CONFIGURED")
 
     # 7. Unified Browser Worker & BrowserCode CDP Evaluation
     def test_07_browser_runtime_and_browsercode_cdp(self):
@@ -260,26 +336,68 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
         )
         self.assertTrue(brw_rt.start_session(session))
 
-        # Test navigate
-        res_nav = brw_rt.run_foreground(session.session_id, {
-            "action": "navigate",
-            "parameters": {"url": "https://company.example/portal"}
-        })
-        self.assertEqual(res_nav.get("status"), "SUCCESS")
-        self.assertEqual(res_nav.get("url"), "https://company.example/portal")
+        # Serve a real page locally so navigation has something to fetch.
+        import http.server
+        import threading
 
-        # Test BrowserCode CDP evaluation
-        res_eval = brw_rt.run_foreground(session.session_id, {
-            "action": "evaluate_javascript",
-            "parameters": {"script": "return document.title;"}
-        })
-        self.assertEqual(res_eval.get("status"), "SUCCESS")
-        self.assertEqual(res_eval.get("engine"), "browsercode_cdp")
+        class _Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"<html><head><title>ZONATA Portal</title></head><body>ok</body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
 
-        # Test screenshot
-        res_shot = brw_rt.run_foreground(session.session_id, {"action": "screenshot"})
-        self.assertEqual(res_shot.get("status"), "SUCCESS")
-        self.assertIsNotNone(res_shot.get("screenshot_hash"))
+            def log_message(self, *args):
+                pass
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        port = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            res_nav = brw_rt.run_foreground(session.session_id, {
+                "action": "navigate",
+                "parameters": {"url": f"http://127.0.0.1:{port}/portal"}
+            })
+            self.assertEqual(res_nav.get("status"), "SUCCESS")
+            self.assertEqual(res_nav.get("http_status"), 200)
+            self.assertEqual(res_nav.get("title"), "ZONATA Portal")
+            self.assertEqual(res_nav.get("executed"), True)
+            self.assertEqual(res_nav.get("mode"), "http_fetch")
+            self.assertFalse(res_nav.get("rendered"))
+
+            # A URL that cannot be reached must not report success.
+            res_bad = brw_rt.run_foreground(session.session_id, {
+                "action": "navigate",
+                "parameters": {"url": "http://127.0.0.1:1/nope", "timeout": 2}
+            })
+            self.assertEqual(res_bad.get("status"), "ACTION_NOT_IMPLEMENTED")
+            self.assertFalse(res_bad.get("executed"))
+
+            # JavaScript evaluation and screenshots need a browser engine and
+            # must refuse rather than return canned results.
+            res_eval = brw_rt.run_foreground(session.session_id, {
+                "action": "evaluate_javascript",
+                "parameters": {"script": "return document.title;"}
+            })
+            self.assertEqual(res_eval.get("status"), "ACTION_NOT_IMPLEMENTED")
+            self.assertEqual(res_eval.get("reason"), "BROWSER_ENGINE_NOT_AVAILABLE")
+
+            res_shot = brw_rt.run_foreground(session.session_id, {"action": "screenshot"})
+            self.assertEqual(res_shot.get("status"), "ACTION_NOT_IMPLEMENTED")
+            self.assertFalse(res_shot.get("executed"))
+
+            # A multi-step workflow must not claim completed steps.
+            res_flow = brw_rt.run_foreground(session.session_id, {
+                "action": "browser.execute",
+                "parameters": {"steps": [{"action": "click"}, {"action": "type"}]}
+            })
+            self.assertEqual(res_flow.get("status"), "ACTION_NOT_IMPLEMENTED")
+            self.assertFalse(res_flow.get("executed"))
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
     # 8. Unified Computer Use (CUA) Worker Runtime
     def test_08_computer_use_runtime_unified_actions(self):
@@ -305,25 +423,53 @@ class TestCoworkerRuntimesAndOrchestration(unittest.TestCase):
         )
         self.assertTrue(cua_rt.start_session(session))
 
-        # Test observe
-        res_obs = cua_rt.run_foreground(session.session_id, {"action": "observe"})
-        self.assertEqual(res_obs.get("status"), "SUCCESS")
-        self.assertGreater(res_obs.get("elements_found", 0), 0)
+        display_available = bool(os.environ.get("DISPLAY"))
 
-        # Test click
+        # Test observe. The element tree is seeded, so on a headless host the
+        # runtime must report PARTIAL rather than pretending it read the screen.
+        res_obs = cua_rt.run_foreground(session.session_id, {"action": "observe"})
+        self.assertGreater(res_obs.get("elements_found", 0), 0)
+        self.assertIn(res_obs.get("status"), ("SUCCESS", "PARTIAL"))
+        self.assertEqual(res_obs.get("synthetic"), True)
+        if not display_available:
+            self.assertEqual(res_obs.get("status"), "PARTIAL")
+            self.assertEqual(res_obs.get("reason"), "PERCEPTION_NOT_IMPLEMENTED")
+
+        # Test click: status must mirror the engine, never be fabricated.
         res_click = cua_rt.run_foreground(session.session_id, {
             "action": "click",
             "parameters": {"coordinate": (250, 450), "button": "left"}
         })
-        self.assertEqual(res_click.get("status"), "SUCCESS")
+        self.assertIn(res_click.get("status"), ("SUCCESS", "ACTION_NOT_IMPLEMENTED"))
+        self.assertEqual(res_click.get("executed"), display_available)
+        if not display_available:
+            self.assertEqual(res_click.get("reason"), "NO_DISPLAY")
 
         # Test type
         res_type = cua_rt.run_foreground(session.session_id, {
             "action": "type",
             "parameters": {"text": "Purchase Order #8849"}
         })
-        self.assertEqual(res_type.get("status"), "SUCCESS")
         self.assertEqual(res_type.get("chars_written"), 20)
+        self.assertEqual(res_type.get("executed"), display_available)
+
+        # Launch is authority-bearing and must be refused by the GUI layer.
+        res_launch = cua_rt.run_foreground(session.session_id, {
+            "action": "launch",
+            "parameters": {"application": "xterm"}
+        })
+        self.assertEqual(res_launch.get("status"), "ACTION_NOT_IMPLEMENTED")
+        self.assertEqual(res_launch.get("reason"), "APP_LAUNCH_REQUIRES_POLICY_GATEWAY")
+
+        # Verification of an unexecuted action must not be CONFIRMED.
+        if not display_available:
+            seal = cua_rt.verify(session.session_id, res_click)
+            self.assertEqual(seal.get("verification_status"), "UNCONFIRMED")
+
+        # Unknown actions must refuse instead of returning a completed task.
+        res_unknown = cua_rt.run_foreground(session.session_id, {"action": "teleport"})
+        self.assertEqual(res_unknown.get("status"), "ACTION_NOT_IMPLEMENTED")
+        self.assertFalse(res_unknown.get("completed"))
 
     # 9. SubWorkerCoordinator Authority & Budget Invariants
     def test_09_subworker_coordinator_hierarchy(self):

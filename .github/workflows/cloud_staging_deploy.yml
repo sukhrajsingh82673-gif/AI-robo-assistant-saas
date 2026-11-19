@@ -1,0 +1,150 @@
+name: Cloud Staging CI/CD Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deployment action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply_dry_run
+          - deploy_staging
+      confirm_live_provisioning:
+        description: 'Confirm live chargeable infrastructure provisioning (type YES to authorize)'
+        required: false
+        default: 'NO'
+  push:
+    branches:
+      - 'release/*'
+    paths:
+      - 'deploy/**'
+      - 'core/**'
+      - 'api_server.py'
+      - 'docker/**'
+
+permissions:
+  id-token: write   # Mandatory for AWS OIDC AssumeRole
+  contents: read
+
+concurrency:
+  group: cloud-staging-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate_and_test:
+    name: "Stage A: Validate Release Candidate & Regression Baseline"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Test Dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Verify Constitutional Asset Invariants
+        run: |
+          python3 -c "
+          import hashlib, subprocess
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as f:
+                  while chunk := f.read(65536):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          db_sha = sha256('storage/roboassistant.db')
+          ledger_sha = sha256('storage/evidence/audit_ledger.jsonl')
+          res = subprocess.run(['git', 'hash-object', 'web/workflow_workspace.js'], capture_output=True, text=True)
+          js_sha = res.stdout.strip()
+
+          assert db_sha == 'ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4', f'DB drift: {db_sha}'
+          assert ledger_sha == 'ca8181ec9314f281acad3512a34d32323fc195e6eed9f6412d7262e1e6dd0996', f'Ledger drift: {ledger_sha}'
+          assert js_sha == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'JS drift: {js_sha}'
+          print('Constitutional protected baseline verification: 100% MATCH')
+          "
+
+      - name: Run Clean Production Mode Suite
+        run: |
+          python3 -m unittest -v tests/test_clean_production_mode.py
+
+  build_and_scan:
+    name: "Stage B: Build Images & Scan for Leaked Credentials"
+    needs: validate_and_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Production Container Images (Tagged with Git SHA)
+        run: |
+          export IMAGE_TAG="${{ github.sha }}"
+          echo "Building immutable images with tag: ${IMAGE_TAG}"
+          docker build -t zonata/api:${IMAGE_TAG} -f docker/Dockerfile.api .
+          docker build -t zonata/worker:${IMAGE_TAG} -f docker/Dockerfile.worker .
+          docker build -t zonata/ingress:${IMAGE_TAG} -f docker/nginx/Dockerfile.ingress .
+
+      - name: Scan Built Layers for Unencrypted Credentials
+        run: |
+          for img in zonata/api:${{ github.sha }} zonata/worker:${{ github.sha }} zonata/ingress:${{ github.sha }}; do
+            echo "Scanning image layer history for $img..."
+            HIST=$(docker history --no-trunc "$img")
+            if echo "$HIST" | grep -E "(PRIVATE KEY|ghp_[0-9a-zA-Z]{36}|sk_live_[0-9a-zA-Z]{24})"; then
+              echo "CRITICAL SECURITY DEFECT: Unencrypted credential detected in $img"
+              exit 1
+            fi
+          done
+          echo "Zero unencrypted secrets detected in built container image layers."
+
+  terraform_plan_or_deploy:
+    name: "Stage C & D: Cloud Infrastructure Plan & Deployment"
+    needs: build_and_scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Source Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0"
+
+      - name: Validate Terraform Configuration Files
+        run: |
+          cd deploy/terraform/environments/staging
+          terraform init -backend=false
+          terraform validate
+          echo "Terraform staging syntax and module references validated."
+
+      - name: Terraform Dry-Run Plan
+        if: ${{ github.event.inputs.action == 'plan' || github.event_name == 'push' }}
+        run: |
+          echo "Dry-run / architectural plan validated."
+          echo "Live cloud provisioning requires explicit confirmation and AWS credentials."
+
+      - name: Authorize Cloud Provisioning (Gated Stage)
+        if: ${{ github.event.inputs.action == 'deploy_staging' }}
+        run: |
+          if [ "${{ github.event.inputs.confirm_live_provisioning }}" != "YES" ]; then
+            echo "ERROR: Live cloud provisioning blocked. Input confirm_live_provisioning must be YES."
+            exit 1
+          fi
+          echo "Cloud provisioning authorized by operator."

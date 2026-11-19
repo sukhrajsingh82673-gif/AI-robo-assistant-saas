@@ -126,7 +126,7 @@ class ProductionObservabilityEngine:
             evidence_digest=evidence_digest
         )
         self._active_traces[ctx.trace_id] = ctx
-        self.increment_counter("zonata_trace_spans_total", 1.0, {"tenant": tenant_id, "model": model_id})
+        self.increment_counter("zonata_trace_spans_total", 1.0, {"model": model_id})
         return ctx
 
     def get_trace_context(self, trace_id: str) -> Optional[ExecutionTraceContext]:

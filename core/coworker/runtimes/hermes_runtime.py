@@ -153,6 +153,7 @@ class HermesMCPAdapter:
 
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
+        self._gateway = None
 
     def format_hermes_tool_name(self, server_name: str, tool_name: str) -> str:
         return f"mcp__{server_name}__{tool_name}"
@@ -180,14 +181,63 @@ class HermesMCPAdapter:
                     "error": f"Tool '{required_perm}' not permitted in session capability scope"
                 }
 
-        # Deterministic simulation/proxy for MCP execution
-        return {
-            "status": "SUCCESS",
+        # Route through the governed MCP gateway. A tool that is not registered
+        # is reported as such rather than fabricated.
+        try:
+            from core.mcp_interoperability_runtime import MCPGateway
+        except Exception as exc:  # pragma: no cover - import cycle guard
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "server": server_name,
+                "tool": tool_name,
+                "reason": f"MCP_GATEWAY_UNAVAILABLE:{exc}",
+            }
+
+        gateway = getattr(self, "_gateway", None)
+        if gateway is None:
+            gateway = MCPGateway(tenant_id=self.tenant_id)
+            self._gateway = gateway
+
+        # Accept either a server_id or a display name.
+        server = None
+        try:
+            server = gateway.get_server(server_name)
+        except Exception:
+            server = None
+        if server is None:
+            try:
+                for srv in gateway.list_servers():
+                    if srv.get("display_name") == server_name or srv.get("server_id") == server_name:
+                        server = srv
+                        break
+            except Exception:
+                server = None
+        if server is None:
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "server": server_name,
+                "tool": tool_name,
+                "reason": "MCP_SERVER_NOT_REGISTERED",
+            }
+
+        gateway_result = gateway.invoke_tool(
+            server_id=server["server_id"],
+            tool_name_or_id=tool_name,
+            arguments=arguments,
+            context={"agent_id": session.worker_id, "tenant_id": session.tenant_id},
+        )
+        executed = str(gateway_result.get("status", "")).upper() in ("SUCCESS", "COMPLETED", "TOOL_SUCCESS")
+        out = {
+            "status": "SUCCESS" if executed else "ACTION_NOT_IMPLEMENTED",
+            "executed": executed,
             "server": server_name,
             "tool": tool_name,
-            "result": f"Executed {tool_name} on {server_name} with args {list(arguments.keys())}",
-            "execution_time_ms": 14.5
+            "gateway_status": gateway_result.get("status"),
+            "result": gateway_result,
         }
+        if not executed:
+            out["reason"] = gateway_result.get("error") or "MCP_TOOL_NOT_EXECUTED"
+        return out
 
 
 class HermesComputerUseAdapter:
@@ -220,17 +270,83 @@ class HermesComputerUseAdapter:
         if action not in valid_actions:
             return {"status": "ERROR", "error": f"Invalid CUA action: {action}"}
 
-        # Capture telemetry
+        # Delegate to the real desktop engine.
+        from ..computer_use_engine import ComputerUseEngine
+        engine = ComputerUseEngine.get_instance()
+        coordinate = parameters.get("coordinate") or (engine.cursor_x, engine.cursor_y)
+        x, y = (int(coordinate[0]), int(coordinate[1])) if len(coordinate) >= 2 else (0, 0)
+
+        if action == "observe":
+            obs = engine.observe()
+            return {
+                "status": "SUCCESS" if (obs.windows_verified and not obs.synthetic) else "PARTIAL",
+                "cua_driver": "zonata-computer-use-engine",
+                "action": action,
+                "executed": obs.windows_verified,
+                "active_window": obs.active_window,
+                "open_windows": obs.open_windows,
+                "elements_found": len(obs.elements),
+                "windows_verified": obs.windows_verified,
+                "synthetic": obs.synthetic,
+                "reason": None if obs.windows_verified else "PERCEPTION_NOT_IMPLEMENTED",
+                "timestamp": time.time(),
+            }
+
+        dispatch = {
+            "click": lambda: engine.click(x, y, parameters.get("button", "left")),
+            "type": lambda: engine.type_text(parameters.get("text", "")),
+            "key": lambda: engine.press_key(parameters.get("key", "Return")),
+            "scroll": lambda: engine.scroll(dx=parameters.get("dx", 0),
+                                            dy=parameters.get("dy", 0),
+                                            direction=parameters.get("direction", "down")),
+            "drag": lambda: engine.drag(x, y,
+                                        int((parameters.get("end") or [x + 50, y + 50])[0]),
+                                        int((parameters.get("end") or [x + 50, y + 50])[1])),
+            "launch": lambda: engine.launch(parameters.get("application", parameters.get("target", ""))),
+            "window": lambda: engine.switch_window(parameters.get("window_title", parameters.get("title", ""))),
+            "screenshot": lambda: None,  # handled below
+            "verify": lambda: engine.verify(parameters.get("assertion", "window_active"),
+                                            parameters.get("expected", parameters.get("window_title", ""))),
+        }
+
+        if action == "screenshot":
+            png = engine.screenshot()
+            synthetic = bool(getattr(engine, "last_screenshot_synthetic", True))
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED" if synthetic else "SUCCESS",
+                "cua_driver": "zonata-computer-use-engine",
+                "action": action,
+                "executed": not synthetic,
+                "screenshot_hash": hashlib.sha256(png).hexdigest(),
+                "size_bytes": len(png),
+                "synthetic": synthetic,
+                "reason": "NO_DISPLAY" if synthetic else None,
+                "timestamp": time.time(),
+            }
+
+        if action == "verify":
+            passed = dispatch["verify"]()
+            return {
+                "status": "SUCCESS" if passed else "VERIFICATION_FAILED",
+                "cua_driver": "zonata-computer-use-engine",
+                "action": action,
+                "executed": passed,
+                "verified": passed,
+                "reason": None if passed else "ASSERTION_NOT_CONFIRMED",
+                "timestamp": time.time(),
+            }
+
+        res = dispatch[action]()
         return {
-            "status": "SUCCESS",
-            "cua_driver": "hermes_background_cua_v1",
+            "status": res.get("status", "ACTION_NOT_IMPLEMENTED"),
+            "cua_driver": "zonata-computer-use-engine",
             "action": action,
-            "coordinates": parameters.get("coordinate"),
-            "target_window": parameters.get("window_title", "default_workspace"),
-            "background_operation": True,
-            "cursor_moved": False, # Non-intrusive background execution
+            "executed": bool(res.get("executed")),
+            "mode": res.get("mode"),
+            "coordinates": [x, y],
+            "target_window": parameters.get("window_title"),
+            "reason": res.get("reason"),
             "timestamp": time.time(),
-            "screenshot_hash": hashlib.sha256(f"screen_{action}_{time.time()}".encode()).hexdigest()[:16]
         }
 
 
@@ -428,14 +544,48 @@ class HermesWorkerRuntime(WorkerRuntime):
             session.log(f"Executed Hermes CUA action: {action}")
             return res
 
-        # Route 4: General Multi-Step Reasoning
-        return {
-            "status": "SUCCESS",
-            "runtime": self.runtime_id(),
-            "reasoning": f"Decomposed and analyzed objective: {task.get('objective', '')}",
-            "steps_completed": 1,
-            "state": "COMPLETED"
-        }
+        # Route 4: General Multi-Step Reasoning via the configured LLM.
+        # A plan is only reported when a model actually produced one.
+        objective = str(task.get("objective", "")).strip()
+        if not objective:
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "runtime": self.runtime_id(),
+                "executed": False,
+                "reason": "EMPTY_OBJECTIVE",
+            }
+        try:
+            from core.llm_runtime import LLMRuntime
+            llm = LLMRuntime.get_instance() if hasattr(LLMRuntime, "get_instance") else LLMRuntime()
+            result = llm.chat(
+                tenant_id=session.tenant_id,
+                company_id=session.company_id,
+                messages=[{"role": "user", "content": objective}],
+                system="You are a governed execution planner. Produce a short, ordered plan.",
+                intent="planning",
+            )
+            content = (result.content or "").strip()
+            executed = bool(content) and not result.degraded
+            out = {
+                "status": "SUCCESS" if executed else "ACTION_NOT_IMPLEMENTED",
+                "runtime": self.runtime_id(),
+                "executed": executed,
+                "reasoning": content,
+                "provider": result.provider,
+                "model": result.model,
+                "degraded": result.degraded,
+                "state": "COMPLETED" if executed else "NOT_EXECUTED",
+            }
+            if not executed:
+                out["reason"] = result.error or "LLM_UNAVAILABLE"
+            return out
+        except Exception as exc:
+            return {
+                "status": "ACTION_NOT_IMPLEMENTED",
+                "runtime": self.runtime_id(),
+                "executed": False,
+                "reason": f"LLM_ERROR:{exc}",
+            }
 
     def run_background(self, session_id: str, task: Dict[str, Any]) -> str:
         """Dispatches an asynchronous background execution returning a job_id."""

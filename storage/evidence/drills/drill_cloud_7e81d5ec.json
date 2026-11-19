@@ -1,0 +1,46 @@
+{
+  "drill_id": "drill_cloud_7e81d5ec",
+  "tenant_id": "tnt_disaster_recovery",
+  "timestamp_utc": "2026-10-20T11:33:36Z",
+  "stages": {
+    "snapshot_generation": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.097,
+      "snapshot_path": "/root/roboassistant/storage/backups/test_snap_drill_cloud_7e81d5ec.db"
+    },
+    "offhost_s3_replication": {
+      "status": "SUCCESS",
+      "duration_seconds": 10.408,
+      "receipt_id": "rcpt_snap_94c3434913",
+      "remote_uri": "s3://zonata-backups/sqlite/snapshots/test_snap_drill_cloud_7e81d5ec.db",
+      "sha256": "27646fcb7c97413bd7b2e2562e8b170185ff00920764ac9a956fd6ea41a00b51",
+      "retention_until": 1793100816.6577146
+    },
+    "worm_cryptographic_verification": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.008,
+      "verified": true
+    },
+    "restoration_execution": {
+      "status": "SUCCESS",
+      "duration_seconds": 0.058,
+      "target_path": "/root/roboassistant/storage/backups/recovery_target_drill_cloud_7e81d5ec",
+      "database_integrity": "VERIFIED_OK",
+      "merkle_evidence_verified": true,
+      "tenant_isolation_verified": true
+    }
+  },
+  "verdict": "LOCAL_RESTORE_VERIFIED",
+  "execution_scope": "LOCAL_CRYPTOGRAPHIC_AND_STORAGE_MIRROR",
+  "cloud_provider_enforcement": "PENDING_AWS_S3_OBJECT_LOCK_API_VERIFICATION",
+  "metrics": {
+    "rto_seconds": 0.058,
+    "rpo_seconds": 10.4183,
+    "total_drill_duration_seconds": 10.572,
+    "sla_target_rto_seconds": 900.0,
+    "sla_target_rpo_seconds": 60.0,
+    "rto_sla_met": true,
+    "rpo_sla_met": true,
+    "measurement_context": "Measured on local cryptographic envelope decryption and disk restoration from off-host mirror buffer."
+  }
+}

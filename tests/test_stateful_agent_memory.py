@@ -28,6 +28,7 @@ Validates:
 25. Section 74 & 75 End-to-end demonstrations (continuity & conflict coordination)
 """
 
+import os
 import unittest
 import time
 import uuid
@@ -47,6 +48,7 @@ from core.stateful_agent_runtime import (
     SecurityException
 )
 from zonata.stateful_agent_adapter import StatefulAgentAdapter
+from core.db import configure_isolated_test_db, SCHEMA_SQL
 from core.meeting_service import AiCeoMeetingService
 from core.approvals import ApprovalPipeline
 from core.models import AuthorityLevel
@@ -54,13 +56,15 @@ from core.models import AuthorityLevel
 
 class TestStatefulAgentMemory(unittest.TestCase):
     def setUp(self):
+        self.test_db_path = configure_isolated_test_db()
         self.tenant_a = "tnt_test_stateful_a"
         self.tenant_b = "tnt_test_stateful_b"
         self.company_1 = "comp_test_c1"
         self.company_2 = "comp_test_c2"
 
-        # Initialize test tenants and companies in DB
+        # Initialize schema and test tenants/companies in isolated DB
         with db.get_connection() as conn:
+            conn.executescript(SCHEMA_SQL)
             conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, created_at) VALUES (?, 'Tenant A', ?)", (self.tenant_a, time.time()))
             conn.execute("INSERT OR IGNORE INTO tenants (tenant_id, name, created_at) VALUES (?, 'Tenant B', ?)", (self.tenant_b, time.time()))
             conn.execute(
@@ -84,6 +88,14 @@ class TestStatefulAgentMemory(unittest.TestCase):
         self.gateway_a = StatefulAgentMemoryGateway(tenant_id=self.tenant_a)
         self.gateway_b = StatefulAgentMemoryGateway(tenant_id=self.tenant_b)
         self.adapter_a = StatefulAgentAdapter(tenant_id=self.tenant_a)
+
+    def tearDown(self):
+        db.close()
+        if hasattr(self, 'test_db_path') and os.path.exists(self.test_db_path):
+            try:
+                os.remove(self.test_db_path)
+            except Exception:
+                pass
 
     # -----------------------------------------------------------------
     # Test 1: Identity Creation & Retrieval

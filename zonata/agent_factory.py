@@ -7,7 +7,9 @@ Constitutional Invariant: An agent cannot become authoritative simply because th
 it must be tested, certified, and assigned an explicit authority contract before activation.
 """
 
-from typing import Dict, List, Optional, Any
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Any, Tuple
 import json
 import time
 import uuid
@@ -196,6 +198,16 @@ class GovernedAgentFactory:
             if not row:
                 raise ValueError(f"Agent {agent_id} not found in zonata_workforce_members")
 
+            def _safe_load(val, default):
+                if val is None:
+                    return default
+                if isinstance(val, (dict, list)):
+                    return val
+                try:
+                    return json.loads(val)
+                except Exception:
+                    return default
+
             agent = DynamicWorkforceMember(
                 id=row["agent_id"],
                 name=row["name"],
@@ -203,21 +215,21 @@ class GovernedAgentFactory:
                 department_id=row["department_id"],
                 executive=row["executive_role"] or "COO",
                 mission_focus=row["mission_focus"] or "",
-                responsibilities=json.loads(row["responsibilities"]) if row["responsibilities"] else [],
-                capabilities=json.loads(row["capabilities"]) if row["capabilities"] else [],
-                tools=json.loads(row["tools"]) if row["tools"] else [],
-                knowledge_sources=json.loads(row["knowledge_sources"]) if row["knowledge_sources"] else [],
-                model_policy=json.loads(row["model_policy"]) if row["model_policy"] else {},
+                responsibilities=_safe_load(row["responsibilities"], []),
+                capabilities=_safe_load(row["capabilities"], []),
+                tools=_safe_load(row["tools"], []),
+                knowledge_sources=_safe_load(row["knowledge_sources"], []),
+                model_policy=_safe_load(row["model_policy"], {}),
                 budget=row["budget_limit"],
                 risk_class=row["risk_class"],
-                approval_policy=json.loads(row["approval_policy"]) if row["approval_policy"] else {},
-                kpis=json.loads(row["kpis"]) if row["kpis"] else [],
-                verification_policy=json.loads(row["verification_policy"]) if row["verification_policy"] else {},
+                approval_policy=_safe_load(row["approval_policy"], {}),
+                kpis=_safe_load(row["kpis"], []),
+                verification_policy=_safe_load(row["verification_policy"], {}),
                 working_hours=row["working_hours"],
-                communication_channels=json.loads(row["communication_channels"]) if row["communication_channels"] else [],
+                communication_channels=_safe_load(row["communication_channels"], []),
                 status=AgentLifecycleState(row["lifecycle_state"]),
-                certification=json.loads(row["certification"]) if row["certification"] else {},
-                authority_scope=json.loads(row["authority_scope"]) if row["authority_scope"] else {}
+                certification=_safe_load(row["certification"], {}),
+                authority_scope=_safe_load(row["authority_scope"], {})
             )
             return agent, row["tenant_id"], row["company_id"]
 

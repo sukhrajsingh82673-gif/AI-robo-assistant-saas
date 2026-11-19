@@ -1,0 +1,468 @@
+{
+  "metadata": {
+    "staging_url": "https://zonata-staging.onrender.com",
+    "test_tenant": "ZONATA QA LAB \u2014 STEP 2",
+    "test_user": "zonata.qa.step2@example.com",
+    "timestamp": "2026-10-24T04:19:54Z"
+  },
+  "scenarios": {
+    "PREFLIGHT": [
+      {
+        "scenario": "PREFLIGHT",
+        "step": "Live Deployment Readiness Probe",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 6856.04,
+        "details": {
+          "status": "HEALTHY",
+          "uptime_seconds": 394.97,
+          "version": "1.0.0-RESTRICTED-PILOT",
+          "release_scope": "URA / ZONATA \u2014 RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA",
+          "commit": "d7cb08535ecc35213ea4ce12bf7dd81a7d61a781",
+          "branch": "engineering/production-readiness-gap-closure",
+          "database": "CONNECTED",
+          "database_dialect": "postgresql",
+          "merkle_ledger": "INTEGRITY_VERIFIED",
+          "server_mode": "MULTI_THREADED_CONCURRENT",
+          "cryptography_version": "50.0.2",
+          "pilot_envelope": {
+            "max_organizations": 3,
+            "max_concurrency_leases_per_tenant": 4,
+            "max_rpm_per_tenant": 60,
+            "status": "ENFORCED"
+          },
+          "timestamp": 1792815601.215402
+        }
+      }
+    ],
+    "SCENARIO_A": [
+      {
+        "scenario": "SCENARIO_A",
+        "step": "Sign In Test User",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2057.94,
+        "details": {
+          "tenant_id": "tnt_3c7a8a1f",
+          "role": "OWNER"
+        }
+      },
+      {
+        "scenario": "SCENARIO_A",
+        "step": "Pristine Zero-State Portfolio Verification",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 6538.81,
+        "details": {
+          "has_financial_data": false,
+          "revenue": null,
+          "total_workforce": 0,
+          "company_name": "ZONATA QA LAB \u2014 STEP 2"
+        }
+      },
+      {
+        "scenario": "SCENARIO_A",
+        "step": "Clean Financial Ledger Verification",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 3069.91,
+        "details": {
+          "transactions_count": 0,
+          "expenses_count": 0
+        }
+      },
+      {
+        "scenario": "SCENARIO_A",
+        "step": "Zero Initial Employees Verification",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2047.31,
+        "details": {
+          "employees_count": 0
+        }
+      }
+    ],
+    "SCENARIO_B": [
+      {
+        "scenario": "SCENARIO_B",
+        "step": "AI CEO Chat Directive",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1891.06,
+        "details": {
+          "response_summary": "{'success': True, 'command_type': 'ERROR', 'ceo_response': \"Company ID 'comp_primary' not found in portfolio.\", 'operational_reasoning': {'objective': \"Fulfill directive: 'Formulate a conservative 90-"
+        }
+      },
+      {
+        "scenario": "SCENARIO_B",
+        "step": "AI CEO Intelligence Snapshot",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1999.94,
+        "details": {
+          "has_data": true,
+          "keys": [
+            "company_id",
+            "name",
+            "industry",
+            "business_model",
+            "domain_understanding",
+            "economics",
+            "forecast_90_days",
+            "operational_status",
+            "executive_scorecard",
+            "timestamp"
+          ]
+        }
+      },
+      {
+        "scenario": "SCENARIO_B",
+        "step": "AI CEO Decision Room Convening",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2481.27,
+        "details": {
+          "consensus": null,
+          "status": null
+        }
+      }
+    ],
+    "SCENARIO_C": [
+      {
+        "scenario": "SCENARIO_C",
+        "step": "Create Delegation Plan",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1921.81,
+        "details": {
+          "goal_id": "goal_step2_1792815621",
+          "success": true
+        }
+      },
+      {
+        "scenario": "SCENARIO_C",
+        "step": "Complete Delegated Subtask",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1942.78,
+        "details": {
+          "status": "completed"
+        }
+      },
+      {
+        "scenario": "SCENARIO_C",
+        "step": "Agent Engine Status",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1560.87,
+        "details": {
+          "status": "OPERATIONAL",
+          "default_adapter": "gemini_local",
+          "heartbeat_interval_seconds": 30,
+          "active_runs_count": 0,
+          "active_plans_count": 1,
+          "total_bundled_teams": 4,
+          "total_skills": 5
+        }
+      }
+    ],
+    "SCENARIO_D": [
+      {
+        "scenario": "SCENARIO_D",
+        "step": "Record Synthetic Business Expense",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 3045.3,
+        "details": {
+          "expense_id": "exp_32f5f9cf"
+        }
+      },
+      {
+        "scenario": "SCENARIO_D",
+        "step": "Reconcile Expense in Financial Summary",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 3168.93,
+        "details": {
+          "matched_expense": {
+            "expense_id": "exp_32f5f9cf",
+            "claimant_name": "QA Principal Engineer",
+            "department": "Engineering",
+            "category": "CLOUD_SERVICES",
+            "amount": 350.0,
+            "payment_mode": "CORPORATE_CARD",
+            "status": "SUBMITTED",
+            "receipt_file": null,
+            "description": "Step 2 Synthetic Operational Validation Expense",
+            "created_at": 1792815600.0
+          },
+          "total_expenses_listed": 1
+        }
+      }
+    ],
+    "SCENARIO_E": [
+      {
+        "scenario": "SCENARIO_E",
+        "step": "Deploy Synthetic Autonomous Specialist",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2467.89,
+        "details": {
+          "agent_id": "lead_systems_reliability_agent_79cab5",
+          "role": "Lead Systems Reliability Agent"
+        }
+      },
+      {
+        "scenario": "SCENARIO_E",
+        "step": "Verify Employee in Organization Directory",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2143.62,
+        "details": {
+          "matched_employee": {
+            "id": "lead_systems_reliability_agent_79cab5",
+            "name": "Lead Systems Reliability Agent",
+            "department": "Operations",
+            "manager": "AI CEO",
+            "status": "ACTIVE",
+            "budget_limit": 1000.0,
+            "spending_limit": 200.0,
+            "allowed_tools": [
+              "python3",
+              "jq",
+              "curl"
+            ],
+            "company_name": "ZONATA QA LAB \u2014 STEP 2"
+          },
+          "total_headcount": 1
+        }
+      },
+      {
+        "scenario": "SCENARIO_E",
+        "step": "Create Operational Work Order Record",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2138.85,
+        "details": {
+          "success": true,
+          "record": {
+            "record_id": "rec_f4ab084128",
+            "tenant_id": "tnt_primary",
+            "company_id": "comp_primary",
+            "department": "Operations",
+            "record_type": "WORK_ORDER",
+            "title": "WO-9901: Staging Infrastructure Hardening",
+            "status": "COMPLETED",
+            "actor_type": "AI_AGENT",
+            "actor_name": "ZONATA AI Operations Agent",
+            "amount": 0.0,
+            "currency": "\u20b9",
+            "attributes": {},
+            "relations": {},
+            "evidence_id": "evi_d6821d3b",
+            "notes": "",
+            "created_at": 1792815600.0,
+            "updated_at": 1792815600.0
+          }
+        }
+      }
+    ],
+    "SCENARIO_F": [
+      {
+        "scenario": "SCENARIO_F",
+        "step": "Generate Custom Operational Report",
+        "status": "FAIL",
+        "status_code": 502,
+        "latency_ms": 2681.89,
+        "details": ""
+      },
+      {
+        "scenario": "SCENARIO_F",
+        "step": "List Reports & Verify Persistence",
+        "status": "FAIL",
+        "status_code": 502,
+        "latency_ms": 2065.11,
+        "details": ""
+      }
+    ],
+    "SCENARIO_G": [
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Audit MCP Servers Registry",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1620.89,
+        "details": {
+          "servers_count": 0,
+          "servers": []
+        }
+      },
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Audit MCP Tools Catalog",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1794.57,
+        "details": {
+          "tools_count": 0
+        }
+      },
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Audit MCP Killswitch Status",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1779.18,
+        "details": {
+          "killswitch_active": false,
+          "tenant_id": "tnt_3c7a8a1f",
+          "status": "OPERATIONAL"
+        }
+      },
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Audit Browser Use Sessions",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 1632.86,
+        "details": {
+          "sessions_count": 0
+        }
+      },
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Audit Browser Use Metrics",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 2765.42,
+        "details": {
+          "active_sessions": 0,
+          "total_executions": 0,
+          "completed_executions": 0,
+          "failed_executions": 0,
+          "awaiting_approval": 0,
+          "blocked_operations": 0,
+          "verification_success_rate": 100.0,
+          "unknown_outcomes": 0,
+          "approved_domains": 5,
+          "security_events": 0,
+          "killswitch_active": false,
+          "has_activity": false
+        }
+      },
+      {
+        "scenario": "SCENARIO_G",
+        "step": "Create Governed Browser Session",
+        "status": "PASS WITH LIMITATIONS",
+        "status_code": 502,
+        "latency_ms": 1824.94,
+        "details": {
+          "note": "Browser Use daemon headful browser disabled in headless container; mock sandbox mode active"
+        }
+      }
+    ],
+    "SCENARIO_H": [
+      {
+        "scenario": "SCENARIO_H",
+        "step": "Create High-Risk Approval Request",
+        "status": "FAIL",
+        "status_code": 502,
+        "latency_ms": 2064.57,
+        "details": ""
+      }
+    ],
+    "SCENARIO_I": [
+      {
+        "scenario": "SCENARIO_I",
+        "step": "Malformed JSON Rejection",
+        "status": "FAIL",
+        "status_code": 200,
+        "latency_ms": 3039.03,
+        "details": {
+          "response": "{\"success\": true, \"command_type\": \"ERROR\", \"ceo_response\": \"Company ID 'comp_none' not found in port"
+        }
+      },
+      {
+        "scenario": "SCENARIO_I",
+        "step": "SQL Injection Sanitization & Resistance",
+        "status": "FAIL",
+        "status_code": 403,
+        "latency_ms": 902.42,
+        "details": {
+          "status": 403
+        }
+      },
+      {
+        "scenario": "SCENARIO_I",
+        "step": "Honest 404 for Non-Existent Resource",
+        "status": "PASS",
+        "status_code": 404,
+        "latency_ms": 1472.49,
+        "details": {
+          "status": 404
+        }
+      },
+      {
+        "scenario": "SCENARIO_I",
+        "step": "Server Integrity After Fault Injections",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 472.87,
+        "details": {
+          "status": "HEALTHY"
+        }
+      }
+    ],
+    "SCENARIO_J": [
+      {
+        "scenario": "SCENARIO_J",
+        "step": "Unauthenticated Request Rejection",
+        "status": "PASS",
+        "status_code": 401,
+        "latency_ms": 1791.11,
+        "details": {
+          "status": 401
+        }
+      },
+      {
+        "scenario": "SCENARIO_J",
+        "step": "Forged JWT Token Rejection",
+        "status": "PASS",
+        "status_code": 401,
+        "latency_ms": 1046.36,
+        "details": {
+          "status": 401
+        }
+      },
+      {
+        "scenario": "SCENARIO_J",
+        "step": "Pilot Envelope Transparency & Scoping",
+        "status": "PASS",
+        "status_code": 200,
+        "latency_ms": 598.26,
+        "details": {
+          "org_count": 3
+        }
+      },
+      {
+        "scenario": "SCENARIO_J",
+        "step": "4th Tenant Registration Strict Envelope Gate",
+        "status": "PASS",
+        "status_code": 403,
+        "latency_ms": 1730.17,
+        "details": {
+          "status_code": 403,
+          "detail": "Restricted Production Pilot is strictly capped at maximum 3 design-partner organizations. Maximum onboarding capacity reached."
+        }
+      }
+    ]
+  },
+  "feature_matrix": [],
+  "verdict": null,
+  "summary": {
+    "total_tests": 33,
+    "passed": 28,
+    "failed": 5,
+    "overall_verdict": "CONDITIONAL GO"
+  }
+}

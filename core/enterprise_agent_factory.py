@@ -144,17 +144,17 @@ class EnterpriseAgentFactory:
                     "role": r["role"],
                     "department": r["department"],
                     "mission": r["mission"],
-                    "responsibilities": json.loads(r["responsibilities"]) if r["responsibilities"] else [],
-                    "capabilities": json.loads(r["capabilities"]) if r["capabilities"] else [],
-                    "tools": json.loads(r["tools"]) if r["tools"] else [],
-                    "knowledge_sources": json.loads(r["knowledge_sources"]) if r["knowledge_sources"] else [],
+                    "responsibilities": json.loads(r["responsibilities"]) if isinstance(r["responsibilities"], str) else (r["responsibilities"] or []),
+                    "capabilities": json.loads(r["capabilities"]) if isinstance(r["capabilities"], str) else (r["capabilities"] or []),
+                    "tools": json.loads(r["tools"]) if isinstance(r["tools"], str) else (r["tools"] or []),
+                    "knowledge_sources": json.loads(r["knowledge_sources"]) if isinstance(r["knowledge_sources"], str) else (r["knowledge_sources"] or []),
                     "memory_policy": r["memory_policy"],
                     "autonomy_level": r["autonomy_level"],
                     "budget_limit": r["budget_limit"],
                     "spending_currency": r["spending_currency"],
                     "approval_threshold": r["approval_threshold"],
                     "reporting_manager": r["reporting_manager"],
-                    "kpis": json.loads(r["kpis"]) if r["kpis"] else [],
+                    "kpis": json.loads(r["kpis"]) if isinstance(r["kpis"], str) else (r["kpis"] or []),
                     "status": r["status"],
                     "test_score": r["test_score"],
                     "created_at": r["created_at"],
@@ -269,13 +269,34 @@ class EnterpriseAgentFactory:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO agent_blueprints (
+            INSERT INTO agent_blueprints (
                 blueprint_id, tenant_id, company_id, name, role, department,
                 mission, responsibilities, capabilities, tools, knowledge_sources,
                 memory_policy, autonomy_level, budget_limit, spending_currency,
                 approval_threshold, reporting_manager, kpis, status, test_score,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (blueprint_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                name = EXCLUDED.name,
+                role = EXCLUDED.role,
+                department = EXCLUDED.department,
+                mission = EXCLUDED.mission,
+                responsibilities = EXCLUDED.responsibilities,
+                capabilities = EXCLUDED.capabilities,
+                tools = EXCLUDED.tools,
+                knowledge_sources = EXCLUDED.knowledge_sources,
+                memory_policy = EXCLUDED.memory_policy,
+                autonomy_level = EXCLUDED.autonomy_level,
+                budget_limit = EXCLUDED.budget_limit,
+                spending_currency = EXCLUDED.spending_currency,
+                approval_threshold = EXCLUDED.approval_threshold,
+                reporting_manager = EXCLUDED.reporting_manager,
+                kpis = EXCLUDED.kpis,
+                status = EXCLUDED.status,
+                test_score = EXCLUDED.test_score,
+                updated_at = EXCLUDED.updated_at
             """, (
                 bp.blueprint_id, self.tenant_id, company_id, bp.name, bp.role,
                 bp.department, bp.mission, json.dumps(bp.responsibilities),

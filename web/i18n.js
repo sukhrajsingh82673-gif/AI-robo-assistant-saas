@@ -1,0 +1,1618 @@
+/**
+ * ZONATA — Internationalisation runtime (English + Arabic)
+ *
+ * A deliberately small runtime: dictionary lookup, `data-i18n` application,
+ * document direction, and Indian (lakh/crore) number and currency formatting.
+ * It is not a framework and it adds no dependency.
+ *
+ * Usage:
+ *   I18n.t('company.add.title')
+ *   I18n.setLanguage('ar')        // sets <html lang="ar" dir="rtl">
+ *   I18n.formatCurrency(1200000)  // ₹12,00,000
+ *   I18n.formatCurrency(1200000, 'INR', { compact: true }) // ₹12 L
+ *
+ * Elements can declare translations:
+ *   <h1 data-i18n="company.add.title"></h1>
+ *   <button data-i18n-aria-label="common.close"></button>
+ */
+
+(function() {
+  'use strict';
+
+  const STORAGE_KEY = 'zonata_language';
+  const SUPPORTED = ['en', 'ar'];
+
+  // Formatting preferences. They mirror real server settings; nothing here is
+  // enabled unless the server reports it.
+  let numberFormat = 'indian';       // indian | international | continental
+  let currencyDisplay = 'symbol';    // symbol | iso | name
+  let activeLocale = null;
+  const CURRENCY_NAMES = {
+    INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound',
+    AED: 'UAE Dirham', SGD: 'Singapore Dollar', JPY: 'Japanese Yen'
+  };
+
+  const DICTIONARIES = {
+    en: {
+      'common.cancel': 'Cancel',
+      'common.close': 'Close',
+      'common.back': 'Back',
+      'common.retry': 'Try again',
+      'common.loading': 'Loading…',
+      'common.english': 'English',
+      'common.arabic': 'العربية',
+      'common.language': 'Language',
+
+      'status.draft': 'Draft',
+      'status.creating': 'Creating',
+      'status.onboarding': 'Onboarding',
+      'status.operational': 'Operational',
+      'status.needs_attention': 'Needs attention',
+      'status.pending_export': 'Pending export',
+      'status.pending_deletion': 'Pending deletion',
+      'status.deleted': 'Deleted',
+      'status.suspended': 'Suspended',
+      'status.unknown': 'Unknown status',
+
+      'company.switcher.title': 'Switch company',
+      'company.switcher.subtitle': 'Your current company is shown first.',
+      'company.switcher.current': 'Current',
+      'company.switcher.empty.title': 'No companies yet',
+      'company.switcher.empty.body': 'Add your first company to start operating.',
+      'company.switcher.empty.sidebar': 'No company yet',
+      'company.switcher.empty.status': 'Add a company to begin',
+      'company.switcher.add': 'Add company',
+      'company.switcher.switched': 'Switched to {name}',
+      'company.switcher.refresh_failed': 'Could not refresh. Showing the companies last loaded on this device.',
+      'company.switcher.refreshing': 'Refreshing companies…',
+      'company.switcher.portfolio': 'All companies (portfolio)',
+      'company.switcher.unknown_industry': 'Operating company',
+
+      'company.add.back': 'Companies',
+      'company.add.title': 'Add a company',
+      'company.add.subtitle': 'Choose how this company joins ZONATA. You can edit or delete it later.',
+      'company.add.new.badge': 'New',
+      'company.add.new.title': 'Create a new company',
+      'company.add.new.body': 'For a business that does not exist yet. ZONATA builds the company with you.',
+      'company.add.new.point1': 'Starts with status Creating',
+      'company.add.new.point2': 'Guided build, typically 1–3 days',
+      'company.add.new.point3': 'Legal and operating setup drafted for your review',
+      'company.add.new.point4': 'You can edit or delete it later',
+      'company.add.new.cta': 'Create new company',
+      'company.add.existing.badge': 'Existing',
+      'company.add.existing.title': 'Add an existing company',
+      'company.add.existing.body': 'For a business already operating. ZONATA studies it and diagnoses what to improve.',
+      'company.add.existing.point1': 'Starts with status Onboarding',
+      'company.add.existing.point2': 'Read-only connections — nothing is written back',
+      'company.add.existing.point3': 'Diagnosis and readiness findings with evidence',
+      'company.add.existing.point4': 'Your data stays in your own systems',
+      'company.add.existing.cta': 'Add existing company',
+      'company.add.not_sure': 'Not sure which one?',
+      'company.add.help.title': 'A quick way to decide',
+      'company.add.help.new': 'Choose Create new if the company has no history in ZONATA and little or no operating data.',
+      'company.add.help.existing': 'Choose Add existing if it already has customers, revenue, tools, or records.',
+      'company.add.help.note': 'Both paths start as a draft. Nothing is submitted until you review and confirm.',
+      'company.add.denied.title': 'You cannot add a company',
+      'company.add.denied.body': 'Only the owner or an allowed admin can add a company. You can still ask the assistant to prepare a draft.',
+      'company.add.intent_new': 'Opening the new company setup. Nothing has been created yet.',
+      'company.add.intent_existing': 'Opening the existing company intake. Nothing has been connected yet.',
+      'company.add.footnote': 'Your company list is scoped to your organisation. Other tenants can never see or change it.',
+
+
+      'company.create.back': 'Companies',
+      'company.create.steps_label': 'Setup steps',
+      'company.create.step.details': 'Details',
+      'company.create.step.review': 'Review',
+      'company.create.title': 'Create a new company',
+      'company.create.subtitle': 'A short brief. ZONATA turns it into a build plan, then shows you exactly what is real and what is still waiting.',
+      'company.create.optional': 'Optional',
+      'company.create.example': 'Example: {example}',
+      'company.create.basics.title': 'The company',
+      'company.create.basics.note': 'Write it the way you would explain it to a new colleague.',
+      'company.create.name.label': 'Company name',
+      'company.create.name.hint': 'The name customers will see. You can rename it later.',
+      'company.create.name.example': 'Northwind Labs',
+      'company.create.tagline.label': 'One-line title',
+      'company.create.tagline.hint': 'What the company does, in one line.',
+      'company.create.tagline.example': 'Applied AI studio for mid-market retailers',
+      'company.create.description.label': 'What the company does',
+      'company.create.description.mode_label': 'How to describe the company',
+      'company.create.description.free': 'Write freely',
+      'company.create.description.guided': 'Answer four questions',
+      'company.create.description.free_label': 'Description',
+      'company.create.description.hint': 'At least a couple of sentences. Who it serves, what it sells, and how it makes money.',
+      'company.create.description.example': 'We build ordering tools for neighbourhood bakeries. Owners pay a monthly fee and we take a small cut of online orders.',
+      'company.create.guided.offer.label': 'What do you offer?',
+      'company.create.guided.offer.hint': 'The product or service in plain words.',
+      'company.create.guided.offer.example': 'Online ordering and delivery software for bakeries',
+      'company.create.guided.audience.label': 'Who is it for?',
+      'company.create.guided.audience.hint': 'Be specific: the kind of customer, not everyone.',
+      'company.create.guided.audience.example': 'Independent bakery owners with one to six stores',
+      'company.create.guided.difference.label': 'Why choose you?',
+      'company.create.guided.difference.hint': 'The one thing you do better or differently.',
+      'company.create.guided.difference.example': 'Setup in a day, with no new hardware',
+      'company.create.guided.revenue.label': 'How does it make money?',
+      'company.create.guided.revenue.hint': 'Pricing, fees or commission.',
+      'company.create.guided.revenue.example': 'A monthly subscription plus a small commission on orders',
+      'company.create.guided.preview': 'This is the description we will use',
+      'company.create.guided.empty': 'Answer the questions above and the description appears here.',
+      'company.create.guided.sentence.audience': 'It serves',
+      'company.create.guided.sentence.difference': 'It stands out because',
+      'company.create.guided.sentence.revenue': 'It makes money by',
+      'company.create.you.title': 'You',
+      'company.create.you.note': 'Used for the audit trail and for the export copy of this company.',
+      'company.create.owner.label': 'Your name',
+      'company.create.owner.hint': 'The person accountable for this company.',
+      'company.create.email.label': 'Email',
+      'company.create.email.hint': 'Needed for a verified export copy later. You can add it then.',
+      'company.create.email.example': 'you@company.com',
+      'company.create.role.label': 'Your role',
+      'company.create.role.hint': 'For example founder, director or operations lead.',
+      'company.create.role.example': 'Founder',
+      'company.create.where.title': 'Where you operate',
+      'company.create.where.note': 'This decides which legal and tax drafts are prepared.',
+      'company.create.country.label': 'Country',
+      'company.create.country.hint': 'Two-letter code or country name.',
+      'company.create.industry.label': 'Industry',
+      'company.create.industry.hint': 'The closest match, in your own words.',
+      'company.create.industry.example': 'Food & Beverage',
+      'company.create.optional.title': 'Optional details',
+      'company.create.optional.note': 'Website, customers, budget, timeline and notes. You can add these later too.',
+      'company.create.website.label': 'Website',
+      'company.create.website.hint': 'Leave empty if there is no website yet.',
+      'company.create.assets.label': 'Asset links',
+      'company.create.assets.hint': 'One link per line. Brand kit, deck, product photos, existing documents.',
+      'company.create.customers.label': 'Target customers',
+      'company.create.customers.hint': 'Who you want to reach first.',
+      'company.create.customers.example': 'Independent retailers in India with 1-6 stores',
+      'company.create.budget.label': 'Starting budget',
+      'company.create.budget.hint': 'An estimate is fine. Numbers only.',
+      'company.create.budget.currency': 'Currency',
+      'company.create.budget.currency_hint': 'Three-letter code.',
+      'company.create.timeline.label': 'Preferred timeline',
+      'company.create.timeline.hint': 'When you would like the company ready.',
+      'company.create.timeline.example': 'Ready in about two weeks',
+      'company.create.notes.label': 'Anything else',
+      'company.create.notes.hint': 'Constraints, existing commitments, things to avoid.',
+      'company.create.review_button': 'Review',
+      'company.create.footnote': 'Nothing is created yet. The next screen shows exactly what will be submitted.',
+      'company.create.review.title': 'Review the setup',
+      'company.create.review.subtitle': 'Check the details. After you confirm, the company is created and the build starts.',
+      'company.create.review.region': 'Company setup summary',
+      'company.create.review.basics': 'Company',
+      'company.create.review.edit': 'Edit',
+      'company.create.review.owner': 'Owner',
+      'company.create.review.not_set': 'Not set',
+      'company.create.review.next.title': 'What happens after you confirm',
+      'company.create.review.next.one': 'The company is created with the status Creating.',
+      'company.create.review.next.two': 'The build reads the brief, drafts the plan and prepares legal drafts for your review.',
+      'company.create.review.next.three': 'Anything that needs a connected provider is shown as waiting on you, never marked done.',
+      'company.create.review.next.estimate': 'The build is estimated at 1-3 days. That is an estimate, not a promise.',
+      'company.create.review.footnote': 'You can edit or delete the company later. Deletion is protected and exports your data first.',
+      'company.create.submitting': 'Creating company...',
+      'company.create.submit': 'Create company and start the build',
+      'company.create.errors.title': 'Please fix these before continuing',
+      'company.create.denied.title': 'You cannot create a company',
+      'company.create.denied.body': 'Only the owner or an allowed admin can create a company. The server enforces this.',
+      'company.create.draft.idle': 'Your answers stay on this device until you review.',
+      'company.create.draft.saving': 'Saving your answers...',
+      'company.create.draft.saved': 'Draft saved',
+      'company.create.draft.local': 'Saved on this device. It will sync when you are back online.',
+      'company.create.draft.error': 'Could not save the draft online. Your answers are still on this device.',
+      'company.create.error.name_required': 'Enter the company name.',
+      'company.create.error.name_short': 'The name must be at least 2 characters.',
+      'company.create.error.title_required': 'Add a one-line title.',
+      'company.create.error.description_required': 'Describe what the company does.',
+      'company.create.error.description_short': 'Use at least 20 characters so the plan has something to work with.',
+      'company.create.error.owner_required': 'Add the name of the accountable person.',
+      'company.create.error.email': 'Enter a valid email address.',
+      'company.create.error.country_required': 'Add the country where the company operates.',
+      'company.create.error.industry_required': 'Add the closest industry.',
+      'company.create.error.url': 'Links must start with http:// or https://.',
+      'company.create.error.assets': 'Every asset link must start with http:// or https://.',
+      'company.create.error.budget': 'Enter a number, or leave the budget empty.',
+      'company.create.error.currency': 'Use a three-letter currency code.',
+      'company.create.error.duplicate': 'A company with this name already exists. Choose a different name.',
+      'company.create.error.submit_failed': 'The company was created as a draft, but the build did not start. You can submit it from the overview.',
+      'company.create.error.create_failed': 'The company could not be created. Nothing was saved.',
+      'company.create.error.network': 'Could not reach the server. Your answers are still on this device.',
+      'company.create.created': 'Company created. The build has started.',
+
+      'company.existing.back': 'Add a company',
+      'company.existing.title': 'Add an existing company',
+      'company.existing.subtitle': 'Tell ZONATA what the business already does. It studies the real numbers, never invented ones.',
+      'company.existing.steps_label': 'Adding an existing company',
+      'company.existing.step.business': 'The business',
+      'company.existing.step.sources': 'Data sources',
+      'company.existing.step.review': 'Review',
+      'company.existing.basics.title': 'What the business is',
+      'company.existing.basics.note': 'Facts only. These are used for onboarding, the readiness score and the audit trail.',
+      'company.existing.name.label': 'Registered or trading name',
+      'company.existing.name.hint': 'The name customers and banks already know.',
+      'company.existing.description.label': 'What it does today',
+      'company.existing.description.hint': 'The products or services it sells, who buys them, and how long it has been running.',
+      'company.existing.model.title': 'How it makes money',
+      'company.existing.model.note': 'The shape of the business decides what ZONATA looks for in the numbers.',
+      'company.existing.model.label': 'Business model',
+      'company.existing.model.hint': 'How revenue is earned, who pays, and what the main costs are.',
+      'company.existing.model.example': 'Sells bakery products through six stores and online delivery. Revenue comes from walk-in sales, online orders and corporate catering; main costs are ingredients, rent and staff.',
+      'company.existing.revenue.label': 'Revenue',
+      'company.existing.revenue.hint': 'The most recent full period. An estimate is fine if it is close.',
+      'company.existing.revenue.currency': 'Currency',
+      'company.existing.revenue.period': 'Period',
+      'company.existing.revenue.preview': '{amount} ({compact}) per {period}',
+      'company.existing.revenue.preview_empty': 'Enter an amount to see how it will be shown.',
+      'company.existing.period.daily': 'day',
+      'company.existing.period.weekly': 'week',
+      'company.existing.period.monthly': 'month',
+      'company.existing.period.quarterly': 'quarter',
+      'company.existing.period.annual': 'year',
+      'company.existing.period.one_time': 'one-time',
+      'company.existing.owner.title': 'Who is accountable',
+      'company.existing.owner.note': 'Used for the audit trail, the export copy and notices. Agents cannot fill this in for you.',
+      'company.existing.owner.role_hint': 'For example founder, managing director or finance lead.',
+      'company.existing.owner.email_hint': 'Needed for a verified export copy and deletion notices.',
+      'company.existing.next': 'Choose data sources',
+      'company.existing.footnote': 'Nothing is created yet. Your answers stay on this device and in a private draft until you confirm.',
+      'company.existing.review_button': 'Review',
+      'company.existing.sources.title': 'Where the data lives',
+      'company.existing.sources.subtitle': 'Eight possible sources. Connect one, plan to connect it later, or skip it with a reason. Nothing is required.',
+      'company.existing.sources.promise_title': 'Read-only, and only what is listed',
+      'company.existing.sources.promise_body': 'ZONATA asks for read-only access to the scope shown on each card. Nothing is written back to your systems, and no data is read until a real provider adapter and your approval are in place.',
+      'company.existing.sources.loading': 'Loading the source catalogue...',
+      'company.existing.sources.unavailable_title': 'The source catalogue could not load',
+      'company.existing.sources.unavailable_body': 'You can still add the company. Source choices are simply left empty and can be set from the company page later.',
+      'company.existing.sources.none': 'No sources are available on this deployment yet. You can still add the company and upload a file later.',
+      'company.existing.sources.counts': '{connect} to connect · {skip} skipped · {later} decided later',
+      'company.existing.sources.footnote': 'A skipped source is recorded with its reason and lowers the readiness score. It is never silently ignored.',
+      'company.existing.sources.reads': 'Reads',
+      'company.existing.sources.why': 'Why',
+      'company.existing.sources.never': 'Never copied',
+      'company.existing.sources.choice_label': 'Choice for {name}',
+      'company.existing.sources.choice.connect': 'Connect',
+      'company.existing.sources.choice.skip': 'Skip',
+      'company.existing.sources.choice.later': 'Decide later',
+      'company.existing.sources.status.connect': 'Will connect',
+      'company.existing.sources.status.skip': 'Skipped',
+      'company.existing.sources.status.later': 'Not decided',
+      'company.existing.sources.reason.label': 'Why skip it?',
+      'company.existing.sources.reason.hint': 'At least a few words. The reason is shown in the readiness score and the audit record.',
+      'company.existing.sources.reason.error': 'Add a short reason, at least 5 characters.',
+      'company.existing.sources.category.financial': 'Financial',
+      'company.existing.sources.category.customer': 'Customer',
+      'company.existing.sources.category.operational': 'Operational',
+      'company.existing.sources.category.document': 'Documents',
+      'company.existing.review.title': 'Review the onboarding',
+      'company.existing.review.subtitle': 'Check the facts and the source choices. After you confirm, the company is created and onboarding starts.',
+      'company.existing.review.region': 'Existing company onboarding summary',
+      'company.existing.review.basics': 'Business',
+      'company.existing.review.sources': 'Data sources',
+      'company.existing.review.sources_none': 'No source was chosen. Onboarding will start and tell you exactly what is missing.',
+      'company.existing.review.next.title': 'What happens after you confirm',
+      'company.existing.review.next.one': 'The company is created with the status Onboarding.',
+      'company.existing.review.next.two': 'Your source choices are saved as read-only connection records or skip reasons.',
+      'company.existing.review.next.three': 'Onboarding checks readiness and what can be read. With no provider adapter it says so instead of inventing findings.',
+      'company.existing.review.next.note': 'A company only becomes Operational when the checks pass with no gaps.',
+      'company.existing.review.footnote': 'You can edit or delete the company later. Deletion is protected and exports your data first.',
+      'company.existing.submitting': 'Adding the company...',
+      'company.existing.submit': 'Add company and start onboarding',
+      'company.existing.created': 'Company added. Onboarding has started.',
+      'company.existing.denied.title': 'You cannot add a company',
+      'company.existing.denied.body': 'Only the owner or an allowed admin can add a company. The server enforces this.',
+      'company.existing.error.business_model': 'Explain how the business makes money.',
+      'company.existing.error.revenue_required': 'Add the revenue amount.',
+      'company.existing.error.revenue_amount': 'Revenue must be a number greater than zero.',
+      'company.existing.error.revenue_period': 'Choose a revenue period.',
+      'company.existing.error.owner_role': 'Add your role in the company.',
+      'company.existing.error.submit_failed': 'The company was created as a draft, but onboarding did not start. You can submit it from the overview.',
+      'company.existing.error.sources_partial': '{count} source choice(s) could not be saved ({detail}). The company exists; set them from its page.',
+      'company.existing.error.network': 'Could not reach the server. Your answers are still on this device.',
+
+      'company.build.back': 'Overview',
+      'company.build.title': 'Company build',
+      'company.build.eyebrow': 'Build progress',
+      'company.build.subtitle': 'Every phase below is real. Anything that needs a provider is shown as waiting on you.',
+      'company.build.onboarding.eyebrow': 'Onboarding progress',
+      'company.build.onboarding.subtitle': 'ZONATA checks readiness, what can actually be read, and what still needs you. Nothing is invented.',
+      'company.build.readiness.title': 'Readiness',
+      'company.build.readiness.value': '{score} out of 100',
+      'company.build.readiness.band.high': 'Ready',
+      'company.build.readiness.band.medium': 'Partly ready',
+      'company.build.readiness.band.low': 'Early',
+      'company.build.readiness.counts': '{connected} connected · {verified} verified · {skipped} skipped · {files} files',
+      'company.build.readiness.next': 'What would raise it',
+      'company.build.diagnosis.title': 'Diagnosis',
+      'company.build.diagnosis.unavailable': 'No diagnosis was produced',
+      'company.build.diagnosis.none': 'No finding has been recorded. Nothing was invented to fill the gap.',
+      'company.build.diagnosis.why': 'Why',
+      'company.build.sources.title': 'Data sources',
+      'company.build.sources.note': 'These are the choices saved when the company was added.',
+      'company.build.sources.empty': 'No source was chosen yet.',
+      'company.build.sources.status.verified': 'Verified',
+      'company.build.sources.status.needs_check': 'Needs a check',
+      'company.build.sources.status.skipped': 'Skipped',
+      'company.build.sources.status.not_started': 'Not connected',
+      'company.build.progress.title': 'Progress',
+      'company.build.progress.value': '{percent} percent complete',
+      'company.build.progress.caption': '{done} of {total} phases finished',
+      'company.build.live': 'This build is running. The page updates by itself.',
+      'company.build.phases.title': 'Phases',
+      'company.build.phase.pending': 'Not started',
+      'company.build.phase.running': 'Running',
+      'company.build.phase.done': 'Done',
+      'company.build.phase.done_with_gaps': 'Done with gaps',
+      'company.build.phase.skipped': 'Skipped',
+      'company.build.phase.failed': 'Failed',
+      'company.build.phase_label.INTAKE': 'Understanding your brief',
+      'company.build.phase_label.RESEARCH': 'Researching the market',
+      'company.build.phase_label.PLAN': 'Planning the company',
+      'company.build.phase_label.BUILD': 'Building base systems',
+      'company.build.phase_label.LEGAL_PACK': 'Drafting the legal pack',
+      'company.build.phase_label.VERIFY': 'Checking everything',
+      'company.build.phase_label.OPERATIONAL': 'Going operational',
+      'company.build.phase_label.CONNECT_VERIFY': 'Connecting and verifying sources',
+      'company.build.phase_label.STUDY': 'Studying the business',
+      'company.build.phase_label.DIAGNOSE': 'Diagnosing what to improve',
+      'company.build.phase_label.ACT': 'Acting on approved work',
+      'company.build.run.pending': 'Queued',
+      'company.build.run.running': 'Running',
+      'company.build.run.done': 'Operational',
+      'company.build.run.gaps': 'Needs attention',
+      'company.build.run.failed': 'Build failed',
+      'company.build.waiting.title': 'Waiting on you',
+      'company.build.waiting.note': 'These steps need something connected or a decision from you. Nothing was faked to fill the gap.',
+      'company.build.waiting.item': 'A step needs attention',
+      'company.build.retry.button': 'Try the build again',
+      'company.build.retry.running': 'Retrying...',
+      'company.build.retry.started': 'A new build attempt has started.',
+      'company.build.error.title': 'Could not load the build',
+      'company.build.error.no_company': 'No company was selected.',
+      'company.build.error.not_found': 'This company was not found in your organisation.',
+      'company.build.error.load': 'The build details could not be loaded.',
+      'company.build.error.offline': 'You are offline. Reconnect and try again.',
+      'company.build.error.network': 'Could not reach the server. Try again.',
+      'company.build.error.retry': 'The build could not be retried.',
+      'company.build.empty.title': 'No build has started',
+      'company.build.empty.body': 'This company has no build run yet. Submit the company again from its overview, or start a new company.',
+      'company.build.done.title': 'The build finished',
+      'company.build.done.body': 'Every phase passed. The company is operational.',
+      'company.build.failed.title': 'The build stopped',
+      'company.build.log.title': 'What happened',
+      'company.build.log.all': 'Show all',
+      'company.build.log.less': 'Show less',
+      'company.build.log.empty': 'No entries yet.',
+      'company.build.estimate.range': 'Estimate: {min}-{max} days',
+      'company.build.estimate.one': 'Estimate: {days} day',
+      'company.build.attempt': 'Attempt {attempt}',
+      'company.build.overview': 'Back to overview',
+      'company.build.footnote': 'Times are shown in your local timezone. The build never marks a skipped step as done.',
+      'assistant.add_opened': 'Opening the Add company page. Nothing has been created yet.',
+      'assistant.switch_opened': 'Opening your companies. Nothing has been switched yet.',
+
+      'company.overview.back': 'Companies',
+      'company.overview.title': 'Company overview',
+      'company.overview.eyebrow': 'Company',
+      'company.overview.subtitle': 'The facts, the build and the audit trail for this company.',
+      'company.overview.unknown_industry': 'Industry not set',
+      'company.overview.readonly': 'View only',
+      'company.overview.menu': 'Company options',
+      'company.overview.edit': 'Edit company',
+      'company.overview.delete': 'Delete company',
+      'company.overview.open_workspace': 'Open the operating workspace',
+      'company.overview.footnote': 'Facts on this page come from your company record and the audit trail. Nothing is estimated.',
+      'company.overview.partial': 'Some secondary details could not be loaded. The company itself is unaffected.',
+      'company.overview.build_running': 'A build is running. Progress below is live; this page does not invent missing steps.',
+      'company.overview.type.new': 'Created new',
+      'company.overview.type.existing': 'Added existing',
+      'company.overview.error.title': 'Could not load the company',
+      'company.overview.error.no_company': 'No company was selected.',
+      'company.overview.error.not_found': 'This company was not found in your organisation.',
+      'company.overview.error.load': 'The company details could not be loaded.',
+      'company.overview.error.offline': 'You are offline. Reconnect and try again.',
+      'company.overview.deletion.title': 'Deletion in progress',
+      'company.overview.deletion.waiting_download': 'Waiting for the export to be downloaded',
+      'company.overview.deletion.due': 'Ready to finish',
+      'company.overview.deletion.countdown_days': '{days} days and {hours} hours left',
+      'company.overview.deletion.countdown_hours': '{hours} hours left',
+      'company.overview.deletion.download': 'Download export',
+      'company.overview.deletion.manage': 'Review deletion',
+      'company.overview.identity.title': 'Identity',
+      'company.overview.identity.status': 'Status',
+      'company.overview.identity.owner': 'Owner',
+      'company.overview.identity.email': 'Owner email',
+      'company.overview.identity.website': 'Website',
+      'company.overview.identity.created': 'Created',
+      'company.overview.identity.updated': 'Last updated',
+      'company.overview.numbers.title': 'Key numbers',
+      'company.overview.numbers.revenue': 'Revenue',
+      'company.overview.numbers.readiness': 'Readiness',
+      'company.overview.numbers.connections': 'Connections',
+      'company.overview.numbers.files': 'Files',
+      'company.overview.numbers.readonly': 'Read-only access',
+      'company.overview.numbers.evidence': 'Recorded evidence',
+      'company.overview.progress.title': 'Build and onboarding',
+      'company.overview.progress.empty': 'No build or onboarding run has started for this company yet.',
+      'company.overview.progress.open': 'See the full progress',
+      'company.overview.sources.title': 'Sources',
+      'company.overview.sources.empty': 'No source catalogue state has been recorded.',
+      'company.overview.connections.title': 'Connections',
+      'company.overview.connections.verified': 'Verified',
+      'company.overview.source.not_started': 'Not started',
+      'company.overview.source.needs_check': 'Needs a check',
+      'company.overview.source.verified': 'Verified',
+      'company.overview.source.skipped': 'Skipped',
+      'company.overview.legal.title': 'Legal drafts',
+      'company.overview.legal.empty': 'No legal drafts have been prepared. They are drafts, not filings.',
+      'company.overview.activity.title': 'Recent activity',
+      'company.overview.activity.empty': 'No audit events are recorded yet.',
+      'company.activity.company_created': 'Company created',
+      'company.activity.company_updated': 'Company details updated',
+      'company.activity.company_submitted': 'Company submitted',
+      'company.activity.company_connection_added': 'Connection added',
+      'company.activity.company_connection_removed': 'Connection removed',
+      'company.activity.company_connection_tested': 'Connection tested',
+      'company.activity.company_file_recorded': 'File recorded',
+      'company.activity.company_file_flagged': 'File flagged',
+      'company.activity.company_source_skipped': 'Source skipped',
+      'company.activity.company_source_restored': 'Source restored',
+      'company.activity.company_delete_requested': 'Deletion requested',
+      'company.activity.company_delete_name_confirmed': 'Company name confirmed for deletion',
+      'company.activity.company_delete_identity_confirmed': 'Identity confirmed for deletion',
+      'company.activity.company_delete_cancelled': 'Deletion cancelled',
+      'company.activity.company_delete_pending_purge': 'Deletion waiting for its recovery window',
+      'company.activity.company_delete_purged': 'Company data purged',
+      'company.activity.company_export_generated': 'Export generated',
+      'company.activity.company_export_email': 'Export email attempted',
+      'company.activity.company_export_downloaded': 'Export downloaded',
+      'company.activity.company_export_failed': 'Export failed',
+      'company.activity.company_admin_granted': 'Company admin allowed',
+      'company.activity.company_admin_revoked': 'Company admin removed',
+      'company.activity.company_build_started': 'Build started',
+      'company.activity.company_build_completed': 'Build completed',
+      'company.activity.company_build_done_with_gaps': 'Build finished with gaps',
+      'company.activity.company_build_failed': 'Build failed',
+      'company.activity.company_build_retried': 'Build retried',
+      'company.activity.company_build_change_notice_pending': 'Build notified of a profile change',
+      'company.activity.company_work_stopped': 'Company work stopped',
+
+      'company.edit.back': 'Company overview',
+      'company.edit.eyebrow': 'Edit',
+      'company.edit.title': 'Edit company',
+      'company.edit.subtitle': 'Change the facts this company is built on. The server validates every field again before it is saved.',
+      'company.edit.type_fixed': 'The company type is fixed. Create a new company if the type must change.',
+      'company.edit.build_running': 'A build is still running. Your changes are saved now; the build is not silently restarted and no step is marked done because of this edit.',
+      'company.edit.readonly': 'You can view this company but not change it.',
+      'company.edit.readonly_note': 'Only the owner or an allowed company admin can edit a company. An agent may prepare a draft, but it can never submit or change settings.',
+      'company.edit.section.identity': 'The company',
+      'company.edit.section.identity_note': 'Name, one-line title and what the company does.',
+      'company.edit.section.owner': 'Owner',
+      'company.edit.section.owner_note': 'The accountable person. This is shown in the audit trail, not used as a login.',
+      'company.edit.section.numbers': 'Money',
+      'company.edit.section.numbers_note': 'Revenue is the last full period you reported. Budget is a planning number, not a bank balance.',
+      'company.edit.save': 'Save changes',
+      'company.edit.saving': 'Saving...',
+      'company.edit.saved': 'Changes saved.',
+      'company.edit.footnote': 'Every save writes an audit event. Clearing an optional field removes it; no old value is kept in the company record.',
+      'company.edit.error.title': 'Could not load this company',
+      'company.edit.error.forbidden': 'You do not have permission to edit this company.',
+      'company.edit.error.offline': 'You are offline. Reconnect and try again.',
+      'company.edit.error.save': 'The changes could not be saved. Nothing was updated.',
+      'company.edit.error.negative': 'Enter zero or a positive number.',
+      'company.edit.connections.title': 'Connections',
+      'company.edit.connections.note': 'Connections are read-only. Removing one revokes its stored credential and its access.',
+      'company.edit.connections.empty': 'No connection is attached to this company yet.',
+      'company.edit.connections.add_label': 'Add a source',
+      'company.edit.connections.add': 'Add connection',
+      'company.edit.connections.remove': 'Remove',
+      'company.edit.connections.remove_confirm': 'Remove this connection and revoke its credential?',
+      'company.edit.connections.add_failed': 'The connection could not be added.',
+      'company.edit.connections.remove_failed': 'The connection could not be removed.',
+      'company.edit.connections.scope_note': 'Only read scopes are requested. A connection stays unverified until ownership is confirmed.',
+
+      'company.delete.eyebrow': 'Protected action',
+      'company.delete.loading': 'Deletion',
+      'company.delete.steps': 'Deletion steps',
+      'company.delete.step.what': 'What happens',
+      'company.delete.step.name': 'Company name',
+      'company.delete.step.identity': 'Your identity',
+      'company.delete.step.export': 'Export',
+      'company.delete.step.recovery': 'Recovery window',
+      'company.delete.what.title': 'Delete {name}?',
+      'company.delete.what.lead': 'This is deliberately multi-step. Nothing is removed until your identity is confirmed, the export exists, and the recovery window is over.',
+      'company.delete.what.remove_title': 'What will be removed',
+      'company.delete.what.remove.departments': 'Departments',
+      'company.delete.what.remove.employees': 'People and agents',
+      'company.delete.what.remove.workflows': 'Workflows',
+      'company.delete.what.remove.connections': 'Connections',
+      'company.delete.what.remove.files': 'Files',
+      'company.delete.what.remove.approvals': 'Approvals',
+      'company.delete.what.stop_title': 'What will stop immediately',
+      'company.delete.what.stop_workflows': 'Running workflows are cancelled.',
+      'company.delete.what.stop_schedules': 'Scheduled work for this company stops.',
+      'company.delete.what.stop_connections': 'Every connection loses access.',
+      'company.delete.what.keep_title': 'What will be kept',
+      'company.delete.what.keep_audit': 'A final audit record of the deletion.',
+      'company.delete.what.keep_record': 'A minimal tombstone with the company id and deletion time.',
+      'company.delete.what.export_promise': 'Before anything is removed, ZONATA prepares a complete export: a PDF split into numbered parts and zipped when needed, plus a JSON copy of the original values and a SHA-256 manifest.',
+      'company.delete.what.recovery': 'Recovery window',
+      'company.delete.what.recovery_none': 'No window. Deletion finishes as soon as the export is delivered or downloaded.',
+      'company.delete.what.recovery_days': '{days} days, cancellable by the owner or an allowed admin.',
+      'company.delete.what.email': 'Export delivery',
+      'company.delete.what.email_yes': 'Emailed to the verified account {recipient}, with an in-app download as backup.',
+      'company.delete.what.email_no': 'No verified email can be used. The export must be downloaded in this app before purge.',
+      'company.delete.what.mfa': 'A two-step code is required at the next step.',
+      'company.delete.what.mfa_setup': 'Workspace settings require two-step verification. This account has not set it up yet, so the next step starts enrollment with your authenticator app.',
+      'company.delete.what.mfa_missing': 'Two-step verification is required by workspace settings, but no authenticator is configured on this deployment. Deletion cannot complete until an owner configures one. Nothing has been deleted.',
+      'company.delete.what.continue': 'I understand, continue',
+      'company.delete.name.title': 'Type the company name',
+      'company.delete.name.lead': 'This confirms you are deleting the right company. Type the name exactly as it appears.',
+      'company.delete.name.label': 'Company name',
+      'company.delete.name.hint': 'Case and spacing must match. Copying and pasting is allowed.',
+      'company.delete.name.footnote': 'The server compares this name again. A wrong name stops the flow.',
+      'company.delete.name.continue': 'Confirm the name',
+      'company.delete.identity.title': 'Confirm it is you',
+      'company.delete.identity.lead': 'Enter the password for your signed-in account. This is checked on the server; the password is never stored by this page.',
+      'company.delete.identity.password': 'Your password',
+      'company.delete.identity.password_hint': 'The account that is signed in now, not the company owner email on the profile.',
+      'company.delete.identity.code': 'Two-step code',
+      'company.delete.identity.mfa': 'A two-step code is required.',
+      'company.delete.identity.mfa_missing': 'Two-step verification is enabled, but this deployment has no authenticator verifier. The server will refuse to continue rather than skip the requirement. Nothing is deleted.',
+      'company.delete.identity.footnote': 'If the password or two-step code is wrong, the company stays exactly as it is.',
+      'company.delete.identity.confirm': 'Confirm and prepare the export',
+      'company.delete.enroll.title': 'Turn on two-step verification',
+      'company.delete.enroll.lead': 'Deleting a company needs a two-step code, and this account has none yet. Set one up with your authenticator app before the deletion can continue.',
+      'company.delete.enroll.start': 'Set up two-step verification',
+      'company.delete.enroll.secret': 'Setup key',
+      'company.delete.enroll.secret_hint': 'Add this key to your authenticator app if you cannot use the link. It is shown once and stored encrypted on the server.',
+      'company.delete.enroll.uri': 'Setup link',
+      'company.delete.enroll.uri_hint': 'An authenticator that accepts otpauth links can open this directly.',
+      'company.delete.enroll.code': 'Code from the app',
+      'company.delete.enroll.enable': 'Turn on two-step',
+      'company.delete.enroll.waiting': 'Each code works once. After turning it on, wait for the next 30-second code and enter it above to continue.',
+      'company.delete.enroll.done': 'Two-step verification is on. Wait for the next code in your app, then enter it above to continue.',
+      'company.delete.enroll.failed': 'Two-step setup did not complete. Nothing was deleted.',
+      'company.delete.export.title': 'Preparing the export',
+      'company.delete.export.lead': 'The export is being written now. Deletion has not finished; it is waiting for this file.',
+      'company.delete.export.failed_lead': 'The export failed, so nothing was purged.',
+      'company.delete.export.failed_note': 'The company is still in its pre-deletion state with an export pending. Retry the export, or cancel the deletion.',
+      'company.delete.export.progress': 'Writing the PDF, the JSON copy and the integrity manifest...',
+      'company.delete.export.retry': 'Retry the export',
+      'company.delete.export.footnote': 'A failed export never leads to a purge.',
+      'company.delete.recovery.title': 'Your export is ready',
+      'company.delete.recovery.lead': 'The export exists. The recovery window starts now, and the owner can still cancel.',
+      'company.delete.recovery.export_title': 'The export',
+      'company.delete.recovery.file': 'File',
+      'company.delete.recovery.file_pending': 'Not available yet',
+      'company.delete.recovery.size': 'Size',
+      'company.delete.recovery.parts': 'PDF parts',
+      'company.delete.recovery.checksum': 'SHA-256',
+      'company.delete.recovery.download': 'Download the export',
+      'company.delete.recovery.download_note': 'The download is authenticated and streamed from this deployment. It is recorded in the audit trail.',
+      'company.delete.recovery.email_title': 'Email delivery',
+      'company.delete.recovery.email_fallback': 'In-app download always works, even when email is not configured.',
+      'company.delete.recovery.window_title': 'Recovery window',
+      'company.delete.recovery.window_note': 'Purge is due after {time}. Cancelling restores the company to its exact previous status.',
+      'company.delete.recovery.blocked_download': 'Purge is waiting for the export download because no email was delivered.',
+      'company.delete.recovery.purge_now': 'Finish deletion now',
+      'company.delete.recovery.cancel': 'Cancel deletion',
+      'company.delete.recovery.footnote': 'After the window ends and the export is delivered, the purge runs and a final audit record is written.',
+      'company.delete.recovery.ready': 'The export is ready.',
+      'company.delete.window.due': 'Ready to finish',
+      'company.delete.window.remaining_days': '{days} days and {hours} hours left',
+      'company.delete.window.remaining_hours': '{hours} hours left',
+      'company.delete.email.sent': 'Emailed to {recipient}.',
+      'company.delete.email.not_configured': 'Email is not configured on this deployment. Use the download.',
+      'company.delete.email.unverified': 'Your signed-in account has no verified email, so no email was sent. Use the download.',
+      'company.delete.email.failed': 'The email could not be sent. Use the download.',
+      'company.delete.email.too_large': 'The export is too large to email. Use the download.',
+      'company.delete.email.not_sent': 'No email has been sent yet.',
+      'company.delete.downloaded': 'Downloaded {filename}.',
+      'company.delete.done.title': 'Deletion complete',
+      'company.delete.done.body': 'The company data was purged after its export was delivered.',
+      'company.delete.done.removed': 'Company-scoped rows and stored files were removed.',
+      'company.delete.done.kept': 'Only the tombstone and the audit trail remain.',
+      'company.delete.done.audit': 'The final record names the request, the reason and the time.',
+      'company.delete.cancelled.title': 'Deletion cancelled',
+      'company.delete.cancelled.body': 'The deletion request was cancelled before the purge. No company data was removed.',
+      'company.delete.cancelled.restored': 'The company is back to its previous status: {status}.',
+      'company.delete.cancel.action': 'Cancel this deletion',
+      'company.delete.status.awaiting_name': 'Waiting for the company name',
+      'company.delete.status.awaiting_identity': 'Waiting for your identity',
+      'company.delete.status.exporting': 'Preparing the export',
+      'company.delete.status.pending_deletion': 'Waiting for the recovery window',
+      'company.delete.status.completed': 'Deletion complete',
+      'company.delete.status.cancelled': 'Deletion cancelled',
+      'company.delete.error.title': 'That step did not complete',
+      'company.delete.error.generic': 'The action could not be completed. Nothing was removed.',
+      'company.delete.error.forbidden': 'Only the owner or an allowed company admin can delete a company. An agent can never delete a company.',
+      'company.delete.error.request': 'The deletion could not be started.',
+      'company.delete.error.name': 'The company name could not be confirmed.',
+      'company.delete.error.name_mismatch': 'The name does not match exactly. Type it again, including spacing.',
+      'company.delete.error.identity': 'Your identity could not be confirmed.',
+      'company.delete.error.mfa_missing': 'Two-step verification is required but no verifier is configured on this deployment. Nothing was deleted. An owner must configure an authenticator first.',
+      'company.delete.error.mfa_required': 'Enter the two-step code from your authenticator.',
+      'company.delete.error.password': 'That password is incorrect. Nothing was deleted.',
+      'company.delete.error.export': 'The export could not be prepared. Nothing was purged.',
+      'company.delete.error.offline': 'You are offline. Reconnect and try again.',
+      'company.delete.error.download': 'The export could not be downloaded. Nothing was purged.',
+      'company.delete.error.purge': 'The purge could not run. Nothing was removed.',
+      'company.delete.error.cancel': 'The deletion could not be cancelled. It is still in its previous state.',
+      'company.delete.error.deliver_first': 'Download the export before finishing the purge.',
+      'company.delete.error.window_active': 'The recovery window has not ended yet.',
+      'company.delete.error.code_wrong': 'That two-step code is not valid. Check the clock on the device with the app, then try the next code.',
+      'company.delete.error.mfa_locked': 'Too many incorrect codes, so two-step is locked for a few minutes. Nothing was deleted.',
+      'company.delete.error.mfa_not_enrolled': 'Two-step verification must be set up before this company can be deleted. Nothing was deleted.',
+      'company.delete.error.mfa_already': 'Two-step verification is already on for this account.',
+      'company.revenue.period.daily': 'Daily',
+      'company.revenue.period.weekly': 'Weekly',
+      'company.revenue.period.monthly': 'Monthly',
+      'company.revenue.period.quarterly': 'Quarterly',
+      'company.revenue.period.annual': 'Annual',
+      'company.revenue.period.one_time': 'One time',
+
+      'format.lakh': 'L',
+      'format.crore': 'Cr',
+      'format.thousand': 'K'
+    },
+
+    ar: {
+      'common.cancel': 'إلغاء',
+      'common.close': 'إغلاق',
+      'common.back': 'رجوع',
+      'common.retry': 'إعادة المحاولة',
+      'common.loading': 'جارٍ التحميل…',
+      'common.english': 'English',
+      'common.arabic': 'العربية',
+      'common.language': 'اللغة',
+
+      'status.draft': 'مسودة',
+      'status.creating': 'قيد الإنشاء',
+      'status.onboarding': 'قيد التهيئة',
+      'status.operational': 'تعمل',
+      'status.needs_attention': 'تحتاج إلى انتباه',
+      'status.pending_export': 'بانتظار التصدير',
+      'status.pending_deletion': 'بانتظار الحذف',
+      'status.deleted': 'محذوفة',
+      'status.suspended': 'موقوفة',
+      'status.unknown': 'حالة غير معروفة',
+
+      'company.switcher.title': 'تبديل الشركة',
+      'company.switcher.subtitle': 'تظهر شركتك الحالية أولاً.',
+      'company.switcher.current': 'الحالية',
+      'company.switcher.empty.title': 'لا توجد شركات بعد',
+      'company.switcher.empty.body': 'أضف شركتك الأولى لبدء العمل.',
+      'company.switcher.empty.sidebar': 'لا توجد شركة بعد',
+      'company.switcher.empty.status': 'أضف شركة للبدء',
+      'company.switcher.add': 'إضافة شركة',
+      'company.switcher.switched': 'تم التبديل إلى {name}',
+      'company.switcher.refresh_failed': 'تعذّر التحديث. يتم عرض الشركات المحمّلة سابقاً على هذا الجهاز.',
+      'company.switcher.refreshing': 'جارٍ تحديث الشركات…',
+      'company.switcher.portfolio': 'كل الشركات (المحفظة)',
+      'company.switcher.unknown_industry': 'شركة عاملة',
+
+      'company.add.back': 'الشركات',
+      'company.add.title': 'إضافة شركة',
+      'company.add.subtitle': 'اختر كيف تنضم هذه الشركة إلى ZONATA. يمكنك تعديلها أو حذفها لاحقاً.',
+      'company.add.new.badge': 'جديدة',
+      'company.add.new.title': 'إنشاء شركة جديدة',
+      'company.add.new.body': 'لعمل لم يوجد بعد. تبني ZONATA الشركة معك خطوة بخطوة.',
+      'company.add.new.point1': 'تبدأ بحالة قيد الإنشاء',
+      'company.add.new.point2': 'بناء موجّه، عادة من يوم إلى ثلاثة أيام',
+      'company.add.new.point3': 'مسودة للهيكل القانوني والتشغيلي لمراجعتك',
+      'company.add.new.point4': 'يمكنك تعديلها أو حذفها لاحقاً',
+      'company.add.new.cta': 'إنشاء شركة جديدة',
+      'company.add.existing.badge': 'موجودة',
+      'company.add.existing.title': 'إضافة شركة موجودة',
+      'company.add.existing.body': 'لعمل يعمل بالفعل. تدرسه ZONATA وتشخّص ما يحتاج إلى تحسين.',
+      'company.add.existing.point1': 'تبدأ بحالة قيد التهيئة',
+      'company.add.existing.point2': 'اتصالات للقراءة فقط — لا يُكتب أي شيء في أنظمتك',
+      'company.add.existing.point3': 'تشخيص ونتائج جاهزية مع الأدلة',
+      'company.add.existing.point4': 'تبقى بياناتك في أنظمتك',
+      'company.add.existing.cta': 'إضافة شركة موجودة',
+      'company.add.not_sure': 'لست متأكداً من الاختيار؟',
+      'company.add.help.title': 'طريقة سريعة للقرار',
+      'company.add.help.new': 'اختر «إنشاء شركة جديدة» إذا لم يكن للشركة سجل في ZONATA ولا تملك بيانات تشغيلية تُذكر.',
+      'company.add.help.existing': 'اختر «إضافة شركة موجودة» إذا كان لديها عملاء أو إيرادات أو أدوات أو سجلات.',
+      'company.add.help.note': 'يبدأ المساران كمسودة. لا يُرسل أي شيء حتى تراجع وتؤكد.',
+      'company.add.denied.title': 'لا يمكنك إضافة شركة',
+      'company.add.denied.body': 'يمكن للمالك أو المسؤول المصرّح له فقط إضافة شركة. يمكنك دائماً أن تطلب من المساعد إعداد مسودة.',
+      'company.add.intent_new': 'جارٍ فتح إعداد الشركة الجديدة. لم يتم إنشاء أي شيء بعد.',
+      'company.add.intent_existing': 'جارٍ فتح استقبال الشركة الموجودة. لم يتم ربط أي شيء بعد.',
+      'company.add.footnote': 'قائمة شركاتك مرتبطة بمؤسستك فقط. لا يمكن لمستأجر آخر رؤيتها أو تغييرها.',
+
+
+      'company.create.back': 'الشركات',
+      'company.create.steps_label': 'خطوات الإعداد',
+      'company.create.step.details': 'التفاصيل',
+      'company.create.step.review': 'المراجعة',
+      'company.create.title': 'إنشاء شركة جديدة',
+      'company.create.subtitle': 'موجز قصير. تحوّله ZONATA إلى خطة بناء، ثم تعرض لك ما هو حقيقي وما ينتظرك.',
+      'company.create.optional': 'اختياري',
+      'company.create.example': 'مثال: {example}',
+      'company.create.basics.title': 'الشركة',
+      'company.create.basics.note': 'اكتبها كما تشرحها لزميل جديد.',
+      'company.create.name.label': 'اسم الشركة',
+      'company.create.name.hint': 'الاسم الذي سيراه العملاء. يمكنك تغييره لاحقاً.',
+      'company.create.name.example': 'مختبرات نورث ويند',
+      'company.create.tagline.label': 'وصف من سطر واحد',
+      'company.create.tagline.hint': 'ما تفعله الشركة في سطر واحد.',
+      'company.create.tagline.example': 'استوديو ذكاء اصطناعي تطبيقي لمتاجر التجزئة المتوسطة',
+      'company.create.description.label': 'ماذا تفعل الشركة',
+      'company.create.description.mode_label': 'طريقة وصف الشركة',
+      'company.create.description.free': 'اكتب بحرية',
+      'company.create.description.guided': 'أجب عن أربعة أسئلة',
+      'company.create.description.free_label': 'الوصف',
+      'company.create.description.hint': 'جملتان على الأقل: لمن تخدم، وماذا تبيع، وكيف تربح.',
+      'company.create.description.example': 'نبني أدوات طلبات لمخابز الأحياء. يدفع المالكون رسماً شهرياً ونأخذ نسبة صغيرة من الطلبات الإلكترونية.',
+      'company.create.guided.offer.label': 'ماذا تقدم؟',
+      'company.create.guided.offer.hint': 'المنتج أو الخدمة بكلمات واضحة.',
+      'company.create.guided.offer.example': 'برنامج طلبات وتوصيل للمخابز',
+      'company.create.guided.audience.label': 'لمن؟',
+      'company.create.guided.audience.hint': 'كن محدداً: نوع العميل، وليس الجميع.',
+      'company.create.guided.audience.example': 'أصحاب مخابز مستقلون لديهم من متجر إلى ستة متاجر',
+      'company.create.guided.difference.label': 'لماذا يختارونك؟',
+      'company.create.guided.difference.hint': 'الشيء الوحيد الذي تفعله أفضل أو بشكل مختلف.',
+      'company.create.guided.difference.example': 'الإعداد في يوم واحد دون أجهزة جديدة',
+      'company.create.guided.revenue.label': 'كيف تربح؟',
+      'company.create.guided.revenue.hint': 'التسعير أو الرسوم أو العمولة.',
+      'company.create.guided.revenue.example': 'اشتراك شهري مع عمولة صغيرة على الطلبات',
+      'company.create.guided.preview': 'هذا هو الوصف الذي سنستخدمه',
+      'company.create.guided.empty': 'أجب عن الأسئلة أعلاه ليظهر الوصف هنا.',
+      'company.create.guided.sentence.audience': 'تخدم',
+      'company.create.guided.sentence.difference': 'تتميز لأنها',
+      'company.create.guided.sentence.revenue': 'تربح من خلال',
+      'company.create.you.title': 'أنت',
+      'company.create.you.note': 'تُستخدم لسجل التدقيق ولنسخة التصدير من هذه الشركة.',
+      'company.create.owner.label': 'اسمك',
+      'company.create.owner.hint': 'الشخص المسؤول عن هذه الشركة.',
+      'company.create.email.label': 'البريد الإلكتروني',
+      'company.create.email.hint': 'مطلوب لنسخة تصدير موثقة لاحقاً. يمكنك إضافته حينها.',
+      'company.create.email.example': 'you@company.com',
+      'company.create.role.label': 'دورك',
+      'company.create.role.hint': 'مثل المؤسس أو المدير أو مسؤول العمليات.',
+      'company.create.role.example': 'مؤسس',
+      'company.create.where.title': 'أين تعمل',
+      'company.create.where.note': 'يحدد هذا المسودات القانونية والضريبية التي ستُعد.',
+      'company.create.country.label': 'الدولة',
+      'company.create.country.hint': 'رمز من حرفين أو اسم الدولة.',
+      'company.create.industry.label': 'القطاع',
+      'company.create.industry.hint': 'أقرب وصف بكلماتك.',
+      'company.create.industry.example': 'الأغذية والمشروبات',
+      'company.create.optional.title': 'تفاصيل اختيارية',
+      'company.create.optional.note': 'الموقع والعملاء والميزانية والجدول والملاحظات. يمكنك إضافتها لاحقاً أيضاً.',
+      'company.create.website.label': 'الموقع الإلكتروني',
+      'company.create.website.hint': 'اتركه فارغاً إن لم يكن هناك موقع بعد.',
+      'company.create.assets.label': 'روابط الملفات',
+      'company.create.assets.hint': 'رابط واحد في كل سطر. هوية العلامة، العرض التقديمي، صور المنتجات، المستندات.',
+      'company.create.customers.label': 'العملاء المستهدفون',
+      'company.create.customers.hint': 'من تريد الوصول إليه أولاً.',
+      'company.create.customers.example': 'متاجر تجزئة مستقلة في الهند لديها من متجر إلى ستة متاجر',
+      'company.create.budget.label': 'الميزانية الأولية',
+      'company.create.budget.hint': 'التقدير كافٍ. أرقام فقط.',
+      'company.create.budget.currency': 'العملة',
+      'company.create.budget.currency_hint': 'رمز من ثلاثة أحرف.',
+      'company.create.timeline.label': 'الجدول المفضل',
+      'company.create.timeline.hint': 'متى تريد أن تكون الشركة جاهزة.',
+      'company.create.timeline.example': 'جاهزة خلال أسبوعين تقريباً',
+      'company.create.notes.label': 'أي شيء آخر',
+      'company.create.notes.hint': 'قيود أو التزامات قائمة أو أمور يجب تجنبها.',
+      'company.create.review_button': 'مراجعة',
+      'company.create.footnote': 'لم يُنشأ شيء بعد. تعرض الشاشة التالية ما سيُرسل بالضبط.',
+      'company.create.review.title': 'راجع الإعداد',
+      'company.create.review.subtitle': 'تحقق من التفاصيل. بعد التأكيد تُنشأ الشركة ويبدأ البناء.',
+      'company.create.review.region': 'ملخص إعداد الشركة',
+      'company.create.review.basics': 'الشركة',
+      'company.create.review.edit': 'تعديل',
+      'company.create.review.owner': 'المالك',
+      'company.create.review.not_set': 'غير محدد',
+      'company.create.review.next.title': 'ما يحدث بعد التأكيد',
+      'company.create.review.next.one': 'تُنشأ الشركة بحالة قيد الإنشاء.',
+      'company.create.review.next.two': 'يقرأ البناء الموجز ويضع الخطة ويعد المسودات القانونية لمراجعتك.',
+      'company.create.review.next.three': 'أي خطوة تحتاج مزوداً متصلاً تظهر كمنتظرة لك، ولا تُعلَّم كمنجزة.',
+      'company.create.review.next.estimate': 'التقدير من يوم إلى ثلاثة أيام. هذا تقدير وليس وعداً.',
+      'company.create.review.footnote': 'يمكنك تعديل الشركة أو حذفها لاحقاً. الحذف محمي ويصدّر بياناتك أولاً.',
+      'company.create.submitting': 'جارٍ إنشاء الشركة...',
+      'company.create.submit': 'إنشاء الشركة وبدء البناء',
+      'company.create.errors.title': 'يرجى إصلاح ما يلي قبل المتابعة',
+      'company.create.denied.title': 'لا يمكنك إنشاء شركة',
+      'company.create.denied.body': 'يمكن للمالك أو المسؤول المصرّح له فقط إنشاء شركة. الخادم هو من يفرض ذلك.',
+      'company.create.draft.idle': 'تبقى إجاباتك على هذا الجهاز حتى تراجعها.',
+      'company.create.draft.saving': 'جارٍ حفظ إجاباتك...',
+      'company.create.draft.saved': 'تم حفظ المسودة',
+      'company.create.draft.local': 'حُفظت على هذا الجهاز. ستتم المزامنة عند عودة الاتصال.',
+      'company.create.draft.error': 'تعذر حفظ المسودة عبر الإنترنت. إجاباتك ما زالت على هذا الجهاز.',
+      'company.create.error.name_required': 'أدخل اسم الشركة.',
+      'company.create.error.name_short': 'يجب أن يكون الاسم حرفين على الأقل.',
+      'company.create.error.title_required': 'أضف وصفاً من سطر واحد.',
+      'company.create.error.description_required': 'صف ما تفعله الشركة.',
+      'company.create.error.description_short': 'استخدم 20 حرفاً على الأقل ليكون لدى الخطة ما تعمل به.',
+      'company.create.error.owner_required': 'أضف اسم الشخص المسؤول.',
+      'company.create.error.email': 'أدخل بريداً إلكترونياً صالحاً.',
+      'company.create.error.country_required': 'أضف الدولة التي تعمل فيها الشركة.',
+      'company.create.error.industry_required': 'أضف أقرب قطاع.',
+      'company.create.error.url': 'يجب أن تبدأ الروابط بـ http:// أو https://.',
+      'company.create.error.assets': 'يجب أن يبدأ كل رابط ملف بـ http:// أو https://.',
+      'company.create.error.budget': 'أدخل رقماً، أو اترك الميزانية فارغة.',
+      'company.create.error.currency': 'استخدم رمز عملة من ثلاثة أحرف.',
+      'company.create.error.duplicate': 'توجد شركة بهذا الاسم بالفعل. اختر اسماً آخر.',
+      'company.create.error.submit_failed': 'أُنشئت الشركة كمسودة، لكن البناء لم يبدأ. يمكنك إرسالها من النظرة العامة.',
+      'company.create.error.create_failed': 'تعذر إنشاء الشركة. لم يُحفظ شيء.',
+      'company.create.error.network': 'تعذر الوصول إلى الخادم. إجاباتك ما زالت على هذا الجهاز.',
+      'company.create.created': 'أُنشئت الشركة. بدأ البناء.',
+
+      'company.existing.back': 'إضافة شركة',
+      'company.existing.title': 'إضافة شركة موجودة',
+      'company.existing.subtitle': 'أخبر ZONATA بما يفعله العمل بالفعل. ستدرس الأرقام الحقيقية، لا أرقامًا مختلقة.',
+      'company.existing.steps_label': 'إضافة شركة موجودة',
+      'company.existing.step.business': 'العمل',
+      'company.existing.step.sources': 'مصادر البيانات',
+      'company.existing.step.review': 'المراجعة',
+      'company.existing.basics.title': 'ما هو العمل',
+      'company.existing.basics.note': 'حقائق فقط. تُستخدم للتهيئة ودرجة الجاهزية وسجل التدقيق.',
+      'company.existing.name.label': 'الاسم المسجّل أو التجاري',
+      'company.existing.name.hint': 'الاسم الذي يعرفه العملاء والبنوك بالفعل.',
+      'company.existing.description.label': 'ماذا يفعل اليوم',
+      'company.existing.description.hint': 'المنتجات أو الخدمات التي يبيعها، ومن يشتريها، ومنذ متى يعمل.',
+      'company.existing.model.title': 'كيف يكسب المال',
+      'company.existing.model.note': 'شكل العمل يحدد ما تبحث عنه ZONATA في الأرقام.',
+      'company.existing.model.label': 'نموذج العمل',
+      'company.existing.model.hint': 'كيف تُكتسب الإيرادات، ومن يدفع، وما هي التكاليف الرئيسية.',
+      'company.existing.model.example': 'يبيع منتجات مخبز عبر ستة فروع وتوصيل إلكتروني. تأتي الإيرادات من البيع المباشر والطلبات الإلكترونية وتموين الشركات؛ والتكاليف الرئيسية هي المكونات والإيجار والموظفون.',
+      'company.existing.revenue.label': 'الإيرادات',
+      'company.existing.revenue.hint': 'آخر فترة كاملة. التقدير مقبول إن كان قريبًا.',
+      'company.existing.revenue.currency': 'العملة',
+      'company.existing.revenue.period': 'الفترة',
+      'company.existing.revenue.preview': '{amount} ({compact}) لكل {period}',
+      'company.existing.revenue.preview_empty': 'أدخل مبلغًا لعرض صيغته.',
+      'company.existing.period.daily': 'يوم',
+      'company.existing.period.weekly': 'أسبوع',
+      'company.existing.period.monthly': 'شهر',
+      'company.existing.period.quarterly': 'ربع سنة',
+      'company.existing.period.annual': 'سنة',
+      'company.existing.period.one_time': 'مرة واحدة',
+      'company.existing.owner.title': 'من هو المسؤول',
+      'company.existing.owner.note': 'يُستخدم لسجل التدقيق ونسخة التصدير والإشعارات. لا يمكن للوكلاء تعبئته عنك.',
+      'company.existing.owner.role_hint': 'مثل المؤسس أو المدير العام أو مسؤول المالية.',
+      'company.existing.owner.email_hint': 'مطلوب لنسخة تصدير موثّقة وإشعارات الحذف.',
+      'company.existing.next': 'اختيار مصادر البيانات',
+      'company.existing.footnote': 'لم يُنشأ شيء بعد. تبقى إجاباتك على هذا الجهاز وفي مسودة خاصة حتى تؤكد.',
+      'company.existing.review_button': 'مراجعة',
+      'company.existing.sources.title': 'أين توجد البيانات',
+      'company.existing.sources.subtitle': 'ثمانية مصادر محتملة. اربط أحدها، أو خطّط لربطه لاحقًا، أو تجاوزه بسبب. لا شيء إلزامي.',
+      'company.existing.sources.promise_title': 'للقراءة فقط، وفيما هو مذكور حصرًا',
+      'company.existing.sources.promise_body': 'تطلب ZONATA وصولًا للقراءة فقط بالنطاق الموضح في كل بطاقة. لا يُكتب أي شيء في أنظمتك، ولا تُقرأ بيانات حتى يتوفر موصل حقيقي وتوافق أنت.',
+      'company.existing.sources.loading': 'جارٍ تحميل قائمة المصادر...',
+      'company.existing.sources.unavailable_title': 'تعذّر تحميل قائمة المصادر',
+      'company.existing.sources.unavailable_body': 'يمكنك إضافة الشركة رغم ذلك. تُترك اختيارات المصادر فارغة ويمكن ضبطها من صفحة الشركة لاحقًا.',
+      'company.existing.sources.none': 'لا توجد مصادر متاحة على هذا النشر بعد. يمكنك إضافة الشركة ورفع ملف لاحقًا.',
+      'company.existing.sources.counts': '{connect} للربط · {skip} متجاوز · {later} يُقرَّر لاحقًا',
+      'company.existing.sources.footnote': 'يُسجَّل المصدر المتجاوز مع سببه ويخفض درجة الجاهزية. لا يُتجاهل بصمت أبدًا.',
+      'company.existing.sources.reads': 'يقرأ',
+      'company.existing.sources.why': 'لماذا',
+      'company.existing.sources.never': 'لا يُنسخ أبدًا',
+      'company.existing.sources.choice_label': 'الاختيار لـ {name}',
+      'company.existing.sources.choice.connect': 'ربط',
+      'company.existing.sources.choice.skip': 'تجاوز',
+      'company.existing.sources.choice.later': 'تقرير لاحقًا',
+      'company.existing.sources.status.connect': 'سيُربط',
+      'company.existing.sources.status.skip': 'متجاوز',
+      'company.existing.sources.status.later': 'لم يُقرَّر',
+      'company.existing.sources.reason.label': 'لماذا تتجاوزه؟',
+      'company.existing.sources.reason.hint': 'بضع كلمات على الأقل. يظهر السبب في درجة الجاهزية وسجل التدقيق.',
+      'company.existing.sources.reason.error': 'أضف سببًا قصيرًا من 5 أحرف على الأقل.',
+      'company.existing.sources.category.financial': 'مالي',
+      'company.existing.sources.category.customer': 'العملاء',
+      'company.existing.sources.category.operational': 'تشغيلي',
+      'company.existing.sources.category.document': 'مستندات',
+      'company.existing.review.title': 'مراجعة التهيئة',
+      'company.existing.review.subtitle': 'تحقق من الحقائق واختيارات المصادر. بعد التأكيد تُنشأ الشركة وتبدأ التهيئة.',
+      'company.existing.review.region': 'ملخص تهيئة الشركة الموجودة',
+      'company.existing.review.basics': 'العمل',
+      'company.existing.review.sources': 'مصادر البيانات',
+      'company.existing.review.sources_none': 'لم يُختر أي مصدر. ستبدأ التهيئة وتخبرك بما ينقص بالضبط.',
+      'company.existing.review.next.title': 'ما يحدث بعد التأكيد',
+      'company.existing.review.next.one': 'تُنشأ الشركة بحالة قيد التهيئة.',
+      'company.existing.review.next.two': 'تُحفظ اختيارات المصادر كسجلات اتصال للقراءة فقط أو كأسباب تجاوز.',
+      'company.existing.review.next.three': 'تتحقق التهيئة من الجاهزية وما يمكن قراءته. بلا موصل تقول ذلك بدل اختلاق النتائج.',
+      'company.existing.review.next.note': 'لا تصبح الشركة تشغيلية إلا عندما تنجح الفحوص بلا فجوات.',
+      'company.existing.review.footnote': 'يمكنك تعديل الشركة أو حذفها لاحقًا. الحذف محمي ويصدّر بياناتك أولًا.',
+      'company.existing.submitting': 'جارٍ إضافة الشركة...',
+      'company.existing.submit': 'إضافة الشركة وبدء التهيئة',
+      'company.existing.created': 'أُضيفت الشركة. بدأت التهيئة.',
+      'company.existing.denied.title': 'لا يمكنك إضافة شركة',
+      'company.existing.denied.body': 'المالك أو المسؤول المصرّح له فقط يمكنه إضافة شركة. الخادم يفرض ذلك.',
+      'company.existing.error.business_model': 'اشرح كيف يكسب العمل المال.',
+      'company.existing.error.revenue_required': 'أضف مبلغ الإيرادات.',
+      'company.existing.error.revenue_amount': 'يجب أن تكون الإيرادات رقمًا أكبر من صفر.',
+      'company.existing.error.revenue_period': 'اختر فترة الإيرادات.',
+      'company.existing.error.owner_role': 'أضف دورك في الشركة.',
+      'company.existing.error.submit_failed': 'أُنشئت الشركة كمسودة، لكن التهيئة لم تبدأ. يمكنك إرسالها من النظرة العامة.',
+      'company.existing.error.sources_partial': 'تعذّر حفظ {count} من اختيارات المصادر ({detail}). الشركة موجودة؛ اضبطها من صفحتها.',
+      'company.existing.error.network': 'تعذّر الوصول إلى الخادم. إجاباتك ما زالت على هذا الجهاز.',
+
+      'company.build.back': 'النظرة العامة',
+      'company.build.title': 'بناء الشركة',
+      'company.build.eyebrow': 'تقدم البناء',
+      'company.build.subtitle': 'كل مرحلة أدناه حقيقية. أي خطوة تحتاج مزوداً تظهر كمنتظرة لك.',
+      'company.build.onboarding.eyebrow': 'تقدم التهيئة',
+      'company.build.onboarding.subtitle': 'تتحقق ZONATA من الجاهزية وما يمكن قراءته فعلًا وما ينتظرك. لا شيء مختلق.',
+      'company.build.readiness.title': 'الجاهزية',
+      'company.build.readiness.value': '{score} من 100',
+      'company.build.readiness.band.high': 'جاهزة',
+      'company.build.readiness.band.medium': 'جاهزة جزئيًا',
+      'company.build.readiness.band.low': 'بداية',
+      'company.build.readiness.counts': '{connected} متصلة · {verified} موثّقة · {skipped} متجاوزة · {files} ملفات',
+      'company.build.readiness.next': 'ما يرفعها',
+      'company.build.diagnosis.title': 'التشخيص',
+      'company.build.diagnosis.unavailable': 'لم يُنتج أي تشخيص',
+      'company.build.diagnosis.none': 'لم تُسجَّل أي نتيجة. لم يُختلق شيء لملء الفجوة.',
+      'company.build.diagnosis.why': 'السبب',
+      'company.build.sources.title': 'مصادر البيانات',
+      'company.build.sources.note': 'هذه هي الاختيارات المحفوظة عند إضافة الشركة.',
+      'company.build.sources.empty': 'لم يُختر أي مصدر بعد.',
+      'company.build.sources.status.verified': 'موثّق',
+      'company.build.sources.status.needs_check': 'يحتاج تحققًا',
+      'company.build.sources.status.skipped': 'متجاوز',
+      'company.build.sources.status.not_started': 'غير متصل',
+      'company.build.progress.title': 'التقدم',
+      'company.build.progress.value': 'اكتمل {percent} بالمئة',
+      'company.build.progress.caption': 'اكتملت {done} من {total} مراحل',
+      'company.build.live': 'هذا البناء قيد التشغيل. تتحدث الصفحة تلقائياً.',
+      'company.build.phases.title': 'المراحل',
+      'company.build.phase.pending': 'لم تبدأ',
+      'company.build.phase.running': 'قيد التشغيل',
+      'company.build.phase.done': 'منجزة',
+      'company.build.phase.done_with_gaps': 'منجزة مع فجوات',
+      'company.build.phase.skipped': 'متجاوزة',
+      'company.build.phase.failed': 'فاشلة',
+      'company.build.phase_label.INTAKE': 'فهم موجزك',
+      'company.build.phase_label.RESEARCH': 'بحث السوق',
+      'company.build.phase_label.PLAN': 'تخطيط الشركة',
+      'company.build.phase_label.BUILD': 'بناء الأنظمة الأساسية',
+      'company.build.phase_label.LEGAL_PACK': 'إعداد الحزمة القانونية',
+      'company.build.phase_label.VERIFY': 'التحقق من كل شيء',
+      'company.build.phase_label.OPERATIONAL': 'بدء التشغيل',
+      'company.build.phase_label.CONNECT_VERIFY': 'ربط المصادر والتحقق منها',
+      'company.build.phase_label.STUDY': 'دراسة العمل',
+      'company.build.phase_label.DIAGNOSE': 'تشخيص ما يحتاج إلى تحسين',
+      'company.build.phase_label.ACT': 'تنفيذ العمل المعتمد',
+      'company.build.run.pending': 'في الانتظار',
+      'company.build.run.running': 'قيد التشغيل',
+      'company.build.run.done': 'تعمل',
+      'company.build.run.gaps': 'تحتاج إلى انتباه',
+      'company.build.run.failed': 'فشل البناء',
+      'company.build.waiting.title': 'بانتظارك',
+      'company.build.waiting.note': 'هذه الخطوات تحتاج شيئاً متصلاً أو قراراً منك. لم يُختلق شيء لملء الفجوة.',
+      'company.build.waiting.item': 'خطوة تحتاج إلى انتباه',
+      'company.build.retry.button': 'إعادة محاولة البناء',
+      'company.build.retry.running': 'جارٍ إعادة المحاولة...',
+      'company.build.retry.started': 'بدأت محاولة بناء جديدة.',
+      'company.build.error.title': 'تعذر تحميل البناء',
+      'company.build.error.no_company': 'لم يتم اختيار شركة.',
+      'company.build.error.not_found': 'لم يتم العثور على هذه الشركة في مؤسستك.',
+      'company.build.error.load': 'تعذر تحميل تفاصيل البناء.',
+      'company.build.error.offline': 'أنت غير متصل. أعد الاتصال وحاول مجدداً.',
+      'company.build.error.network': 'تعذر الوصول إلى الخادم. حاول مجدداً.',
+      'company.build.error.retry': 'تعذرت إعادة محاولة البناء.',
+      'company.build.empty.title': 'لم يبدأ أي بناء',
+      'company.build.empty.body': 'لا يوجد تشغيل بناء لهذه الشركة بعد. أرسل الشركة من نظرة عامة أو ابدأ شركة جديدة.',
+      'company.build.done.title': 'اكتمل البناء',
+      'company.build.done.body': 'نجحت كل المراحل. الشركة تعمل.',
+      'company.build.failed.title': 'توقف البناء',
+      'company.build.log.title': 'ما حدث',
+      'company.build.log.all': 'عرض الكل',
+      'company.build.log.less': 'عرض أقل',
+      'company.build.log.empty': 'لا توجد سجلات بعد.',
+      'company.build.estimate.range': 'التقدير: {min}-{max} أيام',
+      'company.build.estimate.one': 'التقدير: {days} يوم',
+      'company.build.attempt': 'المحاولة {attempt}',
+      'company.build.overview': 'العودة إلى النظرة العامة',
+      'company.build.footnote': 'تُعرض الأوقات بتوقيتك المحلي. لا يعلّم البناء أي خطوة متجاوزة كمنجزة.',
+      'assistant.add_opened': 'جارٍ فتح صفحة إضافة شركة. لم يتم إنشاء أي شيء بعد.',
+      'assistant.switch_opened': 'جارٍ فتح شركاتك. لم يتم تبديل أي شيء بعد.',
+
+      'company.overview.back': 'الشركات',
+      'company.overview.title': 'نظرة عامة على الشركة',
+      'company.overview.eyebrow': 'شركة',
+      'company.overview.subtitle': 'الحقائق والبناء وسجل التدقيق لهذه الشركة.',
+      'company.overview.unknown_industry': 'القطاع غير محدد',
+      'company.overview.readonly': 'عرض فقط',
+      'company.overview.menu': 'خيارات الشركة',
+      'company.overview.edit': 'تعديل الشركة',
+      'company.overview.delete': 'حذف الشركة',
+      'company.overview.open_workspace': 'فتح مساحة العمل التشغيلية',
+      'company.overview.footnote': 'الحقائق في هذه الصفحة تأتي من سجل الشركة وسجل التدقيق. لا شيء تقديري.',
+      'company.overview.partial': 'تعذر تحميل بعض التفاصيل الثانوية. الشركة نفسها غير متأثرة.',
+      'company.overview.build_running': 'هناك بناء قيد التشغيل. التقدم أدناه مباشر، ولا تخترع هذه الصفحة خطوات ناقصة.',
+      'company.overview.type.new': 'أُنشئت جديدة',
+      'company.overview.type.existing': 'أُضيفت قائمة',
+      'company.overview.error.title': 'تعذر تحميل الشركة',
+      'company.overview.error.no_company': 'لم يتم اختيار شركة.',
+      'company.overview.error.not_found': 'لم يتم العثور على هذه الشركة في مؤسستك.',
+      'company.overview.error.load': 'تعذر تحميل تفاصيل الشركة.',
+      'company.overview.error.offline': 'أنت غير متصل. أعد الاتصال وحاول مجدداً.',
+      'company.overview.deletion.title': 'حذف قيد التنفيذ',
+      'company.overview.deletion.waiting_download': 'بانتظار تنزيل النسخة المصدرة',
+      'company.overview.deletion.due': 'جاهز للإكمال',
+      'company.overview.deletion.countdown_days': 'بقي {days} يوماً و{hours} ساعة',
+      'company.overview.deletion.countdown_hours': 'بقي {hours} ساعة',
+      'company.overview.deletion.download': 'تنزيل النسخة',
+      'company.overview.deletion.manage': 'مراجعة الحذف',
+      'company.overview.identity.title': 'الهوية',
+      'company.overview.identity.status': 'الحالة',
+      'company.overview.identity.owner': 'المالك',
+      'company.overview.identity.email': 'بريد المالك',
+      'company.overview.identity.website': 'الموقع الإلكتروني',
+      'company.overview.identity.created': 'أُنشئت',
+      'company.overview.identity.updated': 'آخر تحديث',
+      'company.overview.numbers.title': 'الأرقام الرئيسية',
+      'company.overview.numbers.revenue': 'الإيرادات',
+      'company.overview.numbers.readiness': 'الجاهزية',
+      'company.overview.numbers.connections': 'الاتصالات',
+      'company.overview.numbers.files': 'الملفات',
+      'company.overview.numbers.readonly': 'وصول للقراءة فقط',
+      'company.overview.numbers.evidence': 'أدلة مسجلة',
+      'company.overview.progress.title': 'البناء والتهيئة',
+      'company.overview.progress.empty': 'لم يبدأ أي بناء أو تهيئة لهذه الشركة بعد.',
+      'company.overview.progress.open': 'عرض التقدم الكامل',
+      'company.overview.sources.title': 'المصادر',
+      'company.overview.sources.empty': 'لم تُسجّل حالة كتالوج المصادر.',
+      'company.overview.connections.title': 'الاتصالات',
+      'company.overview.connections.verified': 'موثّقة',
+      'company.overview.source.not_started': 'لم تبدأ',
+      'company.overview.source.needs_check': 'تحتاج تحققاً',
+      'company.overview.source.verified': 'موثّقة',
+      'company.overview.source.skipped': 'متجاوزة',
+      'company.overview.legal.title': 'المسودات القانونية',
+      'company.overview.legal.empty': 'لم تُعدّ مسودات قانونية. هي مسودات وليست تسجيلات رسمية.',
+      'company.overview.activity.title': 'النشاط الأخير',
+      'company.overview.activity.empty': 'لا توجد أحداث تدقيق مسجلة بعد.',
+      'company.activity.company_created': 'أُنشئت الشركة',
+      'company.activity.company_updated': 'حُدّثت بيانات الشركة',
+      'company.activity.company_submitted': 'أُرسلت الشركة',
+      'company.activity.company_connection_added': 'أُضيف اتصال',
+      'company.activity.company_connection_removed': 'أُزيل اتصال',
+      'company.activity.company_connection_tested': 'اختُبر اتصال',
+      'company.activity.company_file_recorded': 'سُجّل ملف',
+      'company.activity.company_file_flagged': 'وُضع علامة على ملف',
+      'company.activity.company_source_skipped': 'تُجاوز مصدر',
+      'company.activity.company_source_restored': 'أُعيد مصدر',
+      'company.activity.company_delete_requested': 'طُلب الحذف',
+      'company.activity.company_delete_name_confirmed': 'تأكد اسم الشركة للحذف',
+      'company.activity.company_delete_identity_confirmed': 'تأكدت الهوية للحذف',
+      'company.activity.company_delete_cancelled': 'أُلغي الحذف',
+      'company.activity.company_delete_pending_purge': 'الحذف بانتظار نافذة الاستعادة',
+      'company.activity.company_delete_purged': 'مُحيت بيانات الشركة',
+      'company.activity.company_export_generated': 'أُنتجت النسخة المصدرة',
+      'company.activity.company_export_email': 'جرت محاولة إرسال النسخة بالبريد',
+      'company.activity.company_export_downloaded': 'نُزّلت النسخة المصدرة',
+      'company.activity.company_export_failed': 'فشل إنتاج النسخة',
+      'company.activity.company_admin_granted': 'سُمح بمسؤول شركة',
+      'company.activity.company_admin_revoked': 'أُزيل مسؤول شركة',
+      'company.activity.company_build_started': 'بدأ البناء',
+      'company.activity.company_build_completed': 'اكتمل البناء',
+      'company.activity.company_build_done_with_gaps': 'اكتمل البناء مع فجوات',
+      'company.activity.company_build_failed': 'فشل البناء',
+      'company.activity.company_build_retried': 'أُعيد محاولة البناء',
+      'company.activity.company_build_change_notice_pending': 'أُبلغ البناء بتغيير في الملف',
+      'company.activity.company_work_stopped': 'أُوقف عمل الشركة',
+
+      'company.edit.back': 'نظرة عامة على الشركة',
+      'company.edit.eyebrow': 'تعديل',
+      'company.edit.title': 'تعديل الشركة',
+      'company.edit.subtitle': 'غيّر الحقائق التي بُنيت عليها الشركة. يتحقق الخادم من كل حقل مرة أخرى قبل الحفظ.',
+      'company.edit.type_fixed': 'نوع الشركة ثابت. أنشئ شركة جديدة إذا لزم تغيير النوع.',
+      'company.edit.build_running': 'البناء ما زال يعمل. تُحفظ تغييراتك الآن، ولا يُعاد تشغيل البناء تلقائياً ولا تُعلَّم أي خطوة كمنجزة بسبب هذا التعديل.',
+      'company.edit.readonly': 'يمكنك عرض هذه الشركة لكن ليس تغييرها.',
+      'company.edit.readonly_note': 'فقط المالك أو مسؤول شركة مسموح له يمكنه تعديل الشركة. يمكن للوكيل إعداد مسودة، لكنه لا يستطيع الإرسال أو تغيير الإعدادات أبداً.',
+      'company.edit.section.identity': 'الشركة',
+      'company.edit.section.identity_note': 'الاسم والعنوان المختصر وما تفعله الشركة.',
+      'company.edit.section.owner': 'المالك',
+      'company.edit.section.owner_note': 'الشخص المسؤول. يظهر في سجل التدقيق ولا يُستخدم كحساب دخول.',
+      'company.edit.section.numbers': 'الأموال',
+      'company.edit.section.numbers_note': 'الإيرادات هي آخر فترة كاملة أبلغت عنها. الميزانية رقم تخطيطي وليست رصيداً بنكياً.',
+      'company.edit.save': 'حفظ التغييرات',
+      'company.edit.saving': 'جارٍ الحفظ...',
+      'company.edit.saved': 'حُفظت التغييرات.',
+      'company.edit.footnote': 'كل حفظ يكتب حدث تدقيق. مسح حقل اختياري يزيله، ولا تبقى القيمة القديمة في سجل الشركة.',
+      'company.edit.error.title': 'تعذر تحميل هذه الشركة',
+      'company.edit.error.forbidden': 'ليس لديك إذن لتعديل هذه الشركة.',
+      'company.edit.error.offline': 'أنت غير متصل. أعد الاتصال وحاول مجدداً.',
+      'company.edit.error.save': 'تعذر حفظ التغييرات. لم يُحدَّث شيء.',
+      'company.edit.error.negative': 'أدخل صفراً أو رقماً موجباً.',
+      'company.edit.connections.title': 'الاتصالات',
+      'company.edit.connections.note': 'الاتصالات للقراءة فقط. إزالة اتصال تلغي بيانات اعتماده ووصوله.',
+      'company.edit.connections.empty': 'لا يوجد اتصال مرتبط بهذه الشركة بعد.',
+      'company.edit.connections.add_label': 'إضافة مصدر',
+      'company.edit.connections.add': 'إضافة اتصال',
+      'company.edit.connections.remove': 'إزالة',
+      'company.edit.connections.remove_confirm': 'إزالة هذا الاتصال وإلغاء بيانات اعتماده؟',
+      'company.edit.connections.add_failed': 'تعذرت إضافة الاتصال.',
+      'company.edit.connections.remove_failed': 'تعذرت إزالة الاتصال.',
+      'company.edit.connections.scope_note': 'تُطلب صلاحيات القراءة فقط. يبقى الاتصال غير موثّق حتى تأكيد الملكية.',
+
+      'company.delete.eyebrow': 'إجراء محمي',
+      'company.delete.loading': 'الحذف',
+      'company.delete.steps': 'خطوات الحذف',
+      'company.delete.step.what': 'ما سيحدث',
+      'company.delete.step.name': 'اسم الشركة',
+      'company.delete.step.identity': 'هويتك',
+      'company.delete.step.export': 'التصدير',
+      'company.delete.step.recovery': 'نافذة الاستعادة',
+      'company.delete.what.title': 'حذف {name}؟',
+      'company.delete.what.lead': 'هذه العملية متعددة الخطوات عمداً. لا يُحذف شيء حتى تأكيد هويتك، ووجود النسخة المصدرة، وانتهاء نافذة الاستعادة.',
+      'company.delete.what.remove_title': 'ما سيُحذف',
+      'company.delete.what.remove.departments': 'الأقسام',
+      'company.delete.what.remove.employees': 'الأشخاص والوكلاء',
+      'company.delete.what.remove.workflows': 'سير العمل',
+      'company.delete.what.remove.connections': 'الاتصالات',
+      'company.delete.what.remove.files': 'الملفات',
+      'company.delete.what.remove.approvals': 'الموافقات',
+      'company.delete.what.stop_title': 'ما سيتوقف فوراً',
+      'company.delete.what.stop_workflows': 'تُلغى عمليات سير العمل الجارية.',
+      'company.delete.what.stop_schedules': 'يتوقف العمل المجدول لهذه الشركة.',
+      'company.delete.what.stop_connections': 'يفقد كل اتصال وصوله.',
+      'company.delete.what.keep_title': 'ما سيبقى',
+      'company.delete.what.keep_audit': 'سجل تدقيق نهائي لعملية الحذف.',
+      'company.delete.what.keep_record': 'أثر أدنى يحتفظ بمعرّف الشركة ووقت الحذف.',
+      'company.delete.what.export_promise': 'قبل حذف أي شيء، تُعدّ ZONATA نسخة كاملة: ملف PDF مقسّم إلى أجزاء مرقمة ومضغوط عند الحاجة، مع نسخة JSON للقيم الأصلية وبيان SHA-256.',
+      'company.delete.what.recovery': 'نافذة الاستعادة',
+      'company.delete.what.recovery_none': 'لا نافذة. يكتمل الحذف بمجرد تسليم النسخة أو تنزيلها.',
+      'company.delete.what.recovery_days': '{days} يوماً، ويمكن للمالك أو مسؤول مسموح الإلغاء.',
+      'company.delete.what.email': 'تسليم النسخة',
+      'company.delete.what.email_yes': 'تُرسل إلى الحساب الموثّق {recipient}، مع تنزيل داخل التطبيق كبديل.',
+      'company.delete.what.email_no': 'لا يوجد بريد موثّق يمكن استخدامه. يجب تنزيل النسخة في هذا التطبيق قبل المحو.',
+      'company.delete.what.mfa': 'سيُطلب رمز تحقق بخطوتين في الخطوة التالية.',
+      'company.delete.what.mfa_setup': 'إعدادات مساحة العمل تفرض التحقق بخطوتين. لم يفعّله هذا الحساب بعد، لذا تبدأ الخطوة التالية التهيئة عبر تطبيق المصادقة.',
+      'company.delete.what.mfa_missing': 'إعدادات مساحة العمل تفرض التحقق بخطوتين، لكن لا يوجد مدقق رموز مهيأ على هذا النشر. لا يمكن إكمال الحذف حتى يهيّئ المالك واحداً. لم يُحذف شيء.',
+      'company.delete.what.continue': 'أفهم، تابع',
+      'company.delete.name.title': 'اكتب اسم الشركة',
+      'company.delete.name.lead': 'هذا يؤكد أنك تحذف الشركة الصحيحة. اكتب الاسم تماماً كما يظهر.',
+      'company.delete.name.label': 'اسم الشركة',
+      'company.delete.name.hint': 'يجب أن تتطابق الأحرف والمسافات. النسخ واللصق مسموح.',
+      'company.delete.name.footnote': 'يقارن الخادم هذا الاسم مرة أخرى. الاسم الخاطئ يوقف العملية.',
+      'company.delete.name.continue': 'تأكيد الاسم',
+      'company.delete.identity.title': 'أكد أنك أنت',
+      'company.delete.identity.lead': 'أدخل كلمة مرور حسابك المسجل. يتحقق الخادم منها، ولا تحفظها هذه الصفحة.',
+      'company.delete.identity.password': 'كلمة مرورك',
+      'company.delete.identity.password_hint': 'الحساب المسجل الآن، وليس بريد مالك الشركة في الملف.',
+      'company.delete.identity.code': 'رمز التحقق بخطوتين',
+      'company.delete.identity.mfa': 'رمز التحقق بخطوتين مطلوب.',
+      'company.delete.identity.mfa_missing': 'التحقق بخطوتين مفعّل، لكن هذا النشر لا يضم مدقق رموز. سيرفض الخادم المتابعة بدلاً من تجاوز الشرط. لم يُحذف شيء.',
+      'company.delete.identity.footnote': 'إذا كانت كلمة المرور أو رمز التحقق خاطئاً، تبقى الشركة كما هي تماماً.',
+      'company.delete.identity.confirm': 'تأكيد وإعداد النسخة',
+      'company.delete.enroll.title': 'تفعيل التحقق بخطوتين',
+      'company.delete.enroll.lead': 'حذف الشركة يتطلب رمز تحقق بخطوتين، ولا يملك هذا الحساب رمزاً بعد. هيّئ واحداً في تطبيق المصادقة قبل متابعة الحذف.',
+      'company.delete.enroll.start': 'تهيئة التحقق بخطوتين',
+      'company.delete.enroll.secret': 'مفتاح التهيئة',
+      'company.delete.enroll.secret_hint': 'أضف هذا المفتاح إلى تطبيق المصادقة إن لم تستخدم الرابط. يظهر مرة واحدة ويُخزّن مشفّراً على الخادم.',
+      'company.delete.enroll.uri': 'رابط التهيئة',
+      'company.delete.enroll.uri_hint': 'يمكن لتطبيق مصادقة يدعم روابط otpauth فتح هذا الرابط مباشرة.',
+      'company.delete.enroll.code': 'الرمز من التطبيق',
+      'company.delete.enroll.enable': 'تفعيل التحقق بخطوتين',
+      'company.delete.enroll.waiting': 'كل رمز يُستخدم مرة واحدة. بعد التفعيل، انتظر الرمز التالي (كل 30 ثانية) وأدخله أعلاه للمتابعة.',
+      'company.delete.enroll.done': 'التحقق بخطوتين مفعّل. انتظر الرمز التالي في تطبيقك ثم أدخله أعلاه للمتابعة.',
+      'company.delete.enroll.failed': 'لم تكتمل تهيئة التحقق بخطوتين. لم يُحذف شيء.',
+      'company.delete.export.title': 'جارٍ إعداد النسخة',
+      'company.delete.export.lead': 'تُكتب النسخة الآن. لم يكتمل الحذف؛ هو بانتظار هذا الملف.',
+      'company.delete.export.failed_lead': 'فشل التصدير، لذلك لم يُمحَ شيء.',
+      'company.delete.export.failed_note': 'الشركة ما زالت في حالتها قبل الحذف مع تصدير معلّق. أعد محاولة التصدير أو ألغِ الحذف.',
+      'company.delete.export.progress': 'جارٍ كتابة PDF ونسخة JSON وبيان السلامة...',
+      'company.delete.export.retry': 'إعادة محاولة التصدير',
+      'company.delete.export.footnote': 'التصدير الفاشل لا يؤدي إلى المحو أبداً.',
+      'company.delete.recovery.title': 'نسختك جاهزة',
+      'company.delete.recovery.lead': 'النسخة موجودة. تبدأ نافذة الاستعادة الآن، ويمكن للمالك الإلغاء.',
+      'company.delete.recovery.export_title': 'النسخة المصدرة',
+      'company.delete.recovery.file': 'الملف',
+      'company.delete.recovery.file_pending': 'غير متاح بعد',
+      'company.delete.recovery.size': 'الحجم',
+      'company.delete.recovery.parts': 'أجزاء PDF',
+      'company.delete.recovery.checksum': 'SHA-256',
+      'company.delete.recovery.download': 'تنزيل النسخة',
+      'company.delete.recovery.download_note': 'التنزيل موثّق ويُبث من هذا النشر. يُسجّل في سجل التدقيق.',
+      'company.delete.recovery.email_title': 'تسليم البريد',
+      'company.delete.recovery.email_fallback': 'التنزيل داخل التطبيق يعمل دائماً حتى إذا لم يُهيأ البريد.',
+      'company.delete.recovery.window_title': 'نافذة الاستعادة',
+      'company.delete.recovery.window_note': 'يستحق المحو بعد {time}. الإلغاء يعيد الشركة إلى حالتها السابقة تماماً.',
+      'company.delete.recovery.blocked_download': 'المحو بانتظار تنزيل النسخة لأنه لم يُسلّم بريد.',
+      'company.delete.recovery.purge_now': 'إكمال الحذف الآن',
+      'company.delete.recovery.cancel': 'إلغاء الحذف',
+      'company.delete.recovery.footnote': 'بعد انتهاء النافذة وتسليم النسخة، يجري المحو ويُكتب سجل تدقيق نهائي.',
+      'company.delete.recovery.ready': 'النسخة جاهزة.',
+      'company.delete.window.due': 'جاهز للإكمال',
+      'company.delete.window.remaining_days': 'بقي {days} يوماً و{hours} ساعة',
+      'company.delete.window.remaining_hours': 'بقي {hours} ساعة',
+      'company.delete.email.sent': 'أُرسلت إلى {recipient}.',
+      'company.delete.email.not_configured': 'البريد غير مهيأ على هذا النشر. استخدم التنزيل.',
+      'company.delete.email.unverified': 'حسابك المسجل لا يملك بريداً موثّقاً، لذلك لم يُرسل بريد. استخدم التنزيل.',
+      'company.delete.email.failed': 'تعذر إرسال البريد. استخدم التنزيل.',
+      'company.delete.email.too_large': 'النسخة أكبر من أن تُرسل بالبريد. استخدم التنزيل.',
+      'company.delete.email.not_sent': 'لم يُرسل أي بريد بعد.',
+      'company.delete.downloaded': 'نُزّل {filename}.',
+      'company.delete.done.title': 'اكتمل الحذف',
+      'company.delete.done.body': 'مُحيت بيانات الشركة بعد تسليم نسختها.',
+      'company.delete.done.removed': 'أُزيلت صفوف الشركة وملفاتها المخزنة.',
+      'company.delete.done.kept': 'بقي الأثر الأدنى وسجل التدقيق فقط.',
+      'company.delete.done.audit': 'يسجل السجل النهائي الطلب والسبب والوقت.',
+      'company.delete.cancelled.title': 'أُلغي الحذف',
+      'company.delete.cancelled.body': 'أُلغي طلب الحذف قبل المحو. لم تُحذف أي بيانات للشركة.',
+      'company.delete.cancelled.restored': 'عادت الشركة إلى حالتها السابقة: {status}.',
+      'company.delete.cancel.action': 'إلغاء هذا الحذف',
+      'company.delete.status.awaiting_name': 'بانتظار اسم الشركة',
+      'company.delete.status.awaiting_identity': 'بانتظار هويتك',
+      'company.delete.status.exporting': 'جارٍ إعداد النسخة',
+      'company.delete.status.pending_deletion': 'بانتظار نافذة الاستعادة',
+      'company.delete.status.completed': 'اكتمل الحذف',
+      'company.delete.status.cancelled': 'أُلغي الحذف',
+      'company.delete.error.title': 'لم تكتمل هذه الخطوة',
+      'company.delete.error.generic': 'تعذر إكمال الإجراء. لم يُحذف شيء.',
+      'company.delete.error.forbidden': 'فقط المالك أو مسؤول شركة مسموح له يمكنه حذف شركة. لا يستطيع الوكيل حذف شركة أبداً.',
+      'company.delete.error.request': 'تعذر بدء الحذف.',
+      'company.delete.error.name': 'تعذر تأكيد اسم الشركة.',
+      'company.delete.error.name_mismatch': 'الاسم غير مطابق تماماً. اكتبه مرة أخرى مع المسافات.',
+      'company.delete.error.identity': 'تعذر تأكيد هويتك.',
+      'company.delete.error.mfa_missing': 'التحقق بخطوتين مطلوب لكن لا يوجد مدقق مهيأ على هذا النشر. لم يُحذف شيء. على المالك تهيئة تطبيق مصادقة أولاً.',
+      'company.delete.error.mfa_required': 'أدخل رمز التحقق بخطوتين من تطبيق المصادقة.',
+      'company.delete.error.password': 'كلمة المرور غير صحيحة. لم يُحذف شيء.',
+      'company.delete.error.export': 'تعذر إعداد النسخة. لم يُمحَ شيء.',
+      'company.delete.error.offline': 'أنت غير متصل. أعد الاتصال وحاول مجدداً.',
+      'company.delete.error.download': 'تعذر تنزيل النسخة. لم يُمحَ شيء.',
+      'company.delete.error.purge': 'تعذر تنفيذ المحو. لم يُحذف شيء.',
+      'company.delete.error.cancel': 'تعذر إلغاء الحذف. ما زال في حالته السابقة.',
+      'company.delete.error.deliver_first': 'نزّل النسخة قبل إكمال المحو.',
+      'company.delete.error.window_active': 'نافذة الاستعادة لم تنتهِ بعد.',
+      'company.delete.error.code_wrong': 'رمز التحقق بخطوتين غير صالح. تحقق من ساعة الجهاز الذي يحمل التطبيق ثم جرّب الرمز التالي.',
+      'company.delete.error.mfa_locked': 'رموز خاطئة كثيرة، لذا التحقق بخطوتين مقفل لبضع دقائق. لم يُحذف شيء.',
+      'company.delete.error.mfa_not_enrolled': 'يجب تهيئة التحقق بخطوتين قبل حذف هذه الشركة. لم يُحذف شيء.',
+      'company.delete.error.mfa_already': 'التحقق بخطوتين مفعّل بالفعل لهذا الحساب.',
+      'company.revenue.period.daily': 'يومي',
+      'company.revenue.period.weekly': 'أسبوعي',
+      'company.revenue.period.monthly': 'شهري',
+      'company.revenue.period.quarterly': 'ربع سنوي',
+      'company.revenue.period.annual': 'سنوي',
+      'company.revenue.period.one_time': 'مرة واحدة',
+
+      'format.lakh': ' لك',
+      'format.crore': ' كر',
+      'format.thousand': ' ألف'
+    }
+  };
+
+  const listeners = new Set();
+  let language = 'en';
+
+  function normaliseLanguage(value) {
+    const raw = String(value || '').toLowerCase().split('-')[0];
+    return SUPPORTED.indexOf(raw) >= 0 ? raw : 'en';
+  }
+
+  function readStoredLanguage() {
+    try {
+      return localStorage.getItem(STORAGE_KEY);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeStoredLanguage(value) {
+    try {
+      localStorage.setItem(STORAGE_KEY, value);
+    } catch (err) {
+      // Private mode / blocked storage: keep the in-memory choice.
+    }
+  }
+
+  function lookup(dict, key) {
+    if (!key) return '';
+    if (Object.prototype.hasOwnProperty.call(dict, key)) return dict[key];
+    // Allow a flat dictionary to be addressed with dotted keys.
+    const parts = String(key).split('.');
+    let node = dict;
+    for (const part of parts) {
+      if (node && typeof node === 'object' && Object.prototype.hasOwnProperty.call(node, part)) {
+        node = node[part];
+      } else {
+        return '';
+      }
+    }
+    return typeof node === 'string' ? node : '';
+  }
+
+  function interpolate(text, vars) {
+    if (!vars || typeof text !== 'string') return text;
+    return text.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
+      const value = vars[name];
+      return value === undefined || value === null ? match : String(value);
+    });
+  }
+
+  function t(key, vars) {
+    const current = DICTIONARIES[language] || DICTIONARIES.en;
+    const fallback = DICTIONARIES.en;
+    const value = lookup(current, key) || lookup(fallback, key) || key;
+    return interpolate(value, vars);
+  }
+
+  function dirFor(lang) {
+    return lang === 'ar' ? 'rtl' : 'ltr';
+  }
+
+  function apply(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    if (!scope || !scope.querySelectorAll) return;
+
+    scope.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    scope.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+      el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+    });
+    scope.querySelectorAll('[data-i18n-title]').forEach((el) => {
+      el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+    });
+    scope.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+    });
+  }
+
+  function setLanguage(next, options) {
+    const value = normaliseLanguage(next);
+    const changed = value !== language;
+    language = value;
+    writeStoredLanguage(value);
+
+    const html = document.documentElement;
+    if (html) {
+      html.setAttribute('lang', value);
+      html.setAttribute('dir', dirFor(value));
+    }
+
+    apply(document);
+    listeners.forEach((fn) => {
+      try {
+        fn(value, dirFor(value));
+      } catch (err) {
+        console.warn('[I18n] listener failed', err);
+      }
+    });
+
+    if (changed && options && options.announce === false) return value;
+    document.dispatchEvent(new CustomEvent('zonata:languagechange', { detail: { language: value, dir: dirFor(value) } }));
+    return value;
+  }
+
+  function onLanguageChange(fn) {
+    if (typeof fn !== 'function') return () => {};
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+
+  function getLanguage() {
+    return language;
+  }
+
+  function getDir() {
+    return dirFor(language);
+  }
+
+  function locale() {
+    if (activeLocale) return activeLocale;
+    return language === 'ar' ? 'ar-IN' : 'en-IN';
+  }
+
+  function numberLocale() {
+    if (numberFormat === 'international') return 'en-US';
+    if (numberFormat === 'continental') return 'de-DE';
+    return language === 'ar' ? 'ar-IN' : 'en-IN';
+  }
+
+  function currencyName(code) {
+    const key = String(code || '').toUpperCase();
+    if (CURRENCY_NAMES[key]) return CURRENCY_NAMES[key];
+    try {
+      const names = new Intl.DisplayNames([locale()], { type: 'currency' });
+      return names.of(key) || key;
+    } catch (err) {
+      return key;
+    }
+  }
+
+  /**
+   * Apply real server preferences without overriding an explicit language
+   * choice the person already made in this browser.
+   */
+  function configure(options) {
+    const opts = options || {};
+    if (opts.locale) activeLocale = String(opts.locale);
+    if (opts.numberFormat) {
+      const raw = String(opts.numberFormat).toLowerCase();
+      if (raw === 'continental' || raw.indexOf('100.000') === 0) numberFormat = 'continental';
+      else if (raw === 'international' || raw.indexOf('100,000') === 0) numberFormat = 'international';
+      else if (raw === 'indian' || raw.indexOf('1,00,000') === 0) numberFormat = 'indian';
+    }
+    if (opts.currencyDisplay) {
+      const raw = String(opts.currencyDisplay).toLowerCase();
+      if (raw === 'iso' || raw.indexOf('iso code') === 0) currencyDisplay = 'iso';
+      else if (raw === 'name' || raw === 'full' || raw.indexOf('full name') === 0) currencyDisplay = 'name';
+      else if (raw === 'symbol' || raw.indexOf('symbol') === 0) currencyDisplay = 'symbol';
+    }
+
+    if (opts.language && !readStoredLanguage()) {
+      setLanguage(opts.language, { announce: false });
+    } else {
+      const html = document.documentElement;
+      if (html) {
+        html.setAttribute('lang', language);
+        html.setAttribute('dir', dirFor(language));
+      }
+      apply(document);
+    }
+
+    document.dispatchEvent(new CustomEvent('zonata:preferenceschange', {
+      detail: getPreferences()
+    }));
+    return getPreferences();
+  }
+
+  function getPreferences() {
+    return {
+      language,
+      locale: activeLocale,
+      numberFormat,
+      currencyDisplay,
+      direction: dirFor(language)
+    };
+  }
+
+  /** Load and apply the tenant/company preferences from the real API. */
+  async function loadPreferences(companyId) {
+    if (typeof fetch !== 'function') return null;
+    const query = companyId ? `?company_id=${encodeURIComponent(companyId)}` : '';
+    try {
+      const res = await fetch(`/api/v1/companies/preferences${query}`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!res || !res.ok) return null;
+      const data = await res.json();
+      const prefs = data && data.preferences ? data.preferences : data;
+      if (!prefs) return null;
+      window.ZONATA_PREFERENCES = prefs;
+      configure({
+        language: prefs.language,
+        locale: prefs.locale,
+        numberFormat: prefs.number_format && prefs.number_format.id,
+        currencyDisplay: prefs.currency && prefs.currency.display
+      });
+      return prefs;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function formatNumber(value, options) {
+    const n = Number(value);
+    const safe = Number.isFinite(n) ? n : 0;
+    try {
+      return new Intl.NumberFormat(numberLocale(), options || {}).format(safe);
+    } catch (err) {
+      return String(safe);
+    }
+  }
+
+  function formatCurrency(amount, currency, options) {
+    const code = String(currency || 'INR').toUpperCase();
+    const opts = options || {};
+    const n = Number(amount);
+    const safe = Number.isFinite(n) ? n : 0;
+
+    if (opts.compact) {
+      return formatCompactCurrency(safe, code);
+    }
+
+    const display = opts.display || currencyDisplay;
+    const maximumFractionDigits = opts.maximumFractionDigits === undefined ? 0 : opts.maximumFractionDigits;
+    const minimumFractionDigits = opts.minimumFractionDigits === undefined ? 0 : opts.minimumFractionDigits;
+
+    if (display === 'iso' || display === 'name') {
+      const prefix = display === 'name' ? currencyName(code) : code;
+      return `${prefix} ${formatNumber(safe, { maximumFractionDigits, minimumFractionDigits })}`;
+    }
+
+    try {
+      return new Intl.NumberFormat(numberLocale(), {
+        style: 'currency',
+        currency: code,
+        maximumFractionDigits,
+        minimumFractionDigits
+      }).format(safe);
+    } catch (err) {
+      return `${code} ${formatNumber(safe, opts)}`;
+    }
+  }
+
+  function currencySymbol(code) {
+    try {
+      const parts = new Intl.NumberFormat(numberLocale(), { style: 'currency', currency: code, maximumFractionDigits: 0 })
+        .formatToParts(0);
+      const symbol = parts.find((part) => part.type === 'currency');
+      return symbol ? symbol.value : code;
+    } catch (err) {
+      return code === 'INR' ? '₹' : code;
+    }
+  }
+
+  /**
+   * Indian compact notation: 1,00,000 -> 1 L, 1,00,00,000 -> 1 Cr.
+   * Non-INR currencies fall back to the locale's compact notation.
+   */
+  function formatCompactCurrency(amount, currency) {
+    const code = String(currency || 'INR').toUpperCase();
+    const n = Number(amount);
+    const safe = Number.isFinite(n) ? n : 0;
+    const sign = safe < 0 ? '-' : '';
+    const abs = Math.abs(safe);
+    const symbol = currencySymbol(code);
+
+    if (code === 'INR') {
+      if (abs >= 1e7) {
+        const value = abs / 1e7;
+        return `${sign}${symbol}${formatNumber(value, { maximumFractionDigits: value >= 10 ? 0 : 1 })}${t('format.crore')}`;
+      }
+      if (abs >= 1e5) {
+        const value = abs / 1e5;
+        return `${sign}${symbol}${formatNumber(value, { maximumFractionDigits: value >= 10 ? 0 : 1 })}${t('format.lakh')}`;
+      }
+      if (abs >= 1e3) {
+        return `${sign}${symbol}${formatNumber(abs / 1e3, { maximumFractionDigits: 0 })}${t('format.thousand')}`;
+      }
+      return `${sign}${symbol}${formatNumber(abs, { maximumFractionDigits: 0 })}`;
+    }
+
+    try {
+      return new Intl.NumberFormat(locale(), {
+        style: 'currency',
+        currency: code,
+        notation: 'compact',
+        maximumFractionDigits: 1
+      }).format(safe);
+    } catch (err) {
+      return `${sign}${symbol}${formatNumber(abs, { notation: 'compact', maximumFractionDigits: 1 })}`;
+    }
+  }
+
+  function init() {
+    const stored = readStoredLanguage();
+    language = normaliseLanguage(stored || 'en');
+    const html = document.documentElement;
+    if (html) {
+      html.setAttribute('lang', language);
+      html.setAttribute('dir', dirFor(language));
+    }
+    apply(document);
+    return language;
+  }
+
+  window.I18n = {
+    SUPPORTED,
+    t,
+    apply,
+    init,
+    configure,
+    loadPreferences,
+    getPreferences,
+    setLanguage,
+    getLanguage,
+    getDir,
+    onLanguageChange,
+    formatNumber,
+    formatCurrency,
+    formatCompactCurrency,
+    locale
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+})();

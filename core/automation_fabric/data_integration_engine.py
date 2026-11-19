@@ -26,7 +26,7 @@ import hashlib
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, Any, List, Optional, Tuple, Callable, Union
 from dataclasses import dataclass, field, asdict
 
 from core.db import db
@@ -616,10 +616,18 @@ class SyncCheckpointManager:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO automation_sync_checkpoints (
+                INSERT INTO automation_sync_checkpoints (
                     tenant_id, stream_name, connector_id, cursor_value, cursor_type,
                     records_synced, last_sync_timestamp, content_checksum, status, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tenant_id, stream_name, connector_id) DO UPDATE SET
+                    cursor_value = EXCLUDED.cursor_value,
+                    cursor_type = EXCLUDED.cursor_type,
+                    records_synced = EXCLUDED.records_synced,
+                    last_sync_timestamp = EXCLUDED.last_sync_timestamp,
+                    content_checksum = EXCLUDED.content_checksum,
+                    status = EXCLUDED.status,
+                    metadata = EXCLUDED.metadata
                 """,
                 (
                     tenant_id, s_name, c_id, c_val, c_type,

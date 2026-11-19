@@ -236,7 +236,16 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         if shutil.which("podman"):
             return "podman"
         if shutil.which("bwrap"):
-            return "bubblewrap"
+            try:
+                probe = subprocess.run(
+                    ["bwrap", "--ro-bind", "/", "/", "--bind", "/tmp", "/tmp", "--unshare-all", "true"],
+                    capture_output=True,
+                    timeout=2.0
+                )
+                if probe.returncode == 0:
+                    return "bubblewrap"
+            except Exception:
+                pass
         return None
 
     def provision(self, session_id: str, profile: RuntimeProfile, workspace: str) -> Dict[str, Any]:
@@ -283,29 +292,39 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
         exec_env.update(caller_env)
         exec_env["ZONATA_CONTAINER_ISOLATION"] = "LEVEL_2"
 
-        # Check if container engine is missing on host
-        if not engine:
-            is_prod = _is_production_environment()
-            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
-            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
-            if not allow_host:
-                msg = (
-                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
-                    if is_prod else
-                    "Execution Rejected: Container engine unavailable on host (container sandbox unavailable; checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
-                )
-                return {
-                    "exit_code": 126,
-                    "stdout": "",
-                    "stderr": msg,
-                    "timed_out": False,
-                    "degraded": True,
-                    "engine": "NONE",
-                    "sandbox_failure": True,
-                    "duration_ms": (time.time() - start) * 1000
-                }
+        # Centralized Security Policy Boundary: Evaluate production mode and isolation invariants first
+        is_prod = _is_production_environment()
+        strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+        host_requested = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")
 
-            # Governed fallback to host sandbox with honest audit flag
+        # 1. Reject host shell execution in production mode under all circumstances (even if Docker is present)
+        if host_requested and is_prod:
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested.",
+                "timed_out": False,
+                "degraded": True,
+                "engine": "NONE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
+
+        # 2. Reject host shell execution when strict isolation is required
+        if host_requested and strict_isolation:
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": "Execution Rejected: Host shell execution is strictly prohibited when strict isolation is required.",
+                "timed_out": False,
+                "degraded": True,
+                "engine": "NONE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
+
+        # 3. Explicit host shell opt-in (only allowed in non-production, non-strict isolation)
+        if host_requested:
             exec_env["ZONATA_CONTAINER_DEGRADED_FALLBACK"] = "1"
             try:
                 proc = subprocess.run(
@@ -336,6 +355,24 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
                     "duration_ms": (time.time() - start) * 1000
                 }
 
+        # 4. Normal container execution: Check if container engine is missing on host
+        if not engine:
+            msg = (
+                "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                if is_prod else
+                "Execution Rejected: Container engine unavailable on host (container sandbox unavailable; checked: docker, podman, bwrap). Unrestricted host-shell fallback is strictly prohibited."
+            )
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": msg,
+                "timed_out": False,
+                "degraded": True,
+                "engine": "NONE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
+
         # Engine is present: run via real engine
         if engine == "bubblewrap":
             full_cmd = f"bwrap --ro-bind / / --bind {cwd} {cwd} --unshare-all {command}"
@@ -355,6 +392,17 @@ class ContainerRuntimeAdapter(BaseRuntimeAdapter):
                 text=True,
                 timeout=timeout_sec
             )
+            if proc.returncode != 0 and ("bwrap:" in proc.stderr or "docker:" in proc.stderr or "podman:" in proc.stderr):
+                return {
+                    "exit_code": 126,
+                    "stdout": proc.stdout,
+                    "stderr": f"Execution Rejected: Container sandbox failure: {proc.stderr.strip()}",
+                    "timed_out": False,
+                    "engine": engine,
+                    "degraded": True,
+                    "sandbox_failure": True,
+                    "duration_ms": (time.time() - start) * 1000
+                }
             return {
                 "exit_code": proc.returncode,
                 "stdout": proc.stdout,
@@ -457,30 +505,39 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
         has_virt = vm_info.get("has_virtualization", False)
         profile = vm_info.get("profile")
 
-        # If hardware virtualization is absent on this host
         caller_env = (env or {}).copy()
-        if not has_virt:
-            is_prod = _is_production_environment()
-            strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
-            allow_host = ((os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")) and not is_prod and not strict_isolation
-            if not allow_host:
-                msg = (
-                    "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
-                    if is_prod else
-                    "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited."
-                )
-                return {
-                    "exit_code": 126,
-                    "stdout": "",
-                    "stderr": msg,
-                    "timed_out": False,
-                    "degraded": True,
-                    "isolation": "KVM_UNAVAILABLE",
-                    "sandbox_failure": True,
-                    "duration_ms": (time.time() - start) * 1000
-                }
+        is_prod = _is_production_environment()
+        strict_isolation = (os.environ.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"]) or (caller_env.get("STRICT_ISOLATION_REQUIRED") in ["1", "true", "True"])
+        host_requested = (os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1") or (caller_env.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1")
 
-            # Governed disposable sandbox fallback
+        # 1. Reject host shell execution in production mode under all circumstances (even if KVM is present)
+        if host_requested and is_prod:
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested.",
+                "timed_out": False,
+                "degraded": True,
+                "isolation": "KVM_UNAVAILABLE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
+
+        # 2. Reject host shell execution when strict isolation is required
+        if host_requested and strict_isolation:
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": "Execution Rejected: Host shell execution is strictly prohibited when strict isolation is required.",
+                "timed_out": False,
+                "degraded": True,
+                "isolation": "KVM_UNAVAILABLE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
+
+        # 3. Explicit host shell opt-in fallback
+        if host_requested:
             exec_env = os.environ.copy()
             exec_env.update(caller_env)
             exec_env["ZONATA_VM_DEGRADED_FALLBACK"] = "1"
@@ -512,6 +569,24 @@ class VMRuntimeAdapter(BaseRuntimeAdapter):
                     "degraded": True,
                     "duration_ms": (time.time() - start) * 1000
                 }
+
+        # 4. If hardware virtualization is absent on this host
+        if not has_virt:
+            msg = (
+                "Execution Rejected: Host shell execution is strictly prohibited in production mode even if override is requested."
+                if is_prod else
+                "Execution Rejected: Hardware-assisted virtualization (/dev/kvm) unavailable on host. MicroVM isolation cannot be satisfied and host execution is prohibited."
+            )
+            return {
+                "exit_code": 126,
+                "stdout": "",
+                "stderr": msg,
+                "timed_out": False,
+                "degraded": True,
+                "isolation": "KVM_UNAVAILABLE",
+                "sandbox_failure": True,
+                "duration_ms": (time.time() - start) * 1000
+            }
 
         # Real VM execution
         exec_env = os.environ.copy()

@@ -1,6 +1,6 @@
 # ZONATA / URA — GitHub CI/CD & Enterprise Release Process
 
-This document describes the 7-stage automated delivery pipeline implemented in [`.github/workflows/ci_cd.yml`](file:///root/roboassistant/.github/workflows/ci_cd.yml).
+This document describes the 7-stage automated delivery pipeline implemented in [`.github/workflows/ci_cd.yml`](../../.github/workflows/ci_cd.yml).
 
 ---
 
@@ -48,7 +48,7 @@ This document describes the 7-stage automated delivery pipeline implemented in [
 - **Suite 4:** Adversarial Security and Multi-Tenant Isolation Suites.
 
 ### Stage 3: Security & Supply Chain
-- **SBOM Generation:** Generates `docs/cyclonedx_sbom.json` via [`SecureSupplyChainController`](file:///root/roboassistant/core/secure_supply_chain.py).
+- **SBOM Generation:** Generates `docs/cyclonedx_sbom.json` via [`SecureSupplyChainController`](../../core/secure_supply_chain.py).
 - **License Screening:** Checks all components against the OSI-approved whitelist (`Apache-2.0`, `MIT`, `BSD-3-Clause`, `BSD-2-Clause`, `ISC`).
 - **Vulnerability Gate:** Evaluates CVE thresholds; halts on unresolved High/Critical CVEs.
 

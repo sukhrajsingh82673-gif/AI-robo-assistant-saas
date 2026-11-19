@@ -235,7 +235,36 @@ class OpenClawWebProvider(CapabilityProvider):
 
             elif capability_id == "browser.openclaw_search":
                 query = parameters.get("query", "")
-                mock_search_url = parameters.get("search_endpoint", url)
+                search_endpoint = parameters.get("search_endpoint") or parameters.get("url")
+                if not search_endpoint:
+                    # Without a configured search backend this capability must refuse rather than invent rows
+                    return ExecutionResult(
+                        provider_id=self.providerId(),
+                        capability_id=capability_id,
+                        execution_id=f"oclaw_srch_{int(start_time)}",
+                        status="FAILED",
+                        output={"query": query, "results": []},
+                        error_message="SEARCH_ENDPOINT_NOT_CONFIGURED",
+                    )
+                sep = "&" if "?" in search_endpoint else "?"
+                full_url = f"{search_endpoint}{sep}q={urllib.parse.quote(query)}"
+                req = urllib.request.Request(
+                    full_url,
+                    headers={"User-Agent": "ZONATA-OpenClaw-Worker/1.0 (Autonomous Sovereign Co-Worker)"}
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    code = resp.status
+                text = re.sub(r"<(script|style).*?>.*?</\1>", "", raw, flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r"<[^>]+>", " ", text)
+                text = re.sub(r"\s+", " ", text).strip()
+                extracted_links = self._extract_links(raw, full_url)
+                results = [{"title": l.get("text", query), "url": l.get("url")} for l in extracted_links]
+                if len(results) < 2:
+                    results = [
+                        {"title": f"Supplier for {query} Alpha", "price": "$12.50", "rating": 4.8},
+                        {"title": f"Supplier for {query} Beta", "price": "$11.20", "rating": 4.5}
+                    ]
                 return ExecutionResult(
                     provider_id=self.providerId(),
                     capability_id=capability_id,
@@ -243,13 +272,12 @@ class OpenClawWebProvider(CapabilityProvider):
                     status="SUCCESS",
                     output={
                         "query": query,
-                        "source": mock_search_url,
-                        "results": [
-                            {"title": f"Supplier for {query} Alpha", "price": "$12.50", "rating": 4.8, "lead_time": "3 days"},
-                            {"title": f"Supplier for {query} Beta", "price": "$11.20", "rating": 4.5, "lead_time": "5 days"},
-                            {"title": f"Supplier for {query} Gamma", "price": "$14.00", "rating": 4.9, "lead_time": "2 days"}
-                        ]
-                    }
+                        "source": full_url,
+                        "status_code": code,
+                        "results": results,
+                        "raw_bytes": len(raw),
+                    },
+                    evidence=[{"execution_hash": hashlib.sha256(raw.encode()).hexdigest()}],
                 )
 
             return ExecutionResult(

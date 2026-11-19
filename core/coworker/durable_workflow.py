@@ -150,9 +150,16 @@ class CoworkerDurableWorkflowEngine:
         vars_dict = initial_variables or {}
         with self._conn_context() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO coworker_workflow_instances 
+                INSERT INTO coworker_workflow_instances 
                 (workflow_id, tenant_id, title, current_state, current_step_index, variables_json, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workflow_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    title = EXCLUDED.title,
+                    current_state = EXCLUDED.current_state,
+                    current_step_index = EXCLUDED.current_step_index,
+                    variables_json = EXCLUDED.variables_json,
+                    updated_at = EXCLUDED.updated_at
             """, (workflow_id, self.tenant_id, title, WorkflowStepState.PENDING.value, 0, json.dumps(vars_dict), now, now))
             conn.commit()
         return {

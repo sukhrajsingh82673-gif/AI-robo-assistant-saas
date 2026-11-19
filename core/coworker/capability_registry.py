@@ -96,11 +96,11 @@ class CapabilityRegistry:
             estimated_cost=0.0,
             determinism_level=DeterminismLevel.DETERMINISTIC,
             reproducibility_level=ReproducibilityLevel.EXACT,
-            health_status=ProviderHealthStatus.AVAILABLE,
+            health_status=ProviderHealthStatus.DEGRADED,
             availability_status="AVAILABLE",
-            installation_status="INSTALLED",
-            runtime_status="RUNNABLE",
-            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            installation_status="NOT_INSTALLED",
+            runtime_status="BLOCKED_EXTERNAL_DEPENDENCY",
+            qualification_status=QualificationStatus.BLOCKED_EXTERNAL_DEPENDENCY,
             evidence_requirements=["execution_log"]
         ))
 
@@ -134,7 +134,9 @@ class CapabilityRegistry:
             availability_status="AVAILABLE",
             installation_status="INSTALLED",
             runtime_status="RUNNABLE",
-            qualification_status=QualificationStatus.REAL_PRODUCTION_QUALIFIED,
+            # Pointer dispatch is real on X11, but element targeting comes from a
+            # seeded perception tree, so this is not fully production qualified.
+            qualification_status=QualificationStatus.PARTIALLY_QUALIFIED,
             evidence_requirements=["execution_log", "output_hash"]
         ))
 

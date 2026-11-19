@@ -25,7 +25,9 @@ class ProductionConfigValidator:
 
     FORBIDDEN_DEV_SECRETS = {
         "changeme", "password", "admin", "123456", "secret",
-        "dev_key", "test_key", "default", "replace_with_secure_password"
+        "dev_key", "test_key", "default", "replace_with_secure_password",
+        "zonata_secure_prod_password_2026", "zonata_minio_secret_password_2026",
+        "zonata_admin_password_2026", "replace_with_"
     }
 
     @classmethod
@@ -43,7 +45,7 @@ class ProductionConfigValidator:
         Raises ConfigurationError if in production and invalid.
         """
         env = env_vars if env_vars is not None else dict(os.environ)
-        current_env = env.get("ZONATA_ENV", "development").lower().strip()
+        current_env = (env.get("ZONATA_ENV") or env.get("APP_ENV") or "development").lower().strip()
         errors: List[str] = []
         warnings: List[str] = []
 
@@ -77,13 +79,55 @@ class ProductionConfigValidator:
                 db_url = env.get("DATABASE_URL", "")
                 if not db_url:
                     errors.append("DATABASE_URL must be specified when DATABASE_DIALECT is postgresql.")
-                elif any(bad in db_url.lower() for bad in cls.FORBIDDEN_DEV_SECRETS):
-                    errors.append("DATABASE_URL contains an insecure default password.")
+                else:
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(db_url)
+                    db_pwd = parsed.password or ""
+                    db_user = parsed.username or ""
+                    if any(bad in db_pwd.lower() for bad in cls.FORBIDDEN_DEV_SECRETS) or any(bad in db_url.lower() for bad in ("zonata_secure_prod_password_2026", "replace_with_")):
+                        errors.append("DATABASE_URL contains an insecure default password.")
+                    if (db_user in ("zonata_admin", "postgres", "admin", "root") or "://zonata_admin:" in db_url or "://postgres:" in db_url) and env.get("ZONATA_ALLOW_SUPERUSER_DB", "0") != "1":
+                        errors.append("DATABASE_URL violates least privilege: superuser role ('zonata_admin' or 'postgres') prohibited for application runtime in production. Use 'zonata_app'.")
+
+                    try:
+                        min_pool = int(env.get("DATABASE_MIN_POOL_SIZE", "5"))
+                        max_pool = int(env.get("DATABASE_MAX_POOL_SIZE", "20"))
+                        if min_pool < 1:
+                            errors.append(f"DATABASE_MIN_POOL_SIZE ({min_pool}) must be at least 1.")
+                        if max_pool < 1:
+                            errors.append(f"DATABASE_MAX_POOL_SIZE ({max_pool}) must be at least 1.")
+                        if min_pool > max_pool:
+                            errors.append(f"DATABASE_MIN_POOL_SIZE ({min_pool}) cannot exceed DATABASE_MAX_POOL_SIZE ({max_pool}).")
+                    except ValueError:
+                        errors.append("DATABASE_MIN_POOL_SIZE and DATABASE_MAX_POOL_SIZE must be valid integers.")
 
             # 5. Ingress CORS check
             cors = env.get("ALLOWED_ORIGINS", "")
             if cors == "*":
                 errors.append("ALLOWED_ORIGINS cannot be '*' wildcard in production.")
+
+            # 6. Network Ingress & TLS Verification
+            tls_cert = env.get("TLS_CERT_PATH", "")
+            tls_key = env.get("TLS_KEY_PATH", "")
+            behind_proxy = env.get("ZONATA_BEHIND_INGRESS_PROXY", "0") == "1"
+            require_tls = env.get("ZONATA_REQUIRE_TLS", "0") == "1"
+
+            if require_tls and not behind_proxy and not (tls_cert and tls_key):
+                errors.append("TLS enforcement active (ZONATA_REQUIRE_TLS=1) but neither TLS certificates (TLS_CERT_PATH, TLS_KEY_PATH) nor ZONATA_BEHIND_INGRESS_PROXY=1 are configured.")
+            if tls_cert and not os.path.exists(tls_cert):
+                errors.append(f"TLS_CERT_PATH specified ('{tls_cert}') but certificate file does not exist on disk.")
+            if tls_key and not os.path.exists(tls_key):
+                errors.append(f"TLS_KEY_PATH specified ('{tls_key}') but private key file does not exist on disk.")
+
+            # 7. Production Observability & Alerting Rules Verification (BLK-05)
+            prom_rules_path = env.get("PROMETHEUS_RULES_PATH", "config/prometheus_rules.yml")
+            if os.path.isabs(prom_rules_path):
+                rule_file = prom_rules_path
+            else:
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                rule_file = os.path.join(base_dir, prom_rules_path)
+            if not os.path.exists(rule_file):
+                errors.append(f"Prometheus alert rules file missing at '{prom_rules_path}' (BLK-05). Production requires verified alerting rules.")
 
         if errors:
             raise ConfigurationError(f"Production Configuration Validation Failed:\n" + "\n".join(f" - {e}" for e in errors))

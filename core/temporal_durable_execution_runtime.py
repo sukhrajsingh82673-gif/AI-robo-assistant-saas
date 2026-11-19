@@ -584,7 +584,8 @@ class TemporalDurableExecutionGateway:
     def __init__(self, tenant_id: str = "tnt_primary", company_id: str = "comp_primary"):
         self.tenant_id = tenant_id
         self.company_id = company_id
-        self.ledger = EvidenceLedger()
+        from core.tenancy import tenant_ledger_path
+        self.ledger = EvidenceLedger(tenant_ledger_path(tenant_id))
         self.verification_engine = TemporalVerificationEngine(tenant_id, company_id)
         self.saga_coordinator = SagaCompensationCoordinator(tenant_id, company_id)
         self._ensure_tenant_and_company()
@@ -956,10 +957,19 @@ class TemporalDurableExecutionGateway:
             if not row:
                 return None
             d = dict(row)
-            d["input_payload"] = json.loads(d["input_payload"] or "{}")
-            d["result_payload"] = json.loads(d["result_payload"] or "{}") if d["result_payload"] else None
-            d["execution_budget"] = json.loads(d["execution_budget"] or "{}") if d["execution_budget"] else {}
-            d["resource_usage"] = json.loads(d["resource_usage"] or "{}") if d["resource_usage"] else {}
+            def _safe_json(val, default):
+                if val is None:
+                    return default
+                if isinstance(val, (dict, list)):
+                    return val
+                try:
+                    return json.loads(val or "{}")
+                except Exception:
+                    return default
+            d["input_payload"] = _safe_json(d.get("input_payload"), {})
+            d["result_payload"] = _safe_json(d.get("result_payload"), None)
+            d["execution_budget"] = _safe_json(d.get("execution_budget"), {})
+            d["resource_usage"] = _safe_json(d.get("resource_usage"), {})
             return d
 
     # -------------------------------------------------------------------------
@@ -1255,12 +1265,25 @@ class TemporalDurableExecutionGateway:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO temporal_workers (
+                INSERT INTO temporal_workers (
                     worker_id, tenant_id, company_id, task_queue, capability_scope,
                     status, runtime_version, worker_version, supported_activities,
                     max_concurrent_activities, max_concurrent_workflows, heartbeat_at,
                     created_at, metadata
                 ) VALUES (?, ?, ?, ?, ?, 'ONLINE', ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (worker_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    task_queue = EXCLUDED.task_queue,
+                    capability_scope = EXCLUDED.capability_scope,
+                    status = EXCLUDED.status,
+                    runtime_version = EXCLUDED.runtime_version,
+                    worker_version = EXCLUDED.worker_version,
+                    supported_activities = EXCLUDED.supported_activities,
+                    max_concurrent_activities = EXCLUDED.max_concurrent_activities,
+                    max_concurrent_workflows = EXCLUDED.max_concurrent_workflows,
+                    heartbeat_at = EXCLUDED.heartbeat_at,
+                    metadata = EXCLUDED.metadata
                 """,
                 (worker_id, self.tenant_id, self.company_id, task_queue,
                  json.dumps(capability_scope), ZONATA_DURABLE_RUNTIME_VERSION,

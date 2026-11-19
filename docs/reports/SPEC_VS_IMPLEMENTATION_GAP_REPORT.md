@@ -1,0 +1,410 @@
+# Coworker 2.0 — Spec vs Implementation Gap Report
+
+Spec source: *URA / ZONATA Autonomous Coworker 2.0 — CEO-Directed Autonomous
+Execution, Desktop Intelligence, Tool Discovery, and Cybersecurity Operations*
+(16 sections, held at `/tmp/opencode/spec.txt`, extracted from the Antigravity
+conversation of 2026-11-04).
+
+Reviewed: 2026-11-06
+Scope: §1–§16 of the spec against the code currently on `main`.
+Status vocabulary: **Verified** · **Implemented-unverified** · **Partial** ·
+**Blocked** · **Not implemented** · **Failed**
+
+A status is only **Verified** when a reproducible command or retained artefact
+backs it. "Tests pass" alone is not treated as proof of real-world execution.
+
+---
+
+## Summary table
+
+| § | Area | Status | One-line reason |
+|---|---|---|---|
+| 1 | Primary objective (CEO-directed autonomous execution) | Partial | Pipeline exists end-to-end; full unattended autonomy not exercised |
+| 2 | Authority and command structure | Verified | Policy, approval, kill-switch and tenant gates enforced and tested |
+| 3 | Five-level decision engine | Partial | L1/L2/L4/L5 real; L3 discovery has no live web/GitHub research |
+| 4 | Advanced desktop computer-use | Partial | 14 primitives dispatch real X11 input; real window tree via `xwininfo`; interactive elements still seeded, no OCR/AT-SPI |
+| 5 | OpenDots integration | Not implemented | No verifiable OpenDots artefact; shim now labelled honestly |
+| 6 | Specialised agent factory | Verified | Ephemeral subworkers inherit scope, parallel execution, tests pass |
+| 7 | Storage and resource management | Verified | Workspace tracking, cleanup manifests, protected paths, download/installation manifests and an ownership gate are implemented and tested |
+| 8 | Autonomous cybersecurity defence | Partial | Real AST/secret/entropy scans; no exploit testing or automated response |
+| 9 | CEO task queue and idle management | Verified | 12 states enforced; idle now runs the real defence patrol (throttled) |
+| 10 | CEO reporting and evidence | Verified | All required report fields present; Merkle ledger sealed |
+| 11 | Mobile/desktop UI redesign | Implemented-unverified | Code present in `web/`; no browser-level verification on this host |
+| 12 | Privacy and data security | Verified (unit) | Firewall, vault, tenant isolation tested; no live multi-tenant pilot |
+| 13 | Technical implementation requirements | Verified | Free/embedded stack only; SQLite + Postgres migration path |
+| 14 | Testing and acceptance | Partial | Broad suites pass; browser E2E, JS/CDP and containers blocked |
+| 15 | Implementation discipline | Verified | No-fabrication policy applied; over-claims corrected below |
+| 16 | Final engineering delivery report | Partial | Reality audit + this report exist; release remains restricted pilot |
+
+---
+
+## Coworker 3.0 addendum (reviewed 2026-11-07)
+
+Commits `420de6a` and `0e34643` added a 3.0 layer on top of the 2.0 spec. It is
+not part of the original 16 sections, so it is assessed separately here.
+
+| Subsystem | File | Status | Evidence / limit |
+|---|---|---|---|
+| Hermes session runtime | `core/coworker/hermes_agent_v3.py` | Partial | Session lifecycle + SQLite memory verified; **in-process**, not a subprocess supervisor. Without `HERMES_API_ENDPOINT` it reports `LLM_UNAVAILABLE`; the deterministic rule engine may still route tool calls, labelled `RULE_ENGINE_ONLY`. |
+| Local inference | `core/coworker/local_inference_adapter.py` | Partial | No language model is present. `LocalModelEngine` is a keyword router (`is_language_model: False`, id `zonata-rules-v1`); `available` is only True for a real Ollama/OpenAI-compatible endpoint. A rule-only turn returns `RULE_ENGINE_ONLY`, `available=False` and a factual tool-result digest. |
+| Hermes tool dispatch | same | Verified | `terminal_exec` runs real commands under `TerminalSecurityGateway`, without a shell; higher-risk classes return `AUTHORIZATION_REQUIRED`; delegation returns `ACTION_NOT_IMPLEMENTED`. |
+| OpenCode engineering loop | `core/coworker/opencode_engine.py` | Partial | Real worktrees, file writes, `git diff`, pytest exit codes, AST review. Repair requires a supplied `repair_fn`; without one it refuses (`AUTOMATED_REPAIR_BACKEND_NOT_CONFIGURED`). |
+| OpenCloud remote workers | `core/coworker/opencloud_engine.py` | Implemented-unverified | Real authenticated HTTP `/dispatch` and failover; no remote node is registered on this host, so dispatch returns `BLOCKED_BY_EXTERNAL_DEPENDENCY`. |
+| Agent cloud registry | `core/coworker/agent_cloud_registry.py` | Verified (catalog) | 5,000 logical identities in SQLite and a 16-thread bounded pool verified. These are **identities**, not 5,000 processes. |
+| OpenDots engine | `core/coworker/opendots_engine.py` | Partial | Real `scrot` capture and `xdotool`/`wmctrl` queries when `DISPLAY` is set; labels `HEADLESS_SIMULATED` otherwise. Grounding remains heuristic. |
+| Escalation router | `core/coworker/escalation_router.py` | Partial | Keyword triage, not root-cause analysis. Resolution is only `verified` when an independent `verification_fn` confirms it. |
+| Defence incidents | `core/coworker/defense_monitor.py` | Partial | Real `/proc` process and port scans. Recording an incident is `DETECTED`; `REMEDIATED` requires a host-state check function. |
+| Dashboard telemetry | `core/coworker/dashboard.py` | Verified (honest) | Every field is derived; with no cloud attached it reports `NOT_INITIALIZED` / `0`, and integrations report `LLM_UNAVAILABLE`, `NO_NODES_CONFIGURED`, `NO_DISPLAY`, etc. |
+| Web cockpit HUD | `web/assistant_coworker_workspace.js` | Implemented-unverified | HUD binds to live snapshot values; no browser on this host to exercise it. |
+| Capability lifecycle V3 | `core/coworker/capability_registry_v3.py` | Partial | 10 stages run: gap detection, catalogue lookup, AST/licence screen, sandbox write, subprocess test, register, subprocess execute, decommission. Unknown features return `NO_CANDIDATE_IN_CATALOG` instead of a generated stub, and untrusted source is never `exec`'d in-process. Approval is a security-score threshold, not a PolicyEngine decision. |
+| DLP credential broker | `core/coworker/dlp_channel_monitor.py` | Partial | Brokering refuses (`CREDENTIAL_BROKER_NOT_CONFIGURED`) unless a host-supplied authorization callback grants the request; the returned handle is an opaque reference. No real secret store is wired. |
+
+The 3.0 qualification reports at
+`docs/qualification/ZONATA_AUTONOMOUS_COWORKER_{2,3}_FINAL_OPERATIONAL_QUALIFICATION.md`
+carry correction notes for the claims that did not survive review.
+
+### Autonomy runtime addendum (reviewed 2026-11-07)
+
+The earlier layers were request-driven. `core/coworker/runtime_supervisor.py`
+adds a tenant-scoped scheduler so the engines advance without a caller.
+
+| Subsystem | Status | Evidence / limit |
+|---|---|---|
+| Autonomy supervisor | **Verified (single host)** | Live server: a mission submitted with `auto_step=false` advanced `20% → 50% → 80%` with no `/step` call, then stopped at `BLOCKED — deliverable generation failed` with an explicit reason. 12 tests cover eligibility, holds, kill switch, DoA approval and the process lock. |
+| Tenant auto-start | **Verified** | First access to `TenantRuntime.coworker` starts the scheduler; `ZONATA_COWORKER_AUTONOMY=0` or test mode disables it. |
+| KillSwitch gate | **Verified** | Supervisor returns `KILLSWITCH_HOLD` and does no work; `BackgroundMissionDispatcher` re-checks the matrix for direct step calls. Evaluation errors fail closed. |
+| Executive queue drain | **Verified (live)** | `POST /api/coworker/work-items` queued items; the next tick processed them without an external `/step` call (`queue_processed=1`, `queue_results` returned the item id, outcome and `objective_achieved=false`). The queue drained to `queue_depth=0`. |
+| DoA approvals | **Verified (live)** | A $50,000 item returned `AWAITING_APPROVAL` and appeared in `GET /api/coworker/approvals` as `DOA_APPROVAL`; `POST .../decide` with `APPROVE` re-queued it. The supervisor never approves it on its own. |
+| Security patrol | **Verified** | The first tick ran a real patrol (`24 findings`, `0 critical`, `0 high`) and the dashboard reports the same timestamp. |
+| Distributed exclusivity | **Partial** | The lock is host-local `flock`. Two API processes on one host cannot duplicate work; multiple hosts still can. A PostgreSQL advisory lock/lease is required before claiming distributed exclusivity. |
+
+The scheduler adds no new authority: it does not auto-approve, does not raise
+autonomy levels, and does not fabricate mission success. A mission without a
+usable language model is reported `BLOCKED`, not completed.
+
+**CEO bridge semantics (corrected 2026-11-07).** `execute_ceo_mission()` marks
+`execution_status=COMPLETED` when it has written a `MISSION_PLAN_RECORD` file and
+independently verified its SHA-256. That is a verified *pipeline record*, not
+proof that the business objective was achieved. The response now carries
+`final_outcome.objective_achieved=false` and the evidence metadata action is
+`CEO_MISSION_PLAN_RECORD_SEALED`; the autonomy queue surfaces the same flag in
+`queue_results`. Several pre-existing tests assert `COMPLETED` for the pipeline
+contract, so the status name was kept, but the user-facing wording no longer
+claims the objective was fulfilled.
+
+---
+
+## §1 Primary objective
+
+**Requirement:** AI CEO assigns work; the Coworker executes, verifies, reports.
+
+**What exists:** `core/coworker/ceo_coworker_bridge.py` (`execute_ceo_mission`),
+`core/coworker/orchestrator_v2.py`, `core/coworker/runtime_router.py`, and the
+per-capability providers.
+
+**Status:** Partial. The pipeline runs and reports, but an unattended multi-hour
+CEO mission has not been demonstrated. The bridge is exercised by tests, not by
+a live CEO session.
+
+---
+
+## §2 Authority and command structure
+
+**Requirement:** CEO authority flows down; Coworker never exceeds its mandate;
+human approval and kill switches are honoured.
+
+**Evidence:** `core/killswitch_matrix.py`, `core/approval_revocation.py`,
+`core/policy_engine.py`, `core/aic_ceo_constitution.py`, and the workforce
+API's role gates. Covered by `tests/test_v10_enterprise_production_unit.py`,
+`tests/test_coworker_constitution_and_workforce_api.py`.
+
+**Status:** Verified. Kill-switch activation now also increments
+`zonata_killswitch_activations_total` so the CRITICAL alert fires.
+
+---
+
+## §3 Five-level decision engine
+
+| Level | Requirement | Status |
+|---|---|---|
+| 1 | Use existing desktop capabilities | Verified — real POSIX/GUI dispatch |
+| 2 | Use existing ZONATA capabilities | Verified — capability registry + router |
+| 3 | Discover external tools | Partial — curated catalogue + admission pipeline only |
+| 4 | Download and install | Verified — isolated venv, real `pip install`, import smoke test |
+| 5 | Execute and verify | Verified — subprocess run, digest, independent verify, rollback |
+
+**Gap (Level 3):** `core/coworker/tool_discovery.py` seeds four known tools and
+runs a 9-stage admission pipeline over them. It does **not** search the web or
+GitHub for candidates, and it does not evaluate live maintenance or CVE data.
+Any claim of "intelligent web research" would be false today.
+
+**Gap (Level 4):** installation is real but always `pip` + venv. There is no
+container path and no non-Python installer.
+
+---
+
+## §4 Advanced desktop computer-use engine
+
+**Requirement:** 14 primitives, real input, verified results.
+
+**Evidence:** `core/coworker/computer_use_engine.py` dispatches `xdotool` and
+`wmctrl`; headless calls return `ACTION_NOT_IMPLEMENTED`. Real proof under
+Xvfb :99 + openbox: **19/19 checks**, typed text read back from a file, 5.4 KB
+real PNG. Artefacts: `/tmp/opencode/evidence/cue_x11_verification.json`,
+script `/tmp/opencode/verify_cue_x11.py`.
+
+A second proof covers window perception: `xwininfo -root -tree` is parsed into
+real windows with real geometry, and the Linux provider dispatches a click at a
+real window's centre. **14/14 checks**, evidence
+`/tmp/opencode/evidence/x11_window_tree_verification.json`, script
+`/tmp/opencode/verify_x11_windows.py`.
+
+**Status:** Partial.
+
+- Input dispatch (click, type, key, hotkey, scroll, drag, window switch): verified.
+- Window perception: **real** top-level windows scraped from the X server
+  (`observe().window_elements`, `perception_source` =
+  `X11_WINDOW_TREE+SEEDED_ELEMENTS`). Unnamed windows and WM internals are
+  excluded; no window is invented when there is no display.
+- Interactive element perception (buttons, fields inside a window): still
+  **seeded**. `synthetic` remains true and every seeded element carries
+  `source: seeded_scene`. No tesseract, no AT-SPI.
+- `launch()` deliberately refuses with `APP_LAUNCH_REQUIRES_POLICY_GATEWAY`.
+
+---
+
+## §5 OpenDots integration
+
+**Requirement:** investigate, then integrate or document the limitation.
+
+**Status:** Not implemented, now documented honestly. Full assessment:
+`docs/architecture/OPENDOTS_INTEGRATION_ASSESSMENT.md`.
+
+`core/coworker/adapters/opendots_adapter.py` no longer advertises a
+`"OpenDots-Grounding-v1"` model or `REAL_PRODUCTION_QUALIFIED`. It returns
+`PERCEPTION_TREE` or `HEURISTIC_ANCHOR` and reports `model_name: None`.
+
+---
+
+## §6 Specialised agent factory
+
+**Requirement:** temporary specialists under Coworker authority, inherited
+scope, safe parallel execution.
+
+**Evidence:** `core/coworker/agent_factory_v2.py`,
+`core/coworker/subworkers_v2.py`. Unknown task IDs now create a least-privilege
+parent (`["read_only"]`, budget 5.0) instead of `["admin", "read_only"]`; scope
+matching is exact/namespace-root rather than substring.
+
+**Status:** Verified by `tests/test_coworker_v2_phase_a.py` and
+`tests/test_coworker_v2_comprehensive.py`.
+
+---
+
+## §7 Storage and resource management
+
+**Requirement:** check disk/RAM/CPU before work; track workspaces; download and
+installation manifests; monitoring; cleanup policy; ownership checks; never
+delete records, evidence, credentials or unknown files.
+
+**Implemented and verified:**
+
+- `core/coworker/resource_guard.py`: `check_host_resources` (disk, RAM),
+  `provision_mission_workspace`, `is_protected_path`, `safe_reclaim_resource`.
+- `CoworkerDbStoreV2` cleanup manifest + `execute_cleanups`.
+- Protected-path rules block `/root`, `/tmp`, the repository tree, databases and
+  evidence extensions.
+- `core/coworker/resource_manifests.py` adds the three §7 records that were
+  missing:
+  - **Download manifest** — URL, local path, byte count, SHA-256, task, mission,
+    timestamp. `verify_download()` re-hashes the file and reports
+    `DIGEST_MATCH` / `DIGEST_MISMATCH` / `FILE_MISSING`.
+  - **Installation manifest** — package, version, interpreter, venv path,
+    source, task, mission, smoke-test result. Written by the Level 4 provisioner
+    after a real `pip install` and import smoke test.
+  - **File ownership** — `register_ownership()` records the owning task for a
+    path (or directory); `can_reclaim()` refuses an unknown path
+    (`NO_OWNERSHIP_RECORD`) and refuses a path owned by a different task
+    (`OWNED_BY_ANOTHER_TASK`).
+- Cleanup enforces the ownership gate for `DIRECTORY`, `VENV` and `TEMP_FILE`
+  resources, so a task cannot delete another task's workspace.
+
+**Remaining limit:** installation is Python-only (`pip` + venv). There is no
+non-Python installer path and no container install path.
+
+**Status:** Verified by `tests/test_resource_manifests_and_window_tree.py` and
+the Coworker v2 resource-guard suites.
+
+---
+
+## §8 Autonomous cybersecurity defence mode
+
+**Implemented:** `core/coworker/defense_monitor.py` performs real AST checks
+(`eval`/`exec`/`__import__`), secret regex scans, entropy checks, dependency
+audit and endpoint audit; findings persist to the DB and are returned as
+structured patrol findings.
+
+**Gaps:**
+
+- No exploit or penetration testing, so "security testing" in the spec is not
+  met.
+- Threat response is limited to finding + notify; automated containment is only
+  the kill-switch matrix, invoked separately.
+- Dependency audit reads local manifests; it does not check live CVE feeds.
+
+**Status:** Partial.
+
+---
+
+## §9 CEO task queue and idle management
+
+**Implemented:** all 12 states with an explicit transition table
+(`core/coworker/contracts_v2.py`), leases with heartbeats, crash recovery,
+cleanup execution.
+
+**Change in this revision:** `run_idle_security_patrol()` now also runs
+`DefensiveCybersecurityMonitor.run_full_defensive_patrol()` when idle, throttled
+to one sweep per 900 s (`enable_defense_patrol`, `defense_patrol_interval_sec`).
+Previously the idle state performed only a stale-`/tmp` directory check, so
+§9's patrol requirement was effectively unwired.
+
+**Status:** Verified (`tests/test_coworker_v2_phase_b.py`).
+
+---
+
+## §10 CEO reporting and evidence
+
+**Implemented:** `AICeoExecutiveReport` in
+`core/coworker/evidence_reporting.py` carries every field the spec lists,
+including software installed, commands executed, files modified, external
+services, errors, recovery actions, verification, security findings, resource
+consumption and deliverables, with a Merkle evidence token.
+
+**Status:** Verified by construction and unit tests; the CEO dashboard renders
+the same structure.
+
+---
+
+## §11 Mobile and desktop UI redesign
+
+**Requirement:** remove duplicate floating AI shortcuts, keep one movable
+assistant, coworker navigation, chat-capable assistant backed by real context.
+
+**What exists:** `web/index.html`, `web/floating_assistant.js`,
+`web/assistant_coworker_workspace.js`, `web/ai_orb.js`.
+
+**Status:** Implemented-unverified. No Playwright/Chromium on this host, so the
+UI has not been exercised in a browser. Dragging, position persistence, touch
+scaling and the single-assistant rule are code-reviewed only.
+
+---
+
+## §12 Privacy and data security
+
+**Implemented:** `core/ai_data_firewall.py` (classification-based egress rules),
+`core/secret_vault.py`, tenant/company isolation in the schema, redaction in
+evidence outputs.
+
+**Status:** Verified at unit level. No live multi-tenant pilot has attempted
+cross-tenant access.
+
+---
+
+## §13 Technical implementation requirements
+
+Free/embedded infrastructure only. SQLite for development, PostgreSQL migration
+`migrations/pg/0005_workforce_architecture.sql` prepared. No paid services are
+required to run the stack.
+
+**Status:** Verified, with the Postgres path unexecuted (see §14).
+
+---
+
+## §14 Testing and acceptance
+
+Passing on this revision:
+
+- `tests/test_coworker_runtimes_hermes_openclaw.py` — 14 passed
+- `tests/test_final_gap_closure_and_opensource.py` — 18 passed
+- `tests/test_coworker_production_qualification.py` — 22 passed
+- `tests/test_v10_enterprise_production_unit.py` — 22 passed
+- Coworker v2 comprehensive + phase A + phase B — see run log
+  `/tmp/opencode/run_coworker_v2.log` (individual tests are slow; ~30 s each)
+
+**Blocked acceptance items:**
+
+| Item | Blocker |
+|---|---|
+| Browser interaction E2E, JS/CDP eval, browser screenshots | No Playwright/Chromium |
+| Container-isolated command execution (OpenHands) | No Docker; gateway refuses host execution |
+| OCR / AT-SPI element perception | No tesseract, Pillow, pytesseract, pyatspi |
+| Live PostgreSQL suite, migration 0005 | No PostgreSQL server |
+| OpenAdapt workflow execution | `openadapt` not installed |
+
+---
+
+## §15 Implementation discipline
+
+Applied throughout: no fabricated success, no invented search results, no
+simulated installs.
+
+### Simulated layers found and removed in this pass
+
+| File | Was | Now |
+|---|---|---|
+| `providers/desktop_native_providers.py` | Invented accessibility trees, clicks and text readback; `SUCCESS`, confidence 0.99 | Linux window/input routes to `ComputerUseEngine`; unavailable perception returns `FAILED` with an explicit reason |
+| `providers/playwright_provider.py` | Plausible titles for non-HTTP URLs, invented supplier rows, fake clicks/types/screenshots, always `SUCCESS` | Real HTTP fetch only; `BROWSER_ENGINE_NOT_AVAILABLE`, `NO_PAGE_CONTENT`, `UNSUPPORTED_URL_SCHEME` refusals; `rendered` reports whether JS ran |
+| `providers/openclaw_provider.py` | Invented three suppliers for any search | Refuses with `SEARCH_ENDPOINT_NOT_CONFIGURED`; real fetch when an endpoint is configured |
+| `runtimes/openclaw_runtime.py` | Fake `ev_claw_ok` evidence and `completed: True` | Delegation refuses with `OPENCLAW_AGENT_RUNTIME_NOT_CONFIGURED` |
+| `runtimes/openhands_runtime.py` | "Simulated governed workspace clean state" | Real gateway writes/commands; failure reasons surfaced |
+| `runtimes/hermes_runtime.py` | Fabricated plan when no LLM | `LLM_UNAVAILABLE`; MCP calls go through `MCPGateway` |
+| `runtimes/browser_runtime.py` | Claimed rendering for static fetches | Real HTTP status/bytes; `rendered: False`; JS/screenshot refuse |
+| `runtimes/computer_use_runtime.py` | Status-string success | Delegates to the real engine, reports `executed` |
+| `providers/computer_use_open_source.py` | Headless actions "succeeded" | `FAILED` + `READY_FOR_REMOTE_NODE`; launch requires the policy gateway |
+| `providers/openadapt_provider.py` | "Deterministic workflow execution" | `ADAPTER_ONLY` refusal unless `openadapt` is importable |
+| `universal_worker_contract.py` | `SUCCESS` with no backend | `FAILED` + `NO_EXECUTION_BACKEND` |
+| `providers/web_scraping_family.py` | Invented 200-status pages during crawl | Real fetch; per-URL `FAILED` records |
+| `adapters/opendots_adapter.py` | Claimed a `REAL_PRODUCTION_QUALIFIED` model | `NOT_A_MODEL`, heuristic/tree labels only |
+| `capability_registry.py` | `desktop.accessibility_tree` claimed production-qualified | `BLOCKED_EXTERNAL_DEPENDENCY`; click downgraded to `PARTIALLY_QUALIFIED` |
+
+Additionally, three alert metrics that were defined but never incremented are
+now driven by real events:
+
+- `zonata_killswitch_activations_total` — `KillSwitchMatrix.activate`
+- `zonata_reconciliation_drift_total` — `reconcile_action` on `DRIFTED`
+- `zonata_budget_exhaustions_total` — `CostGovernor` on hard-limit breach
+
+Verified by `test_10b_alert_metrics_wired_to_real_events`
+(`tests/test_v10_enterprise_production_unit.py`).
+
+---
+
+## §16 Final engineering delivery report
+
+**Status:** Partial. `ZONATA_AUTONOMOUS_COWORKER_2_PRODUCTION_REALITY_AUDIT.md`
+and this report together constitute the delivery record. The release remains a
+**restricted production pilot**, not public GA: the blocked items in §14 are
+prerequisites for a broader claim.
+
+---
+
+## Remaining gaps (ordered by risk)
+
+1. **Interactive perception is seeded, not observed.** Top-level windows are
+   real, but buttons and fields inside them are not. Any workflow that depends
+   on finding a control by appearance is unreliable. Needs AT-SPI on Linux, UIA
+   on Windows, AX on macOS.
+2. **Browser automation is HTTP-only here.** DOM interaction, JS execution and
+   screenshots need Playwright + Chromium in the deployment image.
+3. **Level 3 discovery is a catalogue, not research.** Needs a governed search
+   adapter with allow-lists and licence/CVE checks before it can be called
+   intelligent discovery.
+4. **Installation is Python-only.** Level 4 supports `pip` + venv; there is no
+   non-Python installer or container install path.
+5. **OpenHands command execution requires a container runtime.** Without it the
+   agent can write files but cannot run tests.
+6. **§11 UI unverified in a browser.**
+7. **Two `AuthorityLevel` enums coexist** (`core.models` vs
+   `core.aic_ceo_constitution`), deliberately left un-renamed to avoid
+   colliding with parallel work; both now carry collision docstrings.
+8. **Live PostgreSQL migration 0005 unexecuted.**

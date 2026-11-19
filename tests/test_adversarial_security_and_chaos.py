@@ -9,7 +9,7 @@ import time
 import uuid
 import json
 import os
-from core.db import db
+from core.db import db, configure_isolated_test_db
 from core.auth import UserManager, UserRole, AuthExceptions, TokenRevocationStore, AuthorizationEnforcer
 from core.agent_factory_runtime import (
     GovernedAgentFactory, GovernedToolFactory,
@@ -30,10 +30,20 @@ from core.temporal_durable_execution_runtime import (
 class TestAdversarialSecurityAndChaos(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.test_db_path = configure_isolated_test_db()
         cls.tenant_id = "tnt_primary"
         cls.victim_tenant = f"tnt_victim_{uuid.uuid4().hex[:6]}"
         cls.company_id = "comp_primary"
         cls.ledger = EvidenceLedger("storage/evidence/test_audit_ledger.jsonl")
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?)",
+                (cls.tenant_id, "Primary Test Tenant", time.time())
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO companies (company_id, tenant_id, name, industry, company_type, status, created_at) VALUES (?, ?, ?, 'TECH', 'EXISTING', 'OPERATIONAL', ?)",
+                (cls.company_id, cls.tenant_id, "Primary Test Company", time.time())
+            )
 
     def test_01_tenant_spoofing_defense(self):
         """Attacker possesses valid token for tenant A, attempts mutation on tenant B."""
@@ -148,11 +158,14 @@ class TestAdversarialSecurityAndChaos(unittest.TestCase):
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO temporal_workers (
+                INSERT INTO temporal_workers (
                     worker_id, tenant_id, company_id, task_queue, capability_scope,
                     status, runtime_version, worker_version, supported_activities,
                     max_concurrent_activities, max_concurrent_workflows, heartbeat_at, created_at, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (worker_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    heartbeat_at = EXCLUDED.heartbeat_at
                 """,
                 (
                     stalled_id, self.tenant_id, self.company_id, "q_high", "DEFAULT",

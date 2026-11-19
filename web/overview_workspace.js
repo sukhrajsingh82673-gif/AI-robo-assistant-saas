@@ -34,6 +34,14 @@
 
       const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
 
+      const token = localStorage.getItem('zonata_auth_token');
+      if (!token) {
+        console.warn('[OverviewWorkspace] Unauthenticated access attempted. Directing to auth.');
+        if (typeof clearSession === 'function') clearSession();
+        if (typeof renderApp === 'function') renderApp();
+        return;
+      }
+
       this.isLoading = true;
       this.renderLoading(container);
 
@@ -44,7 +52,18 @@
 
         const res = await fetch(`/api/overview/snapshot?${queryParams.toString()}`);
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: Failed to fetch executive overview snapshot`);
+          if (res.status === 401) {
+            console.warn('[OverviewWorkspace] Unauthorized 401. Re-authenticating session...');
+            if (typeof clearSession === 'function') clearSession();
+            if (typeof renderApp === 'function') renderApp();
+            return;
+          }
+          let errDetail = '';
+          try {
+            const errJson = await res.json();
+            errDetail = errJson.detail || errJson.error || '';
+          } catch(e) {}
+          throw new Error(errDetail || `HTTP ${res.status}: Failed to fetch executive overview snapshot`);
         }
         this.snapshot = await res.json();
         this.error = null;
@@ -90,12 +109,15 @@
       container.innerHTML = `
         <div class="overview-state-panel error">
           <div class="state-icon">⚠️</div>
-          <h3>Intelligence Service Offline</h3>
+          <h3>Intelligence Service Connection</h3>
           <p>${escapeHtml(errorMsg)}</p>
-          <div style="margin-top:16px;">
+          <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
             <button class="btn-primary" onclick="window.OverviewWorkspace.render()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Retry Connection
+            </button>
+            <button class="btn-secondary" onclick="if(window.CurrentCompanyContext){ CurrentCompanyContext.setCompanyId(null); } window.OverviewWorkspace.render();">
+              Switch to Portfolio View
             </button>
           </div>
         </div>
@@ -107,9 +129,9 @@
         <div class="overview-state-panel">
           <div class="state-icon">🏢</div>
           <h3>No Company Data Available</h3>
-          <p>Connect your first company or select a valid operating entity to view intelligence.</p>
+          <p>Add your first company or select a valid operating entity to view intelligence.</p>
           <div style="margin-top:16px;">
-            <button class="btn-primary" onclick="if(window.CompanyWorkspace) window.CompanyWorkspace.startOnboarding('new')">
+            <button class="btn-primary" onclick="if(window.navigateTo) window.navigateTo('/company/add'); else window.location.hash='#/company/add';">
               + Add Company
             </button>
           </div>
@@ -123,73 +145,108 @@
 
       container.innerHTML = `
         <div class="overview-production-page">
-          <!-- 1. EXECUTIVE HEADER -->
-          ${this.renderHeaderHtml(snap, isPortfolio)}
+          <!-- 0. APPLE-GRADE CEO COMMAND CENTER COCKPIT -->
+          <div id="ceo-command-center-slot" style="margin-bottom:36px;"></div>
 
-          <!-- 2. EXECUTIVE KPI STRIP -->
-          ${this.renderKpiStripHtml(snap)}
+          <!-- COLLAPSIBLE DETAILED ANALYTICAL INTELLIGENCE -->
+          <div style="border-top:1px solid var(--separator); padding-top:24px; margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h3 class="t-headline" style="color:var(--label); margin:0;">Deep Analytical Ledger & Subsystems</h3>
+                <p class="t-caption" style="color:var(--label-2); margin-top:2px;">Audit trail, risk matrices, telemetry, and raw subsystem status</p>
+              </div>
+              <button class="btn-apple btn-apple-secondary spring-press"
+                      id="toggleDetailedAnalyticsBtn"
+                      onclick="OverviewWorkspace.toggleDetailedAnalytics()"
+                      style="font-size:13px; padding:6px 14px;">
+                Show Deep Analytics ↓
+              </button>
+            </div>
 
-          <!-- 3. PRIMARY EXECUTIVE PERFORMANCE VISUALIZATION -->
-          ${this.renderPrimaryChartHtml(snap)}
+            <div id="detailedAnalyticsContent" style="display:none;">
+              <!-- 1. EXECUTIVE HEADER -->
+              ${this.renderHeaderHtml(snap, isPortfolio)}
 
-          <!-- 4. EXECUTIVE ATTENTION CENTER -->
-          ${this.renderAttentionCenterHtml(snap)}
+              <!-- 2. EXECUTIVE KPI STRIP -->
+              ${this.renderKpiStripHtml(snap)}
 
-          <!-- 5. FINANCIAL & SALES INTELLIGENCE (Level 3) -->
-          <div class="overview-grid-2col">
-            ${this.renderFinancialPositionHtml(snap)}
-            ${this.renderSalesIntelligenceHtml(snap)}
+              <!-- 3. PRIMARY EXECUTIVE PERFORMANCE VISUALIZATION -->
+              ${this.renderPrimaryChartHtml(snap)}
+
+              <!-- 4. EXECUTIVE ATTENTION CENTER -->
+              ${this.renderAttentionCenterHtml(snap)}
+
+              <!-- 5. FINANCIAL & SALES INTELLIGENCE (Level 3) -->
+              <div class="overview-grid-2col">
+                ${this.renderFinancialPositionHtml(snap)}
+                ${this.renderSalesIntelligenceHtml(snap)}
+              </div>
+
+              <!-- 6. CUSTOMER & MARKETING ANALYTICS -->
+              <div class="overview-grid-2col">
+                ${this.renderCustomerAnalyticsHtml(snap)}
+                ${this.renderMarketingAnalyticsHtml(snap)}
+              </div>
+
+              <!-- 7. OPERATIONS & WORKFORCE INTELLIGENCE (Level 4) -->
+              <div class="overview-grid-2col">
+                ${this.renderOperationsIntelligenceHtml(snap)}
+                ${this.renderWorkforceIntelligenceHtml(snap)}
+              </div>
+
+              <!-- 8. MISSION CAUSALITY & RISK EXPOSURE -->
+              <div class="overview-grid-2col">
+                ${this.renderMissionIntelligenceHtml(snap)}
+                ${this.renderRiskExposureHtml(snap)}
+              </div>
+
+              <!-- 9. TECHNOLOGY & DATA QUALITY TRUST INDICATOR -->
+              <div class="overview-grid-2col">
+                ${this.renderTechnologyInfrastructureHtml(snap)}
+                ${this.renderDataQualityHtml(snap)}
+              </div>
+
+              <!-- 9b. GOVERNED INTEROPERABILITY (MCP - Section 48) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderMcpLayerHtml(snap)}
+              </div>
+
+              <!-- 9c. GOVERNED AGENT EXECUTION (OpenHands - Section 49) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderOpenHandsLayerHtml(snap)}
+              </div>
+
+              <!-- 9d. GOVERNED BROWSER EXECUTION (Browser Use - Section 80) -->
+              <div style="margin-bottom: 20px;">
+                ${this.renderBrowserLayerHtml(snap)}
+              </div>
+
+              <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
+              <div class="overview-grid-2col">
+                ${this.renderExecutiveInsightsHtml(snap)}
+                ${this.renderAnomaliesHtml(snap)}
+              </div>
+
+              <!-- 11. PORTFOLIO PERFORMANCE & COMPARISON (Portfolio Mode Only) -->
+              ${isPortfolio ? this.renderPortfolioSectionHtml(snap) : ''}
+            </div>
           </div>
-
-          <!-- 6. CUSTOMER & MARKETING ANALYTICS -->
-          <div class="overview-grid-2col">
-            ${this.renderCustomerAnalyticsHtml(snap)}
-            ${this.renderMarketingAnalyticsHtml(snap)}
-          </div>
-
-          <!-- 7. OPERATIONS & WORKFORCE INTELLIGENCE (Level 4) -->
-          <div class="overview-grid-2col">
-            ${this.renderOperationsIntelligenceHtml(snap)}
-            ${this.renderWorkforceIntelligenceHtml(snap)}
-          </div>
-
-          <!-- 8. MISSION CAUSALITY & RISK EXPOSURE -->
-          <div class="overview-grid-2col">
-            ${this.renderMissionIntelligenceHtml(snap)}
-            ${this.renderRiskExposureHtml(snap)}
-          </div>
-
-          <!-- 9. TECHNOLOGY & DATA QUALITY TRUST INDICATOR -->
-          <div class="overview-grid-2col">
-            ${this.renderTechnologyInfrastructureHtml(snap)}
-            ${this.renderDataQualityHtml(snap)}
-          </div>
-
-          <!-- 9b. GOVERNED INTEROPERABILITY (MCP - Section 48) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderMcpLayerHtml(snap)}
-          </div>
-
-          <!-- 9c. GOVERNED AGENT EXECUTION (OpenHands - Section 49) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderOpenHandsLayerHtml(snap)}
-          </div>
-
-          <!-- 9d. GOVERNED BROWSER EXECUTION (Browser Use - Section 80) -->
-          <div style="margin-bottom: 20px;">
-            ${this.renderBrowserLayerHtml(snap)}
-          </div>
-
-          <!-- 10. AI-GENERATED EXECUTIVE INSIGHTS & ANOMALIES (Level 5) -->
-          <div class="overview-grid-2col">
-            ${this.renderExecutiveInsightsHtml(snap)}
-            ${this.renderAnomaliesHtml(snap)}
-          </div>
-
-          <!-- 11. PORTFOLIO PERFORMANCE & COMPARISON (Portfolio Mode Only) -->
-          ${isPortfolio ? this.renderPortfolioSectionHtml(snap) : ''}
         </div>
       `;
+
+      const ceoSlot = document.getElementById('ceo-command-center-slot');
+      if (ceoSlot && window.CeoCommandCenter) {
+        window.CeoCommandCenter.render(ceoSlot, snap);
+      }
+    }
+
+    toggleDetailedAnalytics() {
+      const content = document.getElementById('detailedAnalyticsContent');
+      const btn = document.getElementById('toggleDetailedAnalyticsBtn');
+      if (!content || !btn) return;
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      btn.textContent = isHidden ? 'Hide Deep Analytics ↑' : 'Show Deep Analytics ↓';
     }
 
     // =========================================================================
@@ -371,7 +428,7 @@
         value: `${wf.total_workforce}`,
         change: `${wf.ai_workforce} AI • ${wf.human_workforce} Human`,
         changeDir: 'up',
-        meta: `${wf.workforce_utilization_pct || 80}% utilization`,
+        meta: wf.workforce_utilization_pct != null ? `${wf.workforce_utilization_pct}% utilization` : 'Utilization not measured',
         source: wf.source,
         updated: wf.last_updated,
         action: 'window.navigateTo("/workforce")'
@@ -1045,13 +1102,13 @@
             </div>
             <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Workforce Utilization">
               <span class="fin-stat-lbl">Capacity Utilization</span>
-              <span class="fin-stat-val text-emerald">${wf.workforce_utilization_pct || 80}%</span>
+              <span class="fin-stat-val text-emerald">${wf.workforce_utilization_pct != null ? wf.workforce_utilization_pct + '%' : 'n/a'}</span>
               <span class="fin-stat-meta text-secondary">${wf.active_workers} Active • ${wf.idle_workers} Idle</span>
             </div>
             <div class="fin-stat-box" onclick="window.navigateTo('/workforce')" style="cursor:pointer;" title="Inspect Capability Gaps">
               <span class="fin-stat-lbl">Capability Coverage</span>
-              <span class="fin-stat-val">${wf.capability_coverage ? wf.capability_coverage.coverage_pct : 75}%</span>
-              <span class="fin-stat-meta">Open Gaps: ${wf.capability_coverage ? wf.capability_coverage.open_gaps.length : 0}</span>
+              <span class="fin-stat-val">${wf.capability_coverage && wf.capability_coverage.coverage_pct != null ? wf.capability_coverage.coverage_pct + '%' : 'n/a'}</span>
+              <span class="fin-stat-meta">Open Gaps: ${wf.capability_coverage && wf.capability_coverage.open_gaps ? wf.capability_coverage.open_gaps.length : 0}</span>
             </div>
           </div>
 
@@ -1767,23 +1824,30 @@
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 800);
+      const h = rect.height > 0 ? rect.height : 320;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
 
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#64748b';
       ctx.font = '13px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(message, rect.width / 2, rect.height / 2);
+      ctx.fillText(message, w / 2, h / 2);
     }
 
     renderCanvasChart(canvas, dataPoints) {
+      if (!dataPoints || dataPoints.length === 0) {
+        this.drawEmptyChart(canvas, 'No records to visualize for this period.');
+        return;
+      }
+
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
+      const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 800);
+      const h = rect.height > 0 ? rect.height : 320;
 
       canvas.width = w * dpr;
       canvas.height = h * dpr;
@@ -2192,5 +2256,7 @@
       .replace(/'/g, '&#039;');
   }
 
+  window.escapeHtml = escapeHtml;
+  window.formatCompactNumber = formatCompactNumber;
   window.OverviewWorkspace = new OverviewWorkspaceManager();
 })();

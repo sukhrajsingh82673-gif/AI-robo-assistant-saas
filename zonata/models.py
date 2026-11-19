@@ -419,3 +419,65 @@ class CompetitorProfile:
             "confidence": self.confidence,
             "discovered_at": self.discovered_at
         }
+
+# --- 8. Triad Entity Contracts & Invariants ---
+
+class WorkforceTriadType(str, Enum):
+    AI_EMPLOYEE = "AI_EMPLOYEE"      # Permanent corporate identity, holds positions, DoA, SOPs, KRAs
+    AI_AGENT = "AI_AGENT"            # Ephemeral execution worker, leased via agent_leases
+    AI_COWORKER = "AI_COWORKER"      # Host desktop assistant, isolated from corporate DB
+
+@dataclass
+class TriadEntityContract:
+    triad_type: WorkforceTriadType
+    entity_id: str
+    tenant_id: str
+    company_id: str
+    is_autonomous_corporate: bool
+    can_hold_position: bool
+    can_hold_doa_authority: bool
+    requires_concurrency_lease: bool
+    host_desktop_isolated: bool
+
+    @classmethod
+    def create_ai_employee_contract(cls, employee_id: str, tenant_id: str, company_id: str) -> 'TriadEntityContract':
+        return cls(
+            triad_type=WorkforceTriadType.AI_EMPLOYEE,
+            entity_id=employee_id,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            is_autonomous_corporate=True,
+            can_hold_position=True,
+            can_hold_doa_authority=True,
+            requires_concurrency_lease=False,
+            host_desktop_isolated=False
+        )
+
+    @classmethod
+    def create_ai_agent_contract(cls, agent_id: str, tenant_id: str, company_id: str) -> 'TriadEntityContract':
+        return cls(
+            triad_type=WorkforceTriadType.AI_AGENT,
+            entity_id=agent_id,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            is_autonomous_corporate=False,
+            can_hold_position=False,
+            can_hold_doa_authority=False,
+            requires_concurrency_lease=True,
+            host_desktop_isolated=False
+        )
+
+    @classmethod
+    def create_ai_coworker_contract(cls, coworker_id: str, tenant_id: str, company_id: str) -> 'TriadEntityContract':
+        return cls(
+            triad_type=WorkforceTriadType.AI_COWORKER,
+            entity_id=coworker_id,
+            tenant_id=tenant_id,
+            company_id=company_id,
+            is_autonomous_corporate=False,
+            can_hold_position=False,
+            can_hold_doa_authority=False,
+            requires_concurrency_lease=False,
+            host_desktop_isolated=True
+        )
+

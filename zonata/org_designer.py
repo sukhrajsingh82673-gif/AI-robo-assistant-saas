@@ -243,11 +243,35 @@ class OrganizationDesignEngine:
                 {"role": "CTO", "title": "Chief Technology Officer", "focus": "Tooling, Engineering Automation & Machinery Maintenance"},
                 {"role": "CFO", "title": "Chief Financial Officer", "focus": "Procurement, Supply Chain Financing & Cost Accounting"}
             ]
-        elif "SAAS" in ind or "SOFTWARE" in ind or "TECH" in ind:
+        elif ("SAAS" in ind or "SOFTWARE" in ind or "TECH" in ind) and "FINTECH" not in ind and "BIOTECH" not in ind:
             return [
                 {"role": "CTO", "title": "Chief Technology Officer", "focus": "Engineering, Product Architecture, QA & Cloud Infrastructure"},
                 {"role": "CRO", "title": "Chief Revenue Officer", "focus": "SaaS Sales, Growth, Inbound Pipeline & Customer Retention"},
                 {"role": "CFO", "title": "Chief Financial Officer", "focus": "Unit Economics, Runway, ARR/MRR Metrics & Billing"}
+            ]
+        elif "HEALTHCARE" in ind or "BIOTECH" in ind or "PHARMA" in ind:
+            return [
+                {"role": "CMO", "title": "Chief Medical Officer", "focus": "Clinical Governance, Protocols, Patient Safety & Clinical Trials"},
+                {"role": "CRO", "title": "Chief Risk Officer", "focus": "Healthcare Compliance, Statutory Audits & Risk Controls"},
+                {"role": "CFO", "title": "Chief Financial Officer", "focus": "Medical Billing, Provider Payouts & Solvency"}
+            ]
+        elif "FINTECH" in ind or "FINANCIAL" in ind or "BANKING" in ind:
+            return [
+                {"role": "CFO", "title": "Chief Financial Officer", "focus": "Treasury Solvency, Capital Markets & Liquidity Buffers"},
+                {"role": "CRO", "title": "Chief Risk Officer", "focus": "Credit Risk, Volatility Stress-Testing & Solvency"},
+                {"role": "CISO", "title": "Chief Information Security Officer", "focus": "PCI-DSS Infrastructure, SecOps & Encryption"}
+            ]
+        elif "RETAIL" in ind or "ECOMMERCE" in ind:
+            return [
+                {"role": "COO", "title": "Chief Operating Officer", "focus": "Storefront Operations, Fulfillment & Warehousing"},
+                {"role": "CMO", "title": "Chief Marketing Officer", "focus": "Customer Acquisition, Ad ROAS & Brand Equity"},
+                {"role": "CFO", "title": "Chief Financial Officer", "focus": "Working Capital, Inventory Turns & Merchant Margins"}
+            ]
+        elif "LOGISTICS" in ind or "FREIGHT" in ind or "SUPPLY_CHAIN" in ind:
+            return [
+                {"role": "COO", "title": "Chief Operating Officer", "focus": "Fleet Dispatch, Route Operations & On-Time Delivery"},
+                {"role": "CSCO", "title": "Chief Supply Chain Officer", "focus": "Carrier Network, Intermodal Freight & Fuel Hedging"},
+                {"role": "CFO", "title": "Chief Financial Officer", "focus": "Freight Auditing, Accessorial Invoicing & Cash Flow"}
             ]
         else: # General Enterprise
             return [
@@ -336,7 +360,7 @@ class OrganizationDesignEngine:
                     systems_used=["ERP Finance", "Accounting Ledger"]
                 )
             ]
-        elif "SAAS" in ind or "SOFTWARE" in ind:
+        elif ("SAAS" in ind or "SOFTWARE" in ind) and "FINTECH" not in ind and "BIOTECH" not in ind:
             return [
                 DynamicDepartment(
                     id="dept_engineering",
@@ -373,6 +397,126 @@ class OrganizationDesignEngine:
                     responsibilities=["Support ticket SLA resolution", "Account onboarding health", "NPS tracking"],
                     processes=["Automated ticket triage", "Proactive customer check-in"],
                     systems_used=["Zendesk/Intercom", "Knowledge Base"]
+                )
+            ]
+        elif "HEALTHCARE" in ind or "BIOTECH" in ind or "PHARMA" in ind:
+            return [
+                DynamicDepartment(
+                    id="dept_clinical",
+                    name="Clinical Affairs & Patient Care",
+                    code="CLN",
+                    justification="Maintains patient care protocols, clinical scheduling, and trial safety.",
+                    responsibilities=["Clinical scheduling", "Trial safety oversight", "Protocol adherence"],
+                    processes=["Patient intake", "Clinical audit"],
+                    systems_used=["EHR System", "Clinical Portal"]
+                ),
+                DynamicDepartment(
+                    id="dept_compliance",
+                    name="Regulatory & Medical Compliance",
+                    code="CMP",
+                    justification="Monitors HIPAA, FDA filings, and statutory medical standards.",
+                    responsibilities=["HIPAA compliance tracking", "Audit logs review", "Safety escalation"],
+                    processes=["Compliance audit", "Incident reporting"],
+                    systems_used=["Audit Database", "Regulatory Feed"]
+                ),
+                DynamicDepartment(
+                    id="dept_finance",
+                    name="Medical Billing & Finance",
+                    code="FIN",
+                    justification="Handles medical claims, insurance billing, and provider settlements.",
+                    responsibilities=["Claims submission", "Provider payouts", "Revenue cycle"],
+                    processes=["Claims reconciliation", "Financial close"],
+                    systems_used=["Medical Billing ERP", "Bank Feeds"]
+                )
+            ]
+        elif "FINTECH" in ind or "FINANCIAL" in ind or "BANKING" in ind:
+            return [
+                DynamicDepartment(
+                    id="dept_treasury",
+                    name="Treasury & Capital Markets",
+                    code="TRY",
+                    justification="Manages reserve liquidity, capital adequacy ratios, and yield.",
+                    responsibilities=["Liquidity monitoring", "Capital adequacy", "Yield optimization"],
+                    processes=["Daily cash rebalancing", "Yield reporting"],
+                    systems_used=["Banking APIs", "Treasury Management"]
+                ),
+                DynamicDepartment(
+                    id="dept_risk",
+                    name="Risk Management & Solvency",
+                    code="RSK",
+                    justification="Executes credit risk models, volatility stress testing, and counterparty limits.",
+                    responsibilities=["Risk metric evaluation", "Stress testing", "Exposure monitoring"],
+                    processes=["Value-at-Risk modeling", "Limit signoff"],
+                    systems_used=["Risk Analytics Engine", "Ledger Feed"]
+                ),
+                DynamicDepartment(
+                    id="dept_compliance",
+                    name="Regulatory Compliance & AML",
+                    code="CMP",
+                    justification="Enforces FinCEN/SEC reporting, KYC/AML surveillance, and fraud detection.",
+                    responsibilities=["AML screening", "Regulatory filings", "Suspicious activity monitoring"],
+                    processes=["Transaction monitoring", "KYC audit"],
+                    systems_used=["AML Surveillance Engine", "Sanction Feeds"]
+                )
+            ]
+        elif "RETAIL" in ind or "ECOMMERCE" in ind:
+            return [
+                DynamicDepartment(
+                    id="dept_storefront",
+                    name="E-Commerce Storefront Operations",
+                    code="ECO",
+                    justification="Maintains online shopping catalog, payment gateway, and cart conversion.",
+                    responsibilities=["Catalog freshness", "Checkout conversion", "Gateway reliability"],
+                    processes=["Inventory sync", "Cart abandonment review"],
+                    systems_used=["Shopify/Commerce API", "Stripe"]
+                ),
+                DynamicDepartment(
+                    id="dept_fulfillment",
+                    name="Fulfillment & Warehousing",
+                    code="WMS",
+                    justification="Oversees order dispatch, pick-pack-ship SLAs, and return processing.",
+                    responsibilities=["Order turnaround", "Inventory counts", "RMA processing"],
+                    processes=["Dispatch wave release", "Stock audit"],
+                    systems_used=["WMS", "Carrier APIs"]
+                ),
+                DynamicDepartment(
+                    id="dept_marketing",
+                    name="Performance Marketing & Acquisition",
+                    code="MKT",
+                    justification="Manages paid customer acquisition, influencer campaigns, and ROAS.",
+                    responsibilities=["Campaign optimization", "Ad budget pacing", "Attribution"],
+                    processes=["Daily bid adjustment", "Creative testing"],
+                    systems_used=["Meta Ads", "Google Ads", "Analytics"]
+                )
+            ]
+        elif "LOGISTICS" in ind or "FREIGHT" in ind or "SUPPLY_CHAIN" in ind:
+            return [
+                DynamicDepartment(
+                    id="dept_freight",
+                    name="Fleet & Freight Dispatch",
+                    code="LOG",
+                    justification="Controls long-haul routing, load matching, and carrier dispatch.",
+                    responsibilities=["Route optimization", "Carrier rate negotiation", "On-time delivery"],
+                    processes=["Load dispatch", "ETA tracking"],
+                    systems_used=["TMS", "ELD Feed", "Telematics"]
+                ),
+                DynamicDepartment(
+                    id="dept_safety",
+                    name="Fleet Safety & DOT Compliance",
+                    code="SAF",
+                    justification="Enforces DOT hours-of-service, vehicle maintenance, and driver safety.",
+                    responsibilities=["Safety audits", "Vehicle inspection logs", "OSHA reporting"],
+                    processes=["Pre-trip check verification", "Incident investigation"],
+                    systems_used=["Fleet Safety Engine", "DOT Database"]
+                ),
+                DynamicDepartment(
+                    id="dept_finance",
+                    name="Freight Billing & Settlements",
+                    code="FIN",
+                    justification="Audits freight bills, carrier payouts, and fuel surcharge reconciliations.",
+                    responsibilities=["Freight audit", "Carrier settlement", "Accessorial review"],
+                    processes=["Invoice verification", "Settlement signoff"],
+                    systems_used=["Freight ERP", "Carrier Billing"]
                 )
             ]
         else:

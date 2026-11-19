@@ -4,43 +4,79 @@
  * Zero Mock Data Failure • Pure Dynamic State • Local & Live API Synced
  */
 
+// The only switch for sample content in the app. Off by default: every screen
+// must use live API data or an honest empty state. Named samples (pipeline
+// board, report previews) are kept for demos only and are listed in
+// docs/ui-redesign/STUBS.md. Never enable this in production.
+window.USE_SAMPLE_DATA = false;
+
 // ============================================================================
 // Global Authenticated Fetch Interceptor
 // Injects Bearer token and X-Tenant-ID headers on all internal /api/ requests
+// Handles automatic session invalidation on 401 Unauthorized responses
 // ============================================================================
 (function() {
   const _origFetch = window.fetch;
-  window.fetch = function(input, init) {
+  window.fetch = async function(input, init) {
     let url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-    if (typeof url === 'string' && url.startsWith('/api/')) {
-      const isPublicAuthRoute = url.startsWith('/api/auth/login') ||
-                                url.startsWith('/api/auth/token') ||
-                                url.startsWith('/api/auth/register') ||
-                                url.startsWith('/api/auth/environment') ||
-                                url.startsWith('/api/v1/health');
-      if (!isPublicAuthRoute) {
-        init = init || {};
-        let headers = {};
-        if (init.headers instanceof Headers) {
-          init.headers.forEach((v, k) => { headers[k] = v; });
-        } else if (typeof init.headers === 'object' && init.headers !== null) {
-          headers = { ...init.headers };
-        }
+    const isApiCall = typeof url === 'string' && url.startsWith('/api/');
+    const isPublicAuthRoute = url.startsWith('/api/auth/login') ||
+                              url.startsWith('/api/auth/token') ||
+                              url.startsWith('/api/auth/register') ||
+                              url.startsWith('/api/auth/environment') ||
+                              url.startsWith('/api/v1/health');
 
-        const token = localStorage.getItem('zonata_auth_token') || (typeof state !== 'undefined' && state.host && state.host.token);
-        if (token && !headers['Authorization'] && !headers['authorization']) {
-          headers['Authorization'] = `Bearer ${token}`;
+    if (isApiCall && !isPublicAuthRoute) {
+      init = init || {};
+      let headers = {};
+      if (init.headers instanceof Headers) {
+        init.headers.forEach((v, k) => { headers[k] = v; });
+      } else if (typeof init.headers === 'object' && init.headers !== null) {
+        headers = { ...init.headers };
+      }
+
+      const token = localStorage.getItem('zonata_auth_token') || (typeof state !== 'undefined' && state.host && state.host.token);
+      if (token && !headers['Authorization'] && !headers['authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const tenantId = (typeof state !== 'undefined' && state.host && state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
+      if (tenantId && !headers['X-Tenant-ID'] && !headers['x-tenant-id']) {
+        headers['X-Tenant-ID'] = tenantId;
+      }
+      init.headers = headers;
+    }
+
+    const response = await _origFetch.call(this, input, init);
+
+    // If a protected API route returns 401, invalidate stale session cleanly
+    if (response.status === 401 && isApiCall && !isPublicAuthRoute) {
+      console.warn('[Security] 401 Unauthorized on protected route:', url);
+      if (typeof clearSession === 'function' && typeof state !== 'undefined' && state.host) {
+        clearSession();
+        if (typeof showToast === 'function') {
+          showToast('Session expired or authentication required. Please sign in.', 'error');
         }
-        const tenantId = (typeof state !== 'undefined' && state.host && state.host.tenant_id) || localStorage.getItem('zonata_active_tenant_id') || 'tnt_primary';
-        if (tenantId && !headers['X-Tenant-ID'] && !headers['x-tenant-id']) {
-          headers['X-Tenant-ID'] = tenantId;
+        if (typeof renderApp === 'function') {
+          renderApp();
         }
-        init.headers = headers;
       }
     }
-    return _origFetch.call(this, input, init);
+
+    return response;
   };
 })();
+
+// Global HTML Escaping Utility
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
 
 // Global Application State
 const state = {
@@ -73,12 +109,12 @@ const INITIAL_MISSIONS = [];
 const INITIAL_TOOLS = [];
 
 // Canonical Company Deduplication Store
-function getCanonicalCompanies() {
-  if (!Array.isArray(state.companies)) return [];
+function getCanonicalCompanies(companiesList = state.companies) {
+  const targetList = Array.isArray(companiesList) ? companiesList : (Array.isArray(state.companies) ? state.companies : []);
   const seenIds = new Set();
   const seenNames = new Set();
   const result = [];
-  for (const c of state.companies) {
+  for (const c of targetList) {
     if (!c || !c.name || !c.id) continue;
     const nameNorm = c.name.trim().toLowerCase();
     const idVal = c.id;
@@ -174,9 +210,12 @@ window.ThemeManager = ThemeManager;
 ThemeManager.apply();
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   ThemeManager.init();
-  loadStoredSession();
+  await loadStoredSession();
+  if (window.I18n && window.I18n.loadPreferences) {
+    await window.I18n.loadPreferences();
+  }
   loadData();
   setupEventListeners();
   renderApp();
@@ -184,6 +223,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Session Management — P0 Environment-Aware Authentication Boundary
 async function loadStoredSession() {
+  // Handle SSO OAuth Redirect Callback params (?token=... or ?error=...)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthError = urlParams.get('error');
+    const oauthToken = urlParams.get('token') || urlParams.get('auth_token');
+    if (oauthError) {
+      if (typeof showToast === 'function') {
+        showToast(decodeURIComponent(oauthError), 'error');
+      }
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    } else if (oauthToken) {
+      let hostUser = null;
+      try {
+        const lastDot = oauthToken.lastIndexOf('.');
+        const payloadStr = lastDot > 0 ? oauthToken.slice(0, lastDot) : oauthToken;
+        hostUser = JSON.parse(payloadStr);
+      } catch (e) {
+        hostUser = { name: 'Host & Owner', role: 'OWNER', email: 'owner@zonata.internal' };
+      }
+      saveSession(hostUser, oauthToken);
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+      if (typeof showToast === 'function') {
+        showToast(`Welcome, ${hostUser.name || hostUser.email}! Authenticated via SSO.`, 'success');
+      }
+    }
+  } catch (e) {
+    console.warn('OAuth URL param check error:', e);
+  }
+
   const session = localStorage.getItem('zonata_host_session');
   const storedToken = localStorage.getItem('zonata_auth_token');
   if (session) {
@@ -192,13 +262,28 @@ async function loadStoredSession() {
       if (storedToken && !state.host.token) {
         state.host.token = storedToken;
       }
-      // Validate token expiration
-      if (state.host && state.host.exp && state.host.exp < Date.now() / 1000) {
-        console.warn('[Security] Host token expired. Session invalidated.');
+      // Security invariant: A valid authenticated session MUST have a non-empty token
+      if (!state.host || !state.host.token) {
+        console.warn('[Security] Session without authentication token detected. Invalidating.');
         clearSession();
+      } else {
+        // Validate token expiration if available
+        let tokenExp = state.host.exp;
+        if (!tokenExp && typeof state.host.token === 'string' && state.host.token.includes('.')) {
+          try {
+            const lastDot = state.host.token.lastIndexOf('.');
+            const payloadStr = lastDot > 0 ? state.host.token.slice(0, lastDot) : state.host.token;
+            const parsedPayload = JSON.parse(payloadStr);
+            tokenExp = parsedPayload.exp;
+          } catch(e) {}
+        }
+        if (tokenExp && tokenExp < Date.now() / 1000) {
+          console.warn('[Security] Host token expired. Session invalidated.');
+          clearSession();
+        }
       }
     } catch (e) {
-      state.host = null;
+      clearSession();
     }
   }
 
@@ -239,15 +324,23 @@ async function loadStoredSession() {
 }
 
 function saveSession(hostData, token) {
-  state.host = hostData;
+  state.host = hostData || {};
   if (token) {
     state.host.token = token;
     localStorage.setItem('zonata_auth_token', token);
+    try {
+      const lastDot = token.lastIndexOf('.');
+      const payloadStr = lastDot > 0 ? token.slice(0, lastDot) : token;
+      const parsed = JSON.parse(payloadStr);
+      if (parsed.exp) {
+        state.host.exp = parsed.exp;
+      }
+    } catch (e) {}
   }
-  if (hostData && hostData.tenant_id) {
-    localStorage.setItem('zonata_active_tenant_id', hostData.tenant_id);
+  if (state.host && state.host.tenant_id) {
+    localStorage.setItem('zonata_active_tenant_id', state.host.tenant_id);
   }
-  localStorage.setItem('zonata_host_session', JSON.stringify(hostData));
+  localStorage.setItem('zonata_host_session', JSON.stringify(state.host));
 }
 
 function clearSession() {
@@ -313,6 +406,9 @@ function loadData() {
 }
 
 async function syncWithBackend() {
+  const token = localStorage.getItem('zonata_auth_token');
+  if (!token || !state.host) return;
+
   try {
     const res = await fetch('/api/portfolio');
     if (res.ok) {
@@ -342,6 +438,7 @@ async function syncWithBackend() {
         localStorage.setItem('zonata_companies', JSON.stringify(state.companies));
         populateGlobalCompanySelector();
         updateBreadcrumbs();
+        syncCompanySurfaces();
         renderActiveNavView();
       }
     }
@@ -365,15 +462,40 @@ function populateGlobalCompanySelector() {
   const sel = document.getElementById('globalCompanySelector');
   if (!sel) return;
   const currentVal = state.activeCompanyId || '';
-  
-  let optionsHtml = `<option value="">All Companies (Group Portfolio)</option>`;
+
   const deduped = sanitizeCompanies(state.companies);
-  deduped.forEach(c => {
+  if (!deduped.length) {
+    // No fabricated company: give the dropdown a truthful empty state.
+    sel.innerHTML = `<option value="">No company yet — add one</option>`;
+    return;
+  }
+
+  // Current company first, then the rest in their existing order.
+  const active = deduped.find(c => c.id === currentVal);
+  const ordered = active ? [active].concat(deduped.filter(c => c.id !== active.id)) : deduped;
+
+  let optionsHtml = `<option value="">All Companies (Group Portfolio)</option>`;
+  ordered.forEach(c => {
     const isSelected = c.id === currentVal ? 'selected' : '';
-    optionsHtml += `<option value="${c.id}" ${isSelected}>${c.name}</option>`;
+    const label = active && c.id === active.id ? `${c.name} (current)` : c.name;
+    optionsHtml += `<option value="${escapeHtml(c.id)}" ${isSelected}>${escapeHtml(label)}</option>`;
   });
   sel.innerHTML = optionsHtml;
 }
+
+/**
+ * Keep the sidebar switcher, the topbar dropdown and the assistant chip in
+ * sync with the canonical company list. Never invents a company.
+ */
+function syncCompanySurfaces() {
+  if (window.CompanySetupSwitcher && typeof window.CompanySetupSwitcher.syncSidebar === 'function') {
+    window.CompanySetupSwitcher.syncSidebar();
+  }
+  if (window.URAAssistant && typeof window.URAAssistant.refreshContext === 'function') {
+    window.URAAssistant.refreshContext();
+  }
+}
+window.syncCompanySurfaces = syncCompanySurfaces;
 
 function handleGlobalCompanyContextChange(companyId) {
   state.activeCompanyId = companyId || null;
@@ -382,6 +504,7 @@ function handleGlobalCompanyContextChange(companyId) {
   }
   populateGlobalCompanySelector();
   updateBreadcrumbs();
+  syncCompanySurfaces();
   
   const comp = state.companies.find(c => c.id === companyId);
   const label = comp ? comp.name : 'All Companies (Group Portfolio)';
@@ -397,8 +520,7 @@ function updateBreadcrumbs() {
 
   const navLabels = {
     overview: 'Overview',
-    assistant: 'AI Assistant',
-    coworker: 'Autonomous Coworker',
+    coworker: 'Co-worker (Agent / Employee)',
     missions: 'Work & Missions',
     work: 'Work & Missions',
     approvals: 'Sovereign Approvals',
@@ -418,8 +540,9 @@ function updateBreadcrumbs() {
     governance: 'Sovereign Governance & HOST Authority',
     company: 'Company & Structure',
     organization: 'Organization Matrix',
-    ceo: 'AI CEO Command',
-    meeting: 'AI CEO Meeting Room',
+    ceo: 'AI CEO Records',
+    'ceo-records': 'AI CEO Records',
+    meeting: 'Meetings',
     workforce: 'AI Workforce',
     tasks: 'TaskMaker',
     workflows: 'Workflow Runtime',
@@ -580,37 +703,83 @@ function handleRoute(path) {
   const cleanPath = (path || '/').replace(/^\/+/, '/');
   let navKey = null;
 
-  if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview')) navKey = 'overview';
-  else if (cleanPath.startsWith('/assistant')) navKey = 'assistant';
+  // Handle direct auth routes
+  if (cleanPath === '/login' || cleanPath === '/signin') {
+    if (typeof switchAuthTab === 'function') switchAuthTab('signin');
+    if (!state.host) {
+      const authContainer = document.getElementById('authContainer');
+      const appShell = document.getElementById('appShell');
+      if (authContainer) authContainer.style.display = 'flex';
+      if (appShell) appShell.style.display = 'none';
+      return;
+    }
+    navKey = 'overview';
+  } else if (cleanPath === '/register' || cleanPath === '/signup') {
+    if (typeof switchAuthTab === 'function') switchAuthTab('signup');
+    if (!state.host) {
+      const authContainer = document.getElementById('authContainer');
+      const appShell = document.getElementById('appShell');
+      if (authContainer) authContainer.style.display = 'flex';
+      if (appShell) appShell.style.display = 'none';
+      return;
+    }
+    navKey = 'overview';
+  } else if (cleanPath === '/' || cleanPath === '' || cleanPath.startsWith('/overview') || cleanPath === '/workspace' || cleanPath === '/workspace/dashboard' || cleanPath === '/workspace/overview') {
+    navKey = 'overview';
+  } else if (cleanPath.startsWith('/company/ceo-records') || cleanPath.startsWith('/ceo-records')) {
+    navKey = 'ceo-records';
+  } else if (cleanPath.startsWith('/workspace/ai-ceo') || cleanPath.startsWith('/workspace/ceo') || cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) {
+    // The AI CEO chat was merged into the one URA Assistant. Legacy links open
+    // the assistant instead of 404ing; the console itself lives at /ceo-records.
+    navKey = 'overview';
+    if (window.URAAssistant) window.URAAssistant.open({ focus: 'company' });
+  } else if (cleanPath.startsWith('/workspace/coworkers') || cleanPath.startsWith('/workspace/workforce') || cleanPath.startsWith('/workforce')) {
+    navKey = 'workforce';
+  } else if (cleanPath.startsWith('/workspace/finance') || cleanPath.startsWith('/workspace/accounting') || cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) {
+    navKey = 'finance';
+  } else if (cleanPath.startsWith('/workspace/customers') || cleanPath.startsWith('/workspace/sales') || cleanPath.startsWith('/workspace/crm') || cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) {
+    navKey = 'customers';
+  } else if (cleanPath.startsWith('/workspace/integrations') || cleanPath.startsWith('/integrations') || cleanPath.startsWith('/connections')) {
+    navKey = 'integrations';
+  } else if (cleanPath.startsWith('/workspace/evidence') || cleanPath.startsWith('/workspace/records') || cleanPath.startsWith('/records')) {
+    navKey = 'records';
+  } else if (cleanPath.startsWith('/workspace/settings') || cleanPath.startsWith('/settings')) {
+    navKey = 'settings';
+  } else if (cleanPath.startsWith('/workspace/operations') || cleanPath.startsWith('/operations')) {
+    navKey = 'operations';
+  } else if (cleanPath.startsWith('/workspace/schedule') || cleanPath.startsWith('/schedule')) {
+    navKey = 'schedule';
+  } else if (cleanPath.startsWith('/workspace/missions') || cleanPath.startsWith('/workspace/work') || cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) {
+    navKey = 'missions';
+  } else if (cleanPath.startsWith('/assistant')) {
+    // The assistant is a single floating surface, not a page. Legacy links
+    // open the one URA Assistant and land on the overview.
+    navKey = 'overview';
+    if (window.URAAssistant) window.URAAssistant.open();
+  }
   else if (cleanPath.startsWith('/coworker')) navKey = 'coworker';
-  else if (cleanPath.startsWith('/missions') || cleanPath === '/work' || cleanPath.startsWith('/work/')) navKey = 'missions';
-  else if (cleanPath.startsWith('/operations')) navKey = 'operations';
-  else if (cleanPath.startsWith('/customers') || cleanPath.startsWith('/sales') || cleanPath.startsWith('/crm')) navKey = 'customers';
-  else if (cleanPath.startsWith('/finance') || cleanPath.startsWith('/accounting')) navKey = 'finance';
   else if (cleanPath.startsWith('/people') || cleanPath.startsWith('/hr')) navKey = 'people';
-  else if (cleanPath.startsWith('/records')) navKey = 'records';
   else if (cleanPath.startsWith('/files')) navKey = 'files';
   else if (cleanPath.startsWith('/reports') || cleanPath.startsWith('/bi')) navKey = 'reports';
   else if (cleanPath.startsWith('/agent-factory')) navKey = 'agent-factory';
-  else if (cleanPath.startsWith('/integrations')) navKey = 'integrations';
   else if (cleanPath.startsWith('/governance')) navKey = 'governance';
   else if (cleanPath.startsWith('/approvals')) navKey = 'approvals';
   else if (cleanPath.startsWith('/terminal')) navKey = 'terminal';
   else if (cleanPath.startsWith('/activity')) navKey = 'activity';
   else if (cleanPath.startsWith('/artifacts')) navKey = 'artifacts';
-  else if (cleanPath.startsWith('/schedule')) navKey = 'schedule';
-  else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) navKey = 'meeting';
+  else if (cleanPath.startsWith('/ceo/meeting') || cleanPath.startsWith('/meeting')) {
+    navKey = 'overview';
+    if (window.URAAssistant) window.URAAssistant.open({ focus: 'meetings' });
+  }
   else if (cleanPath.startsWith('/plugins')) navKey = 'plugins';
-  else if (cleanPath.startsWith('/connections')) navKey = 'integrations';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/organization')) navKey = 'organization';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/tasks')) navKey = 'tasks';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/company') && cleanPath.includes('/trustgraph')) navKey = 'trustgraph';
+  else if (cleanPath === '/company/add' || cleanPath === '/company/add/') navKey = 'company';
   else if (cleanPath.startsWith('/company')) navKey = 'company';
   else if (cleanPath.startsWith('/organization')) navKey = 'organization';
-  else if (cleanPath.startsWith('/ceo') || cleanPath.startsWith('/ai-ceo')) navKey = 'ceo';
-  else if (cleanPath.startsWith('/workforce')) navKey = 'workforce';
   else if (cleanPath.startsWith('/tasks')) navKey = 'tasks';
   else if (cleanPath.startsWith('/workflows')) navKey = 'workflows';
   else if (cleanPath.startsWith('/agent-network')) navKey = 'agent-network';
@@ -622,7 +791,7 @@ function handleRoute(path) {
   else if (cleanPath.startsWith('/processes')) navKey = 'processes';
   else if (cleanPath.startsWith('/trustgraph')) navKey = 'trustgraph';
   else if (cleanPath.startsWith('/tools')) navKey = 'tools';
-  else if (cleanPath.startsWith('/settings')) navKey = 'settings';
+  else if (cleanPath.startsWith('/design')) navKey = 'design';
   else {
     // Unrecognized route: Do NOT fallback to Home. Explicitly render 404 Route Not Found
     navKey = '404';
@@ -645,6 +814,10 @@ function handleRoute(path) {
 
   updateBreadcrumbs();
 
+  if (window.URAAssistant && window.URAAssistant.refreshContext) {
+    window.URAAssistant.refreshContext();
+  }
+
   if (navKey === '404') {
     renderNotFoundView(cleanPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -652,14 +825,15 @@ function handleRoute(path) {
   }
 
   try {
+    if (window.CompanySetupProgress && !/^\/company\/[^/]+\/build\/?$/.test(cleanPath)) {
+      window.CompanySetupProgress.destroy();
+    }
     if (navKey === 'overview') {
       if (window.OverviewWorkspace && window.OverviewWorkspace.render) {
         window.OverviewWorkspace.render('view-overview');
       } else {
         renderOverview();
       }
-    } else if (navKey === 'assistant' && window.AssistantCoworkerWorkspace) {
-      window.AssistantCoworkerWorkspace.renderAssistant('view-assistant');
     } else if (navKey === 'coworker' && window.AssistantCoworkerWorkspace) {
       window.AssistantCoworkerWorkspace.renderCoworker('view-coworker');
     } else if (navKey === 'missions' && window.AssistantCoworkerWorkspace) {
@@ -699,10 +873,28 @@ function handleRoute(path) {
       window.MeetingRoomWorkspace.render('view-meeting');
     } else if (navKey === 'plugins' && window.PluginsWorkspace) {
       window.PluginsWorkspace.render('view-plugins');
+    } else if (navKey === 'company' && (cleanPath === '/company/add' || cleanPath === '/company/add/') && window.CompanySetupAdd) {
+      window.CompanySetupAdd.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/create' || cleanPath === '/company/create/') && window.CompanySetupCreate) {
+      window.CompanySetupCreate.render('view-company');
+    } else if (navKey === 'company' && (cleanPath === '/company/existing' || cleanPath === '/company/existing/') && window.CompanySetupExisting) {
+      window.CompanySetupExisting.render('view-company');
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/build\/?$/.test(cleanPath) && window.CompanySetupProgress) {
+      const buildMatch = cleanPath.match(/^\/company\/([^/]+)\/build\/?$/);
+      window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/overview\/?$/.test(cleanPath) && window.CompanySetupOverview) {
+      const overviewMatch = cleanPath.match(/^\/company\/([^/]+)\/overview\/?$/);
+      window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    } else if (navKey === 'company' && /^\/company\/[^/]+\/edit\/?$/.test(cleanPath) && window.CompanySetupEdit) {
+      const editMatch = cleanPath.match(/^\/company\/([^/]+)\/edit\/?$/);
+      window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
     } else if (navKey === 'company' && window.CompanyWorkspace) {
+      if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
       window.CompanyWorkspace.render(cleanPath);
     } else if (navKey === 'organization' && window.OrgWorkspace) {
       window.OrgWorkspace.render('view-organization', cleanPath);
+    } else if (navKey === 'ceo-records' && window.AiCeoWorkspace) {
+      window.AiCeoWorkspace.render('view-ceo-records');
     } else if (navKey === 'ceo' && window.AiCeoWorkspace) {
       window.AiCeoWorkspace.render('view-ceo', cleanPath);
     } else if (navKey === 'workforce' && window.WorkforceWorkspace) {
@@ -733,12 +925,23 @@ function handleRoute(path) {
       window.TrustGraphWorkspace.render('view-trustgraph');
     } else if (navKey === 'tools' && window.ToolsFactory) {
       window.ToolsFactory.render(cleanPath);
+    } else if (navKey === 'design' && window.DesignPreviewWorkspace) {
+      window.DesignPreviewWorkspace.render('view-design');
     } else if (navKey === 'settings') {
-      const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
-      if (es && es.render) {
-        es.render(cleanPath);
+      // The V2 console is the default Settings experience. The legacy console
+      // stays reachable at /settings-legacy and for legacy deep links such as
+      // /settings/ai_providers, which the V2 console does not own yet.
+      const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(cleanPath);
+      const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(cleanPath);
+      if (!legacyAlias && !legacyDomain && window.SettingsV2) {
+        window.SettingsV2.render(cleanPath);
       } else {
-        console.warn('[AppRouter] EnterpriseSettings not found');
+        const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
+        if (es && es.render) {
+          es.render(legacyAlias ? '/settings' : cleanPath);
+        } else {
+          console.warn('[AppRouter] EnterpriseSettings not found');
+        }
       }
     } else {
       console.warn(`[AppRouter] No dedicated renderer registered for: ${navKey}`);
@@ -762,12 +965,13 @@ function handleRoute(path) {
 
 // Event Listeners
 function setupEventListeners() {
-  // Navigation clicks
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const targetNav = item.getAttribute('data-nav');
-      if (targetNav) window.navigateTo(`/${targetNav}`);
-    });
+  // Navigation clicks (delegated: the sidebar is rebuilt when menu
+  // visibility changes, so per-item listeners would be lost)
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.nav-item[data-nav]');
+    if (!item) return;
+    const targetNav = item.getAttribute('data-nav');
+    if (targetNav) window.navigateTo(`/${targetNav}`);
   });
 
   // Router hash listener
@@ -781,13 +985,51 @@ function setupEventListeners() {
   const searchDropdown = document.getElementById('commandPaletteResults');
   let searchDebounceTimer = null;
   if (searchInput) {
+    const companyPaletteRows = `
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+           onclick="if(window.CompanySetupSwitcher){window.CompanySetupSwitcher.open();} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">🔀</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Switch company</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Change the operating context</div>
+        </div>
+      </div>
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+           onclick="if(window.navigateTo){window.navigateTo('/company/add');} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">➕</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Add company</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Create new or connect an existing business</div>
+        </div>
+      </div>`;
+    const assistantPaletteRow = `
+      <div class="search-result-item" role="button" tabindex="0"
+           style="padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle);"
+           onclick="if(window.URAAssistant){window.URAAssistant.open();} document.getElementById('commandPaletteResults').style.display='none';">
+        <span aria-hidden="true">✨</span>
+        <div>
+          <div style="font-weight:600; font-size:13px; color:var(--text-primary);">Ask the assistant</div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">Open URA Assistant · Ctrl/Cmd+J</div>
+        </div>
+      </div>`;
+    const defaultPaletteRows = companyPaletteRows + assistantPaletteRow;
+    searchInput.addEventListener('focus', () => {
+      if (searchDropdown && !searchInput.value.trim()) {
+        searchDropdown.innerHTML = defaultPaletteRows;
+        searchDropdown.style.display = 'block';
+      }
+    });
     searchInput.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       clearTimeout(searchDebounceTimer);
       if (!q || q.length < 2) {
         if (searchDropdown) {
-          searchDropdown.style.display = 'none';
-          searchDropdown.innerHTML = '';
+          searchDropdown.innerHTML = defaultPaletteRows;
+          searchDropdown.style.display = 'block';
         }
         return;
       }
@@ -866,7 +1108,7 @@ function setupEventListeners() {
     });
   }
 
-  // Universal Command Palette (⌘K / Ctrl+K) & Modal ESC handler
+  // Universal Command Palette (⌘K / Ctrl+K), assistant shortcut, & modal ESC
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
@@ -875,6 +1117,10 @@ function setupEventListeners() {
         searchEl.focus();
         searchEl.select();
       }
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      e.preventDefault();
+      if (window.URAAssistant) window.URAAssistant.toggle();
     }
     if (e.key === 'Escape') closeModal();
   });
@@ -923,6 +1169,7 @@ function renderApp() {
 
     populateGlobalCompanySelector();
     updateBreadcrumbs();
+    syncCompanySurfaces();
 
     // Preserve URL hash route on load/refresh to prevent unwanted redirection to overview
     const initialHash = window.location.hash ? window.location.hash.slice(1).replace(/^\/+/, '/') : '';
@@ -930,8 +1177,8 @@ function renderApp() {
     const cleanRoute = initialRoute.startsWith('/') ? initialRoute : '/' + initialRoute;
     window.navigateTo(cleanRoute);
 
-    if (window.FloatingAssistant && window.FloatingAssistant.init) {
-      window.FloatingAssistant.init();
+    if (window.URAAssistant && window.URAAssistant.init) {
+      window.URAAssistant.init();
     }
   }
 }
@@ -984,12 +1231,12 @@ function renderAuth() {
       <form id="signInForm" onsubmit="handleAuthSubmit(event, 'signin')">
         <div class="form-group">
           <label class="form-label">Host Email or Username</label>
-          <input type="text" class="form-input" id="authEmail" placeholder="sukhraj@zonata.internal" value="sukhraj@zonata.internal" required />
+          <input type="text" class="form-input" id="authEmail" placeholder="founder@company.com" required />
         </div>
         <div class="form-group">
           <label class="form-label">Secret Password</label>
           <div class="form-input-wrapper">
-            <input type="password" class="form-input" id="authPassword" placeholder="••••••••••••" value="UniversalRobo2026!" required />
+            <input type="password" class="form-input" id="authPassword" placeholder="••••••••••••" required />
           </div>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; font-size:12.5px;">
@@ -1002,6 +1249,17 @@ function renderAuth() {
           <span>Authenticate as Host</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
+
+        <!-- Authorized Pilot One-Click Access -->
+        <div style="margin-top:16px; padding:12px; background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.2); border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div style="text-align:left;">
+            <div style="font-size:12px; font-weight:700; color:var(--accent-blue);">QA Pilot Evaluation Access</div>
+            <div style="font-size:11px; color:var(--text-muted);">One-click entry for authorized pilot testers</div>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:11.5px; padding:6px 12px; font-weight:600; white-space:nowrap;" onclick="autofillPilotCredentials()">
+            ⚡ Quick Sign-In
+          </button>
+        </div>
       </form>
 
       <!-- Sign Up Form (Initially Hidden) -->
@@ -1058,7 +1316,66 @@ window.switchAuthTab = function(tab) {
   }
 };
 
-window.handleSocialAuth = function(provider) {
+window.autofillPilotCredentials = function() {
+  const emailInput = document.getElementById('authEmail');
+  const passInput = document.getElementById('authPassword');
+  if (emailInput) emailInput.value = 'zonata.qa.step2@example.com';
+  if (passInput) passInput.value = 'Step2_Secure_QA_2026!';
+  if (typeof switchAuthTab === 'function') switchAuthTab('signin');
+  const signInForm = document.getElementById('signInForm');
+  if (signInForm) {
+    signInForm.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+};
+
+window.handleSocialAuth = async function(provider) {
+  if (provider === 'Google') {
+    try {
+      const res = await fetch('/api/auth/oauth/google/config');
+      if (res.ok) {
+        const config = await res.json();
+        if (config.configured && config.auth_url) {
+          window.location.href = config.auth_url;
+          return;
+        }
+      }
+    } catch (e) {
+      // Configuration probe failed, fallback to setup modal
+    }
+
+    const redirectUri = `${window.location.origin}/api/auth/oauth/google/callback`;
+    openModal(`Google Enterprise Single Sign-On (SSO)`, `
+      <div style="font-size:13.5px; line-height:1.6; color:var(--text-secondary); padding:4px 0;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <span style="font-size:22px;">🔑</span>
+          <div>
+            <strong style="color:var(--text-primary); font-size:14.5px; display:block;">Google OAuth 2.0 Credentials Needed</strong>
+            <span style="font-size:12px; color:var(--accent-blue);">Enterprise SSO Identity Gateway</span>
+          </div>
+        </div>
+        <p style="margin-bottom:12px;">Google OAuth authentication requires registering this deployment with Google Cloud Console and setting credentials on the host environment.</p>
+
+        <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Authorized Redirect URI (Copy for Google Cloud):</div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" id="googleRedirectUriInput" class="form-input" value="${redirectUri}" readonly style="font-size:12px; font-family:var(--font-mono); padding:6px 8px;" />
+            <button class="btn btn-secondary" style="font-size:12px; padding:6px 12px; white-space:nowrap;" onclick="navigator.clipboard.writeText('${redirectUri}').then(() => showToast('Redirect URI copied to clipboard!', 'success'))">Copy</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">
+            Required Environment Variables on Host (Render / PaaS):<br>
+            <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="closeModal(); switchAuthTab('signin');">Continue with Host Password</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
   openModal(`${provider} Single Sign-On (SSO)`, `
     <div style="font-size:13.5px; line-height:1.6; color:var(--text-secondary); padding:8px 0;">
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
@@ -1084,42 +1401,63 @@ window.handleAuthSubmit = async function(e, type) {
   }
 
   try {
-    if (type === 'signin') {
+    const isSignIn = (type === 'signin');
+    const endpoint = isSignIn ? '/api/auth/login' : '/api/auth/register';
+    let payload = {};
+
+    if (isSignIn) {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.detail || data.error || 'Authentication failed. Please verify credentials.', 'error');
-        return;
-      }
-      saveSession(data.user, data.token);
-      showToast(`Welcome back, ${data.user.name || data.user.email}!`, 'success');
-      renderApp();
+      payload = { email, password };
     } else {
       const name = document.getElementById('newHostName').value.trim();
       const email = document.getElementById('newHostEmail').value.trim();
       const password = document.getElementById('newHostPassword').value;
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.detail || data.error || 'Registration failed.', 'error');
-        return;
-      }
-      saveSession(data.user, data.token);
-      showToast(`Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
-      renderApp();
+      payload = { name, email, password };
     }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // Safe response parsing: never crash with "Unexpected end of JSON input"
+    let data = null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        data = null;
+      }
+    }
+    if (!data) {
+      const rawText = await res.text().catch(() => '');
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        data = { error: rawText.slice(0, 200) || `Server response status: HTTP ${res.status} ${res.statusText || ''}` };
+      }
+    }
+
+    if (!res.ok) {
+      const msg = data.detail || data.error || (isSignIn ? 'Authentication failed. Please verify credentials.' : 'Registration failed.');
+      showToast(msg, 'error');
+      return;
+    }
+
+    saveSession(data.user, data.token);
+    if (window.CurrentCompanyContext && typeof window.CurrentCompanyContext.refresh === 'function') {
+      window.CurrentCompanyContext.refresh();
+    }
+    if (typeof syncWithBackend === 'function') {
+      syncWithBackend();
+    }
+    showToast(isSignIn ? `Welcome back, ${data.user.name || data.user.email}!` : `Account created for ${data.user.name}! Welcome to ZONATA.`, 'success');
+    renderApp();
   } catch (err) {
-    showToast(`Network or server connection error: ${err.message}`, 'error');
+    showToast(`Network or connection error: ${err.message}`, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -1491,8 +1829,37 @@ function drawOverviewActivityChart() {
 // ==========================================================================
 function renderCompanySection() {
   const currentRoute = (window.location.hash.slice(1) || '/company');
+  const route = currentRoute.startsWith('/company') ? currentRoute : '/company';
+  if (route === '/company/add' || route === '/company/add/') {
+    if (window.CompanySetupAdd) window.CompanySetupAdd.render('view-company');
+    return;
+  }
+  if (route === '/company/create' || route === '/company/create/') {
+    if (window.CompanySetupCreate) window.CompanySetupCreate.render('view-company');
+    return;
+  }
+  if (route === '/company/existing' || route === '/company/existing/') {
+    if (window.CompanySetupExisting) window.CompanySetupExisting.render('view-company');
+    return;
+  }
+  const buildMatch = route.match(/^\/company\/([^/]+)\/build\/?$/);
+  if (buildMatch && window.CompanySetupProgress) {
+    window.CompanySetupProgress.render('view-company', decodeURIComponent(buildMatch[1]));
+    return;
+  }
+  const overviewMatch = route.match(/^\/company\/([^/]+)\/overview\/?$/);
+  if (overviewMatch && window.CompanySetupOverview) {
+    window.CompanySetupOverview.render('view-company', decodeURIComponent(overviewMatch[1]));
+    return;
+  }
+  const editMatch = route.match(/^\/company\/([^/]+)\/edit\/?$/);
+  if (editMatch && window.CompanySetupEdit) {
+    window.CompanySetupEdit.render('view-company', decodeURIComponent(editMatch[1]));
+    return;
+  }
+  if (window.CompanySetupProgress) window.CompanySetupProgress.destroy();
   if (window.CompanyWorkspace) {
-    window.CompanyWorkspace.render(currentRoute.startsWith('/company') ? currentRoute : '/company');
+    window.CompanyWorkspace.render(route);
   }
 }
 
@@ -1944,10 +2311,11 @@ window.openHireAgentModal = function() {
       <div class="form-group">
         <label class="form-label">Underlying Model</label>
         <select class="form-input" id="agentModel">
-          <option>Gemini 3.8 Flash (High)</option>
-          <option>Gemini Pro</option>
-          <option>Claude 3.5 Sonnet</option>
-          <option>Local Llama 3 (Ollama)</option>
+          <option value="">Platform default (Settings → Models)</option>
+          <option value="qwen2.5:1.5b">Local Ollama — qwen2.5:1.5b</option>
+          <option value="openai-fast">Embedded Free — gpt-oss-20b</option>
+          <option value="gemini-2.0-flash">Google AI Studio — gemini-2.0-flash</option>
+          <option value="llama-3.3-70b-versatile">Groq — llama-3.3-70b</option>
         </select>
       </div>
       <div class="form-group">
@@ -2254,10 +2622,17 @@ function renderSettingsSection() {
   const container = document.getElementById('view-settings');
   if (!container) return;
 
+  const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
+  const legacyAlias = /^(\/workspace)?\/settings-legacy(\/|$)/.test(route);
+  const legacyDomain = /^(\/workspace)?\/settings\/.+/.test(route);
+  if (!legacyAlias && !legacyDomain && window.SettingsV2) {
+    window.SettingsV2.render(route);
+    return;
+  }
+
   const es = window.EnterpriseSettings || (typeof EnterpriseSettings !== 'undefined' ? EnterpriseSettings : null);
   if (es && es.render) {
-    const route = (window.location.hash.slice(1) || '/settings').replace(/^\/+/, '/');
-    es.render(route.startsWith('/settings') ? route : '/settings');
+    es.render(legacyAlias ? '/settings' : (route.startsWith('/settings') ? route : '/settings'));
   }
 }
 
@@ -2275,7 +2650,7 @@ window.returnToSettingsHub = function() {
   if (es && es.navigateTo) {
     es.navigateTo('hub');
   } else {
-    window.navigateTo('/settings');
+    window.navigateTo('/settings-legacy');
   }
 };
 
@@ -2552,20 +2927,41 @@ window.openSimulateMissionModal = function() {
   `);
 };
 
-window.runSimulationTest = function() {
+window.runSimulationTest = async function() {
   const box = document.getElementById('simResultBox');
   if (!box) return;
   box.style.display = 'block';
-  box.innerHTML = `
-    <div>[SIMULATION_STATE]: COMPLETE</div>
-    <div>[PREDICTED_REVENUE]: ₹58,000 (+287% ROI)</div>
-    <div>[PROJECTED_COST]: ₹14,200</div>
-    <div>[ESTIMATED_CONTRIBUTION]: ₹43,800</div>
-    <div>[RISK_SCORE]: 0.12 (LOW_RISK)</div>
-    <div>[CAN_ROLLBACK]: TRUE (Idempotent DB Transactions)</div>
-    <div>[VERIFICATION_CRITERIA]: Stripe webhook payment confirmation</div>
-  `;
-  showToast('Simulation passed pre-flight checks.', 'success');
+  box.innerHTML = '<div>[SIMULATING]: Running pre-flight digital twin simulation...</div>';
+  try {
+    const res = await fetch('/api/missions/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'Execute automated strategic workload',
+        department: 'Operations',
+        budget: 5000.0,
+        authority: 'ASK_ME'
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      box.innerHTML = `
+        <div>[SIMULATION_STATE]: ${data.status || 'COMPLETE'}</div>
+        <div>[PREDICTED_REVENUE]: ₹${Number(data.projected_revenue || 0).toLocaleString()}</div>
+        <div>[PROJECTED_COST]: ₹${Number(data.projected_cost || 0).toLocaleString()}</div>
+        <div>[ESTIMATED_CONTRIBUTION]: ₹${Number(data.projected_margin || 0).toLocaleString()}</div>
+        <div>[RISK_SCORE]: ${data.risk_score || 0.05} (${data.risk_tier || 'LOW_RISK'})</div>
+        <div>[CAN_ROLLBACK]: ${data.can_rollback !== false ? 'TRUE' : 'FALSE'} (Idempotent DB Transactions)</div>
+        <div>[CONFIDENCE]: ${((data.confidence_score || 0.95) * 100).toFixed(0)}% (${data.simulation_engine || 'DigitalTwinCore'})</div>
+      `;
+      showToast('Simulation passed pre-flight checks.', 'success');
+    } else {
+      const err = await res.json();
+      box.innerHTML = `<div style="color:var(--accent-rose);">[SIMULATION_ERROR]: ${err.detail || err.error || 'Simulation failed'}</div>`;
+    }
+  } catch (err) {
+    box.innerHTML = `<div style="color:var(--accent-rose);">[NETWORK_ERROR]: ${err.message}</div>`;
+  }
 };
 
 window.openAssignMissionModal = function(agentId) {

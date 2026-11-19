@@ -4,6 +4,8 @@ Executes real continuous endurance cycles, monitoring resource consumption, data
 stale leases, worker/node restarts, verification discrepancies, and human escalations.
 """
 
+from __future__ import annotations
+
 from typing import Dict, List, Optional, Any, Callable, TYPE_CHECKING
 import time
 import json
@@ -49,7 +51,7 @@ class SupervisorEnduranceRunner:
     and catches state leaks or deadlocks.
     """
 
-    def __init__(self, engine: UniversalCoworkerEngine, metrics_path: Optional[str] = None):
+    def __init__(self, engine: 'UniversalCoworkerEngine', metrics_path: Optional[str] = None):
         self.engine = engine
         self.metrics_path = metrics_path or "storage/soak_telemetry.json"
         self.telemetry = SoakTelemetryMetrics()

@@ -12,6 +12,7 @@ from core.models import (
 from core.workforce import DynamicAgentFactory
 from core.control_kernel import UniversalControlKernel
 from core.portfolio import OperatingContext
+from workloads.paths import sandbox_artifact
 
 def run_saas_churn_analysis(company: OperatingContext, kernel: UniversalControlKernel) -> Mission:
     mission = Mission(
@@ -37,7 +38,7 @@ def run_saas_churn_analysis(company: OperatingContext, kernel: UniversalControlK
     mission.assigned_agents.append(specialist.agent_id)
     mission.status = MissionStatus.PLAN
 
-    output_path = "/roboassistant/storage/sandbox/saas_retention_campaign.json"
+    output_path = sandbox_artifact("saas_retention_campaign.json")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     action = ActionContract(
@@ -65,7 +66,9 @@ def run_saas_churn_analysis(company: OperatingContext, kernel: UniversalControlK
             "action": "Automated in-app interactive walkthrough + 1-on-1 customer onboarding call",
             "allocated_budget": 18000.0,
             "projected_mrr_recovered": 64000.0
-        }
+        },
+        "data_provenance": "REFERENCE_SCENARIO_FIXTURE",
+        "is_reference_data": True
     }
 
     raw_bytes = json.dumps(campaign_data, indent=2).encode("utf-8")

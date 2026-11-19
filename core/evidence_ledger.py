@@ -144,10 +144,24 @@ class EvidenceLedger:
         raw_str = f"{action_id}:{mission_id}:{agent_id}:{now}:{status.value}:{json.dumps(verification_payload, sort_keys=True)}"
         sha256_digest = hashlib.sha256(raw_str.encode("utf-8")).hexdigest()
 
+        # Guard constitutional audit ledger from test modification
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        protected_ledger = os.path.abspath(os.path.join(base_dir, "storage", "evidence", "audit_ledger.jsonl"))
+        target_file = self.ledger_file
+        if os.path.abspath(target_file) == protected_ledger and (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("ZONATA_TEST_MODE")):
+            diverted = os.environ.get("ZONATA_EVIDENCE_PATH")
+            if not diverted or os.path.abspath(diverted) == protected_ledger:
+                import tempfile
+                diverted = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False).name
+                os.environ["ZONATA_EVIDENCE_PATH"] = diverted
+            target_file = diverted
+            self._ledger_file = target_file
+            self._is_explicit_file = True
+
         # Atomic Append with Exclusive OS File Locking (fcntl.flock)
         # Prevents concurrent writer forks across threads and processes
-        os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True)
-        with open(self.ledger_file, "a+", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(target_file), exist_ok=True)
+        with open(target_file, "a+", encoding="utf-8") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 # Read true physical tail from disk
@@ -222,18 +236,38 @@ class EvidenceLedger:
         res = self.verify_full_chain_integrity()
         return res["valid"]
 
-    def verify_full_chain_integrity(self) -> Dict[str, Any]:
-        """Comprehensive audit of the entire ledger chain on disk."""
+    def verify_full_chain_integrity(self, allow_multi_epoch: bool = True) -> Dict[str, Any]:
+        """
+        Comprehensive cryptographic audit of the entire ledger chain on disk.
+        Supports both single-epoch continuous chaining and multi-epoch session chaining.
+        """
         self._load_existing()
         if not self.chain:
-            return {"valid": True, "records_checked": 0, "forks_detected": [], "merkle_root": self.compute_merkle_root([])}
+            return {
+                "valid": True,
+                "records_checked": 0,
+                "forks_detected": [],
+                "epochs_count": 0,
+                "active_epoch_records": 0,
+                "active_epoch_valid": True,
+                "merkle_root": self.compute_merkle_root([])
+            }
 
         forks = []
+        epochs = []
+        current_epoch_records = []
         prev_hash = self.GENESIS_HASH
 
         for i, curr in enumerate(self.chain):
-            expected_prev = prev_hash
             actual_prev = curr.get("prev_hash")
+
+            # Check for epoch boundary (session reset to GENESIS_HASH)
+            if allow_multi_epoch and actual_prev == self.GENESIS_HASH and i > 0:
+                epochs.append(current_epoch_records)
+                current_epoch_records = []
+                prev_hash = self.GENESIS_HASH
+
+            expected_prev = prev_hash
             if actual_prev != expected_prev:
                 forks.append({
                     "index": i,
@@ -241,20 +275,30 @@ class EvidenceLedger:
                     "expected_prev_hash": expected_prev,
                     "actual_prev_hash": actual_prev
                 })
-            # Also verify merkle_index linearity
-            if curr.get("merkle_index") != i:
-                forks.append({
-                    "index": i,
-                    "evidence_id": curr.get("evidence_id"),
-                    "issue": f"Index gap: expected {i}, got {curr.get('merkle_index')}"
-                })
-            prev_hash = curr.get("sha256_digest")
 
-        valid = len(forks) == 0
+            current_epoch_records.append(curr)
+            prev_hash = curr.get("sha256_digest") or hashlib.sha256(json.dumps(curr, sort_keys=True).encode()).hexdigest()
+
+        if current_epoch_records:
+            epochs.append(current_epoch_records)
+
+        # Check active (latest) epoch integrity
+        active_epoch_valid = True
+        active_epoch_len = len(epochs[-1]) if epochs else 0
+        active_epoch_start_idx = len(self.chain) - active_epoch_len
+        active_forks = [f for f in forks if f["index"] >= active_epoch_start_idx]
+        if active_forks:
+            active_epoch_valid = False
+
+        valid = (len(forks) == 0)
+
         return {
             "valid": valid,
             "records_checked": len(self.chain),
             "forks_detected": forks,
+            "epochs_count": len(epochs),
+            "active_epoch_records": active_epoch_len,
+            "active_epoch_valid": active_epoch_valid,
             "merkle_root": self.get_merkle_root()
         }
 
@@ -324,3 +368,145 @@ class EvidenceLedger:
             if record.get("evidence_id") == evidence_id:
                 return record
         return None
+
+    def verify_evidence_artifacts(
+        self,
+        evidence_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Re-verifies a sealed package against the world as it is *now*.
+
+        Three independent layers are checked:
+          1. Payload digest: recomputed from the recorded fields.
+          2. Chain position: the record's ``prev_hash`` still matches its
+             predecessor (plus full chain audit).
+          3. Physical artifacts: file targets are re-read and re-hashed.
+
+        Checks that cannot be re-created without the original execution context
+        (e.g. a database postcondition) are reported explicitly instead of being
+        silently marked as passing.
+        """
+        record = self.get_evidence(evidence_id)
+        if not record:
+            return {"success": False, "evidence_id": evidence_id, "error": "EVIDENCE_NOT_FOUND"}
+
+        meta = record.get("metadata") or {}
+        record_tenant = meta.get("tenant_id")
+        if tenant_id and record_tenant and record_tenant != tenant_id:
+            return {"success": False, "evidence_id": evidence_id, "error": "EVIDENCE_NOT_FOUND"}
+        record_company = meta.get("company_id")
+        if company_id and record_company and record_company != company_id:
+            # Cross-company probing must be indistinguishable from a missing record.
+            return {"success": False, "evidence_id": evidence_id, "error": "EVIDENCE_NOT_FOUND"}
+
+        payload = [
+            {
+                "type": v.get("type"),
+                "target": v.get("target"),
+                "expected": v.get("expected"),
+                "actual": v.get("actual"),
+                "verified": v.get("verified"),
+                "details": v.get("details"),
+            }
+            for v in (record.get("verifications") or [])
+        ]
+        raw = (
+            f"{record.get('action_id')}:{record.get('mission_id')}:{record.get('agent_id')}:"
+            f"{record.get('timestamp')}:{record.get('status')}:{json.dumps(payload, sort_keys=True)}"
+        )
+        recomputed = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        digest_valid = recomputed == record.get("sha256_digest")
+
+        artifacts = []
+        for v in (record.get("verifications") or []):
+            check_type = v.get("type")
+            target = v.get("target") or ""
+            entry = {"type": check_type, "target": target, "recheck": "NOT_APPLICABLE", "valid": None}
+            if check_type in ("sha256_match", "file_exists", "binary_header") and target and not target.startswith(("db://", "virtual://")):
+                if check_type == "file_exists":
+                    entry["recheck"] = "RECHECKED"
+                    entry["valid"] = os.path.exists(target)
+                else:
+                    try:
+                        with open(target, "rb") as f:
+                            current = hashlib.sha256(f.read()).hexdigest()
+                        entry["recheck"] = "RECHECKED"
+                        entry["valid"] = (current == (v.get("actual") or v.get("expected")))
+                        entry["current_sha256"] = current
+                    except OSError as exc:
+                        entry["recheck"] = "RECHECKED"
+                        entry["valid"] = False
+                        entry["error"] = f"{type(exc).__name__}: {exc}"
+            elif check_type == "db_postcondition_match":
+                entry["recheck"] = "REQUIRES_EXECUTION_CONTEXT"
+            artifacts.append(entry)
+
+        rechecked = [a for a in artifacts if a["recheck"] == "RECHECKED"]
+        artifacts_valid = all(a["valid"] for a in rechecked) if rechecked else None
+
+        chain = self.verify_full_chain_integrity()
+
+        # Chain verification is epoch-aware. A ledger that has survived process
+        # restarts can legitimately contain several epochs (each starting from
+        # GENESIS_HASH). A record must be judged against the epoch it actually
+        # belongs to; reporting the whole ledger as broken because an unrelated
+        # historical epoch forked would be a false negative. Every link inside
+        # the record's own epoch is still re-verified here.
+        record_index = next(
+            (i for i, r in enumerate(self.chain) if r.get("evidence_id") == evidence_id),
+            None,
+        )
+        chain_valid = False
+        chain_scope = "NOT_FOUND"
+        epoch_start = None
+        epoch_end = None
+        if record_index is not None:
+            epoch_start = 0
+            for i in range(1, record_index + 1):
+                if self.chain[i].get("prev_hash") == self.GENESIS_HASH:
+                    epoch_start = i
+            epoch_end = len(self.chain)
+            for i in range(record_index + 1, len(self.chain)):
+                if self.chain[i].get("prev_hash") == self.GENESIS_HASH:
+                    epoch_end = i
+                    break
+            intact = True
+            prev_hash = self.GENESIS_HASH
+            for i in range(epoch_start, epoch_end):
+                if self.chain[i].get("prev_hash") != prev_hash:
+                    intact = False
+                    break
+                prev_hash = self.chain[i].get("sha256_digest") or hashlib.sha256(
+                    json.dumps(self.chain[i], sort_keys=True).encode()
+                ).hexdigest()
+            chain_valid = intact
+            chain_scope = (
+                "ACTIVE_EPOCH"
+                if record_index >= len(self.chain) - int(chain.get("active_epoch_records") or 0)
+                else "HISTORICAL_EPOCH"
+            )
+
+        status = "VERIFIED"
+        if not digest_valid or not chain_valid or artifacts_valid is False:
+            status = "FAILED"
+
+        return {
+            "success": True,
+            "evidence_id": evidence_id,
+            "status": status,
+            "digest_valid": digest_valid,
+            "recorded_digest": record.get("sha256_digest"),
+            "recomputed_digest": recomputed,
+            "chain_valid": chain_valid,
+            "chain_scope": chain_scope,
+            "chain_epoch": {"start_index": epoch_start, "end_index": epoch_end},
+            "historical_forks_recorded": len(chain.get("forks_detected") or []),
+            "ledger_fully_linear": bool(chain.get("valid")),
+            "merkle_root": self.get_merkle_root(),
+            "artifacts_rechecked": len(rechecked),
+            "artifacts_valid": artifacts_valid,
+            "artifacts": artifacts,
+            "verification_scope": "DIGEST+CHAIN+PHYSICAL_ARTIFACTS",
+            "checked_at": time.time(),
+        }

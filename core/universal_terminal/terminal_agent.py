@@ -213,7 +213,11 @@ class TerminalHandlingAgent:
             agent_id=self.agent_id
         )
         if not sec_eval["allowed"]:
-            session.status = TerminalStatus.WAITING_AUTHORIZATION if sec_eval["requires_approval"] else TerminalStatus.FAILED
+            session.status = (
+                TerminalStatus.WAITING_AUTHORIZATION
+                if sec_eval.get("requires_approval", False)
+                else TerminalStatus.FAILED
+            )
             session.log(f"Step 7: Check Policy - {sec_eval['decision']}: {sec_eval['reason']}")
             chk.status = "BLOCKED" if sec_eval["killswitch_engaged"] else "WAITING_AUTHORIZATION"
             self.reversibility_engine.save_checkpoint(chk)

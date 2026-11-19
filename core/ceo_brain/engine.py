@@ -35,12 +35,32 @@ class CEOExecutiveBrain:
         state = CEOStateEngine.get_or_build_state(tenant_id, company_id)
         industry_info = IndustryUnderstandingEngine.analyze_industry(state.industry, state.business_model)
         pnl = FinancialIntelligenceEngine.analyze_profit_and_loss(state.gross_revenue, state.operating_cost)
-        forecast_90d = ForecastEngine.generate_financial_forecast(
-            company_name=state.name,
-            current_monthly_revenue=max(10000.0, state.gross_revenue / 3.0),
-            current_monthly_cost=max(5000.0, state.operating_cost / 3.0),
-            horizon=ForecastHorizon.NINETY_DAYS
-        )
+
+        # Never extrapolate a forecast from invented baseline values. A forecast
+        # is only produced when the tenant has actual booked financial data.
+        has_financials = (state.gross_revenue > 0.0 or state.operating_cost > 0.0)
+        if has_financials:
+            forecast_90d = ForecastEngine.generate_financial_forecast(
+                company_name=state.name,
+                current_monthly_revenue=state.gross_revenue / 3.0,
+                current_monthly_cost=state.operating_cost / 3.0,
+                horizon=ForecastHorizon.NINETY_DAYS
+            )
+        else:
+            forecast_90d = {
+                "status": "INSUFFICIENT_DATA",
+                "detail": (
+                    "No booked revenue or cost exists for this company, so no forecast "
+                    "is produced. Connect a finance system or enter verified figures."
+                ),
+            }
+
+        if has_financials:
+            financial_coverage = "AVAILABLE"
+        elif state.facts:
+            financial_coverage = "PARTIAL_FACTS_ONLY"
+        else:
+            financial_coverage = "MISSING"
 
         return {
             "company_id": company_id,
@@ -55,13 +75,14 @@ class CEOExecutiveBrain:
                 "workforce_count": state.workforce_count,
                 "facts_verified_count": len(state.facts)
             },
-            "executive_scorecard": {
-                "company_understanding": "VERIFIED" if industry_info["identified_domain"] else "INITIALIZED",
-                "financial_coverage": "95%" if state.gross_revenue > 0 else "BASELINE_ZERO",
-                "operational_health": "OPTIMAL",
-                "governance_locks": "ACTIVE"
+            "data_availability": {
+                "financials": has_financials,
+                "financial_coverage": financial_coverage,
+                "verified_facts": len(state.facts),
+                "departments": bool(state.departments),
+                "workforce": state.workforce_count > 0,
             },
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
     @classmethod

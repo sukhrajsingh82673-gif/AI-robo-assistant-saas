@@ -89,14 +89,14 @@ class EnterpriseReportsEngine:
                     "report_category": r["report_category"],
                     "frequency": r["frequency"],
                     "verification_state": r["verification_state"],
-                    "metrics": json.loads(r["metrics"]) if r["metrics"] else {},
-                    "dimensions": json.loads(r["dimensions"]) if r["dimensions"] else {},
-                    "chart_data": json.loads(r["chart_data"]) if r["chart_data"] else [],
-                    "forecast_data": json.loads(r["forecast_data"]) if r["forecast_data"] else {},
+                    "metrics": json.loads(r["metrics"]) if isinstance(r["metrics"], str) else (r["metrics"] or {}),
+                    "dimensions": json.loads(r["dimensions"]) if isinstance(r["dimensions"], str) else (r["dimensions"] or {}),
+                    "chart_data": json.loads(r["chart_data"]) if isinstance(r["chart_data"], str) else (r["chart_data"] or []),
+                    "forecast_data": json.loads(r["forecast_data"]) if isinstance(r["forecast_data"], str) else (r["forecast_data"] or {}),
                     "ai_executive_summary": r["ai_executive_summary"],
                     "data_freshness_seconds": r["data_freshness_seconds"],
                     "generated_by": r["generated_by"],
-                    "export_formats": json.loads(r["export_formats"]) if r["export_formats"] else ["CSV", "JSON", "PDF"],
+                    "export_formats": json.loads(r["export_formats"]) if isinstance(r["export_formats"], str) else (r["export_formats"] or ["CSV", "JSON", "PDF"]),
                     "created_at": r["created_at"],
                     "updated_at": r["updated_at"]
                 })
@@ -118,14 +118,14 @@ class EnterpriseReportsEngine:
                 "report_category": r["report_category"],
                 "frequency": r["frequency"],
                 "verification_state": r["verification_state"],
-                "metrics": json.loads(r["metrics"]) if r["metrics"] else {},
-                "dimensions": json.loads(r["dimensions"]) if r["dimensions"] else {},
-                "chart_data": json.loads(r["chart_data"]) if r["chart_data"] else [],
-                "forecast_data": json.loads(r["forecast_data"]) if r["forecast_data"] else {},
+                "metrics": json.loads(r["metrics"]) if isinstance(r["metrics"], str) else (r["metrics"] or {}),
+                "dimensions": json.loads(r["dimensions"]) if isinstance(r["dimensions"], str) else (r["dimensions"] or {}),
+                "chart_data": json.loads(r["chart_data"]) if isinstance(r["chart_data"], str) else (r["chart_data"] or []),
+                "forecast_data": json.loads(r["forecast_data"]) if isinstance(r["forecast_data"], str) else (r["forecast_data"] or {}),
                 "ai_executive_summary": r["ai_executive_summary"],
                 "data_freshness_seconds": r["data_freshness_seconds"],
                 "generated_by": r["generated_by"],
-                "export_formats": json.loads(r["export_formats"]) if r["export_formats"] else ["CSV", "JSON", "PDF"],
+                "export_formats": json.loads(r["export_formats"]) if isinstance(r["export_formats"], str) else (r["export_formats"] or ["CSV", "JSON", "PDF"]),
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"]
             }
@@ -143,12 +143,28 @@ class EnterpriseReportsEngine:
 
         with db.get_connection() as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO enterprise_reports (
+            INSERT INTO enterprise_reports (
                 report_id, tenant_id, company_id, title, report_category,
                 frequency, verification_state, metrics, dimensions, chart_data,
                 forecast_data, ai_executive_summary, data_freshness_seconds,
                 generated_by, export_formats, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (report_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                title = EXCLUDED.title,
+                report_category = EXCLUDED.report_category,
+                frequency = EXCLUDED.frequency,
+                verification_state = EXCLUDED.verification_state,
+                metrics = EXCLUDED.metrics,
+                dimensions = EXCLUDED.dimensions,
+                chart_data = EXCLUDED.chart_data,
+                forecast_data = EXCLUDED.forecast_data,
+                ai_executive_summary = EXCLUDED.ai_executive_summary,
+                data_freshness_seconds = EXCLUDED.data_freshness_seconds,
+                generated_by = EXCLUDED.generated_by,
+                export_formats = EXCLUDED.export_formats,
+                updated_at = EXCLUDED.updated_at
             """, (
                 rid, self.tenant_id, data.get("company_id", "comp_primary"),
                 title, cat, data.get("frequency", "MONTHLY"),
@@ -187,8 +203,8 @@ class EnterpriseReportsEngine:
             if cnt > 0:
                 return
 
-        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
-        clean_mode = (app_env in ("production", "prod")) or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) or (os.environ.get("ZONATA_CLEAN_STARTUP", "0").lower() in ("1", "true", "yes"))
+        # Invariant: SaaS tenants start with 0 generated reports.
+        clean_mode = os.environ.get("ZONATA_SEED_MOCK_TEST_FIXTURES", "0") != "1"
         if clean_mode:
             return
 

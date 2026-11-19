@@ -32,7 +32,7 @@ curl -s http://127.0.0.1:8080/api/automation/fabric/status
 
 ## 2. Docker Compose Production Topology
 
-Production compose orchestration is defined in [`docker-compose.prod.yml`](file:///root/roboassistant/docker-compose.prod.yml):
+Production compose orchestration is defined in [`docker-compose.prod.yml`](../../docker-compose.prod.yml):
 
 ```bash
 # Launch Production Stack
@@ -49,7 +49,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 ## 3. Kubernetes Multi-Node Enterprise Topology
 
-Kubernetes manifests are located in [`k8s/`](file:///root/roboassistant/k8s/):
+Kubernetes manifests are located in [`k8s/`](../../k8s):
 
 1. `k8s/01-configmap.yaml`: Environment configuration and strict authentication flags.
 2. `k8s/02-secrets.yaml`: Sealed secrets for signing keys and Vault access tokens.

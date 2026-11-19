@@ -1,0 +1,942 @@
+{
+  "": "http://cyclonedx.org/schema/bom-1.5.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:cdcca016-1b6f-4d7f-9639-71eb0016635f",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-19T06:13:04.157633+00:00",
+    "tools": [
+      {
+        "vendor": "ZONATA SecOps",
+        "name": "ZONATA Supply-Chain Auditor",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:generic/zonata-enterprise@1.0.0",
+      "name": "zonata-enterprise",
+      "version": "1.0.0",
+      "description": "ZONATA Universal AI Company Operating System",
+      "licenses": [
+        {
+          "license": {
+            "id": "Proprietary"
+          }
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/psycopg2-binary@2.9.9",
+      "name": "psycopg2-binary",
+      "version": "2.9.9",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "NOASSERTION",
+            "name": "LGPL-3.0-or-later WITH OpenSSL-Exception"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/psycopg2-binary@2.9.9"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pg8000@1.31.5",
+      "name": "pg8000",
+      "version": "1.31.5",
+      "description": "Pure-Python PostgreSQL DB-API 2.0 driver",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pg8000@1.31.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyyaml@6.0.1",
+      "name": "PyYAML",
+      "version": "6.0.1",
+      "description": "YAML parser and emitter for Python",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pyyaml@6.0.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/numpy@1.26.4",
+      "name": "numpy",
+      "version": "1.26.4",
+      "description": "Fundamental package for scientific computing with Python",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/numpy@1.26.4"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pandas@2.2.2",
+      "name": "pandas",
+      "version": "2.2.2",
+      "description": "Powerful data structures for data analysis and relational operations",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pandas@2.2.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "description": "Extensions to the standard Python datetime module",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/python-dateutil@2.9.0.post0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cryptography@50.0.2",
+      "name": "cryptography",
+      "version": "50.0.2",
+      "description": "Cryptographic recipes and primitives for Python developers",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/cryptography@50.0.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/bcrypt@5.0.0",
+      "name": "bcrypt",
+      "version": "5.0.0",
+      "description": "Modern password hashing for Python",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/bcrypt@5.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring@1.3.0",
+      "name": "@napi-rs/keyring",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-darwin-arm64@1.3.0",
+      "name": "@napi-rs/keyring-darwin-arm64",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-darwin-arm64",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-darwin-arm64@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-darwin-x64@1.3.0",
+      "name": "@napi-rs/keyring-darwin-x64",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-darwin-x64",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-darwin-x64@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-freebsd-x64@1.3.0",
+      "name": "@napi-rs/keyring-freebsd-x64",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-freebsd-x64",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-freebsd-x64@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-arm-gnueabihf@1.3.0",
+      "name": "@napi-rs/keyring-linux-arm-gnueabihf",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm-gnueabihf",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-arm-gnueabihf@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-arm64-gnu@1.3.0",
+      "name": "@napi-rs/keyring-linux-arm64-gnu",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm64-gnu",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-arm64-gnu@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-arm64-musl@1.3.0",
+      "name": "@napi-rs/keyring-linux-arm64-musl",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-arm64-musl",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-arm64-musl@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-riscv64-gnu@1.3.0",
+      "name": "@napi-rs/keyring-linux-riscv64-gnu",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-riscv64-gnu",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-riscv64-gnu@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-x64-gnu@1.3.0",
+      "name": "@napi-rs/keyring-linux-x64-gnu",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-x64-gnu",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-x64-gnu@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-linux-x64-musl@1.3.0",
+      "name": "@napi-rs/keyring-linux-x64-musl",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-linux-x64-musl",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-linux-x64-musl@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-win32-arm64-msvc@1.3.0",
+      "name": "@napi-rs/keyring-win32-arm64-msvc",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-arm64-msvc",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-win32-arm64-msvc@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-win32-ia32-msvc@1.3.0",
+      "name": "@napi-rs/keyring-win32-ia32-msvc",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-ia32-msvc",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-win32-ia32-msvc@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@napi-rs/keyring-win32-x64-msvc@1.3.0",
+      "name": "@napi-rs/keyring-win32-x64-msvc",
+      "version": "1.3.0",
+      "description": "Node.js runtime module @napi-rs/keyring-win32-x64-msvc",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@napi-rs/keyring-win32-x64-msvc@1.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@neon/config@1.9.2",
+      "name": "@neon/config",
+      "version": "1.9.2",
+      "description": "Node.js runtime module @neon/config",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@neon/config@1.9.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@neon/env@1.6.3",
+      "name": "@neon/env",
+      "version": "1.6.3",
+      "description": "Node.js runtime module @neon/env",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@neon/env@1.6.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/@neon/sdk@7.3.0",
+      "name": "@neon/sdk",
+      "version": "7.3.0",
+      "description": "Node.js runtime module @neon/sdk",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/@neon/sdk@7.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ansi-regex@6.4.0",
+      "name": "ansi-regex",
+      "version": "6.4.0",
+      "description": "Node.js runtime module ansi-regex",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/ansi-regex@6.4.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ansi-styles@6.2.3",
+      "name": "ansi-styles",
+      "version": "6.2.3",
+      "description": "Node.js runtime module ansi-styles",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/ansi-styles@6.2.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/cliui@9.0.1",
+      "name": "cliui",
+      "version": "9.0.1",
+      "description": "Node.js runtime module cliui",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC",
+            "name": "ISC"
+          }
+        }
+      ],
+      "purl": "pkg:npm/cliui@9.0.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/cliui/string-width@7.2.0",
+      "name": "cliui/string-width",
+      "version": "7.2.0",
+      "description": "Node.js runtime module cliui/string-width",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/cliui/string-width@7.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/emoji-regex@10.6.0",
+      "name": "emoji-regex",
+      "version": "10.6.0",
+      "description": "Node.js runtime module emoji-regex",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/emoji-regex@10.6.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/escalade@3.2.0",
+      "name": "escalade",
+      "version": "3.2.0",
+      "description": "Node.js runtime module escalade",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/escalade@3.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/get-caller-file@2.0.5",
+      "name": "get-caller-file",
+      "version": "2.0.5",
+      "description": "Node.js runtime module get-caller-file",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC",
+            "name": "ISC"
+          }
+        }
+      ],
+      "purl": "pkg:npm/get-caller-file@2.0.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/get-east-asian-width@1.7.0",
+      "name": "get-east-asian-width",
+      "version": "1.7.0",
+      "description": "Node.js runtime module get-east-asian-width",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/get-east-asian-width@1.7.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/jiti@2.7.0",
+      "name": "jiti",
+      "version": "2.7.0",
+      "description": "Node.js runtime module jiti",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/jiti@2.7.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/string-width@8.3.0",
+      "name": "string-width",
+      "version": "8.3.0",
+      "description": "Node.js runtime module string-width",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/string-width@8.3.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/strip-ansi@7.2.0",
+      "name": "strip-ansi",
+      "version": "7.2.0",
+      "description": "Node.js runtime module strip-ansi",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/strip-ansi@7.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/wrap-ansi@9.0.2",
+      "name": "wrap-ansi",
+      "version": "9.0.2",
+      "description": "Node.js runtime module wrap-ansi",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/wrap-ansi@9.0.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/wrap-ansi/string-width@7.2.0",
+      "name": "wrap-ansi/string-width",
+      "version": "7.2.0",
+      "description": "Node.js runtime module wrap-ansi/string-width",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/wrap-ansi/string-width@7.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/y18n@5.0.8",
+      "name": "y18n",
+      "version": "5.0.8",
+      "description": "Node.js runtime module y18n",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC",
+            "name": "ISC"
+          }
+        }
+      ],
+      "purl": "pkg:npm/y18n@5.0.8"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/yargs@18.2.0",
+      "name": "yargs",
+      "version": "18.2.0",
+      "description": "Node.js runtime module yargs",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/yargs@18.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/yargs-parser@22.0.0",
+      "name": "yargs-parser",
+      "version": "22.0.0",
+      "description": "Node.js runtime module yargs-parser",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC",
+            "name": "ISC"
+          }
+        }
+      ],
+      "purl": "pkg:npm/yargs-parser@22.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/zod@4.6.7",
+      "name": "zod",
+      "version": "4.6.7",
+      "description": "Node.js runtime module zod",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "name": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/zod@4.6.7"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/zonata-enterprise@1.0.0",
+      "dependsOn": [
+        "pkg:pypi/psycopg2-binary@2.9.9",
+        "pkg:pypi/pg8000@1.31.5",
+        "pkg:pypi/pyyaml@6.0.1",
+        "pkg:pypi/numpy@1.26.4",
+        "pkg:pypi/pandas@2.2.2",
+        "pkg:pypi/python-dateutil@2.9.0.post0",
+        "pkg:pypi/cryptography@50.0.2",
+        "pkg:pypi/bcrypt@5.0.0",
+        "pkg:npm/@napi-rs/keyring@1.3.0",
+        "pkg:npm/@napi-rs/keyring-darwin-arm64@1.3.0",
+        "pkg:npm/@napi-rs/keyring-darwin-x64@1.3.0",
+        "pkg:npm/@napi-rs/keyring-freebsd-x64@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-arm-gnueabihf@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-arm64-gnu@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-arm64-musl@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-riscv64-gnu@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-x64-gnu@1.3.0",
+        "pkg:npm/@napi-rs/keyring-linux-x64-musl@1.3.0",
+        "pkg:npm/@napi-rs/keyring-win32-arm64-msvc@1.3.0",
+        "pkg:npm/@napi-rs/keyring-win32-ia32-msvc@1.3.0",
+        "pkg:npm/@napi-rs/keyring-win32-x64-msvc@1.3.0",
+        "pkg:npm/@neon/config@1.9.2",
+        "pkg:npm/@neon/env@1.6.3",
+        "pkg:npm/@neon/sdk@7.3.0",
+        "pkg:npm/ansi-regex@6.4.0",
+        "pkg:npm/ansi-styles@6.2.3",
+        "pkg:npm/cliui@9.0.1",
+        "pkg:npm/cliui/string-width@7.2.0",
+        "pkg:npm/emoji-regex@10.6.0",
+        "pkg:npm/escalade@3.2.0",
+        "pkg:npm/get-caller-file@2.0.5",
+        "pkg:npm/get-east-asian-width@1.7.0",
+        "pkg:npm/jiti@2.7.0",
+        "pkg:npm/string-width@8.3.0",
+        "pkg:npm/strip-ansi@7.2.0",
+        "pkg:npm/wrap-ansi@9.0.2",
+        "pkg:npm/wrap-ansi/string-width@7.2.0",
+        "pkg:npm/y18n@5.0.8",
+        "pkg:npm/yargs@18.2.0",
+        "pkg:npm/yargs-parser@22.0.0",
+        "pkg:npm/zod@4.6.7"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/psycopg2-binary@2.9.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pg8000@1.31.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pyyaml@6.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/numpy@1.26.4",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pandas@2.2.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/cryptography@50.0.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/bcrypt@5.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-darwin-arm64@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-darwin-x64@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-freebsd-x64@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-arm-gnueabihf@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-arm64-gnu@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-arm64-musl@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-riscv64-gnu@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-x64-gnu@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-linux-x64-musl@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-win32-arm64-msvc@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-win32-ia32-msvc@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@napi-rs/keyring-win32-x64-msvc@1.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@neon/config@1.9.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@neon/env@1.6.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/@neon/sdk@7.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/ansi-regex@6.4.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/ansi-styles@6.2.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/cliui@9.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/cliui/string-width@7.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/emoji-regex@10.6.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/escalade@3.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/get-caller-file@2.0.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/get-east-asian-width@1.7.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/jiti@2.7.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/string-width@8.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/strip-ansi@7.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/wrap-ansi@9.0.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/wrap-ansi/string-width@7.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/y18n@5.0.8",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/yargs@18.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/yargs-parser@22.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/zod@4.6.7",
+      "dependsOn": []
+    }
+  ]
+}

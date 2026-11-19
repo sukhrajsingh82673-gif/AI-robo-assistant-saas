@@ -394,9 +394,15 @@ class GovernedConnectorRegistry:
             # Register in-flight execution intent in SQLite
             with db.get_connection() as conn_db:
                 conn_db.execute("""
-                    INSERT OR REPLACE INTO automation_connector_idempotency (
+                    INSERT INTO automation_connector_idempotency (
                         idempotency_key, connector_id, operation, tenant_id, status, parameters, created_at
                     ) VALUES (?, ?, ?, ?, 'IN_FLIGHT', ?, ?)
+                    ON CONFLICT (idempotency_key) DO UPDATE SET
+                        connector_id = EXCLUDED.connector_id,
+                        operation = EXCLUDED.operation,
+                        tenant_id = EXCLUDED.tenant_id,
+                        status = EXCLUDED.status,
+                        parameters = EXCLUDED.parameters
                 """, (idempotency_key, connector_id, operation, tenant_id, json.dumps(parameters), now))
                 conn_db.commit()
 

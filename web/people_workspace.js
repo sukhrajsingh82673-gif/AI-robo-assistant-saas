@@ -10,11 +10,50 @@
   class EnterprisePeopleWorkspace {
     constructor() {
       this.activeTab = 'employees'; // 'employees' | 'ai_workers'
+      this.employees = [];
+      this.loading = false;
     }
 
-    render(containerId = 'view-people') {
+    async render(containerId = 'view-people') {
       const container = document.getElementById(containerId);
       if (!container) return;
+
+      if (window.AppleWorkforceBoard) {
+        window.AppleWorkforceBoard.render(container);
+        return;
+      }
+
+      container.innerHTML = `
+        <div style="padding:40px; text-align:center;">
+          <div class="status-pulse-dot" style="margin:0 auto 12px; width:14px; height:14px;"></div>
+          <div style="font-size:14px; color:var(--text-secondary);">Loading Workforce Roster...</div>
+        </div>
+      `;
+
+      await this.loadEmployees();
+      this.renderView(container);
+    }
+
+    async loadEmployees() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/employees');
+        if (res.ok) {
+          const data = await res.json();
+          this.employees = Array.isArray(data.employees) ? data.employees : [];
+        }
+      } catch (err) {
+        console.error('Failed to load employees:', err);
+      } finally {
+        this.loading = false;
+      }
+    }
+
+    renderView(container) {
+      const totalEmp = this.employees.length;
+      const aiAgents = this.employees.filter(e => e.allowed_tools || (e.manager && e.manager.includes('AI'))).length;
+      const humanStaff = totalEmp - aiAgents;
+      const totalPayroll = this.employees.reduce((acc, e) => acc + (Number(e.budget_limit || e.spending_limit || 0)), 0);
 
       container.innerHTML = `
         <div class="people-workspace-layout" style="display:flex; flex-direction:column; gap:20px; max-width:1440px; margin:0 auto; padding-bottom:60px;">
@@ -39,7 +78,7 @@
 
             <!-- Header Action -->
             <div style="display:flex; gap:10px; align-items:center;">
-              <button class="btn-primary" onclick="window.showToast('Employee onboarding invitation dispatched', 'success')">
+              <button class="btn-primary" onclick="window.PeopleWorkspace.openAddEmployeeModal()">
                 + Add Employee Profile
               </button>
             </div>
@@ -49,71 +88,139 @@
           <div class="enterprise-grid-4">
             <div class="metric-stat-card">
               <div class="metric-stat-title">Human Personnel</div>
-              <div class="metric-stat-value">24</div>
-              <div class="metric-stat-sub">100% active, 0 unassigned</div>
+              <div class="metric-stat-value">${humanStaff}</div>
+              <div class="metric-stat-sub">${humanStaff > 0 ? `${humanStaff} active` : 'No personnel assigned'}</div>
             </div>
             <div class="metric-stat-card">
               <div class="metric-stat-title">Autonomous AI Agents</div>
-              <div class="metric-stat-value" style="color:var(--accent-purple);">8</div>
-              <div class="metric-stat-sub">Governed digital co-workers</div>
+              <div class="metric-stat-value" style="color:var(--accent-purple);">${aiAgents}</div>
+              <div class="metric-stat-sub">${aiAgents > 0 ? 'Governed digital co-workers' : '0 specialists deployed'}</div>
             </div>
             <div class="metric-stat-card">
               <div class="metric-stat-title">Average Attendance</div>
-              <div class="metric-stat-value" style="color:var(--accent-emerald);">98.8%</div>
-              <div class="metric-stat-sub">Biometric & SSO verified</div>
+              <div class="metric-stat-value" style="color:var(--accent-emerald);">${totalEmp > 0 ? '100%' : '—'}</div>
+              <div class="metric-stat-sub">${totalEmp > 0 ? 'Biometric & SSO verified' : 'Awaiting team sync'}</div>
             </div>
             <div class="metric-stat-card">
-              <div class="metric-stat-title">Monthly Payroll Total</div>
-              <div class="metric-stat-value">₹2,850,000</div>
-              <div class="metric-stat-sub">Disbursed on 1st of month</div>
+              <div class="metric-stat-title">Monthly Payroll Allocation</div>
+              <div class="metric-stat-value">₹${totalPayroll.toLocaleString()}</div>
+              <div class="metric-stat-sub">${totalPayroll > 0 ? 'Authorized operational budget' : '₹0 committed'}</div>
             </div>
           </div>
 
-          <!-- Personnel Table -->
-          <div class="responsive-table-container">
-            <table class="enterprise-data-table">
-              <thead>
-                <tr>
-                  <th>Employee Name & Dossier</th>
-                  <th>Department</th>
-                  <th>Designation / Role</th>
-                  <th>Manager / Reports To</th>
-                  <th>Compensation (Monthly)</th>
-                  <th>Attendance</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${[
-                  { name: 'Priya Sharma', dept: 'Finance', role: 'Chief Financial Controller', manager: 'Sukhraj Singh (Owner)', comp: '₹250,000', att: '99.2%', status: 'ACTIVE' },
-                  { name: 'Aman Verma', dept: 'Operations', role: 'Director of Hotel Operations', manager: 'Sukhraj Singh (Owner)', comp: '₹220,000', att: '98.5%', status: 'ACTIVE' },
-                  { name: 'Rajesh Khanna', dept: 'Sales', role: 'VP Commercial Enterprise Sales', manager: 'AI CEO Executive', comp: '₹195,000', att: '99.0%', status: 'ACTIVE' },
-                  { name: 'Neha Joshi', dept: 'HR', role: 'Head of People & Culture', manager: 'Sukhraj Singh (Owner)', comp: '₹160,000', att: '98.9%', status: 'ACTIVE' }
-                ].map(emp => `
+          <!-- Personnel Table or Empty State -->
+          ${totalEmp === 0 ? `
+            <div class="empty-state-card" style="padding:60px 24px; text-align:center; background:var(--bg-surface); border:1px dashed var(--border-color); border-radius:12px;">
+              <div style="font-size:36px; margin-bottom:12px;">👥</div>
+              <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">No Workforce Personnel Added Yet</h3>
+              <p style="font-size:13px; color:var(--text-secondary); max-width:480px; margin:0 auto 20px;">
+                Your organization currently has 0 registered human staff and 0 deployed AI specialists. Add an employee profile or deploy an autonomous agent to build your roster.
+              </p>
+              <button class="btn-primary" onclick="window.PeopleWorkspace.openAddEmployeeModal()">+ Add First Employee Profile</button>
+            </div>
+          ` : `
+            <div class="responsive-table-container">
+              <table class="enterprise-data-table">
+                <thead>
                   <tr>
-                    <td>
-                      <div style="font-weight:600; color:var(--text-primary);">👤 ${emp.name}</div>
-                      <div style="font-size:11px; color:var(--text-muted);">ID: EMP-${emp.name.split(' ')[0].toUpperCase()}</div>
-                    </td>
-                    <td><span class="badge" style="background:rgba(255,255,255,0.06); font-size:11px;">${emp.dept}</span></td>
-                    <td style="font-weight:600; color:var(--accent-blue);">${emp.role}</td>
-                    <td style="color:var(--text-secondary);">${emp.manager}</td>
-                    <td style="font-family:var(--font-mono); font-weight:700;">${emp.comp}</td>
-                    <td><span class="badge badge-emerald" style="font-size:11px;">${emp.att}</span></td>
-                    <td><span class="badge badge-emerald">${emp.status}</span></td>
-                    <td>
-                      <button class="btn-secondary" style="padding:4px 8px; font-size:11.5px;" onclick="window.showToast('Employee dossier inspected', 'info')">
-                        Dossier
-                      </button>
-                    </td>
+                    <th>Employee Name & Role</th>
+                    <th>Department</th>
+                    <th>Company</th>
+                    <th>Manager / Reports To</th>
+                    <th>Spend / Budget Limit</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  ${this.employees.map(emp => `
+                    <tr>
+                      <td>
+                        <div style="font-weight:600; color:var(--text-primary);">👤 ${emp.name || 'Specialist'}</div>
+                        <div style="font-size:11px; color:var(--text-muted);">ID: ${emp.id || 'EMP-01'}</div>
+                      </td>
+                      <td><span class="badge" style="background:rgba(255,255,255,0.06); font-size:11px;">${emp.department || 'Operations'}</span></td>
+                      <td style="font-weight:600; color:var(--accent-blue);">${emp.company_name || 'Primary'}</td>
+                      <td style="color:var(--text-secondary);">${emp.manager || 'Executive'}</td>
+                      <td style="font-family:var(--font-mono); font-weight:700;">₹${Number(emp.budget_limit || emp.spending_limit || 0).toLocaleString()}</td>
+                      <td><span class="badge badge-emerald">${emp.status || 'ACTIVE'}</span></td>
+                      <td>
+                        <button class="btn-secondary" style="padding:4px 8px; font-size:11.5px;" onclick="window.showToast ? window.showToast('Employee dossier inspected', 'info') : alert('Employee dossier inspected')">
+                          Dossier
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
         </div>
       `;
+    }
+
+    openAddEmployeeModal() {
+      const body = `
+        <form onsubmit="window.PeopleWorkspace.submitAddEmployee(event)" style="display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label class="form-label">Role / Job Title *</label>
+            <input type="text" class="form-input" id="newEmpRole" placeholder="e.g. Operations Specialist, Financial Analyst" required />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label class="form-label">Department *</label>
+              <select class="form-input" id="newEmpDept">
+                <option value="Operations">Operations</option>
+                <option value="Finance">Finance</option>
+                <option value="Sales">Sales</option>
+                <option value="Procurement">Procurement</option>
+                <option value="Engineering">Engineering</option>
+                <option value="HR">HR</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Monthly Spending / Budget Limit (₹)</label>
+              <input type="number" class="form-input" id="newEmpBudget" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+            <button type="button" class="btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Create Profile</button>
+          </div>
+        </form>
+      `;
+
+      if (window.openModal) {
+        window.openModal('Add Employee Profile', body);
+      }
+    }
+
+    async submitAddEmployee(e) {
+      e.preventDefault();
+      const role = document.getElementById('newEmpRole').value;
+      const dept = document.getElementById('newEmpDept').value;
+      const budget = parseFloat(document.getElementById('newEmpBudget').value || '0');
+
+      try {
+        const res = await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: role,
+            department: dept,
+            budget_limit: budget,
+            spending_limit: budget
+          })
+        });
+
+        if (res.ok) {
+          if (window.closeModal) window.closeModal();
+          if (window.showToast) window.showToast('Employee profile added successfully', 'success');
+          await this.render();
+        }
+      } catch (err) {
+        console.error('Failed to add employee:', err);
+      }
     }
   }
 

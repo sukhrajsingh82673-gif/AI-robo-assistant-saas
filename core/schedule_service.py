@@ -5,6 +5,7 @@ workforce, financial deadlines, and robotic desktop execution.
 """
 
 from typing import Dict, List, Optional, Any
+import os
 import time
 import uuid
 import json
@@ -105,10 +106,11 @@ class UniversalScheduleService:
                 "created_at": r["created_at"]
             })
 
-        # If zero items exist in DB, seed canonical initial schedule items for companies
+        # If zero items exist in DB, seed canonical initial schedule items for companies if enabled
         if not items and (not company_id or company_id == "all"):
-            self._seed_initial_schedules()
-            return self.list_schedules(company_id, item_type, priority, status, start_after, start_before)
+            seeded = self._seed_initial_schedules()
+            if seeded:
+                return self.list_schedules(company_id, item_type, priority, status, start_after, start_before)
 
         return items
 
@@ -437,7 +439,14 @@ class UniversalScheduleService:
         return recs
 
     def _seed_initial_schedules(self):
-        """Seeds realistic initial schedules across companies for immediate productivity."""
+        """Seeds initial schedules only when demo seeding is explicitly enabled."""
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return False
+
         now = time.time()
         # Seed 6 diverse items spanning today, tomorrow, and this week
         seed_items = [
@@ -511,3 +520,4 @@ class UniversalScheduleService:
 
         for s in seed_items:
             self.create_schedule(s)
+        return True

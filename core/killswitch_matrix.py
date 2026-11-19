@@ -66,11 +66,23 @@ class KillSwitchMatrix:
         now = time.time()
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO enterprise_killswitch_matrix (
+                INSERT INTO enterprise_killswitch_matrix (
                     switch_id, level, target_id, reason, activated_by, activated_at, is_active
                 ) VALUES (?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT (switch_id) DO UPDATE SET
+                    level = EXCLUDED.level,
+                    target_id = EXCLUDED.target_id,
+                    reason = EXCLUDED.reason,
+                    activated_by = EXCLUDED.activated_by,
+                    activated_at = EXCLUDED.activated_at,
+                    is_active = 1
             """, (switch_id, level, target_id, reason, activated_by, now))
             conn.commit()
+            try:
+                from .observability_stack import sre_metrics
+                sre_metrics.inc_counter("zonata_killswitch_activations_total")
+            except Exception:
+                pass
             logger.warning(f"KILLSWITCH ENGAGED: Level={level}, Target={target_id}, Reason={reason}")
             return switch_id
 
@@ -124,7 +136,7 @@ class KillSwitchMatrix:
                     SELECT 1 FROM enterprise_killswitch_matrix
                     WHERE level = ? AND is_active = 1
                 """, (level,)).fetchone()
-            return row is not None
+            return bool(row) and bool(row[0])
 
     def is_engaged(self, level: str, target_id: Optional[str] = None) -> bool:
         """Alias for is_activated."""

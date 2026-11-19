@@ -11,7 +11,8 @@ import time
 import os
 import uuid
 import json
-from core.db import db
+import tempfile
+from core.db import db, configure_isolated_test_db
 from core.production_config import ProductionConfigValidator, ConfigurationError
 from core.secret_vault import SecretVault, SecretVaultException
 from core.sovereign_key_manager import SovereignKeyManager, KeyType, SovereignAuthorityViolation
@@ -20,9 +21,29 @@ from core.cost_governor import CostGovernor, BudgetExhaustedException
 from core.killswitch_matrix import KillSwitchMatrix, KillSwitchLevel, KillSwitchEngagedException
 from core.approval_revocation import ApprovalRevocationEngine, ApprovalDeniedException
 from core.reconciliation_engine import ExternalActionReconciliationEngine, ReconciliationStatus
-from core.observability_stack import PrometheusMetricsRegistry, SLOTracker
+from core.observability_stack import PrometheusMetricsRegistry, SLOTracker, sre_metrics
 from core.alerting_engine import AlertingEngine
 from core.production_gates import ProductionCertificationGates
+
+MODULE_ORIG_DB_PATH = None
+MODULE_TEMP_DIR = None
+
+def setUpModule():
+    """Configures a globally isolated database for all test fixtures in this suite."""
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    MODULE_ORIG_DB_PATH = db.db_path
+    MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
+    isolated_db = os.path.join(MODULE_TEMP_DIR.name, "v10_test_isolated.db")
+    configure_isolated_test_db(isolated_db)
+
+def tearDownModule():
+    """Restores database path to original baseline."""
+    global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    if MODULE_ORIG_DB_PATH:
+        db.set_db_path(MODULE_ORIG_DB_PATH)
+        os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
+    if MODULE_TEMP_DIR:
+        MODULE_TEMP_DIR.cleanup()
 
 class TestV10EnterpriseProductionUnit(unittest.TestCase):
 
@@ -162,20 +183,21 @@ class TestV10EnterpriseProductionUnit(unittest.TestCase):
     def test_05_cost_governor_hard_limits(self):
         """Verify soft warnings and hard budget limit failure."""
         gov = CostGovernor(tenant_id=self.tenant_id)
-        gov.set_budget(self.company_id, "MISSION", "msn_budget_01", allocated_inr=1000.0, hard_limit_inr=1000.0)
+        msn_id = f"msn_budget_{uuid.uuid4().hex[:8]}"
+        gov.set_budget(self.company_id, "MISSION", msn_id, allocated_inr=1000.0, hard_limit_inr=1000.0)
 
         # ₹500 spend (50%) -> ACTIVE
-        r1 = gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 500.0)
+        r1 = gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 500.0)
         self.assertEqual(r1["status"], "ACTIVE")
 
         # Additional ₹350 spend (85% total) -> WARNING (soft limit reached)
-        r2 = gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 350.0)
+        r2 = gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 350.0)
         self.assertEqual(r2["status"], "WARNING")
         self.assertTrue(r2["soft_limit_breached"])
 
         # Additional ₹200 spend (105% total) -> Raises BudgetExhaustedException
         with self.assertRaises(BudgetExhaustedException):
-            gov.record_expenditure_and_check(self.company_id, "MISSION", "msn_budget_01", 200.0)
+            gov.record_expenditure_and_check(self.company_id, "MISSION", msn_id, 200.0)
 
     # 6. Nine-Level KillSwitch Matrix
     def test_06_killswitch_nine_levels(self):
@@ -268,6 +290,43 @@ class TestV10EnterpriseProductionUnit(unittest.TestCase):
         alerts = AlertingEngine(tenant_id=self.tenant_id).evaluate_active_alerts(registry)
         self.assertGreaterEqual(len(alerts), 1)
         self.assertEqual(alerts[0]["alert_id"], "ALT_OUTBOX_BACKLOG")
+
+    # 10b. Alert metrics must be driven by real platform events
+    def test_10b_alert_metrics_wired_to_real_events(self):
+        """KillSwitch, drift and budget events must bump the counters the alerts read."""
+        sre_metrics.reset()
+        alerts = AlertingEngine(tenant_id=self.tenant_id)
+
+        # 1. KillSwitch activation
+        ks = KillSwitchMatrix(tenant_id=self.tenant_id)
+        ks.activate(KillSwitchLevel.DOMAIN, "domain_finance", "wiring test")
+        self.assertGreaterEqual(sre_metrics._counters.get("zonata_killswitch_activations_total", 0), 1)
+        fired = [a["alert_id"] for a in alerts.evaluate_active_alerts(sre_metrics)]
+        self.assertIn("ALT_KILLSWITCH_ENGAGED", fired)
+
+        # 2. Reconciliation drift
+        engine = ExternalActionReconciliationEngine(tenant_id=self.tenant_id)
+        receipt = engine.reconcile_action(
+            action_id=f"act_wire_{uuid.uuid4().hex[:6]}",
+            system_type="PMS",
+            idempotency_key="idem_wire_1",
+            expected_state={"rate": 5000},
+            remote_inspector_fn=lambda key: (True, {"rate": 4500}, None),
+        )
+        self.assertEqual(receipt["status"], ReconciliationStatus.DRIFTED)
+        self.assertGreaterEqual(sre_metrics._counters.get("zonata_reconciliation_drift_total", 0), 1)
+        fired = [a["alert_id"] for a in alerts.evaluate_active_alerts(sre_metrics)]
+        self.assertIn("ALT_RECONCILIATION_DRIFT", fired)
+
+        # 3. Budget exhaustion
+        gov = CostGovernor(tenant_id=self.tenant_id)
+        scope_id = f"msn_wire_{uuid.uuid4().hex[:8]}"
+        gov.set_budget(self.company_id, "MISSION", scope_id, allocated_inr=100.0, hard_limit_inr=100.0)
+        with self.assertRaises(BudgetExhaustedException):
+            gov.record_expenditure_and_check(self.company_id, "MISSION", scope_id, 150.0)
+        self.assertGreaterEqual(sre_metrics._counters.get("zonata_budget_exhaustions_total", 0), 1)
+        fired = [a["alert_id"] for a in alerts.evaluate_active_alerts(sre_metrics)]
+        self.assertIn("ALT_BUDGET_EXHAUSTED", fired)
 
     # 11. Automated Certification Gates (GATE-01 to GATE-21)
     def test_11_automated_certification_gates(self):

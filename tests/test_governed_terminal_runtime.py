@@ -205,14 +205,24 @@ class TestGovernedTerminalRuntime(unittest.TestCase):
         self.assertTrue(disc_res["verified"])
         self.assertGreater(disc_res["output"]["candidates_found"], 0)
 
-        # Self-extension admission
+        # Self-extension admission. A capability is only admitted when its runtime
+        # dependency is genuinely installed; otherwise the request must be blocked
+        # with an explicit reason instead of pretending to succeed.
         ext_res = self.runtime.run_foreground(self.session_id, {
             "capability": "terminal.self_extension",
             "parameters": {"query": "extract text from pdf documents"}
         })
-        self.assertEqual(ext_res["status"], "SUCCEEDED")
-        self.assertTrue(ext_res["verified"])
-        self.assertIn(ext_res["output"]["action_taken"], ["FOUND_EXISTING", "ADMITTED_NEW_CAPABILITY"])
+        if ext_res["status"] == "SUCCEEDED":
+            self.assertTrue(ext_res["verified"])
+            self.assertIn(ext_res["output"]["action_taken"], ["FOUND_EXISTING", "ADMITTED_NEW_CAPABILITY"])
+        else:
+            self.assertEqual(ext_res["status"], "FAILED")
+            self.assertFalse(ext_res["verified"])
+            self.assertIn(ext_res["output"]["action_taken"], ["BLOCKED", "NO_MATCH"])
+            self.assertTrue(
+                ext_res["output"].get("qualification_status") or ext_res["output"].get("query"),
+                "blocked admission must carry a reason",
+            )
 
     # 9. WorkerRuntimeRouter Terminal Affinity & Scoring
     def test_router_terminal_affinity(self):

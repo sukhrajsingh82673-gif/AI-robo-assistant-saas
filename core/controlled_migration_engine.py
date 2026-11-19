@@ -47,16 +47,19 @@ class ControlledMigrationEngine:
     """
 
     def __init__(self):
+        if db.is_postgresql() and not db.is_ready():
+            db.verify_readiness()
         self._ensure_migrations_table()
 
     def _ensure_migrations_table(self):
         with db.get_connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS schema_migrations (
-                    version INTEGER PRIMARY KEY,
-                    migration_name TEXT NOT NULL,
-                    applied_at REAL NOT NULL,
+                    version TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
                     checksum TEXT NOT NULL,
+                    applied_at REAL NOT NULL,
+                    execution_time_ms REAL NOT NULL,
                     status TEXT NOT NULL
                 )
             """)

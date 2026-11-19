@@ -8,6 +8,76 @@ import sqlite3
 import os
 import time
 import json
+import re
+import urllib.parse
+import threading
+import sys
+from typing import Optional, Any, Dict, List, Tuple, Set
+
+# Automatically load Neon environment configuration (.env.local / .env)
+try:
+    from core.neon_env import load_neon_env
+    load_neon_env()
+except Exception:
+    pass
+
+def sanitize_db_url(raw_input: str) -> str:
+    """Safely sanitizes database connection strings and diagnostic error strings.
+    Parses connection URLs via urllib.parse to redact userinfo passwords and query secrets,
+    with defensive multi-layer fallbacks for irregular strings, punctuation, URL-encoded
+    characters, and exception traces.
+    """
+    if not raw_input:
+        return ""
+    text = str(raw_input).strip()
+
+    def _sanitize_single_url(url: str) -> str:
+        try:
+            parsed = urllib.parse.urlsplit(url)
+            netloc = parsed.netloc
+            if "@" in netloc:
+                userinfo, hostinfo = netloc.rsplit("@", 1)
+                if ":" in userinfo:
+                    username, _ = userinfo.split(":", 1)
+                    new_userinfo = f"{username}:***"
+                else:
+                    new_userinfo = userinfo
+                netloc = f"{new_userinfo}@{hostinfo}"
+
+            query = parsed.query
+            if query:
+                q_pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
+                new_pairs = []
+                for k, v in q_pairs:
+                    if k.lower() in ("password", "pwd", "secret", "token", "auth", "key"):
+                        new_pairs.append((k, "***"))
+                    else:
+                        new_pairs.append((k, v))
+                query = urllib.parse.urlencode(new_pairs)
+            return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path, query, parsed.fragment))
+        except Exception:
+            return url
+
+    # 1. If raw input is directly a URL:
+    if re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://', text):
+        cleaned = _sanitize_single_url(text)
+    else:
+        cleaned = text
+
+    # 2. Secondary defense: sanitize any embedded URLs in error messages
+    def _sub_embedded(m):
+        return _sanitize_single_url(m.group(0))
+
+    cleaned = re.sub(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\'"`,;)]+', _sub_embedded, cleaned)
+
+    # 3. Tertiary defense: sanitize any remaining :<password>@ patterns
+    cleaned = re.sub(r':([^:@/\s\'"`,;)]+)@', r':***@', cleaned)
+
+    # 4. Quaternary defense: query parameters in strings
+    cleaned = re.sub(r'([?&](?:password|pwd|secret|token|auth)=)[^&\s\'"`,;)]+', r'\g<1>***', cleaned, flags=re.IGNORECASE)
+
+    return cleaned
+
 def get_default_db_path() -> str:
     env_path = os.environ.get("ZONATA_DB_PATH") or os.environ.get("ROBOASSISTANT_DB_PATH")
     if env_path:
@@ -31,6 +101,18 @@ CREATE TABLE IF NOT EXISTS tenants (
     metadata JSON
 );
 
+-- 1b. Restricted Pilot Organizations Registry (Milestone J Operating Envelope)
+CREATE TABLE IF NOT EXISTS pilot_organizations (
+    tenant_id TEXT PRIMARY KEY,
+    org_name TEXT NOT NULL,
+    contact_email TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    registered_at REAL NOT NULL,
+    metadata JSON,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pilot_orgs_status ON pilot_organizations(status);
+
 -- 2. Users & IAM
 CREATE TABLE IF NOT EXISTS users (
     user_id TEXT PRIMARY KEY,
@@ -45,6 +127,52 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- 2b. Authentication Credentials & Password Hashes
+CREATE TABLE IF NOT EXISTS auth_credentials (
+    user_id TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until REAL NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_auth_credentials_user ON auth_credentials(user_id);
+
+-- 2c. Authentication Revoked Tokens
+CREATE TABLE IF NOT EXISTS auth_revoked_tokens (
+    token_id TEXT PRIMARY KEY,
+    revoked_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_revoked_tokens ON auth_revoked_tokens(token_id);
+
+-- 2d. Distributed Rate Limit Events
+CREATE TABLE IF NOT EXISTS auth_rate_limits (
+    rate_key TEXT NOT NULL,
+    attempt_timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_key ON auth_rate_limits(rate_key, attempt_timestamp);
+CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_ts ON auth_rate_limits(attempt_timestamp);
+
+-- 2e. Distributed Tenant Rate Limits & Fairness Windows
+CREATE TABLE IF NOT EXISTS tenant_rate_limits (
+    rate_key TEXT NOT NULL,
+    attempt_timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_rate_limits_key ON tenant_rate_limits(rate_key, attempt_timestamp);
+CREATE INDEX IF NOT EXISTS idx_tenant_rate_limits_ts ON tenant_rate_limits(attempt_timestamp);
+
+-- 2f. Distributed Tenant Concurrency Leases
+CREATE TABLE IF NOT EXISTS tenant_concurrency_leases (
+    lease_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    lease_type TEXT NOT NULL, -- WORKFLOW, AGENT_MISSION, AI_GENERATION
+    acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_leases_tenant ON tenant_concurrency_leases(tenant_id, expires_at);
 
 -- 3. Companies & Operating Contexts
 CREATE TABLE IF NOT EXISTS companies (
@@ -160,6 +288,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     signed_grant_hash TEXT,
     requested_at REAL NOT NULL,
     decided_at REAL,
+    decision_reason TEXT,
     FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
@@ -286,6 +415,60 @@ CREATE TABLE IF NOT EXISTS executive_council_debates (
     FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
+
+-- 14b. Enterprise Skill Arena Decisions
+CREATE TABLE IF NOT EXISTS arena_decisions (
+    decision_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    requester_id TEXT NOT NULL,
+    requester_role TEXT NOT NULL,
+    question TEXT NOT NULL,
+    options_json TEXT NOT NULL,
+    judges_json TEXT NOT NULL,
+    scores_json TEXT NOT NULL,
+    winner_option_id TEXT,
+    winner_title TEXT,
+    consensus_outcome TEXT NOT NULL,
+    status TEXT NOT NULL,
+    agreement REAL NOT NULL DEFAULT 0.0,
+    confidence REAL NOT NULL DEFAULT 0.0,
+    risk_level TEXT NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
+    required_authority TEXT NOT NULL, -- EMPLOYEE, MANAGER, EXECUTIVE, OWNER
+    requester_authority TEXT NOT NULL,
+    authority_granted INTEGER NOT NULL DEFAULT 0,
+    policy_decision TEXT NOT NULL,
+    approval_id TEXT,
+    evidence_id TEXT,
+    evidence_status TEXT,
+    notes TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_decisions_scope ON arena_decisions(tenant_id, company_id, created_at);
+
+-- 14c. Executable Skill Contract Runs
+CREATE TABLE IF NOT EXISTS skill_runs (
+    run_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    skill_id TEXT NOT NULL,
+    requester_id TEXT NOT NULL,
+    requester_role TEXT NOT NULL,
+    status TEXT NOT NULL, -- SATISFIED, ESCALATED, CONTRACT_FAILED
+    required_authority TEXT NOT NULL,
+    inputs_json TEXT NOT NULL,
+    checks_json TEXT NOT NULL,
+    result_json TEXT,
+    evidence_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_runs_scope ON skill_runs(tenant_id, company_id, created_at);
 
 -- 15. Chief of Staff Decision & Coordination Queue
 CREATE TABLE IF NOT EXISTS chief_of_staff_items (
@@ -806,6 +989,31 @@ CREATE TABLE IF NOT EXISTS coworker_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_coworker_tasks_user ON coworker_tasks(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_coworker_tasks_status ON coworker_tasks(status);
+
+-- 42b. Durable Coworker Background Missions (searchable, tenant-scoped)
+CREATE TABLE IF NOT EXISTS coworker_background_missions (
+    mission_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    initiator TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    status TEXT NOT NULL,
+    progress_percent REAL NOT NULL DEFAULT 0,
+    current_stage TEXT NOT NULL DEFAULT 'INITIATED',
+    subworkers_json TEXT NOT NULL DEFAULT '[]',
+    runtimes_json TEXT NOT NULL DEFAULT '[]',
+    deliverables_json TEXT NOT NULL DEFAULT '[]',
+    evidence_id TEXT,
+    notification_message TEXT,
+    timeline_json TEXT NOT NULL DEFAULT '[]',
+    human_control INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bg_missions_tenant ON coworker_background_missions(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_bg_missions_company ON coworker_background_missions(company_id);
 
 -- 43. System Plugins Catalog & State
 CREATE TABLE IF NOT EXISTS system_plugins (
@@ -1923,7 +2131,7 @@ CREATE TABLE IF NOT EXISTS browser_artifacts (
     mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
     size_bytes INTEGER NOT NULL DEFAULT 0,
     sha256_digest TEXT NOT NULL,
-    redacted BOOLEAN NOT NULL DEFAULT 0,
+    redacted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at REAL NOT NULL,
     FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
@@ -3039,12 +3247,107 @@ CREATE TABLE IF NOT EXISTS enterprise_budgets (
                 company_id TEXT NOT NULL,
                 allocated_usd REAL NOT NULL,
                 spent_usd REAL NOT NULL DEFAULT 0.0,
+                reserved_usd REAL NOT NULL DEFAULT 0.0,
+                allocated_tokens BIGINT NOT NULL DEFAULT 0,
+                spent_tokens BIGINT NOT NULL DEFAULT 0,
+                reserved_tokens BIGINT NOT NULL DEFAULT 0,
                 soft_limit_pct REAL NOT NULL DEFAULT 80.0,
                 hard_limit_pct REAL NOT NULL DEFAULT 100.0,
                 is_frozen INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
             );
+
+CREATE TABLE IF NOT EXISTS enterprise_budget_reservations (
+                reservation_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                reserved_usd REAL NOT NULL DEFAULT 0.0,
+                reserved_tokens BIGINT NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'RESERVED',
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                settled_at REAL,
+                actual_usd REAL DEFAULT 0.0,
+                actual_tokens BIGINT DEFAULT 0,
+                metadata JSON,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_budget_res_tenant ON enterprise_budget_reservations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_budget_res_entity ON enterprise_budget_reservations(entity_id);
+CREATE INDEX IF NOT EXISTS idx_budget_res_status ON enterprise_budget_reservations(status);
+
+CREATE TABLE IF NOT EXISTS action_approval_nonces (
+                nonce TEXT PRIMARY KEY,
+                approval_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                action_digest TEXT NOT NULL,
+                approver_id TEXT NOT NULL,
+                approver_role TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                risk_class TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                issued_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                consumed_at REAL,
+                consumed_by_action_id TEXT,
+                metadata JSON,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_tenant ON action_approval_nonces(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_status ON action_approval_nonces(status);
+CREATE INDEX IF NOT EXISTS idx_appr_nonce_digest ON action_approval_nonces(action_digest);
+
+CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+                subscription_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                tier TEXT NOT NULL DEFAULT 'STARTER',
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                current_period_start REAL NOT NULL,
+                current_period_end REAL NOT NULL,
+                grace_period_end REAL,
+                cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+                payment_provider TEXT NOT NULL DEFAULT 'internal',
+                provider_customer_id TEXT,
+                provider_subscription_id TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                metadata JSON,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_tenant_sub_tenant ON tenant_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_sub_status ON tenant_subscriptions(status);
+
+CREATE TABLE IF NOT EXISTS billing_webhook_events (
+                event_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                payload JSON,
+                processed_at REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PROCESSED',
+                error_message TEXT
+            );
+CREATE INDEX IF NOT EXISTS idx_bwh_provider_event ON billing_webhook_events(provider, event_id);
+CREATE INDEX IF NOT EXISTS idx_bwh_status ON billing_webhook_events(status);
+
+CREATE TABLE IF NOT EXISTS tenant_invoices (
+                invoice_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                subscription_id TEXT,
+                amount_due_usd REAL NOT NULL,
+                amount_paid_usd REAL NOT NULL DEFAULT 0.0,
+                currency TEXT NOT NULL DEFAULT 'USD',
+                status TEXT NOT NULL DEFAULT 'PAID',
+                period_start REAL NOT NULL,
+                period_end REAL NOT NULL,
+                line_items JSON,
+                created_at REAL NOT NULL,
+                paid_at REAL,
+                FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+            );
+CREATE INDEX IF NOT EXISTS idx_invoice_tenant ON tenant_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_status ON tenant_invoices(status);
 
 CREATE TABLE IF NOT EXISTS security_incidents (
                 incident_id TEXT PRIMARY KEY,
@@ -3181,10 +3484,1536 @@ CREATE TABLE IF NOT EXISTS disaster_recovery_manifests (
     created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_dr_manifests ON disaster_recovery_manifests(tenant_id, created_at);
+
+-- 20. CRM & Commercial Pipeline
+CREATE TABLE IF NOT EXISTS crm_customers (
+    customer_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    legal_name TEXT,
+    tier TEXT NOT NULL DEFAULT 'STANDARD',
+    industry TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    health_score REAL NOT NULL DEFAULT 100.0,
+    arr REAL NOT NULL DEFAULT 0.0,
+    ltv REAL NOT NULL DEFAULT 0.0,
+    gstin TEXT,
+    address TEXT,
+    sla_level TEXT NOT NULL DEFAULT 'Standard 99.9%',
+    renewal_date TEXT,
+    assigned_agent TEXT,
+    contacts JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_crm_customers ON crm_customers(tenant_id, company_id);
+
+CREATE TABLE IF NOT EXISTS crm_deals (
+    deal_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    customer_id TEXT,
+    title TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'discovery',
+    value REAL NOT NULL DEFAULT 0.0,
+    probability REAL NOT NULL DEFAULT 0.5,
+    closing_date TEXT,
+    owner TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_crm_deals ON crm_deals(tenant_id, company_id);
+
+-- ============================================================================
+-- 11. URA / ZONATA Enterprise AI Corporate Workforce Architecture (25 Tables)
+-- ============================================================================
+
+-- 1. Organizations (Enterprise Root Entity)
+CREATE TABLE IF NOT EXISTS organizations (
+    org_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    parent_org_id TEXT,
+    legal_name TEXT NOT NULL,
+    trade_name TEXT NOT NULL,
+    jurisdiction TEXT NOT NULL DEFAULT 'US-DE',
+    tax_identifier TEXT,
+    incorporation_date REAL,
+    fiscal_year_start_month INTEGER NOT NULL DEFAULT 1,
+    base_currency TEXT NOT NULL DEFAULT 'USD',
+    governance_model TEXT NOT NULL DEFAULT 'AUTONOMOUS_EXECUTIVE_HYBRID',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    metadata JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_org_id) REFERENCES organizations(org_id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_org_tenant ON organizations(tenant_id);
+
+-- 2. Corporate Departments (Control Units / Cost Centers)
+CREATE TABLE IF NOT EXISTS corporate_departments (
+    department_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    parent_department_id TEXT,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    cost_center_code TEXT NOT NULL,
+    head_position_id TEXT,
+    operating_budget_usd REAL NOT NULL DEFAULT 0.0,
+    headcount_ceiling INTEGER NOT NULL DEFAULT 10,
+    current_headcount INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_department_id) REFERENCES corporate_departments(department_id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dept_code ON corporate_departments(company_id, code);
+
+-- 3. Corporate Positions (Organizational Roles)
+CREATE TABLE IF NOT EXISTS corporate_positions (
+    position_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    reports_to_position_id TEXT,
+    position_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    hierarchy_level TEXT NOT NULL,
+    job_family TEXT NOT NULL,
+    headcount_limit INTEGER NOT NULL DEFAULT 1,
+    current_filled_count INTEGER NOT NULL DEFAULT 0,
+    default_authority_profile_id TEXT,
+    is_executive INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE,
+    FOREIGN KEY (reports_to_position_id) REFERENCES corporate_positions(position_id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_code ON corporate_positions(company_id, position_code);
+
+-- 4. Corporate Employees (AI, Human, and Hybrid Fleet)
+CREATE TABLE IF NOT EXISTS corporate_employees (
+    employee_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    identity_type TEXT NOT NULL DEFAULT 'AI_EMPLOYEE',
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    work_email TEXT NOT NULL,
+    lifecycle_state TEXT NOT NULL DEFAULT 'PROPOSED',
+    authority_profile_id TEXT,
+    knowledge_profile_id TEXT,
+    performance_rating REAL NOT NULL DEFAULT 100.0,
+    total_tokens_used INTEGER NOT NULL DEFAULT 0,
+    total_cost_usd REAL NOT NULL DEFAULT 0.0,
+    allocated_monthly_budget_usd REAL NOT NULL DEFAULT 500.0,
+    spent_monthly_budget_usd REAL NOT NULL DEFAULT 0.0,
+    emergency_killswitch INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (position_id) REFERENCES corporate_positions(position_id) ON DELETE RESTRICT,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_emp_pos ON corporate_employees(position_id);
+CREATE INDEX IF NOT EXISTS idx_emp_state ON corporate_employees(lifecycle_state);
+
+-- 5. Employee Reporting Relationships (Explicit Multi-Type Hierarchy DAG)
+CREATE TABLE IF NOT EXISTS employee_reporting_relationships (
+    relationship_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    manager_employee_id TEXT NOT NULL,
+    relationship_type TEXT NOT NULL DEFAULT 'SOLID_LINE',
+    effective_from REAL NOT NULL,
+    effective_to REAL,
+    delegation_scope JSON,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (manager_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_rep_rel ON employee_reporting_relationships(employee_id, manager_employee_id);
+
+-- 6. Employee Authority Profiles (Machine-Enforceable Delegation of Authority DoA)
+CREATE TABLE IF NOT EXISTS employee_authority_profiles (
+    profile_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    max_spend_single_usd REAL NOT NULL DEFAULT 0.0,
+    max_spend_monthly_usd REAL NOT NULL DEFAULT 0.0,
+    max_risk_level TEXT NOT NULL DEFAULT 'LOW',
+    can_hire INTEGER NOT NULL DEFAULT 0,
+    can_fire INTEGER NOT NULL DEFAULT 0,
+    can_enter_contracts INTEGER NOT NULL DEFAULT 0,
+    can_delegate INTEGER NOT NULL DEFAULT 0,
+    can_modify_sops INTEGER NOT NULL DEFAULT 0,
+    dual_approval_required INTEGER NOT NULL DEFAULT 0,
+    allowed_data_classifications JSON NOT NULL,
+    forbidden_tool_patterns JSON NOT NULL,
+    approved_tools JSON NOT NULL,
+    signature_hash TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+
+-- 7. Employee Knowledge Profiles (Clearance & Data Boundaries)
+CREATE TABLE IF NOT EXISTS employee_knowledge_profiles (
+    profile_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    clearance_level TEXT NOT NULL DEFAULT 'INTERNAL',
+    permitted_domains JSON NOT NULL,
+    permitted_systems JSON NOT NULL,
+    forbidden_topics JSON NOT NULL,
+    max_retrieval_tokens INTEGER NOT NULL DEFAULT 8192,
+    data_residency_jurisdictions JSON NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+
+-- 8. SOP Definitions (Standard Operating Procedure Registry)
+CREATE TABLE IF NOT EXISTS sop_definitions (
+    sop_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    sop_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    cadence TEXT NOT NULL DEFAULT 'EVENT_DRIVEN',
+    risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+    objective TEXT NOT NULL,
+    trigger_conditions JSON NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_code ON sop_definitions(company_id, sop_code);
+
+-- 9. SOP Versions (Immutable Version History & Executable Steps)
+CREATE TABLE IF NOT EXISTS sop_versions (
+    version_id TEXT PRIMARY KEY,
+    sop_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    version_semver TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    steps_definition JSON NOT NULL,
+    input_schema JSON NOT NULL,
+    output_schema JSON NOT NULL,
+    anti_gaming_rules JSON NOT NULL,
+    required_authority_level TEXT NOT NULL DEFAULT 'DELEGATED',
+    evidence_requirements JSON NOT NULL,
+    author_employee_id TEXT NOT NULL,
+    approved_by_role TEXT,
+    approved_at REAL,
+    sha256_hash TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (sop_id) REFERENCES sop_definitions(sop_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_ver ON sop_versions(sop_id, version_semver);
+
+-- 10. Employee SOP Assignments (Contractual Assignment of Executable Playbooks)
+CREATE TABLE IF NOT EXISTS employee_sop_assignments (
+    assignment_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    sop_version_id TEXT NOT NULL,
+    assignment_status TEXT NOT NULL DEFAULT 'ACTIVE',
+    compliance_score REAL NOT NULL DEFAULT 100.0,
+    total_executions INTEGER NOT NULL DEFAULT 0,
+    failed_executions INTEGER NOT NULL DEFAULT 0,
+    last_executed_at REAL,
+    assigned_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (sop_version_id) REFERENCES sop_versions(version_id) ON DELETE RESTRICT
+);
+
+-- 11. Employee KRAs (Key Result Areas)
+CREATE TABLE IF NOT EXISTS employee_kras (
+    kra_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    position_id TEXT NOT NULL,
+    strategic_objective_id TEXT,
+    name TEXT NOT NULL,
+    weight_percentage REAL NOT NULL DEFAULT 25.0,
+    accountability_statement TEXT NOT NULL,
+    responsibility TEXT,
+    associated_workflows JSON,
+    associated_kpi_ids JSON,
+    allowed_tools JSON,
+    authority_scope JSON,
+    escalation_rules JSON,
+    expected_outcomes JSON,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+    -- No FKs here: KRA rows are shared by the canonical corporate_employees
+    -- registry and the V7 ai_employees registry, which have independent
+    -- tenant/employee lifecycles. Referential checks are enforced in code.
+);
+
+-- 12. KPI Definitions (Anti-Gaming Paired Metrics Catalog)
+CREATE TABLE IF NOT EXISTS kpi_definitions (
+    kpi_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    kra_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    definition TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    polarity TEXT NOT NULL DEFAULT 'HIGHER_IS_BETTER',
+    target_value REAL NOT NULL,
+    threshold_warning REAL NOT NULL,
+    threshold_critical REAL NOT NULL,
+    paired_counter_metric_id TEXT,
+    counter_metric_weight REAL NOT NULL DEFAULT 0.5,
+    data_source_feed TEXT NOT NULL,
+    verification_method TEXT NOT NULL DEFAULT 'TRANSACTION_RECONCILIATION',
+    measurement_frequency TEXT NOT NULL DEFAULT 'DAILY',
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (kra_id) REFERENCES employee_kras(kra_id) ON DELETE CASCADE,
+    FOREIGN KEY (paired_counter_metric_id) REFERENCES kpi_definitions(kpi_id) ON DELETE SET NULL
+);
+
+-- 13. KPI Measurements (Evidence-Sealed Real Measurements)
+CREATE TABLE IF NOT EXISTS kpi_measurements (
+    measurement_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    kpi_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    mission_id TEXT,
+    measured_value REAL NOT NULL,
+    counter_metric_value REAL,
+    anti_gaming_passed INTEGER NOT NULL DEFAULT 1,
+    variance_percentage REAL NOT NULL DEFAULT 0.0,
+    score_contribution REAL NOT NULL DEFAULT 100.0,
+    raw_evidence_json JSON NOT NULL,
+    evidence_sha256 TEXT NOT NULL,
+    measured_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (kpi_id) REFERENCES kpi_definitions(kpi_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_kpi_meas ON kpi_measurements(kpi_id, employee_id, measured_at);
+
+-- 14. Employee Performance Reviews (Explainable 4-Factor Evaluations)
+CREATE TABLE IF NOT EXISTS employee_performance_reviews (
+    review_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    review_period_start REAL NOT NULL,
+    review_period_end REAL NOT NULL,
+    kpi_achievement_score REAL NOT NULL,
+    sop_compliance_score REAL NOT NULL,
+    anti_gaming_compliance_score REAL NOT NULL,
+    collaboration_sla_score REAL NOT NULL,
+    composite_performance_score REAL NOT NULL,
+    evaluator_role TEXT NOT NULL DEFAULT 'EXEC_CHRO',
+    recommendation TEXT NOT NULL DEFAULT 'RETAIN',
+    mathematical_proof_json JSON NOT NULL,
+    is_sealed INTEGER NOT NULL DEFAULT 1,
+    sealed_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+
+-- 15. Workforce Requisitions (CHRO Workforce Intelligence Pipeline)
+CREATE TABLE IF NOT EXISTS workforce_requisitions (
+    requisition_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    requested_position_title TEXT NOT NULL,
+    requesting_executive_role TEXT NOT NULL,
+    justification TEXT NOT NULL,
+    gap_analysis_evidence JSON NOT NULL,
+    proposed_monthly_budget_usd REAL NOT NULL DEFAULT 200.0,
+    target_agent_template_id TEXT,
+    status TEXT NOT NULL DEFAULT 'PROPOSED',
+    chro_decision_notes TEXT,
+    approved_position_id TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES corporate_departments(department_id) ON DELETE CASCADE
+);
+
+-- 16. Agent Capabilities (Atomic Execution Registry)
+CREATE TABLE IF NOT EXISTS agent_capabilities (
+    capability_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    input_schema JSON NOT NULL,
+    output_schema JSON NOT NULL,
+    risk_class TEXT NOT NULL DEFAULT 'READ_ONLY',
+    cost_per_call_usd REAL NOT NULL DEFAULT 0.001,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cap_code ON agent_capabilities(tenant_id, code);
+
+-- 17. Agent Templates (Reusable Capability Packages)
+CREATE TABLE IF NOT EXISTS agent_templates (
+    template_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    description TEXT NOT NULL,
+    role_category TEXT NOT NULL,
+    default_capabilities JSON NOT NULL,
+    default_toolset JSON NOT NULL,
+    sandbox_requirements JSON NOT NULL,
+    created_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tpl_slug ON agent_templates(tenant_id, slug);
+
+-- 18. Agent Template Versions (Cryptographically Signed Blueprints)
+CREATE TABLE IF NOT EXISTS agent_template_versions (
+    version_id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    semver TEXT NOT NULL,
+    system_prompt_scaffold TEXT NOT NULL,
+    capability_manifest JSON NOT NULL,
+    tool_manifest JSON NOT NULL,
+    resource_limits JSON NOT NULL,
+    sbom_hash TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at REAL NOT NULL,
+    FOREIGN KEY (template_id) REFERENCES agent_templates(template_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tpl_ver ON agent_template_versions(template_id, semver);
+
+-- 19. Agent Instances (Running Ephemeral or Persistent Execution Workers)
+CREATE TABLE IF NOT EXISTS agent_instances (
+    instance_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    template_version_id TEXT NOT NULL,
+    bound_employee_id TEXT,
+    host_runtime_id TEXT NOT NULL,
+    lifecycle_state TEXT NOT NULL DEFAULT 'IDLE',
+    current_lease_id TEXT,
+    allocated_tokens INTEGER NOT NULL DEFAULT 100000,
+    used_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_incurred_usd REAL NOT NULL DEFAULT 0.0,
+    last_heartbeat REAL NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (template_version_id) REFERENCES agent_template_versions(version_id) ON DELETE RESTRICT
+);
+
+-- 20. Agent Leases (Concurrency Control & Mutex Locks)
+CREATE TABLE IF NOT EXISTS agent_leases (
+    lease_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    leased_by_employee_id TEXT NOT NULL,
+    mission_id TEXT,
+    task_id TEXT,
+    lease_state TEXT NOT NULL DEFAULT 'ACTIVE',
+    acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    released_at REAL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES agent_instances(instance_id) ON DELETE CASCADE,
+    FOREIGN KEY (leased_by_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_lease_lookup ON agent_leases(instance_id, lease_state, expires_at);
+
+-- 21. Agent Execution Sessions (Zero-Leakage Execution Sandboxes)
+CREATE TABLE IF NOT EXISTS agent_execution_sessions (
+    session_id TEXT PRIMARY KEY,
+    lease_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    session_token_hash TEXT NOT NULL,
+    memory_scope_id TEXT NOT NULL,
+    isolation_tier TEXT NOT NULL DEFAULT 'EPHEMERAL_CONTAINER',
+    credential_handle_ids JSON NOT NULL,
+    execution_status TEXT NOT NULL DEFAULT 'RUNNING',
+    tokens_consumed INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0.0,
+    started_at REAL NOT NULL,
+    ended_at REAL,
+    FOREIGN KEY (lease_id) REFERENCES agent_leases(lease_id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES agent_instances(instance_id) ON DELETE CASCADE
+);
+
+-- 22. Corporate Missions (Cross-Functional Strategic Initiatives)
+CREATE TABLE IF NOT EXISTS corporate_missions (
+    mission_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    objective_statement TEXT NOT NULL,
+    lead_employee_id TEXT NOT NULL,
+    sponsor_executive_role TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PLANNING',
+    priority_level TEXT NOT NULL DEFAULT 'P1',
+    budget_limit_usd REAL NOT NULL DEFAULT 1000.0,
+    spent_budget_usd REAL NOT NULL DEFAULT 0.0,
+    progress_percentage REAL NOT NULL DEFAULT 0.0,
+    target_delivery_timestamp REAL NOT NULL,
+    completed_at REAL,
+    outcome_evidence_hash TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE RESTRICT
+);
+
+-- 23. Employee Tasks (Atomic Delegated Units of Work)
+CREATE TABLE IF NOT EXISTS employee_tasks (
+    task_id TEXT PRIMARY KEY,
+    mission_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    assigned_employee_id TEXT NOT NULL,
+    delegator_employee_id TEXT NOT NULL,
+    parent_task_id TEXT,
+    sop_version_id TEXT,
+    task_order INTEGER NOT NULL DEFAULT 1,
+    dependency_task_ids JSON NOT NULL,
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    risk_level TEXT NOT NULL DEFAULT 'LOW',
+    evidence_receipt_id TEXT,
+    started_at REAL,
+    completed_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (mission_id) REFERENCES corporate_missions(mission_id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_employee_id) REFERENCES corporate_employees(employee_id) ON DELETE RESTRICT,
+    FOREIGN KEY (parent_task_id) REFERENCES employee_tasks(task_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_task_mission ON employee_tasks(mission_id, status);
+
+-- 24. Cross-Department Collaborations (Formal Multi-Department SLAs)
+CREATE TABLE IF NOT EXISTS cross_department_collaborations (
+    collab_id TEXT PRIMARY KEY,
+    mission_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    initiator_dept_id TEXT NOT NULL,
+    target_dept_id TEXT NOT NULL,
+    deliverable_description TEXT NOT NULL,
+    sla_turnaround_hours REAL NOT NULL DEFAULT 24.0,
+    shared_budget_usd REAL NOT NULL DEFAULT 0.0,
+    escalation_owner_role TEXT NOT NULL DEFAULT 'EXEC_COO',
+    status TEXT NOT NULL DEFAULT 'REQUESTED',
+    accepted_at REAL,
+    fulfilled_at REAL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (mission_id) REFERENCES corporate_missions(mission_id) ON DELETE CASCADE,
+    FOREIGN KEY (initiator_dept_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT,
+    FOREIGN KEY (target_dept_id) REFERENCES corporate_departments(department_id) ON DELETE RESTRICT
+);
+
+-- 25. Corporate Knowledge Assets (6-Tier Data Vault)
+CREATE TABLE IF NOT EXISTS corporate_knowledge_assets (
+    asset_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    department_id TEXT,
+    title TEXT NOT NULL,
+    classification_level TEXT NOT NULL DEFAULT 'INTERNAL',
+    dlp_inspection_status TEXT NOT NULL DEFAULT 'CLEAN',
+    allowed_roles JSON NOT NULL,
+    content_hash TEXT NOT NULL,
+    storage_uri TEXT NOT NULL,
+    is_customer_safe INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asset_class ON corporate_knowledge_assets(tenant_id, classification_level);
+
+-- 47b. Persistent Assistant Messages & Conversational Memory
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    message_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    sender TEXT NOT NULL, -- 'user', 'assistant', 'system'
+    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL', 'COMPANY'
+    content TEXT NOT NULL,
+    intent_category TEXT, -- 'PERSONAL_TASK', 'COMPANY_DELEGATION', 'DOCUMENT_REQUEST', 'MEETING_REQUEST', 'INFORMATIONAL'
+    deliverables JSON,
+    citations JSON,
+    timestamp REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asst_msg_session ON assistant_messages(session_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_asst_msg_tenant_user ON assistant_messages(tenant_id, user_id);
+
+-- 48a. Assistant explicit memory (the owner's saved preferences and facts)
+CREATE TABLE IF NOT EXISTS assistant_memory (
+    memory_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL' | 'COMPANY'
+    content TEXT NOT NULL,
+    source_session_id TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_memory_user
+    ON assistant_memory(tenant_id, user_id, created_at);
+
+-- 48b. Assistant background jobs (survive reload; max 3 active per user)
+CREATE TABLE IF NOT EXISTS assistant_jobs (
+    job_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    session_id TEXT,
+    kind TEXT NOT NULL DEFAULT 'research',
+    title TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL',
+    status TEXT NOT NULL DEFAULT 'QUEUED',
+    progress REAL NOT NULL DEFAULT 0,
+    step TEXT NOT NULL DEFAULT 'Queued',
+    steps JSON,
+    result JSON,
+    citations JSON,
+    error TEXT,
+    notification_seen INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    finished_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_jobs_user
+    ON assistant_jobs(tenant_id, user_id, created_at);
+
+-- 48b. Assistant Generated Deliverables & Documents (Personal & Company Isolated)
+CREATE TABLE IF NOT EXISTS assistant_generated_documents (
+    doc_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT,
+    user_id TEXT NOT NULL,
+    storage_boundary TEXT NOT NULL DEFAULT 'PERSONAL', -- 'PERSONAL', 'COMPANY'
+    title TEXT NOT NULL,
+    format TEXT NOT NULL, -- 'PDF', 'DOCX', 'XLSX', 'PPTX', 'CSV', 'JSON'
+    category TEXT NOT NULL, -- 'REPORT', 'SUMMARY', 'FINANCIAL', 'CONTRACT', 'MEETING_MINUTES', 'MEMO', 'PRESENTATION', 'SPREADSHEET'
+    file_path TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    sha256 TEXT NOT NULL,
+    metadata JSON,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_asst_docs_user ON assistant_generated_documents(tenant_id, user_id, storage_boundary);
+CREATE INDEX IF NOT EXISTS idx_asst_docs_company ON assistant_generated_documents(tenant_id, company_id);
+
+-- 49b. External Calendar & Google Meet Integration Records
+CREATE TABLE IF NOT EXISTS meeting_integrations (
+    integration_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    company_id TEXT NOT NULL,
+    meeting_id TEXT NOT NULL,
+    schedule_id TEXT,
+    provider TEXT NOT NULL DEFAULT 'GOOGLE_MEET', -- 'GOOGLE_MEET', 'INTERNAL_ROOM'
+    meet_url TEXT NOT NULL,
+    dial_in_info JSON,
+    calendar_event_id TEXT,
+    ai_representative_enabled INTEGER NOT NULL DEFAULT 1,
+    statutory_disclosure_signed INTEGER NOT NULL DEFAULT 1,
+    briefing_dossier_id TEXT,
+    created_at REAL NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_mtg_int_comp ON meeting_integrations(tenant_id, company_id);
 """
+
+class DatabaseDialect:
+    SQLITE = "sqlite"
+    POSTGRESQL = "postgresql"
+
+
+class DictRow(tuple):
+    """Row wrapper that supports both index and column name access."""
+    def __new__(cls, values, col_names):
+        inst = super().__new__(cls, values)
+        inst._col_map = {name: val for name, val in zip(col_names, values)}
+        return inst
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return self._col_map.get(key, None)
+        try:
+            return super().__getitem__(key)
+        except (IndexError, TypeError):
+            return 0
+
+    def get(self, key, default=None):
+        return self._col_map.get(key, default)
+
+    def keys(self):
+        return list(self._col_map.keys())
+
+    def values(self):
+        return list(self._col_map.values())
+
+    def items(self):
+        return list(self._col_map.items())
+
+
+class PostgresCursorWrapper:
+    """Cursor wrapper providing sqlite3.Row / DictCursor parity and method chaining for PostgreSQL."""
+    def __init__(self, raw_cursor, normalize_fn=None):
+        self._raw_cursor = raw_cursor
+        self._normalize_fn = normalize_fn or normalize_sql_for_postgres
+
+    def __getattr__(self, name):
+        return getattr(self._raw_cursor, name)
+
+    def execute(self, sql: str, params: Any = ()):
+        norm = self._normalize_fn(sql)
+        if norm:
+            self._raw_cursor.execute(norm, params)
+        return self
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        norm = self._normalize_fn(sql)
+        if norm:
+            self._raw_cursor.executemany(norm, params_seq)
+        return self
+
+    def __iter__(self):
+        while True:
+            row = self.fetchone()
+            if row is None:
+                break
+            yield row
+
+    def fetchone(self):
+        row = self._raw_cursor.fetchone()
+        if row is None:
+            return None
+        if isinstance(row, DictRow):
+            return row
+        if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
+            col_names = [col[0] for col in self._raw_cursor.description]
+            return DictRow(row, col_names)
+        return row
+
+    def fetchall(self):
+        rows = self._raw_cursor.fetchall()
+        if not rows:
+            return []
+        if rows and isinstance(rows[0], DictRow):
+            return rows
+        if hasattr(self._raw_cursor, "description") and self._raw_cursor.description:
+            col_names = [col[0] for col in self._raw_cursor.description]
+            return [DictRow(r, col_names) for r in rows]
+        return rows
+
+
+class DeferredRow(tuple):
+    """Subscriptable tuple that behaves like an empty/default row during deferred import."""
+    def __new__(cls, values=(0,)):
+        return super().__new__(cls, values)
+
+    def __getitem__(self, item):
+        if isinstance(item, int) and item < len(self):
+            return super().__getitem__(item)
+        if isinstance(item, int):
+            return 0
+        return 0
+
+    def __bool__(self):
+        return False
+
+    def get(self, key, default=0):
+        return default
+
+
+class DeferredCursor:
+    """Cursor that records queries or returns empty results during deferred import mode."""
+    def __init__(self, db_instance, sql="", params=()):
+        self.db = db_instance
+        self.sql = sql
+        self.params = params
+
+    def execute(self, sql: str, params: Any = ()):
+        self.db._deferred_queries.append(('execute', sql, params))
+        return self
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        self.db._deferred_queries.append(('executemany', sql, params_seq))
+        return self
+
+    def fetchone(self):
+        return DeferredRow((0,))
+
+    def fetchall(self):
+        return []
+
+    @property
+    def rowcount(self):
+        return 0
+
+    @property
+    def lastrowid(self):
+        return 0
+
+    def __iter__(self):
+        return iter([])
+
+
+class DeferredConnectionProxy:
+    """Proxy connection returned during module import when live database is unreachable."""
+    def __init__(self, db_instance):
+        self.db = db_instance
+
+    @property
+    def row_factory(self):
+        return getattr(self, "_row_factory", None)
+
+    @row_factory.setter
+    def row_factory(self, val):
+        self._row_factory = val
+
+    def cursor(self):
+        return self
+
+    def execute(self, sql: str, params: Any = ()):
+        self.db._deferred_queries.append(('execute', sql, params))
+        return DeferredCursor(self.db, sql, params)
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        self.db._deferred_queries.append(('executemany', sql, params_seq))
+        return DeferredCursor(self.db, sql, params_seq)
+
+    def executescript(self, sql_script: str):
+        self.db._deferred_queries.append(('executescript', sql_script, ()))
+        return DeferredCursor(self.db, sql_script)
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+TABLE_PRIMARY_KEYS: Dict[str, Tuple[str, ...]] = {
+    "missions": ("mission_id",),
+    "tenant_concurrency_leases": ("lease_id",),
+    "employees": ("agent_id",),
+    "a2a_skills": ("skill_id",),
+    "a2a_tasks": ("task_id",),
+    "immutable_agent_packages": ("package_id",),
+    "governed_agents": ("agent_id",),
+    "installed_applications": ("app_id",),
+    "auth_revoked_tokens": ("token_id",),
+    "automation_connector_idempotency": ("idempotency_key",),
+    "automation_sync_checkpoints": ("tenant_id", "stream_name", "connector_id"),
+    "automation_revoked_leases": ("lease_id",),
+    "enterprise_budget_allocations": ("budget_id",),
+    "coworker_background_missions": ("mission_id",),
+    "coworker_profiles": ("worker_id",),
+    "coworker_execution_graphs": ("mission_id",),
+    "coworker_execution_nodes": ("task_id",),
+    "coworker_workflow_instances": ("workflow_id",),
+    "workflow_resource_locks": ("lock_id",),
+    "workflows": ("workflow_id",),
+    "agent_blueprints": ("blueprint_id",),
+    "enterprise_files": ("file_id",),
+    "enterprise_records": ("record_id",),
+    "enterprise_reports": ("report_id",),
+    "host_capabilities": ("cap_id",),
+    "enterprise_identities": ("identity_id",),
+    "enterprise_killswitch_matrix": ("switch_id",),
+    "employee_kpis": ("kpi_id",),
+    "employee_kras": ("kra_id",),
+    "mcp_tools": ("tool_id",),
+    "mcp_resources": ("resource_id",),
+    "mcp_published_capabilities": ("published_id",),
+    "multimodal_capabilities": ("tenant_id", "capability_id"),
+    "stateful_agent_identities": ("tenant_id", "agent_id"),
+    "organization_nodes": ("node_id",),
+    "organization_edges": ("edge_id",),
+    "companies": ("company_id",),
+    "departments": ("department_id",),
+    "users": ("user_id",),
+    "data_sources": ("source_id",),
+    "tenants": ("tenant_id",),
+    "enterprise_budgets": ("entity_id",),
+    "enterprise_budget_reservations": ("reservation_id",),
+    "action_approval_nonces": ("nonce",),
+    "tenant_subscriptions": ("subscription_id",),
+    "billing_webhook_events": ("event_id",),
+    "tenant_invoices": ("invoice_id",),
+    "supervisor_heartbeats": ("heartbeat_id",),
+    "temporal_workers": ("worker_id",),
+    "governed_tools": ("tool_id",),
+    "terminal_checkpoints": ("checkpoint_id",),
+    "employee_performance_records": ("record_id",),
+    "company_processes": ("process_id",),
+    "optimistic_lock_registry": ("table_name",),
+    "schema_migrations": ("version",),
+    "async_command_queue": ("command_id",),
+    "crm_customers": ("customer_id",),
+    "crm_deals": ("deal_id",),
+    "organizations": ("org_id",),
+    "corporate_departments": ("department_id",),
+    "corporate_positions": ("position_id",),
+    "corporate_employees": ("employee_id",),
+    "employee_reporting_relationships": ("relationship_id",),
+    "employee_authority_profiles": ("profile_id",),
+    "employee_knowledge_profiles": ("profile_id",),
+    "sop_definitions": ("sop_id",),
+    "sop_versions": ("version_id",),
+    "employee_sop_assignments": ("assignment_id",),
+    "employee_kras": ("kra_id",),
+    "kpi_definitions": ("kpi_id",),
+    "kpi_measurements": ("measurement_id",),
+    "employee_performance_reviews": ("review_id",),
+    "workforce_requisitions": ("requisition_id",),
+    "agent_capabilities": ("capability_id",),
+    "agent_templates": ("template_id",),
+    "agent_template_versions": ("version_id",),
+    "agent_instances": ("instance_id",),
+    "agent_leases": ("lease_id",),
+    "agent_execution_sessions": ("session_id",),
+    "corporate_missions": ("mission_id",),
+    "employee_tasks": ("task_id",),
+    "cross_department_collaborations": ("collab_id",),
+    "corporate_knowledge_assets": ("asset_id",),
+    "assistant_messages": ("message_id",),
+    "assistant_generated_documents": ("doc_id",),
+    "meeting_integrations": ("integration_id",),
+}
+
+
+def _tokenize_and_replace_placeholders(sql: str) -> str:
+    """
+    Safely converts SQLite '?' parameter placeholders to PostgreSQL '%s'
+    while strictly preserving literal question marks inside:
+    - Single-quoted string literals ('...')
+    - Double-quoted identifiers ("...")
+    - Single-line SQL comments (-- ...)
+    - Multi-line block comments (/* ... */)
+    - Dollar-quoted string constants ($$...$$ or $tag$...$tag$)
+    """
+    if "?" not in sql:
+        return sql
+
+    out = []
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+    in_dollar_quote = False
+    dollar_tag = ""
+
+    i = 0
+    n = len(sql)
+
+    while i < n:
+        c = sql[i]
+        next_c = sql[i + 1] if i + 1 < n else ""
+
+        # Handle comments when not in string literal
+        if not in_single_quote and not in_double_quote and not in_dollar_quote:
+            if in_line_comment:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
+                out.append(c)
+                if c == "\n":
+                    in_line_comment = False
+                i += 1
+                continue
+            elif in_block_comment:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
+                out.append(c)
+                if c == "*" and next_c == "/":
+                    out.append(next_c)
+                    in_block_comment = False
+                    i += 2
+                    continue
+                i += 1
+                continue
+            elif c == "-" and next_c == "-":
+                in_line_comment = True
+                out.append("--")
+                i += 2
+                continue
+            elif c == "/" and next_c == "*":
+                in_block_comment = True
+                out.append("/*")
+                i += 2
+                continue
+
+        # Handle dollar quotes ($$...$$ or $tag$...$tag$)
+        if not in_single_quote and not in_double_quote and not in_line_comment and not in_block_comment:
+            if in_dollar_quote:
+                out.append(c)
+                if c == "$" and sql[i:i + len(dollar_tag)] == dollar_tag:
+                    out.append(dollar_tag[1:])
+                    i += len(dollar_tag)
+                    in_dollar_quote = False
+                    dollar_tag = ""
+                    continue
+                i += 1
+                continue
+            elif c == "$":
+                end_dollar = sql.find("$", i + 1)
+                if end_dollar != -1 and end_dollar - i <= 32:
+                    tag_candidate = sql[i:end_dollar + 1]
+                    inner = tag_candidate[1:-1]
+                    if inner == "" or inner.isidentifier():
+                        in_dollar_quote = True
+                        dollar_tag = tag_candidate
+                        out.append(tag_candidate)
+                        i = end_dollar + 1
+                        continue
+
+        # Handle single and double quotes
+        if not in_line_comment and not in_block_comment and not in_dollar_quote:
+            if in_single_quote:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
+                out.append(c)
+                if c == "'":
+                    if next_c == "'":  # Escaped single quote: ''
+                        out.append(next_c)
+                        i += 2
+                        continue
+                    elif i > 0 and sql[i - 1] == "\\":  # Backslash escape \'
+                        pass
+                    else:
+                        in_single_quote = False
+                i += 1
+                continue
+            elif in_double_quote:
+                if c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
+                out.append(c)
+                if c == '"':
+                    if next_c == '"':  # Escaped double quote: ""
+                        out.append(next_c)
+                        i += 2
+                        continue
+                    else:
+                        in_double_quote = False
+                i += 1
+                continue
+            else:
+                if c == "'":
+                    in_single_quote = True
+                    out.append(c)
+                    i += 1
+                    continue
+                elif c == '"':
+                    in_double_quote = True
+                    out.append(c)
+                    i += 1
+                    continue
+                elif c == "?":
+                    out.append("%s")
+                    i += 1
+                    continue
+                elif c == "%":
+                    if next_c == "%":
+                        out.append("%%")
+                        i += 2
+                        continue
+                    elif next_c == "s" or next_c == "(":
+                        out.append("%")
+                        i += 1
+                        continue
+                    else:
+                        out.append("%%")
+                        i += 1
+                        continue
+
+        out.append(c)
+        i += 1
+
+    return "".join(out)
+
+
+def normalize_sql_for_postgres(sql: str) -> str:
+    """
+    Normalizes SQL statements for PostgreSQL compatibility:
+    - Strips SQLite PRAGMA commands (returns empty string)
+    - Safely replaces ? parameter placeholders with %s outside string literals/comments
+    - Converts SQLite INSERT OR IGNORE INTO to ANSI ON CONFLICT DO NOTHING
+    - Converts legacy INSERT OR REPLACE INTO to ANSI ON CONFLICT (<pk>) DO UPDATE SET ...
+    """
+    stripped = sql.strip()
+    if stripped.upper().startswith("PRAGMA "):
+        return ""
+    if stripped.upper() in ("BEGIN IMMEDIATE", "BEGIN IMMEDIATE;"):
+        return ""
+
+    # Convert ? placeholders to %s safely outside literals and comments
+    normalized = _tokenize_and_replace_placeholders(sql)
+
+    import re
+
+    # Convert BOOLEAN DEFAULT 0/1 to BOOLEAN DEFAULT FALSE/TRUE
+    normalized = re.sub(r"\bBOOLEAN(\s+NOT\s+NULL)?\s+DEFAULT\s+0\b", r"BOOLEAN\1 DEFAULT FALSE", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bBOOLEAN(\s+NOT\s+NULL)?\s+DEFAULT\s+1\b", r"BOOLEAN\1 DEFAULT TRUE", normalized, flags=re.IGNORECASE)
+
+    # Handle SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING
+    if re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", normalized, re.IGNORECASE):
+        normalized = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
+    # Handle SQLite INSERT OR REPLACE INTO -> PostgreSQL ANSI ON CONFLICT ... DO UPDATE SET ...
+    replace_match = re.search(
+        r"\bINSERT\s+OR\s+REPLACE\s+INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)",
+        normalized,
+        re.IGNORECASE
+    )
+    if replace_match:
+        table_name = replace_match.group(1).strip()
+        columns_str = replace_match.group(2)
+        columns = [c.strip().strip('"').strip('`') for c in columns_str.split(",") if c.strip()]
+
+        pk_cols = TABLE_PRIMARY_KEYS.get(table_name)
+        if pk_cols:
+            update_cols = [c for c in columns if c not in pk_cols and c.lower() != "created_at"]
+            pk_target = ", ".join(pk_cols)
+            if update_cols:
+                set_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
+                conflict_clause = f" ON CONFLICT ({pk_target}) DO UPDATE SET {set_clause}"
+            else:
+                conflict_clause = f" ON CONFLICT ({pk_target}) DO NOTHING"
+        else:
+            conflict_clause = " ON CONFLICT DO NOTHING"
+
+        # Substitute INSERT OR REPLACE INTO with INSERT INTO
+        normalized = re.sub(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + conflict_clause
+    elif re.search(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", normalized, re.IGNORECASE):
+        normalized = re.sub(r"\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", normalized, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in normalized.upper():
+            normalized = normalized.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
+    return normalized
+
+
+class PostgresConnectionWrapper:
+    """Wraps raw PostgreSQL connection with sqlite3-compatible Row and transaction semantics."""
+    def __init__(self, raw_conn, pool=None):
+        self.raw_conn = raw_conn
+        self._pool = pool
+        self._is_closed = False
+
+    @property
+    def row_factory(self):
+        return getattr(self, "_row_factory", None)
+
+    @row_factory.setter
+    def row_factory(self, val):
+        self._row_factory = val
+
+    def _normalize_sql(self, sql: str) -> str:
+        return normalize_sql_for_postgres(sql)
+
+    def execute(self, sql: str, params: Any = ()):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute query on closed database connection.")
+        normalized_sql = self._normalize_sql(sql)
+        if not normalized_sql:
+            class DummyCursor:
+                def fetchone(self): return None
+                def fetchall(self): return []
+                @property
+                def rowcount(self): return 0
+                def __iter__(self): return iter([])
+            return DummyCursor()
+        try:
+            import psycopg2.extras
+            cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.execute(normalized_sql, params)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+        except Exception:
+            cursor = self.raw_conn.cursor()
+            cursor.execute(normalized_sql, params)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+
+    def executemany(self, sql: str, params_seq: Any = ()):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute query on closed database connection.")
+        normalized_sql = self._normalize_sql(sql)
+        if not normalized_sql:
+            class DummyCursor:
+                def fetchone(self): return None
+                def fetchall(self): return []
+                @property
+                def rowcount(self): return 0
+                def __iter__(self): return iter([])
+            return DummyCursor()
+        try:
+            import psycopg2.extras
+            cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.executemany(normalized_sql, params_seq)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+        except Exception:
+            cursor = self.raw_conn.cursor()
+            cursor.executemany(normalized_sql, params_seq)
+            return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
+
+    def executescript(self, sql_script: str):
+        if self._is_closed:
+            raise RuntimeError("Cannot execute script on closed database connection.")
+        try:
+            self.raw_conn.rollback()
+        except Exception:
+            pass
+        prev_autocommit = getattr(self.raw_conn, "autocommit", False)
+        try:
+            self.raw_conn.autocommit = True
+        except Exception:
+            pass
+        try:
+            cursor = self.raw_conn.cursor()
+            for statement in sql_script.split(";"):
+                stmt = statement.strip()
+                if stmt:
+                    norm = self._normalize_sql(stmt)
+                    if norm:
+                        try:
+                            cursor.execute(norm)
+                        except Exception:
+                            pass
+            return cursor
+        finally:
+            try:
+                self.raw_conn.autocommit = prev_autocommit
+            except Exception:
+                pass
+
+    def cursor(self):
+        if self._is_closed:
+            raise RuntimeError("Cannot create cursor on closed database connection.")
+        try:
+            import psycopg2.extras
+            raw_cur = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        except Exception:
+            raw_cur = self.raw_conn.cursor()
+        return PostgresCursorWrapper(raw_cur, normalize_fn=self._normalize_sql)
+
+    def commit(self):
+        if self._is_closed:
+            raise RuntimeError("Cannot commit on closed database connection.")
+        self.raw_conn.commit()
+
+    def rollback(self):
+        if self._is_closed:
+            return
+        self.raw_conn.rollback()
+
+    def close(self):
+        if self._is_closed:
+            return
+        self._is_closed = True
+        if self._pool is not None:
+            self._pool.return_connection(self.raw_conn)
+        else:
+            try:
+                self.raw_conn.close()
+            except Exception:
+                pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type is not None:
+                self.rollback()
+            else:
+                self.commit()
+        finally:
+            self.close()
+
+
+class DatabasePoolExhaustedError(RuntimeError):
+    """Raised when the PostgreSQL connection pool is exhausted and timeout expires."""
+    pass
+
+
+class PostgresConnectionPool:
+    """
+    Thread-safe connection pool for PostgreSQL clusters.
+    Supports both psycopg2 and pg8000 drivers with configurable bounds,
+    checkout timeout, health validation, auto-rollback on return,
+    and stale/broken connection eviction.
+    """
+    def __init__(
+        self,
+        db_instance: 'Database',
+        min_size: int = 5,
+        max_size: int = 20,
+        timeout: float = 30.0,
+        idle_timeout: float = 300.0,
+    ):
+        self.db_instance = db_instance
+        self.max_size = max(1, int(max_size))
+        self.min_size = max(1, min(int(min_size), self.max_size))
+        self.timeout = float(timeout)
+        self.idle_timeout = float(idle_timeout)
+
+        self._lock = threading.Lock()
+        self._cond = threading.Condition(self._lock)
+        self._idle_connections: List[Tuple[Any, float]] = []  # List of (raw_conn, last_used_timestamp)
+        self._checked_out: Set[Any] = set()
+        self._total_count: int = 0
+        self._is_closed: bool = False
+
+    def _validate_raw_connection(self, raw_conn: Any) -> bool:
+        """Probes a raw connection to ensure it is healthy and responsive."""
+        try:
+            if hasattr(raw_conn, "closed") and raw_conn.closed != 0:
+                return False
+            cursor = raw_conn.cursor()
+            cursor.execute("SELECT 1")
+            row = cursor.fetchone()
+            cursor.close()
+            return bool(row and row[0] == 1)
+        except Exception:
+            return False
+
+    def get_connection(self, timeout: Optional[float] = None) -> PostgresConnectionWrapper:
+        """
+        Acquires a connection from the pool.
+        Blocks up to timeout seconds if the pool has reached max_size.
+        """
+        wait_timeout = self.timeout if timeout is None else float(timeout)
+        deadline = time.time() + wait_timeout
+
+        with self._cond:
+            if self._is_closed:
+                raise RuntimeError("Database connection pool is closed.")
+
+            while True:
+                # 1. Check for available idle connections
+                while self._idle_connections:
+                    raw_conn, last_used = self._idle_connections.pop()
+                    is_alive = True
+                    if (time.time() - last_used) > self.idle_timeout:
+                        is_alive = self._validate_raw_connection(raw_conn)
+
+                    if is_alive:
+                        self._checked_out.add(raw_conn)
+                        return PostgresConnectionWrapper(raw_conn, pool=self)
+                    else:
+                        try:
+                            raw_conn.close()
+                        except Exception:
+                            pass
+                        self._total_count = max(0, self._total_count - 1)
+
+                # 2. Spawn a new connection if total is under max_size
+                if self._total_count < self.max_size:
+                    raw_conn = self.db_instance._create_raw_connection()
+                    self._total_count += 1
+                    self._checked_out.add(raw_conn)
+                    return PostgresConnectionWrapper(raw_conn, pool=self)
+
+                # 3. Saturated pool: wait on condition variable
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise DatabasePoolExhaustedError(
+                        f"Database connection pool exhausted: all {self.max_size} connections are in use "
+                        f"(waited {wait_timeout:.1f}s)."
+                    )
+
+                self._cond.wait(timeout=remaining)
+                if self._is_closed:
+                    raise RuntimeError("Database connection pool was closed while waiting.")
+                if time.time() >= deadline and not self._idle_connections and self._total_count >= self.max_size:
+                    raise DatabasePoolExhaustedError(
+                        f"Database connection pool exhausted: all {self.max_size} connections are in use "
+                        f"(waited {wait_timeout:.1f}s)."
+                    )
+
+    def return_connection(self, raw_conn: Any, discard: bool = False):
+        """
+        Returns a connection to the idle pool.
+        Executes a safety rollback to ensure transaction isolation.
+        """
+        with self._cond:
+            if raw_conn in self._checked_out:
+                self._checked_out.remove(raw_conn)
+
+            if self._is_closed or discard:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+                self._total_count = max(0, self._total_count - 1)
+                self._cond.notify()
+                return
+
+            # Safety rollback before returning connection to pool
+            try:
+                raw_conn.rollback()
+                self._idle_connections.append((raw_conn, time.time()))
+                self._cond.notify()
+            except Exception:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+                self._total_count = max(0, self._total_count - 1)
+                self._cond.notify()
+
+    def close_all(self):
+        """Closes all pooled connections immediately."""
+        with self._cond:
+            self._is_closed = True
+            for raw_conn, _ in self._idle_connections:
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+            self._idle_connections.clear()
+
+            for raw_conn in list(self._checked_out):
+                try:
+                    raw_conn.close()
+                except Exception:
+                    pass
+            self._checked_out.clear()
+            self._total_count = 0
+            self._cond.notify_all()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Returns snapshot metrics of connection pool utilization."""
+        with self._lock:
+            return {
+                "dialect": "postgresql",
+                "status": "CLOSED" if self._is_closed else "HEALTHY",
+                "total_connections": self._total_count,
+                "active_connections": len(self._checked_out),
+                "idle_connections": len(self._idle_connections),
+                "min_size": self.min_size,
+                "max_size": self.max_size,
+                "timeout_sec": self.timeout,
+                "idle_timeout_sec": self.idle_timeout
+            }
+
+
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
+        self.database_url = os.environ.get("DATABASE_URL", "").strip()
+        dialect_env = os.environ.get("ZONATA_DB_DIALECT", "").lower()
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+
+        # In production mode, SQLite is prohibited under all circumstances.
+        # Legacy ZONATA_ALLOW_SQLITE_IN_PRODUCTION is strictly rejected.
+        if is_prod:
+            if not self.database_url or self.database_url.startswith(("sqlite://", "sqlite:")) or not (
+                self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql"
+            ):
+                raise RuntimeError(
+                    "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
+                    "A valid PostgreSQL DATABASE_URL must be configured. SQLite override flags are not permitted in production."
+                )
+
+        if not is_prod and (dialect_env == "sqlite" or bool(os.environ.get("ZONATA_DB_PATH"))):
+            self.dialect = DatabaseDialect.SQLITE
+        elif self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql":
+            self.dialect = DatabaseDialect.POSTGRESQL
+        else:
+            self.dialect = DatabaseDialect.SQLITE
+
+        self._is_ready = (self.dialect == DatabaseDialect.SQLITE)
+        self._deferred_import_mode = (self.dialect == DatabaseDialect.POSTGRESQL)
+        self._deferred_queries = []
+        self._pg_pool: Optional[PostgresConnectionPool] = None
+
         if db_path is None:
             self.db_path = get_default_db_path()
         elif db_path.startswith("/roboassistant/") and not os.path.exists("/roboassistant"):
@@ -3194,15 +5023,127 @@ class Database:
         else:
             self.db_path = os.path.abspath(db_path)
 
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
-        self._init_db()
+        if self.dialect == DatabaseDialect.SQLITE:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+            if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
+                # Protected baseline database — never mutate or execute schema scripts automatically
+                pass
+            else:
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
+                self._init_db()
 
     def set_db_path(self, new_path: str):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+        is_prod = app_env in ("production", "prod")
+        if is_prod:
+            raise RuntimeError(
+                "Production Safety Invariant Violation: Direct SQLite path reconfiguration is prohibited in production mode."
+            )
+        if self._pg_pool is not None:
+            self._pg_pool.close_all()
+            self._pg_pool = None
         self.db_path = os.path.abspath(new_path)
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
-        self._init_db()
+        self.dialect = DatabaseDialect.SQLITE
+        self._is_ready = True
+        self._deferred_import_mode = False
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        protected_db = os.path.abspath(os.path.join(base_dir, "storage", "roboassistant.db"))
+        if os.path.abspath(self.db_path) == protected_db and os.path.exists(protected_db):
+            pass
+        else:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True, mode=0o750)
+            self._init_db()
+        try:
+            from core.database_engine import engine
+            engine.dialect = DatabaseDialect.SQLITE
+            engine.db_path = self.db_path
+            engine._is_ready = True
+            engine._deferred_import_mode = False
+            if hasattr(engine, 'pools') and engine.pools:
+                for p in engine.pools.values():
+                    p.dialect = DatabaseDialect.SQLITE
+                    p._deferred_import_mode = False
+                    p.reset()
+        except Exception:
+            pass
+        try:
+            from core.evidence_service import evidence_service
+            evidence_service._init_db()
+        except Exception:
+            pass
+        try:
+            from core.automation_fabric.fabric import universal_automation_fabric
+            universal_automation_fabric._init_automation_tables()
+            universal_automation_fabric._ensure_signing_keys_table()
+        except Exception:
+            pass
+        try:
+            from core.security_center import security_center
+            security_center._init_db()
+        except Exception:
+            pass
 
-    def get_connection(self) -> sqlite3.Connection:
+    def initialize(self):
+        if self.dialect == DatabaseDialect.POSTGRESQL:
+            return self.verify_readiness()
+        return self._init_db()
+
+    def get_dialect(self) -> str:
+        return self.dialect
+
+    def is_postgresql(self) -> bool:
+        return self.dialect == DatabaseDialect.POSTGRESQL
+
+    def is_ready(self) -> bool:
+        """Returns True if the database connection has been verified."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            return True
+        return bool(self._is_ready)
+
+    def verify_readiness(self) -> bool:
+        """Verifies genuine database connectivity. Fails closed with actionable sanitized errors."""
+        if self.dialect == DatabaseDialect.SQLITE:
+            self._is_ready = True
+            self._deferred_import_mode = False
+            return True
+
+        if not self.database_url:
+            raise RuntimeError(
+                "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
+                "A valid PostgreSQL DATABASE_URL must be configured."
+            )
+
+        try:
+            pool = self._ensure_pg_pool()
+            conn = pool.get_connection()
+            with conn:
+                cur = conn.execute("SELECT 1")
+                res = cur.fetchone()
+                if not res or res[0] != 1:
+                    raise RuntimeError("Database readiness probe returned invalid result.")
+            self._is_ready = True
+            self._deferred_import_mode = False
+            return True
+        except Exception as e:
+            self._is_ready = False
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
+            raise RuntimeError(
+                f"Database Readiness Verification Failed for '{sanitized_url}': {sanitized_err}"
+            )
+
+    def get_connection(self):
+        if self.dialect == DatabaseDialect.POSTGRESQL:
+            if self._deferred_import_mode and not self._is_ready:
+                return DeferredConnectionProxy(self)
+            return self._get_pooled_postgresql_connection()
+        if not self.db_path or not os.path.exists(os.path.dirname(os.path.abspath(self.db_path))):
+            session_db = os.environ.get("ZONATA_SESSION_TEST_DB")
+            if session_db and os.path.exists(os.path.dirname(os.path.abspath(session_db))):
+                self.set_db_path(session_db)
+            else:
+                configure_isolated_test_db()
         conn = sqlite3.connect(self.db_path, timeout=60.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -3211,9 +5152,186 @@ class Database:
         conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
+    def _ensure_pg_pool(self) -> PostgresConnectionPool:
+        if self._pg_pool is None:
+            min_size = int(os.environ.get("DATABASE_MIN_POOL_SIZE", "5"))
+            max_size = int(os.environ.get("DATABASE_MAX_POOL_SIZE", "20"))
+            timeout_ms = float(os.environ.get("DATABASE_BUSY_TIMEOUT_MS", "60000"))
+            pool_timeout = float(os.environ.get("DATABASE_POOL_TIMEOUT", str(timeout_ms / 1000.0)))
+            idle_timeout = float(os.environ.get("DATABASE_IDLE_TIMEOUT_SEC", "300"))
+            self._pg_pool = PostgresConnectionPool(
+                db_instance=self,
+                min_size=min_size,
+                max_size=max_size,
+                timeout=pool_timeout,
+                idle_timeout=idle_timeout
+            )
+        return self._pg_pool
+
+    def _get_pooled_postgresql_connection(self) -> PostgresConnectionWrapper:
+        pool = self._ensure_pg_pool()
+        return pool.get_connection()
+
+    def get_pool_stats(self) -> Dict[str, Any]:
+        """Returns connection pool metrics for Prometheus / SRE telemetry."""
+        if self.dialect == DatabaseDialect.POSTGRESQL and self._pg_pool is not None:
+            return self._pg_pool.get_stats()
+        return {
+            "dialect": self.dialect,
+            "status": "UNPOOLED" if self.dialect == DatabaseDialect.SQLITE else "UNINITIALIZED",
+            "total_connections": 0,
+            "active_connections": 0,
+            "idle_connections": 0,
+            "min_size": 1,
+            "max_size": 1,
+            "timeout_sec": 60.0,
+            "idle_timeout_sec": 300.0
+        }
+
+    def close(self):
+        """Closes all active and idle pooled connections."""
+        if self._pg_pool is not None:
+            self._pg_pool.close_all()
+            self._pg_pool = None
+
+    def _create_raw_connection(self):
+        # 1. Try psycopg2 driver
+        try:
+            import psycopg2
+            import psycopg2.extras
+            raw_conn = psycopg2.connect(self.database_url, connect_timeout=10)
+            raw_conn.autocommit = False
+            return raw_conn
+        except ImportError:
+            pass
+        except Exception as e:
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
+            raise RuntimeError(
+                f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}"
+            )
+
+        # 2. Fallback to pg8000 pure-Python driver
+        try:
+            termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
+            if os.path.exists(termux_site) and termux_site not in sys.path:
+                sys.path.insert(0, termux_site)
+            import pg8000
+            import ssl
+            parsed = urllib.parse.urlsplit(self.database_url)
+            user = parsed.username or "postgres"
+            password = parsed.password or ""
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 5432
+            database = parsed.path.lstrip("/") or "postgres"
+            ssl_ctx = None
+            if "sslmode=require" in self.database_url or "neon.tech" in (parsed.hostname or ""):
+                ssl_ctx = ssl.create_default_context()
+            raw_conn = pg8000.connect(
+                user=user,
+                password=password,
+                host=host,
+                port=port,
+                database=database,
+                ssl_context=ssl_ctx,
+                timeout=int(os.environ.get("DATABASE_TIMEOUT", "60"))
+            )
+            raw_conn.autocommit = False
+            return raw_conn
+        except ImportError:
+            raise RuntimeError(
+                "PostgreSQL driver (psycopg2 or pg8000) is not installed in the runtime environment. "
+                "Install psycopg2-binary or pg8000."
+            )
+        except Exception as e:
+            sanitized_url = sanitize_db_url(self.database_url)
+            sanitized_err = sanitize_db_url(str(e))
+            raise RuntimeError(
+                f"Failed to connect to PostgreSQL database at '{sanitized_url}': {sanitized_err}"
+            )
+
+    def _get_postgresql_connection(self):
+        raw_conn = self._create_raw_connection()
+        return PostgresConnectionWrapper(raw_conn)
+
     def _init_db(self):
+        if self.dialect == DatabaseDialect.SQLITE:
+            pass
+        elif self.dialect == DatabaseDialect.POSTGRESQL and not self._is_ready:
+            self.verify_readiness()
         with self.get_connection() as conn:
             conn.executescript(SCHEMA_SQL)
+            # Additive, idempotent column migrations for existing databases.
+            for stmt in (
+                "ALTER TABLE approvals ADD COLUMN decision_reason TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN responsibility TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN associated_workflows JSON",
+                "ALTER TABLE employee_kras ADD COLUMN associated_kpi_ids JSON",
+                "ALTER TABLE employee_kras ADD COLUMN allowed_tools JSON",
+                "ALTER TABLE employee_kras ADD COLUMN authority_scope JSON",
+                "ALTER TABLE employee_kras ADD COLUMN escalation_rules JSON",
+                "ALTER TABLE employee_kras ADD COLUMN expected_outcomes JSON",
+                "ALTER TABLE employee_kras ADD COLUMN position_id TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN strategic_objective_id TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN weight_percentage REAL DEFAULT 25.0",
+                "ALTER TABLE employee_kras ADD COLUMN accountability_statement TEXT",
+                "ALTER TABLE employee_kras ADD COLUMN updated_at REAL",
+                "ALTER TABLE organizations ADD COLUMN company_id TEXT",
+                """CREATE TABLE IF NOT EXISTS assistant_messages (
+                    message_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    sender TEXT NOT NULL,
+                    workspace_mode TEXT NOT NULL DEFAULT 'PERSONAL',
+                    content TEXT NOT NULL,
+                    intent_category TEXT,
+                    deliverables JSON,
+                    citations JSON,
+                    timestamp REAL NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS assistant_generated_documents (
+                    doc_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT,
+                    user_id TEXT NOT NULL,
+                    storage_boundary TEXT NOT NULL DEFAULT 'PERSONAL',
+                    title TEXT NOT NULL,
+                    format TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL DEFAULT 0,
+                    sha256 TEXT NOT NULL,
+                    metadata JSON,
+                    created_at REAL NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS meeting_integrations (
+                    integration_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    meeting_id TEXT NOT NULL,
+                    schedule_id TEXT,
+                    provider TEXT NOT NULL DEFAULT 'GOOGLE_MEET',
+                    meet_url TEXT NOT NULL,
+                    dial_in_info JSON,
+                    calendar_event_id TEXT,
+                    ai_representative_enabled INTEGER NOT NULL DEFAULT 1,
+                    statutory_disclosure_signed INTEGER NOT NULL DEFAULT 1,
+                    briefing_dossier_id TEXT,
+                    created_at REAL NOT NULL
+                )""",
+            ):
+                try:
+                    conn.execute(stmt)
+                    conn.commit()
+                except Exception:
+                    # Additive migration already applied (or unsupported):
+                    # roll back so PostgreSQL does not stay in aborted state.
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             conn.commit()
 
 # Global Singleton Database Instance
@@ -3228,4 +5346,41 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         tmp.close()
     db.set_db_path(custom_path)
     os.environ["ZONATA_DB_PATH"] = custom_path
+    try:
+        from core.database_engine import engine, DatabaseDialect
+        engine.dialect = DatabaseDialect.SQLITE
+        engine.db_path = custom_path
+        engine._is_ready = True
+        engine._deferred_import_mode = False
+        if hasattr(engine, 'pools') and engine.pools:
+            for p in engine.pools.values():
+                p.dialect = DatabaseDialect.SQLITE
+                p._deferred_import_mode = False
+                p.reset()
+    except Exception:
+        pass
+    try:
+        from core.evidence_service import evidence_service
+        evidence_service._init_db()
+    except Exception:
+        pass
+    try:
+        from core.automation_fabric.fabric import universal_automation_fabric
+        universal_automation_fabric._init_automation_tables()
+        universal_automation_fabric._ensure_signing_keys_table()
+    except Exception:
+        pass
+    try:
+        from core.security_center import security_center
+        security_center._init_db()
+    except Exception:
+        pass
+    try:
+        from tests.schema_bootstrap import init_all_subsystem_schemas, seed_baseline_tenant_scope
+        init_all_subsystem_schemas()
+        seed_baseline_tenant_scope()
+    except Exception:
+        pass
     return custom_path
+
+

@@ -192,11 +192,20 @@ class TestEnterpriseSettingsCenter(unittest.TestCase):
         self.assertNotEqual(val_a, val_b)
 
     def test_10_live_diagnostic_tests(self):
-        """Verify live diagnostic test execution returns latency and SHA-256 evidence."""
-        for target in ["api_token", "browser", "terminal", "backup", "webhook"]:
+        """Live diagnostics must report real outcomes, never fabricated PASSED."""
+        # Genuinely probeable subsystems.
+        for target in ["database", "terminal", "backup"]:
             res = settings_service.run_live_test(target)
-            self.assertEqual(res["status"], "PASSED")
-            self.assertTrue(res["latency_ms"] > 0)
+            self.assertIn(res["status"], ("PASSED", "FAILED"))
+            self.assertEqual(res["status"], "PASSED", res["detail"])
+            self.assertTrue(res["latency_ms"] >= 0)
+            self.assertEqual(len(res["evidence_hash"]), 64)
+            self.assertTrue(res.get("evidence"))
+
+        # Unprobeable subsystems must say so instead of pretending success.
+        for target in ["api_token", "webhook", "mcp", "a2a"]:
+            res = settings_service.run_live_test(target)
+            self.assertEqual(res["status"], "NOT_IMPLEMENTED")
             self.assertEqual(len(res["evidence_hash"]), 64)
 
     def test_11_effective_runtime_vs_stored_proof(self):

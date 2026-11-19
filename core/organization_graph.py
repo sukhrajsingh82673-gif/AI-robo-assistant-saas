@@ -103,9 +103,17 @@ class OrganizationGraph:
         )
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO organization_nodes (
+            INSERT INTO organization_nodes (
                 node_id, node_type, tenant_id, company_id, name, parent_id, metadata, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (node_id) DO UPDATE SET
+                node_type = EXCLUDED.node_type,
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                name = EXCLUDED.name,
+                parent_id = EXCLUDED.parent_id,
+                metadata = EXCLUDED.metadata,
+                updated_at = EXCLUDED.updated_at
             """, (
                 node.node_id, node.node_type, node.tenant_id, node.company_id,
                 node.name, node.parent_id, json.dumps(node.metadata), now, now
@@ -125,9 +133,16 @@ class OrganizationGraph:
         now = time.time()
         with engine.transaction(workload=WorkloadType.WRITE) as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO organization_edges (
+            INSERT INTO organization_edges (
                 edge_id, tenant_id, company_id, source_id, target_id, relation_type, metadata, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (edge_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
+                company_id = EXCLUDED.company_id,
+                source_id = EXCLUDED.source_id,
+                target_id = EXCLUDED.target_id,
+                relation_type = EXCLUDED.relation_type,
+                metadata = EXCLUDED.metadata
             """, (edge_id, tenant_id, company_id, source_id, target_id, relation_type, json.dumps(metadata or {}), now))
         return edge_id
 

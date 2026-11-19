@@ -1,0 +1,42 @@
+.git
+.github
+.cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+env
+*.log
+*.tmp
+node_modules
+
+# Secrets — never bake into an image layer
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Runtime state and tenant data
+storage/
+!storage/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.bundle
+.neon
+
+# Local test / tooling artefacts
+.pytest_cache
+.coverage
+htmlcov
+dist
+build
+*.egg-info
+.DS_Store
+.idea
+.vscode

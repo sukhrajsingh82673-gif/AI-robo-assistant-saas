@@ -54,17 +54,28 @@ class CostGovernor:
         allocated_inr: float,
         hard_limit_inr: Optional[float] = None
     ) -> str:
-        budget_id = f"bgt_{scope_type.lower()}_{scope_id[:8]}"
+        import hashlib
+        budget_id = f"bgt_{scope_type.lower()}_{hashlib.sha256(f'{self.tenant_id}:{company_id}:{scope_type}:{scope_id}'.encode()).hexdigest()[:16]}"
         hard_limit = hard_limit_inr if hard_limit_inr is not None else allocated_inr
         now = time.time()
 
         with db.get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO enterprise_budget_allocations (
+                INSERT INTO enterprise_budget_allocations (
                     budget_id, tenant_id, company_id, scope_type, scope_id,
                     allocated_budget_inr, spent_inr, soft_limit_pct,
                     hard_limit_inr, status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, 0.0, 0.8, ?, 'ACTIVE', ?, ?)
+                ON CONFLICT (budget_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    scope_type = EXCLUDED.scope_type,
+                    scope_id = EXCLUDED.scope_id,
+                    allocated_budget_inr = EXCLUDED.allocated_budget_inr,
+                    spent_inr = 0.0,
+                    hard_limit_inr = EXCLUDED.hard_limit_inr,
+                    status = 'ACTIVE',
+                    updated_at = EXCLUDED.updated_at
             """, (budget_id, self.tenant_id, company_id, scope_type, scope_id, allocated_inr, hard_limit, now, now))
             conn.commit()
 
@@ -109,6 +120,11 @@ class CostGovernor:
                     WHERE tenant_id = ? AND company_id = ? AND scope_type = ? AND scope_id = ?
                 """, (now, self.tenant_id, company_id, scope_type, scope_id))
                 conn.commit()
+                try:
+                    from .observability_stack import sre_metrics
+                    sre_metrics.inc_counter("zonata_budget_exhaustions_total")
+                except Exception:
+                    pass
                 raise BudgetExhaustedException(
                     f"Hard budget limit of ₹{hard_limit:,.2f} exceeded for {scope_type}:{scope_id}. Requested spend ₹{cost_inr:,.2f} would bring total to ₹{new_spent:,.2f}."
                 )

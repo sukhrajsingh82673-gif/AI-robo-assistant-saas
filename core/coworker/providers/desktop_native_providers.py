@@ -98,72 +98,37 @@ class BaseNativeDesktopProvider(CapabilityProvider):
             )
 
         target_app = params.get("app_name", "EnterpriseApp")
-        element_id = params.get("element_id", "btn_submit")
 
-        output: Dict[str, Any] = {
-            "platform": self._platform,
-            "action": capability,
-            "target_app": target_app,
-            "element_id": element_id,
-            "status": "COMPLETED"
-        }
-
-        # Handle specific native capabilities
-        if capability == "desktop.accessibility_tree":
-            output["tree"] = {
-                "window": target_app,
-                "role": "application",
-                "children": [
-                    {"id": "menu_file", "role": "menu_bar", "name": "File"},
-                    {"id": "tbl_data", "role": "table", "rows": 45, "cols": 6},
-                    {"id": "btn_export", "role": "button", "name": "Export Report"}
-                ]
-            }
-        elif capability == "desktop.click_element":
-            output["clicked_element"] = element_id
-            output["invoked_pattern"] = "InvokePattern.Invoke()"
-        elif capability == "desktop.set_text":
-            output["element_id"] = element_id
-            output["text_applied"] = params.get("text", "")
-        elif capability == "desktop.read_text":
-            output["read_content"] = params.get("mock_content", "Occupancy: 84.5%, ADR: INR 6,250")
-
-        evidence = [
-            {
-                "type": f"{self._platform}_accessibility_event",
-                "action": capability,
-                "element_id": element_id,
-                "timestamp": time.time(),
-                "audit_hash": hashlib.sha256(str(output).encode()).hexdigest()
-            }
-        ]
-
-        self._history[exec_id] = {
-            "capability": capability,
-            "output": output,
-            "status": "COMPLETED",
-            "timestamp": time.time()
-        }
-
+        # No OS accessibility tree (UIA / AXUIElement / AT-SPI) is wired into this
+        # provider. Inventing a tree, a click, or a text readback would report
+        # work that never happened, so these capabilities refuse explicitly.
+        # Subclasses that do have a real backend override this method.
         return ExecutionResult(
             provider_id=self._id,
             capability_id=capability,
             execution_id=exec_id,
-            status="SUCCESS",
-            output=output,
-            confidence=0.99,
-            evidence=evidence,
-            rollback_available=False,
-            idempotency_key=params.get("idempotency_key"),
+            status="FAILED",
+            output={
+                "platform": self._platform,
+                "action": capability,
+                "executed": False,
+                "target_app": target_app,
+                "reason": "NATIVE_ACCESSIBILITY_BACKEND_NOT_IMPLEMENTED",
+            },
+            confidence=0.0,
+            error_message="NATIVE_ACCESSIBILITY_BACKEND_NOT_IMPLEMENTED",
             duration_ms=(time.time() - start_time) * 1000
         )
 
     def observe(self, capability: str, execution_id: str) -> Dict[str, Any]:
+        # There is no accessibility backend to poll, so do not claim one is online.
+        record = self._history.get(execution_id)
         return {
             "execution_id": execution_id,
             "platform": self._platform,
-            "window_state": "FOCUSED_ACTIVE",
-            "accessibility_online": True
+            "executed": bool(record),
+            "window_state": record.get("status") if record else "UNKNOWN",
+            "accessibility_online": False,
         }
 
     def verify(self, execution_id: str, expected_state: Dict[str, Any]) -> VerificationResult:
@@ -359,7 +324,139 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
                         duration_ms=(time.time() - start_time) * 1000
                     )
 
+        # Window / pointer / keyboard capabilities are dispatched through the
+        # real GUI engine (xdotool + wmctrl). If the host cannot accept the
+        # input, the result is FAILED rather than a claimed success.
+        if capability in (
+            "desktop.get_active_window",
+            "desktop.list_windows",
+            "desktop.focus_window",
+            "desktop.click_element",
+            "desktop.set_text",
+            "desktop.find_element_by_id",
+            "desktop.read_text",
+            "desktop.accessibility_tree",
+        ):
+            return self._execute_gui_capability(capability, params, exec_id, start_time)
+
         return super().execute(capability, params, context)
+
+    def _gui_result(self, capability, exec_id, start_time, executed, reason, payload):
+        return ExecutionResult(
+            provider_id=self._id,
+            capability_id=capability,
+            execution_id=exec_id,
+            status="SUCCESS" if executed else "FAILED",
+            output=dict(payload, executed=executed, reason=None if executed else reason),
+            confidence=1.0 if executed else 0.0,
+            error_message=None if executed else reason,
+            duration_ms=(time.time() - start_time) * 1000,
+        )
+
+    def _execute_gui_capability(self, capability, params, exec_id, start_time):
+        from ..computer_use_engine import ComputerUseEngine
+
+        engine = ComputerUseEngine.get_instance()
+
+        if capability == "desktop.accessibility_tree":
+            return self._gui_result(capability, exec_id, start_time, False,
+                                    "ACCESSIBILITY_TREE_NOT_AVAILABLE", {"platform": "linux"})
+
+        if capability == "desktop.read_text":
+            # Reading a widget's text needs an accessibility binding; the
+            # screenshot pipeline cannot do it truthfully.
+            return self._gui_result(capability, exec_id, start_time, False,
+                                    "TEXT_READBACK_NOT_IMPLEMENTED", {"platform": "linux"})
+
+        if capability in ("desktop.get_active_window", "desktop.list_windows"):
+            obs = engine.observe()
+            if not getattr(obs, "windows_verified", False):
+                return self._gui_result(capability, exec_id, start_time, False,
+                                        "WINDOW_ENUMERATION_NOT_AVAILABLE",
+                                        {"platform": "linux", "synthetic": True})
+            payload = {
+                "platform": "linux",
+                "active_window": obs.active_window,
+                "windows": list(obs.open_windows),
+                "synthetic": False,
+            }
+            if getattr(obs, "window_tree_available", False):
+                payload["window_tree"] = [w.to_dict() for w in obs.window_elements]
+                payload["perception_source"] = obs.perception_source
+            return self._gui_result(capability, exec_id, start_time, True, None, payload)
+
+        if capability == "desktop.focus_window":
+            title = params.get("window_title") or params.get("app_name") or ""
+            if not title:
+                return self._gui_result(capability, exec_id, start_time, False,
+                                        "WINDOW_TITLE_REQUIRED", {"platform": "linux"})
+            res = engine.switch_window(title)
+            return self._gui_result(capability, exec_id, start_time, bool(res.get("executed")),
+                                    res.get("reason"), {"platform": "linux", "window": title})
+
+        if capability == "desktop.click_element":
+            element = None
+            element_id = params.get("element_id")
+            label = params.get("label") or params.get("text")
+            target_source = "seeded_scene"
+            if element_id:
+                element = engine.perception._registered_elements.get(element_id)
+                if element is None and element_id.startswith("x11_"):
+                    wid = element_id[4:]
+                    element = next(
+                        (w for w in engine.x11_window_tree() if w.metadata.get("window_id") == wid),
+                        None,
+                    )
+                    target_source = "x11_window_tree"
+            if element is None and label:
+                element = engine.perception.find_by_text(label)
+                if element is not None:
+                    target_source = "seeded_scene"
+                else:
+                    element = engine.find_in_window_tree(label)
+                    if element is not None:
+                        target_source = "x11_window_tree"
+            if element is None:
+                return self._gui_result(capability, exec_id, start_time, False,
+                                        "ELEMENT_NOT_FOUND",
+                                        {"platform": "linux", "element_id": element_id})
+            cx, cy = element.box.center
+            res = engine.click(cx, cy)
+            return self._gui_result(
+                capability, exec_id, start_time, bool(res.get("executed")), res.get("reason"),
+                {"platform": "linux", "element_id": element.element_id,
+                 "coordinates": [cx, cy], "target_source": target_source,
+                 "synthetic_perception": target_source != "x11_window_tree"},
+            )
+
+        if capability == "desktop.set_text":
+            text = params.get("text", "")
+            res = engine.type_text(text)
+            return self._gui_result(capability, exec_id, start_time, bool(res.get("executed")),
+                                    res.get("reason"),
+                                    {"platform": "linux", "characters": len(text)})
+
+        if capability == "desktop.find_element_by_id":
+            element_id = params.get("element_id")
+            element = engine.perception._registered_elements.get(element_id) if element_id else None
+            source = "seeded_scene"
+            if element is None and element_id and element_id.startswith("x11_"):
+                wid = element_id[4:]
+                element = next(
+                    (w for w in engine.x11_window_tree() if w.metadata.get("window_id") == wid),
+                    None,
+                )
+                source = "x11_window_tree"
+            if element is None:
+                return self._gui_result(capability, exec_id, start_time, False,
+                                        "ELEMENT_NOT_FOUND", {"platform": "linux", "element_id": element_id})
+            return self._gui_result(capability, exec_id, start_time, True, None,
+                                    {"platform": "linux", "element": element.to_dict(),
+                                     "target_source": source,
+                                     "synthetic_perception": source != "x11_window_tree"})
+
+        return self._gui_result(capability, exec_id, start_time, False,
+                                "CAPABILITY_NOT_IMPLEMENTED", {"platform": "linux"})
 
     def shutdown(self) -> None:
         for proc in self._spawned_processes.values():

@@ -1,0 +1,371 @@
+/* ==========================================================================
+   URA / ZONATA — Apple-Grade AppShell & Navigation Architecture
+   Quiet • Spacious • Translucent Glass • Responsive Hierarchy
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Root Shell Layout Grid
+   -------------------------------------------------------------------------- */
+.apple-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg);
+  color: var(--label);
+  font-family: var(--font-sans);
+  position: relative;
+}
+
+/* --------------------------------------------------------------------------
+   2. Translucent Glass Sidebar (Desktop & Tablet)
+   -------------------------------------------------------------------------- */
+.apple-sidebar {
+  width: 264px;
+  height: 100vh;
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-right: 0.5px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 100;
+  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .apple-sidebar {
+    background: var(--surface);
+  }
+}
+
+/* Collapsed Rail State (72px) */
+.apple-sidebar.collapsed {
+  width: 72px;
+}
+
+.apple-sidebar.collapsed .sidebar-hide-on-collapse {
+  display: none !important;
+}
+
+.apple-sidebar.collapsed .apple-company-switcher {
+  padding: 8px 0;
+  justify-content: center;
+}
+
+.apple-sidebar.collapsed .apple-nav-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* Top Company Switcher in Sidebar */
+.apple-company-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 16px 18px;
+  border-bottom: 0.5px solid var(--separator);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.16s ease;
+}
+
+.apple-company-switcher:hover {
+  background: var(--separator);
+}
+
+.company-meta-box {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.company-name-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.company-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--label-2);
+}
+
+.status-dot-active {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+/* Sidebar Navigation Items */
+.apple-sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apple-nav-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--label-3);
+  padding: 12px 12px 6px;
+  user-select: none;
+}
+
+.apple-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  color: var(--label-2);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.16s ease, color 0.16s ease;
+  position: relative;
+}
+
+.apple-nav-item:hover {
+  background: var(--separator);
+  color: var(--label);
+}
+
+.apple-nav-item.active {
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.apple-nav-item.active .ura-icon {
+  stroke: var(--accent);
+}
+
+.apple-nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--separator);
+  color: var(--label-2);
+}
+
+.apple-nav-item.active .apple-nav-badge {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* Sidebar Footer Profile Card */
+.apple-sidebar-footer {
+  padding: 12px 14px;
+  border-top: 0.5px solid var(--separator);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   3. Workspace Content Canvas & Top Toolbar
+   -------------------------------------------------------------------------- */
+.apple-workspace-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.apple-top-toolbar {
+  height: 54px;
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-bottom: 0.5px solid var(--separator);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+  z-index: 90;
+}
+
+.toolbar-title-area {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.toolbar-breadcrumbs {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--label);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* Centered Main Scroll Area (Max 1120px) */
+.apple-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px 24px 100px;
+  position: relative;
+}
+
+.apple-content-column {
+  max-width: 1120px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   5. Contextual Inspector Panel (Right 380px)
+   -------------------------------------------------------------------------- */
+.apple-inspector-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  background: var(--surface);
+  border-left: 0.5px solid var(--separator);
+  box-shadow: var(--shadow-4);
+  z-index: 850;
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.apple-inspector-panel.open {
+  transform: translateX(0);
+}
+
+.inspector-header {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 0.5px solid var(--separator);
+  flex-shrink: 0;
+}
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .apple-inspector-panel {
+    top: auto;
+    bottom: 0;
+    width: 100vw;
+    height: 80vh;
+    border-left: none;
+    border-top: 0.5px solid var(--separator);
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    transform: translateY(100%);
+  }
+
+  .apple-inspector-panel.open {
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. Mobile Bottom Tab Bar (under 768px)
+   -------------------------------------------------------------------------- */
+.apple-mobile-tab-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-top: 0.5px solid var(--separator);
+  z-index: 750;
+  align-items: center;
+  justify-content: space-around;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@media (max-width: 768px) {
+  .apple-mobile-tab-bar {
+    display: flex;
+  }
+
+  .apple-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+  }
+
+  .apple-sidebar.drawer-open {
+    transform: translateX(0);
+  }
+}
+
+.mobile-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--label-2);
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.16s ease;
+}
+
+.mobile-tab-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}

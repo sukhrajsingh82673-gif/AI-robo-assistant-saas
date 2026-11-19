@@ -7,7 +7,9 @@ node health, license compliance, risk levels, and historical reliability.
 The AI CEO requests a capability; the router determines the runtime.
 """
 
-from typing import Dict, List, Optional, Any
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Any, Tuple
 import time
 from dataclasses import dataclass, field
 

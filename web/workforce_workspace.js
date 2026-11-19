@@ -21,6 +21,11 @@
       const container = document.getElementById(containerId);
       if (!container) return;
 
+      if (window.AppleWorkforceBoard) {
+        window.AppleWorkforceBoard.render(container);
+        return;
+      }
+
       const companyId = window.CurrentCompanyContext ? window.CurrentCompanyContext.getCompanyId() : null;
       if (!companyId) {
         if (window.CurrentCompanyContext) {
@@ -42,13 +47,28 @@
     async loadWorkforce(companyId) {
       this.loading = true;
       try {
-        const [resWf, resSq] = await Promise.all([
+        const [resWf, resSq, resV8] = await Promise.all([
           fetch(`/api/companies/${companyId}/workforce`),
-          fetch(`/api/workforces?company_id=${companyId}`)
+          fetch(`/api/workforces?company_id=${companyId}`),
+          fetch(`/api/v8/workforce/employees?company_id=${companyId}`)
         ]);
         if (resWf.ok) {
           const data = await resWf.json();
           this.workforce = Array.isArray(data.workforce) ? data.workforce : [];
+        }
+        if (resV8 && resV8.ok) {
+          const v8Data = await resV8.json();
+          if (Array.isArray(v8Data.employees) && v8Data.employees.length > 0) {
+            const v8Mapped = v8Data.employees.map(e => ({
+              id: e.employee_id,
+              name: `${e.first_name} ${e.last_name}`,
+              role: e.position_id,
+              department: e.department_id,
+              status: e.lifecycle_state,
+              triad_type: e.identity_type || 'AI_EMPLOYEE'
+            }));
+            this.workforce = [...this.workforce, ...v8Mapped];
+          }
         }
         if (resSq.ok) {
           const sqData = await resSq.json();
@@ -350,27 +370,30 @@
           return `
             <div style="display:flex; flex-direction:column; gap:10px;">
               <div><strong>Data Access:</strong> Scoped Read-Only (Transactional Mutations require Approval)</div>
-              <div><strong>Financial Ceiling:</strong> ₹10,000 / transaction</div>
+              <div><strong>Financial Ceiling:</strong> ₹${Number(emp.spending_limit || emp.spendingLimit || 0).toLocaleString()} / transaction</div>
               <div><strong>Forbidden Operations:</strong> Credential extraction, destructive table drop, outbound arbitrary wire transfers.</div>
             </div>
           `;
         case 'budget':
+          const allocatedBudget = Number(emp.budget || emp.budget_limit || 0);
+          const currentBurn = Number(emp.actual_spend || emp.burn || 0);
+          const burnPct = allocatedBudget > 0 ? Math.round((currentBurn / allocatedBudget) * 100) : 0;
           return `
             <div>
-              <div style="font-size:18px; font-weight:800; color:var(--accent-amber); margin-bottom:4px;">₹${(emp.budget || 5000).toLocaleString()}</div>
+              <div style="font-size:18px; font-weight:800; color:var(--accent-amber); margin-bottom:4px;">₹${allocatedBudget.toLocaleString()}</div>
               <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Monthly Operating Token & Compute Budget</div>
-              <div style="font-size:12px;">Burn to date: <strong>₹420.00</strong> (8.4% of ceiling)</div>
+              <div style="font-size:12px;">Burn to date: <strong>₹${currentBurn.toLocaleString()}</strong> (${burnPct}% of ceiling)</div>
             </div>
           `;
         case 'performance':
           return `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div style="padding:12px; border:1px solid var(--border-color); border-radius:var(--radius-md); text-align:center;">
-                <div style="font-size:18px; font-weight:700; color:var(--accent-emerald);">99.2%</div>
+                <div style="font-size:18px; font-weight:700; color:var(--accent-emerald);">${emp.sla_compliance || '100%'}</div>
                 <div style="font-size:11px; color:var(--text-muted);">SLA Compliance</div>
               </div>
               <div style="padding:12px; border:1px solid var(--border-color); border-radius:var(--radius-md); text-align:center;">
-                <div style="font-size:18px; font-weight:700; color:var(--accent-blue);">100%</div>
+                <div style="font-size:18px; font-weight:700; color:var(--accent-blue);">${emp.verification_rate || '100%'}</div>
                 <div style="font-size:11px; color:var(--text-muted);">Verification Rate</div>
               </div>
             </div>

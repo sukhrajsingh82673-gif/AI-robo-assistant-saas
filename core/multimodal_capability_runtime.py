@@ -427,15 +427,38 @@ class MultimodalCapabilityRegistry:
         ]
 
         with db.get_connection() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO tenants (tenant_id, name, status, created_at) VALUES (?, ?, 'ACTIVE', ?) ON CONFLICT(tenant_id) DO NOTHING",
+                    (self.tenant_id, "System Primary", now)
+                )
+            except Exception:
+                pass
             for c in caps:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO multimodal_capabilities (
+                    INSERT INTO multimodal_capabilities (
                         capability_id, tenant_id, provider, family, name, version,
                         platform, risk_level, requires_approval, permissions,
                         execution_mode, evidence_requirements, health_status,
                         latency_ms, is_enabled, metadata, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, '["SHA256_HASH", "AUDIT_RECORD"]', ?, ?, 1, ?, ?)
+                    ON CONFLICT (tenant_id, capability_id) DO UPDATE SET
+                        provider = EXCLUDED.provider,
+                        family = EXCLUDED.family,
+                        name = EXCLUDED.name,
+                        version = EXCLUDED.version,
+                        platform = EXCLUDED.platform,
+                        risk_level = EXCLUDED.risk_level,
+                        requires_approval = EXCLUDED.requires_approval,
+                        permissions = EXCLUDED.permissions,
+                        execution_mode = EXCLUDED.execution_mode,
+                        evidence_requirements = EXCLUDED.evidence_requirements,
+                        health_status = EXCLUDED.health_status,
+                        latency_ms = EXCLUDED.latency_ms,
+                        is_enabled = EXCLUDED.is_enabled,
+                        metadata = EXCLUDED.metadata,
+                        updated_at = EXCLUDED.updated_at
                     """,
                     (
                         c["id"], self.tenant_id, c["provider"], c["family"], c["name"],
@@ -447,14 +470,22 @@ class MultimodalCapabilityRegistry:
             conn.commit()
 
     def list_capabilities(self, family: Optional[str] = None) -> List[Dict[str, Any]]:
-        with db.get_connection() as conn:
-            query = "SELECT * FROM multimodal_capabilities WHERE tenant_id = ?"
-            params: List[Any] = [self.tenant_id]
-            if family:
-                query += " AND family = ?"
-                params.append(family.upper())
-            query += " ORDER BY family ASC, capability_id ASC"
-            rows = conn.execute(query, params).fetchall()
+        def _query():
+            with db.get_connection() as conn:
+                q = "SELECT * FROM multimodal_capabilities WHERE tenant_id = ?"
+                p: List[Any] = [self.tenant_id]
+                if family:
+                    q += " AND family = ?"
+                    p.append(family.upper())
+                q += " ORDER BY family ASC, capability_id ASC"
+                return conn.execute(q, p).fetchall()
+
+        rows = _query()
+        if not rows:
+            # The registry may be constructed before the active database is
+            # ready (tests, first boot). Seed once, then read the real rows.
+            self._seed_capabilities()
+            rows = _query()
 
         results = []
         for r in rows:
@@ -1154,6 +1185,16 @@ class MultimodalExecutionManager:
         initial_history = [{"state": ExecutionState.IDLE, "timestamp": now, "detail": "Session initialized"}]
 
         with db.get_connection() as conn:
+            # Foreign-key integrity: the tenant row must exist before a session
+            # can reference it. Never invent a company identifier.
+            conn.execute(
+                """
+                INSERT INTO tenants (tenant_id, name, plan, status, created_at, metadata)
+                VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?, '{}')
+                ON CONFLICT (tenant_id) DO NOTHING
+                """,
+                (self.tenant_id, self.tenant_id, now)
+            )
             conn.execute(
                 """
                 INSERT INTO multimodal_execution_sessions (
@@ -1163,7 +1204,7 @@ class MultimodalExecutionManager:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IDLE', 0, 0, ?, ?, ?)
                 """,
                 (
-                    session_id, self.tenant_id, company_id or "comp_primary",
+                    session_id, self.tenant_id, company_id,
                     workspace_id, user_id, mission_id, task_id, capability_id,
                     json.dumps(initial_history), now, now
                 )

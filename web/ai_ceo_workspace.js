@@ -224,26 +224,14 @@
               </div>
             </div>
 
-            <!-- Natural Language Command Bar -->
-            <div style="margin-top:16px; display:flex; gap:10px;">
-              <input type="text" id="ceoCommandInput" class="ceo-command-input" style="flex:1; padding:10px 16px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:white;" placeholder="Command the AI CEO (e.g. 'Increase hotel bookings by 20% this month', 'What is blocking marketing?', 'Show me the evidence')..." />
-              <button class="btn btn-secondary" id="btnSendCeoCommand" style="padding:10px 20px;">Send Directive</button>
+            <!-- The assistant chat moved to the single URA Assistant window. -->
+            <div style="margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border:1px solid rgba(255,255,255,0.08); border-radius:10px; background:rgba(255,255,255,0.03);">
+              <div>
+                <div style="font-weight:600; color:#e2e8f0; font-size:0.95rem;">Executive conversations live in URA Assistant</div>
+                <div style="color:var(--text-secondary); font-size:0.8rem; margin-top:2px;">Ask the CEO, open records, or delegate work from one assistant window.</div>
+              </div>
+              <button class="btn btn-primary" onclick="window.URAAssistant && window.URAAssistant.open({ focus: 'company' })">Open URA Assistant</button>
             </div>
-
-            <!-- Fast Prompt Chips -->
-            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; font-size:0.8rem;">
-              <span style="color:var(--text-secondary); align-self:center;">Cognitive Directives:</span>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Increase hotel bookings by 20% this month')">🏨 +20% Bookings</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Create a plan to increase revenue for the company by 15% over the next quarter')">📈 +15% Revenue Plan</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('What is blocking marketing?')">🔍 Audit Marketing</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('How is the company performing?')">📊 Health Status</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.sendQuickCommand('Show me the evidence')">🔗 Evidence Ledger</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.runBenchmarkSuite()">🧪 Gemma 4 Benchmark</button>
-              <button class="chip-btn" onclick="window.AiCeoWorkspace.advanceLoopTick()">Next Loop Tick (${this.loopStage})</button>
-            </div>
-
-            <div id="ceoChatFeedback" style="margin-top:12px; display:none; padding:12px; background:rgba(0,0,0,0.4); border-radius:8px; border-left:3px solid #3b82f6;"></div>
-          </div>
 
           <!-- 20-Section Subnav Tabs -->
           <div class="ceo-subnav" style="display:flex; overflow-x:auto; gap:6px; padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.1);">
@@ -1648,19 +1636,6 @@
             btnRun.innerHTML = '<span>⚡ Run 22-Step Scenario</span>';
           }
         };
-      }
-
-      const btnSend = container.querySelector('#btnSendCeoCommand');
-      const input = container.querySelector('#ceoCommandInput');
-      if (btnSend && input) {
-        const handler = async () => {
-          const val = input.value.trim();
-          if (!val) return;
-          input.value = '';
-          await this.sendQuickCommand(val);
-        };
-        btnSend.onclick = handler;
-        input.onkeydown = (e) => { if (e.key === 'Enter') handler(); };
       }
     }
 

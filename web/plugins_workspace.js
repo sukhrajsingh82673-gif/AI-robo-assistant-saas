@@ -162,7 +162,9 @@
       return `
         <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:18px;">
           ${this.connections.map(c => {
-            const healthColor = c.health_score > 90 ? '#10b981' : c.health_score > 70 ? '#f59e0b' : '#ef4444';
+            const hasHealth = typeof c.health_score === 'number';
+            const hasLatency = typeof c.latency_ms === 'number';
+            const healthColor = !hasHealth ? 'var(--text-muted)' : c.health_score > 90 ? '#10b981' : c.health_score > 70 ? '#f59e0b' : '#ef4444';
             const permLevel = c.permission_scope?.level || 'READ_ONLY_VISIBILITY';
 
             return `
@@ -191,13 +193,13 @@
                     <div>
                       <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase;">Health Score</span>
                       <div style="font-weight:700; color:${healthColor}; margin-top:2px;">
-                        ${c.health_score}%
+                        ${hasHealth ? c.health_score + '%' : 'n/a'}
                       </div>
                     </div>
                     <div>
                       <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase;">Latency</span>
                       <div style="font-weight:700; color:var(--text-primary); margin-top:2px;">
-                        ${c.latency_ms} ms
+                        ${hasLatency ? c.latency_ms + ' ms' : 'n/a'}
                       </div>
                     </div>
                   </div>
@@ -395,7 +397,11 @@
         const res = await fetch(`/api/connections/${connectionId}/test`, { method: 'POST' });
         if (res.ok) {
           const data = await res.json();
-          alert(`Connection verified: Latency ${data.latency_ms}ms, Health ${data.health_score}%, Handshake Passed.`);
+          if (data.reachable) {
+            alert(`Endpoint reachable: ${data.status} · ${data.latency_ms} ms. Credentials/handshake were not exercised.`);
+          } else {
+            alert(`Probe failed: ${data.status}${data.error ? ' — ' + data.error : ''}`);
+          }
           await this.loadConnections();
           const container = document.getElementById('view-plugins');
           if (container) this.renderWorkspace(container);

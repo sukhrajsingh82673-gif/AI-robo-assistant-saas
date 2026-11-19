@@ -774,7 +774,7 @@
                 Universal Executive Role Registry (C-Suite Library)
               </h3>
               <p style="font-size:12.5px; color:var(--text-secondary); margin:2px 0 0 0;">
-                Canonical definitions of 15+ C-Suite roles. Roles are instantiated dynamically based on company industry, scale, and workload.
+                Canonical definitions of 26+ Real-World C-Suite roles across diverse industries (SaaS, Healthcare, Manufacturing, Retail, Fintech, Logistics, Hospitality).
               </p>
             </div>
             

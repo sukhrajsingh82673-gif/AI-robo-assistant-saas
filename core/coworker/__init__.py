@@ -63,6 +63,99 @@ from .controllers import (
     GovernedA2AController, GovernedArtifactManager, GovernedArtifact,
     UniversalRecoveryController, FailureState, FailureEvent
 )
+from .contracts_v2 import (
+    TaskLifecycleState, VALID_TRANSITIONS, TaskStateTransition,
+    CoworkerExecutionLease, CleanupManifestRecord, CleanupResourceType,
+    CleanupStatus, SecurityPatrolFinding, PatrolType, PatrolSeverity,
+    LeaseStatus, CoworkerV2Task, SubworkerV2Record
+)
+from .db_store_v2 import CoworkerDbStoreV2
+CoworkerV2Store = CoworkerDbStoreV2
+from .orchestrator_v2 import CoworkerLifecycleOrchestrator, InvalidStateTransitionError
+from .decision_engine import (
+    ExecutionDecisionEngine, ExecutionLadderLevel, DecisionEvaluationResult, ExecutionOutput
+)
+from .computer_use_engine import (
+    ComputerUseEngine, PerceptionEngine, BoundingBox, UIElement, GUIObservation,
+    GUIActionPrimitive, GUIExecutionResult
+)
+from .adapters.hermes_adapter import HermesComputerUseAdapter
+from .adapters.opencloud_adapter import OpenCloudAdapter
+from .adapters.opendots_adapter import OpenDotsAdapter, GroundingTarget
+from .subworkers_v2 import SubWorkerArchetype, ARCHETYPE_REGISTRY, ArchetypeSpec
+from .agent_factory_v2 import EphemeralAgentFactoryV2
+from .resource_guard import ResourceGuardEngine, HostResourceMetrics
+from .defense_monitor import DefensiveCybersecurityMonitor, PatrolScheduler
+from .evidence_reporting import (
+    EvidenceAndReportingEngine, VerificationOutcome, PhysicalVerificationCheck,
+    ExecutiveDeliverable, AICeoExecutiveReport
+)
+from .contracts_v3 import (
+    HermesSessionContext, OpenCodeMission, OpenCodeLoopPhase,
+    RemoteWorkerNode, RemoteWorkerState, AgentRegistrationStatus,
+    AgentIdentityRecord, VisualObservation, ScheduledTaskEntry,
+    EscalationStatus, EscalationTicket, CybersecuritySeverity,
+    DefensiveSecurityIncident, ExecutiveCockpitTelemetry
+)
+from .hermes_agent_v3 import (
+    HermesSessionStore, HermesInferenceGateway, HermesToolDispatcher,
+    HermesProcessManager
+)
+from .opencode_engine import OpenCodeEngine, ConstitutionalViolationError
+from .opencloud_engine import OpenCloudEngine, OpenCloudWorkerServer
+from .agent_cloud_registry import AgentCloudRegistry, SPECIALIST_ARCHETYPES_CATALOG
+from .opendots_engine import OpenDotsEngine
+from .escalation_router import ExecutiveEscalationRouter, AgentCommunicationBus, AgentBusMessage
+from .executive_operating_loop import (
+    OperatingPriority,
+    WorkItemStatus,
+    PriorityWorkItem,
+    ExecutiveOperatingLoop,
+)
+from .runtime_supervisor import (
+    CoworkerAutonomySupervisor,
+    ensure_supervisor,
+    get_supervisor,
+    shutdown_all_supervisors,
+    bootstrap_tenant_supervisors,
+)
+from .local_inference_adapter import (
+    HardwareBudget,
+    LocalInferenceStatus,
+    LocalInferenceAdapter,
+)
+from .dlp_engine import (
+    DLPCategory,
+    DLPChannel,
+    DLPRiskLevel,
+    DLPFinding,
+    DLPScanResult,
+    DLPEngine,
+)
+from .dlp_channel_monitor import DLPChannelMonitor
+from .dlp_response_ladder import DLPResponseLadder
+from .credential_masking_tracker import CredentialMaskingTracker
+from .employee_support_service import (
+    BlockerCategory,
+    SupportTicketStatus,
+    SupportTicket,
+    EmployeeSupportService,
+)
+from .archetype_contracts import (
+    SpecialistRole,
+    SpecialistArchetypeContract,
+    ARCHETYPE_CONTRACTS,
+)
+from .specialist_team_assembler import (
+    AssembledTeamMember,
+    AssembledTeam,
+    SpecialistTeamAssembler,
+)
+from .capability_registry_v3 import (
+    RegisteredCapabilityV3,
+    CapabilityRegistryV3,
+)
+
 
 __all__ = [
     "CapabilityCategory",
@@ -175,6 +268,115 @@ __all__ = [
     "GovernedArtifact",
     "UniversalRecoveryController",
     "FailureState",
-    "FailureEvent"
+    "FailureEvent",
+    # Coworker 2.0 Exports
+    "TaskLifecycleState",
+    "VALID_TRANSITIONS",
+    "TaskStateTransition",
+    "CoworkerExecutionLease",
+    "CleanupManifestRecord",
+    "CleanupResourceType",
+    "CleanupStatus",
+    "SecurityPatrolFinding",
+    "PatrolType",
+    "PatrolSeverity",
+    "LeaseStatus",
+    "CoworkerV2Task",
+    "SubworkerV2Record",
+    "CoworkerDbStoreV2",
+    "CoworkerV2Store",
+    "CoworkerLifecycleOrchestrator",
+    "InvalidStateTransitionError",
+    "ExecutionDecisionEngine",
+    "ExecutionLadderLevel",
+    "DecisionEvaluationResult",
+    "ExecutionOutput",
+    "ComputerUseEngine",
+    "PerceptionEngine",
+    "BoundingBox",
+    "UIElement",
+    "GUIObservation",
+    "GUIActionPrimitive",
+    "GUIExecutionResult",
+    "HermesComputerUseAdapter",
+    "OpenCloudAdapter",
+    "OpenDotsAdapter",
+    "GroundingTarget",
+    "SubWorkerArchetype",
+    "ARCHETYPE_REGISTRY",
+    "ArchetypeSpec",
+    "EphemeralAgentFactoryV2",
+    "ResourceGuardEngine",
+    "HostResourceMetrics",
+    "DefensiveCybersecurityMonitor",
+    "PatrolScheduler",
+    "EvidenceAndReportingEngine",
+    "VerificationOutcome",
+    "PhysicalVerificationCheck",
+    "ExecutiveDeliverable",
+    "AICeoExecutiveReport",
+    # Coworker 3.0 Exports
+    "HermesSessionContext",
+    "OpenCodeMission",
+    "OpenCodeLoopPhase",
+    "RemoteWorkerNode",
+    "RemoteWorkerState",
+    "AgentRegistrationStatus",
+    "AgentIdentityRecord",
+    "VisualObservation",
+    "ScheduledTaskEntry",
+    "EscalationStatus",
+    "EscalationTicket",
+    "CybersecuritySeverity",
+    "DefensiveSecurityIncident",
+    "ExecutiveCockpitTelemetry",
+    "HermesSessionStore",
+    "HermesInferenceGateway",
+    "HermesToolDispatcher",
+    "HermesProcessManager",
+    "OpenCodeEngine",
+    "ConstitutionalViolationError",
+    "OpenCloudEngine",
+    "OpenCloudWorkerServer",
+    "AgentCloudRegistry",
+    "SPECIALIST_ARCHETYPES_CATALOG",
+    "OpenDotsEngine",
+    "ExecutiveEscalationRouter",
+    "AgentCommunicationBus",
+    "AgentBusMessage",
+    # Executive Coworker Milestones 1–5 Exports
+    "OperatingPriority",
+    "WorkItemStatus",
+    "PriorityWorkItem",
+    "ExecutiveOperatingLoop",
+    "CoworkerAutonomySupervisor",
+    "ensure_supervisor",
+    "get_supervisor",
+    "shutdown_all_supervisors",
+    "bootstrap_tenant_supervisors",
+    "HardwareBudget",
+    "LocalInferenceStatus",
+    "LocalInferenceAdapter",
+    "DLPCategory",
+    "DLPChannel",
+    "DLPRiskLevel",
+    "DLPFinding",
+    "DLPScanResult",
+    "DLPEngine",
+    "DLPChannelMonitor",
+    "DLPResponseLadder",
+    "CredentialMaskingTracker",
+    "BlockerCategory",
+    "SupportTicketStatus",
+    "SupportTicket",
+    "EmployeeSupportService",
+    "SpecialistRole",
+    "SpecialistArchetypeContract",
+    "ARCHETYPE_CONTRACTS",
+    "AssembledTeamMember",
+    "AssembledTeam",
+    "SpecialistTeamAssembler",
+    "RegisteredCapabilityV3",
+    "CapabilityRegistryV3"
 ]
 

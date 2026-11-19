@@ -28,6 +28,8 @@ from core.stateful_agent_runtime import (
     SecretScanner,
     SecurityException
 )
+import logging
+logger = logging.getLogger("zonata.stateful_agent")
 
 
 class StatefulAgentAdapter:
@@ -43,45 +45,59 @@ class StatefulAgentAdapter:
 
     def _ensure_core_identities(self):
         """Initializes default AI CEO and Coworker stateful identities if not present."""
-        # 1. AI CEO Identity
-        self.gateway.register_or_get_agent(
-            agent_id="agt_ai_ceo",
-            name="AI CEO",
-            role="Chief Executive Officer",
-            persona_block=(
-                "I am the Sovereign AI CEO of the enterprise. My core objective is maximizing sustainable "
-                "enterprise value, revenue velocity, and operating contribution while strictly adhering to "
-                "Host policy, budget ceilings, and zero-compromise security governance."
-            ),
-            human_block=(
-                "Host is the ultimate owner and sovereign authority. Requires transparent briefing, "
-                "cryptographic approval for high-risk and budget expenditures, and verifiable causality."
-            ),
-            system_instructions=(
-                "Operate with absolute fidelity to verified facts. Treat memory as historical context, "
-                "not authority grants. Escalate non-idempotent or high-spending actions to the Host."
-            ),
-            model_config={"model": "Gemini 3.8 Flash (High)", "temperature": 0.2}
-        )
+        try:
+            with db.get_connection() as conn:
+                conn.execute(
+                    "INSERT INTO tenants (tenant_id, name, plan, status, created_at) "
+                    "VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?) ON CONFLICT (tenant_id) DO NOTHING",
+                    (self.tenant_id, "Primary Organization", time.time())
+                )
+                conn.commit()
+        except Exception:
+            pass
 
-        # 2. Coworker Assistant Identity
-        self.gateway.register_or_get_agent(
-            agent_id="agt_coworker",
-            name="Floating Coworker",
-            role="Executive Automation Assistant",
-            persona_block=(
-                "I am the Host's floating desktop and workspace companion. I execute autonomous tasks, "
-                "monitor background operations, and orchestrate browser/host automation safely."
-            ),
-            human_block=(
-                "Host values fast feedback, concise interaction, and safe execution with sandbox isolation."
-            ),
-            system_instructions=(
-                "Follow safe browsing and desktop control policies. Always check credential handles "
-                "through the secure broker."
-            ),
-            model_config={"model": "Gemini 3.8 Flash (High)", "temperature": 0.3}
-        )
+        try:
+            # 1. AI CEO Identity
+            self.gateway.register_or_get_agent(
+                agent_id="agt_ai_ceo",
+                name="AI CEO",
+                role="Chief Executive Officer",
+                persona_block=(
+                    "I am the Sovereign AI CEO of the enterprise. My core objective is maximizing sustainable "
+                    "enterprise value, revenue velocity, and operating contribution while strictly adhering to "
+                    "Host policy, budget ceilings, and zero-compromise security governance."
+                ),
+                human_block=(
+                    "Host is the ultimate owner and sovereign authority. Requires transparent briefing, "
+                    "cryptographic approval for high-risk and budget expenditures, and verifiable causality."
+                ),
+                system_instructions=(
+                    "Operate with absolute fidelity to verified facts. Treat memory as historical context, "
+                    "not authority grants. Escalate non-idempotent or high-spending actions to the Host."
+                ),
+                model_config={"model": "Gemini 3.8 Flash (High)", "temperature": 0.2}
+            )
+
+            # 2. Coworker Assistant Identity
+            self.gateway.register_or_get_agent(
+                agent_id="agt_coworker",
+                name="Floating Coworker",
+                role="Executive Automation Assistant",
+                persona_block=(
+                    "I am the Host's floating desktop and workspace companion. I execute autonomous tasks, "
+                    "monitor background operations, and orchestrate browser/host automation safely."
+                ),
+                human_block=(
+                    "Host values fast feedback, concise interaction, and safe execution with sandbox isolation."
+                ),
+                system_instructions=(
+                    "Follow safe browsing and desktop control policies. Always check credential handles "
+                    "through the secure broker."
+                ),
+                model_config={"model": "Gemini 3.8 Flash (High)", "temperature": 0.3}
+            )
+        except Exception as e:
+            logger.debug(f"Default stateful identities deferred: {e}")
 
     # -----------------------------------------------------------------
     # AI CEO & Executive Meeting Room Continuity

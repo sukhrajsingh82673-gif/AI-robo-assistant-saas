@@ -99,9 +99,28 @@ class TerminalToolIntegrationEngine:
         if not success:
             return False, f"Tool admission rejected by verification pipeline: {msg}", None
 
-        # Step 11-13: Policy check, Functional validation, and Tool Factory registration
-        integrity_hash = hashlib.sha256(f"{candidate.name}:{candidate.version}:{candidate.license}".encode()).hexdigest()
-        
+        # Step 11-13: Locate the installed artifact and hash the real file.
+        import importlib.util
+        module_name = (candidate.name or "").replace("-", "_")
+        spec = importlib.util.find_spec(module_name)
+        artifact_path = spec.origin if spec and spec.origin else None
+        if not artifact_path or not os.path.isfile(artifact_path):
+            artifact_path = None
+            for entry in os.environ.get("PATH", "").split(os.pathsep):
+                cand_path = os.path.join(entry, candidate.name)
+                if os.path.isfile(cand_path):
+                    artifact_path = cand_path
+                    break
+        if not artifact_path:
+            return (
+                False,
+                f"Installed artifact for '{candidate.name}' could not be located on this host; "
+                "no SBOM can be produced without a real file.",
+                None,
+            )
+        with open(artifact_path, "rb") as _fh:
+            integrity_hash = hashlib.sha256(_fh.read()).hexdigest()
+
         sbom = ToolSBOMEntry(
             tool_id=candidate.name,
             name=candidate.name,
@@ -115,7 +134,7 @@ class TerminalToolIntegrationEngine:
             installer_identity=installer_identity,
             admission_decision="APPROVED_ENTERPRISE_USE",
             quarantine_status=False,
-            files_manifest=[f"/usr/local/bin/{candidate.name}"]
+            files_manifest=[artifact_path]
         )
         self._sbom_catalog[candidate.name] = sbom
         if hasattr(candidate, "tool_id") and candidate.tool_id:

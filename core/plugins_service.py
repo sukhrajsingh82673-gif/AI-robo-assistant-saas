@@ -5,6 +5,7 @@ and schema transformation connectors with health scoring and scoped permissions.
 """
 
 from typing import Dict, List, Optional, Any
+import os
 import time
 import uuid
 import json
@@ -121,15 +122,21 @@ class PluginsAndConnectionsService:
             rows = conn.execute(query, params).fetchall()
 
         if not rows:
-            self._seed_canonical_connections(company_id or "comp_primary")
-            with db.get_connection() as conn:
-                params = [self.tenant_id]
-                query = "SELECT * FROM external_connections WHERE tenant_id = ?"
-                if company_id and company_id != "all":
-                    query += " AND (company_id = ? OR company_id = 'all')"
-                    params.append(company_id)
-                query += " ORDER BY created_at DESC"
-                rows = conn.execute(query, params).fetchall()
+            app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+            is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+            enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+            clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+            if not clean_mode:
+                self._seed_canonical_connections(company_id or "comp_primary")
+                with db.get_connection() as conn:
+                    params = [self.tenant_id]
+                    query = "SELECT * FROM external_connections WHERE tenant_id = ?"
+                    if company_id and company_id != "all":
+                        query += " AND (company_id = ? OR company_id = 'all')"
+                        params.append(company_id)
+                    query += " ORDER BY created_at DESC"
+                    rows = conn.execute(query, params).fetchall()
+            # When no external rows exist we still must surface registered MCP servers.
 
         connections = []
         for r in rows:
@@ -165,8 +172,9 @@ class PluginsAndConnectionsService:
                     "service_type": "MCP_SERVER",
                     "connector_adapter": f"mcp_{ms['transport']}_adapter",
                     "auth_status": "AUTHENTICATED" if ms["trust_state"] in ("TRUSTED", "VALIDATED", "IDENTITY_VERIFIED") else "UNVERIFIED",
-                    "health_score": 98 if ms["health_status"] == "HEALTHY" else 45,
-                    "latency_ms": 12.0,
+                    "health_score": None,
+                    "latency_ms": None,
+                    "health_status": ms["health_status"],
                     "last_sync_at": ms["last_verified"] or ms["last_seen"],
                     "field_mappings": {"protocol": ms["protocol_version"], "transport": ms["transport"]},
                     "permission_scope": {
@@ -220,52 +228,96 @@ class PluginsAndConnectionsService:
         return self.get_connection(conn_id)
 
     def test_connection(self, connection_id: str) -> Dict[str, Any]:
-        """Runs a simulated live ping to verify latency and auth handshake."""
+        """Probes the configured endpoint with a real TCP connection.
+
+        Only measured facts are reported. Credentials/handshakes are *not*
+        exercised, so ``handshake_verified`` stays false unless an HTTP
+        exchange actually proves otherwise.
+        """
+        import socket
+        from urllib.parse import urlsplit
+
         conn = self.get_connection(connection_id)
         if not conn:
             raise ValueError("Connection not found")
 
-        latency = 38
-        health = 99.2
-        status = "CONNECTED"
-
+        endpoint = (conn.get("endpoint_url") or "").strip()
+        parsed = urlsplit(endpoint) if endpoint else None
+        host = parsed.hostname if parsed else None
+        port = (parsed.port if parsed else None) or (
+            443 if (parsed and parsed.scheme == "https") else 80
+        )
         now = time.time()
+
+        if not host:
+            with db.get_connection() as c:
+                c.execute(
+                    "UPDATE external_connections SET auth_status = ?, health_score = ?, latency_ms = ?, updated_at = ? WHERE connection_id = ? AND tenant_id = ?",
+                    ("NOT_CONFIGURED", None, None, now, connection_id, self.tenant_id),
+                )
+                c.commit()
+            return {
+                "connection_id": connection_id,
+                "status": "NOT_CONFIGURED",
+                "reachable": False,
+                "latency_ms": None,
+                "health_score": None,
+                "handshake_verified": False,
+                "error": "No endpoint_url is configured for this connection.",
+                "timestamp": now,
+            }
+
+        began = time.time()
+        error = None
+        reachable = False
+        try:
+            with socket.create_connection((host, port), timeout=3):
+                reachable = True
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+        latency = round((time.time() - began) * 1000, 2)
+        status = "CONNECTED" if reachable else "UNREACHABLE"
+        health = 100.0 if reachable else 0.0
+
         with db.get_connection() as c:
             c.execute(
-                "UPDATE external_connections SET latency_ms = ?, health_score = ?, auth_status = ?, last_sync_at = ?, updated_at = ? WHERE connection_id = ?",
-                (latency, health, status, now, now, connection_id)
+                "UPDATE external_connections SET latency_ms = ?, health_score = ?, auth_status = ?, last_sync_at = ?, updated_at = ? WHERE connection_id = ? AND tenant_id = ?",
+                (latency, health, status, now, now, connection_id, self.tenant_id),
             )
             c.commit()
 
         return {
             "connection_id": connection_id,
             "status": status,
+            "reachable": reachable,
+            "endpoint": endpoint,
             "latency_ms": latency,
             "health_score": health,
-            "handshake_verified": True,
-            "timestamp": now
+            "handshake_verified": False,
+            "auth_verification": "NOT_EXERCISED",
+            "error": error,
+            "timestamp": now,
         }
 
     def sync_connection(self, connection_id: str) -> Dict[str, Any]:
-        """Executes a synchronization cycle, returning translated record counts."""
+        """Reports the truth: no connector adapter is wired for bulk sync yet.
+
+        The platform will not invent record counts. Until a connector adapter
+        is registered for this service type, sync reports NOT_IMPLEMENTED.
+        """
         conn = self.get_connection(connection_id)
         if not conn:
             raise ValueError("Connection not found")
 
-        now = time.time()
-        records_synced = 42
-        with db.get_connection() as c:
-            c.execute(
-                "UPDATE external_connections SET last_sync_at = ?, updated_at = ? WHERE connection_id = ?",
-                (now, now, connection_id)
-            )
-            c.commit()
-
         return {
             "connection_id": connection_id,
-            "records_synced": records_synced,
-            "status": "SYNCED_CLEAN",
-            "last_sync_at": now
+            "records_synced": 0,
+            "status": "NOT_IMPLEMENTED",
+            "detail": (
+                f"No synchronization adapter is registered for service type "
+                f"'{conn.get('service_type')}'. Configure a connector adapter before syncing."
+            ),
+            "last_sync_at": conn.get("last_sync_at"),
         }
 
     def get_connection(self, connection_id: str) -> Optional[Dict[str, Any]]:
@@ -431,6 +483,13 @@ class PluginsAndConnectionsService:
             conn.commit()
 
     def _seed_canonical_connections(self, company_id: str):
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_prod = (app_env in ("production", "prod", "staging")) or (os.environ.get("ZONATA_PRODUCTION", "0") == "1") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        enable_demo = (os.environ.get("ZONATA_ENABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes")) and not is_prod
+        clean_mode = is_prod or not enable_demo or (os.environ.get("ZONATA_DISABLE_DEMO_SEED", "0").lower() in ("1", "true", "yes"))
+        if clean_mode:
+            return
+
         now = time.time()
         connections = [
             {

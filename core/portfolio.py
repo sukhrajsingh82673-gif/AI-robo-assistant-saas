@@ -124,11 +124,23 @@ class CompanyPortfolioManager:
         with db.get_connection() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO companies (
+                INSERT INTO companies (
                     company_id, tenant_id, name, industry, company_type, status,
                     revenue, cost, contribution, understanding_pct,
                     operating_rules, baseline_summary, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (company_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    name = EXCLUDED.name,
+                    industry = EXCLUDED.industry,
+                    company_type = EXCLUDED.company_type,
+                    status = EXCLUDED.status,
+                    revenue = EXCLUDED.revenue,
+                    cost = EXCLUDED.cost,
+                    contribution = EXCLUDED.contribution,
+                    understanding_pct = EXCLUDED.understanding_pct,
+                    operating_rules = EXCLUDED.operating_rules,
+                    baseline_summary = EXCLUDED.baseline_summary
                 """,
                 (
                     company.company_id,
@@ -151,9 +163,10 @@ class CompanyPortfolioManager:
                 dept_id = f"dept_{company.company_id}_{dept_name.lower().replace(' ', '_')}"
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO departments (
+                    INSERT INTO departments (
                         department_id, company_id, tenant_id, name, created_at
                     ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT (department_id) DO NOTHING
                     """,
                     (dept_id, company.company_id, self.tenant_id, dept_name, now)
                 )
@@ -162,10 +175,20 @@ class CompanyPortfolioManager:
             for emp in company.workforce.values():
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO employees (
+                    INSERT INTO employees (
                         agent_id, company_id, tenant_id, role, department, manager,
                         budget_limit, spending_limit, authority_ceiling, working_state, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (agent_id) DO UPDATE SET
+                        company_id = EXCLUDED.company_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        role = EXCLUDED.role,
+                        department = EXCLUDED.department,
+                        manager = EXCLUDED.manager,
+                        budget_limit = EXCLUDED.budget_limit,
+                        spending_limit = EXCLUDED.spending_limit,
+                        authority_ceiling = EXCLUDED.authority_ceiling,
+                        working_state = EXCLUDED.working_state
                     """,
                     (
                         emp.agent_id,
@@ -186,10 +209,18 @@ class CompanyPortfolioManager:
             for ds in company.data_sources:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO data_sources (
+                    INSERT INTO data_sources (
                         source_id, company_id, tenant_id, name, source_type, connection_method,
                         permission_level, health, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (source_id) DO UPDATE SET
+                        company_id = EXCLUDED.company_id,
+                        tenant_id = EXCLUDED.tenant_id,
+                        name = EXCLUDED.name,
+                        source_type = EXCLUDED.source_type,
+                        connection_method = EXCLUDED.connection_method,
+                        permission_level = EXCLUDED.permission_level,
+                        health = EXCLUDED.health
                     """,
                     (
                         ds.source_id,

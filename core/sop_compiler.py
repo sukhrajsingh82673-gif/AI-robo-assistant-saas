@@ -10,11 +10,12 @@ Constitutional Invariants:
   DO_NOT_DUMP_DOC_INTO_PROMPT (Structure into discrete policy & knowledge references)
 """
 
+from __future__ import annotations
 import re
 import json
 import uuid
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, field, asdict
 
 logger = logging.getLogger("zonata.v7.sop_compiler")

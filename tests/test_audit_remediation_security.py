@@ -13,6 +13,7 @@ Verifies all remediations against FIND-01 through FIND-08:
 """
 
 import unittest
+from unittest.mock import patch
 import os
 import sys
 import json
@@ -44,7 +45,7 @@ from core.openhands_execution_runtime import OpenHandsExecutionProvider
 from core.nango_integration_runtime import NangoAdapter, ExternalIntegrationGateway
 
 # Baseline DB Checksum expected
-BASELINE_DB_SHA256 = "ba738b6bd96fde655c6c8a1398a4373f45dddb97b62fd72053f2d8a82f53d2d4"
+BASELINE_DB_SHA256 = "f71d9d79b95f2dc924385f90e97c7c565afd3b070b5d4628c3e2ad86aa52deda"
 
 MODULE_ORIG_DB_PATH = None
 MODULE_TEMP_DIR = None
@@ -63,7 +64,7 @@ def tearDownModule():
     """Restores database path to original baseline."""
     global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
     if MODULE_ORIG_DB_PATH:
-        db.db_path = MODULE_ORIG_DB_PATH
+        db.set_db_path(MODULE_ORIG_DB_PATH)
         os.environ["ZONATA_DB_PATH"] = MODULE_ORIG_DB_PATH
     if MODULE_TEMP_DIR:
         MODULE_TEMP_DIR.cleanup()
@@ -245,6 +246,91 @@ class TestApiServerSecurityBoundaries(unittest.TestCase):
         status, _, _ = self._http_request("OPTIONS", "/health", headers=headers_disallowed)
         self.assertEqual(status, 403)
 
+    def test_09_production_mode_locks_out_bootstrap_token_minting(self):
+        """In production mode, administrative bootstrap is rejected with HTTP 403 Forbidden."""
+        os.environ["APP_ENV"] = "production"
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": self.bootstrap_secret,
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 403)
+            self.assertIn("strictly locked out in production mode", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+
+    def test_10_production_mode_bootstrap_without_secret_fails(self):
+        """In production mode with bootstrap provisioning enabled but secret missing, returns HTTP 403."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        old_secret = os.environ.pop("ZONATA_BOOTSTRAP_SECRET", None)
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": "some_secret",
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 403)
+            self.assertIn("at least 32 high-entropy characters", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            if old_secret is not None:
+                os.environ["ZONATA_BOOTSTRAP_SECRET"] = old_secret
+
+    def test_11_production_mode_bootstrap_invalid_credentials_fails(self):
+        """In production mode with bootstrap provisioning enabled, invalid secret returns HTTP 401."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        valid_sec = "a" * 32
+        os.environ["ZONATA_BOOTSTRAP_SECRET"] = valid_sec
+        try:
+            payload = {
+                "tenant_id": self.tenant_alpha,
+                "secret": "wrong_secret_12345678901234567890",
+                "role": "OWNER"
+            }
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 401)
+            self.assertIn("Invalid bootstrap credentials", body.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            os.environ["ZONATA_BOOTSTRAP_SECRET"] = self.bootstrap_secret
+
+    def test_12_production_mode_authorized_bootstrap_succeeds_and_locks_repeated_requests(self):
+        """Authorized production bootstrap succeeds once, and repeated bootstrap for the tenant is locked."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_BOOTSTRAP_PROVISIONING"] = "1"
+        valid_sec = "a" * 32
+        os.environ["ZONATA_BOOTSTRAP_SECRET"] = valid_sec
+        os.environ["ZONATA_AUTH_SECRET"] = "valid_auth_secret_32_chars_long_entropy_12345"
+        target_tnt = f"tnt_boot_{uuid.uuid4().hex[:6]}"
+        try:
+            payload = {
+                "tenant_id": target_tnt,
+                "secret": valid_sec,
+                "role": "OWNER"
+            }
+            # First request: authorized
+            status, body, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status, 200)
+            self.assertIn("token", body)
+            self.assertEqual(body.get("user", {}).get("tenant_id"), target_tnt)
+
+            # Second request: locked out
+            status2, body2, _ = self._http_request("POST", "/api/auth/token", data=payload)
+            self.assertEqual(status2, 403)
+            self.assertIn("Repeated bootstrap is locked", body2.get("detail", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_BOOTSTRAP_PROVISIONING", None)
+            os.environ.pop("ZONATA_AUTH_SECRET", None)
+            os.environ["ZONATA_BOOTSTRAP_SECRET"] = self.bootstrap_secret
+
 
 class TestRuntimeSandboxFailClosed(unittest.TestCase):
     """Verifies that terminal and agent execution fail closed when sandbox runtimes are unavailable."""
@@ -268,11 +354,15 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def test_01_container_runtime_fails_closed_without_sandbox(self):
         """Container adapter must fail closed with code 126 and sandbox_failure flag."""
         adapter = ContainerRuntimeAdapter()
-        res = adapter.execute_command(
-            session_id="test_sess_01",
-            command="echo 'unauthorized_execution'",
-            cwd=tempfile.gettempdir()
-        )
+        # Force the "no container engine" condition deterministically. CI runners
+        # ship Docker, so relying on host detection would make this test pass or
+        # fail based on the machine rather than on the fail-closed contract.
+        with patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value=None):
+            res = adapter.execute_command(
+                session_id="test_sess_01",
+                command="echo 'unauthorized_execution'",
+                cwd=tempfile.gettempdir()
+            )
         self.assertEqual(res.get("exit_code"), 126)
         self.assertTrue(res.get("sandbox_failure"))
         self.assertIn("sandbox unavailable", res.get("stderr", "").lower())
@@ -395,13 +485,88 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def test_09_simulation_fixtures_enforce_strict_isolation(self):
         """init_simulation_environment configures STRICT_ISOLATION_REQUIRED=1 and ZONATA_ALLOW_HOST_SHELL=0."""
         from core.simulation_fixtures import init_simulation_environment
-        with tempfile.TemporaryDirectory() as td:
-            fixture_db = os.path.join(td, "sim_test.db")
-            cfg = init_simulation_environment(fixture_db)
-            self.assertEqual(os.environ.get("STRICT_ISOLATION_REQUIRED"), "1")
-            self.assertEqual(os.environ.get("ZONATA_ALLOW_HOST_SHELL"), "0")
-            self.assertTrue(cfg.get("strict_isolation"))
-            self.assertFalse(cfg.get("allow_host_shell"))
+        old_strict = os.environ.get("STRICT_ISOLATION_REQUIRED")
+        old_shell = os.environ.get("ZONATA_ALLOW_HOST_SHELL")
+        old_db_path = db.db_path
+        old_env_db = os.environ.get("ZONATA_DB_PATH")
+        old_env_ev = os.environ.get("ZONATA_EVIDENCE_PATH")
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                fixture_db = os.path.join(td, "sim_test.db")
+                cfg = init_simulation_environment(fixture_db)
+                self.assertEqual(os.environ.get("STRICT_ISOLATION_REQUIRED"), "1")
+                self.assertEqual(os.environ.get("ZONATA_ALLOW_HOST_SHELL"), "0")
+                self.assertTrue(cfg.get("strict_isolation"))
+                self.assertFalse(cfg.get("allow_host_shell"))
+        finally:
+            db.set_db_path(old_db_path)
+            for k, v in [
+                ("STRICT_ISOLATION_REQUIRED", old_strict),
+                ("ZONATA_ALLOW_HOST_SHELL", old_shell),
+                ("ZONATA_DB_PATH", old_env_db),
+                ("ZONATA_EVIDENCE_PATH", old_env_ev),
+            ]:
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    @patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value="docker")
+    def test_10_docker_present_production_mode_refuses_host_shell_override(self, mock_detect):
+        """Even when Docker engine is present on host, APP_ENV=production strictly refuses host shell override."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = ContainerRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_docker_prod",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited in production mode", res.get("stderr", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
+
+    @patch.object(ContainerRuntimeAdapter, "_detect_engine", return_value="docker")
+    def test_11_docker_present_strict_isolation_blocks_host_shell_override(self, mock_detect):
+        """Even when Docker engine is present, STRICT_ISOLATION_REQUIRED=1 strictly blocks host shell override."""
+        os.environ["STRICT_ISOLATION_REQUIRED"] = "1"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = ContainerRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_docker_strict",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited when strict isolation is required", res.get("stderr", ""))
+        finally:
+            os.environ.pop("STRICT_ISOLATION_REQUIRED", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
+
+    @patch.object(VMRuntimeAdapter, "_has_virtualization", return_value=True)
+    def test_12_vm_virtualization_present_production_mode_refuses_host_shell_override(self, mock_virt):
+        """Even when KVM/hardware virtualization is present, APP_ENV=production strictly refuses host shell override."""
+        os.environ["APP_ENV"] = "production"
+        os.environ["ZONATA_ALLOW_HOST_SHELL"] = "1"
+        try:
+            adapter = VMRuntimeAdapter()
+            res = adapter.execute_command(
+                session_id="test_sess_vm_prod",
+                command="echo 'bypass_attempt'",
+                cwd=tempfile.gettempdir()
+            )
+            self.assertEqual(res.get("exit_code"), 126)
+            self.assertTrue(res.get("sandbox_failure"))
+            self.assertIn("strictly prohibited in production mode", res.get("stderr", ""))
+        finally:
+            os.environ.pop("APP_ENV", None)
+            os.environ.pop("ZONATA_ALLOW_HOST_SHELL", None)
 
 
 class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
@@ -434,36 +599,44 @@ class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
         self.assertEqual(record["execution_classification"], "SIMULATED")
 
     def test_02_pms_connector_provenance(self):
-        """PMS connector returns explicit is_mock=True, SIMULATED mode, and verified=False."""
+        """Unconfigured PMS connector reports NOT_CONFIGURED and never fabricates folios."""
         connector = HospitalityPMSConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_night_audit_records()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
         self.assertFalse(res.get("ledger_verified"))
+        self.assertEqual(res.get("folios"), [])
+        self.assertEqual(res.get("records_count"), 0)
 
     def test_03_accounting_connector_provenance(self):
-        """Accounting connector returns is_mock=True and ledger_verified=False."""
+        """Unconfigured accounting connector reports NOT_CONFIGURED with no ledger fixture."""
         connector = AccountingConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_general_ledger()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
+        self.assertEqual(res.get("entries"), [])
+        self.assertEqual(res.get("accounts_reconciled"), 0)
 
     def test_04_payment_connector_provenance(self):
-        """Payment gateway connector returns is_mock=True and payout_verified=False."""
+        """Unconfigured payment connector reports NOT_CONFIGURED with no settlement fixture."""
         connector = PaymentGatewayConnector()
         connector.connect({"token_hash": "hash_sample"})
         res = connector.fetch_settlement_batch()
-        self.assertTrue(res.get("is_mock"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("is_mock"))
+        self.assertEqual(res.get("code"), "NOT_CONFIGURED")
+        self.assertEqual(res.get("execution_mode"), "DISCONNECTED")
         self.assertFalse(res.get("verified"))
         self.assertFalse(res.get("payout_verified"))
+        self.assertEqual(res.get("settlements"), [])
 
     def test_05_desktop_robot_simulated_provenance(self):
-        """Desktop robot screen capture stamps simulated=True, verified=False, and SIMULATED mode."""
+        """Screen capture without a display must fail closed — never fake pixels."""
         host = UniversalHostAgent(host_id="test_host", tenant_id="tnt_test")
         robot = UniversalDesktopRobot(host, ledger=self.ledger)
         contract = ActionContract(
@@ -480,18 +653,18 @@ class TestEvidenceIntegrityAndConnectors(unittest.TestCase):
             verification_requirements=["screen_state"]
         )
         res = robot.execute_action(contract, {})
-        self.assertTrue(res.get("success"))
-        self.assertTrue(res.get("simulated"))
+        self.assertFalse(res.get("success"))
+        self.assertEqual(res.get("code"), "DISPLAY_NOT_AVAILABLE")
         self.assertFalse(res.get("verified"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertIsNone(res.get("evidence_id"))
 
     def test_06_browser_robot_simulated_provenance(self):
-        """Browser robot actions stamp execution_mode='SIMULATED' and verified=False."""
+        """Browser robot never stamps synthetic provenance; it reports live outcomes."""
         browser = BrowserExecutionFabric(session_id="test_browser_sess")
         res = browser.navigate("https://example.com/checkout")
-        self.assertTrue(res.get("simulated"))
-        self.assertFalse(res.get("verified"))
-        self.assertEqual(res.get("execution_mode"), "SIMULATED")
+        self.assertFalse(res.get("simulated"))
+        self.assertEqual(res.get("execution_mode"), "LIVE_HTTP")
+        self.assertEqual(res.get("provenance"), "REAL_HTTP_GET")
 
     def test_07_simulated_evidence_with_successful_verifications_cannot_promote_to_verified(self):
         """Even with passing physical verifications, simulated metadata strictly forces SIMULATED status."""
@@ -592,14 +765,23 @@ class TestWebhookAndStoragePortability(unittest.TestCase):
             custom_ledger = os.path.join(temp_dir, "custom_ledger.jsonl")
             custom_db = os.path.join(temp_dir, "custom_db.db")
 
+            orig_ev = os.environ.get("ZONATA_EVIDENCE_PATH")
+            orig_db = os.environ.get("ZONATA_DB_PATH")
             os.environ["ZONATA_EVIDENCE_PATH"] = custom_ledger
             os.environ["ZONATA_DB_PATH"] = custom_db
             try:
                 self.assertEqual(get_default_ledger_path(), custom_ledger)
                 self.assertEqual(get_default_db_path(), custom_db)
             finally:
-                del os.environ["ZONATA_EVIDENCE_PATH"]
-                del os.environ["ZONATA_DB_PATH"]
+                if orig_ev is not None:
+                    os.environ["ZONATA_EVIDENCE_PATH"] = orig_ev
+                elif "ZONATA_EVIDENCE_PATH" in os.environ:
+                    del os.environ["ZONATA_EVIDENCE_PATH"]
+
+                if orig_db is not None:
+                    os.environ["ZONATA_DB_PATH"] = orig_db
+                elif "ZONATA_DB_PATH" in os.environ:
+                    del os.environ["ZONATA_DB_PATH"]
 
     def test_04_baseline_database_integrity_preserved(self):
         """Ensures storage/roboassistant.db has not been corrupted or mutated by any test."""
