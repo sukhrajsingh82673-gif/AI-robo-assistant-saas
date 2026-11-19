@@ -1,0 +1,1964 @@
+{
+ "root": "/data/data/com.termux/files/home/AI-robo-assistant-saas",
+ "extension_counts": {
+  ".py": 635,
+  ".md": 455,
+  ".json": 108,
+  ".js": 75,
+  ".sql": 24,
+  ".tf": 21,
+  ".yaml": 19,
+  ".ts": 14,
+  ".yml": 13,
+  ".sh": 7,
+  "": 1,
+  ".ini": 1,
+  ".txt": 1
+ },
+ "manifests": [
+  "Dockerfile",
+  "package.json",
+  "render.yaml",
+  "requirements.txt"
+ ],
+ "frameworks_detected": [
+  "pytest"
+ ],
+ "api_version_prefixes": {
+  "v8": 269,
+  "v1": 222,
+  "v2": 46
+ },
+ "route_count": 11,
+ "routes_sample": [
+  {
+   "file": "core/decision_center.py",
+   "method": "GET",
+   "path": "company_id"
+  },
+  {
+   "file": "core/decision_center.py",
+   "method": "GET",
+   "path": "risk_level"
+  },
+  {
+   "file": "core/decision_center.py",
+   "method": "GET",
+   "path": "reason"
+  },
+  {
+   "file": "core/decision_center.py",
+   "method": "GET",
+   "path": "consequence"
+  },
+  {
+   "file": "core/decision_center.py",
+   "method": "GET",
+   "path": "requested_at"
+  },
+  {
+   "file": "core/universal_terminal/security_gateway.py",
+   "method": "ANY",
+   "path": "/tmp"
+  },
+  {
+   "file": "tests/test_clean_production_mode.py",
+   "method": "ANY",
+   "path": "/tmp/arbitrary.db"
+  },
+  {
+   "file": "tests/test_coworker_v2_phase_b.py",
+   "method": "ANY",
+   "path": "/root/roboassistant/storage/evidence/audit_ledger.jsonl"
+  },
+  {
+   "file": "tests/test_coworker_v2_phase_b.py",
+   "method": "ANY",
+   "path": "/root/roboassistant/core/api_server.py"
+  },
+  {
+   "file": "tests/test_coworker_v2_phase_b.py",
+   "method": "ANY",
+   "path": "/root/roboassistant/storage/roboassistant.db"
+  },
+  {
+   "file": "tests/test_coworker_v2_phase_b.py",
+   "method": "ANY",
+   "path": "/etc/shadow"
+  }
+ ],
+ "tables": [
+  "a2a_agents",
+  "a2a_artifacts",
+  "a2a_messages",
+  "a2a_published_agents",
+  "a2a_security_events",
+  "a2a_skills",
+  "a2a_tasks",
+  "action_approval_nonces",
+  "active_sessions",
+  "agent_evaluation_runs",
+  "agent_packages",
+  "ai_ceo_decisions",
+  "ai_ceo_meeting_transcripts",
+  "ai_ceo_meetings",
+  "approvals",
+  "arena_decisions",
+  "async_command_queue",
+  "auth_credentials",
+  "auth_rate_limits",
+  "auth_revoked_tokens",
+  "billing_webhook_events",
+  "browser_actions",
+  "browser_approvals",
+  "browser_artifacts",
+  "browser_events",
+  "browser_executions",
+  "browser_runtimes",
+  "browser_security_events",
+  "browser_sessions",
+  "business_causality_chains",
+  "business_intelligence_items",
+  "chief_of_staff_items",
+  "companies",
+  "company_admin_grants",
+  "company_audit_events",
+  "company_build_runs",
+  "company_deletion_requests",
+  "company_drafts",
+  "company_files",
+  "company_knowledge",
+  "company_legal_items",
+  "company_processes",
+  "corporate_data_objects",
+  "corporate_objectives",
+  "coworker_tasks",
+  "credential_handles",
+  "crm_customers",
+  "crm_deals",
+  "data_sources",
+  "department_objectives",
+  "departments",
+  "disaster_recovery_manifests",
+  "employee_performance_records",
+  "employees",
+  "enterprise_budget_reservations",
+  "enterprise_budgets",
+  "enterprise_events",
+  "executive_approval_queue",
+  "executive_council_debates",
+  "executive_council_roles",
+  "executive_decision_evidence",
+  "executive_decisions",
+  "executive_incidents",
+  "executive_meetings",
+  "executive_observations",
+  "executive_opportunities",
+  "executive_policy_rules",
+  "executive_reports",
+  "executive_resource_allocations",
+  "executive_risks",
+  "executive_state",
+  "external_connections",
+  "external_idp_directory",
+  "governed_agents",
+  "governed_memory_records",
+  "governed_tools",
+  "host_capabilities",
+  "host_execution_receipts",
+  "hosts",
+  "immutable_agent_packages",
+  "installed_applications",
+  "knowledge_index_chunks",
+  "lineage_edges",
+  "lineage_nodes",
+  "mcp_executions",
+  "mcp_gateway_invocations",
+  "mcp_prompts",
+  "mcp_published_capabilities",
+  "mcp_resources",
+  "mcp_security_events",
+  "mcp_servers",
+  "mcp_tasks",
+  "mcp_tools",
+  "mission_tasks",
+  "missions",
+  "multimodal_artifacts",
+  "multimodal_capabilities",
+  "multimodal_execution_sessions",
+  "multimodal_observations",
+  "nango_capabilities",
+  "nango_connections",
+  "nango_executions",
+  "nango_providers",
+  "nango_rate_limits",
+  "nango_reconciliations",
+  "nango_runtimes",
+  "nango_security_events",
+  "nango_sync_jobs",
+  "nango_sync_records",
+  "nango_webhooks",
+  "openhands_approvals",
+  "openhands_artifacts",
+  "openhands_commands",
+  "openhands_events",
+  "openhands_executions",
+  "openhands_runtimes",
+  "openhands_security_events",
+  "openhands_workspaces",
+  "optimistic_lock_registry",
+  "organization_edges",
+  "organization_nodes",
+  "organizational_memory",
+  "permissions",
+  "production_audit_logs",
+  "reconciliation_receipts",
+  "role_permissions",
+  "roles",
+  "sales_interactions",
+  "sales_leads",
+  "schema_migrations",
+  "secrets",
+  "security_incidents",
+  "settings_approvals",
+  "settings_audit",
+  "settings_environments",
+  "settings_presets",
+  "settings_revision",
+  "settings_values",
+  "settings_values_tenant_keys",
+  "skill_runs",
+  "stateful_agent_identities",
+  "stateful_conversation_sessions",
+  "stateful_conversation_turns",
+  "stateful_memory_conflicts",
+  "stateful_memory_records",
+  "strategic_plans",
+  "strategic_priorities",
+  "strategy_versions",
+  "supervisor_heartbeats",
+  "system_plugins",
+  "temporal_activity_executions",
+  "temporal_approvals",
+  "temporal_compensations",
+  "temporal_reconciliations",
+  "temporal_runtimes",
+  "temporal_schedules",
+  "temporal_security_events",
+  "temporal_task_queues",
+  "temporal_workers",
+  "temporal_workflow_events",
+  "temporal_workflows",
+  "tenant_agent_quotas",
+  "tenant_concurrency_leases",
+  "tenant_invoices",
+  "tenant_isolation_audit",
+  "tenant_rate_limits",
+  "tenant_resource_quotas",
+  "tenant_subscriptions",
+  "tenants",
+  "tool_packages",
+  "transactional_outbox",
+  "universal_schedules",
+  "unknown_outcomes",
+  "usage_records",
+  "user_company_roles",
+  "user_two_step",
+  "users",
+  "voice_sessions",
+  "workflow_approvals",
+  "workflow_checkpoints",
+  "workflow_events",
+  "workflow_resource_locks",
+  "workflow_runs",
+  "workflows",
+  "workforce_scheduler_queue",
+  "zonata_competitor_profiles",
+  "zonata_discovery_sessions",
+  "zonata_facts",
+  "zonata_health_indicators",
+  "zonata_interviews",
+  "zonata_kg_edges",
+  "zonata_kg_nodes",
+  "zonata_org_blueprints",
+  "zonata_workforce_members"
+ ],
+ "migration_files": [
+  "migrations/common/0002_add_version_optimistic_locks.sql",
+  "migrations/common/0003_settings_v2_schema.sql",
+  "migrations/migration_manager.py",
+  "migrations/pg/0001_postgresql_full_schema.sql",
+  "migrations/pg/0002_approvals_decision_reason.sql",
+  "migrations/pg/0002_phase_11_governance_schema.sql",
+  "migrations/pg/0003_phase_12_billing_schema.sql",
+  "migrations/pg/0003_skill_arena.sql",
+  "migrations/pg/0004_phase_16_rate_limiting_schema.sql",
+  "migrations/pg/0005_workforce_architecture.sql",
+  "migrations/pg/0006_settings_v2_append_only.sql",
+  "migrations/pg/0007_settings_v2_tenant_keys.sql",
+  "migrations/pg/0008_company_setup.sql",
+  "migrations/pg/0009_company_build_workflow.sql",
+  "migrations/pg/0010_company_onboarding.sql",
+  "migrations/pg/0011_company_deletion_export.sql",
+  "migrations/pg/0012_user_two_step.sql",
+  "migrations/rollback/pg/0008_company_setup_rollback.sql",
+  "migrations/rollback/pg/0009_company_build_workflow_rollback.sql",
+  "migrations/rollback/pg/0010_company_onboarding_rollback.sql",
+  "migrations/rollback/pg/0011_company_deletion_export_rollback.sql",
+  "migrations/rollback/pg/0012_user_two_step_rollback.sql",
+  "migrations/sqlite/0004_settings_v2_append_only.sql",
+  "migrations/sqlite/0005_settings_v2_tenant_keys.sql"
+ ],
+ "test_file_count": 164,
+ "test_files_sample": [
+  "core/coworker/local_test_server.py",
+  "scripts/generate_test_accounting_summary.py",
+  "storage/workspaces/tnt_oh_85e4aa/comp_oh_6dff8a/ws_c9c1fe1f99f4/test_invoice.py",
+  "storage/workspaces/tnt_oh_919fa0/comp_oh_52bd27/ws_74828466f082/test_mission.py",
+  "storage/workspaces/tnt_oh_e89eeb/comp_oh_dd25c4/ws_73453c235668/test_mission.py",
+  "storage/workspaces/tnt_test_1795078284653/comp_primary/ws_5f61832ef0d4/calc.py",
+  "storage/workspaces/tnt_test_1795078284653/comp_primary/ws_5f61832ef0d4/tests/test_calc.py",
+  "tests/assistant_e2e_test.js",
+  "tests/assistant_floating_ui_test.js",
+  "tests/assistant_jsdom_smoke_test.js",
+  "tests/browser_settings_click_test.js",
+  "tests/company_setup_ui_test.js",
+  "tests/conftest.py",
+  "tests/e2e/test_user_journeys.spec.ts",
+  "tests/qualification_click_test_results.json",
+  "tests/schema_bootstrap.py",
+  "tests/settings_v2_ui_test.js",
+  "tests/simulate_browser_e2e.js",
+  "tests/test_a2a_interoperability.py",
+  "tests/test_acceptance_scenarios_v3.py",
+  "tests/test_adversarial_security_and_chaos.py",
+  "tests/test_ai_ceo_intelligence_enhancement_qualification.py",
+  "tests/test_ai_ceo_live_integration_qualification.py",
+  "tests/test_ai_ceo_operational_effectiveness_qualification.py",
+  "tests/test_aic_ceo_constitution.py",
+  "tests/test_aic_ceo_economic_command.py",
+  "tests/test_aic_organization_layer.py",
+  "tests/test_aic_organization_qualification.py",
+  "tests/test_apple_accessibility_qa.py",
+  "tests/test_apple_app_shell.py",
+  "tests/test_apple_command_center.py",
+  "tests/test_apple_design_foundations.py",
+  "tests/test_apple_entry_flows.py",
+  "tests/test_apple_primitives.py",
+  "tests/test_apple_terminal_security_coworker.py",
+  "tests/test_apple_workforce_sales_reports.py",
+  "tests/test_assistant_coworker_compound_mission.py",
+  "tests/test_audit_remediation_security.py",
+  "tests/test_browser_use_execution.py",
+  "tests/test_ceo_intelligence.py",
+  "tests/test_clean_production_mode.py",
+  "tests/test_company_build_workflow.py",
+  "tests/test_company_deletion_export.py",
+  "tests/test_company_onboarding.py",
+  "tests/test_company_os.py",
+  "tests/test_company_setup.py",
+  "tests/test_company_setup_abuse.py",
+  "tests/test_company_setup_preferences.py",
+  "tests/test_container_security_staging.py",
+  "tests/test_coworker_autonomy_supervisor.py",
+  "tests/test_coworker_distributed_fleet.py",
+  "tests/test_coworker_fabric.py",
+  "tests/test_coworker_production_qualification.py",
+  "tests/test_coworker_reality_audit.py",
+  "tests/test_coworker_runtimes_hermes_openclaw.py",
+  "tests/test_coworker_v2_comprehensive.py",
+  "tests/test_coworker_v2_enterprise_qualification.py",
+  "tests/test_coworker_v2_phase_a.py",
+  "tests/test_coworker_v2_phase_b.py",
+  "tests/test_coworker_v3_acceptance.py",
+  "tests/test_coworker_v3_comprehensive.py",
+  "tests/test_crm_persistence.py",
+  "tests/test_cross_process_concurrency_coordination.py",
+  "tests/test_deep_scenarios.py",
+  "tests/test_direct_object_access_and_tenant_security.py",
+  "tests/test_disaster_recovery_drill.py",
+  "tests/test_distributed_runtime_v2.py",
+  "tests/test_docker_staging_qualification.py",
+  "tests/test_durable_workflow.py",
+  "tests/test_enterprise_capability_expansion_qualification.py",
+  "tests/test_enterprise_load_benchmarks.py",
+  "tests/test_enterprise_multi_company_controls.py",
+  "tests/test_enterprise_settings_center.py",
+  "tests/test_enterprise_workforce.py",
+  "tests/test_executive_coworker_acceptance.py",
+  "tests/test_final_gap_closure_and_opensource.py",
+  "tests/test_free_tier_worker_durability.py",
+  "tests/test_fresh_user_experience_and_clean_ui.py",
+  "tests/test_frontend_navigation_audit.py",
+  "tests/test_gemma4_adversarial_qualification.py"
+ ],
+ "component_mentions": {
+  "company_kernel": {
+   "files": 28,
+   "occurrences": 32,
+   "top_files": [
+    [
+     "docs/architecture/ZONATA_COWORKER_ARCHITECTURE.md",
+     3
+    ],
+    [
+     "docs/qualification/ZONATA_UNIVERSAL_TERMINAL_FINAL_QUALIFICATION_REPORT.md",
+     2
+    ],
+    [
+     "docs/security/ZONATA_AI_SECURITY_AND_DLP_ARCHITECTURE.md",
+     2
+    ],
+    [
+     "THIRD_PARTY_LICENSES.md",
+     1
+    ],
+    [
+     "docs/architecture/ENTERPRISE_INTEGRATION_ARCHITECTURE.md",
+     1
+    ]
+   ],
+   "sample_hits": [
+    "web/apple_security_center.js:210: { level: '2. ZONATA Company Kernel', desc: 'Deterministic constitutional boundary enforcer; zero bypass', color: 'var(--accent)' },",
+    "web/assistant_coworker_workspace.js:583: <span style=\"color:#94a3b8;\">Sovereign Authority:</span> <strong>ZONATA Company Kernel</strong>",
+    "web/governance_workspace.js:61: { level: '2. ZONATA Company Kernel', desc: 'Deterministic boundary enforcer; zero bypass permitted', status: 'LOCKED', color: '#3b82f6' },"
+   ]
+  },
+  "constitution": {
+   "files": 321,
+   "occurrences": 662,
+   "top_files": [
+    [
+     "core/v8_api_handler.py",
+     29
+    ],
+    [
+     "core/aic_ceo_constitution.py",
+     16
+    ],
+    [
+     "web/ai_ceo_workspace.js",
+     13
+    ],
+    [
+     "docs/architecture/AIC_CEO_MASTER_CONSTITUTION.md",
+     12
+    ],
+    [
+     "web/org_workspace.js",
+     12
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:637: Constitutional Invariant: UNAUTHENTICATED REQUEST != TENANT IDENTITY.",
+    "cli.py:287: print(\" HEALTH INDICATORS (Constitutional: Value, Source, Time, Confidence, Trend):\")",
+    ".github/workflows/cloud_staging_deploy.yml:57: - name: Verify Constitutional Asset Invariants",
+    ".github/workflows/cloud_staging_deploy.yml:77: print('Constitutional protected baseline verification: 100% MATCH')",
+    ".github/workflows/docker_staging_qualification.yml:256: - name: Verify Protected Constitutional Baselines (100% Match)",
+    ".github/workflows/docker_staging_qualification.yml:258: echo \"Verifying inviolable constitutional baseline assets...\"",
+    ".github/workflows/docker_staging_qualification.yml:273: print('All 3 constitutional baseline assets verified byte-for-byte: 100% MATCH')",
+    ".github/workflows/postgres_16_qualification.yml:141: - name: Verify Protected Constitutional Baselines",
+    ".github/workflows/postgres_16_qualification.yml:161: print('Constitutional protected baseline verification: 100% MATCH')",
+    "core/a2a_interoperability_runtime.py:7: privacy, or constitutional guarantees.",
+    "core/a2a_interoperability_runtime.py:17: Constitutional Invariants Enforced:",
+    "core/a2a_interoperability_runtime.py:1083: Constitutional Rule: Never blindly replay non-idempotent mutations!"
+   ]
+  },
+  "policy_engine": {
+   "files": 129,
+   "occurrences": 216,
+   "top_files": [
+    [
+     "tests/test_universal_automation_fabric_qualification.py",
+     13
+    ],
+    [
+     "core/automation_fabric/fabric.py",
+     7
+    ],
+    [
+     "tests/test_v4_policy_lineage_and_dlp.py",
+     6
+    ],
+    [
+     "docs/qualification/ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_FINAL_AUDIT.md",
+     5
+    ],
+    [
+     "core/skill_arena.py",
+     4
+    ]
+   ],
+   "sample_hits": [
+    "openapi_v4.json:79: \"summary\": \"Evaluate request against ABAC policy engine across 8 dimensions\",",
+    "openapi_v5.json:105: \"summary\": \"Evaluate request against 8-dimensional ABAC policy engine\",",
+    "openapi_v6.json:182: \"summary\": \"Evaluate request against 8-dimensional ABAC policy engine\",",
+    "core/a2a_interoperability_runtime.py:1354: Coordinates full delegation through ZONATA PolicyEngine and A2A Gateway.",
+    "core/a2a_interoperability_runtime.py:1413: \"\"\"Coordinates streaming delegation through ZONATA PolicyEngine and A2A Gateway (Section 34).\"\"\"",
+    "core/adversarial_suite.py:20: from core.policy_engine_v2 import policy_engine_v2, PolicyContext, PolicyDecision",
+    "core/adversarial_suite.py:98: Evaluates whether this content confers authority in the Policy Engine.",
+    "core/adversarial_suite.py:116: evaluation = policy_engine_v2.evaluate(injected_context)",
+    "core/agent_evaluation.py:11: 3. POLICY COMPLIANCE: Zero bypass of PolicyEngine / ApprovalEngine",
+    "core/ai_ceo_operational_orchestrator.py:34: from core.policy_engine_v2 import policy_engine_v2, PolicyContext, PolicyDecision",
+    "core/ai_ceo_v8.py:14: GOVERNED_SUBORDINATION (CEO is subordinate to Human Owner, PolicyEngine, AuthorityGateway, ApprovalEngine, ActionGateway, KillSwitch)",
+    "core/aic_organization_constitution.py:207: required_tools=[\"AuthorityGateway\", \"EvidenceLedger\", \"PolicyEngine\", \"OpenHandsRuntime\"],"
+   ]
+  },
+  "authority_gateway": {
+   "files": 69,
+   "occurrences": 101,
+   "top_files": [
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     6
+    ],
+    [
+     "docs/qualification/GEMMA4_INDEPENDENT_QUALIFICATION_AND_AUDIT_REPORT.md",
+     5
+    ],
+    [
+     "core/governed_tool_registry.py",
+     4
+    ],
+    [
+     "docs/qualification/ZONATA_DEEP_PRODUCTION_CAPABILITY_QUALIFICATION_REPORT.md",
+     4
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     4
+    ]
+   ],
+   "sample_hits": [
+    "core/agent_factory_runtime.py:227: security policies, authority gateways, or their own permission boundaries.",
+    "core/ai_ceo_v8.py:14: GOVERNED_SUBORDINATION (CEO is subordinate to Human Owner, PolicyEngine, AuthorityGateway, ApprovalEngine, ActionGateway, KillSwitch)",
+    "core/aic_organization_constitution.py:207: required_tools=[\"AuthorityGateway\", \"EvidenceLedger\", \"PolicyEngine\", \"OpenHandsRuntime\"],",
+    "core/aic_organization_constitution.py:1686: {\"step\": 1, \"action\": \"Validate Authority & Permissions\", \"system\": \"AuthorityGateway\"},",
+    "core/browser_use_execution_runtime.py:1435: 8. Authority Gateway Authorization",
+    "core/ceo_conversation_engine.py:8: Executive Orchestration <-> Authority Gateway <-> Policy / Risk / Approval Engine <->",
+    "core/durable_workflow_runtime.py:11: - PolicyEngine & AuthorityGateway enforcement on side-effecting nodes",
+    "core/edge_security_gateway.py:26: ZONATA sovereign AuthorityGateway remains the ultimate authority.",
+    "core/executive_context_builder.py:165: \"You may propose tool invocations. The AuthorityGateway determines whether execution is permitted:\\n\" +",
+    "core/executive_supervision_loop.py:146: # Deterministic ZONATA Authority Gateway",
+    "core/executive_supervision_loop.py:165: msg = \"ZONATA AuthorityGateway verified policy and budget limits.\"",
+    "core/failsafe_degradation_matrix.py:151: what_remains_available=\"ZONATA sovereign PolicyEngine, role-based AuthorityGateway, emergency controls\","
+   ]
+  },
+  "approval_engine": {
+   "files": 81,
+   "occurrences": 118,
+   "top_files": [
+    [
+     "core/aic_organization_constitution.py",
+     7
+    ],
+    [
+     "core/cryptographic_approvals.py",
+     4
+    ],
+    [
+     "core/voice_agent.py",
+     4
+    ],
+    [
+     "docs/reports/ZONATA_UNIVERSAL_LINUX_TERMINAL_FABRIC_REPORT.md",
+     4
+    ],
+    [
+     "tests/test_enterprise_capability_expansion_qualification.py",
+     4
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:5441: consent = req_data.get(\"consent_given\", True)",
+    "api_server.py:5442: call = get_runtime(tenant_id).voice.initiate_call_session(caller_id, direction, consent)",
+    "core/agent_evaluation.py:11: 3. POLICY COMPLIANCE: Zero bypass of PolicyEngine / ApprovalEngine",
+    "core/ai_ceo_v8.py:14: GOVERNED_SUBORDINATION (CEO is subordinate to Human Owner, PolicyEngine, AuthorityGateway, ApprovalEngine, ActionGateway, KillSwitch)",
+    "core/aic_organization_constitution.py:725: purpose=\"GDPR, CCPA, HIPAA data privacy compliance, consent graphs, and data minimization.\",",
+    "core/aic_organization_constitution.py:728: authority_scope=\"Data privacy policies, DSAR automation, consent audits, third-party vendor privacy.\",",
+    "core/aic_organization_constitution.py:730: kra=[\"Zero Privacy Breaches\", \"DSAR Turnaround SLA\", \"Consent Graph Accuracy\"],",
+    "core/aic_organization_constitution.py:734: subordinate_functions=[\"Data Privacy Office\", \"Consent Operations\", \"Vendor Privacy Review\"],",
+    "core/aic_organization_constitution.py:738: required_data=[\"CONSENT_REGISTRY\", \"DSAR_QUEUE\", \"VENDOR_DPA_ARCHIVE\"],",
+    "core/aic_organization_constitution.py:1259: \"purpose\": \"HIPAA compliance, patient data privacy, and consent management.\"",
+    "core/aic_organization_constitution.py:1426: {\"dept_id\": \"dept_privacy\", \"name\": \"Data Privacy & Patient Records\", \"lead_role\": \"EXEC_CPCO\", \"purpose\": \"EHR privacy governance, patient ",
+    "core/browser_use_execution_runtime.py:1436: 9. Human Approval Escalation (ApprovalEngine)"
+   ]
+  },
+  "evidence_ledger": {
+   "files": 440,
+   "occurrences": 1398,
+   "top_files": [
+    [
+     "core/coworker/evidence_reporting.py",
+     28
+    ],
+    [
+     "api_server.py",
+     27
+    ],
+    [
+     "tests/test_final_gap_closure_and_opensource.py",
+     25
+    ],
+    [
+     "core/remote_disaster_recovery.py",
+     24
+    ],
+    [
+     "core/coworker/durable_workflow.py",
+     16
+    ]
+   ],
+   "sample_hits": [
+    "ZONATA_V10_RELEASE_EVIDENCE_MANIFEST.json:61: \"merkle_chain_valid\": true,",
+    "api_server.py:46: from core.evidence_ledger import EvidenceLedger",
+    "api_server.py:87: from core.evidence_ledger import get_default_ledger_path",
+    "api_server.py:375: \"\"\"Tenant-scoped evidence ledger.\"\"\"",
+    "api_server.py:495: _MERKLE_CACHE: Dict[str, Any] = {\"ts\": 0.0, \"value\": \"UNVERIFIED\", \"lock\": __import__(\"threading\").Lock()}",
+    "api_server.py:496: _MERKLE_TTL = 30.0",
+    "api_server.py:499: def _platform_merkle_status() -> str:",
+    "api_server.py:502: cached = _MERKLE_CACHE[\"value\"]",
+    "api_server.py:503: if now - _MERKLE_CACHE[\"ts\"] < _MERKLE_TTL and cached != \"UNVERIFIED\":",
+    "api_server.py:505: with _MERKLE_CACHE[\"lock\"]:",
+    "api_server.py:507: if now - _MERKLE_CACHE[\"ts\"] < _MERKLE_TTL and _MERKLE_CACHE[\"value\"] != \"UNVERIFIED\":",
+    "api_server.py:508: return _MERKLE_CACHE[\"value\"]"
+   ]
+  },
+  "kill_switch": {
+   "files": 300,
+   "occurrences": 1575,
+   "top_files": [
+    [
+     "api_server.py",
+     127
+    ],
+    [
+     "tests/test_universal_automation_fabric_qualification.py",
+     43
+    ],
+    [
+     "core/killswitch_matrix.py",
+     39
+    ],
+    [
+     "core/temporal_durable_execution_runtime.py",
+     31
+    ],
+    [
+     "core/browser_use_execution_runtime.py",
+     30
+    ]
+   ],
+   "sample_hits": [
+    "ZONATA_V10_RELEASE_EVIDENCE_MANIFEST.json:39: \"nine_level_killswitch\": \"VERIFIED\"",
+    "api_server.py:196: A2AKillSwitch,",
+    "api_server.py:211: MCPKillSwitch,",
+    "api_server.py:229: OpenHandsKillSwitch,",
+    "api_server.py:245: BrowserKillSwitch,",
+    "api_server.py:261: TemporalKillSwitch,",
+    "api_server.py:280: IntegrationKillSwitch,",
+    "api_server.py:613: def _blocked_by_global_killswitch(self, surface: str) -> bool:",
+    "api_server.py:615: if universal_automation_fabric.is_killswitch_active():",
+    "api_server.py:617: \"error\": f\"Global kill switch engaged: {surface} blocked\",",
+    "api_server.py:619: \"killswitch_active\": True,",
+    "api_server.py:3467: \"killswitch_active\": universal_automation_fabric.is_killswitch_active(),"
+   ]
+  },
+  "ai_ceo": {
+   "files": 381,
+   "occurrences": 1404,
+   "top_files": [
+    [
+     "web/app.js",
+     41
+    ],
+    [
+     "core/meeting_service.py",
+     28
+    ],
+    [
+     "api_server.py",
+     26
+    ],
+    [
+     "core/assistant_service.py",
+     24
+    ],
+    [
+     "web/ai_ceo_workspace.js",
+     22
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:109: from core.meeting_service import AiCeoMeetingService",
+    "api_server.py:120: AICeoTerminalInstruction, AICeoTerminalResult",
+    "api_server.py:134: # Zonata Universal AI CEO Subsystems",
+    "api_server.py:353: \"Company scope is locked until the AI CEO approves assistant access \"",
+    "api_server.py:365: \"\"\"Tenant-scoped AI CEO engine.\"\"\"",
+    "api_server.py:2005: \"detail\": \"Onboard a company to view AI CEO intelligence.\",",
+    "api_server.py:2167: # --- ZONATA UNIVERSAL AI CEO OS ENDPOINTS (GET) ---",
+    "api_server.py:2567: recs = get_runtime(tenant_id).schedule.get_ai_ceo_recommendations(company_id)",
+    "api_server.py:2592: # Prompt 03: AI CEO Meeting Room Endpoints (GET)",
+    "api_server.py:3033: \"who\": item.metadata.get(\"requested_by\", \"AI_CEO\"),",
+    "api_server.py:4155: # ZONATA V8: AI CEO Executive Operating Layer & Coworker 2.0 Routes",
+    "api_server.py:5089: manager=\"AI CEO\","
+   ]
+  },
+  "agency_swarm": {
+   "files": 56,
+   "occurrences": 130,
+   "top_files": [
+    [
+     "core/aic_ceo_constitution.py",
+     12
+    ],
+    [
+     "zonata/langgraph_adapter.py",
+     11
+    ],
+    [
+     "tests/test_durable_workflow.py",
+     7
+    ],
+    [
+     "zonata/openhands_adapter.py",
+     7
+    ],
+    [
+     "zonata/browser_use_adapter.py",
+     6
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:8286: res = langgraph_adapter.run_agency_swarm_workflow(directive=directive, company_id=cid)",
+    "core/a2a_interoperability_runtime.py:13: ZONATA -> AI CEO -> Workforce / Agency Swarm -> Mission -> TaskMaker -> LangGraph",
+    "core/aic_ceo_constitution.py:47: AGENCY_SWARM = \"AGENCY_SWARM\"",
+    "core/aic_ceo_constitution.py:149: AuthorityLevel.AGENCY_SWARM.value: 1000.0,",
+    "core/aic_ceo_constitution.py:157: AuthorityLevel.AGENCY_SWARM.value: 10.0,",
+    "core/aic_ceo_constitution.py:165: AuthorityLevel.AGENCY_SWARM.value: 500.0,",
+    "core/aic_ceo_constitution.py:173: AuthorityLevel.AGENCY_SWARM.value: 500.0,",
+    "core/aic_ceo_constitution.py:181: AuthorityLevel.AGENCY_SWARM.value: 2500.0,",
+    "core/aic_ceo_constitution.py:189: AuthorityLevel.AGENCY_SWARM.value: 5000.0,",
+    "core/aic_ceo_constitution.py:197: AuthorityLevel.AGENCY_SWARM.value: 0.0,",
+    "core/aic_ceo_constitution.py:205: AuthorityLevel.AGENCY_SWARM.value: 2000.0,",
+    "core/aic_ceo_constitution.py:213: AuthorityLevel.AGENCY_SWARM.value: 0.0,"
+   ]
+  },
+  "langgraph": {
+   "files": 67,
+   "occurrences": 203,
+   "top_files": [
+    [
+     "api_server.py",
+     16
+    ],
+    [
+     "core/durable_workflow_runtime.py",
+     13
+    ],
+    [
+     "zonata/temporal_adapter.py",
+     11
+    ],
+    [
+     "tests/test_durable_workflow.py",
+     10
+    ],
+    [
+     "zonata/mcp_adapter.py",
+     9
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:185: from zonata.langgraph_adapter import langgraph_adapter",
+    "api_server.py:8268: res = langgraph_adapter.run_simple_workflow(company_id=cid)",
+    "api_server.py:8270: res = langgraph_adapter.run_long_running_workflow(company_id=cid)",
+    "api_server.py:8273: res = langgraph_adapter.run_human_approval_workflow(amount=amount, company_id=cid)",
+    "api_server.py:8277: res = langgraph_adapter.run_human_edit_workflow(initial_amount=init_amt, modified_amount=mod_amt, company_id=cid)",
+    "api_server.py:8279: res = langgraph_adapter.run_failure_recovery_workflow(company_id=cid)",
+    "api_server.py:8281: res = langgraph_adapter.run_ambiguous_transaction_workflow(company_id=cid)",
+    "api_server.py:8283: res = langgraph_adapter.run_loop_control_workflow(company_id=cid)",
+    "api_server.py:8286: res = langgraph_adapter.run_agency_swarm_workflow(directive=directive, company_id=cid)",
+    "api_server.py:8288: res = langgraph_adapter.run_letta_memory_workflow(company_id=cid)",
+    "api_server.py:8290: res = langgraph_adapter.run_hal_multimodal_workflow(company_id=cid)",
+    "api_server.py:8292: res = langgraph_adapter.run_killswitch_workflow(company_id=cid)"
+   ]
+  },
+  "letta": {
+   "files": 42,
+   "occurrences": 63,
+   "top_files": [
+    [
+     "zonata/hal_multimodal_adapter.py",
+     5
+    ],
+    [
+     "core/langfuse_adapter.py",
+     3
+    ],
+    [
+     "docs/architecture/PRE_CHANGE_ARCHITECTURE_BASELINE_SNAPSHOT.md",
+     3
+    ],
+    [
+     "tests/test_durable_workflow.py",
+     3
+    ],
+    [
+     "tests/test_hal_multimodal.py",
+     3
+    ]
+   ],
+   "sample_hits": [
+    "core/a2a_interoperability_runtime.py:426: payloads to external A2A agents. Ensures private Letta memory, secrets,",
+    "core/ai_dlp_gateway.py:12: 4. Memory Persistence (Letta / SQLite)",
+    "core/governed_tool_registry.py:12: Agency Swarm, Letta, HAL, LangGraph, A2A, MCP, OpenHands, Browser Use,",
+    "core/langfuse_adapter.py:7: ZONATA AI CEO, Gemma 4, Letta memory, Agency Swarm, LangGraph, MCP, and A2A.",
+    "core/langfuse_adapter.py:334: \"\"\"Traces Letta memory reads and writes.\"\"\"",
+    "core/langfuse_adapter.py:488: f\"Observed {memory_failures} Letta memory retrieval failures. \"",
+    "core/multimodal_capability_runtime.py:403: \"name\": \"HAL Memory Firewall & Letta Sync\",",
+    "core/multimodal_capability_runtime.py:1122: Scans secrets, classifies epistemic level, forwards approved records to Letta/Stateful memory.",
+    "core/mcp_interoperability_runtime.py:381: or Letta memory.",
+    "core/mcp_interoperability_runtime.py:1977: Letta memories, private credentials, or unrestricted execution authority.",
+    "core/coworker/memory_tier.py:3: Implements segregated, governed memory pools inspired by Hermes & Letta paradigms:",
+    "tests/test_a2a_interoperability.py:584: \"\"\"Req 35: Letta memory boundary filters out core persona and private blocks.\"\"\""
+   ]
+  },
+  "hal": {
+   "files": 35,
+   "occurrences": 127,
+   "top_files": [
+    [
+     "core/multimodal_capability_runtime.py",
+     38
+    ],
+    [
+     "zonata/hal_multimodal_adapter.py",
+     19
+    ],
+    [
+     "tests/test_hal_multimodal.py",
+     17
+    ],
+    [
+     "docs/reports/V3_HAL_VALIDATION.md",
+     7
+    ],
+    [
+     "zonata/langgraph_adapter.py",
+     5
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:2455: # HAL Multimodal Capabilities (Requirement 41)",
+    "api_server.py:2474: \"description\": f\"Governed HAL capability ({mc['family']}). Risk: {mc['risk_level']}.\"",
+    "api_server.py:3359: # HAL Multimodal Capability Layer Endpoints (GET)",
+    "api_server.py:7940: # HAL Multimodal Capability Layer Endpoints (POST)",
+    "core/action_envelope.py:4: Defines the universal envelope consumed by all execution subsystems (MCP, A2A, Nango, Browser, OpenHands, HAL).",
+    "core/action_gateway.py:4: Enforces the mandatory 20-step execution pipeline across all subsystems (MCP, A2A, Nango, Browser, OpenHands, HAL).",
+    "core/governed_tool_registry.py:12: Agency Swarm, Letta, HAL, LangGraph, A2A, MCP, OpenHands, Browser Use,",
+    "core/multimodal_capability_runtime.py:2: RoboAssistant Company OS 2.0 \u2014 Universal Multimodal Capability Runtime (HAL AI Integration)",
+    "core/multimodal_capability_runtime.py:6: ZONATA remains the sovereign authority. HAL is a governed multimodal capability layer.",
+    "core/multimodal_capability_runtime.py:204: \"id\": \"hal.vision.camera\",",
+    "core/multimodal_capability_runtime.py:207: \"name\": \"HAL Webcam Vision & Face Tracking\",",
+    "core/multimodal_capability_runtime.py:218: \"id\": \"hal.vision.screen\","
+   ]
+  },
+  "mcp": {
+   "files": 188,
+   "occurrences": 859,
+   "top_files": [
+    [
+     "web/mcp_workspace.js",
+     63
+    ],
+    [
+     "core/mcp_interoperability_runtime.py",
+     56
+    ],
+    [
+     "api_server.py",
+     48
+    ],
+    [
+     "zonata/mcp_adapter.py",
+     42
+    ],
+    [
+     "tests/test_mcp_interoperability.py",
+     33
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:208: # MCP (Model Context Protocol - Project 06)",
+    "api_server.py:224: # NOTE: MCP gateway/server/scenarios are constructed per tenant via _mcp()/get_runtime().",
+    "api_server.py:396: return get_runtime(tenant_id, company_id).mcp",
+    "api_server.py:3109: elif path == \"/api/coworker/mcp/servers\":",
+    "api_server.py:3658: # MCP (MODEL CONTEXT PROTOCOL - PROJECT 06) GET ENDPOINTS",
+    "api_server.py:3660: elif path == \"/api/mcp/servers\":",
+    "api_server.py:3668: elif path.startswith(\"/api/mcp/servers/\") and len(path.split(\"/\")) == 5:",
+    "api_server.py:3672: self._send_json({\"error\": \"MCP server not found\"}, status=404)",
+    "api_server.py:3686: elif path == \"/api/mcp/tools\":",
+    "api_server.py:3695: elif path.startswith(\"/api/mcp/tools/\") and len(path.split(\"/\")) == 5:",
+    "api_server.py:3699: self._send_json({\"error\": \"MCP tool not found\"}, status=404)",
+    "api_server.py:3704: elif path == \"/api/mcp/resources\":"
+   ]
+  },
+  "a2a": {
+   "files": 111,
+   "occurrences": 481,
+   "top_files": [
+    [
+     "web/agent_network_workspace.js",
+     66
+    ],
+    [
+     "core/a2a_interoperability_runtime.py",
+     55
+    ],
+    [
+     "tests/test_a2a_interoperability.py",
+     52
+    ],
+    [
+     "api_server.py",
+     37
+    ],
+    [
+     "zonata/a2a_adapter.py",
+     32
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:206: # NOTE: A2A gateway/scenarios are constructed per tenant via _a2a()/get_runtime().a2a.",
+    "api_server.py:388: return get_runtime(tenant_id, company_id).a2a",
+    "api_server.py:3543: # A2A (AGENT2AGENT PROTOCOL) GET ENDPOINTS",
+    "api_server.py:3545: elif path == \"/.well-known/agent-card.json\":",
+    "api_server.py:3546: card = _a2a(tenant_id, company_id).server_adapter.generate_agent_card(host_url=f\"http://{self.headers.get('Host', 'localhost:8080')}\")",
+    "api_server.py:3550: elif path == \"/api/a2a/agents\":",
+    "api_server.py:3575: elif path.startswith(\"/api/a2a/agents/\"):",
+    "api_server.py:3593: elif path == \"/api/a2a/tasks\":",
+    "api_server.py:3602: elif path.startswith(\"/api/a2a/tasks/\") or path.startswith(\"/a2a/tasks/\"):",
+    "api_server.py:3612: elif path == \"/api/a2a/approvals\":",
+    "api_server.py:3621: elif path == \"/api/a2a/security/events\":",
+    "api_server.py:3635: elif path == \"/api/a2a/metrics\":"
+   ]
+  },
+  "openhands": {
+   "files": 133,
+   "occurrences": 776,
+   "top_files": [
+    [
+     "core/openhands_execution_runtime.py",
+     113
+    ],
+    [
+     "api_server.py",
+     74
+    ],
+    [
+     "tests/test_openhands_execution.py",
+     62
+    ],
+    [
+     "zonata/openhands_adapter.py",
+     60
+    ],
+    [
+     "core/db.py",
+     32
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:226: # OpenHands (Governed Agent Execution Runtime - Project 07)",
+    "api_server.py:227: from core.openhands_execution_runtime import (",
+    "api_server.py:228: OpenHandsRuntimeGateway,",
+    "api_server.py:229: OpenHandsKillSwitch,",
+    "api_server.py:230: OpenHandsExecutionStatus,",
+    "api_server.py:235: OpenHandsSecurityEventType,",
+    "api_server.py:236: SecurityException as OpenHandsSecurityException",
+    "api_server.py:238: from zonata.openhands_adapter import OpenHandsCanonicalScenarios, OpenHandsCeoBridge",
+    "api_server.py:240: # NOTE: OpenHands gateway/scenarios are constructed per tenant via get_runtime().",
+    "api_server.py:407: def _openhands(tenant_id: str, company_id: str = None):",
+    "api_server.py:408: return get_runtime(tenant_id, company_id).openhands",
+    "api_server.py:411: def _openhands_scenarios(tenant_id: str, company_id: str = None):"
+   ]
+  },
+  "browser_use": {
+   "files": 72,
+   "occurrences": 205,
+   "top_files": [
+    [
+     "zonata/browser_use_adapter.py",
+     33
+    ],
+    [
+     "tests/test_browser_use_execution.py",
+     19
+    ],
+    [
+     "core/browser_use_execution_runtime.py",
+     13
+    ],
+    [
+     "zonata/temporal_adapter.py",
+     9
+    ],
+    [
+     "scripts/run_step2_validation.py",
+     8
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:242: # Browser Use (Governed Autonomous Browser Execution Layer - Project 08)",
+    "api_server.py:243: from core.browser_use_execution_runtime import (",
+    "api_server.py:254: from zonata.browser_use_adapter import BrowserUseCanonicalScenarios, BrowserUseCeoBridge",
+    "api_server.py:3848: # Governed Browser Use Execution Layer Endpoints (GET - Project 08)",
+    "api_server.py:9142: # Governed Browser Use Execution Layer Endpoints (POST - Project 08)",
+    "api_server.py:9152: agent_id = req_data.get(\"agent_id\", \"agent_browser_user\")",
+    "api_server.py:9341: self._send_json({\"error\": f\"Unknown Browser Use scenario '{scenario}'\"}, status=400)",
+    "core/aic_organization_constitution.py:315: required_tools=[\"GoogleAnalyticsAPI\", \"BrowserUseAgent\", \"AdCampaignManager\"],",
+    "core/browser_use_execution_runtime.py:2: ZONATA Governed Browser Use Execution Runtime",
+    "core/browser_use_execution_runtime.py:5: Integrates the upstream Browser Use (browser-use/browser-use) architectural patterns underneath",
+    "core/browser_use_execution_runtime.py:7: AI CEO -> Agency Swarm -> TaskMaker -> LangGraph -> BrowserExecutionGateway -> Browser Use -> Real Browser -> Web Application",
+    "core/browser_use_execution_runtime.py:10: 1. Browser Use != Authority"
+   ]
+  },
+  "terminal": {
+   "files": 81,
+   "occurrences": 251,
+   "top_files": [
+    [
+     "docs/reports/ZONATA_UNIVERSAL_LINUX_TERMINAL_FABRIC_REPORT.md",
+     25
+    ],
+    [
+     "tests/test_universal_terminal_master_qualification.py",
+     20
+    ],
+    [
+     "docs/qualification/ZONATA_UNIVERSAL_TERMINAL_FINAL_QUALIFICATION_REPORT.md",
+     19
+    ],
+    [
+     "tests/test_universal_terminal_operational_qualification.py",
+     15
+    ],
+    [
+     "tests/test_universal_linux_terminal_fabric.py",
+     10
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:116: from core.universal_terminal import (",
+    "api_server.py:117: UniversalTerminal, TerminalHandlingAgent, TerminalHealthService,",
+    "api_server.py:7321: # Check if executing via UniversalTerminal or raw fallback",
+    "run_production_reality_demonstrations.py:177: # 2. Launch Application 1: Xterm Text Processor",
+    "run_production_reality_demonstrations.py:180: app1 = subprocess.Popen([\"xterm\", \"-title\", \"ZONATA App 1 - Finance Terminal\", \"-e\", \"bash\", \"-c\", launch_cmd])",
+    "run_production_reality_demonstrations.py:200: app2 = subprocess.Popen([\"xterm\", \"-title\", \"ZONATA App 2 - Verification Console\", \"-geometry\", \"70x20+400+100\", \"-e\", \"bash\", \"-c\", \"sleep ",
+    "core/governed_tool_registry.py:13: Universal Terminal, Evidence Ledger, and Kill Switches.",
+    "core/governed_tool_registry.py:102: tool_id=\"universal_terminal_command_executor\",",
+    "core/governed_tool_registry.py:112: system_origin=\"UNIVERSAL_TERMINAL\"",
+    "core/production_orchestration.py:10: * Execution workers (Agency Swarm, Universal Terminal, OpenHands)",
+    "core/production_orchestration.py:51: UNIVERSAL_TERMINAL_WORKER = \"UNIVERSAL_TERMINAL_WORKER\"",
+    "core/saas_billing.py:130: features_allowed=[\"core_agents\", \"browser_use\", \"universal_terminal\", \"evidence_ledger\", \"web_scraping\"]"
+   ]
+  },
+  "automation_fabric": {
+   "files": 72,
+   "occurrences": 292,
+   "top_files": [
+    [
+     "api_server.py",
+     34
+    ],
+    [
+     "tests/test_universal_automation_fabric_qualification.py",
+     21
+    ],
+    [
+     "docs/qualification/ZONATA_FINAL_RELEASE_BLOCKER_AUDIT.md",
+     18
+    ],
+    [
+     "docs/qualification/ENTERPRISE_INTEGRATION_QUALIFICATION_REPORT.md",
+     16
+    ],
+    [
+     "core/automation_fabric/fabric.py",
+     14
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:186: from core.automation_fabric import (",
+    "api_server.py:187: universal_automation_fabric,",
+    "api_server.py:615: if universal_automation_fabric.is_killswitch_active():",
+    "api_server.py:3462: # UNIVERSAL AUTOMATION FABRIC GET ENDPOINTS",
+    "api_server.py:3467: \"killswitch_active\": universal_automation_fabric.is_killswitch_active(),",
+    "api_server.py:3468: \"metrics\": universal_automation_fabric.get_fabric_metrics(tenant_id)",
+    "api_server.py:3474: wfs = universal_automation_fabric.list_workflows(tenant_id=tenant_id, company_id=cid)",
+    "api_server.py:3480: wf = universal_automation_fabric.get_workflow(wf_id, tenant_id=tenant_id)",
+    "api_server.py:3489: execs = universal_automation_fabric.list_executions(tenant_id=tenant_id, workflow_id=wf_id)",
+    "api_server.py:3495: ex = universal_automation_fabric.get_execution(exec_id, tenant_id=tenant_id)",
+    "api_server.py:3528: apprs = universal_automation_fabric.list_pending_approvals(tenant_id=tenant_id)",
+    "api_server.py:3533: m = universal_automation_fabric.get_fabric_metrics(tenant_id=tenant_id)"
+   ]
+  },
+  "temporal": {
+   "files": 106,
+   "occurrences": 331,
+   "top_files": [
+    [
+     "api_server.py",
+     38
+    ],
+    [
+     "web/temporal_workspace.js",
+     28
+    ],
+    [
+     "core/temporal_durable_execution_runtime.py",
+     17
+    ],
+    [
+     "zonata/temporal_adapter.py",
+     14
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     11
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:258: # Temporal (Governed Durable Execution & Long-Running Mission Reliability Layer - Project 09)",
+    "api_server.py:275: # NOTE: temporal gateway/scenarios are constructed per tenant via _temporal().",
+    "api_server.py:471: return get_runtime(tenant_id, company_id).temporal",
+    "api_server.py:3935: # Governed Temporal Durable Execution Layer Endpoints (GET - Project 09)",
+    "api_server.py:3937: elif path == \"/api/temporal/clusters\":",
+    "api_server.py:3939: # server/SDK versions: either an external Temporal host is",
+    "api_server.py:3947: \"name\": \"External Temporal Cluster\",",
+    "api_server.py:3953: \"durable_storage\": \"external Temporal persistence\",",
+    "api_server.py:3954: \"verification\": \"Server version is reported by the Temporal cluster and is not assumed here.\",",
+    "api_server.py:3966: \"verification\": \"No external Temporal server is configured (TEMPORAL_HOST unset).\",",
+    "api_server.py:3975: elif path == \"/api/temporal/workers\":",
+    "api_server.py:3980: elif path == \"/api/temporal/queues\":"
+   ]
+  },
+  "vault": {
+   "files": 124,
+   "occurrences": 290,
+   "top_files": [
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     16
+    ],
+    [
+     "core/vault_client.py",
+     15
+    ],
+    [
+     "storage/backups/worm_retention_ledger.json",
+     12
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     11
+    ],
+    [
+     "tests/test_v10_enterprise_production_unit.py",
+     10
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:1901: elif path == \"/api/vault/leases\":",
+    "api_server.py:9800: # Vault Scoped Dynamic Credential Leases",
+    "api_server.py:9801: elif path == \"/api/vault/lease\":",
+    "api_server.py:9817: elif path == \"/api/vault/revoke\":",
+    "docker-compose.prod.yml:63: - VAULT_ADDR=http://vault:8200",
+    "core/ai_dlp_gateway.py:63: INTERNAL_SECURE = \"INTERNAL_SECURE\"         # Controlled internal services (Vault, NATS, local MCP)",
+    "core/aic_organization_constitution.py:1405: {\"dept_id\": \"dept_maintenance\", \"name\": \"Engineering & Facilities\", \"lead_role\": \"EXEC_COO\", \"purpose\": \"HVAC, physical security, asset main",
+    "core/assistant_service.py:1595: target_outcome = \"Retrieve credential handle within isolated vault.\"",
+    "core/auth.py:23: 2. Checks SecretManager for managed vault key",
+    "core/backup_security.py:15: * AES-256-GCM encryption with Vault transit keys",
+    "core/backup_security.py:48: key_id: str                         # Vault transit key reference",
+    "core/backup_security.py:80: \"\"\"Derives a 256-bit cryptographic key from the Vault master transit key string.\"\"\""
+   ]
+  },
+  "keycloak": {
+   "files": 18,
+   "occurrences": 102,
+   "top_files": [
+    [
+     "core/keycloak_idp.py",
+     22
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     12
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     11
+    ],
+    [
+     "tests/test_saas_failure_injection_and_qualification.py",
+     10
+    ],
+    [
+     "docs/qualification/ZONATA_DEEP_PRODUCTION_CAPABILITY_QUALIFICATION_REPORT.md",
+     7
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:307: from core.keycloak_idp import keycloak_idp",
+    "api_server.py:9824: # Keycloak Identity Authentication & Revocation",
+    "api_server.py:9825: elif path == \"/api/keycloak/auth\":",
+    "api_server.py:9828: res = keycloak_idp.authenticate_token(token_str)",
+    "api_server.py:9832: elif path == \"/api/keycloak/revoke\":",
+    "api_server.py:9834: keycloak_idp.revoke_session(session_id)",
+    "docker-compose.prod.yml:64: - KEYCLOAK_URL=http://keycloak:8080",
+    "core/failsafe_degradation_matrix.py:8: 2. Keycloak Outage",
+    "core/failsafe_degradation_matrix.py:66: \"keycloak\": True,",
+    "core/failsafe_degradation_matrix.py:101: elif c_lower == \"keycloak\":",
+    "core/failsafe_degradation_matrix.py:103: component=\"Keycloak IdP\",",
+    "core/keycloak_idp.py:3: Keycloak Enterprise Identity & SSO Integration Engine"
+   ]
+  },
+  "openfga": {
+   "files": 18,
+   "occurrences": 78,
+   "top_files": [
+    [
+     "tests/test_saas_platform_integration.py",
+     15
+    ],
+    [
+     "core/openfga_engine.py",
+     12
+    ],
+    [
+     "api_server.py",
+     9
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     9
+    ],
+    [
+     "docs/qualification/ZONATA_DEEP_PRODUCTION_CAPABILITY_QUALIFICATION_REPORT.md",
+     8
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:304: from core.openfga_engine import openfga_engine",
+    "api_server.py:1894: elif path == \"/api/openfga/relations\":",
+    "api_server.py:1897: rels = openfga_engine.list_relations(user=user, object=obj, tenant_id=tenant_id)",
+    "api_server.py:9777: # OpenFGA Relationship Authorization Endpoints",
+    "api_server.py:9778: elif path == \"/api/openfga/check\":",
+    "api_server.py:9783: allowed = openfga_engine.check(user=user, relation=relation, object=obj, tenant_id=tenant)",
+    "api_server.py:9787: elif path == \"/api/openfga/tuples\":",
+    "api_server.py:9794: ok = openfga_engine.delete_tuple(user=user, relation=relation, object=obj, tenant_id=tenant)",
+    "api_server.py:9796: ok = openfga_engine.write_tuple(user=user, relation=relation, object=obj, tenant_id=tenant)",
+    "core/edge_security_gateway.py:11: Vault (:8200), Database (:5432), NATS (:4222), Temporal (:7233), OpenFGA, and Workers",
+    "core/edge_security_gateway.py:61: \"/openfga/stores\",   # OpenFGA internal store config",
+    "core/failsafe_degradation_matrix.py:11: 5. OpenFGA Outage"
+   ]
+  },
+  "nats": {
+   "files": 36,
+   "occurrences": 180,
+   "top_files": [
+    [
+     "tests/test_saas_failure_injection_and_qualification.py",
+     20
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     19
+    ],
+    [
+     "core/nats_jetstream.py",
+     17
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     14
+    ],
+    [
+     "k8s/12-nats-cluster.yaml",
+     14
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:305: from core.nats_jetstream import jetstream_engine, nats_broker",
+    "api_server.py:1910: msgs = jetstream_engine.replay_stream(stream_name=stream, filter_subject=filter_sub, tenant_id=tenant_id, limit=limit_val)",
+    "api_server.py:9838: # NATS JetStream Event Publish",
+    "api_server.py:9844: msg = jetstream_engine.publish(subject=subject, data=data, tenant_id=tenant, company_id=company)",
+    "docker-compose.prod.yml:61: - NATS_URL=nats://nats:4222",
+    "docker-compose.prod.yml:91: nats:",
+    "docker-compose.prod.yml:114: - NATS_URL=nats://nats:4222",
+    "docker-compose.prod.yml:140: nats:",
+    "docker-compose.prod.yml:234: nats:",
+    "docker-compose.prod.yml:235: image: nats:2.10-alpine",
+    "docker-compose.prod.yml:237: command: [\"-js\", \"-sd\", \"/data/jetstream\", \"-m\", \"8222\"]",
+    "docker-compose.prod.yml:242: - nats-data:/data/jetstream"
+   ]
+  },
+  "s3_minio": {
+   "files": 48,
+   "occurrences": 147,
+   "top_files": [
+    [
+     "k8s/14-minio-storage.yaml",
+     18
+    ],
+    [
+     "docker-compose.prod.yml",
+     14
+    ],
+    [
+     "deploy/compose/docker-compose.cloud-staging.yml",
+     9
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     8
+    ],
+    [
+     ".github/workflows/docker_staging_qualification.yml",
+     7
+    ]
+   ],
+   "sample_hits": [
+    "docker-compose.prod.yml:65: - S3_ENDPOINT=http://minio:9000",
+    "docker-compose.prod.yml:95: minio:",
+    "docker-compose.prod.yml:157: - S3_ENDPOINT=http://minio:9000",
+    "docker-compose.prod.yml:159: - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-zonata_minio_admin}",
+    "docker-compose.prod.yml:160: - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}",
+    "docker-compose.prod.yml:188: minio:",
+    "docker-compose.prod.yml:297: minio:",
+    "docker-compose.prod.yml:298: image: cgr.dev/chainguard/minio:latest",
+    "docker-compose.prod.yml:305: - MINIO_ROOT_USER=${MINIO_ROOT_USER:-zonata_minio_admin}",
+    "docker-compose.prod.yml:306: - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}",
+    "docker-compose.prod.yml:308: - minio-data:/data",
+    "docker-compose.prod.yml:310: test: [\"CMD\", \"curl\", \"-f\", \"http://127.0.0.1:9000/minio/health/live\"]"
+   ]
+  },
+  "otel": {
+   "files": 39,
+   "occurrences": 120,
+   "top_files": [
+    [
+     "core/opentelemetry_engine.py",
+     11
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     11
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     9
+    ],
+    [
+     "k8s/15-observability-stack.yaml",
+     9
+    ],
+    [
+     "docs/qualification/ZONATA_DEEP_PRODUCTION_CAPABILITY_QUALIFICATION_REPORT.md",
+     7
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:302: from core.opentelemetry_engine import opentelemetry_engine, opentelemetry_tracer, CorrelationContext, SpanKind, SpanStatus, StatusCode",
+    "api_server.py:1873: spans = opentelemetry_engine.tracer.get_spans(tenant_id=tenant_id, trace_id=trace_id)",
+    "api_server.py:1878: summary = opentelemetry_engine.metrics.get_metrics_summary()",
+    "api_server.py:9735: # OpenTelemetry Trace Span Endpoint",
+    "api_server.py:9740: span = opentelemetry_engine.start_trace(",
+    "api_server.py:9753: opentelemetry_engine.finish_span(span)",
+    "docker-compose.prod.yml:66: - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317",
+    "docker-compose.prod.yml:328: otel-collector:",
+    "docker-compose.prod.yml:329: image: otel/opentelemetry-collector-contrib:0.96.0",
+    "docker-compose.prod.yml:336: - ./config/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro",
+    ".github/workflows/docker_staging_qualification.yml:153: echo \"Launching zonata-api, zonata-worker, otel-collector, prometheus, and grafana...\"",
+    ".github/workflows/docker_staging_qualification.yml:154: docker compose -f docker-compose.prod.yml up -d zonata-api zonata-worker otel-collector prometheus grafana"
+   ]
+  },
+  "langfuse": {
+   "files": 30,
+   "occurrences": 187,
+   "top_files": [
+    [
+     "tests/test_ai_ceo_intelligence_enhancement_qualification.py",
+     37
+    ],
+    [
+     "core/langfuse_engine.py",
+     18
+    ],
+    [
+     "docs/qualification/ZONATA_AI_CEO_INTELLIGENCE_ENHANCEMENT_ACCEPTANCE.md",
+     17
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     15
+    ],
+    [
+     "core/langfuse_adapter.py",
+     13
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:303: from core.langfuse_engine import langfuse_engine",
+    "api_server.py:1882: elif path == \"/api/langfuse/generations\":",
+    "api_server.py:1885: generations = langfuse_engine.get_generations(tenant_id=tenant_id, mission_id=m_id, agent_id=a_id)",
+    "api_server.py:1889: elif path == \"/api/langfuse/analytics\":",
+    "api_server.py:1890: analytics = langfuse_engine.get_analytics(tenant_id=tenant_id)",
+    "api_server.py:9757: # Langfuse LLM Generation Endpoint",
+    "api_server.py:9758: elif path == \"/api/langfuse/generations\":",
+    "api_server.py:9761: gen = langfuse_engine.record_generation(",
+    "core/ai_ceo_operational_orchestrator.py:37: from core.langfuse_adapter import governed_langfuse_adapter, ExecutionStage",
+    "core/aic_ceo_engine.py:278: from core.langfuse_adapter import governed_langfuse_adapter, ExecutionStage",
+    "core/aic_ceo_engine.py:279: governed_langfuse_adapter.start_stage_span(",
+    "core/aic_ceo_engine.py:339: from core.langfuse_adapter import governed_langfuse_adapter, ExecutionStage, StageStatus"
+   ]
+  },
+  "posthog": {
+   "files": 13,
+   "occurrences": 61,
+   "top_files": [
+    [
+     "core/posthog_analytics.py",
+     14
+    ],
+    [
+     "tests/test_saas_platform_integration.py",
+     12
+    ],
+    [
+     "api_server.py",
+     8
+    ],
+    [
+     "tests/test_saas_failure_injection_and_qualification.py",
+     8
+    ],
+    [
+     "docs/qualification/ZONATA_NON_DESTRUCTIVE_INTEGRATION_AND_ACCEPTANCE_REPORT.md",
+     6
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:310: from core.posthog_analytics import posthog_analytics",
+    "api_server.py:1979: elif path == \"/api/analytics/posthog/funnel\":",
+    "api_server.py:1980: funnel = posthog_analytics.get_funnel_summary(tenant_id=tenant_id)",
+    "api_server.py:1984: elif path == \"/api/analytics/posthog/flags\":",
+    "api_server.py:1987: enabled = posthog_analytics.is_feature_enabled(key, distinct_id=distinct_id, tenant_id=tenant_id)",
+    "api_server.py:10021: # PostHog Product Analytics Capture",
+    "api_server.py:10022: elif path == \"/api/analytics/posthog/capture\":",
+    "api_server.py:10028: event = posthog_analytics.capture(",
+    "core/aic_organization_constitution.py:717: required_tools=[\"PostHogConnector\", \"MixpanelAPI\", \"AdCampaignManager\"],",
+    "core/posthog_analytics.py:3: PostHog SaaS Product Intelligence, Funnels & Feature Flags Engine",
+    "core/posthog_analytics.py:24: logger = logging.getLogger(\"zonata.analytics.posthog\")",
+    "core/posthog_analytics.py:27: class PostHogEvent:"
+   ]
+  },
+  "model_gateway": {
+   "files": 141,
+   "occurrences": 396,
+   "top_files": [
+    [
+     "core/coworker/local_inference_adapter.py",
+     23
+    ],
+    [
+     "core/coworker/hermes_agent_v3.py",
+     21
+    ],
+    [
+     "core/settings/definitions.py",
+     14
+    ],
+    [
+     "core/automation_fabric/enterprise_connectors.py",
+     11
+    ],
+    [
+     "core/cognitive_model_provider.py",
+     9
+    ]
+   ],
+   "sample_hits": [
+    "openapi_v4.json:73: \"summary\": \"Invoke central AI model gateway with pre-flight DLP scanning\",",
+    "openapi_v5.json:96: \"summary\": \"Invoke central model gateway with outbound DLP firewall and token cost accounting\",",
+    "core/adversarial_suite.py:19: from core.model_gateway_v4 import ModelSecurityException",
+    "core/aic_ceo_constitution.py:62: INFERENCE = \"INFERENCE\"",
+    "core/aic_organization_constitution.py:620: kra=[\"Agent Alignment & Safety\", \"Token Cost Efficiency\", \"Model Inference Quality\"],",
+    "core/assistant_service.py:208: # 3. An explicit Owner workspace choice wins over keyword inference.",
+    "core/ceo_conversation_engine.py:65: epistemic_classification: str = \"INFERENCE\"",
+    "core/ceo_conversation_engine.py:75: Combines Gemma 4 cognitive inference with ZONATA deterministic governance.",
+    "core/ceo_conversation_engine.py:107: Bypasses model inference completely. Immediately freezes all missions.",
+    "core/ceo_conversation_engine.py:372: epistemic_classification=\"FACT\" if ev_digest else \"INFERENCE\"",
+    "core/cognitive_model_provider.py:10: - Integrated DLP firewall screening before any external inference dispatch.",
+    "core/cognitive_model_provider.py:29: INFERENCE = \"INFERENCE\""
+   ]
+  },
+  "rls_tenant": {
+   "files": 643,
+   "occurrences": 8874,
+   "top_files": [
+    [
+     "api_server.py",
+     860
+    ],
+    [
+     "core/db.py",
+     434
+    ],
+    [
+     "migrations/pg/0001_postgresql_full_schema.sql",
+     342
+    ],
+    [
+     "core/company_setup/service.py",
+     179
+    ],
+    [
+     "core/overview_service.py",
+     156
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:317: def get_real_system_host(tenant_id: str = \"tnt_primary\"):",
+    "api_server.py:333: \"agents\": sum(len(c.workforce) for c in get_portfolio(tenant_id).list_companies()),",
+    "api_server.py:338: def _ura_meeting_access(tenant_id: str, company_id: Optional[str]) -> tuple:",
+    "api_server.py:344: service = URAAssistantService(tenant_id=tenant_id)",
+    "api_server.py:359: def _cw(tenant_id: str, company_id: str = None):",
+    "api_server.py:361: return get_coworker(tenant_id, company_id)",
+    "api_server.py:364: def _ceo_engine(tenant_id: str, company_id: str = None):",
+    "api_server.py:366: return get_runtime(tenant_id, company_id).ceo_engine",
+    "api_server.py:369: def _company_service(tenant_id: str):",
+    "api_server.py:371: return get_runtime(tenant_id).company_service",
+    "api_server.py:374: def _ledger_for(tenant_id: str):",
+    "api_server.py:376: return get_ledger(tenant_id)"
+   ]
+  },
+  "agent_factory_existing": {
+   "files": 104,
+   "occurrences": 345,
+   "top_files": [
+    [
+     "api_server.py",
+     19
+    ],
+    [
+     "web/agent_factory_workspace.js",
+     18
+    ],
+    [
+     "core/db.py",
+     11
+    ],
+    [
+     "core/agent_factory_runtime.py",
+     10
+    ],
+    [
+     "core/workforce_architecture.py",
+     10
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:49: from core.workforce import DynamicAgentFactory",
+    "api_server.py:130: from core.enterprise_agent_factory import agent_factory, EnterpriseAgentFactory",
+    "api_server.py:141: from zonata.agent_factory import GovernedAgentFactory",
+    "api_server.py:148: zonata_agent_factory = GovernedAgentFactory()",
+    "api_server.py:190: specialized_agent_registry,",
+    "api_server.py:3243: # True Agent Factory Endpoints (GET)",
+    "api_server.py:3245: elif path == \"/api/agent-factory/blueprints\":",
+    "api_server.py:3248: bps = EnterpriseAgentFactory(tenant_id).list_blueprints(company_id=comp_id or company_id, department=dept)",
+    "api_server.py:3523: roles = specialized_agent_registry.list_roles()",
+    "api_server.py:5086: contract = DynamicAgentFactory.create_employment_contract(",
+    "api_server.py:5528: t_res = zonata_agent_factory.run_sandbox_tests(agent_id)",
+    "api_server.py:5529: cert_agent = zonata_agent_factory.certify_and_activate(agent_id)"
+   ]
+  },
+  "workforce": {
+   "files": 605,
+   "occurrences": 4816,
+   "top_files": [
+    [
+     "core/workforce_architecture.py",
+     213
+    ],
+    [
+     "core/aic_organization_constitution.py",
+     142
+    ],
+    [
+     "api_server.py",
+     106
+    ],
+    [
+     "zonata/org_designer.py",
+     104
+    ],
+    [
+     "core/workforce_runtime.py",
+     89
+    ]
+   ],
+   "sample_hits": [
+    "api_server.py:4: dynamic host discovery, first-class approvals, department control units,",
+    "api_server.py:49: from core.workforce import DynamicAgentFactory",
+    "api_server.py:52: from core.departments import DepartmentControlUnit",
+    "api_server.py:100: from core.sales_workforce import AISalesWorkforce",
+    "api_server.py:105: from core.workforce_intelligence import WorkforceIntelligenceEngine",
+    "api_server.py:150: from zonata.agent_swarm_adapter import AgentWorkforceAdapter, workforce_planner",
+    "api_server.py:333: \"agents\": sum(len(c.workforce) for c in get_portfolio(tenant_id).list_companies()),",
+    "api_server.py:1630: \"workforce_count\": len(c.workforce),",
+    "api_server.py:1752: employees_count=len(companies[0].workforce) if companies else 0",
+    "api_server.py:1767: for e in c.workforce.values():",
+    "api_server.py:1771: \"department\": e.department,",
+    "api_server.py:1827: \"department\": m.department,"
+   ]
+  },
+  "dlp": {
+   "files": 260,
+   "occurrences": 884,
+   "top_files": [
+    [
+     "core/model_data_firewall.py",
+     34
+    ],
+    [
+     "core/multimodal_capability_runtime.py",
+     22
+    ],
+    [
+     "docs/security/ZONATA_AI_DLP_DATA_FLOW_AND_POLICY_MATRIX.md",
+     21
+    ],
+    [
+     "core/ai_dlp_gateway.py",
+     19
+    ],
+    [
+     "core/dlp_engine.py",
+     19
+    ]
+   ],
+   "sample_hits": [
+    "ZONATA_V10_RELEASE_EVIDENCE_MANIFEST.json:31: \"data_firewall_pii_redaction\": \"ACTIVE\",",
+    "api_server.py:171: RedactionEngine,",
+    "openapi_v4.json:73: \"summary\": \"Invoke central AI model gateway with pre-flight DLP scanning\",",
+    "openapi_v5.json:96: \"summary\": \"Invoke central model gateway with outbound DLP firewall and token cost accounting\",",
+    "core/a2a_interoperability_runtime.py:441: scrubbed = pat.sub(\"[REDACTED_SECRET_REF]\", scrubbed)",
+    "core/adversarial_suite.py:6: 2. Model DLP Firewall (adversarial obfuscation, hex/base64 encoding, spaced tokens)",
+    "core/adversarial_suite.py:75: # Even if encoded, decode check in DLP blocks or flags",
+    "core/adversarial_suite.py:76: results[\"b64_obfuscation_blocked\"] = not res_raw.is_allowed or \"REDACTED\" in res_raw.sanitized_prompt or \"PRIVATE KEY\" in raw_key",
+    "core/adversarial_suite.py:85: results[\"ssn_redacted\"] = \"[REDACTED_SSN]\" in res_ssn.sanitized_prompt",
+    "core/agent_evaluation.py:12: 4. SAFETY: Absence of prompt-injections, DLP credential leaks, or unauthorized mutations",
+    "core/agent_evaluation.py:205: # 4. Safety (DLP & Secret Leak Check)",
+    "core/agent_evaluation.py:211: dim_findings[\"safety\"] = \"Output passed DLP credential inspection\""
+   ]
+  }
+ },
+ "stub_or_mock_markers_top_files": [
+  {
+   "score": 78,
+   "file": "web/company_workspace.js",
+   "markers": {
+    "stub_word": 77,
+    "scripted": 1
+   }
+  },
+  {
+   "score": 31,
+   "file": "core/db.py",
+   "markers": {
+    "pass_body": 31
+   }
+  },
+  {
+   "score": 22,
+   "file": "web/app.js",
+   "markers": {
+    "todo": 2,
+    "stub_word": 20
+   }
+  },
+  {
+   "score": 21,
+   "file": "core/coworker/runtimes/base_runtime.py",
+   "markers": {
+    "pass_body": 21
+   }
+  },
+  {
+   "score": 21,
+   "file": "api_server.py",
+   "markers": {
+    "stub_word": 1,
+    "pass_body": 20
+   }
+  },
+  {
+   "score": 17,
+   "file": "core/browser_use_execution_runtime.py",
+   "markers": {
+    "pass_body": 17
+   }
+  },
+  {
+   "score": 15,
+   "file": "core/coworker/universal_worker_contract.py",
+   "markers": {
+    "pass_body": 15
+   }
+  },
+  {
+   "score": 15,
+   "file": "core/cognitive_model_provider.py",
+   "markers": {
+    "pass_body": 15
+   }
+  },
+  {
+   "score": 14,
+   "file": "core/mcp_interoperability_runtime.py",
+   "markers": {
+    "not_implemented": 4,
+    "pass_body": 10
+   }
+  },
+  {
+   "score": 14,
+   "file": "core/coworker/provider_base.py",
+   "markers": {
+    "pass_body": 14
+   }
+  },
+  {
+   "score": 14,
+   "file": "core/automation_fabric/fabric.py",
+   "markers": {
+    "pass_body": 14
+   }
+  },
+  {
+   "score": 13,
+   "file": "core/workforce_runtime.py",
+   "markers": {
+    "pass_body": 13
+   }
+  },
+  {
+   "score": 12,
+   "file": "web/ai_ceo_workspace.js",
+   "markers": {
+    "stub_word": 12
+   }
+  },
+  {
+   "score": 10,
+   "file": "core/universal_terminal/runtime_adapters.py",
+   "markers": {
+    "pass_body": 10
+   }
+  },
+  {
+   "score": 10,
+   "file": "core/database_engine.py",
+   "markers": {
+    "pass_body": 10
+   }
+  },
+  {
+   "score": 9,
+   "file": "core/a2a_interoperability_runtime.py",
+   "markers": {
+    "not_implemented": 3,
+    "stub_word": 4,
+    "pass_body": 2
+   }
+  },
+  {
+   "score": 8,
+   "file": "core/settings_service.py",
+   "markers": {
+    "stub_word": 1,
+    "pass_body": 7
+   }
+  },
+  {
+   "score": 8,
+   "file": "core/saas_billing.py",
+   "markers": {
+    "pass_body": 8
+   }
+  },
+  {
+   "score": 8,
+   "file": "core/auth.py",
+   "markers": {
+    "pass_body": 8
+   }
+  },
+  {
+   "score": 7,
+   "file": "web/ura_assistant.js",
+   "markers": {
+    "stub_word": 4,
+    "scripted": 3
+   }
+  },
+  {
+   "score": 7,
+   "file": "web/company_setup_existing.js",
+   "markers": {
+    "stub_word": 7
+   }
+  },
+  {
+   "score": 7,
+   "file": "tests/schema_bootstrap.py",
+   "markers": {
+    "pass_body": 7
+   }
+  },
+  {
+   "score": 7,
+   "file": "core/nango_integration_runtime.py",
+   "markers": {
+    "not_implemented": 5,
+    "pass_body": 2
+   }
+  },
+  {
+   "score": 7,
+   "file": "core/coworker/runtime_supervisor.py",
+   "markers": {
+    "pass_body": 7
+   }
+  },
+  {
+   "score": 7,
+   "file": "core/ceo_chat.py",
+   "markers": {
+    "pass_body": 7
+   }
+  },
+  {
+   "score": 6,
+   "file": "core/unified_search.py",
+   "markers": {
+    "pass_body": 6
+   }
+  },
+  {
+   "score": 6,
+   "file": "core/durable_workflow_runtime.py",
+   "markers": {
+    "not_implemented": 6
+   }
+  },
+  {
+   "score": 6,
+   "file": "core/cryptographic_approvals.py",
+   "markers": {
+    "pass_body": 6
+   }
+  },
+  {
+   "score": 6,
+   "file": "core/coworker/local_inference_adapter.py",
+   "markers": {
+    "pass_body": 6
+   }
+  },
+  {
+   "score": 5,
+   "file": "web/tools_factory.js",
+   "markers": {
+    "stub_word": 5
+   }
+  },
+  {
+   "score": 5,
+   "file": "tests/test_a2a_interoperability.py",
+   "markers": {
+    "stub_word": 3,
+    "pass_body": 1,
+    "scripted": 1
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/settings/secrets.py",
+   "markers": {
+    "pass_body": 5
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/overview_service.py",
+   "markers": {
+    "pass_body": 4,
+    "scripted": 1
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/openhands_execution_runtime.py",
+   "markers": {
+    "pass_body": 5
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/coworker/opendots_engine.py",
+   "markers": {
+    "stub_word": 1,
+    "pass_body": 4
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/coworker/defense_monitor.py",
+   "markers": {
+    "pass_body": 5
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/coworker/computer_use_engine.py",
+   "markers": {
+    "stub_word": 1,
+    "pass_body": 4
+   }
+  },
+  {
+   "score": 5,
+   "file": "core/automation_fabric/connector_registry.py",
+   "markers": {
+    "pass_body": 5
+   }
+  },
+  {
+   "score": 4,
+   "file": "web/workforce_workspace.js",
+   "markers": {
+    "stub_word": 4
+   }
+  },
+  {
+   "score": 4,
+   "file": "web/schedule_workspace.js",
+   "markers": {
+    "stub_word": 4
+   }
+  }
+ ]
+}

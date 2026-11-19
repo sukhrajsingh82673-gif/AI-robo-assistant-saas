@@ -1,0 +1,16 @@
+PASS 7-agent marketing team plans into 3 waves
+PASS independent specialists share wave 0 (build concurrently)
+PASS supervisor is last
+PASS ready set honours max_parallel=4
+PASS campaign becomes ready after its 4 prerequisites
+PASS failed agent blocks transitive dependents
+PASS independent siblings are NOT blocked
+PASS failed agent never becomes certified (atomic_team => FAILED once settled)
+PASS independent policy reports PARTIAL, not success
+PASS all certified + atomic => proceeds to TEAM_QA
+PASS build cycle rejected
+PASS delegation loop rejected
+PASS two supervisors rejected
+PASS unknown node rejected
+PASS 300-agent fleet plans in a single wave
+15/15 passed

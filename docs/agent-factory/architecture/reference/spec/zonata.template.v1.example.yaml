@@ -1,0 +1,47 @@
+# Template manifest: a reusable, configurable starting point. Templates are DATA reviewed by humans; they are
+# never auto-edited in production. Promotion of a validated agent to a template = new template version in
+# review_status DRAFT -> IN_REVIEW -> APPROVED (ApprovalEngine), with the evidence bundle attached.
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: research-agent
+  version: 1.2.0                       # semver: MAJOR = breaking slot/spec change, MINOR = new optional slot/capability, PATCH = wording/test fixes
+  category: research
+  default_risk_tier: R1
+  owner: platform                      # platform | tenant:<id>
+  tags: [research, web, citations]
+compat:
+  spec_api: "^1"                       # zonata.agent/v1
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"         # verified present: langgraph 1.2.22 (2026-11-13)
+  gate_policy: ">=1.0.0"
+  upgrade_from: ["^1.0.0"]             # versions an agent can be migrated from without re-architecture
+parameters:                            # the configurable slots; instantiated by the Agent Developer from the ARS
+  type: object
+  required: [role_title, mission, sources]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission:    { type: string, maxLength: 1000 }
+    sources:    { type: array, minItems: 1, items: { type: string }, description: allowed host patterns }
+    output_format: { enum: [md, pdf, json], default: md }
+    cost_cap_usd:  { type: number, minimum: 0.01, maximum: 5, default: 0.6 }
+base_spec:                             # merged under the parameters to yield a full zonata.agent/v1 document
+  role:
+    responsibilities: ["{{ mission_to_responsibilities }}"]
+    out_of_scope: ["Contacting third parties", "Using non-allowlisted sources"]
+    success_criteria: ["Every claim is cited with source and retrieval date"]
+    instructions_ref: instructions/research-agent.md   # file in the template bundle (content-addressed)
+  model: { requirements: { complexity: medium, privacy: internal, capabilities: [chat, tool_use, structured_output] } }
+  capabilities: { requested: [ { key: reasoning.plan }, { key: tool.use }, { key: browser.automation, params: { mode: allowlist_readonly } }, { key: knowledge.retrieve }, { key: document.generate } ] }
+  permissions: { requested: { tools: [ { name: web.fetch_page, scopes: [read], max_calls: 40 } ], network: { external: true, browser: allowlist_readonly }, writes: false } }
+  workflow: { type: sequential }
+  limits: { max_steps: 30, timeout_seconds: 900, max_cost_usd_per_task: "{{ cost_cap_usd }}" }
+security_requirements:
+  must_pass_suites: [prompt_injection_core, data_leakage_core, tool_abuse_core]
+  forbidden_capabilities: [code.execute, database.write, payments.initiate]
+  max_grantable_risk_tier: R1                 # a request needing more than this cannot use this template as-is
+test_pack:
+  functional_dataset: research-agent-functional@3
+  security_dataset: security-prompt-injection-core@1
+  min_cases: 30
+documentation: { readme: docs/README.md, changelog: CHANGELOG.md, runbook: docs/runbook.md }

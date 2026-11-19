@@ -1,0 +1,24 @@
+# Capability manifest. A capability is a *technical ability*; it never implies authorisation.
+# Authorisation = intersection(requested, template max, requester authority, tenant policy, AI CEO policy, constitution),
+# recomputed by the factory at build time and re-enforced by the AuthorityGateway on EVERY runtime call.
+apiVersion: zonata.capability/v1
+kind: Capability
+metadata: { key: browser.automation, version: 1.0.0, owner: platform }
+classification:
+  risk_tier: R2                         # interactive browsing can leak data / act; read-only allowlist mode downgrades to R1
+  modes:
+    none:                 { risk_tier: R0 }
+    allowlist_readonly:   { risk_tier: R1, requires: [network.allowlist] }
+    allowlist_interactive: { risk_tier: R2, requires: [network.allowlist, approval.per_action_class] }
+implementation:
+  kind: builtin                         # builtin | mcp | a2a | code_package
+  runtime_ref: zonata.runtime.browser_use   # existing ZONATA Browser Use integration (verify in Phase 1)
+  executes_in: browser_sandbox          # never in the API process
+grants_required:                        # scopes the AuthorityGateway must see before each call
+  - { scope: net.fetch, constraint: host in permissions.network.allowed_hosts }
+  - { scope: browser.session, constraint: ephemeral profile, no stored credentials }
+limits: { max_pages_per_task: 40, max_session_seconds: 600, download: false, form_submit: approval_required }
+data_handling: { dlp: scan_outbound, cookies: none, screenshots: redacted }
+sandbox: { profile: T1, network: egress_allowlist_only }
+test_pack: [browser-ssrf-core@1, prompt-injection-web-core@1, host-allowlist-escape@1]
+compatibility: { requires_capabilities: [tool.use], conflicts_with: [] }

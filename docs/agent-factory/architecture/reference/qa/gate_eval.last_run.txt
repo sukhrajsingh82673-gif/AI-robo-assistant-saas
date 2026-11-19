@@ -1,0 +1,15 @@
+PASS clean R1 package passes
+PASS clean R3 package passes
+PASS mock-model evidence can never certify
+PASS one open critical finding blocks
+PASS a single cross-tenant hit blocks
+PASS too few cases (25 < 50) blocks R2 even at 96%
+PASS 85% functional blocks R0 (needs 90%)
+PASS R3 needs two DISTINCT human approvers
+PASS builder cannot be the independent evaluator
+PASS one ungranted tool call blocks
+PASS 5pp regression blocks an upgrade
+PASS cyclic delegation blocks a team
+PASS wilson(79/80) > 0.90
+PASS wilson(18/20) < 0.70 (why n matters)
+14/14 passed

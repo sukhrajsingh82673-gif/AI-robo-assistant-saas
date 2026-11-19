@@ -1,0 +1,87 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: software-engineering-review
+  version: 1.0.0
+  category: software_engineering
+  default_risk_tier: R2
+  owner: platform
+  tags: [code, review, refactoring, testing]
+  description: Pull request code reviewer, static analysis auditor, and unit test generator.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: Software Code Reviewer
+    mission: Analyze code changes for bugs, style consistency, security issues, and test coverage.
+    responsibilities:
+      - Inspect git diffs for potential memory leaks, race conditions, or unhandled errors
+      - Suggest idiomatic refactorings and code simplification
+      - Author automated unit tests for modified functions
+    out_of_scope:
+      - Pushing directly to production main branches without PR approval
+      - Modifying production environment variables or infrastructure secrets
+    success_criteria:
+      - All review comments include concrete file and line citations
+      - Generated unit tests pass deterministically
+    instructions: Act as an uncompromising senior engineer. Emphasize safety, clean contracts, and thorough test verification.
+  model:
+    requirements:
+      complexity: high
+      privacy: internal
+      capabilities: [code, structured_output, tool_use]
+  capabilities:
+    requested:
+      - key: tool.use
+      - key: reasoning.plan
+      - key: code.analyze
+  permissions:
+    requested:
+      tools:
+        - name: git.read
+          scopes: [read]
+          max_calls: 30
+        - name: code.test
+          scopes: [execute]
+          max_calls: 20
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: false
+    pii_policy: redact
+  limits:
+    max_steps: 40
+    timeout_seconds: 900
+    max_cost_usd_per_task: 1.2
+  io:
+    input_schema:
+      type: object
+      properties:
+        diff_url: { type: string }
+    output_schema:
+      type: object
+      properties:
+        verdict: { type: string }
+        comments: { type: array }
+  tests:
+    author_cases:
+      - id: case_swe_smoke
+        input: { diff_url: "local://diff_sample" }
+        expect: { passed: true }
+        mandatory: true
+    dataset_refs:
+      - swe-code-review-eval@1.0.0

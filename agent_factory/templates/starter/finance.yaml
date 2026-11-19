@@ -1,0 +1,89 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: finance-reconciliation
+  version: 1.0.0
+  category: finance
+  default_risk_tier: R1
+  owner: platform
+  tags: [finance, accounting, reconciliation, audit]
+  description: Financial data reconciliation and read-only ledger analysis agent.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: Financial Reconciliation Analyst
+    mission: Perform automated variance detection and financial ledger verification.
+    responsibilities:
+      - Compare journal entries against transactional accounts
+      - Flag variances exceeding configured thresholds
+      - Draft immutable variance explanation logs
+    out_of_scope:
+      - Wire transfers or payment initiation
+      - Modifying posted GL records
+      - Bypassing secondary human signer approval
+    success_criteria:
+      - 100% variance attribution to identified ledger items
+      - Complete mathematical balance checks
+    instructions: Analyze financial records under strict dual-entry rules. Never post unverified balancing entries.
+  model:
+    requirements:
+      complexity: high
+      privacy: confidential
+      capabilities: [structured_output, tool_use]
+  capabilities:
+    requested:
+      - key: tool.use
+      - key: database.query_readonly
+      - key: reasoning.plan
+  permissions:
+    requested:
+      tools:
+        - name: db.query_readonly
+          scopes: [read]
+          max_calls: 50
+        - name: calculator
+          scopes: [execute]
+          max_calls: 100
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: false
+    pii_policy: redact
+  limits:
+    max_steps: 50
+    timeout_seconds: 900
+    max_cost_usd_per_task: 1.0
+  io:
+    input_schema:
+      type: object
+      properties:
+        period_start: { type: string }
+        period_end: { type: string }
+    output_schema:
+      type: object
+      properties:
+        total_variance: { type: number }
+        reconciliation_items: { type: array }
+  tests:
+    author_cases:
+      - id: case_finance_smoke
+        input: { period_start: "2026-01-01", period_end: "2026-01-31" }
+        expect: { balanced: true }
+        mandatory: true
+    dataset_refs:
+      - finance-reconciliation@1.0.0

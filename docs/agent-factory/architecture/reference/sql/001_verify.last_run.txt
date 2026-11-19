@@ -1,0 +1,18 @@
+# Verification run 2026-11-15T11:57:48Z on PostgreSQL 16
+PASS rls-read: tenant B sees 0 rows of tenant A
+PASS rls-write: cross-tenant insert rejected
+PASS rls-fail-closed: no tenant context sees nothing
+PASS freeze: spec immutable after BUILT
+PASS self-grant: permission_profile immutable after BUILT
+PASS no-delete: agent versions cannot be deleted
+PASS artifact-immutable
+PASS cert-immutable
+PASS self-approval blocked at DB layer
+PASS release approved by a different principal
+PASS approval requires ApprovalEngine approval_id
+PASS decided release is immutable
+PASS builder cannot be the independent evaluator
+PASS distinct evaluator accepted
+PASS global template readable by tenant B
+PASS global template not writable by tenant (0 rows updated)
+PASS idempotency key unique per tenant

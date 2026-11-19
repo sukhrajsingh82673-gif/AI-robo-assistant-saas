@@ -1,0 +1,12 @@
+PASS valid signature verifies
+PASS key order does not matter (canonical)
+PASS 1-field change fails (hash mismatch)
+PASS forged signature fails
+PASS signature by an unknown key fails
+PASS revoked key id fails
+PASS swapped manifest with valid old signature fails
+PASS clean chain verifies
+PASS tampered entry detected at the exact seq
+PASS merkle root changes after tamper-and-rehash
+PASS public key export works
+11/11 passed
