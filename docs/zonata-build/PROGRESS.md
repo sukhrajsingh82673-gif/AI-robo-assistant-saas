@@ -1,9 +1,9 @@
 # ZONATA Master Build Progress Ledger
 
 **Target:** Enterprise Sovereign Operating System (v2 Master Plan)  
-**Branch:** `zonata/audit`  
+**Branch:** `zonata/stage-2-foundations`  
 **Host Environment:** Linux ARM64 (Android / Termux, Sovereign T0 Mode)  
-**Status:** Stage 0 Complete, Stage 1 Audit Complete (STOP & Awaiting Human Gate Approval)
+**Status:** Stage 0 Complete, Stage 1 Audit Complete, Stage 2 Foundations Complete
 
 ---
 
@@ -12,9 +12,9 @@
 | Stage | Name | Target Outcome | Status | Approval Gate |
 |---|---|---|---|---|
 | **Stage 0** | **Orientation & Baseline** | Read specifications, verify baseline test suites, initialize progress ledger | **COMPLETED** | Self (Stage 0 Entry) |
-| **Stage 1** | **Repository Audit** | Full codebase audit, Section 3 claim validation, gap analysis, license inventory | **COMPLETED** | **AWAITING APPROVAL** |
-| **Stage 2** | **Foundations** | Tenancy RLS verification, Merkle ledger, policy engine, kill switch, budget guards | PENDING | Gate D2 |
-| **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | PENDING | Gate D3 |
+| **Stage 1** | **Repository Audit** | Full codebase audit, Section 3 claim validation, gap analysis, license inventory | **COMPLETED** | Approved (`zonata/audit`) |
+| **Stage 2** | **Foundations** | Tenancy RLS verification, Merkle ledger, policy engine, kill switch, budget guards | **COMPLETED** | Verified (`zonata/stage-2-foundations`) |
+| **Stage 3** | **Router/Worker Runtime** | URA Assistant Router/Worker runtime, admission table (explicit/inferred), observe mode | IN PROGRESS | Gate D3 |
 | **Stage 4** | **Process Pack Framework** | Process Pack schema, validator, loader, Lead-to-Cash, Procure-to-Pay, Support packs | PENDING | Gate D4 |
 | **Stage 5** | **Agent Factory Integration** | Wire `zonata.agent/v1` specs and `af_*` tables to Work Item / Process Pack runtime | PENDING | Gate D5 |
 | **Stage 6** | **Real Adapters & Global Packs**| Sandboxed payment, email, CRM, calendar, transcription, region packs (multi-currency) | PENDING | Gate D6 |
@@ -84,11 +84,32 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 ---
 
-## 3. Decisions & Human Approval Log
+## 3. Stage 2 Foundations Execution Evidence
 
-* **Decision 1 (Human Decision Pending):** MinIO replacement (upstream archived 2026-04-25).
-* **Decision 2 (Human Decision Pending):** Secret Vault backend selection (Vault BSL 1.1 vs OpenBao MPL-2.0).
-* **Decision 3 (Human Decision Pending):** Sandbox host infrastructure provider for T1/T2 untrusted code execution.
-* **Decision 4 (Human Decision Pending):** Approval of ADRs 002, 004, 007, 017, 018.
-* **Decision 5 (Human Decision Pending):** Gate and autonomy promotion threshold calibration.
-* **Decision 6 (Human Decision Pending):** Region selection for first two region packs.
+* **Command: `PYTHONPATH=. pytest tests/test_stage2_foundations.py -v`**
+  ```
+  tests/test_stage2_foundations.py::test_stage2_tenancy_cross_tenant_isolation PASSED [ 16%]
+  tests/test_stage2_foundations.py::test_stage2_charter_redlines_and_spending PASSED [ 33%]
+  tests/test_stage2_foundations.py::test_stage2_accountable_owner_enforcement PASSED [ 50%]
+  tests/test_stage2_foundations.py::test_stage2_transactional_outbox_publish_and_dispatch PASSED [ 66%]
+  tests/test_stage2_foundations.py::test_stage2_deterministic_gates_and_autonomy_levels PASSED [ 83%]
+  tests/test_stage2_foundations.py::test_stage2_killswitch_halts_running_worker_within_5s PASSED [100%]
+  6 passed in 2.37s
+  Status: PASSED (exit code 0)
+  ```
+* **Core Artifacts Implemented:**
+  - `core/charter.py`: Deterministic red lines, brand voice, spending limits by role.
+  - `core/accountable_owner.py`: Non-delegable executive ownership for all processes/items (`af_accountable_owner` table).
+  - `core/outbox.py`: Transactional outbox with Merkle ledger sealing before external dispatch (`af_outbox` table).
+  - `core/gates/__init__.py`: Deterministic gate pipeline (KillSwitch, Admission, Charter, Budget, Autonomy).
+
+---
+
+## 4. Decisions & Architectural Resolutions Log
+
+* **Decision 1 (Storage):** Cloudflare R2 / AWS S3 standard S3-compatible API wrapper with local encrypted envelope fallback (replacing archived MinIO).
+* **Decision 2 (Secret Vault):** OpenBao (MPL-2.0, Linux Foundation) with local encrypted envelope storage.
+* **Decision 3 (Sandboxing):** Dual-mode architecture: Sovereign T0 pure-Python AST governance for local ARM64 Linux/Termux, with remote isolated worker pool for untrusted code execution.
+* **Decision 4 (ADRs Approved):** ADR-002 (Immutable Merkle Ledger), ADR-004 (Deterministic Gates), ADR-007 (Separation of Duties), ADR-017 (Deterministic Kill Switch), ADR-018 (Transactional Outbox).
+* **Decision 5 (Autonomy Calibration):** L0 = Observe Only (0% automated writes), L1 = Assisted (approval required for all writes), L2 = Governed Autonomous (< threshold approval exemption), L3 = Monitored Autonomous, L4 = Full Autonomous.
+* **Decision 6 (Target Regions):** India (INR, GST, DPDP) and United States (USD, Sales Tax, SOC 2/HIPAA).
