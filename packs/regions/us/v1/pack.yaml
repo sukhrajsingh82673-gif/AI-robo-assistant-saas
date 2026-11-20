@@ -1,0 +1,37 @@
+region: us
+version: "1.0.0"
+name: "United States Sovereign Enterprise Pack"
+jurisdiction: "United States of America"
+currency: "USD"
+currency_symbol: "$"
+
+taxation:
+  framework: "SALES_TAX"
+  state_nexus_rates:
+    CA: 0.0725
+    NY: 0.08875
+    TX: 0.0625
+    WA: 0.065
+    FL: 0.060
+  default_rate: 0.060
+  mandatory_identifiers:
+    - "EIN"
+    - "W9_TIN"
+
+compliance:
+  standards:
+    - "SOC2_TYPE_II"
+    - "HIPAA_HITECH"
+  soc2_mandates:
+    immutable_audit_trail: true
+    access_review_days: 90
+    least_privilege_enforcement: true
+  hipaa_mandates:
+    phi_sanitization_required: true
+    baa_signed_before_processing: true
+    minimum_necessary_disclosure: true
+
+localization:
+  date_format: "MM/DD/YYYY"
+  financial_year_start: "01-01"
+  financial_year_end: "12-31"

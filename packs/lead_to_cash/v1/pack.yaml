@@ -1,0 +1,192 @@
+pack: lead_to_cash
+version: "1.0.0"
+name: "Lead-to-Cash Enterprise Engine"
+description: "End-to-end commercial engine covering inbound marketing qualification, quote generation, contract agreement, invoice billing, and cash collection."
+owner_role: "CMO/CFO"
+trigger_events:
+  - "crm.lead_created"
+  - "web.inbound_inquiry"
+  - "partner.referral_received"
+
+SIPOC:
+  suppliers:
+    - "Marketing Channels"
+    - "Inbound Web Portal"
+    - "Referral Partners"
+  inputs:
+    - "lead_contact"
+    - "company_name"
+    - "estimated_seats"
+    - "requested_tier"
+  process_steps:
+    - "lead_capture"
+    - "lead_qualification"
+    - "quote_generation"
+    - "contract_drafting"
+    - "contract_signing"
+    - "invoice_issuance"
+    - "payment_collection"
+  outputs:
+    - "qualified_lead_id"
+    - "quote_id"
+    - "signed_contract_url"
+    - "invoice_id"
+    - "payment_receipt_id"
+  customers:
+    - "Client Organization"
+    - "Accounts Receivable"
+    - "Customer Success"
+
+steps:
+  - id: "lead_capture"
+    name: "Lead Ingestion and Deduplication"
+    actor: "agent"
+    role: "CMO"
+    tool_capabilities:
+      - "crm.search_contact"
+      - "crm.create_lead"
+    gate_checks:
+      - "KillSwitchGate"
+      - "CharterGate"
+    reversible: true
+
+  - id: "lead_qualification"
+    name: "BANT Qualification Assessment"
+    actor: "agent"
+    role: "CMO"
+    tool_capabilities:
+      - "enrichment.company_profile"
+      - "scoring.bant_evaluator"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "quote_generation"
+    name: "Pricing and Proposal Formulation"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "pricing.calculate_tier"
+      - "discounts.apply_policy"
+    gate_checks:
+      - "BudgetGate"
+      - "CharterGate"
+    reversible: true
+
+  - id: "contract_drafting"
+    name: "Master Services Agreement Formulation"
+    actor: "agent"
+    role: "CLO"
+    tool_capabilities:
+      - "legal.template_generator"
+      - "compliance.jurisdiction_check"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "contract_signing"
+    name: "Dual Execution and Electronic Signature"
+    actor: "human"
+    role: "CEO"
+    tool_capabilities:
+      - "esign.dispatch_envelope"
+      - "esign.verify_signature"
+    gate_checks:
+      - "AutonomyGate"
+    reversible: false
+
+  - id: "invoice_issuance"
+    name: "Tax-Compliant Billing Generation"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "billing.create_invoice"
+      - "tax.calculate_gst_vat"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "payment_collection"
+    name: "Escrow Settlement & Cash Receipt"
+    actor: "system"
+    role: "CFO"
+    tool_capabilities:
+      - "payment.process_settlement"
+      - "ledger.record_receipt"
+    gate_checks:
+      - "AutonomyGate"
+      - "KillSwitchGate"
+    reversible: false
+
+policies:
+  max_discount_percent: 25.0
+  dual_approval_required_above_usd: 10000.0
+  payment_terms_days: 30
+
+KPIs:
+  target_cycle_time_seconds: 86400.0
+  target_first_pass_yield: 0.92
+  target_cost_per_unit_usd: 12.50
+  target_error_rate: 0.015
+  target_customer_satisfaction: 4.8
+
+waste_tags:
+  - "waiting"
+  - "rework"
+  - "handoff"
+  - "defects"
+
+andon:
+  - condition_id: "ANDON-L2C-01"
+    rule_name: "excessive_discount_requested"
+    trigger_expression: "discount_percent > 25"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CFO"
+    description: "Halt process when requested sales discount exceeds Charter maximum policy of 25%."
+
+  - condition_id: "ANDON-L2C-02"
+    rule_name: "sanctioned_entity_detected"
+    trigger_expression: "is_sanctioned == True"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CISO"
+    description: "Emergency halt when company or contact matches national or OFAC sanctions watchlists."
+
+autonomy:
+  current_level: 1
+  promotion_criteria:
+    min_completed_runs: 50
+    min_first_pass_yield: 0.95
+    max_error_rate: 0.01
+    zero_redline_violations: true
+  demotion_criteria:
+    error_rate_threshold: 0.05
+    redline_violation_count: 1
+
+simulation_scenarios:
+  - scenario_id: "SIM-L2C-STANDARD-ENTERPRISE"
+    name: "Standard Enterprise Onboarding"
+    description: "Standard flow for 50-seat corporate customer requesting tier Gold."
+    initial_inputs:
+      lead_contact: "procurement@acmecorp.com"
+      company_name: "Acme International Corp"
+      estimated_seats: 50
+      requested_tier: "enterprise_gold"
+      discount_percent: 10
+      is_sanctioned: False
+    expected_outputs:
+      lead_qualification_output: "processed"
+      invoice_issuance_output: "processed"
+    expected_status: "COMPLETED"
+
+  - scenario_id: "SIM-L2C-ANDON-EXCESSIVE-DISCOUNT"
+    name: "Andon Excessive Discount Trigger"
+    description: "Triggers stop-the-line Andon escalation when discount exceeds 25%."
+    initial_inputs:
+      lead_contact: "bargain@cheapcorp.com"
+      company_name: "Cheap Corp"
+      estimated_seats: 10
+      requested_tier: "starter"
+      discount_percent: 35
+      is_sanctioned: False
+    expected_outputs: {}
+    expected_status: "HALTED_ANDON"

@@ -1,0 +1,200 @@
+{
+  "timestamp": "2026-11-20T12:47:18.453782+00:00",
+  "pypi": {
+    "pydantic": {
+      "version": "2.14.4",
+      "license": "MIT"
+    },
+    "cryptography": {
+      "version": "50.0.2",
+      "license": "Apache-2.0 OR BSD-3-Clause"
+    },
+    "langgraph": {
+      "version": "1.2.24",
+      "license": "MIT"
+    },
+    "opentelemetry-api": {
+      "version": "1.45.2",
+      "license": "Apache-2.0"
+    },
+    "jsonschema": {
+      "version": "4.26.0",
+      "license": "MIT"
+    },
+    "bandit": {
+      "version": "1.9.4",
+      "license": "Apache-2.0"
+    },
+    "pip-audit": {
+      "version": "2.10.1",
+      "license": "non-standard"
+    },
+    "langfuse": {
+      "version": "5.2.0",
+      "license": "MIT"
+    },
+    "deepeval": {
+      "version": "4.3.4",
+      "license": "Apache-2.0"
+    },
+    "ragas": {
+      "version": "0.4.4",
+      "license": "Apache-2.0"
+    },
+    "garak": {
+      "version": "0.17.1",
+      "license": ""
+    },
+    "pyrit": {
+      "version": "1.2.1",
+      "license": "MIT"
+    },
+    "semgrep": {
+      "version": "1.186.0",
+      "license": "LGPL-2.1-or-later"
+    },
+    "mcp": {
+      "version": "2.3.0",
+      "license": "MIT"
+    },
+    "a2a-sdk": {
+      "version": "1.3.1",
+      "license": "Apache-2.0"
+    },
+    "pg8000": {
+      "version": "1.31.6",
+      "license": "BSD-3-Clause"
+    },
+    "PyYAML": {
+      "version": "6.0.3",
+      "license": "MIT"
+    },
+    "numpy": {
+      "version": "2.5.5",
+      "license": "0BSD AND BSD-3-Clause AND CC0-1.0 AND MIT AND Zlib"
+    },
+    "pandas": {
+      "version": "3.1.1",
+      "license": "BSD-3-Clause"
+    },
+    "python-dateutil": {
+      "version": "4.0.0",
+      "license": "BSD-3-Clause"
+    }
+  },
+  "github": {
+    "hashicorp/vault": {
+      "license": "NOASSERTION",
+      "archived": false,
+      "pushed_at": "2026-11-19T23:02:09Z"
+    },
+    "openbao/openbao": {
+      "license": "MPL-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T08:59:15Z"
+    },
+    "minio/minio": {
+      "license": "AGPL-3.0",
+      "archived": true,
+      "pushed_at": "2026-04-24T17:54:39Z"
+    },
+    "temporalio/temporal": {
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-11-20T12:17:13Z"
+    },
+    "keycloak/keycloak": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T05:31:58Z"
+    },
+    "openfga/openfga": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-19T20:20:55Z"
+    },
+    "nats-io/nats-server": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T11:57:44Z"
+    },
+    "open-telemetry/opentelemetry-collector": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T11:28:45Z"
+    },
+    "pgvector/pgvector": {
+      "license": "NOASSERTION",
+      "archived": false,
+      "pushed_at": "2026-11-20T11:41:43Z"
+    },
+    "qdrant/qdrant": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T11:54:23Z"
+    },
+    "google/gvisor": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T09:37:42Z"
+    },
+    "firecracker-microvm/firecracker": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-19T18:53:54Z"
+    },
+    "kata-containers/kata-containers": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T12:00:36Z"
+    },
+    "sigstore/cosign": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T01:00:53Z"
+    },
+    "anchore/syft": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-16T19:59:13Z"
+    },
+    "google/osv-scanner": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T03:36:46Z"
+    },
+    "promptfoo/promptfoo": {
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-11-20T11:01:04Z"
+    },
+    "langfuse/langfuse": {
+      "license": "NOASSERTION",
+      "archived": false,
+      "pushed_at": "2026-11-20T12:47:02Z"
+    },
+    "bagalsharad/agent_factory": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T06:28:26Z"
+    },
+    "mozilla/agent-factory": {
+      "error": "HTTP Error 404: Not Found"
+    },
+    "crewAIInc/crewAI": {
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-11-20T12:34:33Z"
+    },
+    "google/adk-python": {
+      "license": "Apache-2.0",
+      "archived": false,
+      "pushed_at": "2026-11-20T06:29:45Z"
+    },
+    "openai/openai-agents-python": {
+      "license": "MIT",
+      "archived": false,
+      "pushed_at": "2026-11-20T09:42:33Z"
+    }
+  }
+}

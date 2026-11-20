@@ -1,0 +1,184 @@
+pack: procure_to_pay
+version: "1.0.0"
+name: "Procure-to-Pay Enterprise Engine"
+description: "End-to-end enterprise procurement covering requisition intake, vendor screening, purchase orders, 3-way matching, and disbursements."
+owner_role: "CFO/COO"
+trigger_events:
+  - "procurement.requisition_submitted"
+  - "inventory.reorder_point_reached"
+
+SIPOC:
+  suppliers:
+    - "Internal Department Requesters"
+    - "Verified Vendor Catalog"
+  inputs:
+    - "requisition_id"
+    - "item_description"
+    - "requested_quantity"
+    - "estimated_unit_price"
+    - "department_code"
+  process_steps:
+    - "requisition_intake"
+    - "vendor_selection"
+    - "purchase_order_creation"
+    - "po_approval"
+    - "goods_receipt"
+    - "three_way_match"
+    - "payment_disbursement"
+  outputs:
+    - "approved_po_number"
+    - "receiving_slip_id"
+    - "matching_verdict"
+    - "disbursement_ref"
+  customers:
+    - "Requisitioning Department"
+    - "Accounts Payable"
+    - "External Supplier"
+
+steps:
+  - id: "requisition_intake"
+    name: "Intake Validation and Policy Categorization"
+    actor: "agent"
+    role: "COO"
+    tool_capabilities:
+      - "procure.validate_category"
+      - "budget.check_allocation"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "vendor_selection"
+    name: "Supplier Matching and Compliance Verification"
+    actor: "agent"
+    role: "COO"
+    tool_capabilities:
+      - "vendor.lookup_preferred"
+      - "compliance.verify_w9_tax"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "purchase_order_creation"
+    name: "PO Generation and Term Binding"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "erp.create_po"
+    gate_checks:
+      - "BudgetGate"
+    reversible: true
+
+  - id: "po_approval"
+    name: "Accountable Manager Approval Gate"
+    actor: "human"
+    role: "CFO"
+    tool_capabilities:
+      - "approval.record_decision"
+    gate_checks:
+      - "AutonomyGate"
+    reversible: true
+
+  - id: "goods_receipt"
+    name: "Physical or Digital Receipt Verification"
+    actor: "system"
+    role: "COO"
+    tool_capabilities:
+      - "inventory.record_receipt"
+    gate_checks:
+      - "KillSwitchGate"
+    reversible: true
+
+  - id: "three_way_match"
+    name: "Automated 3-Way Reconciliation (PO vs Slip vs Invoice)"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "reconcile.compare_po_invoice_slip"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "payment_disbursement"
+    name: "Bank Wire / ACH Payment Execution"
+    actor: "system"
+    role: "CFO"
+    tool_capabilities:
+      - "bank.dispatch_wire"
+    gate_checks:
+      - "AutonomyGate"
+      - "KillSwitchGate"
+    reversible: false
+
+policies:
+  max_auto_approval_usd: 500.0
+  max_allowed_variance_percent: 2.0
+  require_preferred_vendor: true
+
+KPIs:
+  target_cycle_time_seconds: 172800.0
+  target_first_pass_yield: 0.96
+  target_cost_per_unit_usd: 8.00
+  target_error_rate: 0.005
+
+waste_tags:
+  - "waiting"
+  - "rework"
+  - "over_processing"
+  - "handoff"
+  - "defects"
+
+andon:
+  - condition_id: "ANDON-P2P-01"
+    rule_name: "price_variance_exceeded"
+    trigger_expression: "price_variance_percent > 2"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CFO"
+    description: "Halt line when supplier invoice price differs from PO by more than 2%."
+
+  - condition_id: "ANDON-P2P-02"
+    rule_name: "unapproved_vendor_exception"
+    trigger_expression: "is_approved_vendor == False"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "COO"
+    description: "Halt requisition if vendor is unverified or non-compliant."
+
+autonomy:
+  current_level: 1
+  promotion_criteria:
+    min_completed_runs: 50
+    min_first_pass_yield: 0.98
+    zero_redline_violations: true
+  demotion_criteria:
+    reconcile_failure_count: 2
+    redline_violation_count: 1
+
+simulation_scenarios:
+  - scenario_id: "SIM-P2P-OFFICE-EQUIPMENT"
+    name: "Approved Office IT Purchase"
+    description: "Requisition of 10 monitors from verified Dell partner."
+    initial_inputs:
+      requisition_id: "REQ-2026-901"
+      item_description: "Dell UltraSharp 27 4K Monitors"
+      requested_quantity: 10
+      estimated_unit_price: 350.0
+      department_code: "ENG"
+      is_approved_vendor: True
+      price_variance_percent: 0.5
+    expected_outputs:
+      requisition_intake_output: "processed"
+      payment_disbursement_output: "processed"
+    expected_status: "COMPLETED"
+
+  - scenario_id: "SIM-P2P-ANDON-VARIANCE"
+    name: "Andon Price Variance Trigger"
+    description: "Stops line when supplier raises invoice 8% above original PO."
+    initial_inputs:
+      requisition_id: "REQ-2026-999"
+      item_description: "Cloud Hosting Credits"
+      requested_quantity: 1
+      estimated_unit_price: 5000.0
+      department_code: "OPS"
+      is_approved_vendor: True
+      price_variance_percent: 8.0
+    expected_outputs: {}
+    expected_status: "HALTED_ANDON"
