@@ -1,0 +1,173 @@
+pack: record_to_report
+version: "1.0.0"
+name: "Record-to-Report Financial Engine"
+description: "End-to-end statutory and management accounting engine covering journal entry ingestion, subledger reconciliation, variance analysis, period-end close, financial reporting, and tax-ready export generation."
+owner_role: "CFO"
+trigger_events:
+  - "finance.period_close_triggered"
+  - "finance.journal_entry_received"
+  - "finance.reconciliation_scheduled"
+
+SIPOC:
+  suppliers:
+    - "Accounts Receivable"
+    - "Accounts Payable"
+    - "Payroll Subledger"
+    - "Treasury Banking Feeds"
+  inputs:
+    - "journal_entries"
+    - "bank_statement_lines"
+    - "subledger_balances"
+    - "fx_rates"
+  process_steps:
+    - "journal_ingestion"
+    - "subledger_reconciliation"
+    - "variance_analysis"
+    - "period_end_close"
+    - "financial_statement_generation"
+    - "tax_export_packaging"
+  outputs:
+    - "reconciled_trial_balance"
+    - "financial_statements_pack"
+    - "tax_audit_package"
+  customers:
+    - "Executive Board"
+    - "External Auditors"
+    - "Tax Authorities"
+    - "CFO & Finance Leadership"
+
+steps:
+  - id: "journal_ingestion"
+    name: "Journal Entry Intake & Double-Entry Verification"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "accounting.ingest_journals"
+      - "ledger.validate_double_entry"
+    gate_checks:
+      - "KillSwitchGate"
+      - "CharterGate"
+    reversible: true
+
+  - id: "subledger_reconciliation"
+    name: "Automated Subledger & Bank Feeds Reconciliation"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "reconciliation.match_bank_feeds"
+      - "ledger.identify_discrepancies"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "variance_analysis"
+    name: "Flux & Materiality Variance Analysis"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "analytics.calculate_flux"
+      - "policy.check_materiality_threshold"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "period_end_close"
+    name: "Statutory Period-End Close & Sign-Off"
+    actor: "human"
+    role: "CFO"
+    tool_capabilities:
+      - "accounting.lock_ledger_period"
+      - "signoff.record_executive_approval"
+    gate_checks:
+      - "AutonomyGate"
+    reversible: false
+
+  - id: "financial_statement_generation"
+    name: "Balance Sheet, Income Statement & Cashflow Formulation"
+    actor: "agent"
+    role: "CFO"
+    tool_capabilities:
+      - "reporting.generate_balance_sheet"
+      - "reporting.generate_income_statement"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "tax_export_packaging"
+    name: "Cryptographic Tax & Statutory Audit Seal"
+    actor: "system"
+    role: "CFO"
+    tool_capabilities:
+      - "tax.generate_statutory_export"
+      - "ledger.seal_audit_pack"
+    gate_checks:
+      - "KillSwitchGate"
+      - "AutonomyGate"
+    reversible: false
+
+policies:
+  materiality_variance_limit_usd: 5000.0
+  reconciliation_tolerance_usd: 0.01
+  lockout_window_days_after_close: 5
+
+KPIs:
+  target_cycle_time_seconds: 14400.0
+  target_first_pass_yield: 0.98
+  target_cost_per_unit_usd: 25.0
+  target_error_rate: 0.005
+  target_customer_satisfaction: 4.9
+
+waste_tags:
+  - "waiting"
+  - "rework"
+  - "over-processing"
+  - "defects"
+
+andon:
+  - condition_id: "ANDON-R2R-01"
+    rule_name: "unbalanced_double_entry_variance"
+    trigger_expression: "reconciliation_variance > 0.01"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CFO"
+    description: "Halt close immediately if debits and credits do not reconcile within tolerance."
+
+  - condition_id: "ANDON-R2R-02"
+    rule_name: "material_unexplained_variance"
+    trigger_expression: "unexplained_variance_usd > 5000"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CFO"
+    description: "Halt process when unexplained flux exceeds the $5,000 corporate materiality policy."
+
+autonomy:
+  current_level: 1
+  promotion_criteria:
+    min_completed_runs: 24
+    min_first_pass_yield: 0.99
+    max_error_rate: 0.005
+    zero_redline_violations: true
+  demotion_criteria:
+    error_rate_threshold: 0.02
+    redline_violation_count: 1
+
+simulation_scenarios:
+  - scenario_id: "SIM-R2R-STANDARD-CLOSE"
+    name: "Standard Period End Close"
+    description: "Standard month-end financial close with balanced subledgers and within variance limits."
+    initial_inputs:
+      period: "2026-11"
+      reconciliation_variance: 0.00
+      unexplained_variance_usd: 250.0
+    expected_outputs:
+      journal_ingestion_output: "processed"
+      financial_statement_generation_output: "processed"
+    expected_status: "COMPLETED"
+
+  - scenario_id: "SIM-R2R-ANDON-UNBALANCED-LEDGER"
+    name: "Andon Unbalanced Double Entry Trigger"
+    description: "Triggers stop-the-line Andon escalation when debits and credits differ."
+    initial_inputs:
+      period: "2026-11"
+      reconciliation_variance: 1450.50
+      unexplained_variance_usd: 12000.0
+    expected_outputs: {}
+    expected_status: "HALTED_ANDON"

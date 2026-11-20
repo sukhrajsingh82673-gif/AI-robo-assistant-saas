@@ -34,15 +34,15 @@
 - **Stage 1:** Codebase audit, license inventory, gap analysis (`zonata/audit`).
 - **Stage 2:** Foundations & Governance Core (`core/charter.py`, `core/accountable_owner.py`, `core/outbox.py`, `core/gates/`).
 - **Stage 3:** Router/Worker Runtime (`core/ura_router.py`, `af_work_items`, `af_thread_subscriptions`).
-- **Stage 4:** Process Pack Framework & 3 enterprise packs (`Lead-to-Cash`, `Procure-to-Pay`, `Support-to-Resolution`).
+- **Stage 4:** Process Pack Framework & 7 full enterprise packs (`Lead-to-Cash`, `Procure-to-Pay`, `Support-to-Resolution`, `Record-to-Report`, `Hire-to-Retire`, `Plan-to-Deliver`, `Compliance-and-Risk`).
 - **Stage 5:** Agent Factory Bridge wiring declarative specs into Process Packs (`core/factory_integration.py`).
-- **Stage 6:** Production adapters (Payment, Email, Calendar, CRM, S3) & Region Packs (India GST/DPDP, US Sales Tax/HIPAA).
+- **Stage 6:** Production adapters (Payment, Email, Calendar, CRM, S3) & Region Packs (India GST/DPDP, US Sales Tax/HIPAA, EU VAT/GDPR ROPA).
 - **Stage 7:** Kaizen Evaluation Engine, waste detector, and shadow-mode optimizer (`core/kaizen/`).
 - **Stage 8:** Hardening & Red-Team Security Suite (prompt injection defense, SSRF blocking, WORM AES-256 backup).
 - **Stage 9:** Pilot Deployment Simulation (Apex Global Technologies), L0 observe cycle, and evidence-backed L1 promotion (`docs/zonata-build/PILOT_REPORT.md`).
 
 ## Verification Summary
-- **Stage 2–9 Master Suite:** 37/37 tests passed (`pytest tests/test_stage*.py`).
+- **Stage 2–9 Master Suite & Extended Coverage:** 40/40 tests passed (`pytest tests/test_stage*.py tests/test_extended_coverage.py`).
 - **Agent Factory Acceptance Suite:** 84/84 tests passed (`pytest tests/agent_factory/`).
 - **Frontend & Baseline Suite:** `build`, `typecheck`, `lint`, and assistant contract tests passed with zero regressions.
 - **Git Remote Synchronization:** All stage branches committed and pushed to `origin`.

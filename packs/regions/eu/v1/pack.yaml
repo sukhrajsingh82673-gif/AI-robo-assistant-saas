@@ -1,0 +1,51 @@
+region: eu
+version: "1.0.0"
+name: "European Union & EEA Sovereign Compliance Pack"
+currency: "EUR"
+date_format: "DD/MM/YYYY"
+number_format: "1.234,56"
+time_zones:
+  - "Europe/Berlin"
+  - "Europe/Paris"
+  - "Europe/London"
+  - "Europe/Amsterdam"
+
+taxation:
+  framework: "EU_VAT"
+  standard_rate: 0.20
+  member_states:
+    DE: 0.19
+    FR: 0.20
+    NL: 0.21
+    IE: 0.23
+    ES: 0.21
+    IT: 0.22
+  rules:
+    b2b_cross_border:
+      reverse_charge: true
+      vat_rate: 0.00
+      requires_valid_vies_vat_id: true
+    b2c_domestic:
+      destination_vat_rate_applicable: true
+
+privacy_mandates:
+  framework: "GDPR"
+  legal_bases:
+    - "consent"
+    - "contractual_necessity"
+    - "legal_obligation"
+    - "legitimate_interests"
+  mandates:
+    article_17_right_to_erasure: true
+    article_30_records_of_processing: true
+    data_protection_officer_required: true
+    breach_notification_sla_hours: 72
+  cross_border_transfers:
+    adequacy_decision_required: true
+    standard_contractual_clauses_supported: true
+
+data_residency:
+  default_storage_region: "eu-central-1"
+  model_inference_endpoints:
+    - "eu-west-1"
+    - "eu-central-1"

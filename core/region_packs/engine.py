@@ -1,8 +1,9 @@
 """ZONATA Sovereign Core — Regional Compliance & Tax Engine.
 
-Implements Stage 6 Regional Packs:
+Implements Stage 6 & Global Readiness Regional Packs:
 - India Pack: INR currency, GST calculations (intra vs inter-state), DPDP 2023 consent validation.
 - US Pack: USD currency, State Sales Tax nexus calculations, SOC 2 audit checks, HIPAA PHI sanitization.
+- EU Pack: EUR currency, EU VAT (B2B cross-border reverse charge vs B2C destination rate), GDPR Article 30 ROPA verification.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 logger = logging.getLogger("zonata.core.region_packs")
@@ -36,7 +37,7 @@ class RegionalComplianceEngine:
         self._load_available_packs()
 
     def _load_available_packs(self):
-        for reg in ["india", "us"]:
+        for reg in ["india", "us", "eu"]:
             pack_path = os.path.join(self.packs_dir, reg, "v1", "pack.yaml")
             if os.path.exists(pack_path):
                 with open(pack_path, "r", encoding="utf-8") as f:
@@ -105,6 +106,31 @@ class RegionalComplianceEngine:
                 region="us"
             )
 
+        # 3. European Union VAT Calculation
+        if reg == "eu":
+            is_b2b = context.get("is_b2b", False)
+            vies_vat_id = context.get("vies_vat_id")
+            member_state = context.get("member_state", "DE").upper()
+
+            # B2B Cross-Border with valid VIES VAT ID -> 0% Reverse Charge
+            if is_b2b and vies_vat_id:
+                tax_amt = 0.0
+                breakdown = {"EU_VAT_REVERSE_CHARGE": 0.0}
+            else:
+                member_rates = pack["taxation"].get("member_states", {})
+                rate = member_rates.get(member_state, pack["taxation"].get("standard_rate", 0.20))
+                tax_amt = round(amount * rate, 2)
+                breakdown = {f"EU_VAT_{member_state}": tax_amt}
+
+            return TaxCalculationResult(
+                base_amount=amount,
+                tax_amount=tax_amt,
+                total_amount=round(amount + tax_amt, 2),
+                currency=currency,
+                tax_breakdown=breakdown,
+                region="eu"
+            )
+
         raise NotImplementedError(f"Tax logic not implemented for region '{region_code}'.")
 
     def validate_dpdp_compliance(self, consent_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -124,6 +150,30 @@ class RegionalComplianceEngine:
         return {
             "compliant": len(errors) == 0,
             "law": "DPDP_2023",
+            "errors": errors
+        }
+
+    def validate_gdpr_ropa(self, processing_activity: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates compliance with GDPR Article 30 Records of Processing Activities (ROPA)."""
+        legal_basis = processing_activity.get("legal_basis")
+        categories_of_data = processing_activity.get("data_categories", [])
+        retention_period = processing_activity.get("retention_days")
+        has_dpo = processing_activity.get("dpo_contact") is not None
+
+        errors = []
+        valid_bases = ["consent", "contractual_necessity", "legal_obligation", "legitimate_interests"]
+        if legal_basis not in valid_bases:
+            errors.append(f"GDPR Violation: Invalid legal basis '{legal_basis}'. Must be one of {valid_bases}.")
+        if not categories_of_data:
+            errors.append("GDPR Violation: Article 30 requires explicit categorization of personal data processed.")
+        if not retention_period or retention_period <= 0:
+            errors.append("GDPR Violation: Data retention period must be explicitly defined and greater than 0.")
+        if not has_dpo:
+            errors.append("GDPR Violation: Data Protection Officer (DPO) contact must be recorded for corporate ROPA.")
+
+        return {
+            "compliant": len(errors) == 0,
+            "law": "GDPR_ARTICLE_30",
             "errors": errors
         }
 
