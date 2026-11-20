@@ -205,9 +205,15 @@ class ThreadSubscriptionRegistry:
         with self.db_conn_factory() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO af_thread_subscriptions
+                INSERT INTO af_thread_subscriptions
                 (thread_id, tenant_id, work_item_id, worker_id, assigned_role, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (thread_id) DO UPDATE SET
+                    tenant_id = excluded.tenant_id,
+                    work_item_id = excluded.work_item_id,
+                    worker_id = excluded.worker_id,
+                    assigned_role = excluded.assigned_role,
+                    updated_at = excluded.updated_at
                 """,
                 (thread_id, tenant_id, work_item_id, worker_id, assigned_role, now, now)
             )
@@ -765,13 +771,38 @@ class URARouter:
         with self.db_conn_factory() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO af_work_items (
+                INSERT INTO af_work_items (
                     work_item_id, tenant_id, company_id, title, description, admission_strength,
                     status, target_role, autonomy_level, accountable_owner_id, session_id,
                     thread_id, requester_id, is_human_operator, assigned_worker_id,
                     budget_token_limit, budget_cost_usd_limit, tokens_used, cost_usd_used,
                     result, error, evidence_id, metadata, created_at, updated_at, finished_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (work_item_id) DO UPDATE SET
+                    tenant_id = excluded.tenant_id,
+                    company_id = excluded.company_id,
+                    title = excluded.title,
+                    description = excluded.description,
+                    admission_strength = excluded.admission_strength,
+                    status = excluded.status,
+                    target_role = excluded.target_role,
+                    autonomy_level = excluded.autonomy_level,
+                    accountable_owner_id = excluded.accountable_owner_id,
+                    session_id = excluded.session_id,
+                    thread_id = excluded.thread_id,
+                    requester_id = excluded.requester_id,
+                    is_human_operator = excluded.is_human_operator,
+                    assigned_worker_id = excluded.assigned_worker_id,
+                    budget_token_limit = excluded.budget_token_limit,
+                    budget_cost_usd_limit = excluded.budget_cost_usd_limit,
+                    tokens_used = excluded.tokens_used,
+                    cost_usd_used = excluded.cost_usd_used,
+                    result = excluded.result,
+                    error = excluded.error,
+                    evidence_id = excluded.evidence_id,
+                    metadata = excluded.metadata,
+                    updated_at = excluded.updated_at,
+                    finished_at = excluded.finished_at
                 """,
                 (
                     wi.work_item_id,

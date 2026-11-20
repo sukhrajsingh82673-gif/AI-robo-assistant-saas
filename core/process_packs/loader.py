@@ -137,7 +137,10 @@ class ProcessPackLoader:
             steps=steps,
             policies=data.get("policies", {}),
             kpis=kpis,
-            waste_tags=data.get("waste_tags", []),
+            waste_tags=[
+                {"over-processing": "over_processing"}.get(tag, tag)
+                for tag in data.get("waste_tags", [])
+            ],
             andon=andon_rules,
             autonomy=autonomy,
             simulation_scenarios=scenarios
@@ -166,9 +169,17 @@ class ProcessPackLoader:
         with self.db_conn_factory() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO af_process_packs
+                INSERT INTO af_process_packs
                 (pack_id, version, name, owner_role, current_autonomy_level, definition, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
+                ON CONFLICT (pack_id) DO UPDATE SET
+                    version = excluded.version,
+                    name = excluded.name,
+                    owner_role = excluded.owner_role,
+                    current_autonomy_level = excluded.current_autonomy_level,
+                    definition = excluded.definition,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at
                 """,
                 (
                     pack.pack_id,

@@ -17,6 +17,26 @@ import yaml
 
 logger = logging.getLogger("zonata.core.region_packs")
 
+_DEFAULT_PACKS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "packs",
+    "regions",
+)
+
+# Structural check only: two-letter country prefix plus 8-12 alphanumerics.
+# A live VIES lookup is a separate integration and is not performed offline.
+_EU_VAT_ID_RE = re.compile(r"^[A-Z]{2}[0-9A-Z]{8,12}$")
+
+_GDPR_LEGAL_BASES = {
+    "consent",
+    "contract",
+    "legal_obligation",
+    "vital_interests",
+    "public_task",
+    "legitimate_interests",
+}
+_GDPR_LEGAL_BASIS_ALIASES = {"contractual_necessity": "contract"}
+
 
 @dataclass
 class TaxCalculationResult:
@@ -31,8 +51,8 @@ class TaxCalculationResult:
 class RegionalComplianceEngine:
     """Manages regional tax rules and compliance mandates across sovereign regions."""
 
-    def __init__(self, packs_dir: str = "packs/regions"):
-        self.packs_dir = packs_dir
+    def __init__(self, packs_dir: Optional[str] = None):
+        self.packs_dir = packs_dir or _DEFAULT_PACKS_DIR
         self.packs: Dict[str, Dict[str, Any]] = {}
         self._load_available_packs()
 
@@ -108,17 +128,31 @@ class RegionalComplianceEngine:
 
         # 3. European Union VAT Calculation
         if reg == "eu":
-            is_b2b = context.get("is_b2b", False)
-            vies_vat_id = context.get("vies_vat_id")
-            member_state = context.get("member_state", "DE").upper()
+            member_rates = {
+                str(k).upper(): float(v)
+                for k, v in pack.get("taxation", {}).get("member_states", {}).items()
+            }
+            member_state = str(context.get("member_state") or "").upper()
+            if not member_state:
+                raise ValueError("EU tax calculation requires an explicit 'member_state'.")
+            if member_state not in member_rates:
+                raise ValueError(
+                    f"Unsupported EU member state '{member_state}': no verified VAT rate configured."
+                )
 
-            # B2B Cross-Border with valid VIES VAT ID -> 0% Reverse Charge
-            if is_b2b and vies_vat_id:
+            is_b2b = bool(context.get("is_b2b", False))
+            supplier_state = str(context.get("supplier_member_state") or "").upper()
+            vat_id = str(context.get("vies_vat_id") or "").strip().upper()
+            vat_id_valid = bool(_EU_VAT_ID_RE.match(vat_id)) and vat_id[:2] == member_state
+            cross_border = supplier_state in member_rates and supplier_state != member_state
+
+            # Reverse charge applies only to a cross-border B2B supply whose
+            # customer VAT ID is structurally valid and issued by the customer state.
+            if is_b2b and vat_id_valid and cross_border:
                 tax_amt = 0.0
                 breakdown = {"EU_VAT_REVERSE_CHARGE": 0.0}
             else:
-                member_rates = pack["taxation"].get("member_states", {})
-                rate = member_rates.get(member_state, pack["taxation"].get("standard_rate", 0.20))
+                rate = member_rates[member_state]
                 tax_amt = round(amount * rate, 2)
                 breakdown = {f"EU_VAT_{member_state}": tax_amt}
 
@@ -154,22 +188,48 @@ class RegionalComplianceEngine:
         }
 
     def validate_gdpr_ropa(self, processing_activity: Dict[str, Any]) -> Dict[str, Any]:
-        """Validates compliance with GDPR Article 30 Records of Processing Activities (ROPA)."""
-        legal_basis = processing_activity.get("legal_basis")
-        categories_of_data = processing_activity.get("data_categories", [])
-        retention_period = processing_activity.get("retention_days")
-        has_dpo = processing_activity.get("dpo_contact") is not None
+        """Validates the mandatory Article 30 ROPA fields for a processing activity.
 
-        errors = []
-        valid_bases = ["consent", "contractual_necessity", "legal_obligation", "legitimate_interests"]
-        if legal_basis not in valid_bases:
-            errors.append(f"GDPR Violation: Invalid legal basis '{legal_basis}'. Must be one of {valid_bases}.")
+        DPO contact is required only when the activity explicitly sets
+        ``requires_dpo`` (GDPR Art. 37), not for every ROPA entry.
+        """
+        errors: List[str] = []
+
+        legal_basis = processing_activity.get("legal_basis")
+        if isinstance(legal_basis, str):
+            legal_basis = legal_basis.strip().lower()
+            legal_basis = _GDPR_LEGAL_BASIS_ALIASES.get(legal_basis, legal_basis)
+        if legal_basis not in _GDPR_LEGAL_BASES:
+            errors.append(
+                f"GDPR Violation: Invalid legal basis '{legal_basis}'. "
+                f"Must be one of {sorted(_GDPR_LEGAL_BASES)}."
+            )
+
+        controller = processing_activity.get("controller_identity") or processing_activity.get("controller")
+        if not str(controller or "").strip():
+            errors.append("GDPR Violation: Controller identity and contact details must be recorded.")
+
+        purposes = processing_activity.get("purposes")
+        if not purposes:
+            errors.append("GDPR Violation: Processing purposes must be explicitly recorded.")
+
+        categories_of_data = processing_activity.get("data_categories")
         if not categories_of_data:
             errors.append("GDPR Violation: Article 30 requires explicit categorization of personal data processed.")
-        if not retention_period or retention_period <= 0:
-            errors.append("GDPR Violation: Data retention period must be explicitly defined and greater than 0.")
-        if not has_dpo:
-            errors.append("GDPR Violation: Data Protection Officer (DPO) contact must be recorded for corporate ROPA.")
+
+        retention_period = processing_activity.get("retention_days")
+        if isinstance(retention_period, bool) or not isinstance(retention_period, (int, float)):
+            errors.append("GDPR Violation: Data retention period must be a numeric number of days.")
+        elif retention_period <= 0:
+            errors.append("GDPR Violation: Data retention period must be greater than 0.")
+
+        requires_dpo = bool(processing_activity.get("requires_dpo", False))
+        has_dpo = bool(str(processing_activity.get("dpo_contact") or "").strip())
+        if requires_dpo and not has_dpo:
+            errors.append("GDPR Violation: DPO contact is required for this activity under Article 37.")
+
+        if processing_activity.get("third_country_transfers") and not processing_activity.get("transfer_safeguards"):
+            errors.append("GDPR Violation: Third-country transfers require a recorded transfer safeguard.")
 
         return {
             "compliant": len(errors) == 0,

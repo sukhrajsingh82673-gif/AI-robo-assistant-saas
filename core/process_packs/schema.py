@@ -10,9 +10,61 @@ Implements Section 5 of ZONATA Master Prompt:
 
 from __future__ import annotations
 
+import ast
 import enum
 from dataclasses import asdict, dataclass, field
+from types import CodeType
 from typing import Any, Dict, List, Optional, Set
+
+
+_ALLOWED_ANDON_NODES = (
+    ast.Expression,
+    ast.BoolOp,
+    ast.And,
+    ast.Or,
+    ast.UnaryOp,
+    ast.Not,
+    ast.USub,
+    ast.UAdd,
+    ast.Compare,
+    ast.Eq,
+    ast.NotEq,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.In,
+    ast.NotIn,
+    ast.Is,
+    ast.IsNot,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.BinOp,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Mod,
+    ast.Tuple,
+    ast.List,
+)
+
+
+def compile_andon_expression(expression: str) -> CodeType:
+    """Compiles an Andon expression after rejecting calls/attributes/subscripts."""
+    if not isinstance(expression, str) or not expression.strip():
+        raise ValueError("Andon trigger_expression must be a non-empty string.")
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"Invalid Andon expression: {exc}") from exc
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_ANDON_NODES):
+            raise ValueError(
+                f"Andon expression uses disallowed syntax: {type(node).__name__}"
+            )
+    return compile(tree, "<andon>", "eval")
 
 
 class WasteTag(str, enum.Enum):
@@ -124,10 +176,22 @@ class ProcessPack:
             if p_step not in step_ids:
                 errors.append(f"SIPOC references unknown process step: '{p_step}'.")
 
+        # Verify waste tags use the canonical token set
+        valid_waste_tags = {tag.value for tag in WasteTag}
+        for tag in self.waste_tags:
+            if tag not in valid_waste_tags:
+                errors.append(
+                    f"Unknown waste tag '{tag}'. Must be one of {sorted(valid_waste_tags)}."
+                )
+
         # Verify Andon rules
         for andon in self.andon:
             if andon.action not in ("HALT_AND_ESCALATE", "FLAG_FOR_REVIEW"):
                 errors.append(f"Andon rule '{andon.condition_id}' has invalid action '{andon.action}'.")
+            try:
+                compile_andon_expression(andon.trigger_expression)
+            except ValueError as exc:
+                errors.append(f"Andon rule '{andon.condition_id}': {exc}")
 
         # Verify Autonomy levels (L0-L4)
         if self.autonomy.current_level not in (0, 1, 2, 3, 4):

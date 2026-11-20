@@ -7,19 +7,64 @@ number_format: "1.234,56"
 time_zones:
   - "Europe/Berlin"
   - "Europe/Paris"
-  - "Europe/London"
   - "Europe/Amsterdam"
+  - "Europe/Dublin"
+  - "Europe/Madrid"
+  - "Europe/Rome"
+  - "Europe/Vienna"
+  - "Europe/Brussels"
+  - "Europe/Copenhagen"
+  - "Europe/Stockholm"
+  - "Europe/Helsinki"
+  - "Europe/Lisbon"
+  - "Europe/Prague"
+  - "Europe/Warsaw"
+  - "Europe/Budapest"
+  - "Europe/Bucharest"
+  - "Europe/Sofia"
+  - "Europe/Zagreb"
+  - "Europe/Ljubljana"
+  - "Europe/Bratislava"
+  - "Europe/Athens"
+  - "Europe/Vilnius"
+  - "Europe/Riga"
+  - "Europe/Tallinn"
+  - "Europe/Luxembourg"
+  - "Europe/Malta"
+  - "Asia/Nicosia"
 
 taxation:
   framework: "EU_VAT"
   standard_rate: 0.20
+  # Standard VAT rates for all 27 EU member states (review annually).
   member_states:
+    AT: 0.20
+    BE: 0.21
+    BG: 0.20
+    CY: 0.19
+    CZ: 0.21
     DE: 0.19
-    FR: 0.20
-    NL: 0.21
-    IE: 0.23
+    DK: 0.25
+    EE: 0.22
     ES: 0.21
+    FI: 0.255
+    FR: 0.20
+    GR: 0.24
+    HR: 0.25
+    HU: 0.27
+    IE: 0.23
     IT: 0.22
+    LT: 0.21
+    LU: 0.17
+    LV: 0.21
+    MT: 0.18
+    NL: 0.21
+    PL: 0.23
+    PT: 0.23
+    RO: 0.21
+    SE: 0.25
+    SI: 0.22
+    SK: 0.23
   rules:
     b2b_cross_border:
       reverse_charge: true
@@ -32,13 +77,17 @@ privacy_mandates:
   framework: "GDPR"
   legal_bases:
     - "consent"
-    - "contractual_necessity"
+    - "contract"
     - "legal_obligation"
+    - "vital_interests"
+    - "public_task"
     - "legitimate_interests"
   mandates:
     article_17_right_to_erasure: true
     article_30_records_of_processing: true
-    data_protection_officer_required: true
+    # DPO is mandatory only for Article 37 triggers (public authority,
+    # large-scale monitoring, or large-scale special-category processing).
+    data_protection_officer_required: false
     breach_notification_sla_hours: 72
   cross_border_transfers:
     adequacy_decision_required: true

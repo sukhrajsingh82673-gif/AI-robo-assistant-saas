@@ -273,10 +273,13 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 
 * **Command: `PYTHONPATH=. pytest tests/test_extended_coverage.py -v`**
   ```
-  tests/test_extended_coverage.py::test_all_seven_enterprise_process_packs_load_and_validate PASSED [ 33%]
-  tests/test_extended_coverage.py::test_simulation_and_andon_across_all_extended_packs PASSED [ 66%]
-  tests/test_extended_coverage.py::test_european_union_vat_and_gdpr PASSED [100%]
-  3 passed in 1.33s
+  tests/test_extended_coverage.py::test_all_seven_enterprise_process_packs_load_and_validate PASSED
+  tests/test_extended_coverage.py::test_simulation_and_andon_across_all_extended_packs PASSED
+  tests/test_extended_coverage.py::test_european_union_vat PASSED
+  tests/test_extended_coverage.py::test_gdpr_ropa PASSED
+  tests/test_extended_coverage.py::test_andon_expression_is_sandboxed PASSED
+  tests/test_extended_coverage.py::test_loader_rejects_non_canonical_waste_tag_and_unsafe_andon PASSED
+  6 passed in 1.34s
   Status: PASSED (exit code 0)
   ```
 * **Full 7 Core Business Process Packs Implemented & Validated:**
@@ -290,7 +293,8 @@ Total passing automated tests: **420+ passed, 0 regressions.**
 * **Global Readiness Expansion:**
   - `packs/regions/eu/v1/pack.yaml`: EUR currency, EU VAT with B2B cross-border reverse charge and domestic member state rates, and GDPR Article 30 Records of Processing Activities (ROPA).
   - Multi-jurisdictional compliance across India (DPDP/GST), USA (SOC2/HIPAA/Sales Tax), and EU (GDPR/VAT).
+  - Supervisor correction (2026-11-20): reverse charge now requires a structurally valid VAT ID issued by the customer state and a cross-border EU supplier; unknown or missing member states fail closed; ROPA enforces Article 30 fields with an Article 37-conditional DPO; Andon expressions are AST-sandboxed.
 * **Master Test Suite Execution Evidence:**
   - `PYTHONPATH=. pytest tests/test_stage2_foundations.py tests/test_stage3_router_worker.py tests/test_stage4_process_packs.py tests/test_stage5_factory_integration.py tests/test_stage6_adapters_global.py tests/test_stage7_kaizen.py tests/test_stage8_hardening.py tests/test_stage9_pilot.py tests/test_extended_coverage.py -v`
-  - Result: **40 passed in 7.82s (100% passing across all 10 Stages and all 7 Process Packs).**
+  - Result: **43 passed in 7.96s (100% passing across all 10 Stages and all 7 Process Packs).**
 

@@ -18,7 +18,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.db import db
 from core.gates import DeterministicGatePipeline, GateResult
-from core.process_packs.schema import AndonRule, ProcessPack, ProcessStep, WasteTag
+from core.process_packs.schema import (
+    AndonRule,
+    ProcessPack,
+    ProcessStep,
+    WasteTag,
+    compile_andon_expression,
+)
 from agent_factory.ports import EvidenceEvent
 from agent_factory.adapters.zonata import ZonataEvidenceAdapter
 
@@ -142,15 +148,22 @@ class ProcessExecutionEngine:
     def evaluate_andon(self, pack: ProcessPack, context: Dict[str, Any]) -> Optional[AndonRule]:
         """Evaluates deterministic stop-the-line conditions (Andon cord)."""
         for andon in pack.andon:
-            expr = andon.trigger_expression
             try:
-                # Safe evaluation against context variables
-                # e.g., "discount_percent > 25", "price_diff_percent > 2"
-                local_scope = dict(context)
-                if eval(expr, {"__builtins__": {}}, local_scope):
+                # Expressions are AST-validated at load time: no calls,
+                # attributes, subscripts, or imports can appear here.
+                code = compile_andon_expression(andon.trigger_expression)
+                if eval(code, {"__builtins__": {}}, dict(context)):
                     return andon
-            except Exception as e:
-                logger.debug(f"Andon evaluation skipped for '{andon.condition_id}': {e}")
+            except NameError as exc:
+                logger.warning(
+                    "Andon rule '%s' skipped: missing context input (%s)",
+                    andon.condition_id,
+                    exc,
+                )
+            except ValueError as exc:
+                logger.error("Andon rule '%s' rejected: %s", andon.condition_id, exc)
+            except Exception as exc:
+                logger.error("Andon rule '%s' evaluation failed: %s", andon.condition_id, exc)
         return None
 
     def execute_next_step(
@@ -293,10 +306,23 @@ class ProcessExecutionEngine:
         with self.db_conn_factory() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO af_process_instances
+                INSERT INTO af_process_instances
                 (instance_id, tenant_id, company_id, pack_id, pack_version, status,
                  current_step_index, context_data, records, andon_incident, total_cost_usd, started_at, finished_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (instance_id) DO UPDATE SET
+                    tenant_id = excluded.tenant_id,
+                    company_id = excluded.company_id,
+                    pack_id = excluded.pack_id,
+                    pack_version = excluded.pack_version,
+                    status = excluded.status,
+                    current_step_index = excluded.current_step_index,
+                    context_data = excluded.context_data,
+                    records = excluded.records,
+                    andon_incident = excluded.andon_incident,
+                    total_cost_usd = excluded.total_cost_usd,
+                    started_at = excluded.started_at,
+                    finished_at = excluded.finished_at
                 """,
                 (
                     inst.instance_id,

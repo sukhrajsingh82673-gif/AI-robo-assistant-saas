@@ -88,11 +88,20 @@ class AccountableOwnerRegistry:
 
         with self._get_connection() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO af_accountable_owner (
+                INSERT INTO af_accountable_owner (
                     id, tenant_id, company_id, subject_kind, subject_id,
                     owner_principal_id, owner_name, owner_email,
                     legal_jurisdiction, status, created_at, verified_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
+                ON CONFLICT (tenant_id, subject_kind, subject_id) DO UPDATE SET
+                    id = excluded.id,
+                    company_id = excluded.company_id,
+                    owner_principal_id = excluded.owner_principal_id,
+                    owner_name = excluded.owner_name,
+                    owner_email = excluded.owner_email,
+                    legal_jurisdiction = excluded.legal_jurisdiction,
+                    status = 'ACTIVE',
+                    verified_at = excluded.verified_at
             """, (
                 record_id, tenant_id, company_id, subject_kind, subject_id,
                 owner_principal_id, owner_name, owner_email,

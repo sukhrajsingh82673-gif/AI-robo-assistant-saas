@@ -107,7 +107,7 @@ KPIs:
 
 waste_tags:
   - "waiting"
-  - "over-processing"
+  - "over_processing"
   - "handoff"
   - "defects"
 

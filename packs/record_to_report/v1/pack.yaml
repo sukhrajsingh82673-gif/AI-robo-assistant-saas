@@ -120,7 +120,7 @@ KPIs:
 waste_tags:
   - "waiting"
   - "rework"
-  - "over-processing"
+  - "over_processing"
   - "defects"
 
 andon:
