@@ -1504,6 +1504,147 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(payload, status=status_code)
             return
 
+        # OpenCode Step 1C: System Capabilities Truth API (Admin only, zero secrets)
+        if path == "/api/system/capabilities":
+            role = str(auth_context.get("role") or "").lower()
+            allowed_roles = {"owner", "admin", "global_admin", "executive"}
+            if role not in allowed_roles:
+                self._send_json({
+                    "error": "Forbidden",
+                    "detail": "Admin or Owner role required to access sovereign capability truth table."
+                }, status=403)
+                return
+
+            from core.capability_probe import probe_all_capabilities, summarize_capabilities
+            probe_results = probe_all_capabilities()
+            summary = summarize_capabilities(probe_results)
+
+            plain_language_map = {
+                "OK": "live",
+                "ACCEPTED_BY_PROVIDER": "live",
+                "SANDBOX": "test only",
+                "NOT_CONFIGURED": "not connected",
+                "DEGRADED": "degraded",
+                "NOT_IMPLEMENTED": "not implemented",
+                "FAILED": "failed",
+            }
+
+            cleaned_capabilities = {}
+            for cap_name, res in sorted(probe_results.items()):
+                data = res.to_dict()
+                st = data["status"]
+                data["plain_language"] = plain_language_map.get(st, st.lower())
+                # Secret scrub (Rule 10)
+                meta = data.get("metadata", {})
+                safe_meta = {}
+                for k, v in meta.items():
+                    if any(secret_term in k.lower() for secret_term in ["token", "key", "password", "secret", "credential"]):
+                        safe_meta[k] = "[REDACTED]"
+                    else:
+                        safe_meta[k] = v
+                data["metadata"] = safe_meta
+                cleaned_capabilities[cap_name] = data
+
+            self._send_json({
+                "status": "OK",
+                "summary": summary,
+                "capabilities": cleaned_capabilities
+            })
+            return
+
+        # Settings View: HTML page showing truth table in plain language to owners
+        if path in ("/settings/capabilities", "/api/system/capabilities/view"):
+            role = str(auth_context.get("role") or "").lower()
+            allowed_roles = {"owner", "admin", "global_admin", "executive"}
+            if role not in allowed_roles:
+                self._send_json({
+                    "error": "Forbidden",
+                    "detail": "Admin or Owner role required to view capability status."
+                }, status=403)
+                return
+
+            from core.capability_probe import probe_all_capabilities, summarize_capabilities
+            probe_results = probe_all_capabilities()
+            summary = summarize_capabilities(probe_results)
+
+            plain_language_map = {
+                "OK": ("live", "#10b981", "#d1fae5"),
+                "ACCEPTED_BY_PROVIDER": ("live", "#10b981", "#d1fae5"),
+                "SANDBOX": ("test only", "#3b82f6", "#dbeafe"),
+                "NOT_CONFIGURED": ("not connected", "#6b7280", "#f3f4f6"),
+                "DEGRADED": ("degraded", "#f59e0b", "#fef3c7"),
+                "NOT_IMPLEMENTED": ("not implemented", "#64748b", "#f1f5f9"),
+                "FAILED": ("failed", "#ef4444", "#fee2e2"),
+            }
+
+            rows = []
+            for cap_name, res in sorted(probe_results.items()):
+                st = res.status.value if hasattr(res.status, "value") else str(res.status)
+                plain_lbl, color, bg = plain_language_map.get(st, (st.lower(), "#6b7280", "#f3f4f6"))
+                rows.append(
+                    f"<tr>"
+                    f"<td style='padding: 10px; font-weight: 600;'>{cap_name}</td>"
+                    f"<td style='padding: 10px;'><span style='background: {bg}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;'>{plain_lbl.upper()}</span></td>"
+                    f"<td style='padding: 10px; font-family: monospace;'>{res.latency_ms:.2f} ms</td>"
+                    f"<td style='padding: 10px;'>{res.provider}</td>"
+                    f"<td style='padding: 10px; font-size: 0.85em; color: #666;'>{res.error or res.provider_ref or '-'}</td>"
+                    f"</tr>"
+                )
+
+            rows_html = "\n".join(rows)
+            html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ZONATA — System Capabilities Truth Table</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }}
+        .container {{ max-width: 1000px; margin: 0 auto; background: #1e293b; border-radius: 8px; padding: 2rem; border: 1px solid #334155; }}
+        h1 {{ margin-top: 0; font-size: 1.5rem; }}
+        .summary {{ display: flex; gap: 1rem; margin-bottom: 1.5rem; }}
+        .card {{ background: #0f172a; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid #334155; font-size: 0.9rem; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
+        th {{ text-align: left; padding: 10px; border-bottom: 2px solid #334155; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; }}
+        td {{ border-bottom: 1px solid #334155; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sovereign System Capabilities Truth Table</h1>
+        <div class="summary">
+            <div class="card">Live: <strong>{summary['live']}</strong></div>
+            <div class="card">Test Only: <strong>{summary['test_only']}</strong></div>
+            <div class="card">Not Connected: <strong>{summary['not_connected']}</strong></div>
+            <div class="card">Not Implemented: <strong>{summary['not_implemented']}</strong></div>
+            <div class="card">Degraded: <strong>{summary['degraded']}</strong></div>
+            <div class="card">Failed: <strong>{summary['failed']}</strong></div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Capability</th>
+                    <th>Status</th>
+                    <th>Latency</th>
+                    <th>Provider</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>"""
+            html_bytes = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html_bytes)))
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(html_bytes)
+            return
+
         if path == "/api/auth/me":
             try:
                 ctx = self._get_auth_context()

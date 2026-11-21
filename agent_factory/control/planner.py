@@ -20,6 +20,156 @@ class PlanError(ValueError):
     pass
 
 
+class CapabilityUnavailableError(PlanError):
+    """Raised when a planned step requires a capability that is NOT_CONFIGURED or NOT_IMPLEMENTED."""
+    def __init__(
+        self,
+        capability: str,
+        status: str,
+        reason: str,
+        alternatives: Optional[List[str]] = None,
+        manual_fallback: Optional[str] = None
+    ):
+        self.capability = capability
+        self.status = status
+        self.reason = reason
+        self.alternatives = alternatives or []
+        self.manual_fallback = manual_fallback or "Perform action manually via external tool or verified file upload."
+        msg = (
+            f"Step requires capability '{capability}' which is {status}: {reason}. "
+            f"Configured alternatives: {', '.join(self.alternatives) if self.alternatives else 'None'}. "
+            f"Manual fallback: {self.manual_fallback}"
+        )
+        super().__init__(msg)
+
+
+CAPABILITY_FALLBACK_CATALOG: Dict[str, Dict[str, Any]] = {
+    "browser": {
+        "aliases": ["scrape", "web_scrape", "web_scraping", "webpage", "crawl", "dom"],
+        "alternatives": ["text_extraction", "search"],
+        "manual_fallback": "Upload target document/HTML directly via Document/File Port or submit text content via API."
+    },
+    "desktop_control": {
+        "aliases": ["desktop", "gui", "mouse", "keyboard"],
+        "alternatives": ["workflow_engine"],
+        "manual_fallback": "Trigger actions via programmatic REST API endpoints or pre-scripted jobs."
+    },
+    "email_out": {
+        "aliases": ["smtp", "send_email", "mail"],
+        "alternatives": [],
+        "manual_fallback": "Download compiled RFC 5322 .eml MIME file and send via local corporate mail client."
+    },
+    "antivirus": {
+        "aliases": ["clamav", "virus_scan", "malware_scan"],
+        "alternatives": [],
+        "manual_fallback": "Pre-scan files in external staging DMZ before uploading to storage."
+    },
+    "ocr": {
+        "aliases": ["tesseract", "image_ocr"],
+        "alternatives": ["text_extraction"],
+        "manual_fallback": "Transcribe image or supply machine-readable PDF/text directly."
+    },
+    "payments": {
+        "aliases": ["stripe", "credit_card", "bank_transfer"],
+        "alternatives": [],
+        "manual_fallback": "Record payment intention as an unposted journal draft pending manual bank wire verification."
+    }
+}
+
+
+def resolve_capability_name(name: str) -> str:
+    """Normalize capability or alias to canonical port capability name."""
+    norm = name.strip().lower()
+    for canonical, entry in CAPABILITY_FALLBACK_CATALOG.items():
+        if norm == canonical or norm in entry["aliases"]:
+            return canonical
+    return norm
+
+
+def check_required_capabilities(required_capabilities: List[str]) -> Dict[str, Any]:
+    """Read truth table before promising or scheduling any step to a user.
+    If any required capability is NOT_CONFIGURED or NOT_IMPLEMENTED, refuse immediately.
+    """
+    if not required_capabilities:
+        return {}
+
+    from core.capability_probe import probe_all_capabilities
+    from core.ports.base import PortStatus
+
+    probe_results = probe_all_capabilities()
+    verified: Dict[str, Any] = {}
+
+    for raw_cap in required_capabilities:
+        canonical = resolve_capability_name(raw_cap)
+        res = probe_results.get(canonical)
+
+        if res is None:
+            raise CapabilityUnavailableError(
+                capability=raw_cap,
+                status="NOT_IMPLEMENTED",
+                reason=f"Capability '{raw_cap}' is not recognized or implemented in sovereign runtime",
+                alternatives=[],
+                manual_fallback="Contact system administrator to configure external port provider."
+            )
+
+        if res.status in (PortStatus.NOT_CONFIGURED, PortStatus.NOT_IMPLEMENTED, PortStatus.FAILED):
+            info = CAPABILITY_FALLBACK_CATALOG.get(canonical, {})
+            candidate_alts = info.get("alternatives", [])
+            valid_alts = [
+                alt for alt in candidate_alts
+                if probe_results.get(alt) and probe_results[alt].status in (PortStatus.OK, PortStatus.SANDBOX)
+            ]
+            manual_fallback = info.get(
+                "manual_fallback",
+                "Execute the operation manually or upload pre-processed artifact."
+            )
+            raise CapabilityUnavailableError(
+                capability=canonical,
+                status=res.status.value,
+                reason=res.error or f"Capability '{canonical}' is currently {res.status.value}",
+                alternatives=valid_alts,
+                manual_fallback=manual_fallback
+            )
+
+        verified[canonical] = res
+
+    return verified
+
+
+def schedule_step(
+    step_id: str,
+    action: str,
+    required_capabilities: List[str],
+    parameters: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Promise and schedule a discrete step, verifying truth table before commitment.
+    Returns refusal structure without looping if capability is unavailable.
+    """
+    try:
+        active_caps = check_required_capabilities(required_capabilities)
+        return {
+            "status": "SCHEDULED",
+            "step_id": step_id,
+            "action": action,
+            "required_capabilities": required_capabilities,
+            "active_capabilities": {k: v.to_dict() for k, v in active_caps.items()},
+            "parameters": parameters or {}
+        }
+    except CapabilityUnavailableError as exc:
+        return {
+            "status": "REFUSED",
+            "step_id": step_id,
+            "action": action,
+            "capability": exc.capability,
+            "capability_status": exc.status,
+            "reason": exc.reason,
+            "configured_alternatives": exc.alternatives,
+            "manual_fallback": exc.manual_fallback,
+            "message": str(exc),
+            "looping": False
+        }
+
+
 def _has_cycle(nodes: List[str], edges: List[Tuple[str, str]]) -> bool:
     """Kahn's algorithm for cycle detection."""
     adj = defaultdict(list)
@@ -43,9 +193,13 @@ def plan(
     nodes: List[str],
     edges: List[Tuple[str, str, str]],
     max_parallel: int = 4,
-    max_agents: int = 500
+    max_agents: int = 500,
+    required_capabilities: Optional[List[str]] = None
 ) -> Dict[str, Any]:
-    """Validate DAG constraints and compute topological execution waves."""
+    """Validate DAG constraints, capability readiness, and compute topological execution waves."""
+    if required_capabilities:
+        check_required_capabilities(required_capabilities)
+
     if len(nodes) != len(set(nodes)):
         raise PlanError("duplicate agent_key")
     if not (1 <= len(nodes) <= max_agents):

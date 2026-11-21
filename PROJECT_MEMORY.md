@@ -45,7 +45,7 @@
 ## Active Roadmap (Step 1 Sub-Steps)
 - [x] **1A:** Inventory and repository integrity
 - [x] **1B:** Supply chain, CI and honest claims
-- [ ] **1C:** Capability truth table and the Port framework
+- [x] **1C:** Capability truth table and the Port framework
 - [ ] **1D:** Honest adapters with real providers
 - [ ] **1E:** Document and file backbone
 - [ ] **1F:** Folio, evidence and export packs
