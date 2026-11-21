@@ -68,8 +68,12 @@ class LLMBudgetManager:
         allocated_micro_usd: int,
         period_start: Optional[float] = None,
         period_end: Optional[float] = None,
+        caller_principal_type: str = "HUMAN",
     ) -> str:
-        """Create or update an entity's budget allocation in integer micro-USD."""
+        """Create or update an entity's budget allocation in integer micro-USD. Enforces Rule 15."""
+        if caller_principal_type in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or caller_principal_type.startswith(("agt_", "ai_emp_")):
+            raise PermissionError(f"Rule 15 Violation: Principal '{caller_principal_type}' cannot allocate budgets")
+
         now = time.time()
         start = period_start or now - 3600.0
         end = period_end or now + (86400.0 * 30.0)

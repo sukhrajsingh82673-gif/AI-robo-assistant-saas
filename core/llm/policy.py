@@ -88,8 +88,12 @@ class TenantModelPolicyManager:
         require_no_retention: bool = False,
         block_restricted_docs: bool = True,
         allow_degraded: bool = False,
+        caller_principal_type: str = "HUMAN",
     ) -> None:
-        """Configure tenant model policy."""
+        """Configure tenant model policy. Enforces Rule 15 principal separation."""
+        if caller_principal_type in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or caller_principal_type.startswith(("agt_", "ai_emp_")):
+            raise PermissionError(f"Rule 15 Violation: Principal '{caller_principal_type}' cannot write policies")
+
         import time
         now = time.time()
         policy_id = f"pol_{tenant_id}_{company_id}"
@@ -180,3 +184,4 @@ class TenantModelPolicyManager:
 
 # Global Singleton
 tenant_model_policy = TenantModelPolicyManager()
+tenant_model_policy_manager = tenant_model_policy

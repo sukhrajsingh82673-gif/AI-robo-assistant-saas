@@ -123,15 +123,12 @@ class IndustryPackLoader:
         tenant_id: str,
         company_id: str,
         pack_data: Dict[str, Any],
+        caller_principal_type: str = "HUMAN",
     ) -> Dict[str, Any]:
-        """Installs a validated industry pack into a tenant/company.
-        
-        Actions performed:
-        1. Validates schema and UN ISIC taxonomy code.
-        2. Provisions the Chart of Accounts into the ledger.
-        3. Provisions declared folio types.
-        4. Records the installation manifest in the permanent registry.
-        """
+        """Installs a validated industry pack into a tenant/company. Enforces Rule 15."""
+        if caller_principal_type in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or caller_principal_type.startswith(("agt_", "ai_emp_")):
+            raise PermissionError(f"Rule 15 Violation: Principal '{caller_principal_type}' cannot mutate industry packs or pack review status")
+
         validated = validate_industry_pack_dict(pack_data)
         meta = validated["metadata"]
         now = time.time()

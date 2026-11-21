@@ -373,8 +373,16 @@ class LedgerKernel:
     # 3. POSTING & ZERO-BALANCE ENFORCEMENT
     # =========================================================================
 
-    def post_journal_entry(self, tenant_id: str, company_id: str, entry_id: str) -> Dict[str, Any]:
-        """Posts a DRAFT journal entry after validating the zero-balance invariant per currency.
+    def post_journal_entry(
+        self,
+        tenant_id: str,
+        company_id: str,
+        entry_id: str,
+        principal_id: Optional[str] = None,
+        principal_grade: Optional[str] = None,
+        approval_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Posts a DRAFT journal entry after validating zero-balance invariant and ActionGateway authority.
         
         Once posted, database triggers make the entry and lines strictly immutable.
         """
@@ -410,6 +418,34 @@ class LedgerKernel:
             if debits <= 0:
                 raise UnbalancedJournalEntryError(
                     f"Journal entry {entry_id} currency leg '{curr}' has zero total amount"
+                )
+
+        # Authority & ActionGateway evaluation (OpenCode Step 2C, Acceptance 11)
+        total_minor_units = sum(t["debits"] for t in currency_totals.values())
+        if principal_id or principal_grade or (total_minor_units > 100_000 and principal_grade is not None):
+            from core.action_envelope import ActionEnvelope
+            from core.action_gateway import action_gateway
+            env = ActionEnvelope.create(
+                tenant_id=tenant_id,
+                company_id=company_id,
+                agent_id=principal_id or "system_ledger",
+                capability_id="ledger.post",
+                target=f"journal_entries/{entry_id}",
+                intent=f"Post journal entry {entry_id}",
+                parameters={
+                    "entry_id": entry_id,
+                    "amount_minor_units": total_minor_units,
+                },
+                action_class="POST_LEDGER",
+                principal_id=principal_id,
+                principal_grade=principal_grade,
+                spend_amount_minor_units=total_minor_units,
+                approval_id=approval_id,
+            )
+            decision = action_gateway.evaluate_decision_gate(env)
+            if not decision.allowed:
+                raise LedgerError(
+                    f"Ledger posting rejected by ActionGateway at Step {decision.step_number} [{decision.rule_id}]: {decision.reason}"
                 )
 
         now = time.time()

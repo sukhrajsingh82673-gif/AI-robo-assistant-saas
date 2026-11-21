@@ -61,7 +61,10 @@ class KillSwitchMatrix:
         reason: str,
         activated_by: str = "HUMAN_OWNER"
     ) -> str:
-        """Engages a KillSwitch at a specified level."""
+        """Engages a KillSwitch at a specified level. Enforces Rule 15 principal separation."""
+        if activated_by in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or activated_by.startswith(("agt_", "ai_emp_")):
+            raise PermissionError(f"Rule 15 Violation: Principal '{activated_by}' cannot engage kill switch")
+
         switch_id = f"ks_{level.lower()}_{target_id[:8]}"
         now = time.time()
         with db.get_connection() as conn:
@@ -96,7 +99,10 @@ class KillSwitchMatrix:
         target_id: Optional[str] = None,
         deactivated_by: str = "HUMAN_OWNER"
     ) -> bool:
-        """Disengages an active KillSwitch by switch_id or (level, target_id)."""
+        """Disengages an active KillSwitch by switch_id or (level, target_id). Enforces Rule 15."""
+        if deactivated_by in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or deactivated_by.startswith(("agt_", "ai_emp_")):
+            raise PermissionError(f"Rule 15 Violation: Principal '{deactivated_by}' cannot disengage kill switch")
+
         now = time.time()
         with db.get_connection() as conn:
             if target_id is not None:

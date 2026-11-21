@@ -96,6 +96,11 @@ def init_all_subsystem_schemas():
         ensure_model_gateway_tables()
     except Exception:
         pass
+    try:
+        from core.authority import ensure_authority_tables
+        ensure_authority_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

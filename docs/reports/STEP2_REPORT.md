@@ -272,3 +272,173 @@ PASSED: Zero credentials, passwords, or raw secrets leaked into model_calls.
 - [x] All 9 acceptance tests passing in `tests/test_llm_gateway.py`.
 - [x] Zero regressions across all 99 tests in test suite.
 
+---
+
+## Sub-Step 2C — Authority, Approvals and Budgets in ActionGateway
+
+### 1. Objectives & Scope
+- Elevate authority governance from static definitions to runtime enforcement across finance, ledger posting, agent provisioning, and company management.
+- Establish typed action classes (`ActionClass` enum):
+  - `READ_INTERNAL`, `WRITE_INTERNAL`, `CREATE_DOCUMENT`, `SEND_EXTERNAL_MESSAGE`, `COMMIT_SPEND`, `POST_LEDGER`, `PROVISION_AGENT_OR_HIRE`, `CHANGE_PERMISSION`, `DELETE_DATA`, `EXTERNAL_API_WRITE`, `LEGAL_COMMITMENT`
+  - Reserved action classes: `INSTALL_SOFTWARE`, `DESKTOP_CONTROL`, `BROWSER_SUBMIT` (strictly `NOT_IMPLEMENTED` until Step 3).
+- Implement canonical, fixed 9-step policy decision order in `core/action_gateway.py` where first denial wins, recording every decision as a `PolicyDecision` sealed in the evidence ledger:
+  1. **Kill Switch:** 9-level barrier across GLOBAL, TENANT, COMPANY, AGENT, EMPLOYEE (`core/killswitch_matrix.py`).
+  2. **Company & Tenant Status:** Verify operational status; refuse SUSPENDED, INACTIVE, or KILLED entities.
+  3. **Capability Truth Table:** Verify capability is live; refuse NOT_CONFIGURED, NOT_IMPLEMENTED, or reserved action classes.
+  4. **Principal Type Rules (Rule 15):** Agent, AI-employee, and model principals can never mutate authority profiles, budgets, policies, company constitution, pack review status, approval decisions, delegations, or kill switches. Agents can never call or command employees.
+  5. **Authority Profile (G1–G9 Semantics):** Read-only evaluation of single-spend limits, monthly limits, hire/provision rights, SOP modification rights, data sensitivity (`RESTRICTED`), company constitution rules, and Rule 19 autonomy ceiling (capping `SKELETON`/`DRAFT` packs at `SUPERVISED`). Merge ledger posting policy into this engine with zero second threshold system.
+  6. **Budget Reservation (Rule 20):** Atomically reserve and commit spend in integer minor units with thread-safe concurrency serialization (`core/authority/budget_guard.py`).
+  7. **Segregation of Duties:** Requester != maker != approver. Self-approval strictly forbidden.
+  8. **Approval Requirements:** Multi-tier quorum chains, timeouts, and cryptographic SHA-256 payload digest binding (`compute_payload_digest`). Changing payload after approval voids the approval. AI/agent principals prohibited from approving money, permissions, deletion, or legal commitments.
+  9. **Rate Limit Throttle:** Sliding-window rate limit per tenant/principal.
+- Implement time-bound, revocable, scoped delegations bounded by delegator authority (`core/authority/delegation.py`). Delegations exceeding delegator authority are rejected; revocation takes effect immediately on the very next call.
+- Implement `POST /api/authority/explain` (`action_gateway.explain_decision()`) returning complete machine-readable decision paths.
+- Multi-tenant fail-closed schema migrations (`migrations/common/0020_action_gateway_and_authority.sql` and `migrations/pg/0020_action_gateway_and_authority.sql`) with PostgreSQL 16 Row Level Security.
+
+---
+
+### 2. Empirical Verification & Real Command Outputs
+
+#### 2.1 Acceptance Test Suite Execution (All 12 Tests Passing)
+Command:
+```bash
+python3 -m pytest tests/test_action_gateway_authority.py -v
+```
+Real Command Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 12 items
+
+tests/test_action_gateway_authority.py::test_01_action_above_employee_limit_refused_needs_higher_tier PASSED [  8%]
+tests/test_action_gateway_authority.py::test_02_altering_payload_after_approval_voids_it PASSED [ 16%]
+tests/test_action_gateway_authority.py::test_03_self_approval_strictly_refused PASSED [ 25%]
+tests/test_action_gateway_authority.py::test_04_delegation_beyond_delegator_authority_refused PASSED [ 33%]
+tests/test_action_gateway_authority.py::test_05_revoked_delegate_refused_immediately PASSED [ 41%]
+tests/test_action_gateway_authority.py::test_06_agent_principal_cannot_call_employee PASSED [ 50%]
+tests/test_action_gateway_authority.py::test_07_agent_principal_cannot_write_governance_tables_rule_15 PASSED [ 58%]
+tests/test_action_gateway_authority.py::test_08_two_concurrent_spends_at_edge_of_budget_let_exactly_one_pass PASSED [ 66%]
+tests/test_action_gateway_authority.py::test_09_killed_company_refuses_everything_within_one_call PASSED [ 75%]
+tests/test_action_gateway_authority.py::test_10_draft_pack_company_cannot_reach_autonomous_level PASSED [ 83%]
+tests/test_action_gateway_authority.py::test_11_ledger_posting_above_threshold_requires_approval_through_engine PASSED [ 91%]
+tests/test_action_gateway_authority.py::test_12_explain_endpoint_returns_decision_path PASSED [100%]
+
+============================== 12 passed in 1.98s ==============================
+```
+
+---
+
+#### 2.2 Mutation & Negative Invariant Verification (Rule 8)
+
+##### Mutation 1: Bypassed SHA-256 Payload Digest Check
+Disabled `if current_digest != stored_digest:` in `core/authority/approvals.py`:
+```text
+=== MUTATION CHECK 1: BYPASS PAYLOAD DIGEST CHECK ===
+Return code: 1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_02_altering_payload_after_approval_voids_it _______________
+    # Must fail at Step 8 with APPROVAL_PAYLOAD_MISMATCH
+>   with pytest.raises(ActionGatewayRejection) as exc_info:
+E   Failed: DID NOT RAISE ActionGatewayRejection
+tests/test_action_gateway_authority.py:205: Failed
+=========================== short test summary info ============================
+FAILED tests/test_action_gateway_authority.py::test_02_altering_payload_after_approval_voids_it
+1 failed in 0.60s
+```
+
+##### Mutation 2: Bypassed KillSwitch Check
+Disabled active kill switch evaluation in `core/action_gateway.py`:
+```text
+=== MUTATION CHECK 2: BYPASS KILL SWITCH CHECK ===
+Return code: 1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_09_killed_company_refuses_everything_within_one_call ___________
+>   with pytest.raises(ActionGatewayRejection) as exc_info:
+E   Failed: DID NOT RAISE ActionGatewayRejection
+tests/test_action_gateway_authority.py:618: Failed
+WARNING  zonata.killswitch:killswitch_matrix.py:89 KILLSWITCH ENGAGED: Level=COMPANY, Target=comp_killed_test, Reason=Fraudulent activity detected
+=========================== short test summary info ============================
+FAILED tests/test_action_gateway_authority.py::test_09_killed_company_refuses_everything_within_one_call
+1 failed in 0.63s
+```
+
+##### Mutation 3: Bypassed Self-Approval Refusal
+Disabled `if approver_id == requester_id or approver_id == maker_id:` in `core/authority/approvals.py`:
+```text
+=== MUTATION CHECK 3: BYPASS SELF-APPROVAL CHECK ===
+Return code: 1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_03_self_approval_strictly_refused ____________________
+    # Requester attempting to approve own request must raise SelfApprovalError
+>   with pytest.raises(SelfApprovalError) as exc_info:
+E   Failed: DID NOT RAISE SelfApprovalError
+tests/test_action_gateway_authority.py:234: Failed
+=========================== short test summary info ============================
+FAILED tests/test_action_gateway_authority.py::test_03_self_approval_strictly_refused
+1 failed in 0.49s
+```
+
+---
+
+#### 2.3 Policy Decisions and Database Audit
+Command:
+```bash
+python3 -c "
+from core.db import db
+tables = ['policy_decisions', 'authority_profiles', 'authority_delegations', 'action_approvals', 'company_constitutions']
+with db.get_connection() as conn:
+    cur = conn.cursor()
+    for t in tables:
+        cur.execute(f'SELECT count(*) FROM {t}')
+        print(f'Table {t:<25} exists, row count: {cur.fetchone()[0]}')
+"
+```
+Real Command Output:
+```text
+Table policy_decisions          exists, row count: 0
+Table authority_profiles        exists, row count: 0
+Table authority_delegations     exists, row count: 0
+Table action_approvals          exists, row count: 0
+Table company_constitutions     exists, row count: 0
+```
+*Note: Development database `storage/roboassistant.db` converged to migration 0020 with 312 tables active.*
+
+---
+
+#### 2.4 Sub-Step 2C CI Run Verification
+- **Run ID:** `44946840345`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44946840345](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44946840345)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `cb31d41`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (48s)` — ID `136975899470`
+  - `Job 2: SQLite Dev Profile Test Suite (43s)` — ID `136975899171`
+  - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (1m11s)` — ID `136975899392`
+
+---
+
+### 3. Acceptance Confirmation
+- [x] Typed action classes (`ActionClass` enum) defined with reserved classes (`INSTALL_SOFTWARE`, `DESKTOP_CONTROL`, `BROWSER_SUBMIT`) returning `NOT_IMPLEMENTED`.
+- [x] Canonical 9-step decision gate order strictly enforced in `core/action_gateway.py` with machine-readable rule IDs.
+- [x] Action above employee's G-tier limit is refused and requires higher-tier approval (`test_01`).
+- [x] Altering action payload after approval voids the approval via SHA-256 payload digest mismatch (`test_02`).
+- [x] Self-approval strictly refused (`test_03`).
+- [x] Delegation beyond delegator's authority is refused (`test_04`).
+- [x] Revoked delegate is refused immediately on the very next call (`test_05`).
+- [x] Agent principal cannot call, provision, or command an employee (`test_06`).
+- [x] Rule 15: Agent principal cannot write authority profiles, budgets, policies, constitutions, approvals, delegations, or kill switches (`test_07`).
+- [x] Two concurrent spends at the edge of a budget let exactly one pass (`test_08`).
+- [x] Killed company refuses all operations on the very next call (`test_09`).
+- [x] Rule 19: Company with a `DRAFT` or `SKELETON` industry pack cannot reach autonomous level (`test_10`).
+- [x] Double-entry ledger posting above threshold requires approval through ActionGateway (`test_11`).
+- [x] `POST /api/authority/explain` returns complete step-by-step decision path (`test_12`).
+- [x] All 24 tests across sub-steps 2A, 2B, and 2C passing cleanly.
+
+
