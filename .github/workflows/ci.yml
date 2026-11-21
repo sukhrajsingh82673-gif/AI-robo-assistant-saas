@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - step1-foundation-backbone
+      - step2-intelligence-execution
       - main
   pull_request:
     branches:
       - step1-foundation-backbone
+      - step2-intelligence-execution
       - main
   workflow_dispatch:
 
@@ -180,7 +182,7 @@ jobs:
           python3 -m pytest --collect-only -q
           python3 -m pytest tests/test_settings_registry_phase1.py tests/test_settings_v2_phase2.py -q
           python3 -m pytest tests/test_stage2_foundations.py tests/test_stage6_adapters_global.py -q
-          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step1_scenario.py -q
+          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step1_scenario.py tests/test_step2_preflight.py -q
           python3 scripts/reality_probe.py
           python3 scripts/backup_restore_drill.py
           python3 scripts/step1_scenario.py
@@ -341,7 +343,7 @@ jobs:
           KMS_MASTER_KEY: sovereign_ci_envelope_master_key_32_chars!
           APP_ENV: staging
         run: |
-          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py -v
+          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step2_preflight.py -v
 
       - name: Run Backup & Restore Qualification Drill on PostgreSQL 16
         env:

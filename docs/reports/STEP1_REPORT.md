@@ -638,7 +638,7 @@ Acceptance criteria fully met:
 ### 1. Objectives & Scope
 - Implement unified, governed multi-tenant document system across 10 tables:
   1. `documents` (root aggregate with sensitivity levels, regime tags, status, legal hold, and tombstone).
-  2. `blobs` (content-addressed by SHA-256, deduplicated per tenant via `UNIQUE(tenant_id, sha256)`).
+  2. `blobs` (content-addressed by SHA-256, deduplicated per tenant and company via `UNIQUE(tenant_id, company_id, sha256)`).
   3. `document_versions` (immutable version chain, preserving previous version hashes and payloads).
   4. `document_events` (append-only lifecycle audit trail with Merkle evidence IDs).
   5. `classifications` (deterministic keyword/template rules with confidence and review queue).
@@ -671,7 +671,7 @@ Acceptance criteria fully met:
 - `core/documents/search.py`: Multi-tenant scoped full-text search engine.
 - `core/documents/generation.py`: Versioned template generator and sovereign PDF digital signing.
 - `core/documents/evidence.py`: Bridge sealing document lifecycle events into Merkle `EvidenceLedger`.
-- `tests/test_documents_backbone.py`: Comprehensive test suite verifying all 12 acceptance criteria + 3 mutation checks.
+- `tests/test_documents_backbone.py`: Comprehensive test suite verifying all 12 acceptance criteria, 3 mutation checks, and 4 isolation/truthfulness regressions.
 
 ### 3. Empirical Test Execution & Mutation Verification
 Command executed:
@@ -731,6 +731,16 @@ PostgreSQL 16 & Service Containers Contract Tests:
 
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1E.
+
+#### Supervision verification (2026-11-22)
+The historical output above was captured before the following corrections. Current status:
+- **RLS is fail-closed.** `migrations/pg/0014_document_backbone.sql` no longer grants rows when `zonata.tenant_id`/`zonata.company_id` are unset. `core/db.py` now sets those session settings from a request-scoped `tenant_scope`/`tenant_scoped` context on every PostgreSQL connection checkout.
+- **No plaintext-as-encrypted.** If KMS is `NOT_CONFIGURED`, ingest/version writes are rejected with `ENCRYPTION_UNAVAILABLE`; reads and the integrity sweep report the KMS failure instead of treating ciphertext as plaintext.
+- **Crypto-shred is reference-safe.** Disposal now only destroys a DEK when `ref_count <= 1`; shared blobs are merely dereferenced. Storage deletion failures raise `StorageDeletionFailedError` and do not tombstone or claim `DISPOSED`.
+- **Company boundary enforced.** Blob deduplication and the unique constraint are `(tenant_id, company_id, sha256)`; `check_access()` validates company as well as tenant.
+- **Mutation evidence is real.** The two tautological mutation tests were replaced with mutations that disable the antivirus guard and the SHA check, and four regression tests cover shared-blob disposal, cross-company dedup, KMS refusal, and failed-deletion honesty.
+- **Current result:** `python3 -m pytest tests/test_documents_backbone.py -q` -> `19 passed` (2026-11-22, Termux/aarch64).
+- The CI URL above could not be re-verified in this environment because `gh` is not authenticated; treat it as the historical run cited by Antigravity, not fresh evidence.
 
 ---
 

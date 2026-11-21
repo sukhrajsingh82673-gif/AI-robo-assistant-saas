@@ -3,9 +3,9 @@
 ## Environment
 - **Platform:** Android / Termux (Linux ARM64, Sovereign T0 Mode)
 - **Active Workspace:** `/data/data/com.termux/files/home/AI-robo-assistant-saas`
-- **Active Git Branch:** `step1-foundation-backbone`
+- **Active Git Branch:** `step2-intelligence-execution`
 - **Remote Origin:** `https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git`
-- **Execution Status:** Restricted Pilot (Simulation on Android/Termux hardware; not public GA). GitHub Actions CI is the authoritative verification source of truth.
+- **Execution Status:** OpenCode Step 2 (Intelligence, Authority & Verified Execution Kernel) in progress. GitHub Actions CI is the authoritative verification source of truth.
 
 ## Architectural Principles & Invariants
 1. **Truth Rule:** Nothing reports success it did not achieve. Unconfigured -> `NOT_CONFIGURED`, unbuilt -> `NOT_IMPLEMENTED`. Test fakes permitted only under `ZONATA_TEST_MODE=1` with `sandbox: true`.
@@ -90,11 +90,34 @@
   - Authored Outpatient Healthcare Clinic & Practice blueprint (`packs/industries/clinic/v1/pack.yaml`) conforming to UN ISIC Rev. 4 `Q86`.
   - Implemented end-to-end qualification scenario runner (`scripts/step1_scenario.py`) executing all 12 qualification stages across both SQLite and PostgreSQL 16.
   - Implemented automated pytest suite (`tests/test_step1_scenario.py`).
-  - Successfully verified in GitHub Actions CI (Run ID `44920364090`) with 100% green status across all 3 jobs (Supply Chain, SQLite Dev, PostgreSQL 16 & Service Containers).
+  - Successfully verified in GitHub Actions CI (Run IDs `44920364090` and `44925486054`) with 100% green status across all 3 jobs (Supply Chain, SQLite Dev, PostgreSQL 16 & Service Containers).
   - OpenCode Step 1 complete with exactly 10 commits (1A - 1J) on `step1-foundation-backbone`.
+
+### OpenCode Step 2 — Intelligence, Authority and the Verified Execution Kernel (In Progress)
+- [x] **2A:** Preflight and inventory
+  - Verified Step 1 gate check: 0 collection errors, capability truth table live, Port framework active, all 6 backbone service adapters verified against real containers in CI (Run ID `44925486054`).
+  - Authored `docs/reports/STEP2_INVENTORY.md` auditing all 18 target domain items with `EXISTS`, `PARTIAL`, or `MISSING` classifications.
+  - Documented exact G1–G9 authority profiles from `core/workforce_architecture.py`.
+  - Documented default model provider (`embedded_free` local rule engine fallback) and measured throughput limits.
+  - Audited and documented all 5 untyped model-driven action triggers in `core/`.
+  - Authored acceptance tests in `tests/test_step2_preflight.py` (3 passed).
+  - Documented empirical outputs in `docs/reports/STEP2_REPORT.md`.
+- [ ] **2B:** Model gateway: tiers, budgets, tracing
+- [ ] **2C:** Authority, approvals and budgets enforced in the ActionGateway
+- [ ] **2D:** Organization model (board to agent)
+- [ ] **2E:** Tool registry and the agent runtime
+- [ ] **2F:** Work kernel: missions, projects, tasks, inbox
+- [ ] **2G:** SOP executor
+- [ ] **2H:** Verification pyramid
+- [ ] **2I:** KPI engine and goal engine
+- [ ] **2J:** AI CEO executive brain and workforce trust
+- [ ] **2K:** Evals and the Step 2 qualification
 
 ## Supervision Corrections (2026-11-21)
 - Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).
 - Removed the hardcoded KMS fallback master key; an unconfigured KMS now reports `NOT_CONFIGURED` instead of a false `OK`.
 - Made LLM, search, payments, secrets, observability, workflow-engine, and MCP probes perform real checks. MCP now reads ZONATA's own `mcp_servers` registry, not an external Antigravity directory.
 - Corrected report claims: `2,133` is the collection count, not a full-suite pass count. Full local run before the import fix: `1,958 passed, 59 failed, 31 skipped, 121 errors`. Post-fix targeted run: `33 passed, 4 skipped`.
+- Step 1E corrections: fail-closed RLS with request-scoped `tenant_scope`; KMS absence rejects writes instead of storing plaintext as encrypted; crypto-shred is `ref_count`-safe and verifies storage deletion; blob dedup/unique and `check_access` are company-scoped; tautological mutation tests replaced. `tests/test_documents_backbone.py` now reports `19 passed`.
+- Outstanding systemic finding (1F-1I): `migrations/pg/0015_folio_evidence_backbone.sql`, `0016_ledger_kernel.sql`, `0017_industry_packs.sql`, and `0018_always_on_baseline.sql` still contain the pre-fix fail-open RLS predicate (`OR current_setting(...) IS NULL`). Their isolation claims must not be treated as verified until those policies are fail-closed and their callers set tenant/company context.
+
