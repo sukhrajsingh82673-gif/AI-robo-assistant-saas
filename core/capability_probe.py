@@ -269,96 +269,9 @@ def probe_key_management() -> ProviderResult:
 
 
 def probe_llm() -> ProviderResult:
-    """Probe LLM model provider and reality state."""
-    t0 = time.perf_counter()
-    provider = os.environ.get("ZONATA_LLM_PROVIDER", "").lower()
-    is_prod = os.environ.get("APP_ENV") == "production"
-    allow_degraded = os.environ.get("ZONATA_ALLOW_DEGRADED") == "1"
-
-    if not provider:
-        # Check standard API keys
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            provider = "anthropic"
-        elif os.environ.get("GEMINI_API_KEY"):
-            provider = "gemini"
-        elif os.environ.get("OPENAI_API_KEY"):
-            provider = "openai"
-        elif _is_test_mode() or not is_prod or allow_degraded:
-            provider = "embedded_free"
-        else:
-            return NotConfiguredProvider("llm", "No LLM API keys configured in environment").probe()
-
-    latency_ms = (time.perf_counter() - t0) * 1000.0
-
-    if provider == "embedded_free":
-        if is_prod and allow_degraded:
-            status = PortStatus.DEGRADED
-        elif _is_test_mode():
-            status = PortStatus.SANDBOX
-        else:
-            status = PortStatus.DEGRADED
-        return ProviderResult(
-            status=status,
-            provider="embedded_free",
-            provider_ref="heuristic_rule_engine",
-            sandbox=True,
-            latency_ms=latency_ms,
-            cost=0.0,
-            metadata={"model": "embedded_free_rule_engine", "degraded": True}
-        )
-
-    key_map = {
-        "openai": os.environ.get("OPENAI_API_KEY"),
-        "anthropic": os.environ.get("ANTHROPIC_API_KEY"),
-        "gemini": os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
-    }
-
-    if provider in ("ollama", "local"):
-        base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        code, err = _http_get_status(f"{base}/api/tags", timeout=3.0)
-    elif provider in key_map and key_map[provider]:
-        api_key = key_map[provider]
-        if provider == "openai":
-            code, err = _http_get_status(
-                "https://api.openai.com/v1/models",
-                {"Authorization": f"Bearer {api_key}"},
-            )
-        elif provider == "anthropic":
-            code, err = _http_get_status(
-                "https://api.anthropic.com/v1/models",
-                {"x-api-key": api_key, "anthropic-version": "2023-06-01"},
-            )
-        else:
-            code, err = _http_get_status(
-                "https://generativelanguage.googleapis.com/v1beta/models?key="
-                + urllib.parse.quote(api_key, safe=""),
-            )
-    else:
-        return NotConfiguredProvider(
-            "llm",
-            f"No API key or verified endpoint configured for LLM provider '{provider}'"
-        ).probe()
-
-    latency_ms = (time.perf_counter() - t0) * 1000.0
-    if code == 200:
-        return ProviderResult(
-            status=PortStatus.OK,
-            provider=provider,
-            provider_ref=f"llm_{provider}_models_200",
-            sandbox=False,
-            latency_ms=latency_ms,
-            cost="UNMEASURED",
-            metadata={"provider": provider, "verified": True}
-        )
-    return ProviderResult(
-        status=PortStatus.FAILED,
-        provider=provider,
-        provider_ref=None,
-        sandbox=False,
-        latency_ms=latency_ms,
-        cost="UNMEASURED",
-        error=f"LLM provider probe failed: {err or 'unexpected status ' + str(code)}"
-    )
+    """Probe LLM model provider and reality state via LLMGatewayPort."""
+    from core.ports.llm import llm_gateway
+    return llm_gateway.probe()
 
 
 def probe_browser() -> ProviderResult:

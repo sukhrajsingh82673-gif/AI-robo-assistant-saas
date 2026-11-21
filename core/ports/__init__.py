@@ -55,6 +55,11 @@ from core.ports.kms import (
     SandboxKMSProvider,
     resolve_kms_provider,
 )
+from core.ports.llm import (
+    LLMGatewayPort,
+    ModelTier,
+    llm_gateway,
+)
 
 __all__ = [
     "Port",
@@ -65,6 +70,10 @@ __all__ = [
     "SandboxProvider",
     "PortRegistry",
     "port_registry",
+    # LLM Gateway
+    "LLMGatewayPort",
+    "ModelTier",
+    "llm_gateway",
     # Storage
     "StoragePort",
     "SeaweedFSS3Provider",

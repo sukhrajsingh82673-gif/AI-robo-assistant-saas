@@ -91,6 +91,11 @@ def init_all_subsystem_schemas():
         ApprovalRevocationEngine("tnt_bootstrap")._ensure_table()
     except Exception:
         pass
+    try:
+        from core.llm import ensure_model_gateway_tables
+        ensure_model_gateway_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

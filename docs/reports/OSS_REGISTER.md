@@ -35,6 +35,7 @@ Governed by Standing Rule 5 (Licence Boundary).
 | **proot-distro** | `5.10.3` | `GPL-3.0-only` | BOUNDARY — legal review before commercial use |
 | **py-serializable** | `2.2.0` | `Apache-2.0` | APPROVED (Allowlist) |
 | **pycparser** | `3.12` | `BSD-3-Clause` | APPROVED (Allowlist) |
+| **pydantic** | `1.10.27` | `MIT` | APPROVED (Allowlist) |
 | **Pygments** | `2.21.0` | `BSD-2-Clause` | APPROVED (Allowlist) |
 | **pyparsing** | `3.3.3` | `MIT` | APPROVED (Allowlist) |
 | **pytest** | `9.2.0` | `MIT` | APPROVED (Allowlist) |
@@ -47,6 +48,7 @@ Governed by Standing Rule 5 (Licence Boundary).
 | **sortedcontainers** | `2.4.0` | `Apache-2.0` | APPROVED (Allowlist) |
 | **tomli** | `2.5.0` | `MIT` | APPROVED (Allowlist) |
 | **tomli_w** | `1.2.0` | `MIT` | APPROVED (Allowlist) |
+| **typing-extensions** | `4.16.0` | `PSF-2.0` | APPROVED (Allowlist) |
 | **tzdata** | `2026.6` | `Apache-2.0` | APPROVED (Allowlist) |
 | **urllib3** | `2.8.0` | `MIT` | APPROVED (Allowlist) |
 
