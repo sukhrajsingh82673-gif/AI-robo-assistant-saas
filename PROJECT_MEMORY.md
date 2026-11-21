@@ -63,7 +63,14 @@
   - Implemented self-verifying export pack (`.zip`) containing `manifest.json`, `entries/`, `files/`, `audit_trail.json`, and standalone zero-dependency `verify_pack.py` offline verifier.
   - Implemented deletion drill: sovereign expungement archives export pack to storage, logs pack hash into permanent `EvidenceLedger`, and purges database rows.
   - Authored comprehensive test suite (`tests/test_folio_export_backbone.py`) verifying all 7 acceptance requirements and mutation checks.
-- [ ] **1G:** Ledger kernel
+- [x] **1G:** Ledger kernel
+  - Defined double-entry financial ledger schema (`accounts`, `journal_entries`, `journal_lines`) with PostgreSQL 16 RLS policies and immutability triggers (`migrations/pg/0016_ledger_kernel.sql`).
+  - Enforced Rule 12: Integer minor units only, zero float arithmetic, and strict ISO 4217 currency validation (`core/ledger/currency.py`).
+  - Implemented zero-balance invariant (`sum(debits) == sum(credits)`) strictly per currency; multi-currency entries must independently balance.
+  - Implemented database-level immutability triggers on POSTED entries; accounting corrections performed exclusively via reversing entries (`reverse_journal_entry`).
+  - Integrated folio verification: sealing or closing a folio verifies all linked journal entries are in POSTED status (`UnpostedFolioJournalEntriesError`).
+  - Implemented trial balance generator (`generate_trial_balance`) verifying net zero sum across all accounts.
+  - Authored comprehensive test suite (`tests/test_ledger_kernel.py`) verifying all 7 acceptance criteria and mutation checks (10 passed).
 - [ ] **1H:** Industry Pack framework
 - [ ] **1I:** Always-on baseline
 - [ ] **1J:** Step 1 qualification scenario

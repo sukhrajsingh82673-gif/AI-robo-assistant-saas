@@ -15,8 +15,9 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.evidence_ledger import EvidenceLedger
+from core.documents.errors import EncryptionUnavailableError
 from core.documents.evidence import seal_document_event
 from core.ports.base import PortStatus
 from core.ports.kms import resolve_kms_provider
@@ -29,12 +30,15 @@ class BlobCorruptionError(Exception):
     pass
 
 
+@tenant_scoped
 def create_document_version(
     document_id: str,
     new_payload: bytes,
     author_id: str,
     change_reason: str,
     ledger: Optional[EvidenceLedger] = None,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> Tuple[str, str]:
     """Creates a new immutable version of a document without modifying previous versions.
 
@@ -51,7 +55,12 @@ def create_document_version(
         doc_row = cur.fetchone()
         if not doc_row:
             raise ValueError(f"Document {document_id} not found")
-        tenant_id, company_id, doc_name = doc_row[0], doc_row[1], doc_row[2]
+        doc_tenant_id, doc_company_id, doc_name = doc_row[0], doc_row[1], doc_row[2]
+        if tenant_id is not None and doc_tenant_id != tenant_id:
+            raise ValueError(f"Document {document_id} does not belong to tenant {tenant_id}")
+        if company_id is not None and doc_company_id != company_id:
+            raise ValueError(f"Document {document_id} does not belong to company {company_id}")
+        tenant_id, company_id = doc_tenant_id, doc_company_id
 
         cur.execute(
             "SELECT COALESCE(MAX(version_number), 0) FROM document_versions WHERE document_id = ?",
@@ -60,10 +69,10 @@ def create_document_version(
         current_max_ver = cur.fetchone()[0]
         next_ver = current_max_ver + 1
 
-        # Check deduplication for blob
+        # Check deduplication for blob (scoped to tenant + company)
         cur.execute(
-            "SELECT id FROM blobs WHERE tenant_id = ? AND sha256 = ?",
-            (tenant_id, sha256_hash)
+            "SELECT id FROM blobs WHERE tenant_id = ? AND company_id = ? AND sha256 = ?",
+            (tenant_id, company_id, sha256_hash)
         )
         blob_row = cur.fetchone()
         if blob_row:
@@ -74,10 +83,12 @@ def create_document_version(
             blob_id = f"blb_{uuid.uuid4().hex[:16]}"
             kms_port = resolve_kms_provider()
             storage_port = resolve_storage_provider()
-            key_context = {"tenant_id": tenant_id, "sha256": sha256_hash}
+            key_context = {"tenant_id": tenant_id, "company_id": company_id, "sha256": sha256_hash}
             kms_res, ciphertext = kms_port.encrypt(new_payload, context=key_context)
             if kms_res.status not in (PortStatus.OK, PortStatus.SANDBOX, PortStatus.DEGRADED):
-                ciphertext = new_payload
+                raise EncryptionUnavailableError(
+                    f"KMS port returned {kms_res.status.value}; refusing to store plaintext as encrypted content"
+                )
 
             storage_path = f"tenants/{tenant_id}/blobs/{sha256_hash[:2]}/{sha256_hash}"
             bucket = os.environ.get("S3_BUCKET", "zonata-documents")
@@ -144,10 +155,13 @@ def create_document_version(
     return version_id, blob_id
 
 
+@tenant_scoped
 def get_document_version_payload(
     document_id: str,
     version_number: Optional[int] = None,
     verify_on_read: bool = True,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], bytes]:
     """Retrieves document version record and decrypted payload bytes.
 
@@ -159,7 +173,7 @@ def get_document_version_payload(
             cur.execute(
                 """
                 SELECT v.id, v.version_number, v.blob_id, v.author_id, v.status,
-                       b.sha256, b.byte_size, b.mime_type, b.storage_path, b.tenant_id
+                       b.sha256, b.byte_size, b.mime_type, b.storage_path, b.tenant_id, b.company_id
                 FROM document_versions v
                 JOIN blobs b ON v.blob_id = b.id
                 WHERE v.document_id = ? AND v.version_number = ?
@@ -170,7 +184,7 @@ def get_document_version_payload(
             cur.execute(
                 """
                 SELECT v.id, v.version_number, v.blob_id, v.author_id, v.status,
-                       b.sha256, b.byte_size, b.mime_type, b.storage_path, b.tenant_id
+                       b.sha256, b.byte_size, b.mime_type, b.storage_path, b.tenant_id, b.company_id
                 FROM documents d
                 JOIN document_versions v ON d.current_version_id = v.id
                 JOIN blobs b ON v.blob_id = b.id
@@ -193,7 +207,13 @@ def get_document_version_payload(
         "mime_type": row[7],
         "storage_path": row[8],
         "tenant_id": row[9],
+        "company_id": row[10],
     }
+
+    if tenant_id is not None and meta["tenant_id"] != tenant_id:
+        raise ValueError(f"Document {document_id} does not belong to tenant {tenant_id}")
+    if company_id is not None and meta["company_id"] != company_id:
+        raise ValueError(f"Document {document_id} does not belong to company {company_id}")
 
     storage_port = resolve_storage_provider()
     bucket = os.environ.get("S3_BUCKET", "zonata-documents")
@@ -202,11 +222,20 @@ def get_document_version_payload(
         raise RuntimeError(f"StoragePort.get failed: {st_res.error}")
 
     kms_port = resolve_kms_provider()
-    key_context = {"tenant_id": meta["tenant_id"], "sha256": meta["sha256"]}
+    key_context = {
+        "tenant_id": meta["tenant_id"],
+        "company_id": meta["company_id"],
+        "sha256": meta["sha256"],
+    }
     kms_res, plaintext = kms_port.decrypt(ciphertext, context=key_context)
     if kms_res.status not in (PortStatus.OK, PortStatus.SANDBOX, PortStatus.DEGRADED):
-        # Fallback for plain ciphertext or degraded mode
-        plaintext = ciphertext
+        if verify_on_read and kms_res.status == PortStatus.FAILED:
+            raise BlobCorruptionError(
+                f"Integrity check failed on read for blob {meta['blob_id']}: ciphertext corrupted or tampered ({kms_res.error})"
+            )
+        raise EncryptionUnavailableError(
+            f"KMS port returned {kms_res.status.value}; refusing to treat ciphertext as plaintext"
+        )
 
     if verify_on_read:
         computed_sha = hashlib.sha256(plaintext).hexdigest()
@@ -218,7 +247,12 @@ def get_document_version_payload(
     return meta, plaintext
 
 
-def run_integrity_sweep(tenant_id: str, ledger: Optional[EvidenceLedger] = None) -> Dict[str, Any]:
+@tenant_scoped
+def run_integrity_sweep(
+    tenant_id: str,
+    ledger: Optional[EvidenceLedger] = None,
+    company_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """Sweeps all blobs for a tenant, validating cryptographic SHA-256 integrity against storage.
 
     Reports bit rot / corruption incidents and logs tamper records in evidence ledger.
@@ -252,10 +286,14 @@ def run_integrity_sweep(tenant_id: str, ledger: Optional[EvidenceLedger] = None)
                 corrupted.append({"blob_id": blob_id, "error": f"Storage read failed: {st_res.error}"})
                 continue
 
-            key_context = {"tenant_id": tenant_id, "sha256": expected_sha}
+            key_context = {"tenant_id": tenant_id, "company_id": company_id, "sha256": expected_sha}
             kms_res, plaintext = kms_port.decrypt(ciphertext, context=key_context)
             if kms_res.status not in (PortStatus.OK, PortStatus.SANDBOX, PortStatus.DEGRADED):
-                plaintext = ciphertext
+                corrupted.append({
+                    "blob_id": blob_id,
+                    "error": f"KMS unavailable: {kms_res.status.value}",
+                })
+                continue
 
             computed_sha = hashlib.sha256(plaintext).hexdigest()
             if computed_sha != expected_sha:

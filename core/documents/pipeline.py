@@ -23,8 +23,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.evidence_ledger import EvidenceLedger
+from core.documents.errors import EncryptionUnavailableError
 from core.documents.evidence import seal_document_event
 from core.ports.base import PortStatus
 from core.ports.antivirus import resolve_antivirus_provider
@@ -77,6 +78,7 @@ class DocumentPipeline:
         self.ledger = ledger or EvidenceLedger()
         self.analyzer = PresidioAnalyzerEngine()
 
+    @tenant_scoped
     def ingest(
         self,
         payload: bytes,
@@ -216,16 +218,33 @@ class DocumentPipeline:
         storage_port = resolve_storage_provider()
         kms_port = resolve_kms_provider()
 
-        blob_id, is_deduped = self._store_or_dedup_blob(
-            payload=payload,
-            sha256_hash=sha256_hash,
-            byte_size=byte_size,
-            mime_type=resolved_mime,
-            tenant_id=tenant_id,
-            company_id=company_id,
-            storage_port=storage_port,
-            kms_port=kms_port,
-        )
+        try:
+            blob_id, is_deduped = self._store_or_dedup_blob(
+                payload=payload,
+                sha256_hash=sha256_hash,
+                byte_size=byte_size,
+                mime_type=resolved_mime,
+                tenant_id=tenant_id,
+                company_id=company_id,
+                storage_port=storage_port,
+                kms_port=kms_port,
+            )
+        except EncryptionUnavailableError as exc:
+            err_msg = f"ENCRYPTION_UNAVAILABLE: {exc}"
+            self._update_status(doc_id, DocumentStatus.REJECTED)
+            self._record_event(
+                doc_id, tenant_id, company_id, "ENCRYPTION_UNAVAILABLE",
+                {"error": str(exc)}, author_id
+            )
+            return PipelineResult(
+                document_id=doc_id,
+                status=DocumentStatus.REJECTED,
+                sha256=sha256_hash,
+                byte_size=byte_size,
+                mime_type=resolved_mime,
+                error=err_msg,
+                details={"kms_status": "NOT_CONFIGURED"},
+            )
 
         version_id = f"ver_{uuid.uuid4().hex[:16]}"
         with db.get_connection() as conn:
@@ -440,8 +459,8 @@ class DocumentPipeline:
         with db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT id, ref_count FROM blobs WHERE tenant_id = ? AND sha256 = ?",
-                (tenant_id, sha256_hash)
+                "SELECT id, ref_count FROM blobs WHERE tenant_id = ? AND company_id = ? AND sha256 = ?",
+                (tenant_id, company_id, sha256_hash)
             )
             row = cur.fetchone()
             if row:
@@ -453,11 +472,12 @@ class DocumentPipeline:
                 return blob_id, True
 
         # New blob: perform envelope encryption
-        key_context = {"tenant_id": tenant_id, "sha256": sha256_hash}
+        key_context = {"tenant_id": tenant_id, "company_id": company_id, "sha256": sha256_hash}
         kms_res, ciphertext = kms_port.encrypt(payload, context=key_context)
         if kms_res.status not in (PortStatus.OK, PortStatus.SANDBOX, PortStatus.DEGRADED):
-            # Degraded local envelope fallback
-            ciphertext = payload
+            raise EncryptionUnavailableError(
+                f"KMS port returned {kms_res.status.value}; refusing to store plaintext as encrypted content"
+            )
 
         blob_id = f"blb_{uuid.uuid4().hex[:16]}"
         storage_path = f"tenants/{tenant_id}/blobs/{sha256_hash[:2]}/{sha256_hash}"

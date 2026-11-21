@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS blobs (
     encryption_iv TEXT,
     ref_count INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL,
-    CONSTRAINT uq_tenant_blob_sha UNIQUE (tenant_id, sha256)
+    CONSTRAINT uq_tenant_company_blob_sha UNIQUE (tenant_id, company_id, sha256)
 );
 
 CREATE INDEX IF NOT EXISTS idx_blobs_sha256 ON blobs (sha256);

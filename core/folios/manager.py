@@ -200,6 +200,11 @@ class FolioManager:
                     f"Invalid folio transition: cannot transition from {current_status.value} to {new_status.value}"
                 )
 
+            # Invariant 5: Sealing or closing a folio verifies all its journal entries are in POSTED status
+            if new_status in (FolioStatus.PENDING_CLOSE, FolioStatus.CLOSED):
+                from core.ledger.kernel import LedgerKernel
+                LedgerKernel().verify_folio_journal_entries_posted(tenant_id, company_id, folio_id)
+
             closed_at = now if new_status == FolioStatus.CLOSED else None
             archived_at = now if new_status == FolioStatus.ARCHIVED else None
             expunged_at = now if new_status == FolioStatus.EXPUNGED else None

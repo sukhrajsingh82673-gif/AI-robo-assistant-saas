@@ -16,7 +16,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped, tenant_scope
 from core.evidence_ledger import EvidenceLedger
 from core.documents.evidence import seal_document_event
 from core.documents.versioning import get_document_version_payload
@@ -37,6 +37,7 @@ class ShareLinkRevokedError(Exception):
     pass
 
 
+@tenant_scoped
 def create_access_grant(
     document_id: str,
     tenant_id: str,
@@ -62,31 +63,36 @@ def create_access_grant(
     return grant_id
 
 
+@tenant_scoped
 def check_access(
     document_id: str,
     tenant_id: str,
     user_id: str,
     user_roles: Optional[List[str]] = None,
     required_permission: str = "READ",
+    company_id: Optional[str] = None,
 ) -> bool:
-    """Checks whether user has required permission to access document in tenant."""
+    """Checks whether user has required permission to access document in tenant/company."""
     roles = user_roles or []
     with db.get_connection() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT tenant_id, sensitivity_level, tombstone FROM documents WHERE id = ?",
+            "SELECT tenant_id, company_id, sensitivity_level, tombstone FROM documents WHERE id = ?",
             (document_id,)
         )
         row = cur.fetchone()
         if not row:
             return False
 
-        doc_tenant_id, sensitivity, tombstone = row[0], row[1], row[2]
+        doc_tenant_id, doc_company_id, sensitivity, tombstone = row[0], row[1], row[2], row[3]
         if tombstone:
             return False
 
         # Invariant: Strict multi-tenant isolation
         if doc_tenant_id != tenant_id:
+            return False
+        # Invariant: Strict cross-company isolation within a tenant
+        if company_id is not None and doc_company_id != company_id:
             return False
 
         # Owner / creator / admin or explicit grant check
@@ -94,10 +100,11 @@ def check_access(
             """
             SELECT permission FROM access_grants
             WHERE document_id = ? AND tenant_id = ? AND revoked_at IS NULL
+              AND (company_id = ? OR ? IS NULL)
               AND ((grantee_type = 'user' AND grantee_id = ?)
                 OR (grantee_type = 'role' AND grantee_id IN (%s)))
             """ % (",".join(["?"] * len(roles)) if roles else "''"),
-            [document_id, tenant_id, user_id] + roles
+            [document_id, tenant_id, company_id, company_id, user_id] + roles
         )
         grants = [r[0] for r in cur.fetchall()]
         if "ADMIN" in grants:
@@ -120,6 +127,7 @@ def check_access(
         return False
 
 
+@tenant_scoped
 def create_share_link(
     document_id: str,
     tenant_id: str,
@@ -162,7 +170,12 @@ def create_share_link(
     return link_id, raw_token, expires_at
 
 
-def access_share_link(raw_token: str) -> Tuple[Dict[str, Any], bytes]:
+@tenant_scoped
+def access_share_link(
+    raw_token: str,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+) -> Tuple[Dict[str, Any], bytes]:
     """Resolves an external share token.
 
     Verifies expiration and revocation, then serves document bytes without exposing storage URLs.
@@ -195,13 +208,24 @@ def access_share_link(raw_token: str) -> Tuple[Dict[str, Any], bytes]:
         conn.execute("UPDATE share_links SET access_count = access_count + 1 WHERE id = ?", (link_id,))
 
     # Read payload securely via versioning engine
-    meta, payload = get_document_version_payload(doc_id, verify_on_read=True)
+    meta, payload = get_document_version_payload(
+        doc_id,
+        verify_on_read=True,
+        tenant_id=tenant_id,
+        company_id=company_id,
+    )
     meta["link_id"] = link_id
     meta["tenant_id"] = tenant_id
     return meta, payload
 
 
-def revoke_share_link(raw_token: str, revoked_by: str) -> None:
+@tenant_scoped
+def revoke_share_link(
+    raw_token: str,
+    revoked_by: str,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+) -> None:
     """Revokes an active share link."""
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     with db.get_connection() as conn:

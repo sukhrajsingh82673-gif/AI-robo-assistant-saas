@@ -811,6 +811,81 @@ Real Output:
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1F.
 
+---
+
+## Sub-Step 1G — Double-Entry Financial Ledger Kernel
+
+### 1. Objectives & Architectural Delivery
+1. **Double-Entry Financial Ledger Invariants:**
+   - Strict adherence to Rule 12: Money is represented strictly as integer minor units (e.g. cents, pence, paise). Zero float arithmetic. Currencies strictly validated against ISO 4217 standard codes.
+   - Core tables: `accounts`, `journal_entries`, `journal_lines` with full tenant and company isolation.
+2. **Zero-Balance Invariant:**
+   - Every journal entry enforces `sum(debits) == sum(credits)` strictly per currency. Cross-currency balancing (e.g. USD debits balancing EUR credits) is strictly rejected unless multi-currency legs are each independently balanced.
+3. **Database-Level Immutability:**
+   - `POSTED` journal entries and lines cannot be edited or deleted. Enforced by database triggers on both PostgreSQL 16 (`fn_prevent_posted_journal_entry_modification`) and SQLite (`trg_prevent_delete_posted_entry`, `trg_prevent_update_posted_entry`, `trg_prevent_delete_posted_line`, `trg_prevent_update_posted_line`).
+   - Accounting corrections are performed exclusively via reversing entries (mirror entries with swapped debits and credits referencing the original entry).
+4. **Folio Integration:**
+   - Journal entries carry `folio_id`.
+   - Sealing or transitioning a folio to `PENDING_CLOSE` or `CLOSED` verifies all linked journal entries are in `POSTED` status; unposted draft entries block folio closure (`UnpostedFolioJournalEntriesError`).
+5. **Trial Balance Generation:**
+   - Generates company-scoped trial balance as of a given date, mathematically proving `total_debits == total_credits` with net zero balance across all accounts.
+6. **Multi-Tenant Row-Level Security:**
+   - PostgreSQL 16 RLS policies on `accounts`, `journal_entries`, and `journal_lines` enforcing tenant and company isolation (`migrations/pg/0016_ledger_kernel.sql`).
+
+### 2. Implementation Files
+- `migrations/pg/0016_ledger_kernel.sql`: PostgreSQL 16 DDL, immutability trigger functions, and RLS policies.
+- `migrations/common/0016_ledger_kernel.sql`: SQLite DDL and immutability triggers.
+- `core/ledger/__init__.py`: Public API exports.
+- `core/ledger/currency.py`: ISO 4217 currency specifications, decimals, validation, and zero-float formatting.
+- `core/ledger/schema.py`: `AccountType`, `JournalEntryStatus`, and `ensure_ledger_tables()`.
+- `core/ledger/kernel.py`: `LedgerKernel` (COA, journal entries, zero-balance posting, reversals, trial balance).
+- `core/folios/manager.py`: Integrated folio journal verification before status transition.
+- `tests/test_ledger_kernel.py`: Comprehensive test suite verifying all 7 acceptance criteria, Rule 12 validation, and mutation checks.
+
+### 3. Empirical Test Execution & Mutation Verification
+Command executed:
+```bash
+python3 -m pytest tests/test_ledger_kernel.py -v
+```
+
+Real Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 10 items
+
+tests/test_ledger_kernel.py::TestLedgerKernel::test_attempting_to_update_or_delete_posted_entry_raises_database_error PASSED [ 10%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_float_money_amounts_and_invalid_currencies_are_strictly_rejected PASSED [ 20%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_journal_entry_with_unequal_debits_and_credits_fails_to_post PASSED [ 30%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_mixed_currencies_must_balance_per_currency_independently PASSED [ 40%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_reversing_entry_creates_exact_opposite_lines_and_marks_original_reversed PASSED [ 50%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_sealing_folio_with_draft_journal_entries_raises_unposted_error PASSED [ 60%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_tenant_b_cannot_access_or_modify_tenant_a_accounts_or_journals PASSED [ 70%]
+tests/test_ledger_kernel.py::TestLedgerKernel::test_trial_balance_generates_correct_balances_and_net_zero_sum PASSED [ 80%]
+tests/test_ledger_kernel.py::TestLedgerKernelMutations::test_mutation_bypassing_balance_check_would_fail_invariant PASSED [ 90%]
+tests/test_ledger_kernel.py::TestLedgerKernelMutations::test_mutation_reversal_without_swapped_lines_caught PASSED [100%]
+
+============================== 10 passed in 7.53s ==============================
+```
+
+Combined Targeted Step 1 Test Suite (AST Linter, Capability Truth & Planner, Backbone Ports Contracts, Document Backbone, Folio Export Backbone, Ledger Kernel):
+```bash
+python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py -q
+```
+Real Output:
+```text
+.................s..s.......s..s.................................        [100%]
+61 passed, 4 skipped in 33.34s
+```
+
+Acceptance criteria fully met:
+- Single commit created for Sub-step 1G.
+
+
 
 
 

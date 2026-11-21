@@ -14,8 +14,9 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.evidence_ledger import EvidenceLedger
+from core.documents.errors import StorageDeletionFailedError
 from core.documents.evidence import seal_document_event
 from core.ports.base import PortStatus
 from core.ports.storage import resolve_storage_provider
@@ -31,12 +32,15 @@ class RetentionPeriodActiveError(Exception):
     pass
 
 
+@tenant_scoped
 def apply_legal_hold(
     document_id: str,
     reason: str,
     matter_id: Optional[str],
     applied_by: str,
     ledger: Optional[EvidenceLedger] = None,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> str:
     """Applies an active legal hold to a document, preventing disposal or mutation."""
     ledger = ledger or EvidenceLedger()
@@ -52,7 +56,12 @@ def apply_legal_hold(
         row = cur.fetchone()
         if not row:
             raise ValueError(f"Document {document_id} not found")
-        tenant_id, company_id = row[0], row[1]
+        doc_tenant_id, doc_company_id = row[0], row[1]
+        if tenant_id is not None and doc_tenant_id != tenant_id:
+            raise ValueError(f"Document {document_id} does not belong to tenant {tenant_id}")
+        if company_id is not None and doc_company_id != company_id:
+            raise ValueError(f"Document {document_id} does not belong to company {company_id}")
+        tenant_id, company_id = doc_tenant_id, doc_company_id
 
         conn.execute(
             """
@@ -94,11 +103,14 @@ def apply_legal_hold(
     return hold_id
 
 
+@tenant_scoped
 def release_legal_hold(
     document_id: str,
     hold_id: str,
     released_by: str,
     ledger: Optional[EvidenceLedger] = None,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> None:
     """Releases a specific legal hold. If no active holds remain, clears document's hold flag."""
     ledger = ledger or EvidenceLedger()
@@ -113,7 +125,12 @@ def release_legal_hold(
         row = cur.fetchone()
         if not row:
             raise ValueError(f"Document {document_id} not found")
-        tenant_id, company_id = row[0], row[1]
+        doc_tenant_id, doc_company_id = row[0], row[1]
+        if tenant_id is not None and doc_tenant_id != tenant_id:
+            raise ValueError(f"Document {document_id} does not belong to tenant {tenant_id}")
+        if company_id is not None and doc_company_id != company_id:
+            raise ValueError(f"Document {document_id} does not belong to company {company_id}")
+        tenant_id, company_id = doc_tenant_id, doc_company_id
 
         conn.execute(
             "UPDATE legal_holds SET active = 0, released_at = ?, released_by = ? WHERE id = ?",
@@ -152,11 +169,14 @@ def release_legal_hold(
     )
 
 
+@tenant_scoped
 def dispose_document(
     document_id: str,
     actor_id: str,
     force: bool = False,
     ledger: Optional[EvidenceLedger] = None,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Disposes a document via crypto-shredding and tombstoning.
 
@@ -179,12 +199,18 @@ def dispose_document(
         if not row:
             raise ValueError(f"Document {document_id} not found")
 
-        tenant_id, company_id, name, legal_hold, retention_until, tombstone, current_ver_id = row
+        doc_tenant_id, doc_company_id, name, legal_hold, retention_until, tombstone, current_ver_id = row
+        if tenant_id is not None and doc_tenant_id != tenant_id:
+            raise ValueError(f"Document {document_id} does not belong to tenant {tenant_id}")
+        if company_id is not None and doc_company_id != company_id:
+            raise ValueError(f"Document {document_id} does not belong to company {company_id}")
+        tenant_id, company_id = doc_tenant_id, doc_company_id
 
-        # Invariant 1: Active legal hold blocks disposal
-        if legal_hold:
-            cur.execute("SELECT id, reason FROM legal_holds WHERE document_id = ? AND active = 1", (document_id,))
-            active_holds = cur.fetchall()
+        # Invariant 1: Active legal hold blocks disposal. Query the authoritative
+        # hold rows rather than trusting a potentially stale denormalized flag.
+        cur.execute("SELECT id, reason FROM legal_holds WHERE document_id = ? AND active = 1", (document_id,))
+        active_holds = cur.fetchall()
+        if active_holds:
             reasons = [h[1] for h in active_holds]
             err_msg = f"Cannot dispose document {document_id}: active legal hold enforced ({'; '.join(reasons)})"
             # Record tamper attempt in ledger
@@ -221,16 +247,31 @@ def dispose_document(
         associated_blobs = cur.fetchall()
 
         storage_port = resolve_storage_provider()
+        shredded_count = 0
         for b_id, s_path, ref_cnt in associated_blobs:
-            # Overwrite DEK in database (crypto-shred)
-            conn.execute(
-                "UPDATE blobs SET dek_wrapped = 'CRYPTO_SHREDDED_NULLIFIED', ref_count = ref_count - 1 WHERE id = ?",
-                (b_id,)
-            )
             if ref_cnt <= 1:
-                # Delete ciphertext object from storage backend
+                # Last reference: delete ciphertext first and honour the result
+                # before destroying the DEK. Reporting DISPOSED on a failed
+                # delete would violate the Truth Rule.
                 bucket = os.environ.get("S3_BUCKET", "zonata-documents")
-                storage_port.delete(bucket, s_path)
+                del_res = storage_port.delete(bucket, s_path)
+                if del_res.status not in (PortStatus.OK, PortStatus.ACCEPTED_BY_PROVIDER, PortStatus.SANDBOX):
+                    raise StorageDeletionFailedError(
+                        f"Storage delete failed for blob {b_id}: {del_res.error}"
+                    )
+                # Overwrite DEK in database (crypto-shred)
+                conn.execute(
+                    "UPDATE blobs SET dek_wrapped = 'CRYPTO_SHREDDED_NULLIFIED', ref_count = 0 WHERE id = ?",
+                    (b_id,)
+                )
+                shredded_count += 1
+            else:
+                # Other documents still reference this blob: only release our
+                # reference. Shredding the DEK here would destroy their data.
+                conn.execute(
+                    "UPDATE blobs SET ref_count = ref_count - 1 WHERE id = ?",
+                    (b_id,)
+                )
 
         # Tombstone document record
         conn.execute(
@@ -251,7 +292,11 @@ def dispose_document(
             (
                 f"evt_{uuid.uuid4().hex[:16]}", document_id, tenant_id, company_id,
                 "DOCUMENT_CRYPTO_SHREDDED_DISPOSED",
-                json.dumps({"disposed_by": actor_id, "blobs_shredded": len(associated_blobs)}),
+                json.dumps({
+                    "disposed_by": actor_id,
+                    "blobs_shredded": shredded_count,
+                    "blobs_referenced": len(associated_blobs) - shredded_count,
+                }),
                 actor_id, None, now
             )
         )
@@ -266,7 +311,8 @@ def dispose_document(
         payload={
             "document_id": document_id,
             "disposed_at": now,
-            "blobs_affected": len(associated_blobs),
+            "blobs_shredded": shredded_count,
+            "blobs_referenced": len(associated_blobs) - shredded_count,
         }
     )
 

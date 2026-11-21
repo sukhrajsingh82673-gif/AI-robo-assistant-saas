@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS blobs (
     encryption_iv VARCHAR(64),
     ref_count INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_tenant_blob_sha UNIQUE (tenant_id, sha256)
+    CONSTRAINT uq_tenant_company_blob_sha UNIQUE (tenant_id, company_id, sha256)
 );
 
 CREATE INDEX IF NOT EXISTS idx_blobs_sha256 ON blobs (sha256);
@@ -181,7 +181,9 @@ CREATE INDEX IF NOT EXISTS idx_share_links_doc ON share_links (document_id);
 -- ============================================================================
 -- Row-Level Security (PostgreSQL 16)
 -- Rule 13: Multi-tenant by default. Cross-tenant and cross-company reads and
--- writes are strictly prohibited by kernel RLS policies.
+-- writes are strictly prohibited by kernel RLS policies. Policies are
+-- fail-closed: if the zonata.tenant_id / zonata.company_id session settings are
+-- absent, no rows are visible.
 -- ============================================================================
 DO $$
 DECLARE t text;
@@ -195,11 +197,11 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t||'_tenant_isolation', t);
     EXECUTE format(
       'CREATE POLICY %I ON %I USING (' ||
-      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       ') WITH CHECK (' ||
-      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       ')', t||'_tenant_isolation', t
     );
   END LOOP;
@@ -212,13 +214,13 @@ BEGIN
     EXECUTE format(
       'CREATE POLICY %I ON %I USING (' ||
       '  EXISTS (SELECT 1 FROM documents d WHERE d.id = %I.document_id AND (' ||
-      '    (d.tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '    AND (d.company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '    (d.tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '    AND (d.company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       '  ))' ||
       ') WITH CHECK (' ||
       '  EXISTS (SELECT 1 FROM documents d WHERE d.id = %I.document_id AND (' ||
-      '    (d.tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '    AND (d.company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '    (d.tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '    AND (d.company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       '  ))' ||
       ')', t||'_tenant_isolation', t, t, t
     );

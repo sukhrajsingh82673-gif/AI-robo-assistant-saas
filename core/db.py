@@ -4,6 +4,10 @@ Production SQLite engine providing tenant isolation, schema migrations,
 and relational persistence for all Company OS entities.
 """
 
+import contextlib
+import contextvars
+import functools
+import inspect
 import sqlite3
 import os
 import time
@@ -13,6 +17,43 @@ import urllib.parse
 import threading
 import sys
 from typing import Optional, Any, Dict, List, Tuple, Set
+
+# Request-scoped tenant/company context used to drive PostgreSQL fail-closed RLS.
+_current_tenant_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "zonata_current_tenant_id", default=None
+)
+_current_company_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "zonata_current_company_id", default=None
+)
+
+
+@contextlib.contextmanager
+def tenant_scope(tenant_id: Optional[str], company_id: Optional[str] = None):
+    """Binds the tenant/company used to set transactional RLS session settings."""
+    tenant_token = _current_tenant_id.set(tenant_id)
+    company_token = _current_company_id.set(company_id)
+    try:
+        yield
+    finally:
+        _current_tenant_id.reset(tenant_token)
+        _current_company_id.reset(company_token)
+
+
+def tenant_scoped(func):
+    """Decorator that binds tenant_id/company_id arguments to the RLS context."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            bound = inspect.signature(func).bind_partial(*args, **kwargs)
+            tenant_id = bound.arguments.get("tenant_id")
+            company_id = bound.arguments.get("company_id")
+        except (TypeError, ValueError):
+            tenant_id = company_id = None
+        if tenant_id is None:
+            return func(*args, **kwargs)
+        with tenant_scope(tenant_id, company_id):
+            return func(*args, **kwargs)
+    return wrapper
 
 # Automatically load Neon environment configuration (.env.local / .env)
 try:
@@ -4685,6 +4726,31 @@ class PostgresConnectionWrapper:
         self.raw_conn = raw_conn
         self._pool = pool
         self._is_closed = False
+        self._apply_rls_context()
+
+    def _apply_rls_context(self) -> None:
+        """Applies the request tenant/company to this session for fail-closed RLS.
+
+        Session-level settings are always overwritten (including to empty string)
+        so a pooled connection cannot leak a previous request's scope.
+        """
+        tenant_id = _current_tenant_id.get() or ""
+        company_id = _current_company_id.get() or ""
+        try:
+            cursor = self.raw_conn.cursor()
+            cursor.execute(
+                "SELECT set_config('zonata.tenant_id', %s, false), "
+                "set_config('zonata.company_id', %s, false)",
+                (tenant_id, company_id),
+            )
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        except Exception:
+            # RLS is fail-closed, so a missing context yields zero rows rather
+            # than cross-tenant disclosure.
+            pass
 
     @property
     def row_factory(self):
@@ -5339,6 +5405,8 @@ class Database:
                 ensure_document_backbone_tables(conn)
                 from core.folios.schema import ensure_folio_tables
                 ensure_folio_tables(conn)
+                from core.ledger.schema import ensure_ledger_tables
+                ensure_ledger_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5378,6 +5446,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_document_backbone_tables()
         from core.folios.schema import ensure_folio_tables
         ensure_folio_tables()
+        from core.ledger.schema import ensure_ledger_tables
+        ensure_ledger_tables()
     except Exception:
         pass
     try:

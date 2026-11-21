@@ -15,6 +15,7 @@ Verifies:
 12. LocalEnvelopeKeyProvider reports DEGRADED when allowed and refuses unflagged production.
 """
 
+import base64
 import hashlib
 import json
 import os
@@ -25,9 +26,10 @@ import uuid
 from unittest import mock
 
 from core.db import db, configure_isolated_test_db
+from core.documents.errors import StorageDeletionFailedError
 from core.evidence_ledger import EvidenceLedger
-from core.ports.base import PortStatus
-from core.ports.kms import LocalEnvelopeKeyProvider, resolve_kms_provider
+from core.ports.base import PortStatus, ProviderResult
+from core.ports.kms import LocalEnvelopeKeyProvider, NotConfiguredKMSProvider, resolve_kms_provider
 from core.ports.storage import resolve_storage_provider
 
 from core.documents.schema import (
@@ -246,15 +248,21 @@ class TestDocumentBackbone(unittest.TestCase):
                 new_payload=v2_bytes,
                 author_id=self.user_a,
                 change_reason="Add Merkle proof requirement",
+                tenant_id=self.tenant_a,
+                company_id=self.company_a,
             )
 
         # Retrieve V1
-        meta_v1, payload_v1 = get_document_version_payload(res.document_id, version_number=1)
+        meta_v1, payload_v1 = get_document_version_payload(
+            res.document_id, version_number=1, tenant_id=self.tenant_a, company_id=self.company_a
+        )
         self.assertEqual(payload_v1, v1_bytes)
         self.assertEqual(meta_v1["sha256"], hashlib.sha256(v1_bytes).hexdigest())
 
         # Retrieve V2
-        meta_v2, payload_v2 = get_document_version_payload(res.document_id, version_number=2)
+        meta_v2, payload_v2 = get_document_version_payload(
+            res.document_id, version_number=2, tenant_id=self.tenant_a, company_id=self.company_a
+        )
         self.assertEqual(payload_v2, v2_bytes)
         self.assertEqual(meta_v2["sha256"], hashlib.sha256(v2_bytes).hexdigest())
 
@@ -274,7 +282,7 @@ class TestDocumentBackbone(unittest.TestCase):
             )
 
             # Verify clean sweep first
-            clean_sweep = run_integrity_sweep(tenant_id=self.tenant_a)
+            clean_sweep = run_integrity_sweep(tenant_id=self.tenant_a, company_id=self.company_a)
             self.assertEqual(clean_sweep["status"], "CLEAN")
 
             # Intentionally corrupt the stored payload in storage
@@ -288,13 +296,16 @@ class TestDocumentBackbone(unittest.TestCase):
             storage_port.put(bucket, storage_path, b"TAMPERED_CORRUPTED_BYTES")
 
             # Sweep must detect corruption
-            tamper_sweep = run_integrity_sweep(tenant_id=self.tenant_a)
+            tamper_sweep = run_integrity_sweep(tenant_id=self.tenant_a, company_id=self.company_a)
             self.assertEqual(tamper_sweep["status"], "TAMPER_DETECTED")
             self.assertEqual(tamper_sweep["corrupted_count"], 1)
 
             # Verify-on-read must raise BlobCorruptionError
             with self.assertRaises(BlobCorruptionError):
-                get_document_version_payload(res.document_id, version_number=1, verify_on_read=True)
+                get_document_version_payload(
+                    res.document_id, version_number=1, verify_on_read=True,
+                    tenant_id=self.tenant_a, company_id=self.company_a,
+                )
 
     # =========================================================================
     # 7. LEGAL HOLD DISPOSAL BLOCK
@@ -317,15 +328,26 @@ class TestDocumentBackbone(unittest.TestCase):
                 reason="Tax Authority Statutory Audit Matter #9981",
                 matter_id="MATTER-9981",
                 applied_by="compliance_officer_1",
+                tenant_id=self.tenant_a,
+                company_id=self.company_a,
             )
 
             # Attempt disposal -> MUST fail with LegalHoldEnforcedError
             with self.assertRaises(LegalHoldEnforcedError):
-                dispose_document(res.document_id, actor_id="admin_1")
+                dispose_document(
+                    res.document_id, actor_id="admin_1",
+                    tenant_id=self.tenant_a, company_id=self.company_a,
+                )
 
             # Release legal hold -> disposal now succeeds
-            release_legal_hold(res.document_id, hold_id=hold_id, released_by="compliance_officer_1")
-            disp_res = dispose_document(res.document_id, actor_id="admin_1")
+            release_legal_hold(
+                res.document_id, hold_id=hold_id, released_by="compliance_officer_1",
+                tenant_id=self.tenant_a, company_id=self.company_a,
+            )
+            disp_res = dispose_document(
+                res.document_id, actor_id="admin_1",
+                tenant_id=self.tenant_a, company_id=self.company_a,
+            )
             self.assertEqual(disp_res["status"], "DISPOSED")
             self.assertTrue(disp_res["tombstone"])
 
@@ -349,8 +371,18 @@ class TestDocumentBackbone(unittest.TestCase):
             document_id=res_a.document_id,
             tenant_id=self.tenant_b,
             user_id="intruder_user_b",
+            company_id=self.company_b,
         )
         self.assertFalse(has_access)
+
+        # Same tenant, different company must also be denied (cross-company isolation)
+        cross_company_access = check_access(
+            document_id=res_a.document_id,
+            tenant_id=self.tenant_a,
+            user_id=self.user_a,
+            company_id=self.company_b,
+        )
+        self.assertFalse(cross_company_access)
 
         # Search for Tenant B returns 0 hits
         search_b = search_documents(
@@ -392,7 +424,7 @@ class TestDocumentBackbone(unittest.TestCase):
                 expires_in_seconds=-10,  # Expired in past
             )
             with self.assertRaises(ShareLinkExpiredError):
-                access_share_link(token_exp)
+                access_share_link(token_exp, tenant_id=self.tenant_a, company_id=self.company_a)
 
             # 2. Revoked link test
             link_id_valid, token_valid, _ = create_share_link(
@@ -402,9 +434,12 @@ class TestDocumentBackbone(unittest.TestCase):
                 created_by=self.user_a,
                 expires_in_seconds=3600,
             )
-            revoke_share_link(token_valid, revoked_by=self.user_a)
+            revoke_share_link(
+                token_valid, revoked_by=self.user_a,
+                tenant_id=self.tenant_a, company_id=self.company_a,
+            )
             with self.assertRaises(ShareLinkRevokedError):
-                access_share_link(token_valid)
+                access_share_link(token_valid, tenant_id=self.tenant_a, company_id=self.company_a)
 
     # =========================================================================
     # 10. PROMPT INJECTION BOUNDARY DEFENSE
@@ -492,6 +527,118 @@ class TestDocumentBackbone(unittest.TestCase):
             self.assertIn("prohibited", probe_res.error.lower())
 
 
+class TestDocumentBackboneRegressions(unittest.TestCase):
+    """Regression guards for isolation, encryption truthfulness and safe disposal."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_db_path = configure_isolated_test_db()
+        ensure_document_backbone_tables()
+        cls.pipeline = DocumentPipeline()
+        cls.tenant = f"ten_{uuid.uuid4().hex[:8]}"
+        cls.company_a = f"cmp_a_{uuid.uuid4().hex[:8]}"
+        cls.company_b = f"cmp_b_{uuid.uuid4().hex[:8]}"
+        cls.user = f"usr_{uuid.uuid4().hex[:8]}"
+
+    def _ingest(self, payload: bytes, name: str, company_id: str):
+        with mock.patch.dict(os.environ, {"ZONATA_TEST_MODE": "1"}):
+            return self.pipeline.ingest(
+                payload=payload,
+                name=name,
+                tenant_id=self.tenant,
+                company_id=company_id,
+                author_id=self.user,
+            )
+
+    def test_shared_blob_disposal_does_not_destroy_other_document(self):
+        """Disposing one document must not shred a DEK still referenced by another."""
+        payload = b"Shared SOP payload that must survive a sibling disposal"
+        res1 = self._ingest(payload, "sop_1.txt", self.company_a)
+        res2 = self._ingest(payload, "sop_2.txt", self.company_a)
+        self.assertEqual(res1.blob_id, res2.blob_id)
+
+        disp = dispose_document(
+            res1.document_id, actor_id=self.user,
+            tenant_id=self.tenant, company_id=self.company_a,
+        )
+        self.assertEqual(disp["status"], "DISPOSED")
+
+        _, surviving = get_document_version_payload(
+            res2.document_id,
+            tenant_id=self.tenant,
+            company_id=self.company_a,
+        )
+        self.assertEqual(surviving, payload)
+
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT dek_wrapped, ref_count FROM blobs WHERE id = ?", (res1.blob_id,))
+            dek_wrapped, ref_count = cur.fetchone()
+        self.assertNotEqual(dek_wrapped, "CRYPTO_SHREDDED_NULLIFIED")
+        self.assertEqual(ref_count, 1)
+
+    def test_same_tenant_different_company_blobs_are_not_deduplicated(self):
+        """Deduplication must never cross company boundaries inside a tenant."""
+        payload = b"Identical bytes uploaded by two companies in the same tenant"
+        res_a = self._ingest(payload, "a.txt", self.company_a)
+        res_b = self._ingest(payload, "b.txt", self.company_b)
+        self.assertNotEqual(res_a.blob_id, res_b.blob_id)
+
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT ref_count FROM blobs WHERE id = ?", (res_a.blob_id,))
+            self.assertEqual(cur.fetchone()[0], 1)
+            cur.execute("SELECT ref_count FROM blobs WHERE id = ?", (res_b.blob_id,))
+            self.assertEqual(cur.fetchone()[0], 1)
+
+    def test_kms_not_configured_rejects_ingest_without_storing_plaintext(self):
+        """Truth Rule: no plaintext storage may be reported as encrypted."""
+        payload = b"Content that must never be written in clear when KMS is absent"
+        with mock.patch(
+            "core.documents.pipeline.resolve_kms_provider",
+            return_value=NotConfiguredKMSProvider(),
+        ):
+            res = self._ingest(payload, "unencrypted_attempt.txt", self.company_a)
+
+        self.assertEqual(res.status, DocumentStatus.REJECTED)
+        self.assertIn("ENCRYPTION_UNAVAILABLE", str(res.error))
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) FROM blobs WHERE tenant_id = ? AND sha256 = ?",
+                (self.tenant, hashlib.sha256(payload).hexdigest()),
+            )
+            self.assertEqual(cur.fetchone()[0], 0)
+
+    def test_disposal_fails_honestly_when_storage_delete_fails(self):
+        """Disposal must not report DISPOSED when ciphertext deletion failed."""
+        payload = b"Ciphertext whose deletion will be simulated as failing"
+        res = self._ingest(payload, "delete_fail.txt", self.company_a)
+
+        class _FailingDeleteStorage:
+            def delete(self, bucket, key):
+                return ProviderResult(
+                    status=PortStatus.FAILED,
+                    provider="mutated_storage",
+                    error="simulated delete failure",
+                )
+
+        with mock.patch(
+            "core.documents.retention.resolve_storage_provider",
+            return_value=_FailingDeleteStorage(),
+        ):
+            with self.assertRaises(StorageDeletionFailedError):
+                dispose_document(
+                    res.document_id, actor_id=self.user,
+                    tenant_id=self.tenant, company_id=self.company_a,
+                )
+
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT tombstone FROM documents WHERE id = ?", (res.document_id,))
+            self.assertEqual(cur.fetchone()[0], 0)
+
+
 class TestDocumentBackboneMutations(unittest.TestCase):
     """Standing Rule 8: Mutation checks proving that disabling or tampering with
 
@@ -505,23 +652,87 @@ class TestDocumentBackboneMutations(unittest.TestCase):
         cls.pipeline = DocumentPipeline()
 
     def test_mutation_eicar_bypass_assertion_fails(self):
-        """Mutation check: If an infected file claimed to be AVAILABLE, the invariant check must catch it."""
-        fake_clean_res = PipelineResult(
-            document_id="doc_mutated_eicar",
-            status=DocumentStatus.AVAILABLE,  # Mutated: claiming AVAILABLE on malware
-            sha256="fake_sha",
-            byte_size=68,
-        )
-        with self.assertRaises(AssertionError):
-            self.assertEqual(fake_clean_res.status, DocumentStatus.REJECTED)
+        """Mutation check: disabling antivirus must let EICAR through, proving the guard is load-bearing."""
+        tenant = f"ten_{uuid.uuid4().hex[:8]}"
+        company = f"cmp_{uuid.uuid4().hex[:8]}"
+        user = f"usr_{uuid.uuid4().hex[:8]}"
+        eicar_payload = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
+        class _MutatedCleanAV:
+            provider = "mutated_clean_av"
+
+            def scan_bytes(self, data, filename=None):
+                return ProviderResult(
+                    status=PortStatus.SANDBOX,
+                    provider=self.provider,
+                    sandbox=True,
+                    metadata={"verdict": "CLEAN"},
+                )
+
+        with mock.patch.dict(os.environ, {"ZONATA_TEST_MODE": "1"}), mock.patch(
+            "core.documents.pipeline.resolve_antivirus_provider",
+            return_value=_MutatedCleanAV(),
+        ):
+            res = self.pipeline.ingest(
+                payload=eicar_payload,
+                name="eicar_test.com",
+                tenant_id=tenant,
+                company_id=company,
+                author_id=user,
+            )
+
+        # With the AV guard disabled the malware is no longer rejected; the
+        # acceptance test above proves the guard is what blocks it.
+        self.assertNotEqual(res.status, DocumentStatus.REJECTED)
+        self.assertNotIn("VIRUS_DETECTED", str(res.error))
 
     def test_mutation_tampered_blob_escapes_integrity_sweep_fails(self):
-        """Mutation check: If a blob has a different SHA than recorded, check must catch mismatch."""
-        expected_sha = "56c1ca1f53ec0b49adf8f9b5d0cb4c5267472f60c6bfd159f04c8ee1b20145cc"
-        tampered_bytes = b"TAMPERED_BYTES_MUTATION_CHECK"
-        computed_sha = hashlib.sha256(tampered_bytes).hexdigest()
-        with self.assertRaises(AssertionError):
-            self.assertEqual(expected_sha, computed_sha)
+        """Mutation check: disabling the SHA check must let a tampered blob pass the sweep."""
+        tenant = f"ten_{uuid.uuid4().hex[:8]}"
+        company = f"cmp_{uuid.uuid4().hex[:8]}"
+        user = f"usr_{uuid.uuid4().hex[:8]}"
+        payload = b"Integrity sweep mutation target payload"
+
+        with mock.patch.dict(os.environ, {"ZONATA_TEST_MODE": "1"}):
+            res = self.pipeline.ingest(
+                payload=payload,
+                name="sweep_target.txt",
+                tenant_id=tenant,
+                company_id=company,
+                author_id=user,
+            )
+
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT storage_path FROM blobs WHERE id = ?", (res.blob_id,))
+            storage_path = cur.fetchone()[0]
+
+        storage_port = resolve_storage_provider()
+        kms_port = resolve_kms_provider()
+        bucket = os.environ.get("S3_BUCKET", "zonata-documents")
+        key_context = {"tenant_id": tenant, "company_id": company, "sha256": res.sha256}
+        enc_res, tampered_ciphertext = kms_port.encrypt(b"TAMPERED_BYTES_MUTATION_CHECK", context=key_context)
+        storage_port.put(bucket, storage_path, tampered_ciphertext)
+
+        real_sha256 = hashlib.sha256
+
+        def _mutated_sha256(data=b""):
+            h = real_sha256(data)
+            class _Wrapper:
+                def hexdigest(self):
+                    return res.sha256
+                def digest(self):
+                    return h.digest()
+                def update(self, b):
+                    h.update(b)
+            return _Wrapper()
+
+        # Mutate the hash check to always return the recorded digest.
+        with mock.patch("core.documents.versioning.hashlib.sha256", side_effect=_mutated_sha256):
+            sweep = run_integrity_sweep(tenant_id=tenant, company_id=company)
+
+        self.assertEqual(sweep["status"], "CLEAN")
+        self.assertEqual(sweep["corrupted_count"], 0)
 
     def test_mutation_prompt_injection_breakout_fails_without_neutralization(self):
         """Mutation check: Raw un-neutralized text containing closing delimiter causes fence breach."""
