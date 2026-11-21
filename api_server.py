@@ -10349,6 +10349,20 @@ def run_server(port=8080):
     if is_prod and os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1":
         raise RuntimeError("Security Invariant Violation: ZONATA_ALLOW_HOST_SHELL=1 is strictly prohibited in production mode. Refusing server startup.")
 
+    if is_prod:
+        allow_degraded = os.environ.get("ZONATA_ALLOW_DEGRADED", "0") == "1"
+        if db.dialect == DatabaseDialect.SQLITE and not allow_degraded:
+            raise RuntimeError(
+                "Production Profile Refusal: Running on SQLite in production mode is strictly prohibited. "
+                "PostgreSQL 16 is authoritative. Set ZONATA_ALLOW_DEGRADED=1 to bypass for testing/degraded mode."
+            )
+        model_provider = os.environ.get("ZONATA_MODEL_PROVIDER", "embedded_free").lower()
+        if model_provider in ("embedded_free", "mock", "none") and not allow_degraded:
+            raise RuntimeError(
+                "Production Profile Refusal: Running with 'embedded_free' model provider in production mode is strictly prohibited. "
+                "Configure a verified model provider or set ZONATA_ALLOW_DEGRADED=1 to bypass for testing/degraded mode."
+            )
+
     # Enforce database connectivity readiness verification before binding or starting workers
     db.verify_readiness()
     from core.database_engine import engine

@@ -62,7 +62,7 @@ services:
       - TEMPORAL_HOST=temporal:7233
       - VAULT_ADDR=http://vault:8200
       - KEYCLOAK_URL=http://keycloak:8080
-      - S3_ENDPOINT=http://minio:9000
+      - S3_ENDPOINT=http://seaweedfs:8333
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     volumes:
       - zonata-storage:/app/storage
@@ -92,7 +92,7 @@ services:
         condition: service_started
       temporal:
         condition: service_started
-      minio:
+      seaweedfs:
         condition: service_started
 
   zonata-worker:
@@ -154,10 +154,10 @@ services:
     environment:
       - APP_ENV=production
       - ENVIRONMENT=production
-      - S3_ENDPOINT=http://minio:9000
+      - S3_ENDPOINT=http://seaweedfs:8333
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-zonata-backups-production}
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-zonata_minio_admin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY:-zonata_s3_admin}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY}
       - PG_WAL_ARCHIVE_DIR=/var/lib/postgresql/wal_archive
       - PG_BASE_BACKUP_DIR=/var/lib/postgresql/base_backups
     volumes:
@@ -185,11 +185,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      seaweedfs:
         condition: service_started
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.4-alpine
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
@@ -232,7 +232,7 @@ services:
       - zonata-internal
 
   nats:
-    image: nats:2.10-alpine
+    image: nats:2.10.18-alpine
     restart: unless-stopped
     command: ["-js", "-sd", "/data/jetstream", "-m", "8222"]
     ports:
@@ -294,20 +294,19 @@ services:
       postgres:
         condition: service_healthy
 
-  minio:
-    image: cgr.dev/chainguard/minio:latest
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.79
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    command: "server -s3 -filer"
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:8333:8333"
+      - "127.0.0.1:8888:8888"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-zonata_minio_admin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - WEED_S3_ENABLED=true
     volumes:
-      - minio-data:/data
+      - seaweedfs-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8333/"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -459,8 +458,8 @@ volumes:
     name: nats-data
   temporal-data:
     name: temporal-data
-  minio-data:
-    name: minio-data
+  seaweedfs-data:
+    name: seaweedfs-data
   prometheus-data:
     name: prometheus-data
   alertmanager-data:

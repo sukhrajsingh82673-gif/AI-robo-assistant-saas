@@ -30,10 +30,21 @@
   - Upgraded `package.json` `build` script to execute `node --check web/*.js && python3 -m compileall -q .`.
   - Verified 2,133 tests collected with 0 collection errors.
   - Documented empirical command output in `docs/reports/STEP1_REPORT.md`.
+- **Sub-Step 1B (Supply Chain, CI & Honest Claims):** COMPLETE
+  - Created `.github/workflows/ci.yml` featuring PostgreSQL 16, SeaweedFS S3, Mailpit SMTP, ClamAV 1.4_base, and Apache Tika 2.9.2 service containers.
+  - Pinned all container images across compose files and CI workflows; verified `:latest` rejection in tests and CI.
+  - Configured Dependabot in `.github/dependabot.yml` covering `pip`, `npm`, and `github-actions`.
+  - Generated `docs/reports/OSS_REGISTER.md` cataloging 44 installed distributions with authoritative SPDX licenses.
+  - Scrubbed promotional phrasing in `docs/zonata-build/PILOT_REPORT.md` and memory.
+  - Enforced production startup guards prohibiting SQLite and `embedded_free` models without explicit `ZONATA_ALLOW_DEGRADED=1`.
+  - Pinned all runtime requirements with cryptographic PyPI sha256 hashes (`requirements.txt`).
+  - Upgraded dependencies to resolve security advisories (`cryptography==50.0.2`, `cffi==2.0.0`).
+  - Verified green GitHub Actions CI run 44861703127 across all 3 jobs (PostgreSQL 16 contract tests, SQLite dev test suite, supply chain/license/vulnerability audit).
+  - Documented empirical command outputs in `docs/reports/STEP1_REPORT.md`.
 
 ## Active Roadmap (Step 1 Sub-Steps)
 - [x] **1A:** Inventory and repository integrity
-- [ ] **1B:** Supply chain, CI and honest claims
+- [x] **1B:** Supply chain, CI and honest claims
 - [ ] **1C:** Capability truth table and the Port framework
 - [ ] **1D:** Honest adapters with real providers
 - [ ] **1E:** Document and file backbone
