@@ -57,7 +57,12 @@
   - Added ephemeral hashed external share links and multi-tenant search.
   - Added template document generator (PDF/DOCX/XLSX) and sovereign PDF digital signing.
   - Built full test suite (`tests/test_documents_backbone.py`) with 15 passing tests and mutation checks.
-- [ ] **1F:** Folio, evidence and export packs
+- [x] **1F:** Folio, evidence and export packs
+  - Implemented Folio aggregate root and immutable entries (`folios`, `folio_entries`) with PostgreSQL 16 RLS policies (`migrations/pg/0015_folio_evidence_backbone.sql`).
+  - Added deterministic Merkle tree calculation (`core/folios/merkle.py`), root sealing on status transitions, and audit proof verification without database access.
+  - Implemented self-verifying export pack (`.zip`) containing `manifest.json`, `entries/`, `files/`, `audit_trail.json`, and standalone zero-dependency `verify_pack.py` offline verifier.
+  - Implemented deletion drill: sovereign expungement archives export pack to storage, logs pack hash into permanent `EvidenceLedger`, and purges database rows.
+  - Authored comprehensive test suite (`tests/test_folio_export_backbone.py`) verifying all 7 acceptance requirements and mutation checks.
 - [ ] **1G:** Ledger kernel
 - [ ] **1H:** Industry Pack framework
 - [ ] **1I:** Always-on baseline

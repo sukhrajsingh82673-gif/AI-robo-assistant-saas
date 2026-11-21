@@ -5337,6 +5337,8 @@ class Database:
             try:
                 from core.documents.schema import ensure_document_backbone_tables
                 ensure_document_backbone_tables(conn)
+                from core.folios.schema import ensure_folio_tables
+                ensure_folio_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5374,6 +5376,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     try:
         from core.documents.schema import ensure_document_backbone_tables
         ensure_document_backbone_tables()
+        from core.folios.schema import ensure_folio_tables
+        ensure_folio_tables()
     except Exception:
         pass
     try:

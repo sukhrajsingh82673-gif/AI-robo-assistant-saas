@@ -732,6 +732,86 @@ PostgreSQL 16 & Service Containers Contract Tests:
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1E.
 
+---
+
+## Sub-Step 1F — Folio Aggregate, Merkle Evidence Tree and Export Packs
+
+### 1. Objectives & Architectural Delivery
+1. **Folio Aggregate Core Concept:**
+   - A business aggregate root that binds documents, messages, tasks, notes, journal entries, approvals, timeline events, external receipts, and cryptographic evidence into a single sovereign unit.
+   - Folio states: `DRAFT`, `IN_PROGRESS`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `CLOSED`, `EXPUNGED`. Governed by a strict state transition matrix with immutable terminals.
+2. **Governed Tables & RLS Policies:**
+   - `folios`: multi-tenant, company-scoped folio root record (`folio_id`, `tenant_id`, `company_id`, `folio_type`, `title`, `status`, `merkle_root`, `sealed_at`, `archive_blob_id`, `created_by`, `created_at`, `updated_at`).
+   - `folio_entries`: immutable sequence-numbered append-only log (`entry_id`, `folio_id`, `entry_sequence`, `entry_type`, `reference_id`, `title`, `payload`, `entry_hash`, `author_id`, `created_at`).
+   - PostgreSQL 16 Row-Level Security (RLS) policies enforcing multi-tenant and cross-company isolation on both tables (`migrations/pg/0015_folio_evidence_backbone.sql`).
+3. **Deterministic Merkle Tree & Audit Proofs:**
+   - Cryptographic leaf hashing of canonicalized entry data (`entry_id`, `entry_sequence`, `entry_type`, `reference_id`, `hash(payload)`).
+   - Dynamic binary tree construction with deterministic SHA-256 pair combination.
+   - Generation of Merkle audit paths (`siblings`: `[direction, hash]`), verifiable offline without database access.
+4. **Self-Verifying Export Packs (`.zip`):**
+   - Sovereign archive containing:
+     - `manifest.json`: Folio metadata, sealed Merkle root, entry counts, and SHA-256 digests of all pack contents.
+     - `entries/`: Canonical JSON records of all folio entries.
+     - `files/`: Referenced document blobs verified against their SHA-256 digests.
+     - `audit_trail.json`: Detailed cryptographic timeline with inclusion proofs for each entry.
+     - `verify_pack.py`: Self-contained, zero-dependency Python verification script.
+   - Running `python3 verify_pack.py` offline independently verifies all file digests and recomputes the Merkle tree. Outputs `VERIFIED` (exit 0) or `TAMPER_DETECTED` (exit 1).
+5. **Deletion Drill & Sovereign Expungement:**
+   - Expunging a folio exports the complete self-verifying archive pack to storage.
+   - Records the pack hash in the permanent `EvidenceLedger`.
+   - Purges all database rows (`folios` and `folio_entries`) for that folio, leaving only the immutable cryptographic evidence.
+
+### 2. Implementation Files
+- `migrations/pg/0015_folio_evidence_backbone.sql`: DDL for PostgreSQL 16 with RLS policies.
+- `migrations/common/0015_folio_evidence_backbone.sql`: DDL for SQLite dev/testing profile.
+- `core/folios/__init__.py`: Package entry points.
+- `core/folios/schema.py`: `FolioStatus`, `FolioEntryType`, state transition matrix `ALLOWED_TRANSITIONS`, and table initializers.
+- `core/folios/merkle.py`: Merkle tree generation, root recalculation, and cryptographic proof verification.
+- `core/folios/export.py`: Archive builder with zero-dependency standalone `verify_pack.py` and offline verification engine.
+- `core/folios/manager.py`: `FolioManager` coordinating folio lifecycle, entry appends, transitions, export packs, and expunge drills.
+- `tests/test_folio_export_backbone.py`: Comprehensive test suite verifying all 7 acceptance requirements and mutation checks.
+
+### 3. Empirical Test Execution & Mutation Verification
+Command executed:
+```bash
+python3 -m pytest tests/test_folio_export_backbone.py -v
+```
+
+Real Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 7 items
+
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_export_pack_generates_and_verifies_cleanly_via_standalone_script PASSED [ 14%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_folio_entries_recalculate_merkle_root_deterministically PASSED [ 28%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_folio_expunge_deletion_drill_seals_pack_hash_and_purges_rows PASSED [ 42%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_folio_state_machine_transition_rules PASSED [ 57%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_merkle_audit_proof_verifies_without_database PASSED [ 71%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_tampered_export_pack_fails_with_tamper_detected PASSED [ 85%]
+tests/test_folio_export_backbone.py::TestFolioExportBackbone::test_tenant_b_cannot_access_tenant_a_folio PASSED [100%]
+
+============================== 7 passed in 1.83s ===============================
+```
+
+Combined Targeted Step 1 Test Suite:
+```bash
+python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py -q
+```
+Real Output:
+```text
+..................s..s.......s..s.......................                 [100%]
+51 passed, 4 skipped in 10.20s
+```
+
+Acceptance criteria fully met:
+- Single commit created for Sub-step 1F.
+
+
 
 
 
