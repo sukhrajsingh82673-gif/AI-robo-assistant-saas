@@ -631,6 +631,108 @@ Real Verification Confirmed in Live Containers:
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1D.
 
+---
+
+## Sub-Step 1E — Document and File Backbone
+
+### 1. Objectives & Scope
+- Implement unified, governed multi-tenant document system across 10 tables:
+  1. `documents` (root aggregate with sensitivity levels, regime tags, status, legal hold, and tombstone).
+  2. `blobs` (content-addressed by SHA-256, deduplicated per tenant via `UNIQUE(tenant_id, sha256)`).
+  3. `document_versions` (immutable version chain, preserving previous version hashes and payloads).
+  4. `document_events` (append-only lifecycle audit trail with Merkle evidence IDs).
+  5. `classifications` (deterministic keyword/template rules with confidence and review queue).
+  6. `extractions` (Apache Tika text & OCR provenance, `trust: UNTRUSTED`, Presidio PII/PHI labeling).
+  7. `retention_policies` (jurisdiction, document type, retention days, WORM flag).
+  8. `legal_holds` (active hold blocking any disposal, tombstoning, or mutation).
+  9. `access_grants` (internal permission ACL: user/role/agent with READ/WRITE/ADMIN).
+  10. `share_links` (time-limited external links with SHA-256 token hashing; no raw S3 bucket exposure).
+- Apply PostgreSQL 16 Row-Level Security (RLS) policies enforcing multi-tenant and cross-company isolation on all 10 tables (`migrations/pg/0014_document_backbone.sql`).
+- Implement governed 8-state pipeline (`core/documents/pipeline.py`):
+  `RECEIVED → QUARANTINED → SCANNED → STORED → EXTRACTED → CLASSIFIED → INDEXED → AVAILABLE`
+  with `REVIEW_REQUIRED` (human review queue for confidence < 0.70) and `REJECTED` branches.
+- Content sniffing by magic bytes: binary executables (PE/ELF/Mach-O), scripts, and macro-enabled files are rejected unless routed through quarantined Import lane. Active PDF content is flagged.
+- ClamAV antivirus integration: infected files (e.g. EICAR) are rejected immediately; zero bytes reach available store.
+- Scheduled integrity sweep (`core/documents/versioning.py`): checks all tenant blobs against storage hashes; reports bit rot as corruption incidents and logs tamper events in EvidenceLedger.
+- Prompt injection protection (`core/documents/safety.py`): extracted text carries `trust: UNTRUSTED` and model consumption is fenced inside delimiter tags (`<<<UNTRUSTED_DOCUMENT_CONTENT:id:sha>>>`), neutralizing closing tag breakout attempts.
+- Template generation (`core/documents/generation.py`): DOCX, XLSX, and PDF generation recording `template_id` and `template_version`; PDF digital signing with mandatory legal disclaimer.
+- Local Envelope Key Management: `LocalEnvelopeKeyProvider` reports `DEGRADED` in capability truth table when permitted; prohibited in unflagged production.
+
+### 2. Implementation Files
+- `migrations/pg/0014_document_backbone.sql`: Full PostgreSQL 16 schema DDL with RLS policies.
+- `migrations/common/0014_document_backbone.sql`: SQLite dev/test schema DDL.
+- `core/documents/__init__.py`: Public API exports.
+- `core/documents/schema.py`: Enum definitions and `ensure_document_backbone_tables()` bootstrap.
+- `core/documents/safety.py`: Magic-byte content sniffer, prompt injection scanner, and model fence wrapper.
+- `core/documents/pipeline.py`: Governed intake pipeline executing the 8-state reality ladder.
+- `core/documents/versioning.py`: Immutable versions, verify-on-read, and scheduled integrity sweep.
+- `core/documents/retention.py`: Legal hold management, retention enforcement, and crypto-shred disposal.
+- `core/documents/sharing.py`: Internal access grants and ephemeral hashed external share links.
+- `core/documents/search.py`: Multi-tenant scoped full-text search engine.
+- `core/documents/generation.py`: Versioned template generator and sovereign PDF digital signing.
+- `core/documents/evidence.py`: Bridge sealing document lifecycle events into Merkle `EvidenceLedger`.
+- `tests/test_documents_backbone.py`: Comprehensive test suite verifying all 12 acceptance criteria + 3 mutation checks.
+
+### 3. Empirical Test Execution & Mutation Verification
+Command executed:
+```bash
+python3 -m pytest tests/test_documents_backbone.py -v
+```
+
+Real Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 15 items
+
+tests/test_documents_backbone.py::TestDocumentBackbone::test_corrupted_blob_caught_by_integrity_sweep_and_read PASSED [  6%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_document_under_legal_hold_cannot_be_disposed PASSED [ 13%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_eicar_file_quarantined_and_never_reaches_available PASSED [ 20%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_expired_or_revoked_share_link_rejected PASSED [ 26%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_local_envelope_key_provider_reports_degraded_when_flagged PASSED [ 33%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_prompt_injection_flagged_and_fenced_with_untrusted_delimiters PASSED [ 40%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_renamed_executable_rejected_by_content PASSED [ 46%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_scanned_invoice_pdf_yields_searchable_text_with_provenance PASSED [ 53%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_template_generation_and_sovereign_pdf_signing PASSED [ 60%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_tenant_b_cannot_read_or_search_tenant_a_documents PASSED [ 66%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_two_uploads_of_same_bytes_share_one_blob PASSED [ 73%]
+tests/test_documents_backbone.py::TestDocumentBackbone::test_version_edit_leaves_old_version_retrievable_and_hash_identical PASSED [ 80%]
+tests/test_documents_backbone.py::TestDocumentBackboneMutations::test_mutation_eicar_bypass_assertion_fails PASSED [ 86%]
+tests/test_documents_backbone.py::TestDocumentBackboneMutations::test_mutation_prompt_injection_breakout_fails_without_neutralization PASSED [ 93%]
+tests/test_documents_backbone.py::TestDocumentBackboneMutations::test_mutation_tampered_blob_escapes_integrity_sweep_fails PASSED [100%]
+
+============================== 15 passed in 2.87s ==============================
+```
+
+Combined Targeted Suite Verification (AST Linter, Capability Truth & Planner, Backbone Ports Contracts, Document Backbone):
+```bash
+python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py -q
+```
+Real Output:
+```text
+44 passed, 4 skipped in 11.90s
+```
+
+#### GitHub Actions CI Verification for Sub-Step 1E
+- **CI Run URL:** https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44891996072
+- **Workflow Status:** `COMPLETED / SUCCESS` (3/3 jobs passed)
+- **Live Container Execution Log (PostgreSQL 16 & Service Containers):**
+```text
+PostgreSQL 16 & Service Containers Contract Tests:
+  - Run Six Backbone Service Contract Tests & Document Backbone against Real Containers:
+    tests/test_ports_contracts.py (16 passed)
+    tests/test_documents_backbone.py (15 passed + 1 extra parameterization)
+    ============================== 32 passed in 3.85s ==============================
+```
+
+Acceptance criteria fully met:
+- Single commit created for Sub-step 1E.
+
+
 
 
 

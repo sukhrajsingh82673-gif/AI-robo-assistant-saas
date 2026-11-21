@@ -445,9 +445,60 @@ class SandboxKMSProvider(KeyManagementPort):
         return self.encrypt(pt, new_context)
 
 
+class LocalEnvelopeKeyProvider(SovereignEnvelopeKMSProvider):
+    """Local sovereign envelope key provider.
+
+    Implements Step 1E envelope encryption requirement:
+    Allowed only with an explicit environment flag (ZONATA_ALLOW_DEGRADED=1 or
+    LOCAL_ENVELOPE_KEY=1) and reports DEGRADED in the truth table.
+    No default key; master key never stored in database or logs.
+    """
+
+    def __init__(self, master_key_material: Optional[str] = None):
+        super().__init__(master_key_material=master_key_material)
+        self.provider_name = "local_envelope_kms"
+
+    def probe(self) -> ProviderResult:
+        res = super().probe()
+        if res.status == PortStatus.OK:
+            allow_degraded = (
+                os.environ.get("ZONATA_ALLOW_DEGRADED") == "1"
+                or os.environ.get("LOCAL_ENVELOPE_KEY") == "1"
+                or os.environ.get("USE_LOCAL_ENVELOPE_KMS") == "1"
+            )
+            if allow_degraded:
+                return ProviderResult(
+                    status=PortStatus.DEGRADED,
+                    provider=self.provider_name,
+                    provider_ref=res.provider_ref,
+                    sandbox=False,
+                    latency_ms=res.latency_ms,
+                    cost=0.0,
+                    metadata={"notice": "LocalEnvelopeKeyProvider running in sovereign degraded mode", "degraded": True}
+                )
+            else:
+                return ProviderResult(
+                    status=PortStatus.FAILED,
+                    provider=self.provider_name,
+                    provider_ref=None,
+                    sandbox=False,
+                    latency_ms=res.latency_ms,
+                    cost=0.0,
+                    error="Local envelope key provider prohibited in production without ZONATA_ALLOW_DEGRADED=1 or LOCAL_ENVELOPE_KEY=1"
+                )
+        return res
+
+
 def resolve_kms_provider() -> KeyManagementPort:
+    use_local = (
+        os.environ.get("USE_LOCAL_ENVELOPE_KMS") == "1"
+        or os.environ.get("LOCAL_ENVELOPE_KEY") == "1"
+        or os.environ.get("KMS_PROVIDER", "").lower() == "local"
+    )
     raw_key = os.environ.get("KMS_MASTER_KEY") or os.environ.get("SECRET_VAULT_KEY")
     if HAS_CRYPTOGRAPHY and raw_key:
+        if use_local:
+            return LocalEnvelopeKeyProvider(raw_key)
         return SovereignEnvelopeKMSProvider(raw_key)
     is_test = os.environ.get("ZONATA_TEST_MODE") == "1" or os.environ.get("APP_ENV") in ("test", "testing")
     if is_test:
@@ -455,3 +506,4 @@ def resolve_kms_provider() -> KeyManagementPort:
     return NotConfiguredKMSProvider(
         "KMS master key not configured (set KMS_MASTER_KEY or SECRET_VAULT_KEY)"
     )
+

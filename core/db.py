@@ -5334,6 +5334,11 @@ class Database:
                         conn.rollback()
                     except Exception:
                         pass
+            try:
+                from core.documents.schema import ensure_document_backbone_tables
+                ensure_document_backbone_tables(conn)
+            except Exception:
+                pass
             conn.commit()
 
 # Global Singleton Database Instance
@@ -5364,6 +5369,11 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     try:
         from core.evidence_service import evidence_service
         evidence_service._init_db()
+    except Exception:
+        pass
+    try:
+        from core.documents.schema import ensure_document_backbone_tables
+        ensure_document_backbone_tables()
     except Exception:
         pass
     try:

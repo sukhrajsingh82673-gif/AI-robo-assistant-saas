@@ -220,7 +220,12 @@ class SandboxTextExtractionProvider(TextExtractionPort):
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
-            text = f"[Binary Document of {len(data)} bytes - Synthetic Text Extraction]"
+            import re
+            chunks = re.findall(rb"[\x20-\x7e\n\r\t]{4,}", data)
+            if chunks:
+                text = " ".join(c.decode("latin-1", errors="ignore") for c in chunks)
+            else:
+                text = f"[Binary Document of {len(data)} bytes - Synthetic Text Extraction]"
 
         cleaned = _sanitize_extracted_text(text, max_bytes=max_bytes)
         return ProviderResult(

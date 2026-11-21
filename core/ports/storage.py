@@ -366,9 +366,11 @@ class NotConfiguredStorageProvider(StoragePort):
 
 class SandboxStorageProvider(StoragePort):
     """In-memory simulation active only when ZONATA_TEST_MODE=1."""
+    _store: Dict[str, Dict[str, Any]] = {}
+
     def __init__(self):
         super().__init__(provider_name="sandbox_storage", sandbox=True)
-        self._store: Dict[str, Dict[str, Any]] = {}
+        self._store = SandboxStorageProvider._store
 
     def _is_test(self) -> bool:
         return os.environ.get("ZONATA_TEST_MODE") == "1" or os.environ.get("APP_ENV") in ("test", "testing")

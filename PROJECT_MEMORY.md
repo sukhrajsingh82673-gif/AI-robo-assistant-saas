@@ -47,7 +47,16 @@
 - [x] **1B:** Supply chain, CI and honest claims
 - [x] **1C:** Capability truth table and the Port framework
 - [x] **1D:** Honest adapters with real providers
-- [ ] **1E:** Document and file backbone
+- [x] **1E:** Document and file backbone
+  - Defined 10-table governed schema (`documents`, `blobs`, `document_versions`, `document_events`, `classifications`, `extractions`, `retention_policies`, `legal_holds`, `access_grants`, `share_links`) with PostgreSQL 16 RLS policies.
+  - Implemented 8-state pipeline (`RECEIVED → QUARANTINED → SCANNED → STORED → EXTRACTED → CLASSIFIED → INDEXED → AVAILABLE`) with review queue and rejection branches.
+  - Built magic-byte content sniffer rejecting executables, scripts, and macros unless routed through quarantined Import lane.
+  - Implemented per-tenant SHA-256 blob deduplication and envelope encryption via `LocalEnvelopeKeyProvider`.
+  - Added immutable versioning, verify-on-read, and scheduled integrity sweeps for bit rot detection.
+  - Implemented legal hold enforcement blocking crypto-shred disposal (`LegalHoldEnforcedError`).
+  - Added ephemeral hashed external share links and multi-tenant search.
+  - Added template document generator (PDF/DOCX/XLSX) and sovereign PDF digital signing.
+  - Built full test suite (`tests/test_documents_backbone.py`) with 15 passing tests and mutation checks.
 - [ ] **1F:** Folio, evidence and export packs
 - [ ] **1G:** Ledger kernel
 - [ ] **1H:** Industry Pack framework
