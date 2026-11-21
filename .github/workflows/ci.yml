@@ -180,7 +180,7 @@ jobs:
           python3 -m pytest --collect-only -q
           python3 -m pytest tests/test_settings_registry_phase1.py tests/test_settings_v2_phase2.py -q
           python3 -m pytest tests/test_stage2_foundations.py tests/test_stage6_adapters_global.py -q
-          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py -q
+          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py -q
           python3 scripts/reality_probe.py
 
   # ===========================================================================
@@ -339,4 +339,4 @@ jobs:
           KMS_MASTER_KEY: sovereign_ci_envelope_master_key_32_chars!
           APP_ENV: staging
         run: |
-          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py -v
+          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py -v

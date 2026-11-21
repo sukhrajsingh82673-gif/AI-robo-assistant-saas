@@ -5407,6 +5407,8 @@ class Database:
                 ensure_folio_tables(conn)
                 from core.ledger.schema import ensure_ledger_tables
                 ensure_ledger_tables(conn)
+                from core.industry_packs.loader import ensure_industry_pack_tables
+                ensure_industry_pack_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5448,6 +5450,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_folio_tables()
         from core.ledger.schema import ensure_ledger_tables
         ensure_ledger_tables()
+        from core.industry_packs.loader import ensure_industry_pack_tables
+        ensure_industry_pack_tables()
     except Exception:
         pass
     try:

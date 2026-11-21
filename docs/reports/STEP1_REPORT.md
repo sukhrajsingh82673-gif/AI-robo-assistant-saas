@@ -885,6 +885,90 @@ Real Output:
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1G.
 
+---
+
+## Sub-Step 1H — Declarative Industry Pack Framework with UN ISIC Rev. 4 Taxonomy
+
+### 1. Objectives & Architectural Delivery
+1. **UN ISIC Rev. 4 Taxonomy Registry (`core/industry_packs/isic.py`):**
+   - Implements complete UN ISIC (International Standard Industrial Classification) Rev. 4 taxonomy covering all 21 Sections (A-U) and 88 Divisions (01-99).
+   - Validates that every industry pack maps to an official UN ISIC code and provides programmatic section/division lookup (`get_isic_details`, `validate_isic_code`).
+2. **Declarative `zonata.industry-pack/v1` Schema Validation (`core/industry_packs/schema.py`):**
+   - Strictly validates pack manifest structure: `schema_version`, `metadata` (pack_id, name, version, description, author, industry_code), `document_templates`, `chart_of_accounts`, `folio_types`, and `workflows`.
+   - Rejects malformed or unbalanced charts of accounts (`MalformedChartOfAccountsError`).
+   - Requires every account code, type (`ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `EXPENSE`), and valid ISO 4217 currency.
+   - Enforces referential integrity across pack sections: workflows and folio types cannot reference undefined accounts or document templates.
+3. **Canonical Reference Industry Packs:**
+   - Authored three production-grade canonical reference packs under `packs/industries/`:
+     - `packs/industries/saas/v1/pack.yaml`: ISIC `J62` (Computer programming, consultancy and related activities), ARR/deferred revenue COA, subscription & security review folio types.
+     - `packs/industries/hospitality/v1/pack.yaml`: ISIC `I55` (Accommodation), guest reservation & folio accounts, occupancy tax liabilities, guest stay folio types.
+     - `packs/industries/manufacturing/v1/pack.yaml`: ISIC `C28` (Manufacture of machinery and equipment), WIP inventory, cost of goods, production order folio types.
+4. **Provisioning Engine & Loader (`core/industry_packs/loader.py`):**
+   - `IndustryPackLoader` provisions the validated Chart of Accounts directly into the `LedgerKernel`, creates `company_folio_types`, and records the installation in `installed_industry_packs`.
+   - Multi-tenant and company isolation: each company can install industry packs independently.
+   - Idempotent: re-installing skips existing accounts and updates metadata cleanly.
+5. **Decoupled, Data-Driven Core Architecture:**
+   - Refactored `core/ceo_brain/industry.py` (`IndustryUnderstandingEngine`): removed all hardcoded static `if industry == 'real_estate'` or `if industry == 'saas'` branches. All industry semantics, terms, workflows, and document types are dynamically sourced from loaded industry packs and the UN ISIC taxonomy registry (`IndustryPackRegistry`).
+   - Added AST & source code audit test (`test_zero_hardcoded_industry_branching_in_core`) verifying zero hardcoded industry branching remains in `core/ceo_brain/industry.py`.
+6. **Multi-Tenant Database Migrations & RLS:**
+   - Authored `migrations/common/0017_industry_packs.sql` (SQLite) and `migrations/pg/0017_industry_packs.sql` (PostgreSQL 16) with Row Level Security (RLS) policies on `installed_industry_packs` and `company_folio_types`.
+
+### 2. Implementation Files
+- `core/industry_packs/__init__.py`: Package public API.
+- `core/industry_packs/isic.py`: UN ISIC Rev. 4 taxonomy registry (all 21 sections and 88 divisions).
+- `core/industry_packs/schema.py`: Declarative YAML/JSON validator, schema error types.
+- `core/industry_packs/loader.py`: Installation engine, chart of accounts provisioning, folio type registration.
+- `core/industry_packs/registry.py`: `IndustryPackRegistry` managing discovery and active packs.
+- `packs/industries/saas/v1/pack.yaml`: Canonical SaaS pack (ISIC J62).
+- `packs/industries/hospitality/v1/pack.yaml`: Canonical Hospitality pack (ISIC I55).
+- `packs/industries/manufacturing/v1/pack.yaml`: Canonical Manufacturing pack (ISIC C28).
+- `core/ceo_brain/industry.py`: Refactored to 100% data-driven engine.
+- `migrations/common/0017_industry_packs.sql`: SQLite DDL.
+- `migrations/pg/0017_industry_packs.sql`: PostgreSQL 16 DDL with RLS.
+- `tests/test_industry_pack_framework.py`: Test suite verifying all acceptance criteria and mutation checks.
+
+### 3. Empirical Test Execution & Mutation Verification
+Command executed:
+```bash
+python3 -m pytest tests/test_industry_pack_framework.py -v
+```
+
+Real Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 8 items
+
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_canonical_industry_packs_load_and_validate PASSED [ 12%]
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_industry_understanding_engine_adapts_to_data_driven_packs PASSED [ 25%]
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_invalid_isic_code_fails_schema_validation PASSED [ 37%]
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_malformed_or_unbalanced_coa_fails_validation PASSED [ 50%]
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_valid_industry_pack_installs_cleanly_into_company PASSED [ 62%]
+tests/test_industry_pack_framework.py::TestIndustryPackFramework::test_zero_hardcoded_industry_branching_in_core PASSED [ 75%]
+tests/test_industry_pack_framework.py::TestIndustryPackMutations::test_mutation_folio_referencing_nonexistent_template_fails PASSED [ 87%]
+tests/test_industry_pack_framework.py::TestIndustryPackMutations::test_mutation_workflow_referencing_nonexistent_account_fails PASSED [100%]
+
+============================== 8 passed in 2.60s ===============================
+```
+
+Full Step 1 Test Suite Execution (73 tests passed, 4 skipped in unit mode):
+```bash
+python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py -q
+```
+Real Output:
+```text
+......................................................................... [100%]
+73 passed, 4 skipped in 15.32s
+```
+
+Acceptance criteria fully met:
+- Single commit created for Sub-step 1H.
+
+
 
 
 

@@ -71,7 +71,14 @@
   - Integrated folio verification: sealing or closing a folio verifies all linked journal entries are in POSTED status (`UnpostedFolioJournalEntriesError`).
   - Implemented trial balance generator (`generate_trial_balance`) verifying net zero sum across all accounts.
   - Authored comprehensive test suite (`tests/test_ledger_kernel.py`) verifying all 7 acceptance criteria and mutation checks (10 passed).
-- [ ] **1H:** Industry Pack framework
+- [x] **1H:** Industry Pack framework
+  - Implemented UN ISIC Rev. 4 taxonomy registry (`core/industry_packs/isic.py`) covering all 21 Sections and 88 Divisions with programmatic code validation and division lookup.
+  - Authored declarative `zonata.industry-pack/v1` schema validator (`core/industry_packs/schema.py`) enforcing structural constraints, ISO 4217 currency validation, referential integrity, and chart of accounts balance checks (`MalformedChartOfAccountsError`).
+  - Implemented `IndustryPackLoader` (`core/industry_packs/loader.py`) provisioning Charts of Accounts into `LedgerKernel`, registering `company_folio_types`, and tracking installations in `installed_industry_packs`.
+  - Authored three canonical production-grade reference packs: `packs/industries/saas/v1/pack.yaml` (ISIC J62), `packs/industries/hospitality/v1/pack.yaml` (ISIC I55), and `packs/industries/manufacturing/v1/pack.yaml` (ISIC C28).
+  - Decoupled `core/ceo_brain/industry.py` (`IndustryUnderstandingEngine`): eliminated all hardcoded static `if industry == ...` branches, dynamically resolving industry semantics from data-driven packs and the UN ISIC taxonomy registry (`IndustryPackRegistry`).
+  - Authored database migrations with PostgreSQL 16 RLS policies: `migrations/common/0017_industry_packs.sql` and `migrations/pg/0017_industry_packs.sql`.
+  - Authored comprehensive test suite `tests/test_industry_pack_framework.py` with 8 passing tests, AST checks proving zero hardcoded industry branching, and mutation checks.
 - [ ] **1I:** Always-on baseline
 - [ ] **1J:** Step 1 qualification scenario
 

@@ -1,0 +1,83 @@
+schema_version: "zonata.industry-pack/v1"
+metadata:
+  pack_id: "hospitality_hotel"
+  name: "Hotel & Hospitality Operations"
+  version: "1.0.0"
+  description: "Operating blueprint for hotels, resorts, and managed accommodation properties"
+  author: "ZONATA Systems Foundation"
+  industry_code: "I55"  # Accommodation
+
+document_templates:
+  - template_id: "tpl_hotel_guest_folio"
+    name: "Guest Billing Folio Receipt"
+    type: "invoice"
+    default_sensitivity: "CONFIDENTIAL"
+    default_retention_days: 1825
+    schema:
+      room_number: "string"
+      total_charges_minor: "integer"
+  - template_id: "tpl_hotel_vendor_agreement"
+    name: "Hotel Vendor & Linen Supply Contract"
+    type: "vendor_contract"
+    default_sensitivity: "RESTRICTED"
+    default_retention_days: 2555
+    schema:
+      vendor_name: "string"
+
+chart_of_accounts:
+  - code: "1010"
+    name: "Hotel Front Desk Cash & Bank"
+    type: "ASSET"
+    currency: "USD"
+  - code: "1200"
+    name: "Guest Ledger & Accounts Receivable"
+    type: "ASSET"
+    currency: "USD"
+  - code: "2010"
+    name: "Hotel Accounts Payable"
+    type: "LIABILITY"
+    currency: "USD"
+  - code: "3010"
+    name: "Owner Equity & Reserves"
+    type: "EQUITY"
+    currency: "USD"
+  - code: "4010"
+    name: "Room Nights Revenue (RevPAR)"
+    type: "REVENUE"
+    currency: "USD"
+  - code: "4020"
+    name: "Food & Beverage (F&B) Revenue"
+    type: "REVENUE"
+    currency: "USD"
+  - code: "5010"
+    name: "Housekeeping, Linens & Supplies (COGS)"
+    type: "EXPENSE"
+    currency: "USD"
+  - code: "5020"
+    name: "OTA Commission & Distribution Fees"
+    type: "EXPENSE"
+    currency: "USD"
+
+folio_types:
+  - folio_type: "guest_stay"
+    name: "Guest Stay Stay-to-Settle Folio"
+    description: "Tracks guest check-in, incidental room charges, and checkout settlement"
+    required_documents: ["tpl_hotel_guest_folio"]
+    optional_documents: []
+    required_tasks: ["id_verification", "preauth_deposit", "room_inspection"]
+
+workflows:
+  - workflow_id: "wf_hotel_night_audit"
+    name: "Night Audit & Daily Balance Close"
+    triggers: ["night_audit_scheduled", "manual_manager_close"]
+    steps:
+      - step_id: "post_room_charges"
+        action: "post_journal_entry"
+        debit_account: "1200"
+        credit_account: "4010"
+
+compliance_rules:
+  - rule_id: "cmp_food_safety_audit"
+    name: "HACCP Food Safety Inspection"
+    frequency_days: 30
+    required_approvers: ["fnb_director", "general_manager"]
