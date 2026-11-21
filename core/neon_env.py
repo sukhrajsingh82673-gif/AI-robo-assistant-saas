@@ -13,9 +13,11 @@ from typing import Dict, Optional, Any
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Ensure pure-Python PostgreSQL driver in Termux environment is accessible
-_TERMUX_SITE = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
-if os.path.exists(_TERMUX_SITE) and _TERMUX_SITE not in sys.path:
-    sys.path.insert(0, _TERMUX_SITE)
+_prefix = os.environ.get("PREFIX")
+if _prefix:
+    _termux_site = os.path.join(_prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+    if os.path.exists(_termux_site) and _termux_site not in sys.path:
+        sys.path.insert(0, _termux_site)
 
 
 def load_env_file(filepath: str, overwrite: bool = False) -> Dict[str, str]:

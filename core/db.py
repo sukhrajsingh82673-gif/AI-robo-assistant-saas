@@ -5213,9 +5213,11 @@ class Database:
 
         # 2. Fallback to pg8000 pure-Python driver
         try:
-            termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
-            if os.path.exists(termux_site) and termux_site not in sys.path:
-                sys.path.insert(0, termux_site)
+            _prefix = os.environ.get("PREFIX")
+            if _prefix:
+                _termux_site = os.path.join(_prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+                if os.path.exists(_termux_site) and _termux_site not in sys.path:
+                    sys.path.insert(0, _termux_site)
             import pg8000
             import ssl
             parsed = urllib.parse.urlsplit(self.database_url)

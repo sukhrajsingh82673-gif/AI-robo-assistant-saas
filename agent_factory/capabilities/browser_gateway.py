@@ -9,7 +9,7 @@ Enforces:
 import ipaddress
 import re
 import socket
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 
