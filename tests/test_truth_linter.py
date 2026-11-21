@@ -22,7 +22,6 @@ class TestTruthASTLinter(unittest.TestCase):
         """Current codebase ports and probe files must be 100% compliant with truth rules."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         target_files = [
-            os.path.join(base_dir, "core", "ports", "base.py"),
             os.path.join(base_dir, "core", "capability_probe.py"),
         ]
         all_violations = []
@@ -30,6 +29,11 @@ class TestTruthASTLinter(unittest.TestCase):
             if os.path.exists(f):
                 violations = lint_file(f)
                 all_violations.extend(violations)
+
+        ports_dir = os.path.join(base_dir, "core", "ports")
+        if os.path.exists(ports_dir):
+            from core.lint.truth_linter import lint_directory
+            all_violations.extend(lint_directory(ports_dir))
 
         self.assertEqual(all_violations, [], f"Unexpected AST truth violations: {all_violations}")
 

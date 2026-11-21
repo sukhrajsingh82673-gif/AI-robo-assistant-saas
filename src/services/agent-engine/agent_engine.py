@@ -13,6 +13,7 @@ import uuid
 import time
 import math
 import random
+import os
 
 # Centralized secret and config manager integration
 try:

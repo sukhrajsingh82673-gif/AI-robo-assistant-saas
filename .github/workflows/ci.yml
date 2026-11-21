@@ -180,7 +180,7 @@ jobs:
           python3 -m pytest --collect-only -q
           python3 -m pytest tests/test_settings_registry_phase1.py tests/test_settings_v2_phase2.py -q
           python3 -m pytest tests/test_stage2_foundations.py tests/test_stage6_adapters_global.py -q
-          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py -q
+          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py -q
           python3 scripts/reality_probe.py
 
   # ===========================================================================
@@ -325,3 +325,18 @@ jobs:
           APP_ENV: staging
         run: |
           python3 scripts/reality_probe.py
+
+      - name: Run Six Backbone Service Contract Tests against Real Containers
+        env:
+          DATABASE_URL: postgresql://zonata_ci_user:ci_secure_password_2026@localhost:5432/zonata_ci_contract
+          S3_ENDPOINT: http://localhost:8333
+          SMTP_HOST: localhost
+          SMTP_PORT: 1025
+          MAILPIT_URL: http://localhost:8025
+          CLAMAV_HOST: localhost
+          CLAMAV_PORT: 3310
+          TIKA_ENDPOINT: http://localhost:9998
+          KMS_MASTER_KEY: sovereign_ci_envelope_master_key_32_chars!
+          APP_ENV: staging
+        run: |
+          python3 -m pytest tests/test_ports_contracts.py -v

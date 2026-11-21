@@ -39,17 +39,23 @@
   - Enforced production startup guards prohibiting SQLite and `embedded_free` models without explicit `ZONATA_ALLOW_DEGRADED=1`.
   - Pinned all runtime requirements with cryptographic PyPI sha256 hashes (`requirements.txt`).
   - Upgraded dependencies to resolve security advisories (`cryptography==50.0.2`, `cffi==2.0.0`).
-  - Verified green GitHub Actions CI run 44861703127 across all 3 jobs (PostgreSQL 16 contract tests, SQLite dev test suite, supply chain/license/vulnerability audit).
-  - Documented empirical command outputs in `docs/reports/STEP1_REPORT.md`.
+   - Added a 3-job CI workflow (PostgreSQL 16 contract tests, targeted SQLite suites, supply chain/license/vulnerability audit). Previously cited green-run URLs are **unverified**: `gh` is not authenticated in the current Termux environment, so re-authenticate and confirm before citing them as evidence.
+   - Documented empirical command outputs in `docs/reports/STEP1_REPORT.md`.
 
 ## Active Roadmap (Step 1 Sub-Steps)
 - [x] **1A:** Inventory and repository integrity
 - [x] **1B:** Supply chain, CI and honest claims
 - [x] **1C:** Capability truth table and the Port framework
-- [ ] **1D:** Honest adapters with real providers
+- [x] **1D:** Honest adapters with real providers
 - [ ] **1E:** Document and file backbone
 - [ ] **1F:** Folio, evidence and export packs
 - [ ] **1G:** Ledger kernel
 - [ ] **1H:** Industry Pack framework
 - [ ] **1I:** Always-on baseline
 - [ ] **1J:** Step 1 qualification scenario
+
+## Supervision Corrections (2026-11-21)
+- Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).
+- Removed the hardcoded KMS fallback master key; an unconfigured KMS now reports `NOT_CONFIGURED` instead of a false `OK`.
+- Made LLM, search, payments, secrets, observability, workflow-engine, and MCP probes perform real checks. MCP now reads ZONATA's own `mcp_servers` registry, not an external Antigravity directory.
+- Corrected report claims: `2,133` is the collection count, not a full-suite pass count. Full local run before the import fix: `1,958 passed, 59 failed, 31 skipped, 121 errors`. Post-fix targeted run: `33 passed, 4 skipped`.

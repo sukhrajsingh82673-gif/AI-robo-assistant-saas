@@ -9,11 +9,17 @@ Verifies OpenCode Step 1C:
 """
 
 import json
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
 from core.ports.base import PortStatus, ProviderResult
-from core.capability_probe import probe_all_capabilities, summarize_capabilities
+from core.capability_probe import (
+    probe_all_capabilities,
+    summarize_capabilities,
+    probe_llm,
+    probe_search,
+)
 from agent_factory.control.planner import (
     plan,
     check_required_capabilities,
@@ -181,6 +187,22 @@ class TestCapabilityTruthAndPlanner(unittest.TestCase):
         db_entry = next((c for c in payload["capabilities"] if c["capability"] == "database"), None)
         self.assertIsNotNone(db_entry)
         self.assertIn(db_entry["plain_language"], ("live", "test only", "degraded"))
+
+    def test_search_provider_name_alone_does_not_report_live(self):
+        """Truth Rule: SEARCH_PROVIDER without a verified endpoint is not 'live'."""
+        with patch.dict("os.environ", {"SEARCH_PROVIDER": "fake", "SEARCH_ENDPOINT": ""}, clear=False):
+            res = probe_search()
+        self.assertNotEqual(res.status, PortStatus.OK)
+        self.assertNotEqual(res.provider, "fake")
+
+    def test_unknown_llm_provider_does_not_report_live(self):
+        """Truth Rule: a provider label with no key or verified endpoint is not 'live'."""
+        with patch.dict("os.environ", {"ZONATA_LLM_PROVIDER": "totally_unknown_provider"}, clear=False):
+            for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+                os.environ.pop(key, None)
+            res = probe_llm()
+        self.assertEqual(res.status, PortStatus.NOT_CONFIGURED)
+        self.assertIsNone(res.provider_ref)
 
 
 if __name__ == "__main__":
