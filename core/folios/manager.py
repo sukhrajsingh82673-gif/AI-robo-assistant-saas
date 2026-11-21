@@ -118,7 +118,7 @@ class FolioManager:
 
             cur.execute(
                 """
-                SELECT COALESCE(MAX(sequence_number), 0), entry_hash
+                SELECT sequence_number, entry_hash
                 FROM folio_entries
                 WHERE folio_id = ?
                 ORDER BY sequence_number DESC LIMIT 1

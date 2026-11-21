@@ -4254,7 +4254,10 @@ class PostgresCursorWrapper:
     def execute(self, sql: str, params: Any = ()):
         norm = self._normalize_fn(sql)
         if norm:
-            self._raw_cursor.execute(norm, params)
+            if not params:
+                self._raw_cursor.execute(norm)
+            else:
+                self._raw_cursor.execute(norm, params)
         return self
 
     def executemany(self, sql: str, params_seq: Any = ()):
@@ -4778,11 +4781,17 @@ class PostgresConnectionWrapper:
         try:
             import psycopg2.extras
             cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cursor.execute(normalized_sql, params)
+            if not params:
+                cursor.execute(normalized_sql)
+            else:
+                cursor.execute(normalized_sql, params)
             return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
         except Exception:
             cursor = self.raw_conn.cursor()
-            cursor.execute(normalized_sql, params)
+            if not params:
+                cursor.execute(normalized_sql)
+            else:
+                cursor.execute(normalized_sql, params)
             return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
 
     def executemany(self, sql: str, params_seq: Any = ()):
@@ -5409,6 +5418,10 @@ class Database:
                 ensure_ledger_tables(conn)
                 from core.industry_packs.loader import ensure_industry_pack_tables
                 ensure_industry_pack_tables(conn)
+                from core.baseline.outbox import ensure_outbox_tables
+                ensure_outbox_tables(conn)
+                from core.baseline.scheduler import ensure_scheduler_tables
+                ensure_scheduler_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5452,6 +5465,10 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_ledger_tables()
         from core.industry_packs.loader import ensure_industry_pack_tables
         ensure_industry_pack_tables()
+        from core.baseline.outbox import ensure_outbox_tables
+        ensure_outbox_tables()
+        from core.baseline.scheduler import ensure_scheduler_tables
+        ensure_scheduler_tables()
     except Exception:
         pass
     try:

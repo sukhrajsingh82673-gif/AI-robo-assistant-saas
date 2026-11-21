@@ -79,7 +79,13 @@
   - Decoupled `core/ceo_brain/industry.py` (`IndustryUnderstandingEngine`): eliminated all hardcoded static `if industry == ...` branches, dynamically resolving industry semantics from data-driven packs and the UN ISIC taxonomy registry (`IndustryPackRegistry`).
   - Authored database migrations with PostgreSQL 16 RLS policies: `migrations/common/0017_industry_packs.sql` and `migrations/pg/0017_industry_packs.sql`.
   - Authored comprehensive test suite `tests/test_industry_pack_framework.py` with 8 passing tests, AST checks proving zero hardcoded industry branching, and mutation checks.
-- [ ] **1I:** Always-on baseline
+- [x] **1I:** Always-on baseline
+  - Built transactional outbox (`core/baseline/outbox.py`, `outbox_events` table) with atomic enqueuing, at-least-once delivery, exponential backoff, DLQ after 5 attempts, idempotent handler keys, and mid-job worker crash recovery.
+  - Implemented distributed leased scheduler (`core/baseline/scheduler.py`, `scheduled_jobs`, `scheduler_leader_leases`) with monotonic next-run timing, max-run-time timeouts, catchup policies, and 30s cluster leader election failover leaving zero orphan locks.
+  - Built reality health & readiness probes (`core/baseline/health.py`) mounted to `/healthz` (liveness) and `/readyz` (readiness: DB readability, critical KMS/DB port evaluation, >1GB disk space guard, migration currency), turning HTTP 503 if DB is paused or critical port fails.
+  - Authored automated backup & restore qualification drill (`scripts/backup_restore_drill.py`) verifying 100% byte-for-byte SHA-256 and Merkle root parity across 10 documents, 3 folios, and 50 double-entry ledger entries.
+  - Authored migrations with PostgreSQL 16 RLS policies: `migrations/common/0018_always_on_baseline.sql` and `migrations/pg/0018_always_on_baseline.sql`.
+  - Authored comprehensive test suite `tests/test_always_on_baseline.py` (10 passed) and integrated into CI workflows.
 - [ ] **1J:** Step 1 qualification scenario
 
 ## Supervision Corrections (2026-11-21)

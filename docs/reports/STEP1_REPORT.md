@@ -968,6 +968,134 @@ Real Output:
 Acceptance criteria fully met:
 - Single commit created for Sub-step 1H.
 
+---
+
+## Sub-Step 1I — Always-on Baseline
+
+### 1. Objectives & Architectural Delivery
+1. **Durable Transactional Outbox (`core/baseline/outbox.py`):**
+   - Side effects (email, webhooks, external sync, ledger sync) are committed atomically as `outbox_events` in the same database transaction as the business change.
+   - Worker draining enforces at-least-once delivery with exponential backoff (`next_retry_at = now + 2 ** attempts`).
+   - Dead-letter queue: after 5 failed attempts, the event transitions permanently to `DEAD_LETTER` with `last_error` recorded.
+   - Idempotent handler keys: deduplication across `(tenant_id, company_id, idempotency_key)`.
+   - Mid-job crash resilience: if a worker node crashes mid-job while holding a lease, the expired lease (`locked_until < now`) is safely reclaimed by surviving workers without loss or double delivery.
+2. **Distributed Leased Scheduler (`core/baseline/scheduler.py`):**
+   - Persisted job schedules in `scheduled_jobs` with monotonic next-run timing (`next_run_at`).
+   - Strict `max_run_seconds` execution timeouts.
+   - Missed-run catchup policies (`RUN_ONCE` vs `SKIP_MISSED`).
+   - Cluster leader election lease in `scheduler_leader_leases`: heartbeat refreshed every tick; if a leader node crashes, its lease drops after 30 seconds, allowing surviving nodes to assume leadership and reclaim orphan jobs without stuck locks.
+3. **Reality Health & Readiness Probes (`core/baseline/health.py`):**
+   - `/healthz`: Lightweight liveness probe verifying process responsiveness (HTTP 200).
+   - `/readyz`: Deep qualification probe evaluating:
+     1. Database readable (`SELECT 1`).
+     2. Critical ports not in `FAILED` state (KMS, Database).
+     3. Disk free space > 1.0 GB (`shutil.disk_usage`).
+     4. Migrations current and applied.
+   - If any critical check fails or the database is paused, `/readyz` turns HTTP 503 (`UNREADY`) to drop the pod from ingress routing.
+   - Wired directly into `api_server.py`.
+4. **Automated Backup & Restore Qualification Drill (`scripts/backup_restore_drill.py`):**
+   - Autonomous drill script executing against PostgreSQL 16 (in CI) or SQLite (in dev).
+   - Seeds a synthetic tenant with 10 documents, 3 folios, and 50 double-entry ledger entries.
+   - Snapshots the database (`pg_dump` on PostgreSQL, vacuum backup on SQLite).
+   - Purges/drops the tenant data across all backbone tables (verified 0 counts).
+   - Restores database from the snapshot.
+   - Verifies 100% byte-for-byte parity:
+     - 10/10 Documents: SHA-256 match.
+     - 3/3 Folios: Sealed Merkle root match.
+     - 50/50 Ledger Entries: Double-entry balance parity and net zero trial balance.
+
+### 2. Implementation Files
+- `core/baseline/__init__.py`: Public API exports.
+- `core/baseline/outbox.py`: `DurableOutbox`, `OutboxEventRecord`, `OutboxStatus`.
+- `core/baseline/scheduler.py`: `DurableScheduler`, `ScheduledJobRecord`, `JobStatus`.
+- `core/baseline/health.py`: `check_liveness()`, `check_readiness()`.
+- `api_server.py`: Wired `/healthz` and `/readyz` endpoints.
+- `scripts/backup_restore_drill.py`: Automated 10-doc / 3-folio / 50-entry backup & restore drill.
+- `migrations/common/0018_always_on_baseline.sql`: Common DDL.
+- `migrations/pg/0018_always_on_baseline.sql`: PostgreSQL 16 DDL with RLS.
+- `tests/test_always_on_baseline.py`: Test suite verifying all 10 acceptance requirements and mutation checks.
+
+### 3. Empirical Test Execution & Mutation Verification
+Command executed:
+```bash
+python3 -m pytest tests/test_always_on_baseline.py -v
+```
+
+Real Output:
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 10 items
+
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_liveness_probe_returns_200_ok PASSED [ 10%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_outbox_atomic_enqueue_and_idempotency PASSED [ 20%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_outbox_exponential_backoff_and_dead_letter_queue_after_5_attempts PASSED [ 30%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_outbox_worker_crash_mid_job_leaves_no_loss_or_double_delivery PASSED [ 40%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_outbox_worker_drains_with_at_least_once_delivery PASSED [ 50%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_readiness_probe_returns_200_ready_under_nominal_conditions PASSED [ 60%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_readiness_probe_turns_503_when_critical_port_fails PASSED [ 70%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_readiness_probe_turns_503_when_database_unreachable PASSED [ 80%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_scheduler_dead_node_drops_leader_lease_in_30s_and_reclaims_orphan_locks PASSED [ 90%]
+tests/test_always_on_baseline.py::TestAlwaysOnBaseline::test_scheduler_persisted_job_monotonic_next_run PASSED [100%]
+
+============================== 10 passed in 1.89s ==============================
+```
+
+Backup & Restore Drill Execution:
+```bash
+python3 scripts/backup_restore_drill.py
+```
+Real Output:
+```text
+======================================================================
+ZONATA BACKUP & RESTORE DRILL (OpenCode Step 1I)
+Database Dialect: sqlite
+======================================================================
+[*] Seeding synthetic dataset for tenant tnt_drill_1bf12ebc...
+  [+] Seeded 10 documents with verified SHA-256 digests.
+  [+] Seeded 3 folios with sealed Merkle roots.
+  [+] Seeded 50 balanced POSTED ledger entries.
+
+[*] Step 2: Taking database snapshot...
+  [+] Created SQLite vacuum snapshot at /data/data/com.termux/files/usr/tmp/zonata_backup_drill_qsfhrjfc/sqlite_snapshot.db (14696448 bytes)
+
+[*] Step 3: Dropping tenant tnt_drill_1bf12ebc records across all backbone tables...
+  [+] Verified all synthetic tenant records dropped (counts = 0).
+
+[*] Step 4: Restoring database from snapshot (/data/data/com.termux/files/usr/tmp/zonata_backup_drill_qsfhrjfc/sqlite_snapshot.db)...
+  [+] Database restoration completed.
+
+[*] Step 5: Verifying byte-for-byte SHA-256 digests and Merkle roots...
+  [+] All 10 documents verified with byte-for-byte SHA-256 match.
+  [+] All 3 folios verified with byte-for-byte Merkle root match.
+  [+] All 50 journal entries verified with net zero trial balance.
+
+======================================================================
+[BACKUP_RESTORE_DRILL_VERIFIED] 100% byte-for-byte parity confirmed.
+  - Documents Verified: 10/10 (SHA-256 parity)
+  - Folios Verified: 3/3 (Merkle root parity)
+  - Ledger Journal Entries: 50/50 (Double-entry balance parity)
+======================================================================
+```
+
+Full Step 1 Test Suite Execution (83 tests passed, 4 skipped in unit mode):
+```bash
+python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py -q
+```
+Real Output:
+```text
+................................................................................... [100%]
+83 passed, 4 skipped in 17.23s
+```
+
+Acceptance criteria fully met:
+- Single commit created for Sub-step 1I.
+
+
 
 
 

@@ -10,6 +10,9 @@ from core.ports.base import (
     PortRegistry,
     port_registry,
 )
+
+# Convenience port accessor
+get_port = port_registry.get
 from core.ports.storage import (
     StoragePort,
     SeaweedFSS3Provider,

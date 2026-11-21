@@ -1059,60 +1059,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Standard Health & Liveness Endpoints (Public)
         if path == "/readyz":
-            if not db.is_ready():
-                self._send_json({
-                    "status": "UNREADY",
-                    "database": "UNAVAILABLE",
-                    "error": "Database readiness verification not completed",
-                    "timestamp": time.time()
-                }, status=503)
-                return
-            git_meta = _git_metadata()
-            git_commit = git_meta["commit"]
-            git_branch = git_meta["branch"]
-            db_state = _database_status()
-            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
-            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
-            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
-            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
-            # Authoritative Merkle ledger integrity check, cached briefly so
-            # liveness probes stay fast under concurrent load. The cached value
-            # is a real verification result, not a fabricated constant.
-            merkle_status = _platform_merkle_status()
-            envelope_data = {
-                "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "100" if is_ga_mode else "3")),
-                "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "10" if is_ga_mode else "4")),
-                "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "120" if is_ga_mode else "60")),
-                "mode": "GA" if is_ga_mode else "RESTRICTED_PILOT",
-                "status": "ENFORCED"
-            }
-            self._send_json({
-                "status": "HEALTHY" if db_state == "CONNECTED" else "DEGRADED",
-                "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
-                "version": release_version,
-                "release_scope": release_scope,
-                "commit": git_commit,
-                "branch": git_branch,
-                "database": db_state,
-                "database_dialect": db.get_dialect(),
-                "merkle_ledger": merkle_status,
-                "server_mode": "MULTI_THREADED_CONCURRENT",
-                "cryptography_version": CRYPTOGRAPHY_VERSION,
-                "pilot_envelope": envelope_data,
-                "operating_envelope": envelope_data,
-                "timestamp": time.time()
-            })
+            from core.baseline.health import check_readiness
+            code, payload = check_readiness()
+            self._send_json(payload, status=code)
             return
 
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
-            git_meta = _git_metadata()
-            git_commit = git_meta["commit"]
-            git_branch = git_meta["branch"]
-            db_state = _database_status()
-            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
-            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
-            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
-            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+            from core.baseline.health import check_liveness
+            code, payload = check_liveness()
+            self._send_json(payload, status=code)
+            return
             # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
             try:
                 ledger_audit = _ledger_for("tnt_primary").verify_full_chain_integrity()
