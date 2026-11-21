@@ -168,138 +168,144 @@ class DurableOutbox:
         worker_id: str,
         batch_size: int = 50,
         lease_seconds: float = 30.0,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> int:
         """Drains pending or failed outbox events with lease locking and at-least-once delivery."""
-        now = time.time()
-        processed_count = 0
+        import contextlib
+        from core.db import tenant_scope
+        scope_ctx = tenant_scope(tenant_id, company_id) if tenant_id else contextlib.nullcontext()
+        with scope_ctx:
+            now = time.time()
+            processed_count = 0
 
-        with self.db_conn_factory() as conn:
-            cur = conn.cursor()
+            with self.db_conn_factory() as conn:
+                cur = conn.cursor()
 
-            # 1. Claim eligible events with lease
-            if db.is_postgresql():
-                cur.execute(
-                    """
-                    SELECT id, tenant_id, company_id, topic, idempotency_key, payload,
-                           status, attempts, max_attempts, last_error, next_retry_at,
-                           locked_by, locked_until, dispatched_at, created_at
-                    FROM outbox_events
-                    WHERE (status IN ('PENDING', 'FAILED') OR (status = 'PROCESSING' AND locked_until < ?))
-                      AND next_retry_at <= ?
-                    ORDER BY created_at ASC
-                    LIMIT ?
-                    FOR UPDATE SKIP LOCKED
-                    """,
-                    (now, now, batch_size),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT id, tenant_id, company_id, topic, idempotency_key, payload,
-                           status, attempts, max_attempts, last_error, next_retry_at,
-                           locked_by, locked_until, dispatched_at, created_at
-                    FROM outbox_events
-                    WHERE (status IN ('PENDING', 'FAILED') OR (status = 'PROCESSING' AND locked_until < ?))
-                      AND next_retry_at <= ?
-                    ORDER BY created_at ASC
-                    LIMIT ?
-                    """,
-                    (now, now, batch_size),
-                )
-
-            rows = cur.fetchall()
-            if not rows:
-                return 0
-
-            events: List[OutboxEventRecord] = []
-            for r in rows:
-                ev = OutboxEventRecord(
-                    id=r[0],
-                    tenant_id=r[1],
-                    company_id=r[2],
-                    topic=r[3],
-                    idempotency_key=r[4],
-                    payload=json.loads(r[5]) if isinstance(r[5], str) else r[5],
-                    status=OutboxStatus(r[6]),
-                    attempts=r[7],
-                    max_attempts=r[8],
-                    last_error=r[9],
-                    next_retry_at=r[10],
-                    locked_by=r[11],
-                    locked_until=r[12],
-                    dispatched_at=r[13],
-                    created_at=r[14],
-                )
-                events.append(ev)
-
-            # Mark all claimed rows as PROCESSING with lease lock
-            claimed_ids = [e.id for e in events]
-            locked_until = now + lease_seconds
-            placeholders = ",".join(["?"] * len(claimed_ids))
-            cur.execute(
-                f"""
-                UPDATE outbox_events
-                SET status = 'PROCESSING', locked_by = ?, locked_until = ?
-                WHERE id IN ({placeholders})
-                """,
-                [worker_id, locked_until] + claimed_ids,
-            )
-            conn.commit()
-
-        # 2. Process each event outside the claim lock
-        for event in events:
-            handlers = self._handlers.get(event.topic, []) + self._handlers.get("*", [])
-            success = True
-            handler_error = None
-
-            try:
-                for handler_key, fn in handlers:
-                    fn(event)
-            except Exception as e:
-                success = False
-                handler_error = str(e)
-                logger.error(f"[Outbox Worker {worker_id}] Error executing handler for {event.id}: {e}")
-
-            finish_time = time.time()
-            with self.db_conn_factory() as update_conn:
-                update_cur = update_conn.cursor()
-                if success:
-                    update_cur.execute(
+                # 1. Claim eligible events with lease
+                if db.is_postgresql():
+                    cur.execute(
                         """
-                        UPDATE outbox_events
-                        SET status = 'DISPATCHED', dispatched_at = ?, locked_by = NULL, locked_until = NULL, last_error = NULL
-                        WHERE id = ?
+                        SELECT id, tenant_id, company_id, topic, idempotency_key, payload,
+                               status, attempts, max_attempts, last_error, next_retry_at,
+                               locked_by, locked_until, dispatched_at, created_at
+                        FROM outbox_events
+                        WHERE (status IN ('PENDING', 'FAILED') OR (status = 'PROCESSING' AND locked_until < ?))
+                          AND next_retry_at <= ?
+                        ORDER BY created_at ASC
+                        LIMIT ?
+                        FOR UPDATE SKIP LOCKED
                         """,
-                        (finish_time, event.id),
+                        (now, now + 5.0, batch_size),
                     )
-                    processed_count += 1
                 else:
-                    new_attempts = event.attempts + 1
-                    if new_attempts >= event.max_attempts:
-                        # Move to Dead Letter Queue
-                        update_cur.execute(
-                            """
-                            UPDATE outbox_events
-                            SET status = 'DEAD_LETTER', attempts = ?, last_error = ?, locked_by = NULL, locked_until = NULL
-                            WHERE id = ?
-                            """,
-                            (new_attempts, handler_error, event.id),
-                        )
-                    else:
-                        # Exponential backoff: base 2 seconds (2, 4, 8, 16...)
-                        backoff_seconds = 2.0 ** new_attempts
-                        next_retry = finish_time + backoff_seconds
-                        update_cur.execute(
-                            """
-                            UPDATE outbox_events
-                            SET status = 'FAILED', attempts = ?, next_retry_at = ?, last_error = ?, locked_by = NULL, locked_until = NULL
-                            WHERE id = ?
-                            """,
-                            (new_attempts, next_retry, handler_error, event.id),
-                        )
-                update_conn.commit()
+                    cur.execute(
+                        """
+                        SELECT id, tenant_id, company_id, topic, idempotency_key, payload,
+                               status, attempts, max_attempts, last_error, next_retry_at,
+                               locked_by, locked_until, dispatched_at, created_at
+                        FROM outbox_events
+                        WHERE (status IN ('PENDING', 'FAILED') OR (status = 'PROCESSING' AND locked_until < ?))
+                          AND next_retry_at <= ?
+                        ORDER BY created_at ASC
+                        LIMIT ?
+                        """,
+                        (now, now + 5.0, batch_size),
+                    )
 
-        return processed_count
+                rows = cur.fetchall()
+                if not rows:
+                    return 0
+
+                events: List[OutboxEventRecord] = []
+                for r in rows:
+                    ev = OutboxEventRecord(
+                        id=r[0],
+                        tenant_id=r[1],
+                        company_id=r[2],
+                        topic=r[3],
+                        idempotency_key=r[4],
+                        payload=json.loads(r[5]) if isinstance(r[5], str) else r[5],
+                        status=OutboxStatus(r[6]),
+                        attempts=r[7],
+                        max_attempts=r[8],
+                        last_error=r[9],
+                        next_retry_at=r[10],
+                        locked_by=r[11],
+                        locked_until=r[12],
+                        dispatched_at=r[13],
+                        created_at=r[14],
+                    )
+                    events.append(ev)
+
+                # Mark all claimed rows as PROCESSING with lease lock
+                claimed_ids = [e.id for e in events]
+                locked_until = now + lease_seconds
+                placeholders = ",".join(["?"] * len(claimed_ids))
+                cur.execute(
+                    f"""
+                    UPDATE outbox_events
+                    SET status = 'PROCESSING', locked_by = ?, locked_until = ?
+                    WHERE id IN ({placeholders})
+                    """,
+                    [worker_id, locked_until] + claimed_ids,
+                )
+                conn.commit()
+
+            # 2. Process each event outside the claim lock
+            for event in events:
+                handlers = self._handlers.get(event.topic, []) + self._handlers.get("*", [])
+                success = True
+                handler_error = None
+
+                try:
+                    for handler_key, fn in handlers:
+                        fn(event)
+                except Exception as e:
+                    success = False
+                    handler_error = str(e)
+                    logger.error(f"[Outbox Worker {worker_id}] Error executing handler for {event.id}: {e}")
+
+                finish_time = time.time()
+                with self.db_conn_factory() as update_conn:
+                    update_cur = update_conn.cursor()
+                    if success:
+                        update_cur.execute(
+                            """
+                            UPDATE outbox_events
+                            SET status = 'DISPATCHED', dispatched_at = ?, locked_by = NULL, locked_until = NULL, last_error = NULL
+                            WHERE id = ?
+                            """,
+                            (finish_time, event.id),
+                        )
+                        processed_count += 1
+                    else:
+                        new_attempts = event.attempts + 1
+                        if new_attempts >= event.max_attempts:
+                            # Move to Dead Letter Queue
+                            update_cur.execute(
+                                """
+                                UPDATE outbox_events
+                                SET status = 'DEAD_LETTER', attempts = ?, last_error = ?, locked_by = NULL, locked_until = NULL
+                                WHERE id = ?
+                                """,
+                                (new_attempts, handler_error, event.id),
+                            )
+                        else:
+                            # Exponential backoff: base 2 seconds (2, 4, 8, 16...)
+                            backoff_seconds = 2.0 ** new_attempts
+                            next_retry = finish_time + backoff_seconds
+                            update_cur.execute(
+                                """
+                                UPDATE outbox_events
+                                SET status = 'FAILED', attempts = ?, next_retry_at = ?, last_error = ?, locked_by = NULL, locked_until = NULL
+                                WHERE id = ?
+                                """,
+                                (new_attempts, next_retry, handler_error, event.id),
+                            )
+                    update_conn.commit()
+
+            return processed_count
 
     def get_event(self, event_id: str) -> Optional[OutboxEventRecord]:
         """Fetches an outbox event by ID."""

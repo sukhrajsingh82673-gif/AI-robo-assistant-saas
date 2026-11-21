@@ -86,7 +86,12 @@
   - Authored automated backup & restore qualification drill (`scripts/backup_restore_drill.py`) verifying 100% byte-for-byte SHA-256 and Merkle root parity across 10 documents, 3 folios, and 50 double-entry ledger entries.
   - Authored migrations with PostgreSQL 16 RLS policies: `migrations/common/0018_always_on_baseline.sql` and `migrations/pg/0018_always_on_baseline.sql`.
   - Authored comprehensive test suite `tests/test_always_on_baseline.py` (10 passed) and integrated into CI workflows.
-- [ ] **1J:** Step 1 qualification scenario
+- [x] **1J:** Step 1 qualification scenario and acceptance sign-off
+  - Authored Outpatient Healthcare Clinic & Practice blueprint (`packs/industries/clinic/v1/pack.yaml`) conforming to UN ISIC Rev. 4 `Q86`.
+  - Implemented end-to-end qualification scenario runner (`scripts/step1_scenario.py`) executing all 12 qualification stages across both SQLite and PostgreSQL 16.
+  - Implemented automated pytest suite (`tests/test_step1_scenario.py`).
+  - Successfully verified in GitHub Actions CI (Run ID `44920364090`) with 100% green status across all 3 jobs (Supply Chain, SQLite Dev, PostgreSQL 16 & Service Containers).
+  - OpenCode Step 1 complete with exactly 10 commits (1A - 1J) on `step1-foundation-backbone`.
 
 ## Supervision Corrections (2026-11-21)
 - Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).

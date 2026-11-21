@@ -24,6 +24,12 @@ from core.ledger.schema import AccountType
 
 def ensure_industry_pack_tables(conn: Optional[Any] = None) -> None:
     """Ensures installed_industry_packs and company_folio_types tables exist."""
+    import pathlib
+    from core.db import db, DatabaseDialect
+
+    migration_file = "0017_industry_packs.sql"
+    root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
+
     ddl_sqlite = """
     CREATE TABLE IF NOT EXISTS installed_industry_packs (
         id TEXT PRIMARY KEY,
@@ -53,35 +59,33 @@ def ensure_industry_pack_tables(conn: Optional[Any] = None) -> None:
     """
 
     def _exec(target_conn):
-        if hasattr(target_conn, "executescript"):
-            target_conn.executescript(ddl_sqlite)
+        if db.dialect == DatabaseDialect.SQLITE:
+            sql_path = root_dir / "migrations" / "common" / migration_file
+            if sql_path.exists():
+                target_conn.executescript(sql_path.read_text(encoding="utf-8"))
+            else:
+                target_conn.executescript(ddl_sqlite)
         else:
-            cur = target_conn.cursor()
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS installed_industry_packs (
-                id TEXT PRIMARY KEY,
-                tenant_id TEXT NOT NULL,
-                company_id TEXT NOT NULL,
-                pack_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                version TEXT NOT NULL,
-                isic_code TEXT NOT NULL,
-                raw_manifest TEXT NOT NULL,
-                installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                CONSTRAINT uq_installed_pack UNIQUE (tenant_id, company_id, pack_id)
-            );
-            CREATE TABLE IF NOT EXISTS company_folio_types (
-                id TEXT PRIMARY KEY,
-                tenant_id TEXT NOT NULL,
-                company_id TEXT NOT NULL,
-                pack_id TEXT NOT NULL,
-                folio_type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                config TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                CONSTRAINT uq_company_folio_types UNIQUE (tenant_id, company_id, folio_type)
-            );
+            sql_path = root_dir / "migrations" / "pg" / migration_file
+            if sql_path.exists():
+                target_conn.execute(sql_path.read_text(encoding="utf-8"))
+            # Ensure column types are REAL (epoch seconds) across all environments
+            target_conn.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'company_folio_types' AND column_name = 'created_at' AND data_type IN ('timestamp with time zone', 'timestamp without time zone')
+                ) THEN
+                    ALTER TABLE company_folio_types ALTER COLUMN created_at TYPE REAL USING EXTRACT(EPOCH FROM created_at);
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'installed_industry_packs' AND column_name = 'installed_at' AND data_type IN ('timestamp with time zone', 'timestamp without time zone')
+                ) THEN
+                    ALTER TABLE installed_industry_packs ALTER COLUMN installed_at TYPE REAL USING EXTRACT(EPOCH FROM installed_at);
+                END IF;
+            END $$;
             """)
 
     if conn is not None:
@@ -169,7 +173,7 @@ class IndustryPackLoader:
                         """
                         INSERT INTO company_folio_types (
                             id, tenant_id, company_id, pack_id, folio_type, name, description, config, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_timestamp(?))
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (tenant_id, company_id, folio_type) DO UPDATE SET
                             pack_id = EXCLUDED.pack_id,
                             name = EXCLUDED.name,
@@ -218,7 +222,7 @@ class IndustryPackLoader:
                     """
                     INSERT INTO installed_industry_packs (
                         id, tenant_id, company_id, pack_id, name, version, isic_code, raw_manifest, installed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_timestamp(?))
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (tenant_id, company_id, pack_id) DO UPDATE SET
                         name = EXCLUDED.name,
                         version = EXCLUDED.version,

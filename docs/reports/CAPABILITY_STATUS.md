@@ -1,17 +1,17 @@
 # ZONATA Universal AI Operating System — Capability Truth Table
 
-**Generated:** `2026-11-21T07:44:05.386866+00:00`  
+**Generated:** `2026-11-21T16:34:58.414320+00:00`  
 **Environment:** `development`  
 **Hardware Platform:** `aarch64 Linux`  
-**Execution Mode:** Standard Sovereign
+**Execution Mode:** Sandbox / Test
 
 ---
 
 ## 1. Executive Summary
 
-- **Live (Operational):** `6`
-- **Test / Sandbox:** `0`
-- **Not Connected / Unconfigured:** `10`
+- **Live (Operational):** `7`
+- **Test / Sandbox:** `9`
+- **Not Connected / Unconfigured:** `0`
 - **Degraded Mode:** `0`
 - **Not Implemented:** `2`
 - **Failed:** `0`
@@ -22,24 +22,24 @@
 
 | Capability | Reality Status | Plain Language | Provider | Provider Ref | Latency (ms) | Sandbox | Details / Error |
 |:---|:---|:---|:---|:---|:---|:---|:---|
-| `antivirus` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | CLAMAV_HOST / CLAMAV_PORT not configured |
+| `antivirus` | **SANDBOX** | Test Only | `sandbox_antivirus` | `sandbox_clamav_v1.4` | 0.10 | Yes | {"sandbox": true, "verdict": "CLEAN"} |
 | `browser` | **NOT_IMPLEMENTED** | Not Implemented | `none` | `-` | 0.00 | No | Browser automation runtime is NOT_IMPLEMENTED in sovereign core |
-| `calendar` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | CALDAV_URL not configured |
-| `database` | **OK** | Live | `database_sqlite` | `db_conn_sqlite` | 119.52 | Yes | {"dialect": "sqlite", "rls_active": false} |
+| `calendar` | **SANDBOX** | Test Only | `caldav_sandbox` | `sandbox_calendar_1795278897` | 0.50 | Yes | {"sandbox": true, "note": "Simulation mode"} |
+| `database` | **OK** | Live | `database_sqlite` | `db_conn_sqlite` | 13.43 | Yes | {"dialect": "sqlite", "rls_active": false} |
 | `desktop_control` | **NOT_IMPLEMENTED** | Not Implemented | `none` | `-` | 0.00 | No | Desktop GUI automation runtime is NOT_IMPLEMENTED in sovereign core |
-| `email_in` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | IMAP_HOST not configured |
-| `email_out` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | SMTP_HOST / SMTP_PORT not configured |
-| `key_management` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | KMS master key not configured (set KMS_MASTER_KEY or SECRET_VAULT_KEY) |
-| `llm` | **OK** | Live | `gemini` | `llm_gemini_models_200` | 393.79 | No | {"provider": "gemini", "verified": true} |
-| `mcp` | **OK** | Live | `zonata_mcp_registry` | `mcp_db_servers_198` | 6.87 | No | {"registered_servers": 198} |
-| `observability` | **OK** | Live | `internal_prometheus_metrics` | `metrics_exposition_3882b` | 11.44 | No | {"exposition": "prometheus", "otel_endpoint_configured": false, "otel_verified": false} |
-| `ocr` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | TIKA_ENDPOINT not configured in environment |
-| `payments` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | STRIPE_API_KEY not configured |
-| `search` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | SEARCH_ENDPOINT not configured; a provider name alone is not a live check |
-| `secrets` | **OK** | Live | `mediated_secret_store` | `sec_1973198609fe` | 7.37 | No | {"backend": "in_memory_mediated"} |
-| `storage` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | S3_ENDPOINT not configured in environment |
-| `text_extraction` | **NOT_CONFIGURED** | Not Connected | `not_configured` | `-` | 0.00 | No | TIKA_ENDPOINT not configured in environment |
-| `workflow_engine` | **OK** | Live | `embedded_transactional_outbox` | `outbox_events_0` | 78.32 | No | {"outbox_table": "af_outbox", "event_count": 0} |
+| `email_in` | **SANDBOX** | Test Only | `imap_sandbox` | `sandbox_email_in_1795278897` | 0.50 | Yes | {"sandbox": true, "note": "Simulation mode"} |
+| `email_out` | **SANDBOX** | Test Only | `sandbox_smtp` | `sandbox_smtp_sink` | 0.10 | Yes | {"sandbox": true} |
+| `key_management` | **OK** | Live | `sovereign_aes_gcm_kms` | `kms_kdf_sha256_356cb12c3a42df39` | 0.04 | No | {"cipher": "AES-256-GCM", "envelope_kms": true} |
+| `llm` | **OK** | Live | `gemini` | `llm_gemini_models_200` | 910.48 | No | {"provider": "gemini", "verified": true} |
+| `mcp` | **OK** | Live | `zonata_mcp_registry` | `mcp_db_servers_198` | 14.74 | No | {"registered_servers": 198} |
+| `observability` | **OK** | Live | `internal_prometheus_metrics` | `metrics_exposition_3882b` | 19.42 | No | {"exposition": "prometheus", "otel_endpoint_configured": false, "otel_verified": false} |
+| `ocr` | **SANDBOX** | Test Only | `sandbox_ocr` | `sandbox_ocr_v1` | 0.10 | Yes | {"sandbox": true} |
+| `payments` | **SANDBOX** | Test Only | `stripe_sandbox` | `sandbox_payments_1795278898` | 0.50 | Yes | {"sandbox": true, "note": "Simulation mode"} |
+| `search` | **SANDBOX** | Test Only | `search_sandbox` | `sandbox_search_1795278897` | 0.50 | Yes | {"sandbox": true, "note": "Simulation mode"} |
+| `secrets` | **OK** | Live | `mediated_secret_store` | `sec_9f871af95914` | 5.43 | No | {"backend": "in_memory_mediated"} |
+| `storage` | **SANDBOX** | Test Only | `sandbox_storage` | `sandbox_store_0` | 0.10 | Yes | {"items_count": 0} |
+| `text_extraction` | **SANDBOX** | Test Only | `sandbox_tika` | `sandbox_tika_v2.9.2` | 0.10 | Yes | {"sandbox": true} |
+| `workflow_engine` | **OK** | Live | `embedded_transactional_outbox` | `outbox_events_0` | 122.80 | Yes | {"outbox_table": "af_outbox", "event_count": 0} |
 
 ---
 

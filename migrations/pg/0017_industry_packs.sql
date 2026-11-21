@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS installed_industry_packs (
     version TEXT NOT NULL,
     isic_code TEXT NOT NULL,
     raw_manifest TEXT NOT NULL,
-    installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    installed_at REAL NOT NULL,
     CONSTRAINT uq_installed_pack UNIQUE (tenant_id, company_id, pack_id)
 );
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS company_folio_types (
     name TEXT NOT NULL,
     description TEXT,
     config TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at REAL NOT NULL,
     CONSTRAINT uq_company_folio_types UNIQUE (tenant_id, company_id, folio_type)
 );
 
