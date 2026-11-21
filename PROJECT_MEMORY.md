@@ -102,9 +102,34 @@
   - Audited and documented all 5 untyped model-driven action triggers in `core/`.
   - Authored acceptance tests in `tests/test_step2_preflight.py` (3 passed).
   - Documented empirical outputs in `docs/reports/STEP2_REPORT.md`.
-- [ ] **2B:** Model gateway: tiers, budgets, tracing
-- [ ] **2C:** Authority, approvals and budgets enforced in the ActionGateway
-- [ ] **2D:** Organization model (board to agent)
+  - Verified in CI Run `44939859289` (100% green across all 3 jobs).
+- [x] **2B:** Model gateway: tiers, budgets, tracing
+  - Authored ADR `docs/architecture/ADR_0001_LLM_GATEWAY_ROUTING.md` selecting thin adapter architecture with zero enterprise-licensed dependencies.
+  - Pinned `pydantic==1.10.27` and `typing-extensions==4.16.0` with SHA-256 hashes in `requirements.txt` and `docs/reports/OSS_REGISTER.md`.
+  - Implemented `LLMGateway` port (`core/ports/llm.py`) with 5 tiers (`PLANNER`, `WORKER`, `FAST`, `VISION`, `EMBEDDING`), circuit breakers, exponential jitter retries, and provider fallbacks.
+  - Implemented multi-tier hierarchical budgeting (`core/llm/budget.py`) with reserve-then-settle concurrency locking and integer micro-unit currency accounting.
+  - Implemented data egress policies (`core/llm/policy.py`) blocking `RESTRICTED` documents to unapproved providers and sanitizing secrets.
+  - Implemented prompt-injection defensive delimiters (`core/llm/prompts.py`) and typed JSON schema validation with one retry (`core/llm/typed_output.py`).
+  - Authored acceptance tests in `tests/test_llm_gateway.py` (9 passed).
+  - Verified in CI Run `44943883996` (100% green across all 3 jobs).
+- [x] **2C:** Authority, approvals and budgets enforced in the ActionGateway
+  - Authored schema migrations `migrations/common/0020_action_gateway_and_authority.sql` and `migrations/pg/0020_action_gateway_and_authority.sql` with fail-closed RLS.
+  - Implemented canonical 9-step decision gate order in `core/action_gateway.py` with machine-readable rule IDs.
+  - Enforced typed `ActionClass` enums with reserved classes returning `NOT_IMPLEMENTED`.
+  - Built `core/authority/` subsystem (profiles G1-G9, scoped time-bound delegations, multi-party approvals with SHA-256 canonical payload digest binding, constitution constraints, conservative autonomy ceiling capping `DRAFT`/`SKELETON` packs at `SUPERVISED`).
+  - Enforced Rule 15 across kill switch, LLM budget, model policy, and industry pack loaders.
+  - Merged double-entry ledger posting threshold into ActionGateway.
+  - Authored acceptance tests in `tests/test_action_gateway_authority.py` (12 passed).
+  - Verified in CI Run `44947053635` (100% green across all 3 jobs).
+- [x] **2D:** Organization model (board to agent)
+  - Authored schema migrations `migrations/common/0021_organization_model.sql` and `migrations/pg/0021_organization_model.sql` with fail-closed RLS on all 5 tables (`positions`, `position_assignments`, `reporting_lines`, `board_principals`, `handover_packs`).
+  - Established `core/organization/`:
+    - `types.py`: `OrgLevel` (11 levels), `OccupantType` (`HUMAN`, `AI_EMPLOYEE`), `AssignmentStatus`, domain exceptions.
+    - `pack_roles.py`: Industry pack role mapping for SaaS (`saas_enterprise` / ISIC J62) and Healthcare Clinic (`clinic_health` / ISIC Q86).
+    - `service.py`: `OrganizationService` managing positions, assignments, acyclic graph validation, single CEO enforcement, vacant seat work routing, dynamic org chart query computation, and empirical handover packs without hidden memory.
+  - Enforced ActionGateway Step 4: agents can never command or invoke employees (`AGENT_CANNOT_CALL_EMPLOYEE`), and AI occupants cannot modify org structures (`AIOrganizationSelfEditError` / Rule 15).
+  - Authored acceptance tests in `tests/test_organization_model.py` (8 passed). All 32 Step 2 tests passing in 5.35s.
+  - Verified in CI Run `44949025388` (100% green across all 3 jobs).
 - [ ] **2E:** Tool registry and the agent runtime
 - [ ] **2F:** Work kernel: missions, projects, tasks, inbox
 - [ ] **2G:** SOP executor

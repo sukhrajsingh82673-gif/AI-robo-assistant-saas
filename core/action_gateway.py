@@ -230,7 +230,8 @@ class ZonataActionGateway:
             "authority_profile", "grade_authority", "llm_budget", "enterprise_budget",
             "policy_decision", "model_policy", "company_constitution", "constitution",
             "installed_industry_pack", "pack_review_status", "action_approval",
-            "authority_delegation", "delegation", "killswitch", "enterprise_killswitch"
+            "authority_delegation", "delegation", "killswitch", "enterprise_killswitch",
+            "positions", "position_assignments", "reporting_lines", "board_principals", "org_structure",
         ]
 
         # Check if caller principal is an agent/AI attempting to write governance resources
