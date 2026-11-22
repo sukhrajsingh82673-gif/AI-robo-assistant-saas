@@ -854,3 +854,13 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
 - [x] A `NOT_EXECUTABLE` stub is never run (`test_05_sop_not_executable_stub_never_run`).
 - [x] Precondition failure halts execution before step action runs (`test_06_sop_precondition_failure_stops_instance`).
 - [x] Rule 8 mutation checks verify that acceptance tests fail when invariants are broken (`test_07_sop_mutation_checks_rule_8`).
+
+#### 2.4 Sub-Step 2G CI Run Verification
+- **Run ID:** `44982215849`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44982215849](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44982215849)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `0ca996f`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (1m44s)` — ID `137084974651`
+  - `Job 2: SQLite Dev Profile Test Suite (2m17s)` — ID `137084974826`
+  - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (2m22s)` — ID `137084974854`

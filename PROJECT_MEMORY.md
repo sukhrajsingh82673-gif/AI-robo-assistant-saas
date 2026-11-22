@@ -161,6 +161,7 @@
     - `__init__.py`: Exports and `ensure_sop_tables`.
   - Wired `ensure_sop_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
   - Authored acceptance tests in `tests/test_sop_executor.py` (7 passed). Full Step 2 suite: 58 passed in 17.97s.
+  - Verified in CI Run `44982215849` (100% green across all 3 jobs).
 - [ ] **2H:** Verification pyramid
 - [ ] **2I:** KPI engine and goal engine
 - [ ] **2J:** AI CEO executive brain and workforce trust
