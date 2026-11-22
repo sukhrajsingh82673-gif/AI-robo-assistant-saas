@@ -189,7 +189,20 @@
   - Wired `ensure_kpi_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
   - Authored acceptance tests in `tests/test_kpi_goal_engine.py` (7 passed). Full Step 2 suite: 72 passed in 20.50s.
   - Verified in CI Run `44993864831` (100% green across all 3 jobs).
-- [ ] **2J:** AI CEO executive brain and workforce trust
+- [x] **2J:** AI CEO executive brain and workforce trust
+  - Authored schema migrations `migrations/common/0027_ai_ceo_workforce_trust.sql` and `migrations/pg/0027_ai_ceo_workforce_trust.sql` with fail-closed RLS on all 4 tables (`ceo_directives`, `ceo_decision_records`, `company_risk_register`, `employee_trust_levels`) and Rule 15 role protections revoking write privileges from `zonata_agent_role`.
+  - Established `core/executive/`:
+    - `types.py`: `TrustLevel`, `DirectiveStatus`, `RiskTriggerType`, `RiskSeverity`, domain models, and domain exceptions (`ClarificationRequiredError`, `PlanValidationFailedError`, `NumberLockViolationError`, `PromotionThresholdNotMetError`, `UnauthorizedPromotionApproverError`).
+    - `interpreter.py`: `CommandInterpreter` parsing owner commands into `DirectiveModel` with high-stakes ambiguity detection (money, legal exposure, irreversibility) asking clarifying questions instead of guessing.
+    - `planner.py`: `CEOPlanner` and `PlanValidator` creating execution graphs delegated to positions, enforcing capability availability (`BLOCKED: CAPABILITY_NOT_LIVE` for non-live browser/market research), budget arithmetic, authority profile coverage, dependency acyclicity, and deadline chronology.
+    - `decision.py`: `CEODecisionService` capturing structured options, justifications, and Merkle-sealing in the evidence ledger.
+    - `trust.py`: `WorkforceTrustService` enforcing `SHADOW` by default, measured promotion thresholds ($\ge 5$ tasks, $\ge 0.95$ pass rate, $\ge 90.0\%$ SOP compliance, 0 violations) with mandatory human principal approval (Rule 15), automatic demotion on policy violations, and per-employee kill switch.
+    - `risk.py`: `CompanyRiskService` monitoring KPI, SLA, and verification triggers to generate auditable risk records and proposed corrective tasks (never silent actions).
+    - `reporting.py`: `CEOReportingService` with `NumberLockValidator` verifying all narrative numbers against real database facts and ensuring honest attribution.
+    - `cadence.py`: `CEOCadenceEngine` coordinating daily and weekly reviews.
+    - `__init__.py`: Exports and `ensure_executive_tables`.
+  - Wired `ensure_executive_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
+  - Authored acceptance tests in `tests/test_ai_ceo_workforce_trust.py` (10 passed). Full Step 2 suite: 82 passed in 19.14s.
 - [ ] **2K:** Evals and the Step 2 qualification
 
 ## Supervision Corrections (2026-11-21)

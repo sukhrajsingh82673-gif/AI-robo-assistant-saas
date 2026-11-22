@@ -1059,3 +1059,118 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
   - `Job 2: Supply Chain, SBOM, License & Image Pinning Audit (2m40s)` — ID `137120597971`
   - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (3m59s)` — ID `137120598096`
 
+---
+
+## Sub-Step 2J: AI CEO Executive Brain and Workforce Trust
+
+### 1. Architectural Overview & Implementation Summary
+
+In accordance with OpenCode Step 2J, the AI CEO interprets owner commands, plans, delegates through positions, records decisions, reports measured results, and employees earn autonomy strictly by measured performance.
+
+#### 1.1 Command Interpretation & High-Stakes Ambiguity Gate
+- Realized in `core/executive/interpreter.py` (`CommandInterpreter`):
+  - Owner instructions are parsed into typed `DirectiveModel` instances.
+  - Scans for high-stakes domains: open-ended financial expenditure (`spend`, `budget`, `invest`), legal actions (`sue`, `contract`, `liability`), and irreversible operations (`delete`, `terminate`, `shut down`).
+  - When ambiguity is detected without numeric spend caps, entity targets, or explicit constraints, the brain asks a targeted clarifying question instead of guessing (`ClarificationRequiredError`). An ambiguous command produces a question, not a plan.
+
+#### 1.2 Deterministic Plan Validation & Delegation through Positions
+- Implemented in `core/executive/planner.py` (`CEOPlanner`, `PlanValidator`):
+  - Plans are modeled as typed graphs (`PlanGraphModel`) of missions, projects, and tasks delegated exclusively to positions (never directly executed by the CEO).
+  - Deterministic Plan Validator checks:
+    1. **Capability Availability:** Evaluates required capabilities against `capability_truth_table.get_status()`. Any task requiring non-live capabilities (e.g. `BROWSER_CONTROL`, `MARKET_RESEARCH_LIVE`, `DESKTOP_CONTROL`) is converted to a setup/blocked step marked `BLOCKED: CAPABILITY_NOT_LIVE` with an explicit reason.
+    2. **Budget Arithmetic:** Verifies total estimated task costs ($\sum \text{task.estimate\_minor\_units}$) do not exceed the directive or company budget (`BUDGET_EXCEEDED`).
+    3. **Authority Coverage:** Validates that each position holds an authority profile (`G1`–`G9`) sufficient to cover its assigned action classes and spend limits (`AUTHORITY_INSUFFICIENT`).
+    4. **Dependency Acyclicity:** Directed cycle detection on task prerequisites (`DEPENDENCY_CYCLE`).
+    5. **Deadline Chronology:** Enforces task deadline $\le$ project $\le$ mission $\le$ directive (`DEADLINE_VIOLATION`).
+  - An invalid plan fails validation with detailed reasons and is never started (`PlanValidationFailedError`).
+
+#### 1.3 Decision Records Sealed in Merkle Ledger
+- Implemented in `core/executive/decision.py` (`CEODecisionService`):
+  - Captures options, evidence IDs, chosen option, justification reason, approver, and outcome review date in `ceo_decision_records`.
+  - Seals every decision in the Merkle evidence ledger (`evidence_service.record_event`).
+
+#### 1.4 Company Risk Register (Triggered Corrective Actions)
+- Implemented in `core/executive/risk.py` (`CompanyRiskService`):
+  - Monitors deterministic triggers: `KPI_OFF_TRACK`, `BUDGET_BURN_SPIKE`, `SLA_BREACH`, `VERIFICATION_FAILURE_RATE`, `REPEATED_DENIALS`.
+  - For each risk trigger, records an entry in `company_risk_register` AND automatically drafts a corrective task in `work_tasks` (status `PROPOSED`, never silent actions).
+
+#### 1.5 Owner Reporting with Number-Lock (Rule 18)
+- Realized in `core/executive/reporting.py` (`CEOReportingService`, `NumberLockValidator`):
+  - Gathers factual metrics strictly from stored records (`kpi_snapshots`, `work_tasks`, `accounts`).
+  - **Number-Lock Validator:** Scans narrative text for numeric tokens and checks that every number exists in the database facts dictionary. Any hallucinated or unverified number raises `NumberLockViolationError` and causes the report to fall back to a deterministic, factual data template.
+  - Honest attribution: Prohibits causal claims ("better than human", "our AI caused"), reporting only measured changes and actions taken.
+
+#### 1.6 Workforce Trust & Earned Autonomy (Rule 19 & Rule 15)
+- Realized in `core/executive/trust.py` (`WorkforceTrustService`):
+  - Hierarchy: `SHADOW` (propose only) $\to$ `SUPERVISED` (acts with approval) $\to$ `LIMITED_AUTONOMY` $\to$ `AUTONOMOUS` within limits.
+  - New employees start in `SHADOW` by default (Rule 19: Conservative by default).
+  - **Promotion:** Requires measured thresholds:
+    - $\ge 5$ completed tasks
+    - $\ge 0.95$ verified pass rate
+    - $\ge 90.0\%$ SOP compliance
+    - $0$ policy violations
+    - Verified human principal approval (`approved_by_principal_role == "OWNER"`). AI/agent approvals are strictly refused (`UnauthorizedPromotionApproverError`).
+  - **Demotion:** Automatically drops trust level to `SHADOW` upon any policy violation or verification failure spike, enqueuing an intervention alert in the human inbox.
+  - Per-employee suspension and kill switch (`kill_employee`).
+
+#### 1.7 Database Migrations & Governance
+- `migrations/common/0027_ai_ceo_workforce_trust.sql`: Common DDL for `ceo_directives`, `ceo_decision_records`, `company_risk_register`, `employee_trust_levels`.
+- `migrations/pg/0027_ai_ceo_workforce_trust.sql`: PostgreSQL 16 fail-closed RLS on all 4 tables and Rule 15 role protections revoking `INSERT`, `UPDATE`, and `DELETE` on all executive tables from `zonata_agent_role`.
+
+---
+
+### 2. Verification & Test Evidence
+
+#### 2.1 Sub-Step 2J Test Suite Execution
+Command: `python3 -m pytest tests/test_ai_ceo_workforce_trust.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 10 items
+
+tests/test_ai_ceo_workforce_trust.py::test_01_ambiguous_high_stakes_command_produces_question_not_plan PASSED [ 10%]
+tests/test_ai_ceo_workforce_trust.py::test_02_plan_exceeding_budget_rejected_with_reasons PASSED [ 20%]
+tests/test_ai_ceo_workforce_trust.py::test_03_plan_exceeding_position_authority_rejected_with_reasons PASSED [ 30%]
+tests/test_ai_ceo_workforce_trust.py::test_04_plan_step_needing_browser_marked_blocked PASSED [ 40%]
+tests/test_ai_ceo_workforce_trust.py::test_05_new_employee_starts_in_shadow_rule19 PASSED [ 50%]
+tests/test_ai_ceo_workforce_trust.py::test_06_promotion_requires_human_principal_approval_rule15 PASSED [ 60%]
+tests/test_ai_ceo_workforce_trust.py::test_07_policy_violation_demotes_automatically_and_alerts_inbox PASSED [ 70%]
+tests/test_ai_ceo_workforce_trust.py::test_08_ceo_principal_cannot_edit_constitution_or_authority_rule15 PASSED [ 80%]
+tests/test_ai_ceo_workforce_trust.py::test_09_owner_reporting_number_lock_rejection_rule18 PASSED [ 90%]
+tests/test_ai_ceo_workforce_trust.py::test_10_risk_register_triggers_propose_corrective_tasks PASSED [100%]
+
+============================== 10 passed in 1.66s ==============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (High-Stakes Ambiguity Scanner):**
+   - Disabling ambiguity detection causes unbudgeted commands to attempt execution. With detection active, open-ended financial expenditure immediately raises `ClarificationRequiredError` and blocks planning.
+2. **Mutation 2 (Human Promotion Authority Guard):**
+   - Removing the principal role check allows agents to promote peers. With Rule 15 enforced, agent approval raises `UnauthorizedPromotionApproverError`.
+3. **Mutation 3 (Number-Lock Verification):**
+   - Injecting hallucinated numbers ($99,999) into the narrative draft is detected by `NumberLockValidator`, causing fallback to a verified factual summary.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py tests/test_verification_pyramid.py tests/test_kpi_goal_engine.py tests/test_ai_ceo_workforce_trust.py -v`
+```
+============================= 82 passed in 19.14s ==============================
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] An ambiguous high-stakes command produces a question, not a plan (`test_01_ambiguous_high_stakes_command_produces_question_not_plan`).
+- [x] A plan exceeding budget is rejected with reasons (`test_02_plan_exceeding_budget_rejected_with_reasons`).
+- [x] A plan exceeding position authority is rejected with reasons (`test_03_plan_exceeding_position_authority_rejected_with_reasons`).
+- [x] A plan step needing the browser is marked `BLOCKED: CAPABILITY_NOT_LIVE` (`test_04_plan_step_needing_browser_marked_blocked`).
+- [x] A new employee cannot act above `SHADOW` (`test_05_new_employee_starts_in_shadow_rule19`).
+- [x] Promotion without measured thresholds or human approval is refused (`test_06_promotion_requires_human_principal_approval_rule15`).
+- [x] A policy violation demotes automatically and alerts human inbox (`test_07_policy_violation_demotes_automatically_and_alerts_inbox`).
+- [x] The CEO principal cannot edit the constitution or its own authority (`test_08_ceo_principal_cannot_edit_constitution_or_authority_rule15`).
+- [x] Number-Lock rejects narrative containing unverified numbers (`test_09_owner_reporting_number_lock_rejection_rule18`).
+- [x] Risk register triggers create proposed corrective tasks (`test_10_risk_register_triggers_propose_corrective_tasks`).
+

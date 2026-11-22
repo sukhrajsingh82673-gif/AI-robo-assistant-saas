@@ -5434,6 +5434,8 @@ class Database:
                 ensure_verification_tables(conn)
                 from core.kpi import ensure_kpi_tables
                 ensure_kpi_tables(conn)
+                from core.executive import ensure_executive_tables
+                ensure_executive_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5493,6 +5495,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_verification_tables()
         from core.kpi import ensure_kpi_tables
         ensure_kpi_tables()
+        from core.executive import ensure_executive_tables
+        ensure_executive_tables()
     except Exception:
         pass
     try:
