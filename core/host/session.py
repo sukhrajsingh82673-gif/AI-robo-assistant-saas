@@ -23,6 +23,7 @@ from core.host.types import (
     GrantEventType,
     ReplayDetectedError,
     HostSecurityViolation,
+    ensure_host_permission_tables,
 )
 
 logger = logging.getLogger("zonata.host.session")
@@ -70,6 +71,7 @@ class HostSessionManager:
         )
         """
         with db.get_connection() as conn:
+            ensure_host_permission_tables(conn)
             conn.execute(sql, {
                 "session_id": session_id,
                 "device_id": device_id,

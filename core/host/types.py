@@ -177,24 +177,28 @@ def ensure_host_permission_tables(conn: Optional[Any] = None) -> None:
     migration_file = "0029_host_permission_model.sql"
     root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
 
-    if conn is not None:
-        if hasattr(conn, "executescript") and db.dialect == DatabaseDialect.SQLITE:
-            sql_path = root_dir / "migrations" / "common" / migration_file
-            if sql_path.exists():
-                conn.executescript(sql_path.read_text(encoding="utf-8"))
-        else:
-            sql_path = root_dir / "migrations" / "pg" / migration_file
-            if sql_path.exists():
-                conn.execute(sql_path.read_text(encoding="utf-8"))
-        return
-
-    with db.get_connection() as connection:
+    def _apply_on_conn(target_conn):
         if db.dialect == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
-                connection.executescript(sql_path.read_text(encoding="utf-8"))
+                sql_text = sql_path.read_text(encoding="utf-8")
+                if hasattr(target_conn, "executescript"):
+                    target_conn.executescript(sql_text)
+                else:
+                    for stmt in sql_text.split(";"):
+                        s = stmt.strip()
+                        if s:
+                            target_conn.execute(s)
         else:
             sql_path = root_dir / "migrations" / "pg" / migration_file
             if sql_path.exists():
-                connection.execute(sql_path.read_text(encoding="utf-8"))
+                sql_text = sql_path.read_text(encoding="utf-8")
+                target_conn.execute(sql_text)
+
+    if conn is not None:
+        _apply_on_conn(conn)
+        return
+
+    with db.get_connection() as connection:
+        _apply_on_conn(connection)
 

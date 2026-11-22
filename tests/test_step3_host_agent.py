@@ -49,6 +49,11 @@ from core.host import (
 
 class TestStep3HostPermissionAndAgent(unittest.TestCase):
     def setUp(self):
+        from core.db import db
+        db.verify_readiness()
+        from core.host.types import ensure_host_permission_tables
+        ensure_host_permission_tables()
+        os.environ["ZONATA_STEP3_HOST_ENABLED"] = "1"
         self.tenant_id = "tenant_test_hands"
         self.company_id = "company_test_hands"
         self.owner_id = "user_human_owner_01"

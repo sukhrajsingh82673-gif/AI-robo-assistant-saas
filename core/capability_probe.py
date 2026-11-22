@@ -306,9 +306,15 @@ def probe_desktop_control() -> ProviderResult:
     if _is_test_mode() and os.environ.get("ZONATA_FAKE_HOST_PAIRED") == "1":
         return SandboxProvider("desktop_control", "zonata_host_agent_fake").probe()
 
-    return NotConfiguredProvider(
-        "desktop_control",
-        "No paired and connected host agent. Desktop control requires active host agent connection (Rule 30).",
+    if os.environ.get("ZONATA_STEP3_HOST_ENABLED") == "1":
+        return NotConfiguredProvider(
+            "desktop_control",
+            "No paired and connected host agent. Desktop control requires active host agent connection (Rule 30).",
+        ).probe()
+
+    return NotImplementedProvider(
+        capability="desktop_control",
+        reason="Desktop GUI automation runtime is NOT_IMPLEMENTED in sovereign core"
     ).probe()
 
 

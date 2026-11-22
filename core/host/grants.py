@@ -20,6 +20,7 @@ from core.host.types import (
     GrantEventType,
     HostGrantRecord,
     HostSecurityViolation,
+    ensure_host_permission_tables,
 )
 
 logger = logging.getLogger("zonata.host.grants")
@@ -85,6 +86,7 @@ class HostGrantManager:
         )
         """
         with db.get_connection() as conn:
+            ensure_host_permission_tables(conn)
             conn.execute(
                 sql_grant,
                 {

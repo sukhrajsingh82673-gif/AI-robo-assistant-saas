@@ -69,6 +69,7 @@ class PairingManager:
         )
         """
         with db.get_connection() as conn:
+            ensure_host_permission_tables(conn)
             conn.execute(
                 sql,
                 {
@@ -120,6 +121,7 @@ class PairingManager:
         WHERE device_id = :device_id
         """
         with db.get_connection() as conn:
+            ensure_host_permission_tables(conn)
             row = conn.execute(select_sql, {"device_id": device_id}).fetchone()
             if not row:
                 raise HostSecurityViolation(f"Device {device_id} not found.")

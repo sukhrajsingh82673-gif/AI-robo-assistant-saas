@@ -48,9 +48,9 @@ class ZonataHostAgent:
         self.tenant_id: Optional[str] = None
         self.company_id: Optional[str] = None
 
-        # Private key never leaves this instance and is never persisted in plaintext DB
-        self._private_key: ed25519.Ed25519PrivateKey = ed25519.Ed25519PrivateKey.generate()
-        self._public_key: ed25519.Ed25519PublicKey = self._private_key.public_key()
+        # Sovereign keypair generated in memory; never leaves this instance and never persisted in DB
+        self._signing_key: ed25519.Ed25519PrivateKey = ed25519.Ed25519PrivateKey.generate()
+        self._verifying_key: ed25519.Ed25519PublicKey = self._signing_key.public_key()
 
         # Local grant store enforced on the machine itself
         self._local_grants: Dict[str, HostGrantRecord] = {}
@@ -60,7 +60,7 @@ class ZonataHostAgent:
 
     @property
     def public_key_hex(self) -> str:
-        return self._public_key.public_bytes_raw().hex()
+        return self._verifying_key.public_bytes_raw().hex()
 
     def get_public_key_pem(self) -> str:
         return self.public_key_hex
@@ -77,7 +77,7 @@ class ZonataHostAgent:
         canonical_bytes = HostSessionManager.canonical_envelope_bytes(
             session_id, sequence_no, timestamp, nonce, payload
         )
-        signature = self._private_key.sign(canonical_bytes)
+        signature = self._signing_key.sign(canonical_bytes)
         return signature.hex()
 
     def create_outbound_envelope(self, payload: Dict[str, Any]) -> Dict[str, Any]:
