@@ -1174,3 +1174,13 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
 - [x] Number-Lock rejects narrative containing unverified numbers (`test_09_owner_reporting_number_lock_rejection_rule18`).
 - [x] Risk register triggers create proposed corrective tasks (`test_10_risk_register_triggers_propose_corrective_tasks`).
 
+#### 2.4 Sub-Step 2J CI Run Verification
+- **Run ID:** `45000689850`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45000689850](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45000689850)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `1a55ce8`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: PostgreSQL 16 & Service Containers Contract Tests (2m48s)` — ID `137141357315`
+  - `Job 2: Supply Chain, SBOM, License & Image Pinning Audit (3m8s)` — ID `137141357448`
+  - `Job 3: SQLite Dev Profile Test Suite (2m29s)` — ID `137141357453`
+
