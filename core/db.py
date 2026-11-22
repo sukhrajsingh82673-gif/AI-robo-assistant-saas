@@ -5430,6 +5430,8 @@ class Database:
                 ensure_work_kernel_tables(conn)
                 from core.sop import ensure_sop_tables
                 ensure_sop_tables(conn)
+                from core.verification import ensure_verification_tables
+                ensure_verification_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5485,6 +5487,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_work_kernel_tables()
         from core.sop import ensure_sop_tables
         ensure_sop_tables()
+        from core.verification import ensure_verification_tables
+        ensure_verification_tables()
     except Exception:
         pass
     try:

@@ -49,6 +49,7 @@ VALID_TRANSITIONS: Dict[TaskStatus, Set[TaskStatus]] = {
     },
     TaskStatus.REJECTED: {
         TaskStatus.IN_PROGRESS,  # Re-work after rejection
+        TaskStatus.ASSIGNED,     # Reassigned/routed back
         TaskStatus.CANCELLED,
     },
     TaskStatus.BLOCKED: {

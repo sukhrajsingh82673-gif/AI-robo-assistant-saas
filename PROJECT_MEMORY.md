@@ -162,7 +162,21 @@
   - Wired `ensure_sop_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
   - Authored acceptance tests in `tests/test_sop_executor.py` (7 passed). Full Step 2 suite: 58 passed in 17.97s.
   - Verified in CI Run `44982215849` (100% green across all 3 jobs).
-- [ ] **2H:** Verification pyramid
+- [x] **2H:** Verification pyramid
+  - Authored schema migrations `migrations/common/0025_verification_pyramid.sql` and `migrations/pg/0025_verification_pyramid.sql` with fail-closed RLS on all tables (`task_verifications`, `verification_layer_results`) and Rule 15 role protections revoking `INSERT`, `UPDATE`, and `DELETE` on verification tables from `zonata_agent_role`.
+  - Established `core/verification/`:
+    - `types.py`: `VerificationLayer` (5 layers: `SCHEMA`, `DETERMINISTIC_CODE`, `CROSS_RECORD`, `PEER_MODEL`, `HUMAN`), `VerificationStatus`, `LayerResultStatus`, domain models (`VerificationLayerResult`, `VerificationReport`, `VerificationRecipe`), and domain exceptions.
+    - `sampling.py`: `SpotCheckSampler` providing 100% deterministic, reproducible spot check sampling based on SHA-256 of task ID and layer name.
+    - `layers.py`: Five progressive verification layers:
+      - Layer 1 (`SchemaVerificationLayer`): Type and constraint schema validation.
+      - Layer 2 (`DeterministicCodeVerificationLayer`): Pure code assertions on arithmetic, date chronologies, regex patterns, and deterministic expressions.
+      - Layer 3 (`CrossRecordVerificationLayer`): Foreign key and database value reconciliation against real stored records.
+      - Layer 4 (`PeerModelVerificationLayer`): Critic evaluation against structured rubrics with collusion guard prohibiting task assignees from invoking peer reviews (`UnauthorizedLayerInvokerError`).
+      - Layer 5 (`HumanVerificationLayer`): Human inbox integration resolving only for verified human principals (`OWNER` or human roles).
+    - `engine.py`: `VerificationEngine` with recipe registry, progressive halting on first failing layer, re-routing rejected tasks to `ASSIGNED`, and formal completion signoff.
+    - `__init__.py`: Subsystem exports and `ensure_verification_tables`.
+  - Wired `ensure_verification_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
+  - Authored acceptance tests in `tests/test_verification_pyramid.py` (7 passed). Full Step 2 suite: 65 passed in 15.33s.
 - [ ] **2I:** KPI engine and goal engine
 - [ ] **2J:** AI CEO executive brain and workforce trust
 - [ ] **2K:** Evals and the Step 2 qualification

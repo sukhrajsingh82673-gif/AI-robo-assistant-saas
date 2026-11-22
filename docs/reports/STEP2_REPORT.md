@@ -864,3 +864,83 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
   - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (1m44s)` — ID `137084974651`
   - `Job 2: SQLite Dev Profile Test Suite (2m17s)` — ID `137084974826`
   - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (2m22s)` — ID `137084974854`
+
+---
+
+## Sub-Step 2H: Verification Pyramid: Five Layers from Schema to Human
+
+### 1. Architectural Overview & Implementation Summary
+
+In accordance with OpenCode Step 2H and Rule 17 ("Done is a claim, not a fact"), tasks in ZONATA never transition to `COMPLETED` through self-reporting. Completion is strictly governed by a five-layer progressive verification pyramid.
+
+#### 1.1 Five Verification Layers
+1. **Layer 1 (`SCHEMA`):** Pure code validation of payload structure, required fields, constraints, and data types (`SchemaVerificationLayer`).
+2. **Layer 2 (`DETERMINISTIC_CODE`):** Deterministic unit checks, arithmetic balances, date/timestamp consistency, budget arithmetic, and regex patterns (`DeterministicCodeVerificationLayer`).
+3. **Layer 3 (`CROSS_RECORD`):** Relational database reconciliation against stored records (foreign key existence, invoice matching against PO amounts, double-entry ledger balance, Merkle evidence linkage) (`CrossRecordVerificationLayer`).
+4. **Layer 4 (`PEER_MODEL`):** Independent critic model evaluation against a structured rubric with evidence references (`PeerModelVerificationLayer`). **Strict Collusion Guard:** The task's own assignee principal is prohibited from invoking Layer 4 (`UnauthorizedLayerInvokerError`); only the verification engine or authorized independent verifiers can invoke peer review.
+5. **Layer 5 (`HUMAN`):** Asynchronous or synchronous human review via the durable human inbox (`HumanVerificationLayer`). Only verified human principals (`PrincipalType.OWNER` or human roles) can sign off on Layer 5.
+
+#### 1.2 Database Migrations & Governance
+- `migrations/common/0025_verification_pyramid.sql`: DDL for `task_verifications` and `verification_layer_results`.
+- `migrations/pg/0025_verification_pyramid.sql`: PostgreSQL 16 fail-closed RLS on both tables and Rule 15 role protections revoking `INSERT`, `UPDATE`, and `DELETE` on verification tables from `zonata_agent_role`.
+
+#### 1.3 Recipe Registry & Progressive Halting
+- Every task type registers a verification recipe (`VerificationRecipe`).
+- Verification executes sequentially ($1 \to 2 \to 3 \to 4 \to 5$). If any layer fails, verification halts immediately without evaluating higher, more expensive layers.
+- A failure logs the failing rule name, observed value, expected value, error message, and evidence pointers in `verification_layer_results`, and re-routes the task back to `ASSIGNED` for rework.
+
+#### 1.4 Deterministic Spot Checks
+- Configurable sampling rate for Layer 4 and Layer 5 review via `SpotCheckSampler`.
+- Deterministic hashing: $\text{ratio} = \frac{\text{int}(\text{SHA-256}(task\_id : \text{spot\_check} : layer)[:8], 16) \pmod{10000}}{10000.0} < \text{rate}$.
+- Guaranteed 100% reproducible across processes, machines, and restarts.
+
+---
+
+### 2. Verification & Test Evidence
+
+#### 2.1 Sub-Step 2H Test Suite Execution
+Command: `python3 -m pytest tests/test_verification_pyramid.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 7 items
+
+tests/test_verification_pyramid.py::test_01_task_cannot_transition_to_completed_without_all_required_layers_passing PASSED [ 14%]
+tests/test_verification_pyramid.py::test_02_failing_assertion_at_layer_2_halts_verification_and_logs_mismatch PASSED [ 28%]
+tests/test_verification_pyramid.py::test_03_spot_check_sampling_is_deterministic_and_reproducible PASSED [ 42%]
+tests/test_verification_pyramid.py::test_04_layer_4_peer_model_cannot_be_called_by_tasks_own_agent_principal PASSED [ 57%]
+tests/test_verification_pyramid.py::test_05_layer_5_human_verification_requires_human_principal PASSED [ 71%]
+tests/test_verification_pyramid.py::test_06_rule_17_assignee_cannot_verify_task_via_verification_engine PASSED [ 85%]
+tests/test_verification_pyramid.py::test_07_mutation_checks_rule_8 PASSED [100%]
+
+============================== 7 passed in 2.74s ===============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (Deterministic Arithmetic Guard):**
+   - Corrupting calculation assertions to pass blindly allows corrupted math through. Real code caught $10 + 20 = 999$ mismatch, logging observed 30 vs expected 999.
+2. **Mutation 2 (Layer 4 Assignee Collusion Guard):**
+   - Attempting to call Layer 4 as the task's assignee raised `UnauthorizedLayerInvokerError`, preventing agents from self-reviewing deliverables.
+3. **Mutation 3 (Rule 17 Engine Guard):**
+   - Calling `verify_task` as the task's assignee raised `AssigneeSelfCompletionForbiddenError`.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py tests/test_verification_pyramid.py -v`
+```
+============================= 65 passed in 15.33s ==============================
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] A task cannot transition to `COMPLETED` without all required layers passing (`test_01_task_cannot_transition_to_completed_without_all_required_layers_passing`).
+- [x] A failing assertion at Layer 2 halts verification and logs the mismatch (`test_02_failing_assertion_at_layer_2_halts_verification_and_logs_mismatch`).
+- [x] Spot check sampling is reproducible and deterministic on task ID hash (`test_03_spot_check_sampling_is_deterministic_and_reproducible`).
+- [x] Layer 4 peer model cannot be called by the task's own agent principal (`test_04_layer_4_peer_model_cannot_be_called_by_tasks_own_agent_principal`).
+- [x] Layer 5 human review can only be resolved by a verified human principal (`test_05_layer_5_human_verification_requires_human_principal`).
+- [x] Rule 17: Assignee can never verify its own task via the verification engine (`test_06_rule_17_assignee_cannot_verify_task_via_verification_engine`).
+- [x] Rule 8 mutation checks verify that acceptance tests fail when invariants are broken (`test_07_mutation_checks_rule_8`).

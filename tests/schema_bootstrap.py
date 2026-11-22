@@ -121,6 +121,11 @@ def init_all_subsystem_schemas():
         ensure_sop_tables()
     except Exception:
         pass
+    try:
+        from core.verification import ensure_verification_tables
+        ensure_verification_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():
