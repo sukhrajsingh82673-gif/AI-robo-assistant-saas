@@ -1480,6 +1480,24 @@ tests/test_step2_scenario.py::TestStep2Scenario::test_step2_scenario_runs_cleanl
 ============================= 89 passed in 24.56s ==============================
 ```
 
+#### 2.5 Sub-Step 2K CI Run Verification
+- **Run ID:** `45041196989`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45041196989](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45041196989)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `a541f82`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (1m37s)` — ID `137265820447`
+  - `Job 2: SQLite Dev Profile Test Suite (2m34s)` — ID `137265820343`
+  - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (3m12s)` — ID `137265820130`
+    - Service container handshakes: PASSED
+    - Schema DDL & Dialect: PASSED
+    - Capability Reality Probe: PASSED
+    - 173 Contract Tests (including Step 1 & Step 2): PASSED
+    - Backup & Restore Drill: PASSED
+    - Step 1 Qualification Scenario: PASSED
+    - Golden Evals across all 6 departments: PASSED
+    - Step 2 Qualification Scenario (all 8 stages): PASSED
+
 ---
 
 ### 3. OpenCode Step 2 Formal Sign-Off & Comprehensive Audit

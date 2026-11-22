@@ -5,7 +5,7 @@
 - **Active Workspace:** `/data/data/com.termux/files/home/AI-robo-assistant-saas`
 - **Active Git Branch:** `step2-intelligence-execution`
 - **Remote Origin:** `https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git`
-- **Execution Status:** OpenCode Step 2 (Intelligence, Authority & Verified Execution Kernel) in progress. GitHub Actions CI is the authoritative verification source of truth.
+- **Execution Status:** OpenCode Step 2 (Intelligence, Authority & Verified Execution Kernel) COMPLETE. 100% verified across all 11 sub-steps (2A-2K) in GitHub Actions CI (Run 45041196989).
 
 ## Architectural Principles & Invariants
 1. **Truth Rule:** Nothing reports success it did not achieve. Unconfigured -> `NOT_CONFIGURED`, unbuilt -> `NOT_IMPLEMENTED`. Test fakes permitted only under `ZONATA_TEST_MODE=1` with `sandbox: true`.
@@ -204,7 +204,22 @@
   - Wired `ensure_executive_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
   - Authored acceptance tests in `tests/test_ai_ceo_workforce_trust.py` (10 passed). Full Step 2 suite: 82 passed in 19.14s.
   - Verified in CI Run `45000689850` (100% green across all 3 jobs).
-- [ ] **2K:** Evals and the Step 2 qualification
+- [x] **2K:** Evals and the Step 2 qualification
+  - Authored schema migrations `migrations/common/0028_eval_harness.sql` and `migrations/pg/0028_eval_harness.sql` with fail-closed RLS on `eval_runs` and Rule 15 role protections revoking write privileges from `zonata_agent_role`.
+  - Established `core/evals/`:
+    - `types.py`: `ModelTier` (`FAST`, `WORKER`, `PLANNER`, `VISION`), `TaskResultStatus`, `TaskEvalResult`, `DepartmentEvalSummary`, `EvalRunRecord`, Rule 21 notice, and domain exceptions (`SpendCapExceededError`, `EvalThresholdFailedError`).
+    - `schema.py`: Golden task YAML schema validation (`GoldenTaskSpec`, `GoldenEvalSuiteSpec`).
+    - `runner.py`: `EvalHarness` executing golden benchmark suites, enforcing hard spend caps in micro-units, pass rate threshold gates (default: 90.0%), tracking costs and latencies, printing Rule 21 notices, and persisting run records to `eval_runs`.
+    - `__init__.py`: Exports and `ensure_eval_tables`.
+  - Authored 6 golden department YAML benchmark suites (`evals/departments/*.yaml`) with $\ge 10$ tasks per department (60 tasks total across finance, operations, sales, hr, procurement, customer_support).
+  - Built CLI runner `scripts/run_evals.py` supporting `--department`, `--threshold`, `--max-spend`, `--tier`, `--model`, `--output`.
+  - Implemented 8-stage qualification pipeline `scripts/step2_scenario.py` verifying empty goal setting (`INSUFFICIENT_MEASUREMENTS`), synthetic baseline days-to-pay (38.0 days), CEO directive planning, conservative default autonomy (`SHADOW`), 5-layer verified execution, KPI re-measurement with Number-Lock owner reporting, 7-part adversarial battery, and cryptographic evidence audit with honest capability reporting (`browser` and `desktop` as `NOT_IMPLEMENTED`).
+  - Authored acceptance tests in `tests/test_eval_harness.py` (6 passed) and `tests/test_step2_scenario.py` (1 passed). Full Step 2 suite: 89 passed in local dev; full repository suite: 173 passed, 4 skipped.
+  - Verified in CI Run `45041196989` (100% green across all 3 jobs):
+    - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (1m37s)` — ID `137265820447`
+    - `Job 2: SQLite Dev Profile Test Suite (2m34s)` — ID `137265820343`
+    - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (3m12s)` — ID `137265820130`
+  - OpenCode Step 2 complete across all 11 sub-steps (2A through 2K).
 
 ## Supervision Corrections (2026-11-21)
 - Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).
