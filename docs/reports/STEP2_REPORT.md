@@ -770,3 +770,87 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
   - `Job 3: SQLite Dev Profile Test Suite (3m16s)` — ID `137072250132`
 
 
+
+---
+
+## Sub-Step 2G: SOP Executor: Step Records, Dry Runs, Code-Verified Postconditions, and Compensations
+
+### 1. Architectural Overview & Implementation Summary
+
+In accordance with OpenCode Step 2G, work in ZONATA is governed by documented, verifiable Standard Operating Procedures (SOPs) rather than unconstrained freeform model output.
+
+#### 1.1 Step Types & Schema Validation
+- **Step Types:** `TOOL`, `MODEL`, `HUMAN`, `APPROVAL`, `CHECK`.
+- **Reversibility Classes:** `IRREVERSIBLE`, `COMPENSABLE`, `IDEMPOTENT`.
+- **Pack Stubs:** Industry pack SOP stubs without executable steps are compiled with status `NOT_EXECUTABLE`. Attempting to execute them raises `SOPNotExecutableError`.
+- **Immutable Step Records:** Every step run writes an immutable record in `sop_step_records` containing:
+  - `input_hash`: SHA-256 of resolved inputs.
+  - `step_def_hash`: SHA-256 of the immutable step definition.
+  - `output_hash`: SHA-256 of the step outputs.
+  - `actor_id`, `start_time`, `finish_time`, `duration_ms`.
+  - `preconditions_passed` (0 or 1), `postconditions_passed` (0 or 1).
+  - `outcome`: `PASSED`, `FAILED`, or `ESCALATED`.
+  - `evidence_event_id`: Merkle event ledger linkage.
+
+#### 1.2 Deterministic Condition Verification & Compliance
+- **Rule 16 & Rule 17 Compliance:** Preconditions and postconditions are strictly evaluated in pure Python code (`SOPConditionEvaluator`), never self-reported or certified by the executing model or agent.
+- **Dynamic Compliance Calculation (`SOPComplianceCalculator`):** Compliance score is computed dynamically from real step records:
+  $$\text{Compliance Score} = \left(\frac{\text{Compliant Steps}}{\text{Total Expected Steps}}\right) \times 100.0$$
+  A missing step record is a direct compliance failure. Deleting a step record immediately lowers the computed compliance score.
+
+#### 1.3 Dry-Run Mode (Zero Side-Effects)
+- When `dry_run=True`, the executor traverses the SOP DAG, resolves all input variables, validates all static pre- and post-conditions, and produces an execution plan without calling external network sinks, posting journal entries to the financial ledger, or enqueueing outbox events.
+
+#### 1.4 Reverse Compensations
+- When an SOP encounters a failure mid-flight (e.g. postcondition breach or tool fault), the executor halts execution and iterates backwards through all previously completed steps marked `COMPENSABLE`, executing their registered compensating actions in strict reverse order (`sop_compensations`).
+
+---
+
+### 2. Verification & Test Evidence
+
+#### 2.1 Sub-Step 2G Test Suite Execution
+Command: `python3 -m pytest tests/test_sop_executor.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 7 items
+
+tests/test_sop_executor.py::test_01_sop_run_produces_one_record_per_step_and_deletion_lowers_score PASSED [ 14%]
+tests/test_sop_executor.py::test_02_sop_postcondition_failure_stops_instance_with_failed PASSED [ 28%]
+tests/test_sop_executor.py::test_03_sop_dry_run_causes_zero_side_effects PASSED [ 42%]
+tests/test_sop_executor.py::test_04_sop_compensation_runs_in_reverse_order_for_reversible_failure PASSED [ 57%]
+tests/test_sop_executor.py::test_05_sop_not_executable_stub_never_run PASSED [ 71%]
+tests/test_sop_executor.py::test_06_sop_precondition_failure_stops_instance PASSED [ 85%]
+tests/test_sop_executor.py::test_07_sop_mutation_checks_rule_8 PASSED    [100%]
+
+============================== 7 passed in 2.04s ===============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (Postcondition Verification Guard):**
+   - Corrupting condition evaluation to always return True causes invalid outputs to wrongly succeed. Real code verified that invalid output fails immediately.
+2. **Mutation 2 (Dynamic Compliance Calculation):**
+   - Deleting a step record from `sop_step_records` lowered the compliance score from 100.0% to 66.67%, proving the score cannot be faked or self-reported.
+3. **Mutation 3 (NOT_EXECUTABLE Stubs):**
+   - Attempting to execute an unimplemented pack stub raises `SOPNotExecutableError` and halts before creating instances.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py -v`
+```
+============================= 58 passed in 17.97s ==============================
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] SOP run produces one record per step, and deleting a step record lowers the computed score (`test_01_sop_run_produces_one_record_per_step_and_deletion_lowers_score`).
+- [x] Step whose postcondition fails stops the instance with `FAILED` (`test_02_sop_postcondition_failure_stops_instance_with_failed`).
+- [x] Dry-run mode causes zero side effects (`test_03_sop_dry_run_causes_zero_side_effects`).
+- [x] Compensation runs for a reversible failure in reverse order (`test_04_sop_compensation_runs_in_reverse_order_for_reversible_failure`).
+- [x] A `NOT_EXECUTABLE` stub is never run (`test_05_sop_not_executable_stub_never_run`).
+- [x] Precondition failure halts execution before step action runs (`test_06_sop_precondition_failure_stops_instance`).
+- [x] Rule 8 mutation checks verify that acceptance tests fail when invariants are broken (`test_07_sop_mutation_checks_rule_8`).

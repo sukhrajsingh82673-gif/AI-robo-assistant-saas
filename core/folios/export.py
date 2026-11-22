@@ -7,7 +7,7 @@ Implements OpenCode Step 1F:
     2. metadata.json (complete folio record, timeline, state history).
     3. merkle_audit_slice.json (leaf hashes, tree structure, individual proofs).
     4. documents/ (original byte files for all linked documents).
-    5. signatures.json (cryptographic signature over manifest SHA-256).
+    5. signatures.json (cryptographic signature over the Merkle root, when KMS is configured).
     6. verify_pack.py (embedded zero-dependency Python verifier).
 - Verification detects corruption or single-byte tampering, reporting TAMPER_DETECTED.
 """
@@ -24,6 +24,7 @@ import zipfile
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.db import db, tenant_scoped
+from core.ports.base import PortStatus
 from core.ports.kms import resolve_kms_provider
 from core.documents.versioning import get_document_version_payload
 from core.folios.merkle import (
@@ -219,6 +220,7 @@ def generate_folio_export_pack(
 
     # Fetch document binaries for linked documents
     documents_to_include: List[Tuple[str, bytes]] = []
+    document_export_failures: List[Dict[str, str]] = []
     for e in entries:
         if e["entry_type"] == "DOCUMENT":
             doc_id = e["reference_id"]
@@ -229,22 +231,45 @@ def generate_folio_export_pack(
                 )
                 doc_name = meta.get("storage_path", "").split("/")[-1] or f"{doc_id}.bin"
                 documents_to_include.append((f"documents/{doc_id}_{doc_name}", doc_bytes))
-            except Exception:
-                pass
+            except Exception as e:
+                document_export_failures.append(
+                    {"document_id": doc_id, "error": str(e)}
+                )
+    if document_export_failures:
+        metadata_doc["document_export_failures"] = document_export_failures
+        metadata_doc["complete"] = False
+    else:
+        metadata_doc["complete"] = True
 
     # Sign manifest
     kms_port = resolve_kms_provider()
     sig_context = {"tenant_id": tenant_id, "folio_id": folio_id, "merkle_root": computed_root}
     kms_res, sig_blob = kms_port.encrypt(computed_root.encode("utf-8"), context=sig_context)
-    sig_hex = sig_blob.hex() if sig_blob else hashlib.sha256(computed_root.encode()).hexdigest()
+    if kms_res.status == PortStatus.OK and sig_blob:
+        signature_status = "SIGNED"
+        signature_hex: Optional[str] = sig_blob.hex()
+        signature_error: Optional[str] = None
+    else:
+        signature_status = (
+            "NOT_CONFIGURED"
+            if kms_res.status == PortStatus.NOT_CONFIGURED
+            else "FAILED"
+        )
+        signature_hex = None
+        signature_error = kms_res.error or "KMS did not produce a signature"
 
     signatures_doc = {
         "folio_id": folio_id,
         "merkle_root": computed_root,
-        "signature_hex": sig_hex,
+        "signature_status": signature_status,
+        "signature_hex": signature_hex,
+        "signature_error": signature_error,
         "key_provider": kms_res.provider,
         "signed_at": time.time(),
-        "disclaimer": "Sovereign cryptographic verification slice. Valid without external network access.",
+        "disclaimer": (
+            "Sovereign cryptographic verification slice. Valid without external network access. "
+            "A null signature_hex means the pack is hash-verifiable but NOT cryptographically signed."
+        ),
     }
 
     # Serialize files to compute manifest

@@ -116,6 +116,11 @@ def init_all_subsystem_schemas():
         ensure_work_kernel_tables()
     except Exception:
         pass
+    try:
+        from core.sop import ensure_sop_tables
+        ensure_sop_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

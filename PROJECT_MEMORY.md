@@ -151,7 +151,16 @@
   - Gated capability reality checks: tasks requiring unconfigured or unbuilt capabilities transition to `BLOCKED` with code `CAPABILITY_NOT_LIVE`.
   - Authored acceptance tests in `tests/test_work_kernel.py` (10 passed). All 51 Step 2 tests passing in 14.42s.
   - Verified in CI Run `44978052207` (100% green across all 3 jobs).
-- [ ] **2G:** SOP executor
+- [x] **2G:** SOP executor
+  - Authored schema migrations `migrations/common/0024_sop_executor.sql` and `migrations/pg/0024_sop_executor.sql` with fail-closed RLS on all 3 tables (`sop_instances`, `sop_step_records`, `sop_compensations`) and Rule 15 role protections revoking `DELETE ON sop_step_records` and `UPDATE (compliance_score) ON sop_instances` from `zonata_agent_role`.
+  - Established `core/sop/`:
+    - `types.py`: `SOPStepType` (`TOOL`, `MODEL`, `HUMAN`, `APPROVAL`, `CHECK`), `SOPStepReversibility` (`IRREVERSIBLE`, `COMPENSABLE`, `IDEMPOTENT`), `SOPStepOutcome` (`PASSED`, `FAILED`, `ESCALATED`), and domain exceptions.
+    - `definition.py`: `SOPDefinitionService` managing parent definitions, immutable version publishing with SHA-256 sealing, pack stub compilation (unimplemented stubs compiled as `NOT_EXECUTABLE`), and version retrieval.
+    - `compliance.py`: `SOPComplianceCalculator` computing dynamic compliance scores from immutable step records ($\text{score} = (\text{compliant\_steps} / \text{total\_expected\_steps}) \times 100$). Deleting a step record directly lowers the computed score.
+    - `executor.py`: `SOPExecutor` executing steps sequentially, recording SHA-256 input/step_def/output hashes, code-evaluating preconditions and postconditions (never self-certified by agent or model), executing dry-runs with zero side-effects (querying outbox and journal entries confirms zero mutations), and rolling back completed compensable steps in reverse order upon failure.
+    - `__init__.py`: Exports and `ensure_sop_tables`.
+  - Wired `ensure_sop_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
+  - Authored acceptance tests in `tests/test_sop_executor.py` (7 passed). Full Step 2 suite: 58 passed in 17.97s.
 - [ ] **2H:** Verification pyramid
 - [ ] **2I:** KPI engine and goal engine
 - [ ] **2J:** AI CEO executive brain and workforce trust
@@ -163,5 +172,5 @@
 - Made LLM, search, payments, secrets, observability, workflow-engine, and MCP probes perform real checks. MCP now reads ZONATA's own `mcp_servers` registry, not an external Antigravity directory.
 - Corrected report claims: `2,133` is the collection count, not a full-suite pass count. Full local run before the import fix: `1,958 passed, 59 failed, 31 skipped, 121 errors`. Post-fix targeted run: `33 passed, 4 skipped`.
 - Step 1E corrections: fail-closed RLS with request-scoped `tenant_scope`; KMS absence rejects writes instead of storing plaintext as encrypted; crypto-shred is `ref_count`-safe and verifies storage deletion; blob dedup/unique and `check_access` are company-scoped; tautological mutation tests replaced. `tests/test_documents_backbone.py` now reports `19 passed`.
-- Outstanding systemic finding (1F-1I): `migrations/pg/0015_folio_evidence_backbone.sql`, `0016_ledger_kernel.sql`, `0017_industry_packs.sql`, and `0018_always_on_baseline.sql` still contain the pre-fix fail-open RLS predicate (`OR current_setting(...) IS NULL`). Their isolation claims must not be treated as verified until those policies are fail-closed and their callers set tenant/company context.
+- Step 1F-1I hardening (2026-11-22): removed the fail-open `OR current_setting(...) IS NULL` predicate from `migrations/pg/0015_folio_evidence_backbone.sql`, `0016_ledger_kernel.sql`, `0017_industry_packs.sql`, and `0018_always_on_baseline.sql`; all four now use `ENABLE` + `FORCE` RLS with `USING` and `WITH CHECK` predicates. Wired `@tenant_scoped`/tenant-company arguments through folio manager/merkle/export, ledger kernel, industry-pack loader, outbox, and the scheduler tick/job APIs; cluster-wide leader leases remain intentionally unscoped. Export packs now report `signature_status` honestly (`NOT_CONFIGURED`/`FAILED` with no fabricated signature) and list document export failures instead of silently omitting them. Targeted Step 1 suite: `84 passed, 4 skipped` (2026-11-22, Termux/aarch64). PostgreSQL/RLS execution remains unverified locally because no PG service is available in this environment.
 

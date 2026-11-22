@@ -5428,6 +5428,8 @@ class Database:
                 ensure_agent_runtime_tables(conn)
                 from core.work import ensure_work_kernel_tables
                 ensure_work_kernel_tables(conn)
+                from core.sop import ensure_sop_tables
+                ensure_sop_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5481,6 +5483,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_agent_runtime_tables()
         from core.work import ensure_work_kernel_tables
         ensure_work_kernel_tables()
+        from core.sop import ensure_sop_tables
+        ensure_sop_tables()
     except Exception:
         pass
     try:

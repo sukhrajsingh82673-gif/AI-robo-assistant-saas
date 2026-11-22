@@ -1241,3 +1241,16 @@ Acceptance criteria fully met:
 
 
 
+
+---
+
+## Supervision verification — 1F–1I RLS hardening and 1J rerun (2026-11-22)
+
+The historical 1F–1J outputs above were captured before the following corrections.
+
+- **Fail-open RLS removed.** `migrations/pg/0015_folio_evidence_backbone.sql`, `0016_ledger_kernel.sql`, `0017_industry_packs.sql`, and `0018_always_on_baseline.sql` no longer use `OR current_setting(...) IS NULL`. Each table has `ENABLE ROW LEVEL SECURITY`, `FORCE ROW LEVEL SECURITY`, and identical `USING`/`WITH CHECK` tenant+company predicates. `grep -rn "current_setting.*IS NULL" migrations/pg/` returns no matches.
+- **Tenant/company context wired.** `@tenant_scoped` and explicit optional `tenant_id`/`company_id` arguments now cover folio lifecycle/merkle/export, ledger kernel methods, industry-pack install/get, outbox enqueue/drain/get, and scheduler register/tick/get. The cluster-wide leader-lease table (`scheduler_leader_leases`) intentionally remains outside tenant RLS.
+- **Export truth tightened.** `signatures.json` now carries `signature_status` (`SIGNED`, `NOT_CONFIGURED`, or `FAILED`) and `signature_hex: null` when the KMS did not produce a signature; it no longer substitutes a SHA-256 hash for a signature. Linked-document export failures are listed under `document_export_failures` with `complete: false` instead of being silently dropped.
+- **Scenario updated.** `scripts/step1_scenario.py` passes tenant/company context to all folio, ledger, pack, outbox, and scheduler calls exercised on PostgreSQL.
+- **Current result:** `python3 -m pytest tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step1_scenario.py tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py -q` -> `84 passed, 4 skipped` (2026-11-22, Termux/aarch64).
+- **Residual limitation:** no PostgreSQL/container runtime is available in this Termux environment, so the fail-closed RLS policies, `set_config` session context, and PG-specific scenario path could not be re-executed here. The historical live-container and CI claims above remain unverified in this environment; `gh` is unauthenticated.
