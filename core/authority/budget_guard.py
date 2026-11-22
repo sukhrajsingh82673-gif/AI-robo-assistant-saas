@@ -20,26 +20,35 @@ class SpendBudgetGuard:
         self._lock = threading.Lock()
         self._ensure_table()
 
-    def _ensure_table(self):
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS company_spend_budgets (
-                    budget_id TEXT PRIMARY KEY,
-                    tenant_id TEXT NOT NULL,
-                    company_id TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    allocated_minor_units INTEGER NOT NULL,
-                    spent_minor_units INTEGER NOT NULL DEFAULT 0,
-                    reserved_minor_units INTEGER NOT NULL DEFAULT 0,
-                    created_at REAL NOT NULL,
-                    updated_at REAL NOT NULL,
-                    UNIQUE(tenant_id, company_id, category)
-                )
-                """
+    def _ensure_table(self, conn=None):
+        sql = """
+            CREATE TABLE IF NOT EXISTS company_spend_budgets (
+                budget_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                allocated_minor_units INTEGER NOT NULL,
+                spent_minor_units INTEGER NOT NULL DEFAULT 0,
+                reserved_minor_units INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(tenant_id, company_id, category)
             )
-            conn.commit()
+        """
+        if conn is not None:
+            cur = conn.cursor()
+            cur.execute(sql)
+            if hasattr(conn, "commit"):
+                try:
+                    conn.commit()
+                except Exception:
+                    pass
+            return
+
+        with db.get_connection() as c:
+            cur = c.cursor()
+            cur.execute(sql)
+            c.commit()
 
     def set_budget(
         self,
@@ -53,6 +62,7 @@ class SpendBudgetGuard:
         budget_id = f"bg_{company_id}_{category}"
         with self._lock:
             with db.get_connection() as conn:
+                self._ensure_table(conn)
                 cur = conn.cursor()
                 if db.is_postgresql():
                     cur.execute(
@@ -107,6 +117,7 @@ class SpendBudgetGuard:
 
         with self._lock:
             with db.get_connection() as conn:
+                self._ensure_table(conn)
                 cur = conn.cursor()
                 cur.execute(
                     """

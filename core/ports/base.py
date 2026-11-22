@@ -183,7 +183,7 @@ class CapabilityTruthTable:
             except Exception:
                 return PortStatus.FAILED.value
 
-        if capability in ("browser", "desktop_control", "install_software", "unsupported_device"):
+        if capability in ("browser", "desktop", "desktop_control", "install_software", "unsupported_device"):
             return PortStatus.NOT_IMPLEMENTED.value
 
         # Domain-level database-backed capability prefixes map to primary database connectivity

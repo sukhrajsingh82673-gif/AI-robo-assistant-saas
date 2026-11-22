@@ -5422,6 +5422,8 @@ class Database:
                 ensure_outbox_tables(conn)
                 from core.baseline.scheduler import ensure_scheduler_tables
                 ensure_scheduler_tables(conn)
+                from core.authority import ensure_authority_tables
+                ensure_authority_tables(conn)
                 from core.organization import ensure_organization_tables
                 ensure_organization_tables(conn)
                 from core.agents import ensure_agent_runtime_tables
@@ -5436,6 +5438,8 @@ class Database:
                 ensure_kpi_tables(conn)
                 from core.executive import ensure_executive_tables
                 ensure_executive_tables(conn)
+                from core.evals import ensure_eval_tables
+                ensure_eval_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5483,6 +5487,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_outbox_tables()
         from core.baseline.scheduler import ensure_scheduler_tables
         ensure_scheduler_tables()
+        from core.authority import ensure_authority_tables
+        ensure_authority_tables()
         from core.organization import ensure_organization_tables
         ensure_organization_tables()
         from core.agents import ensure_agent_runtime_tables
@@ -5497,6 +5503,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_kpi_tables()
         from core.executive import ensure_executive_tables
         ensure_executive_tables()
+        from core.evals import ensure_eval_tables
+        ensure_eval_tables()
     except Exception:
         pass
     try:

@@ -1,0 +1,212 @@
+department: finance
+tasks:
+  - id: fin_001
+    name: "Invoice Line Item Reconciliation and Discrepancy Detection"
+    tier: "WORKER"
+    input:
+      documents:
+        - "inv_1001_acme.pdf"
+      folios:
+        - "folio_ap_vendor_acme"
+      data:
+        vendor: "Acme Logistics"
+        invoice_total: 125000
+        po_number: "PO-9921"
+        line_items:
+          - description: "Freight handling"
+            amount: 75000
+          - description: "Fuel surcharge"
+            amount: 50000
+    task: "Verify that invoice line items sum exactly to invoice total and match PO-9921."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+        - "variance_minor_units"
+      expected_variance: 0
+
+  - id: fin_002
+    name: "Two-Way Purchase Order Match"
+    tier: "WORKER"
+    input:
+      documents:
+        - "po_4401.pdf"
+        - "inv_2041.pdf"
+      folios:
+        - "folio_procurement_suppliers"
+      data:
+        vendor: "Global Cloud Services"
+        invoice_total: 350000
+        line_items:
+          - description: "Monthly cloud hosting"
+            amount: 350000
+    task: "Compare invoice lines against PO line items to verify unit price and total quantity match."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+        - "variance_minor_units"
+
+  - id: fin_003
+    name: "Three-Way Match (PO, Receiving Dock Log, Invoice)"
+    tier: "WORKER"
+    input:
+      documents:
+        - "po_8812.pdf"
+        - "grn_receiving_dock_8812.pdf"
+        - "inv_vendor_8812.pdf"
+      folios:
+        - "folio_receiving_warehouse"
+      data:
+        vendor: "Industrial Tooling Corp"
+        invoice_total: 480000
+        line_items:
+          - description: "CNC Milling Drill Bits (50 units)"
+            amount: 400000
+          - description: "Coolant Lubricant Drums (4 units)"
+            amount: 80000
+    task: "Execute three-way reconciliation confirming items billed were ordered on PO and received at loading dock."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+        - "variance_minor_units"
+
+  - id: fin_004
+    name: "Accounts Payable Days-to-Pay Calculation"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_ap_invoices_q3"
+      data:
+        days_to_pay: 38
+        target_days: 30
+    task: "Calculate company-wide days-to-pay from invoice receipt timestamps to payment execution timestamps."
+    acceptance_criteria:
+      - "days_to_pay_computed"
+    scoring:
+      required_fields:
+        - "status"
+        - "days_to_pay"
+
+  - id: fin_005
+    name: "Trial Balance Debits and Credits Integrity Check"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_general_ledger_period_close"
+      data:
+        trial_balance:
+          total_debits: 154000000
+          total_credits: 154000000
+    task: "Verify that sum of debits equals sum of credits in the general ledger trial balance."
+    acceptance_criteria:
+      - "debits_equal_credits"
+    scoring:
+      required_fields:
+        - "status"
+        - "imbalance"
+
+  - id: fin_006
+    name: "Foreign Currency Exchange Gain/Loss Valuation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_fx_hedging"
+      data:
+        invoice_total: 100000
+        base_currency: "USD"
+        foreign_currency: "EUR"
+        exchange_rate_contract: 1.08
+        exchange_rate_settlement: 1.05
+    task: "Compute FX gain/loss on foreign currency invoice settlement against standard rate."
+    acceptance_criteria:
+      - "fx_gain_loss_calculated"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: fin_007
+    name: "Payroll Tax Withholding Calculation"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_payroll_november"
+      data:
+        invoice_total: 500000
+        line_items:
+          - description: "Base Salary"
+            amount: 400000
+          - description: "State & Federal Tax"
+            amount: 100000
+    task: "Verify exact minor-unit deductions for payroll withholdings."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+        - "variance_minor_units"
+
+  - id: fin_008
+    name: "Quarterly Operating Cash Flow Variance Analysis"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_cash_treasury"
+      data:
+        invoice_total: 890000
+        line_items:
+          - description: "Inflow Operations"
+            amount: 500000
+          - description: "Inflow Financing"
+            amount: 390000
+    task: "Reconcile quarterly operating cash inflows and verify ledger postings."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: fin_009
+    name: "CapEx vs OpEx Accounting Classification"
+    tier: "WORKER"
+    input:
+      documents:
+        - "asset_acquisition_server_cluster.pdf"
+      folios:
+        - "folio_fixed_assets"
+      data:
+        invoice_total: 2500000
+        line_items:
+          - description: "Server hardware capitalization"
+            amount: 2500000
+    task: "Audit capital expenditure asset thresholds according to corporate accounting policy."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: fin_010
+    name: "Corporate Card Spend Limit Exceedance Audit"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_corporate_cards"
+      data:
+        invoice_total: 120000
+        line_items:
+          - description: "Client Dinner"
+            amount: 80000
+          - description: "Taxi fare"
+            amount: 40000
+    task: "Check expense reports against executive authority limits G2 and G3."
+    acceptance_criteria:
+      - "line_items_sum_equals_total"
+    scoring:
+      required_fields:
+        - "status"
+        - "variance_minor_units"

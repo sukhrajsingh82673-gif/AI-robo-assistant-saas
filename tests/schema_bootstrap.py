@@ -136,6 +136,11 @@ def init_all_subsystem_schemas():
         ensure_executive_tables()
     except Exception:
         pass
+    try:
+        from core.evals import ensure_eval_tables
+        ensure_eval_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

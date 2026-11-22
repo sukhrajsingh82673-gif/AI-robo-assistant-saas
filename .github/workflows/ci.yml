@@ -192,10 +192,12 @@ jobs:
           python3 -m pytest --collect-only -q
           python3 -m pytest tests/test_settings_registry_phase1.py tests/test_settings_v2_phase2.py -q
           python3 -m pytest tests/test_stage2_foundations.py tests/test_stage6_adapters_global.py -q
-          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step1_scenario.py tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py -q
+          python3 -m pytest tests/test_truth_linter.py tests/test_capability_truth_and_planner.py tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step1_scenario.py tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py tests/test_verification_pyramid.py tests/test_kpi_goal_engine.py tests/test_ai_ceo_workforce_trust.py tests/test_eval_harness.py tests/test_step2_scenario.py -q
           python3 scripts/reality_probe.py
           python3 scripts/backup_restore_drill.py
           python3 scripts/step1_scenario.py
+          python3 scripts/run_evals.py
+          python3 scripts/step2_scenario.py
 
   # ===========================================================================
   # JOB 3: LIVE SERVICE CONTAINERS & POSTGRESQL 16 CONTRACT TESTS
@@ -358,7 +360,7 @@ jobs:
           KMS_MASTER_KEY: sovereign_ci_envelope_master_key_32_chars!
           APP_ENV: staging
         run: |
-          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py -v
+          python3 -m pytest tests/test_ports_contracts.py tests/test_documents_backbone.py tests/test_folio_export_backbone.py tests/test_ledger_kernel.py tests/test_industry_pack_framework.py tests/test_always_on_baseline.py tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py tests/test_verification_pyramid.py tests/test_kpi_goal_engine.py tests/test_ai_ceo_workforce_trust.py tests/test_eval_harness.py tests/test_step2_scenario.py -v
 
       - name: Run Backup & Restore Qualification Drill on PostgreSQL 16
         env:
@@ -388,3 +390,20 @@ jobs:
           APP_ENV: staging
         run: |
           python3 scripts/step1_scenario.py
+
+      - name: Run Golden Evals & Step 2 Qualification Scenario on PostgreSQL 16 & Live Containers
+        env:
+          DATABASE_URL: postgresql://zonata_ci_user:ci_secure_password_2026@localhost:5432/zonata_ci_contract
+          S3_ENDPOINT: http://localhost:8333
+          SMTP_HOST: localhost
+          SMTP_PORT: 1025
+          MAILPIT_URL: http://localhost:8025
+          CLAMAV_HOST: localhost
+          CLAMAV_PORT: 3310
+          TIKA_ENDPOINT: http://localhost:9998
+          KMS_MASTER_KEY: sovereign_ci_envelope_master_key_32_chars!
+          APP_ENV: staging
+          ZONATA_TEST_MODE: "1"
+        run: |
+          python3 scripts/run_evals.py
+          python3 scripts/step2_scenario.py

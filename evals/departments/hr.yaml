@@ -1,0 +1,189 @@
+department: hr
+tasks:
+  - id: hr_001
+    name: "Candidate Resume Anonymization & PII Redaction"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_recruiting_inbox"
+      data:
+        candidate_name: "Jane Doe"
+        pii_tokens:
+          - "555-019-2831"
+          - "jane.doe@example.com"
+          - "123 Elm Street, Cityville"
+    task: "Redact all personally identifiable contact tokens from incoming applicant profile before hiring manager review."
+    acceptance_criteria:
+      - "pii_redacted"
+    scoring:
+      required_fields:
+        - "sanitized"
+        - "redacted_count"
+
+  - id: hr_002
+    name: "New Hire Onboarding Checklist Audit"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_employee_onboarding"
+      data:
+        employee_id: "EMP-401"
+        checklist_items:
+          - item: "I-9 Verification"
+            completed: true
+          - item: "Information Security Training"
+            completed: true
+          - item: "Direct Deposit Setup"
+            completed: true
+          - item: "Hardware Acknowledgment"
+            completed: true
+    task: "Verify that all mandatory legal onboarding checklist items are marked complete within 3 business days."
+    acceptance_criteria:
+      - "checklist_complete"
+    scoring:
+      required_fields:
+        - "status"
+        - "completed_count"
+
+  - id: hr_003
+    name: "Paid Time Off (PTO) Accrual and Balance Verification"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_pto_records"
+      data:
+        employee_id: "EMP-208"
+        accrual_rate_hours_per_month: 13.33
+        months_worked: 6
+        pto_used_hours: 40.0
+    task: "Calculate accurate accrued PTO balance and verify requested absence approval."
+    acceptance_criteria:
+      - "pto_calculated"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_004
+    name: "Performance Review Scoring and Rating Distribution"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_annual_reviews"
+      data:
+        cycle_year: 2026
+        department: "Engineering"
+        rating_distribution:
+          exceeds_percent: 15.0
+          meets_percent: 75.0
+          needs_improvement_percent: 10.0
+    task: "Verify departmental performance review distribution conforms to corporate calibration guidelines."
+    acceptance_criteria:
+      - "distribution_calibrated"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_005
+    name: "Mandatory Compliance Training Deadline Enforcement"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_compliance_training"
+      data:
+        course: "Anti-Harassment & Ethics 2026"
+        days_until_deadline: 5
+        completion_status: "NOT_STARTED"
+    task: "Generate automated escalation reminder for employee and manager regarding overdue compliance module."
+    acceptance_criteria:
+      - "reminder_generated"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_006
+    name: "Compensation Band Equity Range Check"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_compensation_ranges"
+      data:
+        position_level: "STAFF_ENGINEER"
+        proposed_salary_minor_units: 18500000
+        band_min_minor_units: 16000000
+        band_max_minor_units: 21000000
+    task: "Verify that promotion offer salary falls within approved corporate band equity range."
+    acceptance_criteria:
+      - "salary_within_band"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_007
+    name: "Confidential Workplace Grievance Triage"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_hr_investigations"
+      data:
+        case_id: "ETH-2026-08"
+        category: "Policy Violation"
+        sensitivity: "RESTRICTED"
+    task: "Apply Step 1 sensitivity classification RESTRICTED and route to designated People Relations officer."
+    acceptance_criteria:
+      - "grievance_triaged"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_008
+    name: "Employee Offboarding Access Revocation Timeline Audit"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_offboarding_logs"
+      data:
+        employee_id: "EMP-092"
+        departure_timestamp: 1763784000
+        idp_deprovision_timestamp: 1763784300
+        elapsed_seconds: 300
+        sla_max_seconds: 900
+    task: "Verify that identity provider account access was severed within the required 15-minute security SLA."
+    acceptance_criteria:
+      - "access_revocation_audited"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_009
+    name: "Healthcare Benefits Life Event Enrollment Eligibility"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_benefits_elections"
+      data:
+        event_type: "MARRIAGE"
+        days_since_event: 21
+        statutory_window_days: 30
+    task: "Validate qualifying life event documentation and confirm employee enrollment window eligibility."
+    acceptance_criteria:
+      - "eligibility_verified"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: hr_010
+    name: "Remote Work Tax Jurisdiction Residence Validation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_employee_locations"
+      data:
+        employee_id: "EMP-312"
+        primary_residence_state: "Washington"
+        payroll_withholding_state: "Washington"
+    task: "Verify state tax nexus consistency for permanent remote employee work arrangement."
+    acceptance_criteria:
+      - "tax_nexus_verified"
+    scoring:
+      required_fields:
+        - "status"

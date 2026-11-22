@@ -78,6 +78,57 @@ class KPIEngine:
         return cls.get_kpi(tenant_id, company_id, kpi_id)
 
     @classmethod
+    def create_tree_definition(cls, request: KPIDefinitionCreateRequest, tenant_id: Optional[str] = None, company_id: Optional[str] = None) -> Dict[str, Any]:
+        """Convenience alias for register_kpi."""
+        t_id = tenant_id or getattr(request, "tenant_id", "default_tenant")
+        c_id = company_id or getattr(request, "company_id", "default_company")
+        return cls.register_kpi(t_id, c_id, request)
+
+    @classmethod
+    def approve_kpi(cls, tenant_id: str, company_id: str, kpi_id: str, approver_principal_id: str = "usr_owner") -> Dict[str, Any]:
+        """Approves a KPI definition node in the tree."""
+        with db.get_connection() as conn:
+            conn.execute(
+                "UPDATE kpi_tree_definitions SET is_active = 1, updated_at = ? WHERE id = ? AND tenant_id = ? AND company_id = ?",
+                (time.time(), kpi_id, tenant_id, company_id)
+            )
+            conn.commit()
+        evidence_service.record_event(
+            tenant_id=tenant_id,
+            company_id=company_id,
+            event_type="KPI_APPROVED",
+            payload={"kpi_id": kpi_id, "approver": approver_principal_id},
+            action_id=f"appr_kpi_{kpi_id}"
+        )
+        return cls.get_kpi(tenant_id, company_id, kpi_id)
+
+    @classmethod
+    def approve_tree_definition(cls, kpi_id: str, tenant_id: Optional[str] = None, company_id: Optional[str] = None, approver_principal_id: str = "usr_owner") -> Dict[str, Any]:
+        """Convenience alias for approve_kpi."""
+        t_id = tenant_id
+        c_id = company_id
+        if not t_id or not c_id:
+            with db.get_connection() as conn:
+                row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
+                if row:
+                    t_id = row[0]
+                    c_id = row[1]
+        return cls.approve_kpi(t_id or "default_tenant", c_id or "default_company", kpi_id, approver_principal_id)
+
+    @classmethod
+    def compute_snapshot(cls, kpi_id: str, tenant_id: Optional[str] = None, company_id: Optional[str] = None) -> KPISnapshotModel:
+        """Convenience alias for compute_kpi_snapshot looking up tenant/company scope if omitted."""
+        t_id = tenant_id
+        c_id = company_id
+        if not t_id or not c_id:
+            with db.get_connection() as conn:
+                row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
+                if row:
+                    t_id = row[0]
+                    c_id = row[1]
+        return cls.compute_kpi_snapshot(t_id or "default_tenant", c_id or "default_company", kpi_id)
+
+    @classmethod
     def get_kpi(cls, tenant_id: str, company_id: str, kpi_id: str) -> Dict[str, Any]:
         """Retrieves a KPI definition by ID."""
         with db.get_connection() as conn:
@@ -125,17 +176,20 @@ class KPIEngine:
             raise MissingComputationProofError("No KPI score is stored without its inputs hash.")
 
         # 2. Evaluate Thresholds
-        status = KPIStatus.ON_TRACK
-        if direction == KPIDirection.HIGHER_IS_BETTER:
-            if val < crit_val:
-                status = KPIStatus.CRITICAL
-            elif val < warn_val:
-                status = KPIStatus.WARNING
-        else:  # LOWER_IS_BETTER
-            if val > crit_val:
-                status = KPIStatus.CRITICAL
-            elif val > warn_val:
-                status = KPIStatus.WARNING
+        if proof.get("count") == 0:
+            status = KPIStatus.INSUFFICIENT_MEASUREMENTS
+        else:
+            status = KPIStatus.ON_TRACK
+            if direction == KPIDirection.HIGHER_IS_BETTER:
+                if val < crit_val:
+                    status = KPIStatus.CRITICAL
+                elif val < warn_val:
+                    status = KPIStatus.WARNING
+            else:  # LOWER_IS_BETTER
+                if val > crit_val:
+                    status = KPIStatus.CRITICAL
+                elif val > warn_val:
+                    status = KPIStatus.WARNING
 
         snapshot_id = f"kpis_{uuid.uuid4().hex[:12]}"
         now = time.time()

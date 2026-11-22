@@ -44,7 +44,8 @@ class EmailOutPort(Port):
         subject: str,
         body: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
-        from_addr: Optional[str] = None
+        from_addr: Optional[str] = None,
+        **kwargs
     ) -> ProviderResult:
         raise NotImplementedError
 
@@ -102,7 +103,8 @@ class SMTPEmailProvider(EmailOutPort):
         subject: str,
         body: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
-        from_addr: Optional[str] = None
+        from_addr: Optional[str] = None,
+        **kwargs
     ) -> ProviderResult:
         """Sends email via SMTP. Reality Ladder: returns ACCEPTED_BY_PROVIDER (never DELIVERED)."""
         t0 = time.perf_counter()
@@ -229,7 +231,8 @@ class NotConfiguredEmailProvider(EmailOutPort):
         subject: str,
         body: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
-        from_addr: Optional[str] = None
+        from_addr: Optional[str] = None,
+        **kwargs
     ) -> ProviderResult:
         return self.probe()
 
@@ -270,7 +273,8 @@ class SandboxEmailProvider(EmailOutPort):
         subject: str,
         body: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
-        from_addr: Optional[str] = None
+        from_addr: Optional[str] = None,
+        **kwargs
     ) -> ProviderResult:
         if not self._is_test():
             return ProviderResult(status=PortStatus.FAILED, provider=self.provider_name, error="Sandbox rejected")

@@ -46,6 +46,7 @@ class KPIStatus(str, enum.Enum):
     ON_TRACK = "ON_TRACK"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
+    INSUFFICIENT_MEASUREMENTS = "INSUFFICIENT_MEASUREMENTS"
 
 
 class DefectType(str, enum.Enum):

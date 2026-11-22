@@ -91,6 +91,10 @@ class VerificationReport(BaseModel):
     layer_results: List[VerificationLayerResult] = Field(default_factory=list)
     is_spot_check: bool = False
 
+    @property
+    def is_passed(self) -> bool:
+        return self.overall_status == VerificationStatus.PASSED
+
 
 class VerificationRecipe(BaseModel):
     task_type: str

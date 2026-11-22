@@ -40,6 +40,10 @@ from core.authority.approvals import (
     ApprovalsManager,
     approvals_manager,
 )
+from core.authority.budget_guard import (
+    SpendBudgetGuard,
+    spend_budget_guard,
+)
 from core.authority.constitution import (
     ConstitutionManager,
     constitution_manager,
@@ -63,6 +67,7 @@ def ensure_authority_tables(conn: Optional[Any] = None) -> None:
             sql_path = root_dir / "migrations" / "pg" / migration_file
             if sql_path.exists():
                 conn.execute(sql_path.read_text(encoding="utf-8"))
+        spend_budget_guard._ensure_table(conn)
         return
 
     with db.get_connection() as connection:
@@ -74,6 +79,7 @@ def ensure_authority_tables(conn: Optional[Any] = None) -> None:
             sql_path = root_dir / "migrations" / "pg" / migration_file
             if sql_path.exists():
                 connection.execute(sql_path.read_text(encoding="utf-8"))
+        spend_budget_guard._ensure_table(connection)
 
 
 # Ensure tables on initial import

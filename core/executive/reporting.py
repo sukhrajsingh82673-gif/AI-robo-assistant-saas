@@ -37,6 +37,15 @@ class NumberLockValidator:
         return numbers
 
     @classmethod
+    def validate_text_against_facts(cls, narrative_text: str, facts: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates narrative against facts and returns status dict."""
+        unverified = cls.verify_numbers(narrative_text, facts)
+        return {
+            "valid": len(unverified) == 0,
+            "unverified_numbers": unverified,
+        }
+
+    @classmethod
     def verify_numbers(cls, narrative_text: str, facts: Dict[str, Any]) -> List[float]:
         """
         Verifies that every number in narrative_text matches at least one value in facts.
