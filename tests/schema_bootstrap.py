@@ -126,6 +126,11 @@ def init_all_subsystem_schemas():
         ensure_verification_tables()
     except Exception:
         pass
+    try:
+        from core.kpi import ensure_kpi_tables
+        ensure_kpi_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

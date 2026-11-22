@@ -954,3 +954,98 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
   - `Job 1: PostgreSQL 16 & Service Containers Contract Tests (2m20s)` — ID `137100070515`
   - `Job 2: Supply Chain, SBOM, License & Image Pinning Audit (2m28s)` — ID `137100070724`
   - `Job 3: SQLite Dev Profile Test Suite (2m21s)` — ID `137100070767`
+
+---
+
+## Sub-Step 2I: KPI Engine and Goal Engine (Hierarchical Trees, Deterministic Proofs, Threshold Alerts, Kaizen Loop)
+
+### 1. Architectural Overview & Implementation Summary
+
+In accordance with OpenCode Step 2I and Rule 18 (Determinism: "performance is computed in code, not claimed in English; models never compute numbers shown to owners"), the KPI and Goal Engine establishes a mathematical and verifiable performance system for the autonomous enterprise.
+
+#### 1.1 Hierarchical KPI Trees & Scope Hierarchy
+- Defined in `kpi_tree_definitions`: nodes span the organizational hierarchy:
+  $$\text{COMPANY} \to \text{DEPARTMENT} \to \text{POSITION} / \text{EMPLOYEE} \to \text{MISSION} \to \text{TASK}$$
+- Attributes: `target_value`, `warning_threshold`, `critical_threshold`, `direction` (`HIGHER_IS_BETTER` vs `LOWER_IS_BETTER`), `unit`, `cadence` (`REALTIME`, `HOURLY`, `DAILY`, `WEEKLY`, `MONTHLY`, `QUARTERLY`), and `parent_kpi_id`.
+
+#### 1.2 Deterministic Arithmetic Calculator & Inputs Hash Sealing (Rule 18)
+- Realized in `core/kpi/calculator.py` (`KPICalculator`):
+  1. `TASK_DURATION`: Computes average completion duration from `work_tasks.completed_at - work_tasks.submitted_at`.
+  2. `PRODUCTIVITY`: Computes hourly throughput directly from raw task completion records:
+     $$\text{productivity} = \frac{\text{completed\_tasks} \times 3600.0}{\sum \text{task\_duration\_seconds}}$$
+     Directly responsive to duration alterations in the database.
+  3. `PASS_RATE`: Deterministic ratio of `PASSED` over total `task_verifications`.
+  4. `COST_PER_MISSION`: Average minor units spend per completed task/mission.
+  5. `DEFECT_RATE`: Percentage of verification failures against total submissions.
+  6. `LEDGER_BALANCE`: Exact reconciliation from double-entry `accounts`.
+- **Cryptographic Inputs Hash:** Every snapshot computation derives a SHA-256 hash over the raw data rows queried.
+- **Fail-Closed Proof Invariant:** Any attempt to store a `kpi_snapshots` row without a valid `inputs_hash` raises `MissingComputationProofError`.
+
+#### 1.3 Threshold Breach Escalation & Playbooks
+- When a computed snapshot crosses `warning_threshold` or `critical_threshold`, status evaluates to `WARNING` or `CRITICAL`.
+- Automatically logs an alert in `kpi_alerts` (`severity`, `observed_value`, `threshold_value`, `status='OPEN'`, `playbook_triggered`).
+- Escalates directly into `human_inbox` as `InboxItemType.TASK_INTERVENTION` targeting `OWNER` principals for review or intervention.
+
+#### 1.4 Kaizen Continuous Improvement Feedback Loop
+- Implemented in `core/kpi/kaizen.py` (`KaizenEngine`):
+  1. Failed task verifications log defect events in `kaizen_defect_records` (`SCHEMA_DEFECT`, `ARITHMETIC_DEFECT`, `CROSS_RECORD_DEFECT`, `QUALITY_DEFECT`, `HUMAN_REJECTED`).
+  2. Recurring defect clustering (`analyze_defects_and_cluster`):
+     - When defects on an SOP exceed `threshold_count`, Kaizen automatically synthesizes an `SOP_REVISION_PROPOSAL` in `DRAFT` status with actionable suggestions.
+     - When defects on a position exceed `threshold_count`, Kaizen synthesizes a `COACHING_PROMPT` in `DRAFT` status for agent guidance.
+     - Stored in `kaizen_proposals` table.
+
+#### 1.5 Database Migrations & Multi-Tenant RLS
+- `migrations/common/0026_kpi_goal_engine.sql`: Common DDL for `kpi_tree_definitions`, `kpi_snapshots`, `kpi_alerts`, `kaizen_defect_records`, `kaizen_proposals`.
+- `migrations/pg/0026_kpi_goal_engine.sql`: PostgreSQL 16 fail-closed RLS on all 5 tables and Rule 15 role protections revoking `INSERT`, `UPDATE`, and `DELETE` on all KPI and Kaizen tables from `zonata_agent_role`.
+
+---
+
+### 2. Verification & Test Evidence
+
+#### 2.1 Sub-Step 2I Test Suite Execution
+Command: `python3 -m pytest tests/test_kpi_goal_engine.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 7 items
+
+tests/test_kpi_goal_engine.py::test_01_task_duration_change_alters_productivity PASSED [ 14%]
+tests/test_kpi_goal_engine.py::test_02_kpi_threshold_breach_escalates_to_alerts_and_inbox PASSED [ 28%]
+tests/test_kpi_goal_engine.py::test_03_kaizen_defect_clustering_generates_sop_revision_proposal PASSED [ 42%]
+tests/test_kpi_goal_engine.py::test_04_missing_computation_proof_fails_closed PASSED [ 57%]
+tests/test_kpi_goal_engine.py::test_05_position_coaching_prompt_clustering PASSED [ 71%]
+tests/test_kpi_goal_engine.py::test_06_pass_rate_and_cost_per_mission_deterministic_metrics PASSED [ 85%]
+tests/test_kpi_goal_engine.py::test_07_rule15_principal_separation_migration_permissions PASSED [100%]
+
+============================== 7 passed in 1.51s ===============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (Task Duration Sensitivity):**
+   - In `test_01`, changing task completion duration from 60s to 120s directly changed computed productivity from 60.0 tasks/hr to 30.0 tasks/hr, and produced a distinct cryptographic `inputs_hash`.
+2. **Mutation 2 (Inputs Hash Proof Guard):**
+   - In `test_04`, an empty or missing `inputs_hash` raised `MissingComputationProofError`, preventing any unverified or model-invented scores from persisting.
+3. **Mutation 3 (Rule 15 Agent Separation):**
+   - Verified that `migrations/pg/0026_kpi_goal_engine.sql` revokes write permissions (`INSERT`, `UPDATE`, `DELETE`) on all KPI and Kaizen tables from `zonata_agent_role`.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py tests/test_sop_executor.py tests/test_verification_pyramid.py tests/test_kpi_goal_engine.py -v`
+```
+============================= 72 passed in 20.50s ==============================
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] Changing a task duration in the database changes computed employee productivity KPI on the next tick (`test_01_task_duration_change_alters_productivity`).
+- [x] A breached KPI fires an escalation to `kpi_alerts` and human inbox (`test_02_kpi_threshold_breach_escalates_to_alerts_and_inbox`).
+- [x] Defect clustering on an SOP produces an SOP revision proposal in `DRAFT` status (`test_03_kaizen_defect_clustering_generates_sop_revision_proposal`).
+- [x] Invariant enforcement: No KPI score is stored without its inputs hash (`test_04_missing_computation_proof_fails_closed`).
+- [x] Position defect clustering synthesizes a coaching prompt in `DRAFT` status (`test_05_position_coaching_prompt_clustering`).
+- [x] Deterministic metrics (pass rate, cost per mission) calculate exact arithmetic (`test_06_pass_rate_and_cost_per_mission_deterministic_metrics`).
+- [x] Rule 15: Migration revokes write permissions on KPI and Kaizen tables from agent role (`test_07_rule15_principal_separation_migration_permissions`).
+

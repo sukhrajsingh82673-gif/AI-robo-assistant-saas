@@ -178,7 +178,16 @@
   - Wired `ensure_verification_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
   - Authored acceptance tests in `tests/test_verification_pyramid.py` (7 passed). Full Step 2 suite: 65 passed in 15.33s.
   - Verified in CI Run `44987137880` (100% green across all 3 jobs).
-- [ ] **2I:** KPI engine and goal engine
+- [x] **2I:** KPI engine and goal engine
+  - Authored schema migrations `migrations/common/0026_kpi_goal_engine.sql` and `migrations/pg/0026_kpi_goal_engine.sql` with fail-closed RLS on all 5 tables (`kpi_tree_definitions`, `kpi_snapshots`, `kpi_alerts`, `kaizen_defect_records`, `kaizen_proposals`) and Rule 15 role protections revoking `INSERT`, `UPDATE`, and `DELETE` on all KPI and Kaizen tables from `zonata_agent_role`.
+  - Established `core/kpi/`:
+    - `types.py`: `KPIScopeLevel`, `KPIMetricType`, `KPIDirection`, `KPICadence`, `KPIStatus`, `DefectType`, `KaizenProposalType`, domain models (`KPISnapshotModel`, `KPIAlertModel`, `KaizenDefectRecordModel`, `KaizenProposalModel`), and domain exceptions (`MissingComputationProofError`, etc.).
+    - `calculator.py`: `KPICalculator` computing exact arithmetic from database records (`TASK_DURATION`, `PRODUCTIVITY`, `PASS_RATE`, `COST_PER_MISSION`, `DEFECT_RATE`, `LEDGER_BALANCE`) and generating cryptographic SHA-256 `inputs_hash`. Altering a task's duration in the database directly alters computed employee productivity.
+    - `engine.py`: `KPIEngine` managing organizational tree definitions, executing snapshot computations, enforcing non-empty `inputs_hash`, detecting threshold breaches (`WARNING`, `CRITICAL`), and dispatching alerts to `kpi_alerts` and the durable `human_inbox` (`TASK_INTERVENTION`).
+    - `kaizen.py`: `KaizenEngine` recording verification defects, clustering defect records by position or SOP, and automatically synthesizing `COACHING_PROMPT` or `SOP_REVISION_PROPOSAL` in `DRAFT` status upon reaching defect threshold count.
+    - `__init__.py`: Exports and `ensure_kpi_tables`.
+  - Wired `ensure_kpi_tables` into `core/db.py` and `tests/schema_bootstrap.py`.
+  - Authored acceptance tests in `tests/test_kpi_goal_engine.py` (7 passed). Full Step 2 suite: 72 passed in 20.50s.
 - [ ] **2J:** AI CEO executive brain and workforce trust
 - [ ] **2K:** Evals and the Step 2 qualification
 
