@@ -558,3 +558,103 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
 
 
 
+
+
+## Sub-Step 2E: Tool Registry, Built-in Tools, and ZonataAgentRuntime Execution Kernel
+
+### 1. Executive Summary & Architectural Scope
+Sub-Step 2E establishes the sovereign execution runtime where models propose actions and deterministic code disposes them. Key invariants delivered:
+1. **Tool Contract (`core/tools/contract.py`):**
+   - Strictly typed schemas using `pydantic.BaseModel` for all tool inputs and outputs.
+   - Explicit `SideEffectClass` classification: `READ`, `WRITE_REVERSIBLE`, `WRITE_IRREVERSIBLE`, `EXTERNAL_COMMS`, `MONEY`.
+   - Capability reality gate: queries `capability_truth_table`; any tool whose capability is not `OK` or `SANDBOX` appears as unavailable with machine-readable reasons (`NOT_CONFIGURED`, `NOT_IMPLEMENTED`) and is never executed.
+   - Defensive delimiter wrapping (`wrap_untrusted_tool_output`): wraps all tool outputs in tamper-proof fences (`<<<UNTRUSTED_CONTENT source="..." id="..." sha256="..." >>> ... <<<END_UNTRUSTED_CONTENT>>>`) and neutralizes inner tag breakout attempts (`<<<NEUTRALIZED_UNTRUSTED_CONTENT>>>`).
+2. **Built-in Sovereign Tools (`core/tools/builtins/`):**
+   - **CalculatorTool:** Safe AST evaluation executing exact integer / `Decimal` arithmetic in pure Python code (never delegated to an LLM).
+   - **Document Tools:** `DocumentSearchTool`, `DocumentReadTool` (with defensive delimiters), and `DocumentCreateTool` (returns version ID).
+   - **Folio Tools:** `FolioReadTool` and `FolioAppendTool` (advances immutable Merkle root).
+   - **Ledger Tools:** `LedgerReadTool` and `LedgerPostTool` (dispatches through ActionGateway under `ActionClass.POST_LEDGER`, enforcing authority limits and segregation of duties).
+   - **Email Tools:** `EmailSendTool` (dispatches through ActionGateway under `ActionClass.SEND_EXTERNAL_MESSAGE`, returns honest `ACCEPTED_BY_PROVIDER` status from real SMTP / Mailpit) and `EmailReadTool`.
+   - **Calendar Tools:** `CalendarCreateTool` (generates compliant RFC 5545 iCalendar appointments) and `CalendarReadTool`.
+   - **KPI Tools:** `KPIReadTool` (computes metrics deterministically in code).
+3. **ZonataAgentRuntime (`core/agents/runtime.py`):**
+   - Honest naming: strictly named `ZonataAgentRuntime` (never claims to be LangGraph or Temporal).
+   - Bounded execution loop: enforces `max_steps`, `timeout_seconds`, and `budget_micro_units`.
+   - Repetition detection: breaks immediately if the same tool is called with identical arguments twice without state change (`HALTED_REPETITION`), preventing runaway loops and preserving budget.
+   - Crash recovery (`kill -9` drill): every step is persisted in `agent_run_steps`. Resumed runs skip already-executed steps with idempotency keys, guaranteeing zero duplicated email sends or ledger postings.
+   - Kill switch check: evaluates `enterprise_killswitch_matrix` and `coordination.is_killed` before every single step, immediately halting with `HALTED_BY_KILL_SWITCH`.
+4. **Agent Certification Gate (`core/agents/certification.py`):**
+   - Evaluates qualification records in `agent_certifications`. Uncertified agents are clamped to `AutonomyLevel.SHADOW` (Rule 19).
+5. **WorkflowEngine Port (`core/ports/workflow.py`):**
+   - Defines `WorkflowEnginePort`, `WorkflowEngineResult`, `WorkflowRunSpec`, and `LocalWorkflowEngine`. Pluggable for future external engines behind the port.
+6. **Database Migrations:**
+   - `migrations/common/0022_agent_runtime_and_tools.sql` & `migrations/pg/0022_agent_runtime_and_tools.sql` with PostgreSQL 16 fail-closed Row Level Security and Rule 15 role protections.
+
+---
+
+### 2. Empirical Verification & Acceptance Test Outputs
+
+#### 2.1 Acceptance Test Suite Execution
+Command: `python3 -m pytest tests/test_agent_runtime.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 9 items
+
+tests/test_agent_runtime.py::test_01_agent_tool_above_authority_refused_at_gateway PASSED [ 11%]
+tests/test_agent_runtime.py::test_02_unconfigured_capability_tool_never_invoked PASSED [ 22%]
+tests/test_agent_runtime.py::test_03_runaway_loop_halts_at_repetition_detector PASSED [ 33%]
+tests/test_agent_runtime.py::test_04_kill_9_mid_run_resume_idempotency PASSED [ 44%]
+tests/test_agent_runtime.py::test_05_untrusted_content_prompt_injection_defense PASSED [ 55%]
+tests/test_agent_runtime.py::test_06_deterministic_calculator_exact_decimal_arithmetic PASSED [ 66%]
+tests/test_agent_runtime.py::test_07_kill_switch_halts_before_step_execution PASSED [ 77%]
+tests/test_agent_runtime.py::test_08_uncertified_agent_clamped_to_shadow PASSED [ 88%]
+tests/test_agent_runtime.py::test_09_mutation_checks_fail_when_invariants_broken PASSED [100%]
+
+============================== 9 passed in 2.21s ===============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (Float Drift vs Exact Decimal Arithmetic):**
+   - Standard float computation: `100.50 * 1.05 + 12.34` produces `117.86500000000001` (binary float drift).
+   - Deterministic Decimal AST evaluator: `evaluate_decimal_expression("100.50 * 1.05 + 12.34")` produces exact `117.865`.
+   - Discrepancy confirmed and caught: `str(float_calc) != str(decimal_calc)`.
+2. **Mutation 2 (Unsafe Delimiter Breakout):**
+   - Injection payload with `<<<END_UNTRUSTED_CONTENT>>>`.
+   - `wrap_untrusted_tool_output` neutralizes inner tag to `<<<NEUTRALIZED_UNTRUSTED_CONTENT>>>`, preventing premature delimiter breakout.
+3. **Mutation 3 (Uncertified Agent Claiming Autonomous Autonomy):**
+   - Uncertified agent requesting `AutonomyLevel.AUTONOMOUS` is clamped to `AutonomyLevel.SHADOW`.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py -v`
+```
+============================== 41 passed in 7.18s ==============================
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] Agent with tool above its authority is refused at the ActionGateway; run halts with audit record (`test_01_agent_tool_above_authority_refused_at_gateway`).
+- [x] Tool whose capability is `NOT_CONFIGURED` or `NOT_IMPLEMENTED` is never invoked; agent runtime halts with honest reason (`test_02_unconfigured_capability_tool_never_invoked`).
+- [x] Runaway loop (same tool, same arguments) halts at repetition detector; does not burn budget (`test_03_runaway_loop_halts_at_repetition_detector`).
+- [x] `kill -9` mid-run: simulate by interrupting after step 1, resume from persisted state; verify step 1 side-effect is not duplicated (`test_04_kill_9_mid_run_resume_idempotency`).
+- [x] Untrusted content with prompt injection is wrapped in defensive delimiters; runtime does not elevate authority or change system prompt (`test_05_untrusted_content_prompt_injection_defense`).
+- [x] Deterministic calculator returns exact `Decimal` results; never delegates to model (`test_06_deterministic_calculator_exact_decimal_arithmetic`).
+- [x] Active kill switch halts run before step execution with `HALTED_BY_KILL_SWITCH` (`test_07_kill_switch_halts_before_step_execution`).
+- [x] Uncertified agents cannot run above `SHADOW` (`test_08_uncertified_agent_clamped_to_shadow`).
+- [x] Rule 8 mutation checks verify failure when invariants broken (`test_09_mutation_checks_fail_when_invariants_broken`).
+- [x] WorkflowEngine Port with `WorkflowEnginePort`, `WorkflowEngineResult`, `WorkflowRunSpec`, and `LocalWorkflowEngine` implemented behind port pattern.
+
+#### 2.4 Sub-Step 2E CI Run Verification
+- **Run ID:** `44974481895`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44974481895](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44974481895)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `794341f`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (51s)` — ID `137061185093`
+  - `Job 2: SQLite Dev Profile Test Suite (45s)` — ID `137061185168`
+  - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (1m13s)` — ID `137061184920`

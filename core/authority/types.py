@@ -128,3 +128,7 @@ class PolicyDecisionResult:
     decision_path: List[Dict[str, Any]]
     evidence_id: Optional[str] = None
     created_at: float = 0.0
+
+    @property
+    def status(self) -> str:
+        return "APPROVED" if self.allowed else "REJECTED"

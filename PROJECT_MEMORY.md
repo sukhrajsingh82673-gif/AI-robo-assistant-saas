@@ -130,7 +130,16 @@
   - Enforced ActionGateway Step 4: agents can never command or invoke employees (`AGENT_CANNOT_CALL_EMPLOYEE`), and AI occupants cannot modify org structures (`AIOrganizationSelfEditError` / Rule 15).
   - Authored acceptance tests in `tests/test_organization_model.py` (8 passed). All 32 Step 2 tests passing in 5.35s.
   - Verified in CI Run `44949025388` (100% green across all 3 jobs).
-- [ ] **2E:** Tool registry and the agent runtime
+- [x] **2E:** Tool registry and the agent runtime
+  - Defined `ToolContract` with typed Pydantic input/output schemas, `SideEffectClass` enums, required capability key checked against truth table, ActionGateway action classes, timeout, and idempotency key support.
+  - Implemented defensive delimiter wrapping `wrap_untrusted_tool_output` for untrusted tool outputs, neutralizing rogue closing tags (`<<<NEUTRALIZED_UNTRUSTED_CONTENT>>>`).
+  - Built 10 real built-in tools backed by Step 1 infrastructure: `CalculatorTool` (exact AST Decimal arithmetic), `DocumentSearchTool`, `DocumentReadTool`, `DocumentCreateTool`, `FolioReadTool`, `FolioAppendTool`, `LedgerReadTool`, `LedgerPostTool` (via ActionGateway), `EmailSendTool` (honest `ACCEPTED_BY_PROVIDER` via SMTP/Mailpit), `EmailReadTool`, `CalendarCreateTool` (RFC 5545), `CalendarReadTool`, `KPIReadTool`.
+  - Built `ZonataAgentRuntime`: bounded execution loop (`max_steps`, `timeout_seconds`, `budget_micro_units`), repetition detection breaking on identical tool calls without state change (`HALTED_REPETITION`), ActionGateway authority gate before every tool invocation, step persistence in `agent_run_steps` with idempotency keys, crash recovery (`kill -9` resumption without duplicate side-effects), kill switch check before every step (`HALTED_BY_KILL_SWITCH`), task-scoped working memory, defensive prompt injection protection.
+  - Enforced agent certification gate (`core/agents/certification.py`): uncertified agents cannot exceed `AutonomyLevel.SHADOW`.
+  - Implemented `WorkflowEnginePort` (`core/ports/workflow.py`) with `WorkflowEngineResult`, `WorkflowRunSpec`, and `LocalWorkflowEngine`.
+  - Authored migrations `0022_agent_runtime_and_tools.sql` in `common/` and `pg/` with fail-closed RLS and Rule 15 role protections.
+  - Authored acceptance tests in `tests/test_agent_runtime.py` (9 passed). All 41 Step 2 tests passing in 7.18s.
+- [ ] **2F:** Work kernel: missions, projects, tasks, inbox
 - [ ] **2F:** Work kernel: missions, projects, tasks, inbox
 - [ ] **2G:** SOP executor
 - [ ] **2H:** Verification pyramid

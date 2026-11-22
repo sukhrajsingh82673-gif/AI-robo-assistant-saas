@@ -9,6 +9,8 @@ from core.ports.base import (
     SandboxProvider,
     PortRegistry,
     port_registry,
+    CapabilityTruthTable,
+    capability_truth_table,
 )
 
 # Convenience port accessor
@@ -60,6 +62,15 @@ from core.ports.llm import (
     ModelTier,
     llm_gateway,
 )
+from core.ports.workflow import (
+    WorkflowEnginePort,
+    WorkflowEngineResult,
+    WorkflowRunSpec,
+    LocalWorkflowEngine,
+    NotConfiguredWorkflowEngineProvider,
+    SandboxWorkflowEngineProvider,
+    resolve_workflow_provider,
+)
 
 __all__ = [
     "Port",
@@ -70,6 +81,16 @@ __all__ = [
     "SandboxProvider",
     "PortRegistry",
     "port_registry",
+    "CapabilityTruthTable",
+    "capability_truth_table",
+    # Workflow
+    "WorkflowEnginePort",
+    "WorkflowEngineResult",
+    "WorkflowRunSpec",
+    "LocalWorkflowEngine",
+    "NotConfiguredWorkflowEngineProvider",
+    "SandboxWorkflowEngineProvider",
+    "resolve_workflow_provider",
     # LLM Gateway
     "LLMGatewayPort",
     "ModelTier",

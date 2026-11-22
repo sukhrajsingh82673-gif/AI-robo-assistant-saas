@@ -861,6 +861,9 @@ class ZonataActionGateway:
             "timestamp": time.time(),
         }
 
+    # Alias for convenience and backwards-compatibility
+    evaluate = evaluate_decision_gate
+
 
 # Global Action Gateway singleton instance
 action_gateway = ZonataActionGateway()

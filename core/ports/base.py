@@ -158,3 +158,69 @@ class PortRegistry:
 
 
 port_registry = PortRegistry()
+
+
+class CapabilityTruthTable:
+    """Authoritative capability truth probe results adhering to Step 1C."""
+
+    def get_status(self, capability: str) -> str:
+        """Returns the PortStatus string ('OK', 'SANDBOX', 'NOT_CONFIGURED', 'NOT_IMPLEMENTED', 'FAILED')."""
+        if not capability:
+            return PortStatus.OK.value
+
+        try:
+            from core.capability_probe import PROBE_DISPATCH
+            if capability in PROBE_DISPATCH:
+                probe_res = PROBE_DISPATCH[capability]()
+                return probe_res.status.value if isinstance(probe_res.status, PortStatus) else str(probe_res.status)
+        except Exception:
+            pass
+
+        if capability in port_registry._ports:
+            try:
+                res = port_registry.get(capability).probe()
+                return res.status.value if isinstance(res.status, PortStatus) else str(res.status)
+            except Exception:
+                return PortStatus.FAILED.value
+
+        if capability in ("browser", "desktop_control", "install_software", "unsupported_device"):
+            return PortStatus.NOT_IMPLEMENTED.value
+
+        # Domain-level database-backed capability prefixes map to primary database connectivity
+        domain_prefixes = (
+            "billing", "task", "policy", "data", "agent", "clinic",
+            "internal", "org", "user", "ledger", "tool", "financial",
+        )
+        if any(capability.startswith(p) for p in domain_prefixes):
+            return self.get_status("database")
+
+        port = port_registry.get(capability)
+        if isinstance(port, NotConfiguredProvider):
+            return PortStatus.NOT_CONFIGURED.value
+        if isinstance(port, NotImplementedProvider):
+            return PortStatus.NOT_IMPLEMENTED.value
+        try:
+            res = port.probe()
+            return res.status.value if isinstance(res.status, PortStatus) else str(res.status)
+        except Exception:
+            return PortStatus.NOT_CONFIGURED.value
+
+    def probe(self, capability: str) -> ProviderResult:
+        try:
+            from core.capability_probe import PROBE_DISPATCH
+            if capability in PROBE_DISPATCH:
+                return PROBE_DISPATCH[capability]()
+        except Exception:
+            pass
+        return port_registry.get(capability).probe()
+
+    def probe_all(self) -> Dict[str, ProviderResult]:
+        try:
+            from core.capability_probe import probe_all_capabilities
+            return probe_all_capabilities()
+        except Exception:
+            return {}
+
+
+capability_truth_table = CapabilityTruthTable()
+

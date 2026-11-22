@@ -5422,6 +5422,10 @@ class Database:
                 ensure_outbox_tables(conn)
                 from core.baseline.scheduler import ensure_scheduler_tables
                 ensure_scheduler_tables(conn)
+                from core.organization import ensure_organization_tables
+                ensure_organization_tables(conn)
+                from core.agents import ensure_agent_runtime_tables
+                ensure_agent_runtime_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5469,6 +5473,10 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_outbox_tables()
         from core.baseline.scheduler import ensure_scheduler_tables
         ensure_scheduler_tables()
+        from core.organization import ensure_organization_tables
+        ensure_organization_tables()
+        from core.agents import ensure_agent_runtime_tables
+        ensure_agent_runtime_tables()
     except Exception:
         pass
     try:
