@@ -4395,7 +4395,7 @@ class DeferredConnectionProxy:
         self._row_factory = val
 
     def cursor(self):
-        return self
+        return DeferredCursor(self.db)
 
     def execute(self, sql: str, params: Any = ()):
         self.db._deferred_queries.append(('execute', sql, params))
@@ -4408,6 +4408,12 @@ class DeferredConnectionProxy:
     def executescript(self, sql_script: str):
         self.db._deferred_queries.append(('executescript', sql_script, ()))
         return DeferredCursor(self.db, sql_script)
+
+    def fetchone(self):
+        return DeferredRow((0,))
+
+    def fetchall(self):
+        return []
 
     def commit(self):
         pass
@@ -5253,6 +5259,11 @@ class Database:
 
     def get_connection(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:
+            if not self._is_ready:
+                try:
+                    self.verify_readiness()
+                except Exception:
+                    pass
             if self._deferred_import_mode and not self._is_ready:
                 return DeferredConnectionProxy(self)
             return self._get_pooled_postgresql_connection()

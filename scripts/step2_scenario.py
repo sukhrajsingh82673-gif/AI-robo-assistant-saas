@@ -104,6 +104,12 @@ def run_scenario() -> Dict[str, Any]:
     logger.info("               OPENCODE STEP 2 QUALIFICATION SCENARIO START                     ")
     logger.info("================================================================================")
 
+    # 0. Ensure database connectivity & dialect readiness
+    try:
+        db.verify_readiness()
+    except Exception as e:
+        logger.warning("Database readiness verification notice: %s", e)
+
     # 1. Bootstrap schemas
     ensure_document_backbone_tables()
     ensure_folio_tables()

@@ -36,6 +36,12 @@ def main():
 
     args = parser.parse_args()
 
+    from core.db import db
+    try:
+        db.verify_readiness()
+    except Exception as e:
+        logger.warning("Database readiness verification notice: %s", e)
+
     harness = EvalHarness()
     departments = [args.department] if args.department else harness.list_available_departments()
 
