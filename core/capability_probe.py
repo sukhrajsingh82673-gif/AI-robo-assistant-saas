@@ -283,10 +283,32 @@ def probe_browser() -> ProviderResult:
 
 
 def probe_desktop_control() -> ProviderResult:
-    """Probe desktop GUI control capability. Explicitly NOT_IMPLEMENTED."""
-    return NotImplementedProvider(
-        capability="desktop_control",
-        reason="Desktop GUI automation runtime is NOT_IMPLEMENTED in sovereign core"
+    """Probe desktop GUI control capability. Requires an active paired host agent (Step 3B, Rule 30)."""
+    try:
+        from core.db import db
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT device_id FROM devices WHERE pairing_status = 'PAIRED' LIMIT 1"
+            ).fetchone()
+            if row:
+                return ProviderResult(
+                    status=PortStatus.OK,
+                    provider="zonata_host_agent",
+                    provider_ref=f"host_device_{row['device_id']}",
+                    sandbox=False,
+                    latency_ms=1.0,
+                    cost="ZERO",
+                    metadata={"paired": True, "device_id": row["device_id"]},
+                )
+    except Exception:
+        pass
+
+    if _is_test_mode() and os.environ.get("ZONATA_FAKE_HOST_PAIRED") == "1":
+        return SandboxProvider("desktop_control", "zonata_host_agent_fake").probe()
+
+    return NotConfiguredProvider(
+        "desktop_control",
+        "No paired and connected host agent. Desktop control requires active host agent connection (Rule 30).",
     ).probe()
 
 
