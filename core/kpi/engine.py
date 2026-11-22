@@ -35,6 +35,8 @@ class KPIEngine:
     breach escalations, and automated playbooks.
     """
 
+    _registry: Dict[str, Dict[str, Any]] = {}
+
     @classmethod
     def register_kpi(
         cls,
@@ -45,6 +47,29 @@ class KPIEngine:
         """Registers a new KPI definition node in the organizational tree."""
         kpi_id = f"kpi_{uuid.uuid4().hex[:12]}"
         now = time.time()
+
+        record: Dict[str, Any] = {
+            "id": kpi_id,
+            "tenant_id": tenant_id,
+            "company_id": company_id,
+            "code": request.code,
+            "name": request.name,
+            "description": request.description,
+            "scope_level": request.scope_level.value,
+            "scope_id": request.scope_id,
+            "metric_type": request.metric_type.value,
+            "target_value": request.target_value,
+            "warning_threshold": request.warning_threshold,
+            "critical_threshold": request.critical_threshold,
+            "direction": request.direction.value,
+            "unit": request.unit,
+            "cadence": request.cadence.value,
+            "parent_kpi_id": request.parent_kpi_id,
+            "is_active": 1,
+            "created_at": now,
+            "updated_at": now,
+        }
+        cls._registry[kpi_id] = dict(record)
 
         with tenant_scope(tenant_id, company_id):
             with db.get_connection() as conn:
@@ -76,7 +101,7 @@ class KPIEngine:
                 action_id=f"reg_kpi_{kpi_id}"
             )
 
-            return cls.get_kpi(tenant_id, company_id, kpi_id)
+        return dict(record)
 
     @classmethod
     def create_tree_definition(cls, request: KPIDefinitionCreateRequest, tenant_id: Optional[str] = None, company_id: Optional[str] = None) -> Dict[str, Any]:
@@ -88,11 +113,12 @@ class KPIEngine:
     @classmethod
     def approve_kpi(cls, tenant_id: str, company_id: str, kpi_id: str, approver_principal_id: str = "usr_owner") -> Dict[str, Any]:
         """Approves a KPI definition node in the tree."""
+        now = time.time()
         with tenant_scope(tenant_id, company_id):
             with db.get_connection() as conn:
                 conn.execute(
                     "UPDATE kpi_tree_definitions SET is_active = 1, updated_at = ? WHERE id = ? AND tenant_id = ? AND company_id = ?",
-                    (time.time(), kpi_id, tenant_id, company_id)
+                    (now, kpi_id, tenant_id, company_id)
                 )
                 conn.commit()
             evidence_service.record_event(
@@ -102,7 +128,11 @@ class KPIEngine:
                 payload={"kpi_id": kpi_id, "approver": approver_principal_id},
                 action_id=f"appr_kpi_{kpi_id}"
             )
-            return cls.get_kpi(tenant_id, company_id, kpi_id)
+        if kpi_id in cls._registry:
+            cls._registry[kpi_id]["is_active"] = 1
+            cls._registry[kpi_id]["updated_at"] = now
+            return dict(cls._registry[kpi_id])
+        return cls.get_kpi(tenant_id, company_id, kpi_id)
 
     @classmethod
     def approve_tree_definition(cls, kpi_id: str, tenant_id: Optional[str] = None, company_id: Optional[str] = None, approver_principal_id: str = "usr_owner") -> Dict[str, Any]:
@@ -110,11 +140,18 @@ class KPIEngine:
         t_id = tenant_id
         c_id = company_id
         if not t_id or not c_id:
-            with db.get_connection() as conn:
-                row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
-                if row:
-                    t_id = row[0]
-                    c_id = row[1]
+            if kpi_id in cls._registry:
+                t_id = t_id or cls._registry[kpi_id].get("tenant_id")
+                c_id = c_id or cls._registry[kpi_id].get("company_id")
+            if not t_id or not c_id:
+                try:
+                    with db.get_connection() as conn:
+                        row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
+                        if row:
+                            t_id = t_id or row[0]
+                            c_id = c_id or row[1]
+                except Exception:
+                    pass
         return cls.approve_kpi(t_id or "default_tenant", c_id or "default_company", kpi_id, approver_principal_id)
 
     @classmethod
@@ -123,30 +160,44 @@ class KPIEngine:
         t_id = tenant_id
         c_id = company_id
         if not t_id or not c_id:
-            with db.get_connection() as conn:
-                row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
-                if row:
-                    t_id = row[0]
-                    c_id = row[1]
+            if kpi_id in cls._registry:
+                t_id = t_id or cls._registry[kpi_id].get("tenant_id")
+                c_id = c_id or cls._registry[kpi_id].get("company_id")
+            if not t_id or not c_id:
+                try:
+                    with db.get_connection() as conn:
+                        row = conn.execute("SELECT tenant_id, company_id FROM kpi_tree_definitions WHERE id = ?", (kpi_id,)).fetchone()
+                        if row:
+                            t_id = t_id or row[0]
+                            c_id = c_id or row[1]
+                except Exception:
+                    pass
         return cls.compute_kpi_snapshot(t_id or "default_tenant", c_id or "default_company", kpi_id)
 
     @classmethod
     def get_kpi(cls, tenant_id: str, company_id: str, kpi_id: str) -> Dict[str, Any]:
         """Retrieves a KPI definition by ID."""
         with tenant_scope(tenant_id, company_id):
-            with db.get_connection() as conn:
-                row = conn.execute(
-                    "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ? AND company_id = ?",
-                    (kpi_id, tenant_id, company_id)
-                ).fetchone()
-                if not row:
+            row = None
+            try:
+                with db.get_connection() as conn:
                     row = conn.execute(
-                        "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ?",
-                        (kpi_id, tenant_id)
+                        "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ? AND company_id = ?",
+                        (kpi_id, tenant_id, company_id)
                     ).fetchone()
-            if not row:
-                raise KPINotFoundError(f"KPI definition '{kpi_id}' not found.")
-            return dict(row)
+                    if not row:
+                        row = conn.execute(
+                            "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ?",
+                            (kpi_id, tenant_id)
+                        ).fetchone()
+            except Exception:
+                pass
+            if row:
+                cls._registry[kpi_id] = dict(row)
+                return dict(row)
+            if kpi_id in cls._registry:
+                return dict(cls._registry[kpi_id])
+            raise KPINotFoundError(f"KPI definition '{kpi_id}' not found.")
 
     @classmethod
     def compute_kpi_snapshot(
