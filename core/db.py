@@ -5426,6 +5426,8 @@ class Database:
                 ensure_organization_tables(conn)
                 from core.agents import ensure_agent_runtime_tables
                 ensure_agent_runtime_tables(conn)
+                from core.work import ensure_work_kernel_tables
+                ensure_work_kernel_tables(conn)
             except Exception:
                 pass
             conn.commit()
@@ -5477,6 +5479,8 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
         ensure_organization_tables()
         from core.agents import ensure_agent_runtime_tables
         ensure_agent_runtime_tables()
+        from core.work import ensure_work_kernel_tables
+        ensure_work_kernel_tables()
     except Exception:
         pass
     try:

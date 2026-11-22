@@ -12,7 +12,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 import uuid
 
-from core.db import db
+from core.db import db, tenant_scoped
 
 logger = logging.getLogger("zonata.baseline.scheduler")
 
@@ -82,6 +82,7 @@ class DurableScheduler:
         self._handlers: Dict[str, Callable[[ScheduledJobRecord], None]] = {}
         ensure_scheduler_tables()
 
+    @tenant_scoped
     def register_job(
         self,
         tenant_id: str,
@@ -253,10 +254,13 @@ class DurableScheduler:
     # Job Execution, Heartbeats & Orphan Lock Recovery
     # --------------------------------------------------------------------------
 
+    @tenant_scoped
     def tick(
         self,
         node_id: str,
         lease_duration: float = DEFAULT_LEASE_DURATION,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> int:
         """Executes one tick of the scheduler on node_id.
         
@@ -372,7 +376,13 @@ class DurableScheduler:
 
         return executed_count
 
-    def get_job(self, job_id: str) -> Optional[ScheduledJobRecord]:
+    @tenant_scoped
+    def get_job(
+        self,
+        job_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Optional[ScheduledJobRecord]:
         """Fetches a scheduled job by ID."""
         with self.db_conn_factory() as conn:
             cur = conn.cursor()
@@ -383,8 +393,10 @@ class DurableScheduler:
                        lease_owner, lease_heartbeat_at, lease_expires_at, status, created_at
                 FROM scheduled_jobs
                 WHERE job_id = ?
+                  AND (tenant_id = ? OR ? IS NULL)
+                  AND (company_id = ? OR ? IS NULL)
                 """,
-                (job_id,),
+                (job_id, tenant_id, tenant_id, company_id, company_id),
             )
             r = cur.fetchone()
             if not r:

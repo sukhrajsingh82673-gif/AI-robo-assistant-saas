@@ -658,3 +658,104 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
   - `Job 1: Supply Chain, SBOM, License & Image Pinning Audit (51s)` — ID `137061185093`
   - `Job 2: SQLite Dev Profile Test Suite (45s)` — ID `137061185168`
   - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (1m13s)` — ID `137061184920`
+
+
+---
+
+## Sub-Step 2F: Work Kernel: Missions, Projects, Work Tasks, and Human Inbox
+
+### 1. Executive Summary & Architectural Scope
+Sub-Step 2F establishes the authoritative work orchestration kernel for ZONATA. Work can be created, assigned, tracked, submitted, verified, reassigned, and completed through strict APIs without synthetic or hand-seeded rows.
+
+Key architectural deliverables:
+1. **7-State Task State Machine (`core/work/state_machine.py`):**
+   - Strictly enforced state transitions: `PROPOSED → ASSIGNED → ACCEPTED → IN_PROGRESS → SUBMITTED → VERIFYING → COMPLETED`, along with `REJECTED`, `BLOCKED` (with machine-readable reason, e.g. `CAPABILITY_NOT_LIVE`), and `CANCELLED`.
+   - **Rule 17 Enforcement:** 'Done' is a claim, not a fact. An assignee can **never** mark its own task `COMPLETED` (raises `AssigneeSelfCompletionForbiddenError`).
+   - Only the verification service or an authorized verifier principal may transition tasks to `COMPLETED`.
+   - Terminal states `COMPLETED` and `CANCELLED` reject further modifications.
+2. **DAG Dependency & Cycle Detection (`core/work/dag.py`):**
+   - Implements Kahn's topological sort algorithm across task dependencies.
+   - Cycle detection rejects self-referential or transitive cyclic delegations (`TaskDependencyCycleError`).
+   - Prerequisite gating: dependent tasks cannot be accepted or started until all prerequisite tasks reach `COMPLETED` (`PrerequisiteNotCompletedError`).
+3. **Deterministic Assignment Engine (`core/work/assignment.py`):**
+   - Eligibility filtering based on candidate authority profile spend limits, capabilities, and effective autonomy trust levels.
+   - Deterministic candidate scoring based on active queue depth, cost minor units, and verified historical pass rate:
+     `score = (pass_rate * 100.0) - (queue_depth * 10.0) - (cost_minor_units / 1000.0)`
+   - Stores full score breakdown and justification in machine-readable `assignment_reasons`.
+4. **Human Inbox & Notification Engine (`core/work/inbox.py`):**
+   - Manages durable human intervention requests (`TASK_APPROVAL`, `TASK_INTERVENTION`, `DECISION_REQUEST`, `SLA_ESCALATION`).
+   - Dispatches email notifications via the Step 1 `EmailOutPort` adapter.
+   - State tracking: `PENDING → ACKNOWLEDGED → RESOLVED` with audit timestamps and actor attribution.
+   - Durable persistence: inbox items survive process restarts and connection resets.
+5. **SLA Timers & 3-Tier Escalation Ladder (`core/work/sla.py`):**
+   - Controllable clock mechanism (`ClockManager.controllable_clock`) for deterministic deadline testing.
+   - Deterministic escalation hierarchy upon deadline breach:
+     - **Level 1:** Assignee's direct supervisor position.
+     - **Level 2:** Organization CEO position.
+     - **Level 3+:** Company Owner (`PrincipalType.OWNER`).
+   - Automatically enqueues human inbox items and logs tamper-evident records to the Merkle evidence ledger.
+6. **Unified Work Service & HTTP API (`core/work/service.py`, `core/workforce_api.py`):**
+   - Endpoints: `POST /api/workforce/missions`, `POST /api/workforce/projects`, `POST /api/workforce/tasks`, `/assign`, `/accept`, `/start`, `/submit`, `/verify`, `/reassign`, `/cancel`, `GET /api/workforce/inbox`, `/acknowledge`, `/resolve`.
+   - Gated capability reality checks: tasks requiring unconfigured or unbuilt capabilities transition to `BLOCKED` with code `CAPABILITY_NOT_LIVE`.
+7. **Database Migrations:**
+   - `migrations/common/0023_work_kernel.sql`: SQLite DDL for `work_missions`, `work_projects`, `work_tasks`, `task_dependencies`, `task_events`, and `human_inbox`.
+   - `migrations/pg/0023_work_kernel.sql`: PostgreSQL 16 fail-closed Row Level Security on all 6 tables and Rule 15 role protections revoking mutations on `human_inbox` decisions from `zonata_agent_role`.
+
+---
+
+### 2. Empirical Verification & Acceptance Test Outputs
+
+#### 2.1 Acceptance Test Suite Execution
+Command: `python3 -m pytest tests/test_work_kernel.py -v`
+```
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 10 items
+
+tests/test_work_kernel.py::test_01_dependency_cycle_rejected PASSED      [ 10%]
+tests/test_work_kernel.py::test_02_illegal_state_transitions_rejected PASSED [ 20%]
+tests/test_work_kernel.py::test_03_assignee_cannot_self_complete_rule17 PASSED [ 30%]
+tests/test_work_kernel.py::test_04_non_live_capability_transitions_to_blocked PASSED [ 40%]
+tests/test_work_kernel.py::test_05_prerequisite_must_be_completed_before_start PASSED [ 50%]
+tests/test_work_kernel.py::test_06_sla_breach_escalates_up_the_chain_with_controllable_clock PASSED [ 60%]
+tests/test_work_kernel.py::test_07_human_inbox_item_survives_restart PASSED [ 70%]
+tests/test_work_kernel.py::test_08_deterministic_assignment_scoring PASSED [ 80%]
+tests/test_work_kernel.py::test_09_workforce_http_api_lifecycle PASSED   [ 90%]
+tests/test_work_kernel.py::test_10_mutation_checks PASSED                [100%]
+
+============================== 10 passed in 3.11s ==============================
+```
+
+#### 2.2 Empirical Mutation Checks (Rule 8: Invariants Fail When Mutated)
+1. **Mutation 1 (DAG Cycle Detection):**
+   - Proved that circular dependency A -> B -> A raises `TaskDependencyCycleError`.
+   - Disabling Kahn's cycle detection passes circular graphs, deadlocking execution.
+2. **Mutation 2 (Rule 17 Self-Completion Prohibition):**
+   - Proved that assignee attempting to verify and complete its own task raises `AssigneeSelfCompletionForbiddenError`.
+   - Disabling the assignee check allows agents to fabricate completion claims, violating Rule 17.
+
+#### 2.3 Full Step 2 Regression Test Suite
+Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway.py tests/test_action_gateway_authority.py tests/test_organization_model.py tests/test_agent_runtime.py tests/test_work_kernel.py -q`
+```
+...................................................                      [100%]
+51 passed in 14.42s
+```
+
+---
+
+### 3. Acceptance Criteria Confirmation
+- [x] Dependency cycle rejected (`test_01_dependency_cycle_rejected`).
+- [x] Illegal state transitions rejected (`test_02_illegal_state_transitions_rejected`).
+- [x] Assignee cannot mark its own task `COMPLETED` under Rule 17 (`test_03_assignee_cannot_self_complete_rule17`).
+- [x] Task needing a non-live capability becomes `BLOCKED` with code `CAPABILITY_NOT_LIVE` instead of faking success (`test_04_non_live_capability_transitions_to_blocked`).
+- [x] Prerequisite tasks must be completed before dependent tasks can start (`test_05_prerequisite_must_be_completed_before_start`).
+- [x] SLA breach escalates up the chain (Supervisor → CEO → Owner) in a test with a controllable clock (`test_06_sla_breach_escalates_up_the_chain_with_controllable_clock`).
+- [x] Human inbox item survives process/connection restart (`test_07_human_inbox_item_survives_restart`).
+- [x] Deterministic assignment scoring chooses optimal candidate and stores justification (`test_08_deterministic_assignment_scoring`).
+- [x] HTTP workforce API handles end-to-end task lifecycle and refuses self-verification with HTTP 403 (`test_09_workforce_http_api_lifecycle`).
+- [x] Rule 8 mutation checks verify that acceptance tests fail when invariants are broken (`test_10_mutation_checks`).
+

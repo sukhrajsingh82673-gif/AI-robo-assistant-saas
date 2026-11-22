@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.auth import AuthorizationEnforcer
 from core.workforce_architecture import WorkforceArchitecture, WorkforceError
+from core.work.types import WorkKernelError
 
 WriteResult = Optional[Tuple[Dict[str, Any], int]]
 
@@ -161,6 +162,20 @@ def handle_get(path: str, query_params: Dict[str, List[str]], tenant_id: str,
                 ).fetchall()
             items = [dict(r) for r in rows]
             return ({"success": True, "collaborations": items, "count": len(items)}, 200)
+
+        # OpenCode Step 2F: Work Kernel Inbox and Task Lookups
+        if path == "/api/workforce/inbox":
+            from core.work import human_inbox_service
+            target_id = _one(query_params, "target_principal_id")
+            status_val = _one(query_params, "status")
+            items = human_inbox_service.list_items(tenant_id, company_id, target_id, status_val)
+            return ({"success": True, "items": items, "count": len(items)}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.count("/") == 4:
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.get_task(tenant_id, company_id, task_id)
+            return ({"success": True, "task": task}, 200)
 
         return None
     except WorkforceError as exc:
@@ -398,7 +413,121 @@ def handle_post(path: str, req_data: Dict[str, Any], tenant_id: str,
             )
             return (result, 200)
 
+        # OpenCode Step 2F: Missions, Projects, Work Tasks, Human Inbox
+        if path == "/api/workforce/missions":
+            from core.work import workforce_work_service, MissionCreateRequest
+            req = MissionCreateRequest(**req_data)
+            mission = workforce_work_service.create_mission(tenant_id, company_id, req)
+            return ({"success": True, "mission": mission}, 201)
+
+        if path == "/api/workforce/projects":
+            from core.work import workforce_work_service, ProjectCreateRequest
+            req = ProjectCreateRequest(**req_data)
+            project = workforce_work_service.create_project(tenant_id, company_id, req)
+            return ({"success": True, "project": project}, 201)
+
+        if path == "/api/workforce/tasks":
+            from core.work import workforce_work_service, TaskCreateRequest
+            req = TaskCreateRequest(**req_data)
+            task = workforce_work_service.create_task(tenant_id, company_id, req)
+            return ({"success": True, "task": task}, 201)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/assign"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.assign_task(
+                tenant_id, company_id, task_id,
+                assignee_id=req_data.get("assignee_id"),
+                assignee_type=req_data.get("assignee_type", "POSITION"),
+                actor_id=str(req_data.get("actor_id") or actor),
+                candidate_pool=req_data.get("candidate_pool"),
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/accept"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.accept_task(
+                tenant_id, company_id, task_id,
+                actor_id=str(req_data.get("actor_id") or actor)
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/start"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.start_task(
+                tenant_id, company_id, task_id,
+                actor_id=str(req_data.get("actor_id") or actor)
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/submit"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.submit_task(
+                tenant_id, company_id, task_id,
+                deliverable=req_data.get("deliverable", {}),
+                actor_id=str(req_data.get("actor_id") or actor)
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/verify"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.verify_task(
+                tenant_id, company_id, task_id,
+                decision=str(req_data.get("decision", "APPROVED")),
+                verifier_id=str(req_data.get("verifier_id") or actor),
+                verification_report_id=req_data.get("verification_report_id"),
+                reason=req_data.get("reason"),
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/reassign"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.reassign_task(
+                tenant_id, company_id, task_id,
+                new_assignee_id=str(req_data.get("new_assignee_id")),
+                new_assignee_type=req_data.get("new_assignee_type", "POSITION"),
+                actor_id=str(req_data.get("actor_id") or actor),
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/tasks/") and path.endswith("/cancel"):
+            task_id = path.split("/")[4]
+            from core.work import workforce_work_service
+            task = workforce_work_service.cancel_task(
+                tenant_id, company_id, task_id,
+                actor_id=str(req_data.get("actor_id") or actor),
+                reason=req_data.get("reason")
+            )
+            return ({"success": True, "task": task}, 200)
+
+        if path.startswith("/api/workforce/inbox/") and path.endswith("/acknowledge"):
+            inbox_id = path.split("/")[4]
+            from core.work import human_inbox_service
+            item = human_inbox_service.acknowledge(
+                tenant_id, company_id, inbox_id,
+                actor_id=str(req_data.get("actor_id") or actor)
+            )
+            return ({"success": True, "item": item}, 200)
+
+        if path.startswith("/api/workforce/inbox/") and path.endswith("/resolve"):
+            inbox_id = path.split("/")[4]
+            from core.work import human_inbox_service
+            item = human_inbox_service.resolve(
+                tenant_id, company_id, inbox_id,
+                actor_id=str(req_data.get("actor_id") or actor),
+                resolution_data=req_data.get("resolution_data", {})
+            )
+            return ({"success": True, "item": item}, 200)
+
         return None
+    except WorkKernelError as exc:
+        code = 404 if "not found" in str(exc).lower() else (403 if "forbidden" in str(exc).lower() else 400)
+        return ({"success": False, "error": str(exc)}, code)
     except WorkforceError as exc:
         return ({"success": False, "error": str(exc)}, 400)
     except ValueError as exc:

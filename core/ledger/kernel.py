@@ -12,7 +12,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 import uuid
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.ledger.currency import format_minor_units, validate_currency
 from core.ledger.schema import (
     AccountType,
@@ -66,6 +66,7 @@ class LedgerKernel:
     # 1. CHART OF ACCOUNTS (COA)
     # =========================================================================
 
+    @tenant_scoped
     def create_account(
         self,
         tenant_id: str,
@@ -108,6 +109,7 @@ class LedgerKernel:
 
         return account_id
 
+    @tenant_scoped
     def get_account(self, tenant_id: str, company_id: str, account_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves an account by its ID, enforcing tenant and company scoping."""
         with db.get_connection() as conn:
@@ -135,6 +137,7 @@ class LedgerKernel:
                 "created_at": row[8],
             }
 
+    @tenant_scoped
     def get_account_by_code(self, tenant_id: str, company_id: str, code: str) -> Optional[Dict[str, Any]]:
         """Retrieves an account by its code within a tenant and company."""
         with db.get_connection() as conn:
@@ -162,6 +165,7 @@ class LedgerKernel:
                 "created_at": row[8],
             }
 
+    @tenant_scoped
     def list_accounts(self, tenant_id: str, company_id: str, is_active: Optional[bool] = None) -> List[Dict[str, Any]]:
         """Lists accounts for a company with optional active filter."""
         with db.get_connection() as conn:
@@ -193,6 +197,7 @@ class LedgerKernel:
     # 2. JOURNAL ENTRIES & LINES
     # =========================================================================
 
+    @tenant_scoped
     def create_journal_entry(
         self,
         tenant_id: str,
@@ -234,6 +239,7 @@ class LedgerKernel:
 
         return entry_id
 
+    @tenant_scoped
     def add_journal_line(
         self,
         tenant_id: str,
@@ -315,6 +321,7 @@ class LedgerKernel:
 
         return line_id
 
+    @tenant_scoped
     def get_journal_entry(self, tenant_id: str, company_id: str, entry_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves a journal entry with all its lines."""
         with db.get_connection() as conn:
@@ -373,6 +380,7 @@ class LedgerKernel:
     # 3. POSTING & ZERO-BALANCE ENFORCEMENT
     # =========================================================================
 
+    @tenant_scoped
     def post_journal_entry(
         self,
         tenant_id: str,
@@ -493,6 +501,7 @@ class LedgerKernel:
     # 4. REVERSING ENTRIES (CORRECTIONS)
     # =========================================================================
 
+    @tenant_scoped
     def reverse_journal_entry(
         self,
         tenant_id: str,
@@ -564,6 +573,7 @@ class LedgerKernel:
     # 5. TRIAL BALANCE GENERATION
     # =========================================================================
 
+    @tenant_scoped
     def generate_trial_balance(
         self,
         tenant_id: str,
@@ -661,6 +671,7 @@ class LedgerKernel:
     # 6. FOLIO INTEGRATION VERIFICATION
     # =========================================================================
 
+    @tenant_scoped
     def verify_folio_journal_entries_posted(self, tenant_id: str, company_id: str, folio_id: str) -> bool:
         """Verifies that all journal entries associated with a folio are in POSTED status."""
         with db.get_connection() as conn:

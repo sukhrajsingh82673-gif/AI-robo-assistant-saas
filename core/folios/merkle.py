@@ -11,7 +11,7 @@ import hashlib
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped
 
 
 GENESIS_ROOT = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -91,7 +91,12 @@ def verify_merkle_proof(
     return current_hash == expected_root
 
 
-def recompute_folio_merkle_root(folio_id: str) -> str:
+@tenant_scoped
+def recompute_folio_merkle_root(
+    folio_id: str,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+) -> str:
     """Fetches all entries for folio_id, recalculates Merkle root, and updates database."""
     with db.get_connection() as conn:
         cur = conn.cursor()
@@ -100,9 +105,11 @@ def recompute_folio_merkle_root(folio_id: str) -> str:
             SELECT entry_hash
             FROM folio_entries
             WHERE folio_id = ?
+              AND (tenant_id = ? OR ? IS NULL)
+              AND (company_id = ? OR ? IS NULL)
             ORDER BY sequence_number ASC
             """,
-            (folio_id,)
+            (folio_id, tenant_id, tenant_id, company_id, company_id)
         )
         rows = cur.fetchall()
         leaf_hashes = [r[0] for r in rows]
@@ -110,7 +117,8 @@ def recompute_folio_merkle_root(folio_id: str) -> str:
         root, _ = build_folio_merkle_tree(leaf_hashes)
         now = time.time()
         conn.execute(
-            "UPDATE folios SET merkle_root = ?, updated_at = ? WHERE id = ?",
-            (root, now, folio_id)
+            "UPDATE folios SET merkle_root = ?, updated_at = ? WHERE id = ?"
+            " AND (tenant_id = ? OR ? IS NULL) AND (company_id = ? OR ? IS NULL)",
+            (root, now, folio_id, tenant_id, tenant_id, company_id, company_id)
         )
         return root

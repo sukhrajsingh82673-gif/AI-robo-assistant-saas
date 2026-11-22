@@ -101,6 +101,21 @@ def init_all_subsystem_schemas():
         ensure_authority_tables()
     except Exception:
         pass
+    try:
+        from core.organization import ensure_organization_tables
+        ensure_organization_tables()
+    except Exception:
+        pass
+    try:
+        from core.agents import ensure_agent_runtime_tables
+        ensure_agent_runtime_tables()
+    except Exception:
+        pass
+    try:
+        from core.work import ensure_work_kernel_tables
+        ensure_work_kernel_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

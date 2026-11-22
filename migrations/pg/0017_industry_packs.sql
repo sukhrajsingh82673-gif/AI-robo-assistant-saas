@@ -40,11 +40,11 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t||'_tenant_isolation', t);
     EXECUTE format(
       'CREATE POLICY %I ON %I USING (' ||
-      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       ') WITH CHECK (' ||
-      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), '''') OR current_setting(''zonata.tenant_id'', true) IS NULL)' ||
-      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), '''') OR current_setting(''zonata.company_id'', true) IS NULL)' ||
+      '  (tenant_id = NULLIF(current_setting(''zonata.tenant_id'', true), ''''))' ||
+      '  AND (company_id = NULLIF(current_setting(''zonata.company_id'', true), ''''))' ||
       ')', t||'_tenant_isolation', t
     );
   END LOOP;

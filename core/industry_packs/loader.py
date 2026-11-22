@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 import uuid
 import yaml
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.industry_packs.isic import get_isic_details
 from core.industry_packs.schema import (
     MalformedChartOfAccountsError,
@@ -118,6 +118,7 @@ class IndustryPackLoader:
 
         return validate_industry_pack_dict(data)
 
+    @tenant_scoped
     def install_pack(
         self,
         tenant_id: str,
@@ -279,6 +280,7 @@ class IndustryPackLoader:
             "workflows_count": len(validated.get("workflows", [])),
         }
 
+    @tenant_scoped
     def get_installed_pack(self, tenant_id: str, company_id: str, pack_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves installed pack details for a company."""
         with db.get_connection() as conn:

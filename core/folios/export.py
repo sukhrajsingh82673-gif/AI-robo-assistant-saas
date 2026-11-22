@@ -23,7 +23,7 @@ import time
 import zipfile
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.ports.kms import resolve_kms_provider
 from core.documents.versioning import get_document_version_payload
 from core.folios.merkle import (
@@ -124,9 +124,12 @@ if __name__ == "__main__":
 '''
 
 
+@tenant_scoped
 def generate_folio_export_pack(
     folio_id: str,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    company_id: Optional[str] = None,
 ) -> Tuple[str, str, int]:
     """Generates a standalone, self-verifying .zip folio export pack.
 
@@ -146,7 +149,12 @@ def generate_folio_export_pack(
         if not folio_row:
             raise ValueError(f"Folio {folio_id} not found")
 
-        f_id, tenant_id, company_id, f_type, title, subject_id, status, root, created_by, created_at, updated_at = folio_row
+        f_id, doc_tenant_id, doc_company_id, f_type, title, subject_id, status, root, created_by, created_at, updated_at = folio_row
+        if tenant_id is not None and doc_tenant_id != tenant_id:
+            raise ValueError(f"Folio {folio_id} does not belong to tenant {tenant_id}")
+        if company_id is not None and doc_company_id != company_id:
+            raise ValueError(f"Folio {folio_id} does not belong to company {company_id}")
+        tenant_id, company_id = doc_tenant_id, doc_company_id
 
         cur.execute(
             """
@@ -215,7 +223,10 @@ def generate_folio_export_pack(
         if e["entry_type"] == "DOCUMENT":
             doc_id = e["reference_id"]
             try:
-                meta, doc_bytes = get_document_version_payload(doc_id, verify_on_read=True)
+                meta, doc_bytes = get_document_version_payload(
+                    doc_id, verify_on_read=True,
+                    tenant_id=tenant_id, company_id=company_id,
+                )
                 doc_name = meta.get("storage_path", "").split("/")[-1] or f"{doc_id}.bin"
                 documents_to_include.append((f"documents/{doc_id}_{doc_name}", doc_bytes))
             except Exception:

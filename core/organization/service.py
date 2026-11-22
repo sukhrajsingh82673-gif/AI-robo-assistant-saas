@@ -337,6 +337,33 @@ class OrganizationService:
                 "updated_at": row[14],
             }
 
+    def get_ceo(self, tenant_id: str, company_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves the active CEO position for the company."""
+        with db.get_connection() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                SELECT position_id, tenant_id, company_id, department_id, title, level
+                FROM positions
+                WHERE tenant_id = ? AND company_id = ?
+                  AND (level = 'CEO' OR UPPER(title) IN ('CEO', 'CHIEF EXECUTIVE OFFICER', 'EXECUTIVE_CEO', 'EXEC_CEO'))
+                  AND is_active = 1
+                LIMIT 1
+                """,
+                (tenant_id, company_id),
+            )
+            row = c.fetchone()
+            if row:
+                return {
+                    "position_id": row[0],
+                    "tenant_id": row[1],
+                    "company_id": row[2],
+                    "department_id": row[3],
+                    "title": row[4],
+                    "level": row[5],
+                }
+            return None
+
     def list_positions(
         self,
         tenant_id: str,

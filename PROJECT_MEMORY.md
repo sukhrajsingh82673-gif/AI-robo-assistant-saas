@@ -139,8 +139,17 @@
   - Implemented `WorkflowEnginePort` (`core/ports/workflow.py`) with `WorkflowEngineResult`, `WorkflowRunSpec`, and `LocalWorkflowEngine`.
   - Authored migrations `0022_agent_runtime_and_tools.sql` in `common/` and `pg/` with fail-closed RLS and Rule 15 role protections.
   - Authored acceptance tests in `tests/test_agent_runtime.py` (9 passed). All 41 Step 2 tests passing in 7.18s.
-- [ ] **2F:** Work kernel: missions, projects, tasks, inbox
-- [ ] **2F:** Work kernel: missions, projects, tasks, inbox
+- [x] **2F:** Work kernel: missions, projects, tasks, inbox
+  - Authored schema migrations `migrations/common/0023_work_kernel.sql` and `migrations/pg/0023_work_kernel.sql` with fail-closed RLS on all 6 tables (`work_missions`, `work_projects`, `work_tasks`, `task_dependencies`, `task_events`, `human_inbox`) and Rule 15 role protections revoking mutations on `human_inbox` decisions from `zonata_agent_role`.
+  - Implemented 7-state task machine (`core/work/state_machine.py`) with strict lifecycle transitions (`PROPOSED → ASSIGNED → ACCEPTED → IN_PROGRESS → SUBMITTED → VERIFYING → COMPLETED`, `REJECTED`, `BLOCKED`, `CANCELLED`).
+  - Enforced Rule 17: 'Done' is a claim, not a fact. Assignee can never complete its own task (`AssigneeSelfCompletionForbiddenError`); tasks complete only via independent verification.
+  - Implemented Kahn's DAG cycle detection (`core/work/dag.py`) and prerequisite task completion gating (`PrerequisiteNotCompletedError`).
+  - Implemented deterministic candidate assignment engine (`core/work/assignment.py`) evaluating authority limits, autonomy trust levels, active queue depth, cost, and historical pass rate.
+  - Built durable human inbox & notification engine (`core/work/inbox.py`) surviving restarts and dispatching notifications via `EmailOutPort`.
+  - Built SLA timers & 3-tier escalation ladder (`core/work/sla.py`) with controllable clock (`ClockManager.controllable_clock`), escalating up the reporting hierarchy: Supervisor position -> CEO position -> Owner.
+  - Implemented unified workforce work service (`core/work/service.py`) and REST APIs in `core/workforce_api.py` (`POST /api/workforce/missions`, `projects`, `tasks`, `/assign`, `/accept`, `/start`, `/submit`, `/verify`, `/reassign`, `/cancel`, `GET /api/workforce/inbox`, `/acknowledge`, `/resolve`).
+  - Gated capability reality checks: tasks requiring unconfigured or unbuilt capabilities transition to `BLOCKED` with code `CAPABILITY_NOT_LIVE`.
+  - Authored acceptance tests in `tests/test_work_kernel.py` (10 passed). All 51 Step 2 tests passing in 14.42s.
 - [ ] **2G:** SOP executor
 - [ ] **2H:** Verification pyramid
 - [ ] **2I:** KPI engine and goal engine

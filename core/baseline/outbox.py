@@ -13,7 +13,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import uuid
 
-from core.db import db
+from core.db import db, tenant_scoped
 
 logger = logging.getLogger("zonata.baseline.outbox")
 
@@ -97,6 +97,7 @@ class DurableOutbox:
         self._handlers[topic] = [h for h in self._handlers[topic] if h[0] != key]
         self._handlers[topic].append((key, handler))
 
+    @tenant_scoped
     def enqueue(
         self,
         tenant_id: str,
@@ -163,6 +164,7 @@ class DurableOutbox:
             with self.db_conn_factory() as c:
                 return _do_insert(c)
 
+    @tenant_scoped
     def drain(
         self,
         worker_id: str,
@@ -307,7 +309,13 @@ class DurableOutbox:
 
             return processed_count
 
-    def get_event(self, event_id: str) -> Optional[OutboxEventRecord]:
+    @tenant_scoped
+    def get_event(
+        self,
+        event_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Optional[OutboxEventRecord]:
         """Fetches an outbox event by ID."""
         with self.db_conn_factory() as conn:
             cur = conn.cursor()
@@ -318,8 +326,10 @@ class DurableOutbox:
                        locked_by, locked_until, dispatched_at, created_at
                 FROM outbox_events
                 WHERE id = ?
+                  AND (tenant_id = ? OR ? IS NULL)
+                  AND (company_id = ? OR ? IS NULL)
                 """,
-                (event_id,),
+                (event_id, tenant_id, tenant_id, company_id, company_id),
             )
             r = cur.fetchone()
             if not r:

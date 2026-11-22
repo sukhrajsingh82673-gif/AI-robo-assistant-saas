@@ -15,7 +15,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped
 from core.evidence_ledger import EvidenceLedger
 from core.documents.evidence import seal_document_event
 from core.ports.storage import resolve_storage_provider
@@ -42,6 +42,7 @@ class FolioManager:
         ensure_folio_tables()
         self.ledger = ledger or EvidenceLedger()
 
+    @tenant_scoped
     def create_folio(
         self,
         tenant_id: str,
@@ -85,6 +86,7 @@ class FolioManager:
 
         return folio_id
 
+    @tenant_scoped
     def add_entry(
         self,
         folio_id: str,
@@ -93,6 +95,8 @@ class FolioManager:
         title: str,
         payload: Dict[str, Any],
         author_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Tuple[str, str, int]:
         """Appends an immutable entry to the folio timeline and recalculates the Merkle root.
 
@@ -112,7 +116,12 @@ class FolioManager:
             if not folio_row:
                 raise ValueError(f"Folio {folio_id} not found")
 
-            tenant_id, company_id, status = folio_row
+            doc_tenant_id, doc_company_id, status = folio_row
+            if tenant_id is not None and doc_tenant_id != tenant_id:
+                raise ValueError(f"Folio {folio_id} does not belong to tenant {tenant_id}")
+            if company_id is not None and doc_company_id != company_id:
+                raise ValueError(f"Folio {folio_id} does not belong to company {company_id}")
+            tenant_id, company_id = doc_tenant_id, doc_company_id
             if status in (FolioStatus.EXPUNGED.value, FolioStatus.CLOSED.value):
                 raise ValueError(f"Cannot add entry to folio {folio_id} in {status} status")
 
@@ -151,7 +160,9 @@ class FolioManager:
             )
 
         # Recalculate folio Merkle root
-        new_root = recompute_folio_merkle_root(folio_id)
+        new_root = recompute_folio_merkle_root(
+            folio_id, tenant_id=tenant_id, company_id=company_id
+        )
 
         # Seal in evidence ledger
         seal_document_event(
@@ -172,12 +183,15 @@ class FolioManager:
 
         return entry_id, entry_hash, next_seq
 
+    @tenant_scoped
     def transition_status(
         self,
         folio_id: str,
         new_status: FolioStatus,
         actor_id: str,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> None:
         """Transitions folio to new status following strict state machine rules."""
         now = time.time()
@@ -191,7 +205,12 @@ class FolioManager:
             if not row:
                 raise ValueError(f"Folio {folio_id} not found")
 
-            tenant_id, company_id, current_status_str = row
+            doc_tenant_id, doc_company_id, current_status_str = row
+            if tenant_id is not None and doc_tenant_id != tenant_id:
+                raise ValueError(f"Folio {folio_id} does not belong to tenant {tenant_id}")
+            if company_id is not None and doc_company_id != company_id:
+                raise ValueError(f"Folio {folio_id} does not belong to company {company_id}")
+            tenant_id, company_id = doc_tenant_id, doc_company_id
             current_status = FolioStatus(current_status_str)
 
             allowed = ALLOWED_TRANSITIONS.get(current_status, set())
@@ -239,7 +258,13 @@ class FolioManager:
             }
         )
 
-    def get_folio(self, folio_id: str) -> Optional[Dict[str, Any]]:
+    @tenant_scoped
+    def get_folio(
+        self,
+        folio_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Retrieves folio record and current Merkle root."""
         with db.get_connection() as conn:
             cur = conn.cursor()
@@ -254,6 +279,10 @@ class FolioManager:
             )
             row = cur.fetchone()
             if not row:
+                return None
+            if tenant_id is not None and row[1] != tenant_id:
+                return None
+            if company_id is not None and row[2] != company_id:
                 return None
 
             cur.execute("SELECT COUNT(*) FROM folio_entries WHERE folio_id = ?", (folio_id,))
@@ -278,7 +307,13 @@ class FolioManager:
                 "entry_count": entry_count,
             }
 
-    def list_entries(self, folio_id: str) -> List[Dict[str, Any]]:
+    @tenant_scoped
+    def list_entries(
+        self,
+        folio_id: str,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Lists all timeline entries for a folio in chronological order."""
         with db.get_connection() as conn:
             cur = conn.cursor()
@@ -288,9 +323,11 @@ class FolioManager:
                        payload_json, author_id, sequence_number, entry_hash, created_at
                 FROM folio_entries
                 WHERE folio_id = ?
+                  AND (tenant_id = ? OR ? IS NULL)
+                  AND (company_id = ? OR ? IS NULL)
                 ORDER BY sequence_number ASC
                 """,
-                (folio_id,)
+                (folio_id, tenant_id, tenant_id, company_id, company_id)
             )
             rows = cur.fetchall()
 
@@ -310,23 +347,40 @@ class FolioManager:
                 for r in rows
             ]
 
-    def export_pack(self, folio_id: str, output_dir: Optional[str] = None) -> Tuple[str, str, int]:
+    @tenant_scoped
+    def export_pack(
+        self,
+        folio_id: str,
+        output_dir: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> Tuple[str, str, int]:
         """Exports self-verifying standalone .zip pack for the folio."""
-        return generate_folio_export_pack(folio_id, output_dir=output_dir)
+        return generate_folio_export_pack(
+            folio_id,
+            output_dir=output_dir,
+            tenant_id=tenant_id,
+            company_id=company_id,
+        )
 
+    @tenant_scoped
     def expunge_folio(
         self,
         folio_id: str,
         actor_id: str,
-        force: bool = False
+        force: bool = False,
+        tenant_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Executes deletion drill: exports pack, verifies pack, seals pack hash, and expunges DB rows and blobs.
 
         The exported .zip pack remains the sovereign audit record.
         """
-        folio = self.get_folio(folio_id)
+        folio = self.get_folio(folio_id, tenant_id=tenant_id, company_id=company_id)
         if not folio:
             raise ValueError(f"Folio {folio_id} not found")
+        tenant_id = tenant_id or folio["tenant_id"]
+        company_id = company_id or folio["company_id"]
 
         current_status = FolioStatus(folio["status"])
         if current_status not in (FolioStatus.CLOSED, FolioStatus.ARCHIVED) and not force:
@@ -335,7 +389,9 @@ class FolioManager:
             )
 
         # 1. Export pack
-        zip_path, pack_sha, pack_size = self.export_pack(folio_id)
+        zip_path, pack_sha, pack_size = self.export_pack(
+            folio_id, tenant_id=tenant_id, company_id=company_id
+        )
 
         # 2. Standalone verification before expunging
         is_valid, status_msg, report = verify_export_pack_file(zip_path)
