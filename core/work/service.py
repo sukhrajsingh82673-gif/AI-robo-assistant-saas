@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.ports.base import capability_truth_table
 from core.evidence_service import evidence_service
 from core.work.types import (
@@ -36,6 +36,7 @@ from core.work.sla import ClockManager
 logger = logging.getLogger("zonata.work.service")
 
 
+@tenant_scoped_class
 class WorkforceWorkService:
     """
     Authoritative service orchestrating the multi-tenant work kernel.

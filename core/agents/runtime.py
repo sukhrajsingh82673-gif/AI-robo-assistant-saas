@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel, ValidationError
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.action_envelope import ActionEnvelope
 from core.action_gateway import action_gateway, ActionGatewayRejection
 from core.authority.types import ActionClass, PrincipalType, AutonomyLevel
@@ -47,6 +47,7 @@ class AgentRunStatus:
     HALTED_AUTHORITY_DENIED = "HALTED_AUTHORITY_DENIED"
 
 
+@tenant_scoped_class
 class ZonataAgentRuntime:
     """Sovereign Agent Execution Kernel.
 

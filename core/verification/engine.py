@@ -10,7 +10,7 @@ import json
 import uuid
 from typing import Dict, Any, List, Optional
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.evidence_service import evidence_service
 from core.work.service import workforce_work_service
 from core.work.types import TaskStatus, AssigneeSelfCompletionForbiddenError
@@ -35,6 +35,7 @@ from core.verification.layers import (
 from core.verification.sampling import SpotCheckSampler
 
 
+@tenant_scoped_class
 class VerificationEngine:
     """
     Five-layer progressive verification engine enforcing Rule 17.

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import uuid
 import yaml
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.evals.types import (
     RULE_21_DISCLAIMER,
     EvalTask,
@@ -34,6 +34,7 @@ class EvalThresholdFailedError(Exception):
     pass
 
 
+@tenant_scoped_class
 class EvalHarness:
     """Executes golden eval tasks per department, measuring protocol accuracy, latency, and cost."""
 

@@ -11,7 +11,7 @@ import json
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.evidence_service import evidence_service
 from core.tools import tool_registry
 from core.sop.types import (
@@ -95,6 +95,7 @@ class SOPConditionEvaluator:
         return True, "Default pass"
 
 
+@tenant_scoped_class
 class SOPExecutor:
     """
     Step-by-step verified execution kernel for SOP playbooks.

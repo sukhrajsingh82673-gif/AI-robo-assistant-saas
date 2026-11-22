@@ -338,9 +338,13 @@ def test_04_missing_computation_proof_fails_closed():
             def compute_metric(cls, *args, **kwargs):
                 return 10.0, {"mock": True}, ""
 
-        orig_calc = kpi_engine.compute_kpi_snapshot.__globals__["KPICalculator"]
+        import core.kpi.engine as kpi_engine_module
+        orig_calc = getattr(kpi_engine_module, "KPICalculator")
         try:
-            kpi_engine.compute_kpi_snapshot.__globals__["KPICalculator"] = MockCalculator
+            kpi_engine_module.KPICalculator = MockCalculator
+            fn = getattr(kpi_engine.compute_kpi_snapshot, "__wrapped__", kpi_engine.compute_kpi_snapshot)
+            if hasattr(fn, "__globals__") and "KPICalculator" in fn.__globals__:
+                fn.__globals__["KPICalculator"] = MockCalculator
             req = KPIDefinitionCreateRequest(
                 code="FAIL_PROOF_KPI",
                 name="Proof Guard KPI",
@@ -353,7 +357,10 @@ def test_04_missing_computation_proof_fails_closed():
             kpi_def = kpi_engine.register_kpi(TENANT_ID, COMPANY_ID, req)
             kpi_engine.compute_kpi_snapshot(TENANT_ID, COMPANY_ID, kpi_def["id"])
         finally:
-            kpi_engine.compute_kpi_snapshot.__globals__["KPICalculator"] = orig_calc
+            kpi_engine_module.KPICalculator = orig_calc
+            fn = getattr(kpi_engine.compute_kpi_snapshot, "__wrapped__", kpi_engine.compute_kpi_snapshot)
+            if hasattr(fn, "__globals__") and "KPICalculator" in fn.__globals__:
+                fn.__globals__["KPICalculator"] = orig_calc
 
 
 def test_05_position_coaching_prompt_clustering():

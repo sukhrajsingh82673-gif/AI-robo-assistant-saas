@@ -10,7 +10,7 @@ import time
 import uuid
 from typing import Dict, Any, Optional
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.evidence_service import evidence_service
 from core.work.inbox import human_inbox_service, InboxItemType
 from core.executive.types import (
@@ -22,6 +22,7 @@ from core.executive.types import (
 )
 
 
+@tenant_scoped_class
 class WorkforceTrustService:
     """
     Manages employee trust levels, promotion thresholds, automatic demotions,

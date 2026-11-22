@@ -12,7 +12,7 @@ import uuid
 from typing import Dict, Any, List, Optional, Set
 from collections import defaultdict, deque
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.ports.base import capability_truth_table
 from core.work import workforce_work_service
 from core.executive.types import (
@@ -144,6 +144,7 @@ class PlanValidator:
         return reasons
 
 
+@tenant_scoped_class
 class CEOPlanner:
     """
     Translates validated Directives into execution graphs of missions, projects, and tasks.

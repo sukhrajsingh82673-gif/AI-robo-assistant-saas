@@ -11,7 +11,7 @@ import uuid
 import datetime
 from typing import Dict, Any, List, Optional
 
-from core.db import db, tenant_scope, tenant_scoped_class
+from core.db import db, tenant_scope
 from core.evidence_service import evidence_service
 from core.work.inbox import human_inbox_service, InboxItemType
 from core.kpi.types import (
@@ -29,7 +29,6 @@ from core.kpi.types import (
 from core.kpi.calculator import KPICalculator
 
 
-@tenant_scoped_class
 class KPIEngine:
     """
     Manages KPI hierarchy, deterministic calculations, snapshot proofs,

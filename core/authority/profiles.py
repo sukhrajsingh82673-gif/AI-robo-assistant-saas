@@ -100,7 +100,7 @@ class AuthorityProfileManager:
         modify_sops = can_modify_sops if can_modify_sops is not None else std["can_modify_sops"]
 
         now = time.time()
-        profile_id = f"prof_{principal_id}"
+        profile_id = f"prof_{tenant_id}_{company_id}_{principal_id}"
 
         with db.get_connection() as conn:
             cur = conn.cursor()
