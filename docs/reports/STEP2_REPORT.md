@@ -759,3 +759,14 @@ Command: `python3 -m pytest tests/test_step2_preflight.py tests/test_llm_gateway
 - [x] HTTP workforce API handles end-to-end task lifecycle and refuses self-verification with HTTP 403 (`test_09_workforce_http_api_lifecycle`).
 - [x] Rule 8 mutation checks verify that acceptance tests fail when invariants are broken (`test_10_mutation_checks`).
 
+#### 2.4 Sub-Step 2F CI Run Verification
+- **Run ID:** `44978052207`
+- **Run URL:** [https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44978052207](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/44978052207)
+- **Branch:** `step2-intelligence-execution`
+- **Head Commit:** `c63db83`
+- **Status:** **`SUCCESS` across all three jobs**:
+  - `Job 1: PostgreSQL 16 & Service Containers Contract Tests (2m50s)` — ID `137072249885`
+  - `Job 2: Supply Chain, SBOM, License & Image Pinning Audit (2m18s)` — ID `137072250129`
+  - `Job 3: SQLite Dev Profile Test Suite (3m16s)` — ID `137072250132`
+
+

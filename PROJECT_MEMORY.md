@@ -150,6 +150,7 @@
   - Implemented unified workforce work service (`core/work/service.py`) and REST APIs in `core/workforce_api.py` (`POST /api/workforce/missions`, `projects`, `tasks`, `/assign`, `/accept`, `/start`, `/submit`, `/verify`, `/reassign`, `/cancel`, `GET /api/workforce/inbox`, `/acknowledge`, `/resolve`).
   - Gated capability reality checks: tasks requiring unconfigured or unbuilt capabilities transition to `BLOCKED` with code `CAPABILITY_NOT_LIVE`.
   - Authored acceptance tests in `tests/test_work_kernel.py` (10 passed). All 51 Step 2 tests passing in 14.42s.
+  - Verified in CI Run `44978052207` (100% green across all 3 jobs).
 - [ ] **2G:** SOP executor
 - [ ] **2H:** Verification pyramid
 - [ ] **2I:** KPI engine and goal engine

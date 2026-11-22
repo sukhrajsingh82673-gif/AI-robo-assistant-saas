@@ -329,6 +329,8 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_alpha_id,
+        tenant_id=tenant_alpha,
+        company_id=company_alpha,
         entry_type=FolioEntryType.DOCUMENT,
         reference_id=ingested_alpha["clean_contract.pdf"].document_id,
         title="Executed Master Services Agreement",
@@ -337,6 +339,8 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_alpha_id,
+        tenant_id=tenant_alpha,
+        company_id=company_alpha,
         entry_type=FolioEntryType.COMMUNICATION,
         reference_id="comm_deal_approval_email",
         title="Procurement Approval Confirmation",
@@ -345,13 +349,18 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_alpha_id,
+        tenant_id=tenant_alpha,
+        company_id=company_alpha,
         entry_type=FolioEntryType.TASK,
         reference_id="task_soc2_review",
         title="Security & Compliance Review Signoff",
         payload={"reviewer": "ciso", "status": "APPROVED"},
         author_id="user_alpha_admin",
     )
-    folio_mgr.transition_status(folio_alpha_id, FolioStatus.ACTIVE, actor_id="user_alpha_admin")
+    folio_mgr.transition_status(
+        folio_alpha_id, FolioStatus.ACTIVE, actor_id="user_alpha_admin",
+        tenant_id=tenant_alpha, company_id=company_alpha,
+    )
 
     # Patient-Engagement Folio for Tenant Beta
     folio_beta_id = folio_mgr.create_folio(
@@ -364,6 +373,8 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_beta_id,
+        tenant_id=tenant_beta,
+        company_id=company_beta,
         entry_type=FolioEntryType.DOCUMENT,
         reference_id=ingested_beta["clean_contract.pdf"].document_id,
         title="Patient Intake & Consent Form",
@@ -372,6 +383,8 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_beta_id,
+        tenant_id=tenant_beta,
+        company_id=company_beta,
         entry_type=FolioEntryType.COMMUNICATION,
         reference_id="comm_telehealth_consult",
         title="Telehealth Physician Consultation Notes",
@@ -380,16 +393,25 @@ def run_scenario() -> Dict[str, Any]:
     )
     folio_mgr.add_entry(
         folio_id=folio_beta_id,
+        tenant_id=tenant_beta,
+        company_id=company_beta,
         entry_type=FolioEntryType.TASK,
         reference_id="task_prescription_dispatch",
         title="Pharmacy Prescription Dispatch",
         payload={"pharmacy": "Central Health Rx", "rx_id": "RX-8821"},
         author_id="user_beta_admin",
     )
-    folio_mgr.transition_status(folio_beta_id, FolioStatus.ACTIVE, actor_id="user_beta_admin")
+    folio_mgr.transition_status(
+        folio_beta_id, FolioStatus.ACTIVE, actor_id="user_beta_admin",
+        tenant_id=tenant_beta, company_id=company_beta,
+    )
 
-    fol_a = folio_mgr.get_folio(folio_alpha_id)
-    fol_b = folio_mgr.get_folio(folio_beta_id)
+    fol_a = folio_mgr.get_folio(
+        folio_alpha_id, tenant_id=tenant_alpha, company_id=company_alpha
+    )
+    fol_b = folio_mgr.get_folio(
+        folio_beta_id, tenant_id=tenant_beta, company_id=company_beta
+    )
 
     print(f"  [+] Built Deal Folio {folio_alpha_id} (Entries: {fol_a['entry_count']}, Merkle Root: {fol_a['merkle_root'][:16]}...)")
     print(f"  [+] Built Patient Folio {folio_beta_id} (Entries: {fol_b['entry_count']}, Merkle Root: {fol_b['merkle_root'][:16]}...)")
@@ -407,12 +429,18 @@ def run_scenario() -> Dict[str, Any]:
     temp_export_dir = tempfile.mkdtemp(prefix="zonata_step1_export_")
     try:
         # Export Alpha
-        zip_alpha, sha_alpha, size_alpha = generate_folio_export_pack(folio_alpha_id, output_dir=temp_export_dir)
+        zip_alpha, sha_alpha, size_alpha = generate_folio_export_pack(
+            folio_alpha_id, output_dir=temp_export_dir,
+            tenant_id=tenant_alpha, company_id=company_alpha,
+        )
         is_valid_a, msg_a, _ = verify_export_pack_file(zip_alpha)
         assert is_valid_a and msg_a == "VERIFIED", f"Alpha export pack verification failed: {msg_a}"
 
         # Export Beta
-        zip_beta, sha_beta, size_beta = generate_folio_export_pack(folio_beta_id, output_dir=temp_export_dir)
+        zip_beta, sha_beta, size_beta = generate_folio_export_pack(
+            folio_beta_id, output_dir=temp_export_dir,
+            tenant_id=tenant_beta, company_id=company_beta,
+        )
         is_valid_b, msg_b, _ = verify_export_pack_file(zip_beta)
         assert is_valid_b and msg_b == "VERIFIED", f"Beta export pack verification failed: {msg_b}"
 

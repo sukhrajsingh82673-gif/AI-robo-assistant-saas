@@ -85,7 +85,7 @@ class TestAlwaysOnBaseline(unittest.TestCase):
         )
         self.assertEqual(ev1, ev2)
 
-        record = self.outbox.get_event(ev1)
+        record = self.outbox.get_event(ev1, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertIsNotNone(record)
         self.assertEqual(record.status, OutboxStatus.PENDING)
         self.assertEqual(record.payload["email_to"], "audit@acme.corp")
@@ -107,11 +107,11 @@ class TestAlwaysOnBaseline(unittest.TestCase):
             payload={"msg": "Hello"},
         )
 
-        drained = self.outbox.drain(worker_id="worker_test_1", batch_size=10)
+        drained = self.outbox.drain(tenant_id=self.tenant_a, company_id=self.company_a, worker_id="worker_test_1", batch_size=10)
         self.assertEqual(drained, 1)
         self.assertIn(ev_id, dispatched_events)
 
-        rec = self.outbox.get_event(ev_id)
+        rec = self.outbox.get_event(ev_id, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertIsNotNone(rec)
         self.assertEqual(rec.status, OutboxStatus.DISPATCHED)
         self.assertIsNotNone(rec.dispatched_at)
@@ -136,8 +136,8 @@ class TestAlwaysOnBaseline(unittest.TestCase):
         )
 
         # Attempt 1 -> fails -> status FAILED, attempts=1
-        self.outbox.drain(worker_id="worker_retry", lease_seconds=1.0)
-        rec = self.outbox.get_event(ev_id)
+        self.outbox.drain(tenant_id=self.tenant_a, company_id=self.company_a, worker_id="worker_retry", lease_seconds=1.0)
+        rec = self.outbox.get_event(ev_id, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertEqual(rec.status, OutboxStatus.FAILED)
         self.assertEqual(rec.attempts, 1)
         self.assertIn("Simulated external provider crash", rec.last_error)
@@ -150,8 +150,8 @@ class TestAlwaysOnBaseline(unittest.TestCase):
 
         # Attempts 2, 3, 4
         for expected_attempts in [2, 3, 4]:
-            self.outbox.drain(worker_id="worker_retry", lease_seconds=1.0)
-            rec = self.outbox.get_event(ev_id)
+            self.outbox.drain(tenant_id=self.tenant_a, company_id=self.company_a, worker_id="worker_retry", lease_seconds=1.0)
+            rec = self.outbox.get_event(ev_id, tenant_id=self.tenant_a, company_id=self.company_a)
             self.assertEqual(rec.status, OutboxStatus.FAILED)
             self.assertEqual(rec.attempts, expected_attempts)
             with db.get_connection() as conn:
@@ -160,8 +160,8 @@ class TestAlwaysOnBaseline(unittest.TestCase):
                 conn.commit()
 
         # Attempt 5 -> Final failure -> moves to DEAD_LETTER
-        self.outbox.drain(worker_id="worker_retry", lease_seconds=1.0)
-        rec = self.outbox.get_event(ev_id)
+        self.outbox.drain(tenant_id=self.tenant_a, company_id=self.company_a, worker_id="worker_retry", lease_seconds=1.0)
+        rec = self.outbox.get_event(ev_id, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertEqual(rec.status, OutboxStatus.DEAD_LETTER)
         self.assertEqual(rec.attempts, 5)
 
@@ -197,11 +197,11 @@ class TestAlwaysOnBaseline(unittest.TestCase):
             conn.commit()
 
         # Worker 2 comes online and drains: reclaims the abandoned event
-        drained = self.outbox.drain(worker_id="survivor_worker_node", lease_seconds=30.0)
+        drained = self.outbox.drain(tenant_id=self.tenant_a, company_id=self.company_a, worker_id="survivor_worker_node", lease_seconds=30.0)
         self.assertEqual(drained, 1)
         self.assertEqual(execution_count, 1)
 
-        rec = self.outbox.get_event(ev_id)
+        rec = self.outbox.get_event(ev_id, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertEqual(rec.status, OutboxStatus.DISPATCHED)
 
     # =========================================================================
@@ -224,11 +224,13 @@ class TestAlwaysOnBaseline(unittest.TestCase):
             first_run_delay_seconds=-5.0,  # Due immediately
         )
 
-        ran = self.scheduler.tick(node_id="leader_node_1")
+        ran = self.scheduler.tick(
+            node_id="leader_node_1", tenant_id=self.tenant_a, company_id=self.company_a
+        )
         self.assertGreaterEqual(ran, 1)
         self.assertIn("daily_compliance_sweep", job_runs)
 
-        rec = self.scheduler.get_job(job_id)
+        rec = self.scheduler.get_job(job_id, tenant_id=self.tenant_a, company_id=self.company_a)
         self.assertIsNotNone(rec)
         self.assertEqual(rec.status, JobStatus.IDLE)
         # Next run is monotonically in the future
