@@ -22,6 +22,14 @@ def ensure_agent_runtime_tables(conn: Optional[Any] = None) -> None:
 
     if conn is not None:
         if hasattr(conn, "executescript") and getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
+            try:
+                cur = conn.execute("PRAGMA table_info(agent_certifications)")
+                cols = [r[1] for r in cur.fetchall()]
+                if cols and "company_id" not in cols:
+                    conn.execute("ALTER TABLE agent_certifications ADD COLUMN company_id TEXT")
+                    conn.commit()
+            except Exception:
+                pass
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
                 conn.executescript(sql_path.read_text(encoding="utf-8"))
@@ -33,6 +41,14 @@ def ensure_agent_runtime_tables(conn: Optional[Any] = None) -> None:
 
     with db.get_connection() as connection:
         if getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
+            try:
+                cur = connection.execute("PRAGMA table_info(agent_certifications)")
+                cols = [r[1] for r in cur.fetchall()]
+                if cols and "company_id" not in cols:
+                    connection.execute("ALTER TABLE agent_certifications ADD COLUMN company_id TEXT")
+                    connection.commit()
+            except Exception:
+                pass
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
                 connection.executescript(sql_path.read_text(encoding="utf-8"))

@@ -12,7 +12,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from core.db import db, DatabaseDialect
+from core.db import db, DatabaseDialect, tenant_scoped_class
 from core.evidence_service import evidence_service
 from core.organization.types import (
     OrgLevel,
@@ -33,6 +33,7 @@ from core.organization.pack_roles import resolve_org_template_for_pack
 logger = logging.getLogger("zonata.organization")
 
 
+@tenant_scoped_class
 class OrganizationService:
     """Enterprise organizational model and hierarchy controller."""
 

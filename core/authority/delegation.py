@@ -8,7 +8,7 @@ import time
 import uuid
 from typing import Dict, Any, Optional, List
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.authority.types import (
     DelegationAuthorityExceededError,
     DelegationRevokedError,
@@ -21,6 +21,7 @@ from core.authority.profiles import authority_profile_manager
 logger = logging.getLogger("zonata.authority.delegation")
 
 
+@tenant_scoped_class
 class DelegationManager:
     """Manages time-bound, revocable, scoped delegations bounded by delegator authority."""
 

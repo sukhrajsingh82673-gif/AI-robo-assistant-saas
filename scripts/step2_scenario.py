@@ -32,7 +32,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from core.db import db, DatabaseDialect
+from core.db import db, DatabaseDialect, tenant_scope
 from core.documents.schema import ensure_document_backbone_tables
 from core.folios.schema import ensure_folio_tables
 from core.folios.manager import FolioManager
@@ -134,6 +134,11 @@ def run_scenario() -> Dict[str, Any]:
         "stages": {},
     }
 
+    with tenant_scope(tenant_id, company_id):
+        return _run_scenario_stages(run_id, tenant_id, company_id, scorecard)
+
+
+def _run_scenario_stages(run_id: str, tenant_id: str, company_id: str, scorecard: Dict[str, Any]) -> Dict[str, Any]:
     # Seed baseline tenant and company in database if not present
     with db.get_connection() as conn:
         conn.execute(

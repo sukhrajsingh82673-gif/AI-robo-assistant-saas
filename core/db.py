@@ -53,7 +53,40 @@ def tenant_scoped(func):
             return func(*args, **kwargs)
         with tenant_scope(tenant_id, company_id):
             return func(*args, **kwargs)
+    wrapper._tenant_scoped = True
     return wrapper
+
+
+def tenant_scoped_class(cls):
+    """Bind RLS context for every class method that accepts tenant_id.
+
+    This is a safety net for service classes where threading tenant_id through
+    every internal call would be error-prone. Methods already decorated are
+    left untouched. ``tenant_scoped`` itself is a no-op unless the caller
+    supplies tenant_id, so SQLite behavior is unchanged.
+    """
+    for name, attr in list(vars(cls).items()):
+        if name.startswith("__") or name.startswith("_tenant_"):
+            continue
+        if isinstance(attr, classmethod):
+            fn = attr.__func__
+            if _tenant_accepting(fn) and not getattr(fn, "_tenant_scoped", False):
+                setattr(cls, name, classmethod(tenant_scoped(fn)))
+        elif isinstance(attr, staticmethod):
+            fn = attr.__func__
+            if _tenant_accepting(fn) and not getattr(fn, "_tenant_scoped", False):
+                setattr(cls, name, staticmethod(tenant_scoped(fn)))
+        elif callable(attr):
+            if _tenant_accepting(attr) and not getattr(attr, "_tenant_scoped", False):
+                setattr(cls, name, tenant_scoped(attr))
+    return cls
+
+
+def _tenant_accepting(func) -> bool:
+    try:
+        return "tenant_id" in inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
 
 # Automatically load Neon environment configuration (.env.local / .env)
 try:

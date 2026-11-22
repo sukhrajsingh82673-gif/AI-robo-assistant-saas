@@ -10,7 +10,7 @@ import json
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 
-from core.db import db
+from core.db import db, tenant_scope
 from core.kpi.types import (
     KPIMetricType,
     KPIScopeLevel,
@@ -38,21 +38,22 @@ class KPICalculator:
         Computes metric value, computation proof dictionary, and inputs_hash.
         Returns: (computed_value, proof_dict, inputs_hash)
         """
-        with db.get_connection() as conn:
-            if metric_type == KPIMetricType.TASK_DURATION:
-                return cls._compute_task_duration(conn, tenant_id, company_id, scope_level, scope_id)
-            elif metric_type == KPIMetricType.PRODUCTIVITY:
-                return cls._compute_productivity(conn, tenant_id, company_id, scope_level, scope_id)
-            elif metric_type == KPIMetricType.PASS_RATE:
-                return cls._compute_pass_rate(conn, tenant_id, company_id, scope_level, scope_id)
-            elif metric_type == KPIMetricType.COST_PER_MISSION:
-                return cls._compute_cost_per_mission(conn, tenant_id, company_id, scope_level, scope_id)
-            elif metric_type == KPIMetricType.DEFECT_RATE:
-                return cls._compute_defect_rate(conn, tenant_id, company_id, scope_level, scope_id)
-            elif metric_type == KPIMetricType.LEDGER_BALANCE:
-                return cls._compute_ledger_balance(conn, tenant_id, company_id, scope_level, scope_id)
-            else:
-                raise InvalidKPIComputationError(f"Unsupported metric type: {metric_type}")
+        with tenant_scope(tenant_id, company_id):
+            with db.get_connection() as conn:
+                if metric_type == KPIMetricType.TASK_DURATION:
+                    return cls._compute_task_duration(conn, tenant_id, company_id, scope_level, scope_id)
+                elif metric_type == KPIMetricType.PRODUCTIVITY:
+                    return cls._compute_productivity(conn, tenant_id, company_id, scope_level, scope_id)
+                elif metric_type == KPIMetricType.PASS_RATE:
+                    return cls._compute_pass_rate(conn, tenant_id, company_id, scope_level, scope_id)
+                elif metric_type == KPIMetricType.COST_PER_MISSION:
+                    return cls._compute_cost_per_mission(conn, tenant_id, company_id, scope_level, scope_id)
+                elif metric_type == KPIMetricType.DEFECT_RATE:
+                    return cls._compute_defect_rate(conn, tenant_id, company_id, scope_level, scope_id)
+                elif metric_type == KPIMetricType.LEDGER_BALANCE:
+                    return cls._compute_ledger_balance(conn, tenant_id, company_id, scope_level, scope_id)
+                else:
+                    raise InvalidKPIComputationError(f"Unsupported metric type: {metric_type}")
 
     @classmethod
     def _compute_task_duration(

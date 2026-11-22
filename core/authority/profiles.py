@@ -7,13 +7,14 @@ import logging
 import time
 from typing import Dict, Any, Optional
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.authority.types import ActionClass, PrincipalType, Rule15Violation, GOVERNED_PRINCIPAL_TYPES
 from core.workforce_architecture import GRADE_AUTHORITY, TIER_RANK
 
 logger = logging.getLogger("zonata.authority.profiles")
 
 
+@tenant_scoped_class
 class AuthorityProfileManager:
     """Manages and enforces corporate authority profiles across G1 to G9 tiers."""
 

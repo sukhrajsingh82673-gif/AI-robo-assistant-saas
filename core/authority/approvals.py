@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Dict, Any, Optional, Tuple, List
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.authority.types import (
     ActionClass,
     PrincipalType,
@@ -40,6 +40,7 @@ def compute_payload_digest(payload: Any) -> str:
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
+@tenant_scoped_class
 class ApprovalsManager:
     """Manages cryptographic approval requests, quorum chains, and payload digest verification."""
 

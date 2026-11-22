@@ -7,12 +7,13 @@ import logging
 import time
 from typing import Dict, Any, Optional, List
 
-from core.db import db
+from core.db import db, tenant_scoped_class
 from core.authority.types import PrincipalType, Rule15Violation, GOVERNED_PRINCIPAL_TYPES
 
 logger = logging.getLogger("zonata.authority.constitution")
 
 
+@tenant_scoped_class
 class ConstitutionManager:
     """Manages versioned corporate constitutions and evaluates constitutional prohibitions."""
 
