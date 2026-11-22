@@ -139,6 +139,11 @@ class KPIEngine:
                     "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ? AND company_id = ?",
                     (kpi_id, tenant_id, company_id)
                 ).fetchone()
+                if not row:
+                    row = conn.execute(
+                        "SELECT * FROM kpi_tree_definitions WHERE id = ? AND tenant_id = ?",
+                        (kpi_id, tenant_id)
+                    ).fetchone()
             if not row:
                 raise KPINotFoundError(f"KPI definition '{kpi_id}' not found.")
             return dict(row)

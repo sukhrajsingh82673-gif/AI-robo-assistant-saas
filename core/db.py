@@ -4762,6 +4762,8 @@ class PostgresConnectionWrapper:
         self.raw_conn = raw_conn
         self._pool = pool
         self._is_closed = False
+        self._applied_tenant = None
+        self._applied_company = None
         self._apply_rls_context()
 
     def _apply_rls_context(self) -> None:
@@ -4772,6 +4774,9 @@ class PostgresConnectionWrapper:
         """
         tenant_id = _current_tenant_id.get() or ""
         company_id = _current_company_id.get() or ""
+        if (getattr(self, "_applied_tenant", None) == tenant_id and
+            getattr(self, "_applied_company", None) == company_id):
+            return
         try:
             cursor = self.raw_conn.cursor()
             cursor.execute(
@@ -4783,6 +4788,8 @@ class PostgresConnectionWrapper:
                 cursor.close()
             except Exception:
                 pass
+            self._applied_tenant = tenant_id
+            self._applied_company = company_id
         except Exception:
             # RLS is fail-closed, so a missing context yields zero rows rather
             # than cross-tenant disclosure.
@@ -4802,6 +4809,7 @@ class PostgresConnectionWrapper:
     def execute(self, sql: str, params: Any = ()):
         if self._is_closed:
             raise RuntimeError("Cannot execute query on closed database connection.")
+        self._apply_rls_context()
         normalized_sql = self._normalize_sql(sql)
         if not normalized_sql:
             class DummyCursor:
@@ -4830,6 +4838,7 @@ class PostgresConnectionWrapper:
     def executemany(self, sql: str, params_seq: Any = ()):
         if self._is_closed:
             raise RuntimeError("Cannot execute query on closed database connection.")
+        self._apply_rls_context()
         normalized_sql = self._normalize_sql(sql)
         if not normalized_sql:
             class DummyCursor:
@@ -4882,6 +4891,7 @@ class PostgresConnectionWrapper:
     def cursor(self):
         if self._is_closed:
             raise RuntimeError("Cannot create cursor on closed database connection.")
+        self._apply_rls_context()
         try:
             import psycopg2.extras
             raw_cur = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
