@@ -11,9 +11,11 @@ import re
 import time
 import json
 import uuid
+import numbers
+import decimal
 from typing import Dict, Any, List, Set, Optional
 
-from core.db import db
+from core.db import db, tenant_scope
 from core.executive.types import NumberLockViolationError
 
 
@@ -54,7 +56,7 @@ class NumberLockValidator:
         # Collect all valid numbers from facts
         valid_numbers: Set[float] = set()
         for v in facts.values():
-            if isinstance(v, (int, float)):
+            if isinstance(v, (int, float, decimal.Decimal, numbers.Number)):
                 fval = float(v)
                 valid_numbers.add(round(fval, 2))
                 # Also allow percentage representation (e.g. 0.95 -> 95.0)
@@ -62,11 +64,11 @@ class NumberLockValidator:
                     valid_numbers.add(round(fval * 100.0, 2))
             elif isinstance(v, list):
                 for item in v:
-                    if isinstance(item, (int, float)):
+                    if isinstance(item, (int, float, decimal.Decimal, numbers.Number)):
                         valid_numbers.add(round(float(item), 2))
             elif isinstance(v, dict):
                 for sub_v in v.values():
-                    if isinstance(sub_v, (int, float)):
+                    if isinstance(sub_v, (int, float, decimal.Decimal, numbers.Number)):
                         valid_numbers.add(round(float(sub_v), 2))
 
         narrative_numbers = cls.extract_numbers_from_text(narrative_text)
@@ -105,33 +107,34 @@ class CEOReportingService:
         """Collects verified factual metrics from stored database tables."""
         facts: Dict[str, Any] = {}
 
-        with db.get_connection() as conn:
-            # 1. Work tasks stats
-            t_rows = conn.execute(
-                """
-                SELECT count(*) as total_tasks,
-                       sum(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_tasks,
-                       sum(estimate_minor_units) as total_spend
-                FROM work_tasks WHERE tenant_id = ? AND company_id = ?
-                """,
-                (tenant_id, company_id)
-            ).fetchone()
-            if t_rows:
-                facts["total_tasks"] = t_rows["total_tasks"] or 0
-                facts["completed_tasks"] = t_rows["completed_tasks"] or 0
-                facts["total_spend_minor_units"] = t_rows["total_spend"] or 0
+        with tenant_scope(tenant_id, company_id):
+            with db.get_connection() as conn:
+                # 1. Work tasks stats
+                t_rows = conn.execute(
+                    """
+                    SELECT count(*) as total_tasks,
+                           sum(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_tasks,
+                           sum(estimate_minor_units) as total_spend
+                    FROM work_tasks WHERE tenant_id = ? AND company_id = ?
+                    """,
+                    (tenant_id, company_id)
+                ).fetchone()
+                if t_rows:
+                    facts["total_tasks"] = int(t_rows["total_tasks"]) if t_rows["total_tasks"] is not None else 0
+                    facts["completed_tasks"] = int(t_rows["completed_tasks"]) if t_rows["completed_tasks"] is not None else 0
+                    facts["total_spend_minor_units"] = int(t_rows["total_spend"]) if t_rows["total_spend"] is not None else 0
 
-            # 2. Latest KPI snapshots
-            kpi_rows = conn.execute(
-                """
-                SELECT kpi_id, current_value, target_value, status
-                FROM kpi_snapshots WHERE tenant_id = ? AND company_id = ?
-                ORDER BY computed_at DESC LIMIT 10
-                """,
-                (tenant_id, company_id)
-            ).fetchall()
-            for r in kpi_rows:
-                facts[f"kpi_{r['kpi_id']}"] = r["current_value"]
+                # 2. Latest KPI snapshots
+                kpi_rows = conn.execute(
+                    """
+                    SELECT kpi_id, current_value, target_value, status
+                    FROM kpi_snapshots WHERE tenant_id = ? AND company_id = ?
+                    ORDER BY computed_at DESC LIMIT 10
+                    """,
+                    (tenant_id, company_id)
+                ).fetchall()
+                for r in kpi_rows:
+                    facts[f"kpi_{r['kpi_id']}"] = float(r["current_value"]) if r["current_value"] is not None else 0.0
 
         return facts
 
