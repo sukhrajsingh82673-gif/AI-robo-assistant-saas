@@ -137,6 +137,30 @@ OK
 All 7 acceptance tests passed with 100% success.
 - **Authoritative CI Run:** [45105885119](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45105885119) (100% GREEN across SQLite Dev Profile 1m52s, PostgreSQL 16 & Service Containers 3m9s, and Supply Chain, SBOM & Gitleaks Audit 1m48s).
 
+---
+
+# Sub-Step 3E — Governed Browser Engine
+
+## 1. Overview
+Sub-Step 3E implements the Governed Browser Engine using Playwright under the unified `BrowserPort` architecture, fulfilling Rules 24, 25, 26, and 32:
+- **Unified Port Architecture (`BrowserPort`):** Provider-agnostic browser interface with `PlaywrightBrowserProvider`, `SandboxBrowserProvider`, and `NotConfiguredBrowserProvider`.
+- **Untrusted Page Content Boundary (Rule 26):** All page text, DOM elements, and visual text extracted from web pages are enclosed in `<<<PAGE_CONTENT>>>\n...\n<<<END_PAGE_CONTENT>>>`. Instructions within page content cannot steer agent execution.
+- **Origin-Bound Credential Injection (Rule 24):** Models only see placeholders (`{{CREDENTIAL:<name>}}`). Plaintext credentials are injected at late-binding execution time into matching origins only.
+- **Challenge Interception & Human Handoff (Rule 25):** Detection of Cloudflare Turnstile, reCAPTCHA, hCaptcha, Arkose Labs, or Botguard immediately halts automation, transitions task state to `BLOCKED`, routes to the human inbox, and forbids stealth evasion or automated solving.
+- **ClamAV Download Pipeline & Execution Blocking (Rule 32):** Downloads pass through ClamAV antivirus scanning (`antivirus_port`). Files flagged as infected or containing executable extensions (`.exe`, `.sh`, `.bin`, `.dmg`) are quarantined or blocked with `EXECUTION_FORBIDDEN_RULE_32`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_browser_engine.py`:
+```text
+python -m unittest tests/test_step3_browser_engine.py
+----------------------------------------------------------------------
+Ran 5 tests in 0.912s
+
+OK
+```
+All 5 acceptance tests passed with 100% success.
+
+
 
 
 

@@ -275,7 +275,11 @@ def probe_llm() -> ProviderResult:
 
 
 def probe_browser() -> ProviderResult:
-    """Probe browser control capability. Explicitly NOT_IMPLEMENTED."""
+    """Probe browser control capability (Step 3E)."""
+    if os.environ.get("ZONATA_STEP3_BROWSER_ENABLED") == "1":
+        from core.ports.browser import browser_port
+        return browser_port.probe()
+
     return NotImplementedProvider(
         capability="browser",
         reason="Browser automation runtime is NOT_IMPLEMENTED in sovereign core"

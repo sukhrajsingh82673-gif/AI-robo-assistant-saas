@@ -71,6 +71,13 @@ from core.ports.workflow import (
     SandboxWorkflowEngineProvider,
     resolve_workflow_provider,
 )
+from core.ports.browser import (
+    BrowserPort,
+    browser_port,
+    BrowserExecutionResult,
+    BrowserPageSnapshot,
+    SandboxBrowserProvider,
+)
 
 __all__ = [
     "Port",
