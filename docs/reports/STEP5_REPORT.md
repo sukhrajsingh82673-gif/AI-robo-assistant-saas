@@ -175,5 +175,41 @@ tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::te
 - **OpenCode Review:** `docs/reviews/step5-5e-review.md` (STATUS: PASS)
 - **CI Certification:** Run ID `45263331780` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
+---
+
+## Sub-Step 5F — Audit, Privacy & Compliance Engineering
+
+### 1. Implementation Summary
+- **Merkle Hash-Chained Audit Logging:** Built `core/audit/siem_exporter.py` with `SIEMExporter` and `AuditEvent`. Every audit event links to its predecessor via cryptographic SHA-256 hash chaining, enabling fail-closed tamper detection (`AuditChainTamperedError`).
+- **Common Event Format (CEF) Ingestion:** Standardized audit log export to Micro Focus CEF:0 format, enabling direct ingestion by enterprise SIEMs (Splunk, Datadog, Sentinel).
+- **Data Subject Access Request (DSAR):** Built `core/privacy/dsar.py` with `DSARManager` generating verifiable, portable JSON packages containing user identity, activity logs, and consent records under GDPR Art. 15 and DPDP Act 2023.
+- **Crypto-Shredding Erasure:** Implemented `CryptoShredder` coordinating with `SecretsPort` to permanently destroy tenant cryptographic keys, rendering all stored database ciphertexts irretrievable under GDPR Art. 17.
+- **Statutory 72-Hour Breach Notification:** Implemented `BreachNotificationCoordinator` producing structured breach reports within statutory windows under GDPR Art. 33 / DPDP.
+- **Rule 46 Compliance Control Matrix:** Created `core/compliance/control_matrix.py` generating `docs/security/CONTROL_MATRIX.md` mapping ISO 27001, SOC 2, HIPAA, DPDP, and GDPR requirements to factual code and test verification points. Enforced Rule 46 linter strictly blocking unverified marketing claims.
+- **Test Suite:** Authored `tests/test_step5_audit_privacy_compliance.py` passing 7/7 tests covering hash chaining, CEF formatting, DSAR, crypto-shredding, breach notification, and Rule 46 mutation checks.
+
+### 2. Execution Evidence
+```text
+$ python3 -m pytest tests/test_step5_audit_privacy_compliance.py -v
+============================= test session starts ==============================
+collected 7 items
+
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_01_audit_event_hash_chaining_and_tamper_detection PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_02_cef_log_formatting PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_03_dsar_export_bundle_generation PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_04_crypto_shredding_erasure PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_05_breach_notification_report PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_06_control_matrix_generation_and_rule46_verification PASSED
+tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_07_mutation_check_rule_46_banned_claims_flagged PASSED
+
+============================== 7 passed in 0.95s ===============================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5f-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5f-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **CI Certification:** In progress
+
+
 
 
