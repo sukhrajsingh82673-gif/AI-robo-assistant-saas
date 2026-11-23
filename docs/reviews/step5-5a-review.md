@@ -37,4 +37,5 @@
 ## 3. Final Determination
 Sub-Step 5A successfully fulfills all prompt acceptance criteria. The preflight gate check, security inventory, secrets register, and trust ADRs are fully certified.
 
+**CI Run ID:** `45214041764` (Status: SUCCESS, Duration: 2m44s)  
 **Verdict: PASS**
