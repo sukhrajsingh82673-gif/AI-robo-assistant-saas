@@ -1,0 +1,14 @@
+# Gitleaks configuration file for ZONATA
+title = "ZONATA Gitleaks Config"
+
+[allowlist]
+description = "Global allowlist for simulated host agent key generation and test fixtures"
+commits = [
+    "5ccbdd63346951081dbc1a7fa58650717b62ca75",
+    "92a4c7de27912f9288721d1745f3e3108571f95f"
+]
+paths = [
+    '''core/host/.*''',
+    '''tests/test_step3_host_agent\.py''',
+    '''docs/reviews/.*'''
+]
