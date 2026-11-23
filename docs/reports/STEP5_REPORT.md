@@ -103,6 +103,6 @@ tests/test_step5_identity_access.py::TestIdentityAccessGovernance::test_12_probe
 
 ### 3. Review & Status
 - **Handoff Dossier:** `docs/reviews/step5-5c-handoff.md`
-- **OpenCode Review:** `docs/reviews/step5-5c-review.md` (STATUS: PENDING CI CERTIFICATION)
-- **CI Certification:** In progress
+- **OpenCode Review:** `docs/reviews/step5-5c-review.md` (STATUS: PASS)
+- **CI Certification:** Run ID `45240457724` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
