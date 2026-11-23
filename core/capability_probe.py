@@ -570,6 +570,12 @@ def probe_observability() -> ProviderResult:
         )
 
 
+def probe_identity() -> ProviderResult:
+    """Probe identity and directory synchronization provider (Keycloak / OIDC / Sandbox)."""
+    from core.ports.identity import resolve_identity_provider
+    return resolve_identity_provider().probe()
+
+
 PROBE_DISPATCH = {
     "database": probe_database,
     "storage": probe_storage,
