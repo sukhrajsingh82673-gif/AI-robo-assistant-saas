@@ -38,6 +38,7 @@ class WorkloadIdentityValidator:
 
     def __init__(self, trust_domain: str = "zonata.internal"):
         self.trust_domain = trust_domain
+        self._revoked_spiffe_ids: Set[str] = set()
         # Allowed caller -> callee service interactions
         self._acl: Dict[str, Set[str]] = {
             "agent_runtime": {"action_gateway", "document_service", "llm_gateway"},
@@ -47,6 +48,14 @@ class WorkloadIdentityValidator:
             "worker_temporal": {"action_gateway", "ledger_service"},
             "github_webhook_worker": {"action_gateway", "event_bus"},
         }
+
+    def revoke_spiffe_id(self, spiffe_id: str) -> None:
+        """Revoke a workload SPIFFE credential immediately during incident containment."""
+        self._revoked_spiffe_ids.add(spiffe_id)
+
+    def is_spiffe_revoked(self, spiffe_id: str) -> bool:
+        """Check if a workload SPIFFE credential has been revoked."""
+        return spiffe_id in self._revoked_spiffe_ids
 
     def parse_spiffe_id(self, spiffe_id: str) -> WorkloadIdentity:
         """
@@ -78,6 +87,8 @@ class WorkloadIdentityValidator:
 
     def check_service_access(self, caller: WorkloadIdentity, target_service: str) -> bool:
         """Enforce service-to-service least-privilege matrix."""
+        if caller.spiffe_id in self._revoked_spiffe_ids:
+            return False
         allowed_targets = self._acl.get(caller.service_name, set())
         if target_service not in allowed_targets:
             return False

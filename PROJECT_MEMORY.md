@@ -338,6 +338,16 @@
   - Verified 100% GREEN in GitHub Actions CI Run `45188993293`.
 - **OpenCode Step 4 Status:** 100% COMPLETE across all 10 sub-steps (4A–4J) with zero skipped checks, zero unreviewed bypasses, and verified green across PostgreSQL 16, SQLite, and Supply Chain CI jobs.
 
+### OpenCode Step 5 — Trust Layer, Security & Privacy Engineering (In Progress)
+- [x] **5A (Preflight, Security Inventory, Secrets Register & Trust ADRs):** COMPLETE (CI Run 45214041764)
+- [x] **5B (OpenBao Secrets Platform & Transit KMS behind SecretsPort):** COMPLETE (CI Run 45230614186)
+- [x] **5C (Identity and Access — Keycloak / OIDC / Workload Identity):** COMPLETE (CI Run 45240457724)
+- [x] **5D (Database & Tenant Isolation Hardening — Transaction-Scoped RLS):** COMPLETE (CI Run 45260547840)
+- [x] **5E (Application & Supply-Chain Security — ASVS Hardening, WAF, SBOM, Cosign):** COMPLETE (CI Run 45263331780)
+- [x] **5F (Audit, Privacy & Compliance Engineering — Merkle Chains, DSAR, Shredding, Rule 46):** COMPLETE (CI Run 45265898071)
+- [x] **5G (Incident Response & Security Resilience — Containment Playbooks, Quarantine, Chaos Drills):** COMPLETE (Testing 6/6 passed, 69/69 full suite passed, CI in flight)
+
+
 
 ## Supervision Corrections (2026-11-21)
 - Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).

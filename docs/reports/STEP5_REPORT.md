@@ -210,6 +210,41 @@ tests/test_step5_audit_privacy_compliance.py::TestAuditPrivacyCompliance::test_0
 - **OpenCode Review:** `docs/reviews/step5-5f-review.md` (STATUS: PASS)
 - **CI Certification:** Run ID `45265898071` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
+---
+
+## Sub-Step 5G — Incident Response & Security Resilience
+
+### 1. Implementation Summary
+- **Leaked Secret Containment Playbook:** Built `core/incident/playbooks.py` featuring `LeakedSecretPlaybook` performing automated discovery containment: revokes leaked tokens/secrets in OpenBao via `SecretsPort.revoke_secret`, revokes tenant API keys in `APIKeyManager`, terminates active refresh token families in `IdentityPort`, automatically rotates secrets to fresh versions, and emits high-priority CEF audit alerts.
+- **Rogue Agent Quarantine Playbook:** Implemented `AgentQuarantinePlaybook` isolating compromised agent principals: registers agent quarantine barrier (`assert_not_quarantined`), activates distributed coordination killswitches (`coordination.set_killswitch_state`), revokes SPIFFE workload credentials (`WorkloadIdentityValidator.revoke_spiffe_id`), cancels in-flight workflows, seals forensic evidence in `EvidenceLedger`, and emits maximum-severity (10) CEF audit alerts.
+- **Security Chaos Harness Drills:** Created `core/incident/chaos_drills.py` containing `SecurityChaosHarness` orchestrating:
+  1. *Vault Outage & Fail-Closed Drill:* Simulates Vault seal/network failure, proving fail-closed semantics and zero plaintext fallback (Rule 41).
+  2. *Database Dynamic Credential Rotation Drill:* Generates dynamic credentials and performs zero-downtime rotation.
+  3. *Token Theft Cascade Revocation Drill:* Proves immediate detection of stolen refresh token reuse (`TokenReuseDetectedError`) and complete invalidation of the compromised token family.
+- **Test Suite:** Authored `tests/test_step5_incident_response_resilience.py` passing 6/6 tests covering all containment playbooks and resilience drills.
+
+### 2. Execution Evidence
+```text
+$ python3 -m pytest tests/test_step5_incident_response_resilience.py -v
+============================= test session starts ==============================
+collected 6 items
+
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_01_leaked_secret_automated_containment PASSED
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_02_rogue_agent_quarantine_and_isolation PASSED
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_03_chaos_drill_vault_outage_fail_closed PASSED
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_04_chaos_drill_db_credential_rotation PASSED
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_05_chaos_drill_token_theft_cascade_revocation PASSED
+tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilience::test_06_mutation_check_unquarantined_agent_fails_verification PASSED
+
+============================== 6 passed in 0.63s ===============================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5g-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5g-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **CI Certification:** In progress
+
+
 
 
 
