@@ -37,4 +37,5 @@ Sub-Step 5D hardens the relational storage tier against cross-tenant disclosure 
 ---
 
 ## 4. Final Verdict
-**PASS**. Sub-Step 5D meets all requirements and rules. Ready for commit and CI push.
+**PASS**. Sub-Step 5D meets all requirements and rules.
+**Certified CI Run:** `45260547840` (Status: SUCCESS, PostgreSQL 16 & Supply Chain 100% GREEN). Ready for Sub-Step 5E.

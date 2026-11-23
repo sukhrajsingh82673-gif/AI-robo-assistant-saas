@@ -136,7 +136,7 @@ tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_07_ten
 
 ### 3. Review & Status
 - **Handoff Dossier:** `docs/reviews/step5-5d-handoff.md`
-- **OpenCode Review:** `docs/reviews/step5-5d-review.md` (STATUS: PENDING CI CERTIFICATION)
-- **CI Certification:** In progress
+- **OpenCode Review:** `docs/reviews/step5-5d-review.md` (STATUS: PASS)
+- **CI Certification:** Run ID `45260547840` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
 
