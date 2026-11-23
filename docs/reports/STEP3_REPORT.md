@@ -246,6 +246,28 @@ pytest tests/test_step3_terminal.py
 6 passed in 1.41s
 ```
 All 6 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45118704991](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45118704991) (100% GREEN across SQLite Dev Profile 3m4s, PostgreSQL 16 & Service Containers 2m26s, and Supply Chain, SBOM & Gitleaks Audit 1m58s).
+
+---
+
+# Sub-Step 3J — Agent Factory Import Lane & Sandboxing
+
+## 1. Overview
+Sub-Step 3J delivers the secure intake pipeline and isolated sandbox runner for open-source agents and skills imported through the Agent Factory:
+- **Rule 5 Licence Gate (`core/agent_import/license_gate.py`):** Automatically validates licenses against approved permissive types (`MIT`, `Apache-2.0`, `BSD`, `ISC`, `CC0`, `Unlicense`). Copyleft and restrictive licenses (`GPL`, `AGPL`, `SSPL`, `BSL`) are rejected with `LicenseViolationError`.
+- **ClamAV Quarantine & AST Security Scan (`core/agent_import/scanner.py`):** Scans imported package bytes with ClamAV antivirus (Rule 32) and inspects AST for arbitrary `eval()`, `exec()`, system execution, and Rule 25 anti-evasion patterns.
+- **Isolated Scratch Sandboxing (`core/agent_import/sandbox_runner.py`):** Restricts imported skill runtime to an isolated temporary scratch directory with strict timeout budgets and automatic post-execution destruction.
+- **Certified Package Provenance (`core/agent_import/types.py`):** Clean packages certified with `SkillCertificationStatus.CERTIFIED` and immutable sha256 digests.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_agent_import.py`:
+```text
+pytest tests/test_step3_agent_import.py
+----------------------------------------------------------------------
+5 passed in 0.48s
+```
+All 5 acceptance tests passed with 100% success.
+
 
 
 
