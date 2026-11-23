@@ -139,4 +139,41 @@ tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_07_ten
 - **OpenCode Review:** `docs/reviews/step5-5d-review.md` (STATUS: PASS)
 - **CI Certification:** Run ID `45260547840` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
+---
+
+## Sub-Step 5E — Application & Supply-Chain Security
+
+### 1. Implementation Summary
+- **Host Header & CORS Hardening:** Built `core/security/api_hardening.py` with `HostHeaderValidator` and `CORSValidator`. Strictly protects against host poisoning attacks and enforces ASVS V14.4 (rejects wildcard `*` with credentials).
+- **OWASP Defense Headers & Progressive Rate Limiting:** Implemented `SecurityHeaderInjector` (CSP, HSTS, X-Frame-Options, X-Content-Type-Options) and `BruteForceProtector` enforcing progressive exponential lockout (from 1s up to 60s/300s) on repeated authentication failures.
+- **WAF Attack Inspection:** Added `WAFPayloadInspector` inspecting HTTP request payloads for SQLi, XSS, Path Traversal, Command Injection, and rejecting oversized payloads (>10MB).
+- **CycloneDX SBOM Compliance:** Built `core/security/supply_chain.py` featuring `SBOMValidator` verifying CycloneDX SBOM schemas and enforcing Rule 5 license allow-lists (blocking AGPL, SSPL, BSL, Elastic).
+- **Cosign Artifact Signing & Verification:** Implemented `CosignSigner` leveraging OpenBao Transit keys to sign container digests and release bundles (`cosign://...`) with cryptographic verification and fail-closed tampering detection.
+- **Test Suite:** Authored `tests/test_step5_app_supply_chain_security.py` passing 9/9 tests across all API hardening, brute-force, WAF, SBOM, and Cosign invariants.
+
+### 2. Execution Evidence
+```text
+$ python3 -m pytest tests/test_step5_app_supply_chain_security.py -v
+============================= test session starts ==============================
+collected 9 items
+
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_01_host_header_validation_and_poisoning_rejection PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_02_cors_origin_allowlist_and_credential_wildcard_rejection PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_03_security_headers_injection PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_04_brute_force_exponential_lockout PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_05_waf_payload_inspection_and_attacks PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_06_cyclonedx_sbom_validation PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_07_mutation_check_disallowed_license_in_sbom PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_08_cosign_artifact_signing_and_verification PASSED
+tests/test_step5_app_supply_chain_security.py::TestAppAndSupplyChainSecurity::test_09_tampered_artifact_fails_cosign_verification PASSED
+
+============================== 9 passed in 0.98s ===============================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5e-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5e-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **CI Certification:** In progress
+
+
 
