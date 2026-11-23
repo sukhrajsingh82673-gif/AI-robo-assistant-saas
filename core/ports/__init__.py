@@ -85,6 +85,12 @@ from core.ports.search import (
     SearchResultItem,
     SandboxSearchProvider,
 )
+from core.ports.terminal import (
+    TerminalPort,
+    terminal_port,
+    TerminalCommandResult,
+    SandboxTerminalProvider,
+)
 
 __all__ = [
     "Port",
@@ -153,4 +159,8 @@ __all__ = [
     "search_port",
     "SearchExecutionResult",
     "SearchResultItem",
+    # Terminal
+    "TerminalPort",
+    "terminal_port",
+    "TerminalCommandResult",
 ]

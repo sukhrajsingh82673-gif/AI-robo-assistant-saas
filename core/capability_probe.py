@@ -290,6 +290,12 @@ def probe_browser() -> ProviderResult:
     ).probe()
 
 
+def probe_terminal() -> ProviderResult:
+    """Probe terminal capability (Step 3I)."""
+    from core.ports.terminal import terminal_port
+    return terminal_port.probe()
+
+
 def probe_desktop_control() -> ProviderResult:
     """Probe desktop GUI control capability. Requires an active paired host agent (Step 3B, Rule 30)."""
     try:

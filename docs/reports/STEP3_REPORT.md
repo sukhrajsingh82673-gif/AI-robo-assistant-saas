@@ -223,6 +223,30 @@ pytest tests/test_step3_research.py
 5 passed in 0.52s
 ```
 All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45117897678](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117897678) (100% GREEN across SQLite Dev Profile 2m31s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 2m2s).
+
+---
+
+# Sub-Step 3I — Terminal Governance & Safety Controls
+
+## 1. Overview
+Sub-Step 3I implements strict terminal governance, safety classification, process supervision, and safety controls:
+- **Terminal Default OFF (`TERMINAL_ENABLED=0`):** Terminal access is disabled by default. Unconfigured environments return `NOT_CONFIGURED` and refuse execution with `TerminalDisabledError`.
+- **Command Security Tiers (`core/terminal/classifier.py`):** Commands classified into `SAFE_READ_ONLY`, `MUTATING_SAFE`, `HIGH_IMPACT`, and `FORBIDDEN_DENIED`.
+- **Dangerous Command Deny-List (Rule 3):** Strict rejection of `sudo`, `su`, `curl | sh`, `wget | bash`, `rm -rf /`, `mkfs`, raw reverse shells, and fork bombs (`DangerousCommandForbiddenError`).
+- **High-Impact Gating (Rule 27 & 31):** Destructive commands (`rm`, `git push`, `chmod`, `systemctl`) require human ActionGateway approval.
+- **Process Supervision & Timeouts:** Execution limits enforce automatic SIGTERM/SIGKILL termination on timeouts, flagging `killed_by_signal=True`.
+- **Output Boundary Delimiters (Rule 26):** All stdout and stderr enclosed in `<<<TERMINAL_OUTPUT command='...'>>> ... <<<END_TERMINAL_OUTPUT>>>`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_terminal.py`:
+```text
+pytest tests/test_step3_terminal.py
+----------------------------------------------------------------------
+6 passed in 1.41s
+```
+All 6 acceptance tests passed with 100% success.
+
 
 
 
