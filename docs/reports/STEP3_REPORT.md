@@ -159,6 +159,28 @@ Ran 5 tests in 0.912s
 OK
 ```
 All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45111182176](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45111182176) (100% GREEN across SQLite Dev Profile 2m49s, PostgreSQL 16 & Service Containers 3m24s, and Supply Chain, SBOM & Gitleaks Audit 1m42s).
+
+---
+
+# Sub-Step 3F — Anti-Evasion Policy & Dependency Deny-List (Rule 25)
+
+## 1. Overview
+Sub-Step 3F implements the rigorous automated enforcement of Rule 25 (No circumvention of verification challenges):
+- **AST & Dependency Deny-List (`core/security/anti_evasion.py`):** Automated scanner detecting banned stealth evasion packages (`playwright-stealth`, `puppeteer-extra-plugin-stealth`, `undetected-chromedriver`, etc.), captcha solving SDKs (`2captcha`, `anticaptcha`, `capmonster`, `deathbycaptcha`, `capsolver`), and stealth AST patterns (`navigator.webdriver` manipulation).
+- **CI Supply Chain Linter (`scripts/anti_evasion_linter.py`):** Runs during GitHub Actions CI Supply Chain Audit, failing the build if banned packages or evasion patterns exist.
+- **Challenge Policy & Official Route Suggestions (`core/browser/challenge_policy.py`):** Challenges immediately halt automation, transition tasks to `BLOCKED`, and present human inbox handoffs with actionable alternatives (Official REST/GraphQL APIs, bulk data export, enterprise IP allow-listing).
+- **Governed Rate Limiting & Zero IP Rotation (`core/browser/rate_limiter.py`):** Full-jitter exponential backoff on HTTP 429/503/403 responses within time/cost budget, strictly forbidding IP/proxy rotation (`AntiEvasionViolationError`).
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_anti_evasion.py`:
+```text
+pytest tests/test_step3_anti_evasion.py
+----------------------------------------------------------------------
+6 passed in 13.02s
+```
+All 6 acceptance tests passed with 100% success.
+
 
 
 
