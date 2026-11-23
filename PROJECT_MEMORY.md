@@ -315,7 +315,14 @@
   - Implemented multi-tenant migrations `migrations/common/0033_mcp_governance.sql` and `migrations/pg/0033_mcp_governance.sql`.
   - Verified 8/8 unit and mutation checks passing locally (`tests/test_step4_governed_mcp.py`).
   - Verified 100% GREEN in GitHub Actions CI Run `45176513573`.
-- [ ] **4H:** OpenTelemetry instrumentation & canary
+- [x] **4H (OpenTelemetry Instrumentation & Secret Canary):** COMPLETE
+  - Built W3C TraceContext propagation (`core/telemetry/context.py`) emitting standard traceparents (`00-{trace_id32}-{span_id16}-{flags02}`) across carrier boundaries.
+  - Built Rule 24 and Rule 36 redaction engine (`core/telemetry/sanitizer.py`) guaranteeing zero plaintext credentials and enforcing tenant privacy policies.
+  - Built dual-mode distributed tracer (`core/telemetry/tracer.py`) emitting stable `zonata.*` metrics and `gen_ai.*` semantic conventions under `OTEL_GENAI_CONVENTIONS_ENABLED=1`.
+  - Built active `TelemetryCanaryProbe` (`core/telemetry/canary.py`) verifying 0% leak rate under injected canary secret attacks.
+  - Enforced Standing Rule 40 / ADR 0016 Legal/AGPL isolation check (0 in-process AGPL imports).
+  - Verified 8/8 unit and mutation checks passing locally (`tests/test_step4_opentelemetry.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45182013131`.
 - [ ] **4I:** 24/7 autonomous daemon & self-healing
 - [ ] **4J:** Golden evals & Step 4 qualification scenario
 
