@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@neon/config": "^1.9.2",
-    "@neon/env": "^1.6.3"
+    "@neon/env": "^2.1.8"
   },
   "devDependencies": {
     "jsdom": "^31.0.0"
