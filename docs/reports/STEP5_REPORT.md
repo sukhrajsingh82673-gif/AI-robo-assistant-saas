@@ -277,8 +277,51 @@ tests/test_step5_crypto_agility.py::TestCryptoAgility::test_08_mutation_check_un
 
 ### 3. Review & Status
 - **Handoff Dossier:** `docs/reviews/step5-5h-handoff.md`
-- **OpenCode Review:** `docs/reviews/step5-5h-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **OpenCode Review:** `docs/reviews/step5-5h-review.md` (STATUS: PASS)
+- **CI Certification:** Run ID `45271869688` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
+
+---
+
+## Sub-Step 5I — Step 5 Qualification & Red-Team Run
+
+### 1. Implementation Summary
+- **End-to-End Qualification Pipeline:** Built `scripts/step5_scenario.py` implementing `Step5QualificationScenario`, deterministically executing and certifying all 8 security pillars in 209.28ms (budget: < 5,000ms):
+  1. *Preflight & Governance (5A):* Verified 8 ADRs and zero plaintext secrets in `SECRETS_REGISTER.md`.
+  2. *OpenBao Secrets Platform & Transit KMS (5B):* Verified multi-tenant isolation, transit key rotation, and sealed vault fail-closed.
+  3. *Identity & Access Governance (5C):* Verified OIDC JWT validation, Rule 44 owner immutability, salted SHA-256 API keys, and machine interactive login prohibition.
+  4. *Database Isolation & Transaction Context (5D):* Verified transaction-scoped tenant context (Rule 43), zero context leakage across transaction pooler reuse, and least-privilege non-superuser roles.
+  5. *Application & Supply Chain Hardening (5E):* Verified host poisoning defense, CORS wildcard credentials defense, WAF SQLi/XSS defense, and Cosign container signature verification.
+  6. *SIEM Audit & Rule 46 Compliance (5F):* Verified Merkle hash-chain logging, CEF:0 export, DSAR export bundle, crypto-shredding, and Rule 46 factual matrix.
+  7. *Incident Containment & Chaos Drills (5G):* Verified automated leaked secret containment, rogue agent quarantine, and 3 security chaos drills.
+  8. *Crypto Agility & Online Rewrapping (5H):* Verified 3 versioned ciphers (including Kyber-AES PQC hybrid), AEAD tamper rejection, and zero-downtime online rewrap.
+- **Acceptance Test Suite:** Authored `tests/test_step5_qualification_scenario.py` passing 9/9 tests in 0.74s.
+- **Cumulative Test Results:** 86/86 tests passing across all Step 5 test suites + truth linter in 2.14s.
+
+### 2. Execution Evidence
+```text
+$ python3 scripts/step5_scenario.py
+================================================================================
+ZONATA SOVEREIGN OS — STEP 5 TRUST LAYER QUALIFICATION SCENARIO
+================================================================================
+[PASS] 1. Preflight Reality & Governance (5A)                  (2.26ms)
+[PASS] 2. OpenBao Secrets Platform & Transit KMS (5B)          (0.10ms)
+[PASS] 3. Identity, Access & Ownership Governance (5C)         (63.06ms)
+[PASS] 4. Database & Tenant Isolation Hardening (5D)           (58.68ms)
+[PASS] 5. Application & Supply-Chain Security (5E)             (0.32ms)
+[PASS] 6. SIEM Audit, Privacy & Rule 46 Compliance (5F)        (0.38ms)
+[PASS] 7. Incident Containment & Chaos Drills (5G)             (63.43ms)
+[PASS] 8. Crypto Agility & Online Rewrapping (5H)              (5.46ms)
+================================================================================
+QUALIFICATION SCENARIO COMPLETE: ALL PASS
+Total Execution Time: 209.28ms (Budget: < 5,000ms)
+================================================================================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5i-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5i-review.md` (STATUS: PENDING CI CERTIFICATION)
 - **CI Certification:** In progress
+
 
 
 
