@@ -180,6 +180,29 @@ pytest tests/test_step3_anti_evasion.py
 6 passed in 13.02s
 ```
 All 6 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45116556969](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45116556969) (100% GREEN across SQLite Dev Profile 2m34s, PostgreSQL 16 & Service Containers 2m57s, and Supply Chain, SBOM & Gitleaks Audit 1m52s).
+
+---
+
+# Sub-Step 3G — Remote View & Human Takeover
+
+## 1. Overview
+Sub-Step 3G delivers the remote view streaming engine and human takeover state machine:
+- **Bounded Viewport Streaming (Rule 28):** Viewports cropped strictly to granted bounding rectangle (`ViewportBounds`), preventing out-of-scope window or desktop capture.
+- **Pre-Transmission Redaction (Rule 24 & 28):** Masking engine blacks out secret inputs and verification widgets prior to base64 encoding and transmission.
+- **Instant Human Takeover (Rule 27):** Peripheral or web-UI human interaction instantly suppresses agent execution with `AgentExecutionSuppressedError`.
+- **State Assertion Hand-Back:** Human releases control with explicit postcondition assertion (`TakeoverHandbackAssertion`), logging Merkle audit events to `human_takeover_events`.
+- **Relational Schema & PostgreSQL RLS:** Migrations `0031_remote_view_and_takeover.sql` provision `remote_view_sessions` and `human_takeover_events` with tenant isolation policies.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_remote_view.py`:
+```text
+pytest tests/test_step3_remote_view.py
+----------------------------------------------------------------------
+5 passed in 0.51s
+```
+All 5 acceptance tests passed with 100% success.
+
 
 
 
