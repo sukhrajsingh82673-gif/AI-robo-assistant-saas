@@ -111,6 +111,32 @@ OK
 All 8 acceptance tests passed with 100% success.
 - **Authoritative CI Run:** [45103351997](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45103351997) (100% GREEN across SQLite Dev Profile 1m27s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 1m46s).
 
+---
+
+# Sub-Step 3D — Origin-Bound Credential Vault
+
+## 1. Overview
+Sub-Step 3D delivered the sovereign origin-bound credential vault (`enterprise_secret_vault`) with zero-leakage guarantees:
+- **Strict Origin Binding:** Credentials bound to explicit `(scheme, host, port)` tuples. Injections into mismatched origins or insecure scheme downgrades are refused with `OriginMismatchError`.
+- **Model Plaintext Secrecy (Rule 24):** Models and prompts operate solely on symbolic placeholders (`{{CREDENTIAL:<name>}}`). Plaintext substitution occurs only at the moment of execution inside the engine.
+- **Post-Injection Masking (Rule 24):** Perception snapshots, accessibility trees, and DOM dumps mask the injected values with `[MASKED_INPUT]`, preventing credential leakage in logs or evidence records.
+- **KMS Envelope Encryption:** Per-tenant data keys encrypt credentials at rest in table `enterprise_secret_vault` with PostgreSQL 16 Row Level Security.
+- **ActionGateway Gate (Rule 27):** High-privilege credentials require human ActionGateway approval before injection.
+- **Zero Secret Export:** Plaintext secrets cannot be exported through any API or tool.
+- **Ephemeral Session Cookies:** Cookie jars are origin-bound and purged immediately upon session completion.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_credential_vault.py`:
+```text
+python -m unittest tests/test_step3_credential_vault.py
+----------------------------------------------------------------------
+Ran 7 tests in 0.458s
+
+OK
+```
+All 7 acceptance tests passed with 100% success.
+
+
 
 
 
