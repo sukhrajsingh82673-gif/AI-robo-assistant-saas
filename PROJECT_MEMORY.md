@@ -323,7 +323,14 @@
   - Enforced Standing Rule 40 / ADR 0016 Legal/AGPL isolation check (0 in-process AGPL imports).
   - Verified 8/8 unit and mutation checks passing locally (`tests/test_step4_opentelemetry.py`).
   - Verified 100% GREEN in GitHub Actions CI Run `45182013131`.
-- [ ] **4I:** 24/7 autonomous daemon & self-healing
+- [x] **4I (24/7 Autonomous Daemon & Self-Healing):** COMPLETE
+  - Built distributed leader lease manager (`core/daemon/leader_elector.py`) with 30s TTL, heartbeat renewals, and automatic dead-node failover.
+  - Built durable leased scheduler (`core/daemon/autonomous_daemon.py`) executing scheduled jobs with monotonic catchup policies (`RUN_ONCE`, `SKIP_MISSED`).
+  - Built transactional outbox DLQ processor (`core/daemon/dlq_processor.py`) with exponential backoff, jitter, and poison-pill isolation.
+  - Built self-healing supervisor (`core/daemon/self_healing.py`) reclaiming orphaned jobs and expired locks, and production `CircuitBreaker`.
+  - Built 24/7 health canary probe (`core/daemon/canary_probe.py`) emitting structured `DaemonHealthStatus`.
+  - Verified 8/8 unit and mutation checks passing locally (`tests/test_step4_autonomous_daemon.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45184715104`.
 - [ ] **4J:** Golden evals & Step 4 qualification scenario
 
 
