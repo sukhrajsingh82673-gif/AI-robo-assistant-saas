@@ -19,10 +19,13 @@
 | **Rule 34 Anti-Bypass Linter** | AST linter checking for direct model imports, unwrapped subprocesses, and raw network egress in framework runtimes. | Implemented in `core/security/anti_bypass.py` and `scripts/anti_bypass_linter.py`. Clean scan on repo (0 violations); integrated into CI Job 1. | **PASS** |
 | **Rule 35 Idempotency** | At-least-once execution with deterministic idempotency keys. | Verified in `test_04_local_agent_runtime_idempotency_cache`: replayed runs return cached results. | **PASS** |
 | **Acceptance Testing** | Unit tests and mutation checks. | `tests/test_step4_runtime_ports.py` ran 15 tests in 9.64s with 100% PASS. | **PASS** |
+| **CI Verification** | GitHub Actions 3-job workflow passes 100% green on branch `step4-durable-frameworks`. | Run ID `45153307058` passed (Supply Chain, SQLite Dev, and PostgreSQL 16 Contract Tests). | **PASS** |
 
 ---
 
 ## 2. Reviewer Verdict
 
 **STATUS: PASS.**  
-Sub-Step 4B satisfies all runtime port requirements, spec compiler targets, anti-bypass AST security controls, and acceptance test criteria. The builder is authorized to commit Sub-Step 4B and proceed to Sub-Step 4C (`LangGraph runtime adapter & checkpointer`).
+- **GitHub Actions CI Run:** [45153307058](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45153307058)
+- **Commit:** `05bfe5a`
+Sub-Step 4B satisfies all runtime port requirements, spec compiler targets, anti-bypass AST security controls, acceptance test criteria, and CI verification. The builder is authorized to proceed to Sub-Step 4C (`LangGraph runtime adapter & checkpointer`).
