@@ -113,4 +113,55 @@ Sub-Step 4B verification complete. OpenCode review verdict: PASS.
   - SQLite Dev Profile Test Suite: PASS (1m43s)
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (2m44s)
 - **Commit:** `05bfe5a`
-Proceeding to Sub-Step 4C: LangGraph runtime adapter & checkpointer.
+
+---
+
+## Sub-Step 4C: LangGraph Runtime Adapter & Encrypted PostgreSQL Checkpointer
+
+### 1. Overview & Objectives
+Sub-Step 4C delivers the sovereign LangGraph-style cyclic execution runtime with encrypted persistence:
+- **`PostgresCheckpointer` (`core/langgraph/checkpointer.py`):**
+  - Manages `langgraph_checkpoints` and `langgraph_checkpoint_writes` tables with multi-tenant row-level security (`tenant_id`, `company_id`).
+  - Implements **Rule 36 (Payload Encryption at Rest)**: state payloads are encrypted via `KeyManagementPort` envelope encryption (`kms.encrypt(...)`), storing base64 ciphertext in the database. Plaintext state never touches database rows.
+  - Fail-closed security: if KMS encryption is unconfigured or unavailable, checkpointing raises `RuntimeError` rather than writing unencrypted state.
+- **Cyclic Agent Loop (`core/langgraph/adapter.py`):**
+  - Executes bounded iterative cycles: **Planner Node** $\rightarrow$ **Tool Executor Node** $\rightarrow$ **Critic Evaluator Node** $\rightarrow$ **Router**.
+  - Limits iterations to $\le 5$ (bounded graph execution).
+  - Enforces **Rule 34**: 100% of LLM calls route through `LLMGatewayPort`; 100% of tools route through `ActionGateway` and `ToolRegistry`.
+  - Enforces **Rule 35**: Deterministic idempotency keys (`{run_id}_{step_id}_{tool_name}`) prevent duplicate execution across replays. Resuming a completed run loads from the encrypted checkpoint cache without redundant execution.
+  - Untrusted data tagging: tool outputs are marked untrusted in `AgentState`.
+- **Database Migrations:**
+  - `migrations/common/0032_langgraph_checkpoints.sql`
+  - `migrations/pg/0032_langgraph_checkpoints.sql`
+
+### 2. Real Execution Output
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 7 items
+
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_01_checkpointer_tables_created PASSED [ 14%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_02_checkpointer_put_and_get PASSED [ 28%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_03_encryption_at_rest_rule_36 PASSED [ 42%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_04_cyclic_execution_loop PASSED [ 57%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_05_resumption_from_checkpoint_rule_35 PASSED [ 71%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_06_streaming_chunks PASSED [ 85%]
+tests/test_step4_langgraph_runtime.py::TestStep4LangGraphRuntime::test_07_mutation_check_unconfigured_kms_fails_closed PASSED [100%]
+
+============================== 7 passed in 0.98s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Rule 33 (Replaceable Adapters):** LangGraph execution state lives strictly in the checkpointer; authority, ledger, and business truth remain in ZONATA tables.
+- **Rule 34 (Port Routing):** Every model prompt routes via `llm_gateway.generate()` and every tool call routes through `action_gateway.evaluate_decision_gate()` followed by `tool_registry.execute()`.
+- **Rule 35 (At-least-once Execution & Idempotency):** Checkpoint resumption checks for completed thread state; identical run IDs return cached checkpoint results without repeating external actions.
+- **Rule 36 (Payload Encryption at Rest):** Direct database inspection confirms `checkpoint_blob` is base64-encoded ciphertext produced by KMS envelope encryption; zero plaintext leakage.
+- **Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` updated with LangGraph / PostgresCheckpointer marked `ADOPTED`.
+
+### 4. Status
+Sub-Step 4C verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4D: Temporal durable execution engine & workers.

@@ -256,25 +256,40 @@ class LocalAgentRuntimeAdapter(AgentRuntimePort):
         requested_tool = input_data.get("requested_tool")
         tool_output = {}
         if requested_tool and requested_tool in spec.allowed_tools:
-            tool = tool_registry.get_tool(requested_tool)
+            tool = tool_registry.get(requested_tool)
             if tool:
                 tool_args = input_data.get("tool_args", {})
-                action_env = ActionEnvelope(
+                act_class_val = getattr(tool, "required_action_class", ActionClass.READ_INTERNAL)
+                if hasattr(act_class_val, "value"):
+                    act_class_str = act_class_val.value
+                else:
+                    act_class_str = str(act_class_val)
+                action_env = ActionEnvelope.create(
                     tenant_id=context.tenant_id,
                     company_id=context.company_id,
-                    actor_id=context.actor_id,
-                    action_class=ActionClass.READ_ONLY,
-                    payload={"tool": requested_tool, "args": tool_args},
+                    agent_id=context.actor_id,
+                    capability_id=getattr(tool, "required_capability", "database"),
+                    target=requested_tool,
+                    intent=f"Execute tool {requested_tool}",
+                    parameters=tool_args,
+                    action_class=act_class_str,
                     idempotency_key=f"{idem_key}_{requested_tool}",
                 )
                 try:
-                    action_decision = action_gateway.evaluate(action_env)
+                    action_decision = action_gateway.evaluate_decision_gate(action_env)
                     if action_decision.allowed:
-                        tool_res = tool.execute(tool_args)
+                        tool_res = tool_registry.execute(
+                            name=requested_tool,
+                            tenant_id=context.tenant_id,
+                            company_id=context.company_id,
+                            principal_id=context.actor_id,
+                            arguments=tool_args,
+                            idempotency_key=f"{idem_key}_{requested_tool}",
+                        )
                         tool_output = {"tool": requested_tool, "result": tool_res}
                         tool_calls_executed.append(tool_output)
                     else:
-                        tool_output = {"tool": requested_tool, "error": "ActionGateway rejected tool execution"}
+                        tool_output = {"tool": requested_tool, "error": f"ActionGateway rejected tool execution: {action_decision.reason}"}
                 except Exception as e:
                     tool_output = {"tool": requested_tool, "error": str(e)}
 
