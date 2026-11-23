@@ -4531,7 +4531,7 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
     - Multi-line block comments (/* ... */)
     - Dollar-quoted string constants ($$...$$ or $tag$...$tag$)
     """
-    if "?" not in sql:
+    if "?" not in sql and ":" not in sql:
         return sql
 
     out = []
@@ -4677,6 +4677,14 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
                 elif c == "?":
                     out.append("%s")
                     i += 1
+                    continue
+                elif c == ":" and (next_c.isalpha() or next_c == "_") and (i == 0 or sql[i - 1] != ":"):
+                    j = i + 1
+                    while j < n and (sql[j].isalnum() or sql[j] == "_"):
+                        j += 1
+                    param_name = sql[i + 1:j]
+                    out.append(f"%({param_name})s")
+                    i = j
                     continue
                 elif c == "%":
                     if next_c == "%":
@@ -5494,6 +5502,10 @@ class Database:
                 ensure_executive_tables(conn)
                 from core.evals import ensure_eval_tables
                 ensure_eval_tables(conn)
+                from core.host.types import ensure_host_permission_tables
+                ensure_host_permission_tables(conn)
+                from core.vault.vault import OriginBoundSecretVault
+                OriginBoundSecretVault().ensure_tables(conn)
             except Exception:
                 pass
             conn.commit()

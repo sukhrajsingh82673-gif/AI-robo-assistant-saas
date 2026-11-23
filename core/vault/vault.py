@@ -82,6 +82,21 @@ class OriginBoundSecretVault:
     def ensure_tables(self, conn) -> None:
         """Ensures vault tables exist across SQLite and PostgreSQL."""
         if db.is_postgresql():
+            import pathlib
+            root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
+            sql_path = root_dir / "migrations" / "pg" / "0030_origin_bound_credential_vault.sql"
+            if sql_path.exists():
+                sql_text = sql_path.read_text(encoding="utf-8")
+                for stmt in sql_text.split(";"):
+                    s = stmt.strip()
+                    if s:
+                        try:
+                            conn.execute(s)
+                            if hasattr(conn, "commit"):
+                                conn.commit()
+                        except Exception:
+                            if hasattr(conn, "rollback"):
+                                conn.rollback()
             return
         conn.execute("""
         CREATE TABLE IF NOT EXISTS enterprise_secret_vault (

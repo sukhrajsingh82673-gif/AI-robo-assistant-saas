@@ -267,6 +267,80 @@ pytest tests/test_step3_agent_import.py
 5 passed in 0.48s
 ```
 All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45119338377](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45119338377) (100% GREEN across SQLite Dev Profile 2m35s, PostgreSQL 16 & Service Containers 2m23s, and Supply Chain, SBOM & Gitleaks Audit 3m10s).
+
+---
+
+# Sub-Step 3K — Golden Evals & Final Step 3 Qualification Scenario
+
+## 1. Overview
+Sub-Step 3K concludes OpenCode Step 3 (Hands) by integrating and executing the end-to-end qualification scenario `scripts/step3_scenario.py`. The scenario exercises all 10 sovereign hands components across 10 qualification milestones:
+1. **Preflight & Capability Truth:** Probing 18 core capabilities to verify reality table reporting.
+2. **Host Permission Model & Pairing (3B):** Ed25519 cryptographic key binding, human step-up auth, local host grant enforcement (Rule 23).
+3. **Desktop Perception & Control (3C):** Layer 1 OS Accessibility Tree parsing, relative coordinate mapping, password masking on host, visual masking, out-of-grant boundary rejection (Rule 24, 28).
+4. **Origin-Bound Credential Vault (3D):** Origin-bound late-binding injection, cross-origin mismatch rejection, zero plaintext export invariant (Rule 24).
+5. **Governed Browser Engine & Download Scanning (3E):** Local fixture login, untrusted page content delimiting (`<<<PAGE_CONTENT>>>`), ClamAV quarantine scanning, executable download blocking (Rule 26, 32).
+6. **Anti-Evasion Policy & Rate Limiting (3F):** AST repository hygiene verification, proxy rotation denial, challenge detection halting and human handoff (Rule 25).
+7. **Remote View & Human Takeover (3G):** Viewport-bounded frame streaming, pre-transmission masking, agent command suppression during takeover, explicit state assertion handback (Rule 27, 28).
+8. **Research Hand & Search Provider (3H):** SearchPort query resolution, delimited citation containment (`<<<SEARCH_RESULTS>>>`), prompt injection neutralization (Rule 26, 30).
+9. **Terminal Governance & Safety Controls (3I):** Strict denial of dangerous commands (`sudo`, `rm -rf /`, `curl | sh`), human approval gating for high-impact commands, safe delimited execution (Rule 23, 27).
+10. **Agent Factory Import Lane & Sandboxing (3J):** Permissive open-source license gating (Rule 5), AST and ClamAV code scanning, scratch directory isolation and cleanup (Rule 32).
+
+## 2. Verification & Test Execution
+- Executed qualification scenario `scripts/step3_scenario.py`:
+```text
+======================================================================
+ZONATA SOVEREIGN CORE — STEP 3 QUALIFICATION SCENARIO (HANDS)
+======================================================================
+
+[01/10] Capability Truth Probes & Reality Table
+----------------------------------------------------------------------
+Verified 18 standard capabilities probed. Status OK/SANDBOX: 18/18.
+
+[02/10] Host Agent Pairing & Sovereign Key Cryptography (Rule 23)
+----------------------------------------------------------------------
+Host pairing verified with Ed25519 mutual authentication and local grant enforcement.
+
+[03/10] Desktop Perception (A11y Tree First) & Interaction Dispatch
+----------------------------------------------------------------------
+Desktop perception accessibility hierarchy, password masking, and coordinate bounds enforced.
+
+[04/10] Origin-Bound Credential Vault (Rule 24)
+----------------------------------------------------------------------
+Origin-bound credential late-binding injection and zero-export invariant verified.
+
+[05/10] Governed Browser Engine & ClamAV Download Scanner (Rule 26, 32)
+----------------------------------------------------------------------
+Governed browser content delimiting and download pipeline verified.
+
+[06/10] Anti-Evasion Policy & Governed Backoff (Rule 25)
+----------------------------------------------------------------------
+Rule 25 AST repository hygiene, proxy rotation denial, and challenge halting verified.
+
+[07/10] Remote View Bounded Capture & Human Takeover (Rule 27, 28)
+----------------------------------------------------------------------
+Remote view bounded streaming, agent suppression, and handback assertions verified.
+
+[08/10] Research Hand & SearchPort Delimited Citations (Rule 26, 30)
+----------------------------------------------------------------------
+Research hand structured search and Rule 26 citation boundaries verified.
+
+[09/10] Terminal Safety Controls & Command Gating (Rule 23, 27)
+----------------------------------------------------------------------
+Terminal command classifier, sudo/rm denial, and safe execution verified.
+
+[10/10] Agent Factory Import Lane, Licence Gate & Sandboxing (Rule 5, 32)
+----------------------------------------------------------------------
+Agent Factory import lane licence gate, security scan, and sandboxing verified.
+
+======================================================================
+STEP 3 QUALIFICATION SCENARIO: 10/10 MILESTONES PASSED [GREEN]
+======================================================================
+```
+- Full Step 3 unit and contract test suite: 67 passed in 23.29s.
+- Anti-evasion linter check passes with 0 violations.
+- Added `python3 scripts/step3_scenario.py` to GitHub Actions CI under both `sqlite_dev_tests` and `contract_and_postgres_tests`.
+
 
 
 
