@@ -486,4 +486,71 @@ Sub-Step 4H verification complete. OpenCode review verdict: PASS.
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (2m29s)
   - Supply Chain, SBOM, License & Image Pinning Audit: PASS (1m51s)
 - **Commit:** `721340f`
-Proceeding to Sub-Step 4I: 24/7 autonomous daemon & self-healing.
+
+---
+
+## Sub-Step 4I: 24/7 Autonomous Daemon & Self-Healing
+
+### 1. Overview & Objectives
+Sub-Step 4I delivers ZONATA's enterprise autonomous 24/7 background supervisor daemon and self-healing subsystem:
+- **Distributed Leader Leases (`core/daemon/leader_elector.py`):**
+  - Manages cluster leadership via `scheduler_leader_leases` with 30s TTL and periodic heartbeats.
+  - Guarantees single-leader execution with automatic failover if the active leader crashes (`expires_at < now`).
+- **Dead-Letter Queue Processor (`core/daemon/dlq_processor.py`):**
+  - Drains `outbox_events` transactional events.
+  - Implements exponential backoff with jitter on transient failures.
+  - Isolates unrecoverable events to `DEAD_LETTER` once `attempts >= max_attempts` without blocking healthy partitions.
+  - Provides manual `reprocess_dead_letter(...)` capability.
+- **Autonomous Self-Healing Supervisor (`core/daemon/self_healing.py`):**
+  - Detects orphaned `RUNNING` scheduled jobs whose `lease_expires_at` is in the past and resets them to `IDLE`.
+  - Detects stalled `PROCESSING` outbox locks whose `locked_until` has expired and resets them to `PENDING`.
+  - Provides a production `CircuitBreaker` state machine (`CLOSED` -> `OPEN` -> `HALF_OPEN` -> `CLOSED`) protecting external integrations (SMTP, S3, LLM).
+- **24/7 Health Canary Probe (`core/daemon/canary_probe.py`):**
+  - Runs synthetic operational health checks covering database connectivity, outbox backlog, and KMS encryption roundtrip.
+  - Emits structured `DaemonHealthStatus` (`HEALTHY`, `DEGRADED`, `UNHEALTHY`).
+- **Autonomous Daemon (`core/daemon/autonomous_daemon.py`):**
+  - Coordinates discrete supervisory cycles (`tick()`), scheduled job execution, and catchup policies (`RUN_ONCE`, `SKIP_MISSED`).
+  - Registers OS termination signals (`SIGINT`, `SIGTERM`) for graceful shutdown, releasing leader leases.
+- **Adoption Log (`docs/reports/ADOPTION_STATUS.md`):**
+  - Updated `24/7 Autonomous Daemon` to `ADOPTED`.
+
+### 2. Real Execution Output
+```text
+======================================================================
+ZONATA Rule 34 Audit — Port Egress & Framework Anti-Bypass Linter
+Scanning directory: core
+======================================================================
+[PASS] Zero Rule 34 port bypass violations found across all frameworks.
+======================================================================
+
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 8 items
+
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_01_distributed_leader_election_and_failover PASSED [ 12%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_02_scheduled_job_execution_and_catchup_policies PASSED [ 25%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_03_outbox_dlq_processor_and_exponential_backoff PASSED [ 37%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_04_self_healing_reclaims_orphaned_jobs_and_locks PASSED [ 50%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_05_circuit_breaker_transitions PASSED [ 62%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_06_canary_health_probe PASSED [ 75%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_07_graceful_shutdown_releases_lease PASSED [ 87%]
+tests/test_step4_autonomous_daemon.py::TestStep4AutonomousDaemon::test_08_mutation_check_unhandled_crash_fails_closed PASSED [100%]
+
+============================== 8 passed in 2.12s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Durable Distributed Single-Leader Model:** Leases are tracked in `scheduler_leader_leases`. Heartbeat leases expire after 30 seconds; crashed nodes failover automatically without split-brain anomalies.
+- **Deterministic Catchup Execution:** Missed runs execute once or skip according to explicit job policy (`RUN_ONCE` vs `SKIP_MISSED`).
+- **Partition Isolation & DLQ:** Toxic events are isolated to `DEAD_LETTER` after retry limits, preventing cascade blockage of the outbox.
+- **Self-Healing Fault Tolerance:** Stalled job executions and crashed worker locks are automatically recovered to `IDLE` / `PENDING`.
+- **Circuit Breakers for Upstream Outages:** External network dependencies fast-reject requests during prolonged outages and gracefully test recovery after cooldown.
+- **Standing Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` tracks 24/7 Autonomous Daemon as `ADOPTED`.
+
+### 4. Status
+Sub-Step 4I verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4J: Golden evals & Step 4 qualification scenario.
