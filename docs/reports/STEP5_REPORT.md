@@ -106,3 +106,37 @@ tests/test_step5_identity_access.py::TestIdentityAccessGovernance::test_12_probe
 - **OpenCode Review:** `docs/reviews/step5-5c-review.md` (STATUS: PASS)
 - **CI Certification:** Run ID `45240457724` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
 
+---
+
+## Sub-Step 5D — Database & Tenant Isolation Hardening
+
+### 1. Implementation Summary
+- **Transaction-Scoped Tenant Context (Rule 43):** Refactored `PostgresConnectionWrapper._apply_rls_context()` in `core/db.py` to enforce transaction-local `set_config('zonata.tenant_id', %s, true)` and `set_config('zonata.company_id', %s, true)`. Upon transaction termination (`commit()` or `rollback()`), settings are discarded automatically by PostgreSQL, and connection wrapper resets internal cached tenant scopes.
+- **Least Privilege Database Roles (Rule 42):** Implemented `core/db_security.py` featuring `DBRoleAuditor.verify_connection_role_safety()`. Strictly audits connection roles against `pg_roles` to verify that normal application workloads do NOT run with `SUPERUSER` or `BYPASSRLS` privileges; raises `DatabaseSecurityViolation` in production mode.
+- **Forced Row-Level Security (RLS) Audit:** Built `RLSAuditor.audit_tenant_tables()` querying `pg_class`, `pg_attribute`, and `pg_policy` to verify that all tenant-bearing tables enforce RLS (`relrowsecurity = true` AND `relforcerowsecurity = true`) with valid isolation policies.
+- **Transaction Pooler Contract & Mutation Suite:** Implemented `TransactionPoolerContract.assert_no_context_leak()` proving zero cross-tenant leakage across connection reuses behind transaction poolers (PgBouncer, Neon). Validated with mutation test proving that session-scoped context (`false`) leaks data and is detected.
+- **Test Suite:** Authored `tests/test_step5_database_isolation.py` passing 7/7 tests across all isolation, role, and pooler invariants.
+
+### 2. Execution Evidence
+```text
+$ python3 -m pytest tests/test_step5_database_isolation.py -v
+============================= test session starts ==============================
+collected 7 items
+
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_01_transaction_scoped_tenant_context_rule43 PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_02_pooler_simulation_connection_reuse_zero_leak PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_03_mutation_check_session_scoped_leaks_context PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_04_db_role_safety_auditor_least_privilege_rule42 PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_05_forced_rls_auditor_enforcement PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_06_database_audit_security_integration PASSED
+tests/test_step5_database_isolation.py::TestDatabaseTenantIsolation::test_07_tenant_scope_context_manager_lifecycle PASSED
+
+============================== 7 passed in 0.88s ===============================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5d-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5d-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **CI Certification:** In progress
+
+
