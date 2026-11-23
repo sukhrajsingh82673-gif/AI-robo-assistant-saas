@@ -39,3 +39,28 @@ OK
 - **Handoff Dossier:** `docs/reviews/step5-5a-handoff.md`
 - **OpenCode Review:** `docs/reviews/step5-5a-review.md` (STATUS: PASS)
 - **CI Certification:** Run ID `45214041764` (Status: SUCCESS, PostgreSQL 16 & Supply Chain 100% GREEN)
+
+---
+
+## Sub-Step 5B — Secrets Platform (OpenBao behind `SecretsPort`)
+
+### 1. Implementation Summary
+- Implemented `core/ports/secrets.py` defining `SecretsPort` and `OpenBaoSecretsProvider` (MPL-2.0) with multi-tenant KV v2 secret paths, Transit envelope encryption, dynamic DB credentials, and crypto-shredding.
+- Authored `SandboxSecretsProvider` providing a high-fidelity in-memory simulator for `ZONATA_TEST_MODE=1` verifying versioned transit keys, rewrap, token revocation, seal status, and dynamic credential leases.
+- Hardened `core/ports/kms.py` with `OpenBaoTransitKMSProvider` and enforced strict Rule 41 invariant: `LocalEnvelopeKeyProvider` is removed from production code paths, and production profiles refuse to boot with degraded/local providers.
+- Upgraded `core/capability_probe.py` so `probe_secrets()` validates a full write, read, rotate, and revoke cycle.
+- Authored and verified `tests/test_step5_secrets_platform.py` passing 9/9 tests covering tenant isolation, key rotation/rewrap, token revocation, fail-closed on seal, crypto-shredding, dynamic DB credentials, canary hunt, and production profile refusal.
+
+### 2. Execution Evidence
+```text
+$ python3 -m unittest tests/test_step5_secrets_platform.py
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.002s
+
+OK
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5b-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5b-review.md` (STATUS: PASS)

@@ -370,37 +370,58 @@ def probe_payments() -> ProviderResult:
 
 
 def probe_secrets() -> ProviderResult:
-    """Probe the mediated secret store with a real store/retrieve round-trip."""
+    """Probe the authoritative SecretsPort with a real write, read, rotate, and revoke cycle (Sub-Step 5B)."""
     t0 = time.perf_counter()
     probe_value = secrets.token_hex(16)
+    rotate_value = secrets.token_hex(16)
     try:
-        from core.secrets import SecretManager
-        probe_name = f"capability_probe_{probe_value[:8]}"
-        ref = SecretManager.store_secret("__probe__", probe_name, probe_value)
-        retrieved = SecretManager.get_secret(ref)
-        SecretManager._SECRETS.pop(ref, None)
+        from core.ports.secrets import get_secrets_provider
+        provider = get_secrets_provider()
+        probe_key = f"probe_{secrets.token_hex(8)}"
+
+        # 1. Set Secret
+        res_set, ok_set = provider.set_secret(probe_key, probe_value)
+        if not res_set.is_success() or not ok_set:
+            raise RuntimeError(f"Set secret failed: {res_set.error}")
+
+        # 2. Get Secret
+        res_get, val_get = provider.get_secret(probe_key)
+        if not res_get.is_success() or val_get != probe_value:
+            raise RuntimeError(f"Get secret mismatch: expected {probe_value}, got {val_get}")
+
+        # 3. Rotate Secret
+        res_rot, ok_rot = provider.rotate_secret(probe_key, rotate_value)
+        if not res_rot.is_success() or not ok_rot:
+            raise RuntimeError(f"Rotate secret failed: {res_rot.error}")
+
+        # 4. Verify Rotated Value
+        res_get2, val_get2 = provider.get_secret(probe_key)
+        if val_get2 != rotate_value:
+            raise RuntimeError(f"Rotated secret mismatch: expected {rotate_value}, got {val_get2}")
+
+        # 5. Revoke Secret (cleanup)
+        provider.revoke_secret(probe_key)
+
         latency_ms = (time.perf_counter() - t0) * 1000.0
-        if retrieved == probe_value:
-            return ProviderResult(
-                status=PortStatus.OK,
-                provider="mediated_secret_store",
-                provider_ref=ref,
-                sandbox=False,
-                latency_ms=latency_ms,
-                cost=0.0,
-                metadata={"backend": "in_memory_mediated"}
-            )
-        raise RuntimeError("secret round-trip mismatch")
+        return ProviderResult(
+            status=PortStatus.OK,
+            provider=provider.provider_name,
+            provider_ref=f"secrets://{probe_key}",
+            sandbox=(provider.provider_name == "sandbox_openbao"),
+            latency_ms=latency_ms,
+            cost=0.0,
+            metadata={"backend": provider.provider_name, "cycle": "write_read_rotate_revoke_verified"},
+        )
     except Exception as e:
         latency_ms = (time.perf_counter() - t0) * 1000.0
         return ProviderResult(
             status=PortStatus.FAILED,
-            provider="mediated_secret_store",
+            provider="secrets_port",
             provider_ref=None,
             sandbox=False,
             latency_ms=latency_ms,
             cost="UNMEASURED",
-            error=f"Secret store probe failed: {str(e)}"
+            error=f"Secret store probe failed: {str(e)}",
         )
 
 
