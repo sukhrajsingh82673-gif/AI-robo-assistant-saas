@@ -3,9 +3,9 @@
 ## Environment
 - **Platform:** Android / Termux (Linux ARM64, Sovereign T0 Mode)
 - **Active Workspace:** `/data/data/com.termux/files/home/AI-robo-assistant-saas`
-- **Active Git Branch:** `step2-intelligence-execution`
+- **Active Git Branch:** `step3-hands`
 - **Remote Origin:** `https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git`
-- **Execution Status:** OpenCode Step 2 (Intelligence, Authority & Verified Execution Kernel) COMPLETE. 100% verified across all 11 sub-steps (2A-2K) in GitHub Actions CI (Run 45041196989).
+- **Execution Status:** OpenCode Step 3 (Hands: host permission, browser, desktop, credentials, software, research) COMPLETE. 100% verified across all 11 sub-steps (3A-3K) in GitHub Actions CI (Run 45127055429).
 
 ## Architectural Principles & Invariants
 1. **Truth Rule:** Nothing reports success it did not achieve. Unconfigured -> `NOT_CONFIGURED`, unbuilt -> `NOT_IMPLEMENTED`. Test fakes permitted only under `ZONATA_TEST_MODE=1` with `sandbox: true`.
@@ -220,6 +220,56 @@
     - `Job 2: SQLite Dev Profile Test Suite (2m34s)` — ID `137265820343`
     - `Job 3: PostgreSQL 16 & Service Containers Contract Tests (3m12s)` — ID `137265820130`
   - OpenCode Step 2 complete across all 11 sub-steps (2A through 2K).
+
+### OpenCode Step 3 — Hands: host permission, browser, desktop, credentials, software, research (COMPLETE)
+- [x] **3A (Preflight, Inventory, ADRs):** COMPLETE
+  - Conducted full gap analysis in `docs/reports/STEP3_INVENTORY.md` across browser, desktop, terminal, credential vault, import lane, and research hand.
+  - Authored 7 Architectural Decision Records (ADR 0001 - 0007) in `docs/adr/` with licensing and security analysis.
+  - Verified in CI Run `45050382208` (100% GREEN).
+- [x] **3B (Host Permission Model & Host Agent):** COMPLETE
+  - Built sovereign host agent (`core/host/agent.py`) with outbound-only mutual Ed25519 authentication (`core/host/pairing.py`).
+  - Implemented local grant enforcement (Rule 23) denying password managers, banking apps, and OS security settings by default (`core/host/grants.py`).
+  - Added physical kill switch instant halt and anti-replay protection.
+  - Verified in CI Run `45100113591` (100% GREEN).
+- [x] **3C (Desktop Perception and Control):** COMPLETE
+  - Implemented two-tier perception architecture: Layer 1 OS Accessibility Tree parsing with relative coordinates, falling back to Layer 2 window-bounded Vision capture.
+  - Enforced host-side password and secret input masking before frames or snapshots leave the host (Rule 24, 28).
+  - Built 11 GUI interaction primitives with coordinate boundary enforcement and physical speed throttling.
+  - Verified in CI Run `45103351997` (100% GREEN).
+- [x] **3D (Origin-Bound Credential Vault):** COMPLETE
+  - Built origin-bound vault (`core/vault/vault.py`) enforcing late-binding injection solely inside the execution engine.
+  - Enforced zero plaintext export invariant (`SecretExportForbiddenError`), cross-origin refusal (`OriginMismatchError`), and ephemeral session cookie purges.
+  - Verified in CI Run `45105885119` (100% GREEN).
+- [x] **3E (Governed Browser Engine):** COMPLETE
+  - Built governed browser automation engine (`core/browser/engine.py`) integrating Playwright with vault placeholder injection.
+  - Enforced Rule 26 content delimiting (`<<<PAGE_CONTENT>>>`) and Rule 32 download scanning with ClamAV quarantine and executable block.
+  - Verified in CI Run `45111182176` (100% GREEN).
+- [x] **3F (Anti-Evasion Policy & Dependency Deny-List):** COMPLETE
+  - Implemented Rule 25 strict anti-evasion policy: automated CI AST and manifest scanner (`scripts/anti_evasion_linter.py`) banning captcha-solvers, proxy-rotation, and stealth plugins.
+  - Built challenge policy engine (`core/browser/challenge_policy.py`) halting execution, queuing human inbox handoff, and suggesting official routes.
+  - Verified in CI Run `45116556969` (100% GREEN).
+- [x] **3G (Remote View & Human Takeover):** COMPLETE
+  - Implemented viewport-bounded frame streaming with pre-transmission credential redaction (`core/remote_view/streamer.py`).
+  - Built takeover coordinator (`core/remote_view/takeover.py`) instantly suppressing agent execution during human control and requiring explicit handback assertions.
+  - Verified in CI Run `45117206511` (100% GREEN).
+- [x] **3H (Research Hand & Search Provider):** COMPLETE
+  - Built research engine (`core/research/engine.py`) over typed `SearchPort` (`core/ports/search.py`) with SearXNG adapter.
+  - Enforced structured citation generation and untrusted search result delimiting (`<<<SEARCH_RESULTS>>>`), neutralizing prompt injections as passive data.
+  - Verified in CI Run `45117897678` (100% GREEN).
+- [x] **3I (Terminal Governance & Safety Controls):** COMPLETE
+  - Built 4-tier terminal command classifier (`core/terminal/classifier.py`): strictly blocking forbidden commands (`sudo`, `rm -rf /`, `curl | sh`), gating high-impact commands behind ActionGateway human approval, and delimiting safe output (`<<<TERMINAL_OUTPUT>>>`).
+  - Implemented sub-process supervision with hard timeout budgets and SIGKILL termination (`core/ports/terminal.py`).
+  - Verified in CI Run `45118704991` (100% GREEN).
+- [x] **3J (Agent Factory Import Lane & Sandboxing):** COMPLETE
+  - Built open-source license gate (`core/agent_import/license_gate.py`) permitting approved permissive licenses and rejecting copyleft (`GPL`, `AGPL`, `SSPL`).
+  - Added ClamAV malware scanning and AST security inspection (`core/agent_import/scanner.py`).
+  - Implemented isolated temporary scratch runner (`core/agent_import/sandbox_runner.py`) with automatic cleanup.
+  - Verified in CI Run `45119338377` (100% GREEN).
+- [x] **3K (Golden Evals & Final Step 3 Qualification Scenario):** COMPLETE
+  - Authored comprehensive qualification scenario (`scripts/step3_scenario.py`) exercising all 10 hands components across 10 qualification milestones.
+  - Full Step 3 unit and contract suite (67 passed in 23.29s).
+  - Verified end-to-end on both SQLite and live PostgreSQL 16 in CI Run `45127055429` (100% GREEN).
+
 
 ## Supervision Corrections (2026-11-21)
 - Fixed a step-1 regression: missing `import os` in `src/services/agent-engine/agent_engine.py` (caused all 121 full-suite errors).
