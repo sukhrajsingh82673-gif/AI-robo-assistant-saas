@@ -3,7 +3,7 @@
 ## Environment
 - **Platform:** Android / Termux (Linux ARM64, Sovereign T0 Mode)
 - **Active Workspace:** `/data/data/com.termux/files/home/AI-robo-assistant-saas`
-- **Active Git Branch:** `step3-hands`
+- **Active Git Branch:** `step4-durable-frameworks`
 - **Remote Origin:** `https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git`
 - **Execution Status:** OpenCode Step 3 (Hands: host permission, browser, desktop, credentials, software, research) COMPLETE. 100% verified across all 11 sub-steps (3A-3K) in GitHub Actions CI (Run 45127055429).
 
@@ -269,6 +269,22 @@
   - Authored comprehensive qualification scenario (`scripts/step3_scenario.py`) exercising all 10 hands components across 10 qualification milestones.
   - Full Step 3 unit and contract suite (67 passed in 23.29s).
   - Verified end-to-end on both SQLite and live PostgreSQL 16 in CI Run `45127055429` (100% GREEN).
+
+### OpenCode Step 4 — Durable Execution, LangGraph + Google ADK Runtimes, MCP, Observability, 24/7 Hardening (In Progress)
+- [x] **4A (Preflight, Inventory and ADRs):** COMPLETE
+  - Verified all 8 foundation dependencies from Steps 1–3 (`tests/test_step4_preflight.py`).
+  - Authored comprehensive audit of 10 target domains in `docs/reports/STEP4_INVENTORY.md`.
+  - Authored 9 formal Architectural Decision Records (`ADR 0009` through `ADR 0017`) covering Temporal topology, Decision D4-1 runtime split, LangGraph checkpointer, Google ADK extension points, MCP SDK rug-pull defenses, A2A interop, OpenTelemetry conventions, AGPL boundaries, and PostgreSQL transactional outbox.
+  - Tested 12/12 assertions passing 100% locally.
+- [ ] **4B:** Runtime ports, spec compilers & anti-bypass guards
+- [ ] **4C:** LangGraph runtime adapter & checkpointer
+- [ ] **4D:** Temporal durable execution engine & workers
+- [ ] **4E:** Framework split qualification & chaos test
+- [ ] **4F:** Google ADK hierarchical teams & loops
+- [ ] **4G:** Governed MCP client & sandboxed server
+- [ ] **4H:** OpenTelemetry instrumentation & canary
+- [ ] **4I:** 24/7 autonomous daemon & self-healing
+- [ ] **4J:** Golden evals & Step 4 qualification scenario
 
 
 ## Supervision Corrections (2026-11-21)
