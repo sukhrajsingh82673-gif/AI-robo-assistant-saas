@@ -285,11 +285,36 @@
   - Added anti-bypass linter and test suite to `.github/workflows/ci.yml`.
   - Verified 15/15 unit and mutation checks passing locally (`tests/test_step4_runtime_ports.py`).
   - Verified 100% GREEN in GitHub Actions CI Run `45153307058` across all 3 jobs (Supply Chain, SQLite Dev profile, PostgreSQL 16 contract tests).
-- [ ] **4C:** LangGraph runtime adapter & checkpointer
-- [ ] **4D:** Temporal durable execution engine & workers
-- [ ] **4E:** Framework split qualification & chaos test
-- [ ] **4F:** Google ADK hierarchical teams & loops
-- [ ] **4G:** Governed MCP client & sandboxed server
+- [x] **4C (LangGraph Runtime Adapter & Checkpointer):** COMPLETE
+  - Built `PostgresCheckpointer` (`core/langgraph/checkpointer.py`) storing encrypted checkpoints (`kms.encrypt(...)`) with fail-closed RLS on PostgreSQL 16.
+  - Built `LangGraphRuntimeAdapter` (`core/langgraph/adapter.py`) with bounded cyclic execution (Planner -> Tool Executor -> Critic, $\le 5$ iterations).
+  - Enforced Rule 34 (100% LLMGateway and ActionGateway routing) and Rule 35 (deterministic idempotency caching).
+  - Verified 7/7 unit and mutation checks passing locally (`tests/test_step4_langgraph_runtime.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45158634030`.
+- [x] **4D (Temporal Durable Execution Engine & Workers):** COMPLETE
+  - Built Temporal workflow definitions (`core/temporal/workflows.py`) with versioning `"1.0.0"` per Rule 38 and distributed kill-switch enforcement.
+  - Built Temporal activity handlers (`core/temporal/activities.py`) wrapping LLMGateway and ActionGateway with Rule 35 deterministic idempotency caching.
+  - Built `TemporalRuntimeAdapter` (`core/temporal/adapter.py`) implementing `AgentRuntimePort`.
+  - Verified 9/9 unit and mutation checks passing locally (`tests/test_step4_temporal_runtime.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45160750438`.
+- [x] **4E (Framework Split Qualification & Chaos Test):** COMPLETE
+  - Built `FrameworkRouter` (`core/framework_router.py`) enforcing Decision D4-1 matrix across `TEMPORAL`, `LANGGRAPH`, `GOOGLE_ADK`, and `LOCAL`.
+  - Built `ChaosSimulator` (`core/chaos/simulator.py`) validating worker crash recovery, heartbeat timeouts, and idempotency key replays.
+  - Verified 9/9 unit and mutation checks passing locally (`tests/test_step4_framework_split_chaos.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45164337104`.
+- [x] **4F (Google ADK Hierarchical Teams & Loops):** COMPLETE
+  - Built `ZonataADKModel` (`core/adk/model.py`) and `ZonataADKToolWrapper` (`core/adk/tool_wrapper.py`) routing through ZONATA ports.
+  - Built `ZonataADKSessionService` (`core/adk/session.py`) storing KMS-encrypted dialogues with RLS isolation.
+  - Built `HierarchicalTeamCoordinator` (`core/adk/coordinator.py`) enforcing tree depth $\le 3$ and loop count $\le 5$.
+  - Built `GoogleADKRuntimeAdapter` (`core/adk/adapter.py`) implementing `AgentRuntimePort`.
+  - Verified 10/10 unit and mutation checks passing locally (`tests/test_step4_google_adk_runtime.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45169236544`.
+- [x] **4G (Governed MCP Client & Sandboxed Server):** COMPLETE
+  - Built `GovernedMCPClient` (`core/mcp/client.py`) with Rule 39 deterministic SHA-256 schema hash pinning and prompt injection neutralization via verified description overrides.
+  - Built `SandboxedMCPServer` (`core/mcp/server.py`) handling JSON-RPC 2.0 `tools/list` and `tools/call` with defensive `wrap_untrusted_tool_output` wrapping.
+  - Implemented multi-tenant migrations `migrations/common/0033_mcp_governance.sql` and `migrations/pg/0033_mcp_governance.sql`.
+  - Verified 8/8 unit and mutation checks passing locally (`tests/test_step4_governed_mcp.py`).
+  - Verified 100% GREEN in GitHub Actions CI Run `45176513573`.
 - [ ] **4H:** OpenTelemetry instrumentation & canary
 - [ ] **4I:** 24/7 autonomous daemon & self-healing
 - [ ] **4J:** Golden evals & Step 4 qualification scenario
