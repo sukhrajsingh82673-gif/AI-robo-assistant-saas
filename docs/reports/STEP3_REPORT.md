@@ -86,4 +86,29 @@ OK
 All 9 tests passed with 100% success.
 - **Authoritative CI Run:** [45100113591](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45100113591) (100% GREEN across SQLite Dev Profile 2m4s, PostgreSQL 16 & Service Containers 3m0s, and Supply Chain, SBOM & Gitleaks Audit 2m4s).
 
+---
+
+# Sub-Step 3C — Desktop Perception and Control
+
+## 1. Overview
+Sub-Step 3C delivered standard OS accessibility perception and synthetic input control under host agent supervision:
+- **Two-Tier Perception Pipeline (ADR 0003):** Layer 1 OS accessibility tree (UIA, AXUIElement, AT-SPI) prioritized for zero token cost and sub-millisecond semantic interaction. Layer 2 (`ModelTier.VISION`) invoked only when the tree is incomplete, when high-impact actions require visual pre-confirmation (Rule 27), or when visual inspection is explicitly requested.
+- **Minimum Necessary Capture (Rule 28):** All capture strictly bounded to the granted window rectangle `[wx, wy, width, height]`. Outside contents are never captured or sent.
+- **Host-Side Masking (Rule 24):** Password fields, credentials, and challenge/CAPTCHA widgets are masked (`[MASKED_INPUT]` in tree, blackout regions in visual frames) on the host machine before any data leaves.
+- **11 GUI Interaction Primitives:** Relative coordinates `(rx, ry)` translated from granted window origin. Coordinates outside the granted window boundary are rejected locally with `OutOfGrantCoordinatesError`.
+- **Physical-Speed Throttling:** Restricts synthetic typing cadence to realistic human physiology (~12 chars/sec max, ~120 wpm) and rate-limits rapid mouse clicks to prevent OS buffer flooding.
+- **Instant Human Physical Override:** Peripheral hooks immediately halt all automation and engage the host kill switch whenever human mouse/keyboard activity is detected.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_desktop_control.py`:
+```text
+python -m unittest tests/test_step3_desktop_control.py
+----------------------------------------------------------------------
+Ran 8 tests in 1.826s
+
+OK
+```
+All 8 acceptance tests passed with 100% success.
+
+
 

@@ -31,6 +31,23 @@ from core.host.types import (
     DeniedByDefaultError,
 )
 from core.host.session import HostSessionManager
+from core.host.perception import (
+    BoundingRect,
+    AccessibilityTree,
+    AccessibilityNode,
+    PerceptionLayer,
+    PerceptionSnapshot,
+    DesktopPerceptionEngine,
+)
+from core.host.interaction import (
+    InteractionPrimitive,
+    InteractionResult,
+    OutOfGrantCoordinatesError,
+    HumanPhysicalOverrideError,
+    PhysicalSpeedThrottler,
+    HumanOverrideDetector,
+    DesktopInteractionDispatcher,
+)
 
 logger = logging.getLogger("zonata.host.agent")
 
@@ -57,6 +74,10 @@ class ZonataHostAgent:
         self._kill_switch_engaged: bool = False
         self._active_session_id: Optional[str] = None
         self._sequence_counter: int = 0
+
+        # Sub-Step 3C Desktop Perception & Interaction Engines
+        self.perception_engine = DesktopPerceptionEngine()
+        self.interaction_dispatcher = DesktopInteractionDispatcher()
 
     @property
     def public_key_hex(self) -> str:
@@ -112,6 +133,7 @@ class ZonataHostAgent:
         Immediately halts execution, drops session, and reports to cloud.
         """
         self._kill_switch_engaged = True
+        self.interaction_dispatcher.override_detector.trigger_physical_override(f"HOST_PHYSICAL_KILL_SWITCH_TRIGGERED_BY_{actor}")
         logger.critical(f"HOST KILL SWITCH TRIGGERED by {actor} on {self.device_name}!")
 
         if self._active_session_id:
@@ -159,6 +181,61 @@ class ZonataHostAgent:
     def reset_kill_switch_for_test(self) -> None:
         """Resets the kill switch flag for test environments only."""
         self._kill_switch_engaged = False
+        self.interaction_dispatcher.override_detector.reset()
+
+    def trigger_physical_override(self, reason: str = "HUMAN_PHYSICAL_INPUT_DETECTED") -> None:
+        """Called when a physical human mouse/keyboard action is detected on the workstation."""
+        self.trigger_kill_switch(actor="HUMAN_PHYSICAL")
+
+    def perceive_window(
+        self,
+        window_bounds: BoundingRect,
+        accessibility_data: Optional[Dict[str, Any]] = None,
+        frame_metadata: Optional[Dict[str, Any]] = None,
+        force_vision: bool = False,
+        is_high_impact: bool = False,
+        visual_inspection_task: bool = False,
+        prompt_override: Optional[str] = None,
+    ) -> PerceptionSnapshot:
+        """Executes two-tier perception over the granted window bounds."""
+        if self._kill_switch_engaged or self.interaction_dispatcher.override_detector.is_override_active:
+            raise HostSecurityViolation("Host kill switch or human override is engaged. Perception halted.")
+        return self.perception_engine.perceive(
+            tenant_id=self.tenant_id or "default_tenant",
+            company_id=self.company_id or "default_company",
+            window_bounds=window_bounds,
+            accessibility_data=accessibility_data,
+            frame_metadata=frame_metadata,
+            force_vision=force_vision,
+            is_high_impact=is_high_impact,
+            visual_inspection_task=visual_inspection_task,
+            prompt_override=prompt_override,
+        )
+
+    def dispatch_gui_action(
+        self,
+        primitive: InteractionPrimitive,
+        window_bounds: BoundingRect,
+        relative_coords: Optional[Tuple[int, int]] = None,
+        drag_end_relative: Optional[Tuple[int, int]] = None,
+        text: Optional[str] = None,
+        key_name: Optional[str] = None,
+        scroll_delta: Optional[int] = None,
+    ) -> InteractionResult:
+        """Executes a GUI interaction primitive with coordinate and physical rate bounds."""
+        if self._kill_switch_engaged or self.interaction_dispatcher.override_detector.is_override_active:
+            raise HostSecurityViolation("Host kill switch or human override is engaged. Interaction halted.")
+        return self.interaction_dispatcher.dispatch(
+            tenant_id=self.tenant_id or "default_tenant",
+            company_id=self.company_id or "default_company",
+            primitive=primitive,
+            window_bounds=window_bounds,
+            relative_coords=relative_coords,
+            drag_end_relative=drag_end_relative,
+            text=text,
+            key_name=key_name,
+            scroll_delta=scroll_delta,
+        )
 
     def execute_command(self, command_payload: Dict[str, Any]) -> Dict[str, Any]:
         """

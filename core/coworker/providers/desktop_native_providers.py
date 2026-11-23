@@ -359,6 +359,18 @@ class LinuxDesktopProvider(BaseNativeDesktopProvider):
         engine = ComputerUseEngine.get_instance()
 
         if capability == "desktop.accessibility_tree":
+            raw_tree = params.get("accessibility_data") or params.get("tree_data")
+            if raw_tree:
+                from core.host.perception import DesktopPerceptionEngine, BoundingRect
+                engine_perc = DesktopPerceptionEngine()
+                bounds_data = params.get("window_bounds", {"x": 0, "y": 0, "width": 1920, "height": 1080})
+                bounds = BoundingRect.from_dict(bounds_data)
+                parsed = engine_perc.parse_accessibility_snapshot(raw_tree, bounds)
+                return self._gui_result(capability, exec_id, start_time, True, None, {
+                    "platform": "linux",
+                    "tree": parsed.to_dict(),
+                    "interactable_count": len(parsed.get_interactable_nodes()),
+                })
             return self._gui_result(capability, exec_id, start_time, False,
                                     "ACCESSIBILITY_TREE_NOT_AVAILABLE", {"platform": "linux"})
 
