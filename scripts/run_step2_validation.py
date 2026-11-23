@@ -558,7 +558,8 @@ def run():
         "overall_verdict": "RESTRICTED PILOT GO" if len(failed) == 0 else "CONDITIONAL GO"
     }
 
-    with open("/root/roboassistant/scripts/step2_audit_results.json", "w") as f:
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "step2_audit_results.json")
+    with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 
 if __name__ == "__main__":

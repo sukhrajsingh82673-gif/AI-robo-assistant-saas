@@ -244,3 +244,109 @@ def metric_brief(metrics: Dict[str, Any]) -> List[str]:
         f"(not posted to the P&L until approved).",
     ]
     return lines
+
+
+# ==============================================================================
+# SUB-STEP 2B: DETERMINISTIC CALCULATOR & CLOCK TOOLS (RULE 18)
+# Models call these tools instead of performing internal arithmetic.
+# ==============================================================================
+
+import ast
+import operator
+import re
+
+_ALLOWED_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def deterministic_calculator(expression: str) -> float | int:
+    """Safe, deterministic math expression evaluator using AST parsing.
+    
+    Permits only numeric constants and standard arithmetic operators (+, -, *, /, //, %, **).
+    Rejects attribute access, function calls, variable lookups, and syntax manipulation.
+    """
+    clean_expr = expression.strip()
+    if not clean_expr:
+        raise ValueError("Empty mathematical expression")
+
+    try:
+        parsed = ast.parse(clean_expr, mode="eval")
+    except SyntaxError as e:
+        raise ValueError(f"Malformed mathematical expression: {e}")
+
+    def _eval_node(node):
+        if isinstance(node, ast.Expression):
+            return _eval_node(node.body)
+        elif isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return node.value
+            raise ValueError(f"Disallowed constant type in expression: {type(node.value)}")
+        elif isinstance(node, ast.UnaryOp):
+            op_type = type(node.op)
+            if op_type in _ALLOWED_OPS:
+                return _ALLOWED_OPS[op_type](_eval_node(node.operand))
+            raise ValueError(f"Unsupported unary operator: {op_type}")
+        elif isinstance(node, ast.BinOp):
+            op_type = type(node.op)
+            if op_type in _ALLOWED_OPS:
+                left = _eval_node(node.left)
+                right = _eval_node(node.right)
+                if op_type in (ast.Div, ast.FloorDiv, ast.Mod) and right == 0:
+                    raise ZeroDivisionError("Division by zero in deterministic calculation")
+                return _ALLOWED_OPS[op_type](left, right)
+            raise ValueError(f"Unsupported binary operator: {op_type}")
+        else:
+            raise ValueError(f"Forbidden AST element in expression: {type(node).__name__}")
+
+    res = _eval_node(parsed)
+    return res
+
+
+def deterministic_percentage(part: float | int, total: float | int, round_digits: int = 2) -> float:
+    """Compute percentage deterministically with zero-division safeguard."""
+    if not total:
+        return 0.0
+    return round((float(part) / float(total)) * 100.0, round_digits)
+
+
+def deterministic_clock(now: Optional[float] = None) -> Dict[str, Any]:
+    """Deterministic time and date oracle for agent runtimes."""
+    import time as _time
+    ts = now if now is not None else _time.time()
+    dt = _dt.datetime.fromtimestamp(ts, tz=_dt.timezone.utc)
+    return {
+        "timestamp": ts,
+        "isoformat": dt.isoformat(),
+        "year": dt.year,
+        "month": dt.month,
+        "day": dt.day,
+        "hour": dt.hour,
+        "minute": dt.minute,
+        "second": dt.second,
+        "day_of_week": dt.strftime("%A"),
+        "is_weekend": dt.weekday() >= 5,
+    }
+
+
+def deterministic_date_add(base_iso: str, days: int = 0, hours: int = 0) -> str:
+    """Add days or hours to an ISO date string and return resulting ISO format."""
+    dt = _dt.datetime.fromisoformat(base_iso.replace("Z", "+00:00"))
+    res = dt + _dt.timedelta(days=days, hours=hours)
+    return res.isoformat()
+
+
+def deterministic_date_diff_days(iso1: str, iso2: str) -> int:
+    """Calculate integer day difference between two ISO timestamps."""
+    d1 = _dt.datetime.fromisoformat(iso1.replace("Z", "+00:00"))
+    d2 = _dt.datetime.fromisoformat(iso2.replace("Z", "+00:00"))
+    return (d1.date() - d2.date()).days
+

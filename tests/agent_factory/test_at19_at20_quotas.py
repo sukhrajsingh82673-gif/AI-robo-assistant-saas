@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+from pathlib import Path
 import pytest
 from agent_factory.api.routes import AgentFactoryRouter
 from agent_factory.control.quotas import ensure_quotas_seeded, reserve_quota
@@ -10,7 +11,7 @@ from agent_factory.control.quotas import ensure_quotas_seeded, reserve_quota
 @pytest.fixture
 def test_db(tmp_path):
     db_file = str(tmp_path / "test_at19_at20.db")
-    schema_path = "/data/data/com.termux/files/home/AI-robo-assistant-saas/migrations/sqlite/0013_agent_factory_core.sql"
+    schema_path = str(Path(__file__).resolve().parents[2] / "migrations" / "sqlite" / "0013_agent_factory_core.sql")
     with open(schema_path, "r") as f:
         schema = f.read()
     conn = sqlite3.connect(db_file)

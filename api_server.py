@@ -1059,60 +1059,16 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Standard Health & Liveness Endpoints (Public)
         if path == "/readyz":
-            if not db.is_ready():
-                self._send_json({
-                    "status": "UNREADY",
-                    "database": "UNAVAILABLE",
-                    "error": "Database readiness verification not completed",
-                    "timestamp": time.time()
-                }, status=503)
-                return
-            git_meta = _git_metadata()
-            git_commit = git_meta["commit"]
-            git_branch = git_meta["branch"]
-            db_state = _database_status()
-            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
-            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
-            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
-            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
-            # Authoritative Merkle ledger integrity check, cached briefly so
-            # liveness probes stay fast under concurrent load. The cached value
-            # is a real verification result, not a fabricated constant.
-            merkle_status = _platform_merkle_status()
-            envelope_data = {
-                "max_organizations": int(os.environ.get("MAX_DESIGN_PARTNER_ORGS", "100" if is_ga_mode else "3")),
-                "max_concurrency_leases_per_tenant": int(os.environ.get("PILOT_MAX_CONCURRENCY", "10" if is_ga_mode else "4")),
-                "max_rpm_per_tenant": int(os.environ.get("PILOT_MAX_RPM", "120" if is_ga_mode else "60")),
-                "mode": "GA" if is_ga_mode else "RESTRICTED_PILOT",
-                "status": "ENFORCED"
-            }
-            self._send_json({
-                "status": "HEALTHY" if db_state == "CONNECTED" else "DEGRADED",
-                "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
-                "version": release_version,
-                "release_scope": release_scope,
-                "commit": git_commit,
-                "branch": git_branch,
-                "database": db_state,
-                "database_dialect": db.get_dialect(),
-                "merkle_ledger": merkle_status,
-                "server_mode": "MULTI_THREADED_CONCURRENT",
-                "cryptography_version": CRYPTOGRAPHY_VERSION,
-                "pilot_envelope": envelope_data,
-                "operating_envelope": envelope_data,
-                "timestamp": time.time()
-            })
+            from core.baseline.health import check_readiness
+            code, payload = check_readiness()
+            self._send_json(payload, status=code)
             return
 
         if path in ("/health", "/healthz", "/livez", "/api/v1/health"):
-            git_meta = _git_metadata()
-            git_commit = git_meta["commit"]
-            git_branch = git_meta["branch"]
-            db_state = _database_status()
-            is_ga_mode = os.environ.get("ZONATA_PUBLIC_GA_MODE", "0") == "1" or os.environ.get("ZONATA_RESTRICTED_PILOT_MODE", "1") == "0"
-            default_version = "1.0.0-GA" if is_ga_mode else "1.0.0-RESTRICTED-PILOT"
-            release_version = os.environ.get("APP_RELEASE_VERSION", default_version)
-            release_scope = "URA / ZONATA — PUBLIC GA PRODUCTION" if is_ga_mode else "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+            from core.baseline.health import check_liveness
+            code, payload = check_liveness()
+            self._send_json(payload, status=code)
+            return
             # Authoritative Merkle ledger integrity check — derived honestly from ledger verifier
             try:
                 ledger_audit = _ledger_for("tnt_primary").verify_full_chain_integrity()
@@ -1502,6 +1458,147 @@ class RoboAssistantRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "GET", path, query_params, {}, auth_context, company_id
             )
             self._send_json(payload, status=status_code)
+            return
+
+        # OpenCode Step 1C: System Capabilities Truth API (Admin only, zero secrets)
+        if path == "/api/system/capabilities":
+            role = str(auth_context.get("role") or "").lower()
+            allowed_roles = {"owner", "admin", "global_admin", "executive"}
+            if role not in allowed_roles:
+                self._send_json({
+                    "error": "Forbidden",
+                    "detail": "Admin or Owner role required to access sovereign capability truth table."
+                }, status=403)
+                return
+
+            from core.capability_probe import probe_all_capabilities, summarize_capabilities
+            probe_results = probe_all_capabilities()
+            summary = summarize_capabilities(probe_results)
+
+            plain_language_map = {
+                "OK": "live",
+                "ACCEPTED_BY_PROVIDER": "live",
+                "SANDBOX": "test only",
+                "NOT_CONFIGURED": "not connected",
+                "DEGRADED": "degraded",
+                "NOT_IMPLEMENTED": "not implemented",
+                "FAILED": "failed",
+            }
+
+            cleaned_capabilities = {}
+            for cap_name, res in sorted(probe_results.items()):
+                data = res.to_dict()
+                st = data["status"]
+                data["plain_language"] = plain_language_map.get(st, st.lower())
+                # Secret scrub (Rule 10)
+                meta = data.get("metadata", {})
+                safe_meta = {}
+                for k, v in meta.items():
+                    if any(secret_term in k.lower() for secret_term in ["token", "key", "password", "secret", "credential"]):
+                        safe_meta[k] = "[REDACTED]"
+                    else:
+                        safe_meta[k] = v
+                data["metadata"] = safe_meta
+                cleaned_capabilities[cap_name] = data
+
+            self._send_json({
+                "status": "OK",
+                "summary": summary,
+                "capabilities": cleaned_capabilities
+            })
+            return
+
+        # Settings View: HTML page showing truth table in plain language to owners
+        if path in ("/settings/capabilities", "/api/system/capabilities/view"):
+            role = str(auth_context.get("role") or "").lower()
+            allowed_roles = {"owner", "admin", "global_admin", "executive"}
+            if role not in allowed_roles:
+                self._send_json({
+                    "error": "Forbidden",
+                    "detail": "Admin or Owner role required to view capability status."
+                }, status=403)
+                return
+
+            from core.capability_probe import probe_all_capabilities, summarize_capabilities
+            probe_results = probe_all_capabilities()
+            summary = summarize_capabilities(probe_results)
+
+            plain_language_map = {
+                "OK": ("live", "#10b981", "#d1fae5"),
+                "ACCEPTED_BY_PROVIDER": ("live", "#10b981", "#d1fae5"),
+                "SANDBOX": ("test only", "#3b82f6", "#dbeafe"),
+                "NOT_CONFIGURED": ("not connected", "#6b7280", "#f3f4f6"),
+                "DEGRADED": ("degraded", "#f59e0b", "#fef3c7"),
+                "NOT_IMPLEMENTED": ("not implemented", "#64748b", "#f1f5f9"),
+                "FAILED": ("failed", "#ef4444", "#fee2e2"),
+            }
+
+            rows = []
+            for cap_name, res in sorted(probe_results.items()):
+                st = res.status.value if hasattr(res.status, "value") else str(res.status)
+                plain_lbl, color, bg = plain_language_map.get(st, (st.lower(), "#6b7280", "#f3f4f6"))
+                rows.append(
+                    f"<tr>"
+                    f"<td style='padding: 10px; font-weight: 600;'>{cap_name}</td>"
+                    f"<td style='padding: 10px;'><span style='background: {bg}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;'>{plain_lbl.upper()}</span></td>"
+                    f"<td style='padding: 10px; font-family: monospace;'>{res.latency_ms:.2f} ms</td>"
+                    f"<td style='padding: 10px;'>{res.provider}</td>"
+                    f"<td style='padding: 10px; font-size: 0.85em; color: #666;'>{res.error or res.provider_ref or '-'}</td>"
+                    f"</tr>"
+                )
+
+            rows_html = "\n".join(rows)
+            html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ZONATA — System Capabilities Truth Table</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }}
+        .container {{ max-width: 1000px; margin: 0 auto; background: #1e293b; border-radius: 8px; padding: 2rem; border: 1px solid #334155; }}
+        h1 {{ margin-top: 0; font-size: 1.5rem; }}
+        .summary {{ display: flex; gap: 1rem; margin-bottom: 1.5rem; }}
+        .card {{ background: #0f172a; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid #334155; font-size: 0.9rem; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
+        th {{ text-align: left; padding: 10px; border-bottom: 2px solid #334155; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; }}
+        td {{ border-bottom: 1px solid #334155; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sovereign System Capabilities Truth Table</h1>
+        <div class="summary">
+            <div class="card">Live: <strong>{summary['live']}</strong></div>
+            <div class="card">Test Only: <strong>{summary['test_only']}</strong></div>
+            <div class="card">Not Connected: <strong>{summary['not_connected']}</strong></div>
+            <div class="card">Not Implemented: <strong>{summary['not_implemented']}</strong></div>
+            <div class="card">Degraded: <strong>{summary['degraded']}</strong></div>
+            <div class="card">Failed: <strong>{summary['failed']}</strong></div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Capability</th>
+                    <th>Status</th>
+                    <th>Latency</th>
+                    <th>Provider</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>"""
+            html_bytes = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html_bytes)))
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(html_bytes)
             return
 
         if path == "/api/auth/me":
@@ -10348,6 +10445,20 @@ def run_server(port=8080):
     is_prod = (app_env == "production") or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1") or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
     if is_prod and os.environ.get("ZONATA_ALLOW_HOST_SHELL", "0") == "1":
         raise RuntimeError("Security Invariant Violation: ZONATA_ALLOW_HOST_SHELL=1 is strictly prohibited in production mode. Refusing server startup.")
+
+    if is_prod:
+        allow_degraded = os.environ.get("ZONATA_ALLOW_DEGRADED", "0") == "1"
+        if db.dialect == DatabaseDialect.SQLITE and not allow_degraded:
+            raise RuntimeError(
+                "Production Profile Refusal: Running on SQLite in production mode is strictly prohibited. "
+                "PostgreSQL 16 is authoritative. Set ZONATA_ALLOW_DEGRADED=1 to bypass for testing/degraded mode."
+            )
+        model_provider = os.environ.get("ZONATA_MODEL_PROVIDER", "embedded_free").lower()
+        if model_provider in ("embedded_free", "mock", "none") and not allow_degraded:
+            raise RuntimeError(
+                "Production Profile Refusal: Running with 'embedded_free' model provider in production mode is strictly prohibited. "
+                "Configure a verified model provider or set ZONATA_ALLOW_DEGRADED=1 to bypass for testing/degraded mode."
+            )
 
     # Enforce database connectivity readiness verification before binding or starting workers
     db.verify_readiness()

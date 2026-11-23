@@ -58,14 +58,14 @@ import settings_migration_dry_run as dry_run  # noqa: E402
 class TestRegistryIntegrity(unittest.TestCase):
     def test_counts_are_exact(self):
         counts = settings_registry.counts()
-        self.assertEqual(counts["total"], 202)
-        self.assertEqual(counts["categories"], 45)
+        self.assertEqual(counts["total"], 214)
+        self.assertEqual(counts["categories"], 46)
         self.assertEqual(counts["sections"], 16)
-        self.assertEqual(counts["live"] + counts["coming_soon"] + counts["hidden"] + counts["action"], 202)
-        self.assertEqual(counts["live"], 19)
+        self.assertEqual(counts["live"] + counts["coming_soon"] + counts["hidden"] + counts["action"], 214)
+        self.assertEqual(counts["live"], 30)
         self.assertEqual(counts["action"], 2)
         self.assertEqual(counts["hidden"], 4)
-        self.assertEqual(counts["coming_soon"], 177)
+        self.assertEqual(counts["coming_soon"], 178)
 
     def test_keys_are_unique_and_match_source(self):
         keys = [definition.key for definition in settings_registry.all()]
@@ -74,7 +74,7 @@ class TestRegistryIntegrity(unittest.TestCase):
 
     def test_every_category_is_mapped_once(self):
         category_ids = [str(category["id"]) for category in CATEGORIES_CATALOG]
-        self.assertEqual(len(category_ids), 45)
+        self.assertEqual(len(category_ids), 46)
         self.assertEqual(set(category_ids), set(CATEGORY_TO_SECTION))
         for category in category_ids:
             self.assertIn(CATEGORY_TO_SECTION[category], SECTION_IDS)

@@ -1,0 +1,184 @@
+department: procurement
+tasks:
+  - id: proc_001
+    name: "Purchase Requisition Authority Matrix Routing"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_procurement_requisitions"
+      data:
+        requisition_id: "REQ-771"
+        requisition_amount_minor_units: 4500000
+        approver_limit_minor_units: 5000000
+    task: "Check requisition against department head authority limits and auto-approve or route to CFO."
+    acceptance_criteria:
+      - "authority_limit_checked"
+    scoring:
+      required_fields:
+        - "approved_within_limit"
+        - "routing"
+
+  - id: proc_002
+    name: "Competitive Vendor RFP Bid Tabulation and Scoring"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_rfp_evaluations"
+      data:
+        rfp_id: "RFP-FIBER-2026"
+        vendor_bids:
+          - vendor_id: "VEND-ALPHA"
+            total_cost: 12000000
+            sla_uptime: 99.99
+          - vendor_id: "VEND-BETA"
+            total_cost: 14500000
+            sla_uptime: 99.95
+    task: "Tabulate vendor cost and SLA metrics to determine best-value compliant provider."
+    acceptance_criteria:
+      - "bids_tabulated"
+    scoring:
+      required_fields:
+        - "selected_vendor"
+        - "routing"
+
+  - id: proc_003
+    name: "Supplier Anti-Bribery and Sanctions Screening"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_supplier_diligence"
+      data:
+        supplier_name: "Apex Hardware Export Ltd"
+        jurisdiction: "Singapore"
+        ofac_match: false
+        pep_involvement: false
+    task: "Verify that supplier passes international sanctions and export control compliance screening."
+    acceptance_criteria:
+      - "sanctions_screened"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_004
+    name: "Master Services Agreement (MSA) Rate Card Audit"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_rate_cards"
+      data:
+        vendor: "Elite Consulting Services"
+        contracted_hourly_rate_usd: 175.0
+        invoiced_hourly_rate_usd: 175.0
+    task: "Verify contractor billed rates match agreed pricing rate card in parent supplier contract."
+    acceptance_criteria:
+      - "rates_reconciled"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_005
+    name: "Blanket Purchase Order Cumulative Spend Tracking"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_blanket_pos"
+      data:
+        bpo_id: "BPO-2026-01"
+        bpo_cap_minor_units: 50000000
+        current_cumulative_spend_minor_units: 42000000
+        new_invoice_minor_units: 3500000
+    task: "Verify that new release against blanket purchase order does not exceed total contracted ceiling."
+    acceptance_criteria:
+      - "bpo_cap_verified"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_006
+    name: "Single-Source Procurement Justification Verification"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_sole_source_waivers"
+      data:
+        item: "Proprietary Optical Lithography Laser Diode"
+        alternative_vendors_count: 0
+        justification_code: "PATENTED_SOLE_SOURCE"
+    task: "Audit non-competitive bid justification against corporate governance compliance requirements."
+    acceptance_criteria:
+      - "waiver_validated"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_007
+    name: "Supplier Environmental and Safety Certification Audit"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_vendor_certificates"
+      data:
+        supplier_id: "SUPP-882"
+        iso_14001_certified: true
+        iso_9001_certified: true
+        certificate_expiry_year: 2028
+    task: "Confirm active status of supplier ISO quality and environmental standards certifications."
+    acceptance_criteria:
+      - "certifications_verified"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_008
+    name: "Volume Discount Tier Rebate Calculation"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_volume_rebates"
+      data:
+        annual_spend_minor_units: 120000000
+        tier_threshold_minor_units: 100000000
+        rebate_percent: 3.5
+    task: "Calculate earned vendor volume rebate credit for exceeding annual spend tier."
+    acceptance_criteria:
+      - "rebate_calculated"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_009
+    name: "Vendor Late Delivery Contractual Penalty Calculation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_supplier_sla"
+      data:
+        po_id: "PO-902"
+        contracted_delivery_date: "2026-11-01"
+        actual_delivery_date: "2026-11-08"
+        days_late: 7
+        penalty_per_day_minor_units: 50000
+    task: "Compute liquidated damages penalty to be deducted from vendor payment invoice."
+    acceptance_criteria:
+      - "penalty_calculated"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: proc_010
+    name: "Supplier Contract Termination Notice Period Verification"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_supplier_contracts"
+      data:
+        contract_id: "VCON-310"
+        required_notice_days: 90
+        effective_termination_date: "2027-03-01"
+        notice_served_date: "2026-11-20"
+    task: "Verify that notice of termination for convenience adheres to contractual lead-time requirements."
+    acceptance_criteria:
+      - "notice_period_verified"
+    scoring:
+      required_fields:
+        - "routing"

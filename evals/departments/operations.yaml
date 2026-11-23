@@ -1,0 +1,198 @@
+department: operations
+tasks:
+  - id: ops_001
+    name: "Warehouse Safety Stock Depletion Alert"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_inventory_central"
+      data:
+        stock_level: 45
+        safety_threshold: 100
+        sku: "SKU-PACK-09"
+    task: "Compare current SKU physical inventory against safety threshold and trigger reorder alert if depleted."
+    acceptance_criteria:
+      - "safety_stock_checked"
+    scoring:
+      required_fields:
+        - "threshold_breached"
+        - "action"
+
+  - id: ops_002
+    name: "Fulfillment SLA Breach Escalation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_order_fulfillment"
+      data:
+        order_id: "ORD-99120"
+        sla_target_minutes: 120
+        actual_minutes: 145
+    task: "Detect order processing time exceeding SLA and trigger logistics dispatcher notification."
+    acceptance_criteria:
+      - "sla_checked"
+    scoring:
+      required_fields:
+        - "sla_breached"
+        - "action"
+
+  - id: ops_003
+    name: "Preventative Maintenance Schedule Generation"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_machinery_logs"
+      data:
+        machine_id: "CONVEYOR-04"
+        run_hours: 520
+        maintenance_interval_hours: 500
+        stock_level: 10
+        safety_threshold: 20
+    task: "Schedule mandatory preventative maintenance routine when operational run hours exceed limit."
+    acceptance_criteria:
+      - "schedule_generated"
+    scoring:
+      required_fields:
+        - "action"
+
+  - id: ops_004
+    name: "Shift Roster Rest Hours Validation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_shift_scheduling"
+      data:
+        shift_worker_id: "WRK-501"
+        rest_hours_between_shifts: 8
+        min_required_rest_hours: 11
+        stock_level: 15
+        safety_threshold: 10
+    task: "Verify that work schedule complies with statutory minimum rest periods between consecutive shifts."
+    acceptance_criteria:
+      - "shift_rest_verified"
+    scoring:
+      required_fields:
+        - "action"
+
+  - id: ops_005
+    name: "Incident Runbook Automated Dispatch"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_incident_management"
+      data:
+        incident_id: "INC-8891"
+        severity: "P1"
+        system: "Edge Gateway Router"
+        sla_target_minutes: 15
+        actual_minutes: 20
+    task: "Categorize infrastructure outage incident and trigger high-priority paging runbook."
+    acceptance_criteria:
+      - "runbook_dispatched"
+    scoring:
+      required_fields:
+        - "action"
+
+  - id: ops_006
+    name: "Warehouse Bin Location Optimization"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_warehouse_layout"
+      data:
+        sku: "SKU-FAST-01"
+        pick_frequency: "VERY_HIGH"
+        suggested_zone: "ZONE_A_FRONT"
+        stock_level: 250
+        safety_threshold: 50
+    task: "Validate bin slotting allocation to minimize forklift transit time for fast-moving items."
+    acceptance_criteria:
+      - "bin_allocated"
+    scoring:
+      required_fields:
+        - "action"
+
+  - id: ops_007
+    name: "Freight Courier Delivery Performance Scoring"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_carrier_metrics"
+      data:
+        carrier: "SwiftFreight"
+        on_time_shipments: 480
+        total_shipments: 500
+        sla_target_minutes: 60
+        actual_minutes: 45
+    task: "Calculate monthly on-time delivery rate for third-party logistics courier partner."
+    acceptance_criteria:
+      - "on_time_rate_computed"
+    scoring:
+      required_fields:
+        - "action"
+
+  - id: ops_008
+    name: "Quality Assurance Defect Clumping Detection"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_qa_assembly_line"
+      data:
+        batch_id: "BAT-2026-11-20"
+        units_inspected: 1000
+        defects_found: 18
+        defect_threshold_ppm: 10000
+        stock_level: 5
+        safety_threshold: 10
+    task: "Detect assembly line defect density anomalies and trigger Kaizen investigation if above threshold."
+    acceptance_criteria:
+      - "defect_density_checked"
+    scoring:
+      required_fields:
+        - "threshold_breached"
+        - "action"
+
+  - id: ops_009
+    name: "Supply Chain Bottleneck Stage Identification"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_value_stream_mapping"
+      data:
+        stages:
+          - name: "Assembly"
+            avg_duration_minutes: 15
+          - name: "Testing"
+            avg_duration_minutes: 45
+          - name: "Packaging"
+            avg_duration_minutes: 10
+        sla_target_minutes: 60
+        actual_minutes: 70
+    task: "Identify critical path bottleneck stage with longest cycle time in manufacturing pipeline."
+    acceptance_criteria:
+      - "bottleneck_identified"
+    scoring:
+      required_fields:
+        - "sla_breached"
+        - "action"
+
+  - id: ops_010
+    name: "Cold Chain Temperature Excursion Audit"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_cold_chain_telemetry"
+      data:
+        sensor_id: "TEMP-REEFER-02"
+        max_allowed_temp_c: 4.0
+        recorded_temp_c: 6.2
+        duration_minutes: 25
+        stock_level: 2
+        safety_threshold: 10
+    task: "Verify refrigerated transport temperature records and flag cargo quarantine if limits exceeded."
+    acceptance_criteria:
+      - "temperature_excursion_flagged"
+    scoring:
+      required_fields:
+        - "threshold_breached"
+        - "action"

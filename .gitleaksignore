@@ -1,0 +1,4 @@
+# Gitleaks ignore file
+# Ignores false positive on in-memory Ed25519 key generation
+5ccbdd63346951081dbc1a7fa58650717b62ca75:core/host/agent.py:generic-api-key:52
+92a4c7de27912f9288721d1745f3e3108571f95f:core/host/agent.py:generic-api-key:52

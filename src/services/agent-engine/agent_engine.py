@@ -13,6 +13,7 @@ import uuid
 import time
 import math
 import random
+import os
 
 # Centralized secret and config manager integration
 try:
@@ -42,7 +43,7 @@ class AgentEngineConfigManager:
         "heartbeat_jitter_seconds": 2.5,
         "default_model_adapter": "gemini_local",
         "delegation_max_depth": 5,
-        "workspace_root": "/root/roboassistant/storage",
+        "workspace_root": os.environ.get("ZONATA_STORAGE_ROOT", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "storage")),
     }
 
     @classmethod
