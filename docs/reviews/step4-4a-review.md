@@ -24,10 +24,13 @@
 | **ADR 0016 (Observability & AGPL)** | Clear boundary isolation for Prometheus/Jaeger (Apache-2.0) vs Grafana/Loki/Tempo (AGPL-3.0). | Fully documented in `docs/architecture/ADR_0016_OBSERVABILITY_BACKENDS_AND_AGPL_BOUNDARY.md`. | **PASS** |
 | **ADR 0017 (Outbox vs NATS)** | Selection of transactional PostgreSQL outbox for transactional ACID safety, retaining outbox pattern. | Fully documented in `docs/architecture/ADR_0017_NATS_VS_POSTGRES_OUTBOX.md`. | **PASS** |
 | **Acceptance Testing** | Unit tests verifying gate dependencies, inventory coverage, ADR validity, and mutation checks. | `tests/test_step4_preflight.py` ran 12 tests in 0.76s with 100% PASS. | **PASS** |
+| **CI Verification** | GitHub Actions 3-job workflow passes 100% green on branch `step4-durable-frameworks`. | Run ID `45137351358` passed (Supply Chain, SQLite Dev, and PostgreSQL 16 Contract Tests). | **PASS** |
 
 ---
 
 ## 2. Reviewer Verdict
 
 **STATUS: PASS.**  
-Sub-Step 4A satisfies all gate requirements, inventory documentation, architectural decision records, and acceptance testing. The builder is authorized to commit Sub-Step 4A and proceed to Sub-Step 4B (`Runtime ports, spec compilers & anti-bypass guards`).
+- **GitHub Actions CI Run:** [45137351358](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45137351358)
+- **Commit:** `16ce16d`
+Sub-Step 4A satisfies all gate requirements, inventory documentation, architectural decision records, acceptance testing, and CI verification. The builder is authorized to proceed to Sub-Step 4B (`Runtime ports, spec compilers & anti-bypass guards`).
