@@ -421,70 +421,28 @@ class LangGraphRuntimeAdapter(AgentRuntimePort):
 class TemporalRuntimeAdapter(AgentRuntimePort):
     """Adapter for Temporal durable execution workflows (ADR 0009, ADR 0010).
     
-    Fails closed when temporalio or server is not available. Conforms to
-    Truth Rule 1. Full engine implemented in Sub-Step 4D.
+    Delegates to core.temporal.adapter.TemporalRuntimeAdapter.
     """
 
     def __init__(self, provider_name: str = "temporal_runtime", sandbox: bool = False):
         super().__init__(provider_name=provider_name, sandbox=sandbox)
-        self._server_host = os.environ.get("TEMPORAL_HOST", "")
-        self._has_sdk = False
-        try:
-            import temporalio  # type: ignore
-            self._has_sdk = True
-        except ImportError:
-            self._has_sdk = False
+        from core.temporal.adapter import TemporalRuntimeAdapter as RealTemporalAdapter
+        self._delegate = RealTemporalAdapter(provider_name=provider_name, sandbox=sandbox)
 
     def probe(self) -> ProviderResult:
-        if not self._has_sdk or not self._server_host:
-            if os.environ.get("ZONATA_TEST_MODE") == "1" or self.sandbox:
-                return ProviderResult(
-                    status=PortStatus.SANDBOX,
-                    provider=self.provider_name,
-                    provider_ref="sandbox_temporal",
-                    sandbox=True,
-                    metadata={"target": "temporal", "mode": "simulated_sandbox"},
-                )
-            return ProviderResult(
-                status=PortStatus.NOT_CONFIGURED,
-                provider=self.provider_name,
-                error="Temporal server or temporalio SDK not configured",
-            )
-        return ProviderResult(
-            status=PortStatus.OK,
-            provider=self.provider_name,
-            provider_ref=f"temporal_{self._server_host}",
-            metadata={"target": "temporal", "host": self._server_host},
-        )
+        return self._delegate.probe()
 
     def execute_agent(self, spec: AgentSpec, input_data: Dict[str, Any], context: ExecutionContext) -> AgentResult:
-        probe = self.probe()
-        if probe.status == PortStatus.NOT_CONFIGURED:
-            return AgentResult(
-                status=PortStatus.NOT_CONFIGURED,
-                provider=self.provider_name,
-                run_id=context.run_id,
-                state=AgentRuntimeStatus.FAILED,
-                error="Temporal runtime adapter is not configured in this environment",
-            )
-        return AgentResult(
-            status=probe.status,
-            provider=self.provider_name,
-            sandbox=probe.sandbox,
-            run_id=context.run_id,
-            state=AgentRuntimeStatus.COMPLETED,
-            output={"framework": "temporal", "workflow_id": f"wf_{context.run_id}"},
-            idempotency_key=context.idempotency_key,
-        )
+        return self._delegate.execute_agent(spec, input_data, context)
 
     def stream_agent(self, spec: AgentSpec, input_data: Dict[str, Any], context: ExecutionContext) -> Iterator[AgentChunk]:
-        yield AgentChunk(chunk_type="log", content="Temporal workflow started")
+        return self._delegate.stream_agent(spec, input_data, context)
 
     def cancel_agent(self, run_id: str, reason: str = "User cancelled") -> bool:
-        return True
+        return self._delegate.cancel_agent(run_id, reason)
 
     def get_runtime_status(self, run_id: str) -> Dict[str, Any]:
-        return {"run_id": run_id, "framework": "temporal", "status": "PENDING"}
+        return self._delegate.get_runtime_status(run_id)
 
 
 class GoogleADKRuntimeAdapter(AgentRuntimePort):

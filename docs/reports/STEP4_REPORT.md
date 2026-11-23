@@ -170,4 +170,61 @@ Sub-Step 4C verification complete. OpenCode review verdict: PASS.
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (2m49s)
 - **Commit:** `e8943c7`
 
-Proceeding to Sub-Step 4D: Temporal durable execution engine & workers.
+---
+
+## Sub-Step 4D: Temporal Durable Execution Engine & Workers
+
+### 1. Overview & Objectives
+Sub-Step 4D delivers the enterprise durable execution engine for long-running workflows, scheduled multi-day business processes, and resilient distributed worker dispatch:
+- **`TemporalActivities` (`core/temporal/activities.py`):**
+  - Implements durable activities: `llm_generation_activity`, `tool_execution_activity`.
+  - Enforces **Rule 34 (Port Routing)**: 100% of LLM calls route through `LLMGatewayPort`; 100% of tools route through `ActionGateway` and `ToolRegistry`.
+  - Enforces **Rule 35 (At-least-once Execution & Idempotency)**: Replayed or retried activities with identical idempotency keys return cached output without repeating external side effects.
+  - Fail-closed security: policy violations raise `NonRetryableActivityError`.
+- **`ZonataAgentWorkflow` (`core/temporal/workflows.py`):**
+  - Enforces **Rule 38 (Versioned Workflows)**: Carries explicit `workflow_version = "1.0.0"`.
+  - Coordinates activities deterministically; generates per-step deterministic idempotency keys (`{workflow_id}_step{idx}_{action}`).
+  - Respects kill switch: active kill switches halt workflow execution with `HALTED_BY_KILL_SWITCH`.
+- **`TemporalRuntimeAdapter` (`core/temporal/adapter.py`):**
+  - Bridges `AgentRuntimePort` to Temporal Durable Execution engine.
+  - Probes live Temporal cluster or provides sovereign deterministic simulation under `ZONATA_TEST_MODE=1`.
+  - Fails closed when unconfigured (Truth Rule 1).
+- **`core/ports/agent_runtime.py`:**
+  - Delegates `TemporalRuntimeAdapter` cleanly to `core.temporal.adapter.TemporalRuntimeAdapter`.
+- **`docs/reports/ADOPTION_STATUS.md`:**
+  - Updated Temporal Durable Execution to `ADOPTED`.
+
+### 2. Real Execution Output
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 9 items
+
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_01_probe_fail_closed_and_sandbox PASSED [ 11%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_02_workflow_execution_success PASSED [ 22%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_03_activity_dispatch_through_action_gateway PASSED [ 33%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_04_idempotent_activity_replay_rule_35 PASSED [ 44%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_05_workflow_versioning_rule_38 PASSED [ 55%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_06_kill_switch_halts_workflow PASSED [ 66%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_07_streaming_chunks PASSED [ 77%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_08_mutation_check_unauthorized_tool_rejected PASSED [ 88%]
+tests/test_step4_temporal_runtime.py::TestStep4TemporalRuntime::test_09_mutation_check_unconfigured_runtime_fails_closed PASSED [100%]
+
+============================== 9 passed in 1.08s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Rule 33 (Replaceable Adapters):** Temporal manages execution state only; business truth, approvals, and budget live in ZONATA tables.
+- **Rule 34 (Port Isolation & Anti-Bypass):** Direct model imports or unrouted tool calls are strictly forbidden and verified by AST linter.
+- **Rule 35 (At-least-once Execution & Idempotency):** Activities with identical idempotency keys return cached execution records without repeating side effects.
+- **Rule 36 (Payload Reference Hygiene):** Payloads pass opaque IDs and references; never raw plaintext secrets.
+- **Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` tracks Temporal Durable Execution as `ADOPTED`.
+- **Rule 38 (Versioned Workflows):** Workflows carry explicit version `"1.0.0"` in records and metadata.
+
+### 4. Status
+Sub-Step 4D verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4E: Framework split qualification & chaos test.
