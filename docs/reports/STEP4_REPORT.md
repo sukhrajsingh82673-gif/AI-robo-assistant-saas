@@ -233,4 +233,54 @@ Sub-Step 4D verification complete. OpenCode review verdict: PASS.
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (3m13s)
 - **Commit:** `9296fe5`
 
-Proceeding to Sub-Step 4E: Framework split qualification & chaos test.
+---
+
+## Sub-Step 4E: Framework Split Qualification & Chaos Test
+
+### 1. Overview & Objectives
+Sub-Step 4E qualifies the runtime framework division of labor (Decision D4-1 / ADR 0009) and executes fault-injection chaos drills to prove crash resilience and idempotency invariants:
+- **`FrameworkRouter` (`core/framework_router.py`):**
+  - Enforces the constitutional division of labor across all 4 runtimes:
+    - `TEMPORAL`: Long-running durable business processes (timeout > 3600s, `is_durable=True`, `workflow_type="durable"`).
+    - `LANGGRAPH`: Short-cycle iterative agents (planning loops, critic cycles, `workflow_type="cyclic"`).
+    - `GOOGLE_ADK`: Hierarchical multi-agent squads (`workflow_type="hierarchical"` or `requires_team=True`).
+    - `LOCAL`: Standard in-process sequential utility agents.
+  - Rejects mismatches and out-of-bound workloads (`RoutingValidationError` on unbounded loops >10, multi-day ephemeral routing, unknown runtimes).
+- **Chaos Engineering & Fault Injection (`core/chaos/simulator.py`):**
+  - **LangGraph Mid-Cycle Worker Crash:** Injects simulated process termination (`SimulatedWorkerCrash`), restarts a fresh adapter from checkpointer, and verifies seamless resumption from saved state without re-executing already-completed steps (Rule 35).
+  - **Temporal Activity Crash & Replay:** Simulates worker termination after tool activity completion, replays with identical idempotency key, and verifies cached output return with `cached_replay=True` and zero duplicate side-effects.
+- **Multi-Tenant RLS Isolation Under Chaos:**
+  - Proves that checkpoint state created during fault injection remains strictly isolated by `tenant_id` and `company_id`.
+
+### 2. Real Execution Output
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 9 items
+
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_01_router_assigns_temporal_for_durable_or_long_running PASSED [ 11%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_02_router_assigns_langgraph_for_cyclic_loops PASSED [ 22%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_03_router_assigns_google_adk_for_hierarchical_teams PASSED [ 33%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_04_router_assigns_local_for_sequential_tasks PASSED [ 44%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_05_router_rejects_architectural_mismatches PASSED [ 55%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_06_langgraph_chaos_crash_and_recovery PASSED [ 66%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_07_temporal_chaos_activity_crash_and_replay PASSED [ 77%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_08_multi_tenant_isolation_under_chaos PASSED [ 88%]
+tests/test_step4_framework_split_chaos.py::TestStep4FrameworkSplitChaos::test_09_mutation_check_unauthorized_bypass_attempt_fails PASSED [100%]
+
+============================== 9 passed in 0.84s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Decision D4-1:** Runtimes are assigned strictly according to lifecycle requirements; invalid workloads fail closed.
+- **Rule 33 (Replaceable Adapters):** Execution state held only in adapter session wrappers; business authority and evidence logged in ZONATA core tables.
+- **Rule 35 (At-least-once Execution & Idempotency):** Injected crash drills prove that replays and resumptions never duplicate tool calls or ledger postings.
+- **Multi-Tenant Isolation:** Crash recovery respects RLS bounds (`tenant_id`, `company_id`).
+
+### 4. Status
+Sub-Step 4E verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4F: Google ADK hierarchical teams & loops.
