@@ -91,6 +91,19 @@ from core.ports.terminal import (
     TerminalCommandResult,
     SandboxTerminalProvider,
 )
+from core.ports.agent_runtime import (
+    AgentRuntimePort,
+    AgentSpec,
+    ExecutionContext,
+    AgentChunk,
+    AgentResult,
+    AgentRuntimeStatus,
+    LocalAgentRuntimeAdapter,
+    LangGraphRuntimeAdapter,
+    TemporalRuntimeAdapter,
+    GoogleADKRuntimeAdapter,
+    local_agent_runtime,
+)
 
 __all__ = [
     "Port",
@@ -163,4 +176,16 @@ __all__ = [
     "TerminalPort",
     "terminal_port",
     "TerminalCommandResult",
+    # Agent Runtime
+    "AgentRuntimePort",
+    "AgentSpec",
+    "ExecutionContext",
+    "AgentChunk",
+    "AgentResult",
+    "AgentRuntimeStatus",
+    "LocalAgentRuntimeAdapter",
+    "LangGraphRuntimeAdapter",
+    "TemporalRuntimeAdapter",
+    "GoogleADKRuntimeAdapter",
+    "local_agent_runtime",
 ]

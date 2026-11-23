@@ -277,7 +277,13 @@
   - Authored 9 formal Architectural Decision Records (`ADR 0009` through `ADR 0017`) covering Temporal topology, Decision D4-1 runtime split, LangGraph checkpointer, Google ADK extension points, MCP SDK rug-pull defenses, A2A interop, OpenTelemetry conventions, AGPL boundaries, and PostgreSQL transactional outbox.
   - Tested 12/12 assertions passing 100% locally.
   - Verified 100% GREEN in GitHub Actions CI Run `45137351358` across all 3 jobs (Supply chain, SQLite Dev profile, PostgreSQL 16 contract tests).
-- [ ] **4B:** Runtime ports, spec compilers & anti-bypass guards
+- [x] **4B (Runtime Ports, Spec Compilers & Anti-Bypass Guards):** COMPLETE
+  - Built typed `AgentRuntimePort` (`core/ports/agent_runtime.py`) with universal lifecycle contracts and execution structures (`AgentSpec`, `AgentResult`, `ExecutionContext`, `AgentChunk`).
+  - Built `LocalAgentRuntimeAdapter` (sovereign execution via LLMGateway and ActionGateway) and fail-closed framework adapters (`LangGraphRuntimeAdapter`, `TemporalRuntimeAdapter`, `GoogleADKRuntimeAdapter`).
+  - Built `AgentSpecCompiler` (`core/agent_spec/compiler.py`) targeting `LOCAL`, `LANGGRAPH`, `TEMPORAL`, and `GOOGLE_ADK` execution descriptors with deterministic digests.
+  - Built Rule 34 Anti-Bypass AST Linter (`scripts/anti_bypass_linter.py` & `core/security/anti_bypass.py`) blocking direct model imports, unwrapped subprocesses, and raw network calls in framework runtimes.
+  - Added anti-bypass linter and test suite to `.github/workflows/ci.yml`.
+  - Verified 15/15 unit and mutation checks passing locally (`tests/test_step4_runtime_ports.py`).
 - [ ] **4C:** LangGraph runtime adapter & checkpointer
 - [ ] **4D:** Temporal durable execution engine & workers
 - [ ] **4E:** Framework split qualification & chaos test
