@@ -416,4 +416,69 @@ Sub-Step 4G verification complete. OpenCode review verdict: PASS.
   - SQLite Dev Profile Test Suite: PASS (2m3s)
   - Supply Chain, SBOM, License & Image Pinning Audit: PASS (1m46s)
 - **Commit:** `4cf0b70`
-Proceeding to Sub-Step 4H: OpenTelemetry instrumentation & canary.
+
+---
+
+## Sub-Step 4H: OpenTelemetry Instrumentation & Secret Canary
+
+### 1. Overview & Objectives
+Sub-Step 4H delivers enterprise distributed tracing and telemetry sanitization across ZONATA's multi-framework execution stack:
+- **W3C TraceContext Propagation (`core/telemetry/context.py`):**
+  - Generates and parses standard W3C `traceparent` headers (`00-{trace_id32}-{span_id16}-{flags02}`).
+  - Injects and extracts correlation contexts across asynchronous carrier boundaries (HTTP headers, activity payloads, and task messages).
+- **Rule 24 & Rule 36 Redaction Engine (`core/telemetry/sanitizer.py`):**
+  - Sanitizes attributes against credentials, passwords, private keys, API keys, and canary tokens.
+  - Enforces prompt and completion body gating based on tenant privacy policy (`tenant_allow_prompt_capture`).
+  - Fails closed in strict mode (`TelemetryLeakageError`) when unredacted secrets are detected.
+- **Dual-Mode Distributed Tracer (`core/telemetry/tracer.py`):**
+  - Emits stable, forward-compatible `zonata.*` namespace attributes on 100% of spans.
+  - Emits official OpenTelemetry GenAI semantic conventions (`gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.total_tokens`) behind `OTEL_GENAI_CONVENTIONS_ENABLED=1`.
+- **Secret Canary Probe & Scanner (`core/telemetry/canary.py`):**
+  - Generates high-entropy canary secrets (`ZONATA_CANARY_*`).
+  - Executes active end-to-end drills injecting canary secrets into spans and proves 0% leak rate in serialized OTLP payloads.
+- **Runtime Interceptors (`core/telemetry/interceptor.py`):**
+  - `@instrument_llm_call` and `@instrument_tool_call` decorators and `trace_span` context managers.
+- **Standing Rule 40 / ADR 0016 Legal/AGPL Isolation:**
+  - Automated AST scanner verifies zero in-process imports of AGPL packages (`grafana`, `loki`, `tempo`).
+- **Adoption Log (`docs/reports/ADOPTION_STATUS.md`):**
+  - Updated `OpenTelemetry GenAI` to `ADOPTED`.
+
+### 2. Real Execution Output
+```text
+======================================================================
+ZONATA Rule 34 Audit — Port Egress & Framework Anti-Bypass Linter
+Scanning directory: core
+======================================================================
+[PASS] Zero Rule 34 port bypass violations found across all frameworks.
+======================================================================
+
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 8 items
+
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_01_w3c_traceparent_propagation PASSED [ 12%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_02_span_creation_and_hierarchical_linking PASSED [ 25%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_03_genai_semantic_conventions_flag PASSED [ 37%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_04_secret_canary_probe_zero_leakage_rule_24 PASSED [ 50%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_05_tenant_policy_prompt_body_gating_rule_36 PASSED [ 62%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_06_runtime_interceptors_and_decorators PASSED [ 75%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_07_standing_rule_40_agpl_isolation_check PASSED [ 87%]
+tests/test_step4_opentelemetry.py::TestStep4OpenTelemetry::test_08_mutation_check_strict_leakage_fails_closed PASSED [100%]
+
+============================== 8 passed in 8.45s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Standing Rule 24 (Zero Plaintext Secrets):** Telemetry attributes never contain raw API keys, bearer tokens, or passwords; canary injection drills verify 0 leaks.
+- **Standing Rule 36 (Attribute Allow-List & Privacy Gating):** Prompt and completion bodies are redacted to `[BODY_OMITTED_BY_TENANT_POLICY]` by default, captured only under explicit tenant opt-in.
+- **Standing Rule 40 / ADR 0016 (AGPL Network Boundary):** AST checks enforce zero linking of AGPL libraries in application code; Prometheus, Alertmanager, and Jaeger serve as Apache-2.0 telemetry core; Grafana/Loki/Tempo remain external boundary containers.
+- **ADR 0015 (Stable zonata.* vs GenAI Conventions):** Forward-compatible `zonata.*` metrics always emitted; `gen_ai.*` emitted under explicit feature flag.
+- **Standing Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` tracks OpenTelemetry GenAI as `ADOPTED`.
+
+### 4. Status
+Sub-Step 4H verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4I: 24/7 autonomous daemon & self-healing.
