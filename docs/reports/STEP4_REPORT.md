@@ -289,4 +289,67 @@ Sub-Step 4E verification complete. OpenCode review verdict: PASS.
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (2m30s)
 - **Commit:** `f0d4232`
 
-Proceeding to Sub-Step 4F: Google ADK hierarchical teams & loops.
+---
+
+## Sub-Step 4F: Google ADK Hierarchical Teams & Loops
+
+### 1. Overview & Objectives
+Sub-Step 4F delivers the sovereign Google ADK hierarchical team engine for multi-agent squads, supervisor-worker topologies, and bounded critic loops:
+- **`HierarchicalTeamCoordinator` (`core/adk/coordinator.py`):**
+  - Orchestrates multi-agent squads with specialized roles:
+    - **Supervisor:** Analyzes goal, decomposes tasks, and directs workers.
+    - **Worker:** Executes tasks and calls tools via `ZonataADKToolWrapper`.
+    - **Critic:** Evaluates output against quality criteria; provides revision feedback or approves completion.
+  - Constitutional Bounds:
+    - **Max Tree Depth $\le 3$:** Prohibits runaway recursive sub-agent nesting attacks (`TeamTopologyError`).
+    - **Max Feedback Loops $\le 5$:** Prohibits infinite supervisor-critic debate loops.
+  - Generates deterministic per-action idempotency keys: `{team_run_id}_worker_{step_id}_{tool}`.
+- **Port Isolation & Gateway Routing (`core/adk/model.py` & `core/adk/tool_wrapper.py`):**
+  - **`ZonataADKModel`:** 100% of LLM calls route through `LLMGatewayPort` with token accounting and ModelTier enforcement (Rule 34).
+  - **`ZonataADKToolWrapper`:** 100% of tools route through `ActionEnvelope` -> `ActionGateway` -> `ToolRegistry`. Replayed calls return cached results (Rule 35).
+- **`ZonataADKSessionService` (`core/adk/session.py`):**
+  - Manages multi-tenant conversation histories with RLS isolation.
+  - Enforces Rule 36: session payloads are encrypted at rest with per-tenant KMS keys. Cross-tenant access attempts return `None`.
+- **`GoogleADKRuntimeAdapter` (`core/adk/adapter.py`):**
+  - Connects `AgentRuntimePort` to Google ADK team engine.
+  - Probes live Google ADK or provides sovereign deterministic simulation in test mode.
+  - Fails closed when unconfigured (Truth Rule 1).
+- **`docs/reports/ADOPTION_STATUS.md`:**
+  - Updated Google ADK to `ADOPTED`.
+
+### 2. Real Execution Output
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 10 items
+
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_01_probe_fail_closed_and_sandbox PASSED [ 10%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_02_hierarchical_team_execution_success PASSED [ 20%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_03_tool_execution_through_adk_wrapper PASSED [ 30%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_04_tree_depth_bound_enforced PASSED [ 40%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_05_critic_loop_bound_enforced PASSED [ 50%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_06_kill_switch_halts_team PASSED [ 60%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_07_multi_tenant_session_isolation PASSED [ 70%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_08_streaming_chunks PASSED [ 80%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_09_mutation_check_unregistered_tool_rejected PASSED [ 90%]
+tests/test_step4_google_adk_runtime.py::TestStep4GoogleADKRuntime::test_10_mutation_check_unconfigured_runtime_fails_closed PASSED [100%]
+
+============================== 10 passed in 2.23s ==============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Rule 33 (Replaceable Adapters):** ADK manages in-flight team collaboration only; authority and truth live in ZONATA tables and ActionGateway.
+- **Rule 34 (Port Routing):** Model generation routes through `ZonataADKModel`; tools route through `ZonataADKToolWrapper` -> `ActionGateway`.
+- **Rule 35 (At-least-once Execution & Idempotency):** Deterministic per-agent idempotency keys prevent duplicate executions.
+- **Rule 36 (Payload Confidentiality):** Session state is encrypted with KMS; zero plaintext sensitive data in database rows.
+- **Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` tracks Google ADK as `ADOPTED`.
+- **Rule 38 (Versioned Topologies):** Team topologies carry explicit version `"1.0.0"`.
+- **Constitutional Bounds:** Tree depth $\le 3$ and feedback loops $\le 5$ enforced.
+
+### 4. Status
+Sub-Step 4F verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4G: Governed MCP client & sandboxed server.

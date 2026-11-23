@@ -448,66 +448,28 @@ class TemporalRuntimeAdapter(AgentRuntimePort):
 class GoogleADKRuntimeAdapter(AgentRuntimePort):
     """Adapter for Google ADK hierarchical teams and critic loops (ADR 0010, ADR 0012).
     
-    Fails closed when google-adk is not available. Conforms to Truth Rule 1.
-    Full multi-agent team engine implemented in Sub-Step 4F.
+    Delegates to core.adk.adapter.GoogleADKRuntimeAdapter.
     """
 
     def __init__(self, provider_name: str = "google_adk_runtime", sandbox: bool = False):
         super().__init__(provider_name=provider_name, sandbox=sandbox)
-        self._has_sdk = False
-        try:
-            import google.adk  # type: ignore
-            self._has_sdk = True
-        except ImportError:
-            self._has_sdk = False
+        from core.adk.adapter import GoogleADKRuntimeAdapter as RealADKAdapter
+        self._delegate = RealADKAdapter(provider_name=provider_name, sandbox=sandbox)
 
     def probe(self) -> ProviderResult:
-        if not self._has_sdk:
-            if os.environ.get("ZONATA_TEST_MODE") == "1" or self.sandbox:
-                return ProviderResult(
-                    status=PortStatus.SANDBOX,
-                    provider=self.provider_name,
-                    provider_ref="sandbox_google_adk",
-                    sandbox=True,
-                    metadata={"target": "google-adk", "mode": "simulated_sandbox"},
-                )
-            return ProviderResult(
-                status=PortStatus.NOT_CONFIGURED,
-                provider=self.provider_name,
-                error="google-adk package is not installed in the current environment",
-            )
-        return ProviderResult(
-            status=PortStatus.OK,
-            provider=self.provider_name,
-            provider_ref=f"google_adk_{int(time.time())}",
-            metadata={"target": "google-adk", "native": True},
-        )
+        return self._delegate.probe()
 
     def execute_agent(self, spec: AgentSpec, input_data: Dict[str, Any], context: ExecutionContext) -> AgentResult:
-        probe = self.probe()
-        if probe.status == PortStatus.NOT_CONFIGURED:
-            return AgentResult(
-                status=PortStatus.NOT_CONFIGURED,
-                provider=self.provider_name,
-                run_id=context.run_id,
-                state=AgentRuntimeStatus.FAILED,
-                error="Google ADK runtime adapter is not configured in this environment",
-            )
-        return AgentResult(
-            status=probe.status,
-            provider=self.provider_name,
-            sandbox=probe.sandbox,
-            run_id=context.run_id,
-            state=AgentRuntimeStatus.COMPLETED,
-            output={"framework": "google-adk", "status": "executed_via_adapter"},
-            idempotency_key=context.idempotency_key,
-        )
+        return self._delegate.execute_agent(spec, input_data, context)
 
     def stream_agent(self, spec: AgentSpec, input_data: Dict[str, Any], context: ExecutionContext) -> Iterator[AgentChunk]:
-        yield AgentChunk(chunk_type="log", content="Google ADK agent started")
+        return self._delegate.stream_agent(spec, input_data, context)
 
     def cancel_agent(self, run_id: str, reason: str = "User cancelled") -> bool:
-        return True
+        return self._delegate.cancel_agent(run_id, reason)
+
+    def get_runtime_status(self, run_id: str) -> Dict[str, Any]:
+        return self._delegate.get_runtime_status(run_id)
 
     def get_runtime_status(self, run_id: str) -> Dict[str, Any]:
         return {"run_id": run_id, "framework": "google-adk", "status": "PENDING"}
