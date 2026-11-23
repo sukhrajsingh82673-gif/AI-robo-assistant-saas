@@ -338,7 +338,7 @@
   - Verified 100% GREEN in GitHub Actions CI Run `45188993293`.
 - **OpenCode Step 4 Status:** 100% COMPLETE across all 10 sub-steps (4A–4J) with zero skipped checks, zero unreviewed bypasses, and verified green across PostgreSQL 16, SQLite, and Supply Chain CI jobs.
 
-### OpenCode Step 5 — Trust Layer, Security & Privacy Engineering (In Progress)
+### OpenCode Step 5 — Trust Layer, Security & Privacy Engineering (COMPLETE)
 - [x] **5A (Preflight, Security Inventory, Secrets Register & Trust ADRs):** COMPLETE (CI Run 45214041764)
 - [x] **5B (OpenBao Secrets Platform & Transit KMS behind SecretsPort):** COMPLETE (CI Run 45230614186)
 - [x] **5C (Identity and Access — Keycloak / OIDC / Workload Identity):** COMPLETE (CI Run 45240457724)
@@ -347,7 +347,7 @@
 - [x] **5F (Audit, Privacy & Compliance Engineering — Merkle Chains, DSAR, Shredding, Rule 46):** COMPLETE (CI Run 45265898071)
 - [x] **5G (Incident Response & Security Resilience — Containment Playbooks, Quarantine, Chaos Drills):** COMPLETE (CI Run 45270507340)
 - [x] **5H (Crypto Agility & Future-Proofing — Versioned Envelopes, Kyber-AES Hybrid, Online Rewrap):** COMPLETE (CI Run 45271869688)
-- [x] **5I (Step 5 Qualification & Red-Team Run — 8-Milestone Pipeline in 209ms):** COMPLETE (Testing 9/9 passed, 86/86 full suite passed, CI in flight)
+- [x] **5I (Step 5 Qualification & Red-Team Run — 8-Milestone Pipeline in 209ms):** COMPLETE (CI Run 45274178625)
 - **OpenCode Step 5 Status:** 100% COMPLETE across all 9 sub-steps (5A–5I) with zero skipped checks, zero unreviewed bypasses, and verified green across PostgreSQL 16, SQLite, and Supply Chain CI jobs.
 
 
