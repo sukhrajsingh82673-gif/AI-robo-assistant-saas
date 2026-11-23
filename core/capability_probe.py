@@ -226,7 +226,11 @@ def probe_ocr() -> ProviderResult:
 
 
 def probe_search() -> ProviderResult:
-    """Probe search indexing backend with a real HTTP reachability check."""
+    """Probe search indexing backend with a real HTTP reachability check (Step 3H)."""
+    if os.environ.get("ZONATA_STEP3_RESEARCH_ENABLED") == "1":
+        from core.ports.search import search_port
+        return search_port.probe()
+
     t0 = time.perf_counter()
     search_endpoint = os.environ.get("SEARCH_ENDPOINT")
     search_provider = os.environ.get("SEARCH_PROVIDER", "custom")

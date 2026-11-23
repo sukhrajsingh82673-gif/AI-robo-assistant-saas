@@ -202,6 +202,28 @@ pytest tests/test_step3_remote_view.py
 5 passed in 0.51s
 ```
 All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45117206511](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117206511) (100% GREEN across SQLite Dev Profile 1m54s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 1m46s).
+
+---
+
+# Sub-Step 3H — Research Hand & Search Provider
+
+## 1. Overview
+Sub-Step 3H delivers the research hand and search provider under the unified Port framework:
+- **SearchPort (`core/ports/search.py`):** Standard Port abstraction supporting `SearXNGSearchProvider`, `SandboxSearchProvider`, and `NotConfiguredSearchProvider` with full AST truth linter compliance.
+- **Untrusted Content Delimiting (Rule 26):** Search results and snippets wrapped in `<<<SEARCH_RESULTS query='...'>>> ... <<<END_SEARCH_RESULTS>>>`. Prompt injection payloads embedded in search snippets are treated strictly as passive data.
+- **Research Engine (`core/research/engine.py`):** Structured citation synthesis and research coordination.
+- **Capability Truth Table (`core/capability_probe.py`):** `probe_search()` dynamically routes to `search_port.probe()` under `ZONATA_STEP3_RESEARCH_ENABLED="1"`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_research.py`:
+```text
+pytest tests/test_step3_research.py
+----------------------------------------------------------------------
+5 passed in 0.52s
+```
+All 5 acceptance tests passed with 100% success.
+
 
 
 

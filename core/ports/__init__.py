@@ -78,6 +78,13 @@ from core.ports.browser import (
     BrowserPageSnapshot,
     SandboxBrowserProvider,
 )
+from core.ports.search import (
+    SearchPort,
+    search_port,
+    SearchExecutionResult,
+    SearchResultItem,
+    SandboxSearchProvider,
+)
 
 __all__ = [
     "Port",
@@ -138,4 +145,12 @@ __all__ = [
     "NotConfiguredKMSProvider",
     "SandboxKMSProvider",
     "resolve_kms_provider",
+    # Browser
+    "BrowserPort",
+    "browser_port",
+    # Search
+    "SearchPort",
+    "search_port",
+    "SearchExecutionResult",
+    "SearchResultItem",
 ]
