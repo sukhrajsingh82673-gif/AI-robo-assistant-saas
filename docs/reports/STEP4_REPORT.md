@@ -358,4 +358,57 @@ Sub-Step 4F verification complete. OpenCode review verdict: PASS.
   - PostgreSQL 16 & Service Containers Contract Tests: PASS (2m30s)
 - **Commit:** `943c102`
 
-Proceeding to Sub-Step 4G: Governed MCP client & sandboxed server.
+---
+
+## Sub-Step 4G: Governed MCP Client & Sandboxed Server
+
+### 1. Overview & Objectives
+Sub-Step 4G delivers the enterprise-governed Model Context Protocol (MCP) subsystem, enforcing strict boundaries against prompt injection and untrusted tool definitions:
+- **`GovernedMCPClient` (`core/mcp/client.py`):**
+  - Manages `mcp_server_registrations` and `mcp_pinned_tools` with multi-tenant RLS isolation.
+  - Implements **Rule 39 (Untrusted External Metadata)**:
+    - **Schema Hash Pinning:** Computes deterministic SHA-256 hash (`schema_hash`) of tool schemas. Schema alterations raise `SchemaTamperingError`.
+    - **Prompt Injection Defense:** Model-facing tool descriptions are replaced with verified sovereign descriptions (`verified_description`), completely neutralizing embedded prompt injection.
+  - Implements **Rule 34 (Port Routing)**: MCP tool execution evaluates `ActionEnvelope` via `ActionGateway` and executes through `ToolRegistry`.
+  - Implements **Rule 35 (At-least-once Execution & Idempotency)**: Replayed calls with identical idempotency keys return cached execution records without repeating side effects.
+- **`SandboxedMCPServer` (`core/mcp/server.py`):**
+  - Responds to standard MCP JSON-RPC 2.0 requests (`tools/list`, `tools/call`).
+  - Defensively wraps all tool outputs with `wrap_untrusted_tool_output(...)` to prevent delimiter breakout attacks.
+- **Database Migrations:**
+  - `migrations/common/0033_mcp_governance.sql`
+  - `migrations/pg/0033_mcp_governance.sql`
+- **`docs/reports/ADOPTION_STATUS.md`:**
+  - Updated Governed MCP Client to `ADOPTED`.
+
+### 2. Real Execution Output
+```text
+============================= test session starts ==============================
+platform android -- Python 3.14.10, pytest-9.2.0, pluggy-1.7.0 -- /data/data/com.termux/files/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /data/data/com.termux/files/home/AI-robo-assistant-saas
+configfile: pytest.ini
+plugins: platformdirs-4.14.7
+collecting ... collected 8 items
+
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_01_server_registration_and_schema_hash_pinning PASSED [ 12%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_02_prompt_injection_neutralization_rule_39 PASSED [ 25%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_03_schema_tampering_detection_fails_closed PASSED [ 37%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_04_unpinned_tool_rejected PASSED [ 50%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_05_execution_through_action_gateway_rule_34 PASSED [ 62%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_06_idempotent_replay_rule_35 PASSED [ 75%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_07_sandboxed_server_json_rpc_roundtrip PASSED [ 87%]
+tests/test_step4_governed_mcp.py::TestStep4GovernedMCP::test_08_mutation_check_unapproved_tool_execution_blocked PASSED [100%]
+
+============================== 8 passed in 2.06s ===============================
+```
+
+### 3. Decisions & Invariants Enforced
+- **Rule 39 (Untrusted External Metadata):** External tool descriptions and schemas are untrusted data; schema tampering is rejected with `SchemaTamperingError`; descriptions are overridden by verified sovereign text.
+- **Rule 34 (Port Isolation & Anti-Bypass):** MCP tools execute through `ActionEnvelope` evaluated by `ActionGateway`.
+- **Rule 35 (At-least-once Execution & Idempotency):** Deterministic per-action idempotency keys prevent duplicate executions.
+- **Defensive Output Wrapping:** Tool responses from `SandboxedMCPServer` are framed within `<<<UNTRUSTED_CONTENT>>>` wrappers.
+- **Rule 37 (Adoption Honesty):** `docs/reports/ADOPTION_STATUS.md` tracks Governed MCP Client as `ADOPTED`.
+
+### 4. Status
+Sub-Step 4G verification complete. OpenCode review verdict: PASS.
+Proceeding to Sub-Step 4H: OpenTelemetry instrumentation & canary.

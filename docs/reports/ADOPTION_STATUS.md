@@ -9,5 +9,5 @@ In compliance with **Standing Rule 37 (Adoption Honesty)**:
 | **LangGraph / PostgresCheckpointer** | `ADOPTED` | Sovereign StateGraph Adapter | `core.langgraph.adapter.LangGraphRuntimeAdapter`, `core.langgraph.checkpointer.PostgresCheckpointer` | Step 4C cyclic state graph with KMS Rule 36 encrypted PostgreSQL checkpoints |
 | **Temporal Durable Execution** | `ADOPTED` | Sovereign Durable Engine | `core.temporal.adapter.TemporalRuntimeAdapter`, `core.temporal.workflows.ZonataAgentWorkflow` | Step 4D enterprise durable workflow and worker execution with deterministic idempotency |
 | **Google ADK** | `ADOPTED` | Sovereign Hierarchical Teams | `core.adk.adapter.GoogleADKRuntimeAdapter`, `core.adk.coordinator.HierarchicalTeamCoordinator` | Step 4F supervisor-worker-critic squads bounded by tree depth <= 3 and feedback loops <= 5 |
-| **Governed MCP Client** | `NOT_ADOPTED` | `mcp>=1.0.0` | `core.mcp` | Scheduled for Sub-Step 4G |
+| **Governed MCP Client** | `ADOPTED` | Sovereign Governed MCP Client | `core.mcp.client.GovernedMCPClient`, `core.mcp.server.SandboxedMCPServer` | Step 4G tool schema hash pinning, prompt injection neutralization, and ActionGateway execution |
 | **OpenTelemetry GenAI** | `NOT_ADOPTED` | `opentelemetry-api` | `core.telemetry` | Scheduled for Sub-Step 4H |
