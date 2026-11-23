@@ -241,8 +241,45 @@ tests/test_step5_incident_response_resilience.py::TestIncidentResponseAndResilie
 
 ### 3. Review & Status
 - **Handoff Dossier:** `docs/reviews/step5-5g-handoff.md`
-- **OpenCode Review:** `docs/reviews/step5-5g-review.md` (STATUS: PENDING CI CERTIFICATION)
+- **OpenCode Review:** `docs/reviews/step5-5g-review.md` (STATUS: PASS)
+- **CI Certification:** Run ID `45270507340` (Status: SUCCESS, PostgreSQL 16, SQLite & Supply Chain 100% GREEN)
+
+---
+
+## Sub-Step 5H — Crypto Agility & Future-Proofing
+
+### 1. Implementation Summary
+- **Versioned Envelope Architecture:** Built `core/crypto/types.py` defining `CryptoAlgorithm` (`v1-aes256gcm`, `v2-chacha20poly1305`, `v3-kyber-aes256gcm`) and `CryptoEnvelope` encapsulating version, key identifier, IV/nonce, authentication tag, payload ciphertext, optional PQC hybrid KEM ciphertext, and authenticated data (AAD) under Rule 45.
+- **Cryptographic Engine Registry:** Implemented `core/crypto/registry.py` containing `CryptoRegistry` and three versioned AEAD handlers:
+  1. `AES256GCMHandler`: 256-bit AES-GCM with 96-bit nonce and 128-bit authentication tag.
+  2. `ChaCha20Poly1305Handler`: RFC 8439 ChaCha20-Poly1305 stream cipher.
+  3. `KyberHybridHandler`: Post-Quantum Cryptography hybrid combining ML-KEM/Kyber key encapsulation with symmetric AES-256-GCM data encryption.
+- **Zero-Downtime Online Rewrapping:** Built `core/crypto/rewrap.py` with `OnlineRewrapper` executing non-blocking on-the-fly key and algorithm migrations without application downtime.
+- **Test Suite:** Authored `tests/test_step5_crypto_agility.py` passing 8/8 tests covering all three algorithms, AEAD tamper detection, JSON envelope serialization, zero-downtime online rewrap, and unapproved algorithm rejection.
+
+### 2. Execution Evidence
+```text
+$ python3 -m pytest tests/test_step5_crypto_agility.py -v
+============================= test session starts ==============================
+collected 8 items
+
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_01_v1_aes256gcm_encryption_and_decryption PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_02_v2_chacha20poly1305_encryption_and_decryption PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_03_v3_kyber_aes256gcm_post_quantum_hybrid PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_04_tampered_ciphertext_fails_closed_rule45 PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_05_tampered_tag_fails_closed PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_06_envelope_serialization_and_deserialization PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_07_online_rewrapping_migration_zero_downtime PASSED
+tests/test_step5_crypto_agility.py::TestCryptoAgility::test_08_mutation_check_unsupported_algorithm_fails PASSED
+
+============================== 8 passed in 0.60s ===============================
+```
+
+### 3. Review & Status
+- **Handoff Dossier:** `docs/reviews/step5-5h-handoff.md`
+- **OpenCode Review:** `docs/reviews/step5-5h-review.md` (STATUS: PENDING CI CERTIFICATION)
 - **CI Certification:** In progress
+
 
 
 

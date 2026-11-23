@@ -345,7 +345,8 @@
 - [x] **5D (Database & Tenant Isolation Hardening — Transaction-Scoped RLS):** COMPLETE (CI Run 45260547840)
 - [x] **5E (Application & Supply-Chain Security — ASVS Hardening, WAF, SBOM, Cosign):** COMPLETE (CI Run 45263331780)
 - [x] **5F (Audit, Privacy & Compliance Engineering — Merkle Chains, DSAR, Shredding, Rule 46):** COMPLETE (CI Run 45265898071)
-- [x] **5G (Incident Response & Security Resilience — Containment Playbooks, Quarantine, Chaos Drills):** COMPLETE (Testing 6/6 passed, 69/69 full suite passed, CI in flight)
+- [x] **5G (Incident Response & Security Resilience — Containment Playbooks, Quarantine, Chaos Drills):** COMPLETE (CI Run 45270507340)
+- [x] **5H (Crypto Agility & Future-Proofing — Versioned Envelopes, Kyber-AES Hybrid, Online Rewrap):** COMPLETE (Testing 8/8 passed, 77/77 full suite passed, CI in flight)
 
 
 
