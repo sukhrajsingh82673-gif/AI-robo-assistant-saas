@@ -47,3 +47,40 @@ Executed local test suite `tests/test_step6_preflight.py` passing 6/6 tests:
 - `test_04_step6_inventory_covers_all_ten_domains`: PASSED
 - `test_05_all_six_step6_adrs_exist_and_complete`: PASSED
 - `test_06_mutation_check_unregistered_secret_or_unapproved_adr_fails`: PASSED
+
+### 5. CI Certification
+- **GitHub Actions Run ID:** `45305621974`
+- **Workflow:** `ZONATA Step 6 Evolution & Governed Self-Improvement Qualification`
+- **Status:** `completed` / `success` across all 3 matrix jobs:
+  - Supply Chain, SBOM, License & Image Pinning Audit: SUCCESS
+  - SQLite Dev Profile Test Suite: SUCCESS
+  - PostgreSQL 16 & Service Containers Contract Tests: SUCCESS
+- **Sub-Step 6A Status:** **100% COMPLETE & CERTIFIED**
+
+---
+
+## Sub-Step 6B — The Preservation Contract and Regression Gate (Rules 49 & 50)
+
+### 1. Cryptographic Baseline & Tagging
+- Annotated and created git tag `step5-final` on commit `914f5331bfb7325888c0c0090e4fc6677a913681`.
+- Generated `docs/baselines/STEP1-5_BASELINE.json` recording exact SHA-256 digests and byte counts for 1,951 files across Steps 1 through 5.
+- Linked historical qualification CI run IDs (Step 1: `45083160475`, Step 2: `45101684343`, Step 3: `45127055429`, Step 4: `45188993293`, Step 5: `45274178625`).
+
+### 2. Protected Paths & Preservation Engine
+- Authored declarative policy `security/protected_paths.yaml` freezing core engine, database DDLs, models, and prior test suites.
+- Built `core/evolution/preservation.py` providing:
+  - `verify_baseline_integrity()`: Validates all 1,951 baseline files against disk state.
+  - `verify_git_diff_integrity()`: Enforces zero modifications (`M`), deletions (`D`), or renames (`R`) against `step5-final`.
+  - `verify_evolution_flag_equivalence()`: Confirms `EVOLUTION_ENABLED` defaults to `false` and maintains bit-for-bit equivalence.
+  - `lint_migration()`: Blocks destructive SQL (DROP TABLE, DROP COLUMN, ALTER TYPE, DISABLE RLS, DROP POLICY).
+
+### 3. Verification & Qualification Tests
+Executed local test suite `tests/test_step6_preservation_contract.py` passing 7/7 tests:
+- `test_01_step5_baseline_manifest_exists_and_valid`: PASSED
+- `test_02_preservation_engine_verifies_working_copy_integrity`: PASSED
+- `test_03_preservation_engine_detects_tampered_step5_file`: PASSED
+- `test_04_protected_paths_policy_blocks_unauthorized_paths`: PASSED
+- `test_05_migration_linter_blocks_destructive_ddl`: PASSED
+- `test_06_evolution_flag_defaults_to_false_and_preserves_step5_behavior`: PASSED
+- `test_07_git_diff_integrity_against_step5_final`: PASSED
+

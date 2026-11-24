@@ -1,0 +1,56 @@
+# ZONATA Security: Protected Paths Policy (Rule 49 Preservation Contract)
+# Step 6 and subsequent self-improvement processes are strictly additive.
+# Any modification, deletion, or renaming of protected paths is a hard violation.
+
+version: "zonata.protected_paths/v1"
+governing_rule: "Rule 49 (Preservation Contract)"
+status: "FROZEN"
+baseline_commit: "914f5331bfb7325888c0c0090e4fc6677a913681"
+baseline_tag: "step5-final"
+
+protected_directories:
+  - "core/"
+  - "models/"
+  - "db/"
+  - "scripts/"
+  - "web/"
+  - "tests/"
+  - "storage/"
+  - ".github/workflows/"
+
+protected_files:
+  - "requirements.txt"
+  - "pytest.ini"
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - "docker-compose.dev.yml"
+  - "docker-compose.prod.yml"
+  - ".github/workflows/ci.yml"
+  - "README.md"
+  - "LICENSE"
+
+# Explicit directory and file exceptions where Step 6 additive files are permitted
+allowed_step6_paths:
+  - "core/evolution/"
+  - "security/"
+  - "tools/"
+  - "agents/"
+  - "docs/adr/ADR_0026*"
+  - "docs/adr/ADR_0027*"
+  - "docs/adr/ADR_0028*"
+  - "docs/adr/ADR_0029*"
+  - "docs/adr/ADR_0030*"
+  - "docs/adr/ADR_0031*"
+  - "docs/reviews/step6-*"
+  - "docs/reports/STEP6_*"
+  - "docs/baselines/"
+  - "docs/security/"
+  - "tests/test_step6_*"
+  - "scripts/step6_*"
+  - ".github/workflows/ci-evolution.yml"
+
+enforcement:
+  deny_modifications_to_baseline_files: true
+  deny_deletions_of_baseline_files: true
+  deny_destructive_ddl_migrations: true
+  evolution_flag_default: false
