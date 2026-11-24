@@ -142,3 +142,42 @@
   tests/test_step8c_industry_coverage.py::TestStep8cIndustryCoverage::test_08_rule_68_tenant_isolation_with_identical_code PASSED [100%]
   ======= 8 passed in 0.66s =======
   ```
+
+## Sub-Step 8D: Global Corporate Readiness
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/consolidation/`: Multi-Company Group Consolidation Engine implementing IAS 21 / ASC 830 foreign exchange translation (spot and period-average), CTA balancing equity plug, and automated 2-sided intercompany matching and eliminations ($debits - credits = 0$) with SHA-256 seal.
+  - `packs/jurisdictions/`: 30 jurisdiction packs with 5 deep regimes:
+    1. `IN` (Clearance CTC via India GST e-Invoice IRP)
+    2. `DE` (Post-Audit Exchange via ZUGFeRD 2.2 / XRechnung CII)
+    3. `BE` (Peppol Network via Peppol BIS Billing 3.0 UBL)
+    4. `PL` (Central Clearance Portal via KSeF FA(2))
+    5. `US` (No Mandate sales & use tax)
+    - Plus 25 standard trade corridor packs (`FR`, `IT`, `ES`, `NL`, `GB`, `JP`, `SG`, `AU`, `CA`, `BR`, `MX`, `SA`, `AE`, `ZA`, `SE`, `CH`, `NO`, `DK`, `FI`, `AT`, `IE`, `NZ`, `KR`, `IL`, `PT`).
+  - `core/invoicing/`: Canonical EN 16931-1:2017 e-invoicing model with minor unit currency math, statutory tax escalation engine (`TaxDeterminationEscalationRequired`), and export adapters for India IRP, Germany ZUGFeRD, Peppol BIS 3.0, Italy SdI (FatturaPA), and Poland KSeF.
+  - `core/i18n/`: Enterprise internationalization stack:
+    - `cldr.py`: CLDR formatting for numbers, currencies, and dates across global locales (including Indian numbering commas and German decimal commas).
+    - `rtl.py`: Bi-directional layout detection, metadata, and bidi markers for Arabic, Hebrew, Persian, and Urdu.
+    - `pseudo.py`: Pseudo-localization string expansion engine for i18n testing.
+    - `translation_guard.py`: Statutory translation guard blocking unreviewed machine translations of legal/tax texts (`UnreviewedLegalTranslationBlockedError`).
+  - `core/residency/cell_router.py`: Sovereign regional cellular router mapping jurisdictions to isolated regional cells (`cell-eu-frankfurt`, `cell-us-east`, `cell-in-mumbai`) and enforcing `CrossRegionOperationRefusedError`.
+  - `core/connectors/wave1/`: 8 enterprise integration connectors (SAP S/4HANA, QuickBooks, Salesforce, Workday, ServiceNow, Slack, Snowflake, and ISO 20022 `pacs.008`/`camt.053`) with recorded replay contract fixtures.
+  - `core/procurement/buyer_pack.py`: Enterprise procurement pack generator requiring explicit audit citations (SOC 2, ISO 27001, GDPR DPA, Pentest, DR SLAs) and raising `ProcurementEvidenceMissingError` when absent.
+  - `tests/test_step8d_global_readiness.py`: 10 comprehensive automated unit and contract tests verifying consolidation, invoicing, tax escalation, CLDR/RTL formatting, regional cells, Wave 1 connectors, and procurement dossier integrity.
+- **Verification Output:**
+  ```text
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_01_three_entity_group_consolidation_and_eliminations PASSED [ 10%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_02_canonical_invoicing_adapters PASSED [ 20%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_03_statutory_tax_escalation_gate PASSED [ 30%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_04_cldr_formatting PASSED [ 40%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_05_rtl_detection_and_bidi PASSED [ 50%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_06_pseudo_localization PASSED [ 60%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_07_unreviewed_legal_translation_blocked PASSED [ 70%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_08_cellular_routing_and_cross_region_refusal PASSED [ 80%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_09_wave1_connectors_contracts PASSED [ 90%]
+  tests/test_step8d_global_readiness.py::TestStep8DGlobalReadiness::test_10_procurement_pack_generator PASSED [100%]
+  ======= 10 passed in 0.98s =======
+  ```
+

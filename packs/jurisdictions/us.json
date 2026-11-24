@@ -1,0 +1,45 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "US",
+    "country_name": "United States",
+    "version": "1.0.0",
+    "regime_type": "COMMON_LAW",
+    "currency": "USD",
+    "is_deep_overlay": true
+  },
+  "tax_regime": {
+    "system_name": "State Sales & Use Tax",
+    "standard_rate": 7.5,
+    "e_invoicing_model": "NO_CENTRAL_MANDATE",
+    "status": "UNVERIFIED",
+    "statutory_citation": "United States Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "United States Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 3650,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "payroll_regime": {
+    "statutory_withholding": true,
+    "social_security_rate_employer": 12.0,
+    "status": "UNVERIFIED",
+    "citation": "United States Statutory Payroll Act"
+  },
+  "e_invoicing_adapter_config": {
+    "adapter_id": "adapter_us_no_central_mandate",
+    "schema_version": "1.0.0",
+    "requires_digital_seal": true
+  },
+  "content_digest": "d47d1da3c6ff3e0aa8e2d27f9aabaddefeca22ed31ccb9181b79e6d691f78d1b"
+}

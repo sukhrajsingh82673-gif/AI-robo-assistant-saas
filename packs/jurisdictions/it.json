@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "IT",
+    "country_name": "Italy",
+    "version": "1.0.0",
+    "regime_type": "CLEARANCE_CTC",
+    "currency": "EUR",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Imposta sul Valore Aggiunto (IVA)",
+    "standard_rate": 22.0,
+    "e_invoicing_model": "CLEARANCE_SDI",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Italy Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Italy Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "87243c3b3ef76c0d05c6e97cad2e3b7459b7c950f5b921db9f133caa7abb1e28"
+}

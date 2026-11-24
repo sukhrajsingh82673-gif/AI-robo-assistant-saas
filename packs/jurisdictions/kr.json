@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "KR",
+    "country_name": "South Korea",
+    "version": "1.0.0",
+    "regime_type": "CIVIL_LAW",
+    "currency": "KRW",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Value Added Tax (VAT)",
+    "standard_rate": 10.0,
+    "e_invoicing_model": "CLEARANCE_ETAX_NTS",
+    "status": "UNVERIFIED",
+    "statutory_citation": "South Korea Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "South Korea Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "a17ec6642b88d601d47b92feb242259c1856c6683031a08a66ce55022349fd9b"
+}

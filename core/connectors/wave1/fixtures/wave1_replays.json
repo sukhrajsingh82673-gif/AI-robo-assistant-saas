@@ -1,0 +1,96 @@
+{
+  "sap_s4hana": {
+    "get_gl_account": {
+      "d": {
+        "results": [
+          {"GLAccount": "100100", "CompanyCode": "1000", "GLAccountLongText": "Petty Cash Account", "AccountCurrency": "EUR"}
+        ]
+      }
+    },
+    "post_journal_entry": {
+      "d": {
+        "AccountingDocument": "0100000452",
+        "CompanyCode": "1000",
+        "FiscalYear": "2026",
+        "Status": "POSTED"
+      }
+    }
+  },
+  "quickbooks": {
+    "get_company_info": {
+      "CompanyInfo": {
+        "CompanyName": "Zonata Synthetic Subsidiary Inc",
+        "LegalName": "Zonata Synthetic Subsidiary Inc",
+        "CompanyAddr": {"Line1": "100 Market St", "City": "San Francisco", "CountrySubDivisionCode": "CA"}
+      }
+    },
+    "create_invoice": {
+      "Invoice": {
+        "Id": "QB-98765",
+        "DocNumber": "INV-2026-QB-001",
+        "TotalAmt": 1500.00,
+        "Balance": 1500.00
+      }
+    }
+  },
+  "salesforce": {
+    "query_account": {
+      "totalSize": 1,
+      "done": true,
+      "records": [
+        {"Id": "001xx000003DHPwAAO", "Name": "Acme Global Industries", "Industry": "Manufacturing"}
+      ]
+    },
+    "create_opportunity": {
+      "id": "006xx000001ScVaAAK",
+      "success": true,
+      "errors": []
+    }
+  },
+  "workday": {
+    "get_worker": {
+      "Worker_Data": {
+        "Worker_ID": "W009841",
+        "Personal_Data": {"Legal_Name": "Jane Doe", "Country": "USA"},
+        "Employment_Data": {"Position_Title": "Senior Systems Engineer", "Hire_Date": "2024-03-01"}
+      }
+    }
+  },
+  "servicenow": {
+    "get_incident": {
+      "result": {
+        "sys_id": "9d385610874130107297946565cb0be4",
+        "number": "INC0010023",
+        "short_description": "Network latency in EU cluster",
+        "state": "2",
+        "urgency": "1"
+      }
+    }
+  },
+  "slack": {
+    "post_message": {
+      "ok": true,
+      "channel": "C0123456789",
+      "ts": "1732483200.000100",
+      "message": {"text": "Notification delivered"}
+    }
+  },
+  "snowflake": {
+    "execute_query": {
+      "statementHandle": "01b89efc-0000-abcd-0000-00000001",
+      "resultSetMetaData": {"numRows": 2, "format": "jsonv2"},
+      "data": [
+        ["100100", "EUR", "150000"],
+        ["100200", "EUR", "350000"]
+      ]
+    }
+  },
+  "iso20022": {
+    "pacs008": {
+      "msg_id": "MSG-2026-PACS008-001",
+      "status": "ACCP",
+      "settlement_amount": 54000.00,
+      "currency": "EUR"
+    }
+  }
+}

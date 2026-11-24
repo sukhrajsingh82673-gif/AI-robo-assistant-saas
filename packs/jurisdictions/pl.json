@@ -1,0 +1,45 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "PL",
+    "country_name": "Poland",
+    "version": "1.0.0",
+    "regime_type": "CLEARANCE_CTC",
+    "currency": "PLN",
+    "is_deep_overlay": true
+  },
+  "tax_regime": {
+    "system_name": "Podatek od Towar\u00f3w i Us\u0142ug (VAT)",
+    "standard_rate": 23.0,
+    "e_invoicing_model": "CENTRAL_PORTAL_KSEF",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Poland Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Poland Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 3650,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "payroll_regime": {
+    "statutory_withholding": true,
+    "social_security_rate_employer": 12.0,
+    "status": "UNVERIFIED",
+    "citation": "Poland Statutory Payroll Act"
+  },
+  "e_invoicing_adapter_config": {
+    "adapter_id": "adapter_pl_central_portal_ksef",
+    "schema_version": "1.0.0",
+    "requires_digital_seal": true
+  },
+  "content_digest": "71ae1197b4fa6d725893c11e3ad5d9e1a273f3937dee4d3c184f69478623ab7a"
+}
