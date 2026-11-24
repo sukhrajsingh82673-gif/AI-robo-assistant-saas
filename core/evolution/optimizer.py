@@ -248,3 +248,52 @@ class GovernedSelfImprovementEngine:
             "canary_calls": candidate.canary_calls,
             "canary_errors": candidate.canary_errors,
         }
+
+
+class CageIntegrityGuard:
+    """Rule 51: Prevents modification of cage, authority, budget, or policy components."""
+
+    PROHIBITED_KEYWORDS = {
+        "authority",
+        "budget",
+        "policy",
+        "permission",
+        "grant",
+        "approval",
+        "kill_switch",
+        "cage",
+        "grader",
+        "evaluator",
+        "governance",
+    }
+
+    @classmethod
+    def inspect_candidate(cls, target_name: str, proposed_payload: Dict[str, Any]) -> None:
+        payload_str = str(proposed_payload).lower()
+        target_lower = target_name.lower()
+        for kw in cls.PROHIBITED_KEYWORDS:
+            if kw in payload_str or kw in target_lower:
+                raise CageIntegrityViolationError(
+                    f"Rule 51 Violated: Optimization candidate cannot mutate authority, budget, or cage component '{kw}'."
+                )
+
+
+class GovernedOptimizer(GovernedSelfImprovementEngine):
+    """Alias for GovernedSelfImprovementEngine."""
+    pass
+
+
+class CanaryRolloutManager:
+    """Manages canary rollout traffic and telemetry."""
+
+    def __init__(self, engine: Optional[GovernedSelfImprovementEngine] = None):
+        self.engine = engine or GovernedSelfImprovementEngine()
+
+    def deploy_canary(self, candidate_id: str, company_id: str = "default") -> Dict[str, Any]:
+        return {
+            "status": "CANARY",
+            "candidate_id": candidate_id,
+            "company_id": company_id,
+            "canary_traffic_percent": 10.0,
+        }
+

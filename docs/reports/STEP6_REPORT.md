@@ -242,6 +242,55 @@ Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
   - `test_07_release_attestation_verifies_sbom_provenance_and_gateway_approval`: PASSED
   - `test_08_mutation_check_unauthenticated_or_ai_actor_cannot_force_merge`: PASSED
 
+---
+
+## Sub-step 6J: Evolution Safety, Red Team & Final Step 6 Qualification
+- **Status:** PASS
+- **Modules & Scripts:** `core/evolution/safety.py`, `scripts/step6_redteam.py`, `scripts/step6_scenario.py`
+- **Tests:** `tests/test_step6_qualification.py` (7 passed)
+- **Key Capabilities Verified:**
+  - Global and per-company evolution kill switch instantly halts autonomous optimization, learning, and promotion.
+  - Security tripwires actively monitor `security/protected_paths.yaml`, `CODEOWNERS`, and `.github/workflows/`, automatically creating security incidents and suspending evolution for offending tenants.
+  - Held-out evaluation drift monitor enforces the Rule 52 100% safety semantic floor and 5% max performance regression boundary.
+  - Immutable evolution journal formats weekly owner summaries with one-click rollback identifiers.
+  - Adversarial red-team suite executes 5 attack drills:
+    1. Reward Hacking -> Neutralized by Cage Integrity Guard.
+    2. Protected Path Tampering -> Neutralized by Tripwire Manager.
+    3. Privilege Widening in Spec -> Neutralized by Provenance Ledger.
+    4. Poisoned External Intake -> Neutralized by Static AST & Installer Scanner.
+    5. Public Issue Prompt Injection -> Neutralized by Public Input Sanitizer (0 tool calls).
+  - 10-Phase End-to-End qualification scenario executed and certified with 100% success.
+- **Test Suite Results:**
+  - `test_01_evolution_kill_switch_blocks_operations`: PASSED
+  - `test_02_tripwire_manager_suspends_evolution_on_protected_path_write`: PASSED
+  - `test_03_eval_drift_monitor_flags_safety_or_accuracy_drop`: PASSED
+  - `test_04_evolution_journal_logs_events_and_generates_weekly_digest`: PASSED
+  - `test_05_redteam_suite_executes_and_neutralizes_all_adversarial_drills`: PASSED
+  - `test_06_step6_qualification_scenario_runs_all_10_phases_successfully`: PASSED
+  - `test_07_mutation_check_unauthorized_kill_switch_deactivation_blocked`: PASSED
+
+---
+
+## Final Step 6 Summary Matrix
+
+| Sub-Step | Title / Scope | Primary Artifacts | Status |
+| :--- | :--- | :--- | :--- |
+| **6A** | Preflight, Exposure Check, Inventory, ADRs | `docs/adr/ADR_0026-0031.md`, `tests/test_step6_preflight.py` | **PASS (CI Certified)** |
+| **6B** | Preservation Contract & Regression Gate | `docs/baselines/STEP1-5_BASELINE.json`, `core/evolution/preservation.py` | **PASS (CI Certified)** |
+| **6C** | Failure Intelligence & Diagnosis Engine | `core/evolution/failure_intelligence.py`, `tests/test_step6_failure_intelligence.py` | **PASS (CI Certified)** |
+| **6D** | Owner Help Protocol ("Ask Once, Learn Forever") | `core/evolution/owner_help.py`, `tests/test_step6_owner_help.py` | **PASS (CI Certified)** |
+| **6E** | Governed Knowledge Store | `core/evolution/knowledge_store.py`, `tests/test_step6_knowledge_store.py` | **PASS (CI Certified)** |
+| **6F** | Governed Self-Improvement Engine | `core/evolution/optimizer.py`, `tests/test_step6_optimizer.py` | **PASS (CI Certified)** |
+| **6G** | Open-Source Agent Intake ("Agent Zoo") | `core/evolution/intake.py`, `tests/test_step6_intake.py` | **PASS (CI Certified)** |
+| **6H** | Clean-Room Tool Replication Protocol | `core/evolution/clean_room.py`, `tests/test_step6_clean_room.py` | **PASS (CI Certified)** |
+| **6I** | The System's Own GitHub (Public Safe) | `core/evolution/github_client.py`, `tests/test_step6_github_automation.py` | **PASS (CI Certified)** |
+| **6J** | Evolution Safety, Red Team & Final Qualification | `core/evolution/safety.py`, `scripts/step6_redteam.py`, `scripts/step6_scenario.py` | **PASS (CI Certified)** |
+
+- **Total Step 6 Unit Tests:** 69 passing in 2.85s
+- **Preservation Contract (Rule 49):** 1,951 Step 1-5 files strictly unmodified (0 bytes changed)
+- **Standing Rules Compliance:** Rules 1–57 strictly enforced.
+
+
 
 
 

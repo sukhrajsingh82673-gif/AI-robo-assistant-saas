@@ -184,10 +184,10 @@ class PublicInputSanitizer:
     """Triage worker for untrusted external issues and comments."""
 
     INJECTION_PATTERNS = [
-        re.compile(r"ignore\s+(?:all\s+)?instructions", re.IGNORECASE),
-        re.compile(r"print\s+(?:the\s+)?(?:secret|token|credentials|api_key)", re.IGNORECASE),
+        re.compile(r"ignore\s+(?:all\s+|any\s+|previous\s+)?instructions", re.IGNORECASE),
+        re.compile(r"(?:print|output|leak|display)\s+(?:the\s+|all\s+)?(?:secret|token|credentials|api_key|environment\s+variables|env)", re.IGNORECASE),
         re.compile(r"exfiltrate\s+to", re.IGNORECASE),
-        re.compile(r"you\s+are\s+now\s+in\s+god\s+mode", re.IGNORECASE),
+        re.compile(r"you\s+are\s+now\s+in\s+(?:god|developer)\s+mode", re.IGNORECASE),
         re.compile(r"curl\s+.*\|\s*(?:ba)?sh", re.IGNORECASE),
     ]
 
