@@ -16,8 +16,8 @@
 | **7A** | Preflight, Inventory & ADRs 0032–0038 | `STEP7_INVENTORY.md`, ADRs 0032-0038, CI workflow | **PASS** | `0d1aed7` |
 | **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | `ba03cdd` |
 | **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | `c3a6243` |
-| **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | Pending |
-| **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | Pending | - |
+| **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | `14177fa` |
+| **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | Pending |
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | Pending | - |
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | Pending | - |
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | Pending | - |
@@ -103,6 +103,25 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7d_sales_support.py` -> 7 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py` -> 28 passed.
+
+---
+
+## Sub-Step 7E: Marketing & Brand Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `packs/brand/brand_guidelines.json`: Structured brand guidelines data schema encoding voice principles, color palettes, disallowed terms, forbidden superlatives, and Rule 44 banned phrases.
+  - `core/marketing/brand.py`: Automated brand guidelines validator detecting forbidden superlatives ('fastest', 'cheapest') and Rule 44 'better than human' claims.
+  - `core/marketing/claim_verifier.py`: Ground-truth benchmark claim verification engine checking statistical assertions (uptime, tps, security audits) against citations.
+  - `core/marketing/campaign.py`: Governed campaign lifecycle manager enforcing progressive gating across Brief -> Creative -> Brand Review -> Legal Approval -> Budget Spend Commitment -> Scheduling.
+  - `core/marketing/attribution.py`: First-party privacy-safe multi-touch attribution calculator supporting First-Touch, Last-Touch, Linear, Time-Decay, and U-Shaped (40/20/40) models.
+  - `core/marketing/marketing_port.py`: `MarketingPort` interface with Google Ads, Meta Ads, and LinkedIn Ads platform adapters operating behind dynamic OpenBao auth leases.
+  - `tests/test_step7e_marketing.py`: 6 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7e_marketing.py` -> 6 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py` -> 34 passed.
+
 
 
 
