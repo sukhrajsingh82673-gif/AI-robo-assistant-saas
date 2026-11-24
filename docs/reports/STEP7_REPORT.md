@@ -21,8 +21,8 @@
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | `8c16daf` |
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | `d9a32b1` |
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | `24d2556` |
-| **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | **PASS** | Pending |
-| **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | Pending | - |
+| **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | **PASS** | `bff76dc` |
+| **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | **PASS** | Pending |
 | **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | Pending | - |
 | **7L** | Cross-Department Workflows | 7 compiled Temporal process workflows | Pending | - |
 | **7M** | Qualification & Benchmarks | 250 golden checkpoint tasks, 30-day simulated company | Pending | - |
@@ -186,6 +186,24 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7i_rnd.py` -> 5 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py` -> 54 passed.
+
+---
+
+## Sub-Step 7J: Legal, Compliance, IT & Security Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/legal/contract_engine.py`: Contract obligation parser, redline deviation analyzer, and Rule 62 human signature gateway gatekeeper.
+  - `core/compliance/policy_mapping.py`: Multi-regulatory control matrix covering SOC 2 Type II, ISO 27001:2022, GDPR, and India DPDP Act 2023 with automated evidence collection hooks.
+  - `core/it_security/asset_inventory.py`: IT asset inventory engine tracking hardware, software, subscriptions, and TLS certificates with proactive 30d/15d/7d expiration alerts.
+  - `core/it_security/vuln_tracker.py`: CVSS v3.1 vulnerability intake engine enforcing remediation SLAs (Critical: 24h, High: 7d).
+  - `core/it_security/posture_scanner.py`: Passive domain security posture scanner auditing SPF, DMARC, HSTS, CSP, and security headers.
+  - `tests/test_step7j_legal_security.py`: 6 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7j_legal_security.py` -> 6 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py tests/test_step7j_legal_security.py` -> 60 passed.
+
 
 
 
