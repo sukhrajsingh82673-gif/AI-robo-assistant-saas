@@ -15,8 +15,8 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **7A** | Preflight, Inventory & ADRs 0032–0038 | `STEP7_INVENTORY.md`, ADRs 0032-0038, CI workflow | **PASS** | `0d1aed7` |
 | **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | `ba03cdd` |
-| **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | Pending |
-| **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | Pending | - |
+| **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | `c3a6243` |
+| **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | Pending |
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | Pending | - |
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | Pending | - |
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | Pending | - |
@@ -83,5 +83,26 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7c_finance.py` -> 7 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py` -> 21 passed.
+
+---
+
+## Sub-Step 7D: Sales, CRM & Customer Support Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/sales/lead_engine.py`: Multi-key lead deduplication engine across email, phone, and company domain.
+  - `core/sales/consent.py`: Rule 64 outreach consent engine enforcing suppression lists and channel-specific lawful basis verification (express consent required for SMS/WhatsApp).
+  - `core/sales/quotes.py`: Quote calculation engine with margin analysis and discount guardrail requiring manager gateway approval for discounts > 20% (Rule 62).
+  - `core/sales/negotiation.py`: Bounded negotiation engine with configurable concession steps, max concession ceilings, and non-negotiable floor prices.
+  - `core/sales/crm_port.py`: `CrmPort` with `NativeCrmAdapter`, `TwentyCrmAdapter` (AGPL container, Rule 60), and `HubSpotCrmAdapter` (dynamic OpenBao token, Rule 41/42).
+  - `core/support/helpdesk_port.py`: `HelpdeskPort` with `NativeHelpdeskAdapter`, `ChatwootAdapter`, and `ZammadAdapter`.
+  - `core/support/ticket_lifecycle.py`: Multi-label ticket classifier (urgency, sentiment, topic), capacity/skill-aware ticket router, and governed auto-responder with human approval gates.
+  - `core/support/sla_clock.py`: SLA escalation clock tracking response and resolution windows, triggering warnings at 50%, 75%, 90%, and 100% breach.
+  - `tests/test_step7d_sales_support.py`: 7 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7d_sales_support.py` -> 7 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py` -> 28 passed.
+
 
 
