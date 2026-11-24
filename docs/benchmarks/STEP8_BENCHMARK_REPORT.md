@@ -1,7 +1,7 @@
 # Step 8 Empirical Human-Baseline Benchmark Report
 
 > **Governing Rule:** Rule 69 & ADR 0045/0046  
-> **Execution Timestamp:** 2026-11-24T17:12:04.358973+00:00  
+> **Execution Timestamp:** 2026-11-24T17:16:01.197674+00:00  
 > **Comparison Baseline:** Config C (Zonata Autonomous System) vs Config A (Unassisted Human Baseline)  
 
 ## 1. Executive Summary
@@ -37,4 +37,4 @@ Under Rule 69, Zonata does not benchmark against or claim superiority over unass
 
 ## 5. Cryptographic Seal
 
-**Report Seal (SHA-256):** `40b11f31c3313ac9df927e965a06e4028d257aa1166afef6dfea521659783583`  
+**Report Seal (SHA-256):** `780d73f12dd44009a07bfe53eeec1c7453eb6f09cde02c8f7ee30a5eb5d2e410`  

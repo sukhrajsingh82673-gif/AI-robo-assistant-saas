@@ -226,5 +226,30 @@
   ======= 6 passed in 0.88s =======
   ```
 
+## Sub-Step 8G: Pilot Kit & Readiness Gate
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/pilot/shadow_runner.py`: Passive shadow mode execution engine ensuring read-only observation with zero external network or database mutations, backed by `ZeroExternalWritesSpy` and raising `ShadowModeWriteBlockedError` on mutation attempts.
+  - `core/pilot/kill_switch.py`: Emergency kill-switch and isolation drill runner verifying sub-second worker termination (< 1000 ms) and blocking further tenant execution (`TENANT_ISOLATED`).
+  - `core/pilot/exit.py`: Clean pilot exit manager generating self-contained JSON dossier exports with SHA-256 manifests and executing irreversible cryptographic data erasure receipts under GDPR Art. 17.
+  - `docs/pilot/PILOT_CHARTER_TEMPLATE.md`: Standardized enterprise bilateral pilot charter specifying scope, 30-day term, designated human DPO and executive sponsor signoffs, and isolation commitments.
+  - `scripts/pilot_readiness.py`: Pilot readiness qualification gate evaluating 12 mandatory criteria. Strictly enforces the Rule 74/75 invariant: output status is strictly `READY_FOR_HUMAN_GO_DECISION`, never an automated "GO".
+  - `docs/reports/PILOT_READINESS_REPORT.md`: Formally sealed readiness qualification report documenting 12/12 passing criteria.
+  - `tests/test_step8g_pilot_readiness.py`: 7 automated tests validating shadow execution, write blocking, kill-switch drills, clean exit erasure, charter templates, and readiness gate status invariants.
+- **Verification Output:**
+  ```text
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_01_shadow_mode_passive_observation_and_zero_writes PASSED [ 14%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_02_shadow_mode_blocks_external_write_attempts PASSED [ 28%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_03_emergency_kill_switch_isolation_drill PASSED [ 42%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_04_kill_switch_blocks_worker_execution PASSED [ 57%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_05_pilot_exit_export_and_irreversible_erasure PASSED [ 71%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_06_pilot_charter_template_contents PASSED [ 85%]
+  tests/test_step8g_pilot_readiness.py::TestStep8GPilotReadiness::test_07_pilot_readiness_evaluation_gate PASSED [100%]
+  ======= 7 passed in 0.94s =======
+  ```
+
+
 
 
