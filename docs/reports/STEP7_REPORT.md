@@ -22,8 +22,8 @@
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | `d9a32b1` |
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | `24d2556` |
 | **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | **PASS** | `bff76dc` |
-| **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | **PASS** | Pending |
-| **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | Pending | - |
+| **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | **PASS** | `bf6d092` |
+| **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | **PASS** | Pending |
 | **7L** | Cross-Department Workflows | 7 compiled Temporal process workflows | Pending | - |
 | **7M** | Qualification & Benchmarks | 250 golden checkpoint tasks, 30-day simulated company | Pending | - |
 
@@ -212,3 +212,20 @@
 
 
 
+
+---
+
+## Sub-Step 7K: Analytics & Business Intelligence Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/bi/semantic_layer.py`: Metrics definitions as code (ARR, MRR, Gross Margin, DSO, DPO, DIO, Cash Conversion Cycle, Headcount, Turnover, OEE) and Rule 65 enforcement blocking agents from executing raw SQL.
+  - `core/bi/bi_port.py`: `BiPort` ABC and `CubeSemanticAdapter` exposing `mcp_cube_analytics` tool contract.
+  - `core/bi/dashboards.py`: Apache Superset dashboard definitions (JSON) and multi-tenant guest token generator with `tenant_id` and `company_id` RLS filter injection.
+  - `core/bi/meeting_intelligence.py`: Meeting transcript parser with action item extraction (owner, action, deadline, context) and decision logging.
+  - `core/bi/depreciation.py`: Asset depreciation engine (Straight-Line, Declining-Balance, Sum-of-Years'-Digits) and balanced double-entry ledger journal generator.
+  - `tests/test_step7k_analytics.py`: 7 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7k_analytics.py` -> 7 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py tests/test_step7j_legal_security.py tests/test_step7k_analytics.py` -> 67 passed.
