@@ -23,8 +23,8 @@
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | `24d2556` |
 | **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | **PASS** | `bff76dc` |
 | **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | **PASS** | `bf6d092` |
-| **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | **PASS** | Pending |
-| **7L** | Cross-Department Workflows | 7 compiled Temporal process workflows | Pending | - |
+| **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | **PASS** | `0a6a790` |
+| **7L** | Cross-Department Workflows | 7 compiled Temporal process workflows | **PASS** | Pending |
 | **7M** | Qualification & Benchmarks | 250 golden checkpoint tasks, 30-day simulated company | Pending | - |
 
 ---
@@ -229,3 +229,23 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7k_analytics.py` -> 7 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py tests/test_step7j_legal_security.py tests/test_step7k_analytics.py` -> 67 passed.
+
+---
+
+## Sub-Step 7L: Cross-Department Orchestration Workflows
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/workflows/departments/base.py`: `DepartmentBaseWorkflow`, `DepartmentWorkflowContext`, and Rule 59 post-write independent re-read verification invariant (`verify_re_read`).
+  - `core/workflows/departments/lead_to_cash.py`: End-to-end Lead-to-Cash workflow across Marketing (Rule 64 consent & dedup) -> Sales (Quote & discount gate) -> Legal (Contract & signature gate) -> Finance (India GST E-Invoice with IRN, payment capture & balanced ledger).
+  - `core/workflows/departments/procure_to_pay.py`: Requisition -> Sanctions screening freeze check -> RFQ matrix & award gate -> PO creation -> QC AQL inspection lot -> AP 3-way match -> Vendor fraud 72h hold check -> Disbursement & balanced ledger.
+  - `core/workflows/departments/record_to_report.py`: Ingest -> Bank reconciliation -> Fixed asset depreciation journal -> Month-end close cutoffs -> Trial balance validation -> Period lock -> Rule 65 Semantic Layer reporting.
+  - `core/workflows/departments/hire_to_retire.py`: Inclusive job posting -> Candidate screening -> Rule 63 counterfactual fairness audit (100 demographic slices) -> Compensation approval gate -> Employee onboarding -> Deterministic payroll -> Sub-60s rapid offboarding with cryptographic audit receipt.
+  - `core/workflows/departments/plan_to_deliver.py`: Demand order -> BOM explosion & shortage check -> Work order execution & OEE calculation -> QC inspection lot -> Sovereign carrier logistics tracking to delivery.
+  - `core/workflows/departments/support_to_resolution.py`: Ticket ingest -> Multi-label classification (Urgency, Sentiment, Topic) -> SLA clock -> Skill-aware routing -> Governed auto-responder human approval gate -> Resolution & CSAT.
+  - `core/workflows/departments/compliance_audit_cycle.py`: Control framework mapping (SOC 2, GDPR, DPDP) -> IT asset inventory & CVSS SLA tracking -> Passive domain posture audit -> Cryptographic audit attestation package with SHA256 seal.
+  - `tests/test_step7l_cross_department_workflows.py`: 10 comprehensive cross-department process tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7l_cross_department_workflows.py tests/test_preservation_step7.py` -> 13 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py tests/test_step7j_legal_security.py tests/test_step7k_analytics.py tests/test_step7l_cross_department_workflows.py` -> 77 passed.
