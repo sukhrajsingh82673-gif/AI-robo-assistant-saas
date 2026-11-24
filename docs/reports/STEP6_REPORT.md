@@ -149,6 +149,28 @@ Executed local test suite `tests/test_step6_knowledge_store.py` passing 7/7 test
 - `test_06_crypto_shredding_renders_tenant_playbooks_unreadable`: PASSED
 - `test_07_mutation_check_tenant_cannot_set_global_true`: PASSED
 
+---
+
+## Sub-Step 6F — Governed Self-Improvement Engine (DSPy + GEPA, Held-Out Tests, Safety Floor, Canary Rollouts)
+
+### 1. Architectural Implementation
+- Built `core/evolution/optimizer.py` providing:
+  - **Optimization Scope & Targets:** Governs evolution of system prompts, few-shot demonstration selectors, and tool-routing heuristics.
+  - **Rule 51 Cage Integrity:** Blocks any proposal attempting to mutate authority tables, budgets, kill switches, graders, or core AST code.
+  - **Rule 52 Safety Semantic Floor:** Strictly enforces 100% compliance across all safety and truth checks. Candidates with even 0.01% safety degradation are rejected.
+  - **Held-Out Evaluation:** Evaluates candidate generalization against held-out validation suites before approval.
+  - **Rule 53 Canary Allocation & Auto-Rollback:** Allocates 10% traffic to approved canaries and monitors error rates. If canary error rate exceeds baseline by >2%, executes immediate automated rollback.
+
+### 2. Verification & Qualification Tests
+Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
+- `test_01_optimizer_candidate_improves_training_metric`: PASSED
+- `test_02_held_out_evaluation_confirms_generalization`: PASSED
+- `test_03_safety_semantic_floor_rejects_candidate_with_any_safety_regression`: PASSED
+- `test_04_canary_rollout_allocates_ten_percent_traffic`: PASSED
+- `test_05_simulated_canary_regression_triggers_auto_rollback`: PASSED
+- `test_06_mutation_check_candidate_modifying_authority_or_cage_fails`: PASSED
+
+
 
 
 
