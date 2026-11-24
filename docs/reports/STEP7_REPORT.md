@@ -14,8 +14,8 @@
 | Sub-Step | Title / Scope | Primary Artifacts | Status | CI Run ID |
 | :--- | :--- | :--- | :--- | :--- |
 | **7A** | Preflight, Inventory & ADRs 0032–0038 | `STEP7_INVENTORY.md`, ADRs 0032-0038, CI workflow | **PASS** | `0d1aed7` |
-| **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | Pending |
-| **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | Pending | - |
+| **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | `ba03cdd` |
+| **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | Pending |
 | **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | Pending | - |
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | Pending | - |
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | Pending | - |
@@ -66,4 +66,22 @@
 - **Verification Commands:**
   - `pytest -v tests/test_preservation_step7.py tests/test_step7b_platform.py` -> 8 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py` -> 14 passed.
+
+---
+
+## Sub-Step 7C: Finance & Accounting Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/finance/ap_matching.py`: AP 3-way matching engine with strict tolerances (0% quantity, 1% / $50 price), discrepancy typed holds, and payment gateway approval gates.
+  - `core/finance/bank_rec.py`: Multi-format statement parser (CAMT.053 XML, MT940 SWIFT, CSV) and 2-phase reconciliation matcher (exact and fuzzy matching with payee similarity >= 0.85).
+  - `core/finance/vendor_fraud.py`: Vendor bank profile change detector with mandatory 72-hour fraud protection hold and out-of-band human verification release (Rule 62).
+  - `core/finance/month_end_close.py`: Deterministic month-end close engine with AP/AR cutoffs, asset depreciation, bank rec signoff, intercompany eliminations, trial balance debit=credit equality check, and immutable period locking.
+  - `core/finance/gst_einvoicing.py` & `packs/regions/india/gst_rules.json`: Statutory cited GST data pack (Rule 61), NIC Schema v1.03 E-Invoice payload generator, 64-char SHA256 IRN hash calculator, E-Way bill generation (> INR 50k), and GSTR-2B purchase register reconciliation.
+  - `tests/test_step7c_finance.py`: 7 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7c_finance.py` -> 7 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py` -> 21 passed.
+
 

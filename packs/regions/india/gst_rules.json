@@ -1,0 +1,23 @@
+{
+  "$schema": "zonata.statutory-pack/v1",
+  "pack_id": "india_gst_2026",
+  "jurisdiction": "IN",
+  "statute": "Central Goods and Services Tax Act, 2017",
+  "effective_date": "2026-04-01",
+  "citation": "CBIC Notification No. 14/2026-Central Tax; E-Invoice Schema v1.03",
+  "currency": "INR",
+  "rates": [
+    {"rate": 0.0, "description": "Exempt / Nil Rated", "applies_to": ["fresh_food", "grains", "healthcare"]},
+    {"rate": 0.05, "description": "Essential Goods (5%)", "applies_to": ["packaged_food", "apparel_low_cost"]},
+    {"rate": 0.12, "description": "Standard Rate Tier 1 (12%)", "applies_to": ["computers", "processed_goods"]},
+    {"rate": 0.18, "description": "Standard Rate Tier 2 (18%)", "applies_to": ["saas_services", "professional_services", "it_hardware"]},
+    {"rate": 0.28, "description": "Luxury & Demerit Goods (28%)", "applies_to": ["automobiles", "luxury_electronics"]}
+  ],
+  "rules": {
+    "inter_state_tax": "IGST",
+    "intra_state_tax": ["CGST", "SGST"],
+    "eway_bill_threshold_inr": 50000.0,
+    "einvoice_mandatory_threshold_cr_inr": 5.0,
+    "b2b_mandatory_einvoice": true
+  }
+}
