@@ -170,6 +170,31 @@ Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
 - `test_05_simulated_canary_regression_triggers_auto_rollback`: PASSED
 - `test_06_mutation_check_candidate_modifying_authority_or_cage_fails`: PASSED
 
+---
+
+## Sub-step 6G: Open-Source Agent and Tool Intake ("Agent Zoo")
+- **Status:** PASS
+- **Module:** `core/evolution/intake.py`
+- **Tests:** `tests/test_step6_intake.py` (8 passed)
+- **Key Capabilities Verified:**
+  - `IntakeState` lifecycle: `DISCOVERED -> QUARANTINED -> EVALUATED -> APPROVED_FOR_SANDBOX -> CERTIFIED -> ACTIVE`.
+  - Human-only promotion to `ACTIVE` enforced under Rule 53 and Rule 57; non-human principals rejected with `HumanApprovalRequiredError`.
+  - Static security scanning rejecting unpinned dependencies, missing cryptographic hash locks, and pipe-to-shell installers (`curl | sh`, Rule 32).
+  - License classification enforcing Rule 5 allow-list and tagging AGPL/GPL components as `BOUNDARY`.
+  - AST analysis detecting direct `os.environ` secret harvesting and prohibited `eval()` calls.
+  - Behavioral sandbox runner isolating candidate execution, blocking unauthorized egress, and reconciling declared vs. observed capabilities.
+  - Reference evaluation of Nous Research Hermes Agent (MIT) documenting architectural parity with native ZONATA engines.
+- **Test Suite Results:**
+  - `test_01_hermes_reference_evaluation_produces_governed_report`: PASSED
+  - `test_02_static_scanner_rejects_curl_pipe_sh_installer`: PASSED
+  - `test_03_static_scanner_rejects_unpinned_or_unhashed_dependency`: PASSED
+  - `test_04_static_scanner_flags_agpl_as_boundary`: PASSED
+  - `test_05_ast_scanner_detects_env_read_and_dangerous_calls`: PASSED
+  - `test_06_sandbox_blocks_unauthorized_egress_and_fs_escape`: PASSED
+  - `test_07_promotion_to_active_strictly_requires_human_principal`: PASSED
+  - `test_08_mutation_check_readme_prompt_injection_flagged`: PASSED
+
+
 
 
 
