@@ -271,6 +271,49 @@
   ======= 5 passed in 0.92s =======
   ```
 
+## Sub-Step 8I: Step 8 Final Qualification & Scenario
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `scripts/step8_scenario.py`: Comprehensive multi-sector end-to-end synthetic scenario simulating 3 global corporate groups (Apex Industrial AG in C28/DE, SilkRoute Holdings in G47/IN/US, Al-Sharq Transport in H52/SA/BE) over 30 days of operations with ZUGFeRD, India IRP, Peppol UBL, and Arabic RTL layout formatting.
+  - Multi-Currency Group Consolidation: IAS 21 multi-currency balance translation with CTA equity plug and two-sided intercompany matching achieving exact zero-net elimination variance ($debits - credits = 0$).
+  - Adversarial Boundary Interception: Successfully injected and verified 7/7 automated boundary blocks (clinical diagnosis refusal, consumer credit advice refusal, unverified tax rate escalation, unreviewed machine translation blocking, cross-region cellular data refusal, tenant concurrency burst throttling, and missing procurement evidence rejection).
+  - Deterministic Scenario Digest: SHA-256 seal `24092f0c095b2a74ff7505e049c80c99558ac2e6a8a515467cad21164dc60174`.
+  - `tests/test_step8i_final_scenario.py`: Automated test validating scenario execution and operational assertions.
+- **Verification Output:**
+  ```text
+  tests/test_step8i_final_scenario.py::TestStep8IFinalScenario::test_01_end_to_end_multi_sector_scenario_qualification PASSED [100%]
+  ======= 1 passed in 1.34s =======
+  ```
+
+---
+
+## 3. Step 8 Invariant & Governing Rules Verification Matrix
+
+| Rule | Description | Verification Mechanism | Status |
+| :--- | :--- | :--- | :---: |
+| **Rule 67** | Preservation Extension (Steps 1–7 Immutable) | `tests/test_preservation_step8.py` (2,137 baseline file hashes match 100%) | **VERIFIED** |
+| **Rule 68** | Industry Neutrality (No `if industry == ...`) | `tests/test_step8a_preflight.py::test_06` regex grep across entire repo (0 matches) | **VERIFIED** |
+| **Rule 69** | Empirical Human-Baseline Program | `docs/benchmarks/STEP8_BENCHMARK_REPORT.md` (Config C vs Config A, N >= 30, sealed) | **VERIFIED** |
+| **Rule 70** | Regulated E-Invoicing & Tax Gates | EN 16931 models; unverified statutory taxes escalate to human accountants | **VERIFIED** |
+| **Rule 71** | Depth Earned by Human Review | AI reviewers strictly prohibited (`AIReviewerProhibitedError`); post-review digest voiding | **VERIFIED** |
+| **Rule 72** | Hard Sector Boundaries | Automated refusal of clinical, legal, consumer credit, and safety control mutations | **VERIFIED** |
+| **Rule 73** | Global by Construction | Integer minor units, CLDR formatting across 30 jurisdictions, regional cellular residency | **VERIFIED** |
+| **Rule 74** | Passive Shadow Mode Invariant | Zero external network writes or production DB mutations in shadow observation mode | **VERIFIED** |
+| **Rule 75** | Emergency Isolation Kill-Switch | Sub-second tenant shutdown (< 1000 ms) and complete data erasure under GDPR Art. 17 | **VERIFIED** |
+| **Rule 76** | Scale, Reliability & Idempotency | Noisy-neighbor token bucket governor, 50-entity consolidation (< 500 ms), chaos retry | **VERIFIED** |
+
+---
+
+## 4. Final Signoff & Qualification Attestation
+
+**Step 8 Target Status:** `step8-final`  
+**Cumulative Step 8 Test Suite:** 67 passed, 0 failed, 0 warnings  
+**Preservation Contract Status:** PASS (Zero modifications to Step 1–7 baseline files)  
+**OpenCode Red-Team Verdict:** PASS across all sub-steps (8A through 8I)  
+
+
 
 
 
