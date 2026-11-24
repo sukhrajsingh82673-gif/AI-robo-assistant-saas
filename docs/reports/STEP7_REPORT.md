@@ -18,8 +18,8 @@
 | **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | `c3a6243` |
 | **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | `14177fa` |
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | `4109727` |
-| **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | Pending |
-| **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | Pending | - |
+| **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | `8c16daf` |
+| **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | Pending |
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | Pending | - |
 | **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | Pending | - |
 | **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | Pending | - |
@@ -138,6 +138,24 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7f_hr.py` -> 6 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py` -> 40 passed.
+
+---
+
+## Sub-Step 7G: Operations & Production Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/operations/bom.py`: Multi-level indented BOM explosion engine calculating gross/net requirements, rolling up critical-path lead times, and alerting on component inventory shortages.
+  - `core/operations/work_orders.py`: Work order lifecycle state machine managing operation dispatches, material issuance, and production scrap tracking.
+  - `core/operations/oee.py`: Overall Equipment Effectiveness calculator tracking Availability, Performance, Quality, planned vs. unplanned downtime, and total yield.
+  - `core/operations/quality.py`: Quality control inspection engine applying Acceptance Quality Limit (AQL) sampling rules and placing non-bypassable quarantine holds on defective lots.
+  - `core/operations/maintenance.py`: Preventive maintenance scheduler and reliability analytics engine calculating Mean Time Between Failures (MTBF) and Mean Time To Repair (MTTR).
+  - `tests/test_step7g_operations.py`: 5 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7g_operations.py` -> 5 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py` -> 45 passed.
+
 
 
 
