@@ -181,3 +181,28 @@
   ======= 10 passed in 0.98s =======
   ```
 
+## Sub-Step 8E: Human-Baseline Benchmark Program
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `docs/benchmarks/HUMAN_BASELINE_METHOD.md`: Formal specification of the four canonical evaluation configurations (A: Unassisted Human, B: Unassisted AI, C: Zonata Autonomous System, D: Human + Zonata Collaborative), Claim Equivalence rule (strictly C vs A or D vs A), metrics, sample size requirements ($N \ge 30$), and Critical Safety Violation Veto.
+  - `core/benchmarks/vault.py`: Benchmark Vault with authenticated HMAC envelope encryption, role-based ACLs (`BENCHMARK_AUTHOR`, `BENCHMARK_EVALUATOR`, `AUDITOR`, `BENCHMARK_ADMIN`), and SHA-256 tamper-evident integrity seals.
+  - `core/benchmarks/recorder.py`: Human Baseline Telemetry Recorder with explicit participant consent verification (`ParticipantConsentMissingError`), irreversible HMAC-SHA256 pseudonymization, PII/credential scrubbing, and high-precision duration timers.
+  - `core/benchmarks/calibration.py`: External benchmark calibration adapters for TheAgentCompany (TAC), GDPval / WorkArena, and Remote Labor Index (RLI), with strict budgetary spend cap enforcement (`EvaluationBudgetExceededError`).
+  - `core/benchmarks/claims.py`: Governed Claims Registry enforcing empirical rigor ($N \ge 30$, 0 safety violations, valid baseline comparison) and rejecting unbacked promotional claims (`UnverifiedClaimBlockedError`).
+  - `tests/test_step8e_benchmark_program.py`: 8 comprehensive tests validating methodology, vault security, consent enforcement, PII scrubbing, calibration adapters, spend caps, and claims governance.
+- **Verification Output:**
+  ```text
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_01_methodology_doc_configurations_and_rules PASSED [ 12%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_02_vault_encryption_acls_and_tamper_detection PASSED [ 25%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_03_baseline_recorder_requires_consent PASSED [ 37%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_04_telemetry_scrubbing_and_session_completion PASSED [ 50%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_05_external_calibration_adapters PASSED [ 62%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_06_spend_cap_ceiling_enforced PASSED [ 75%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_07_governed_claims_registry_valid_claim PASSED [ 87%]
+  tests/test_step8e_benchmark_program.py::TestStep8EBenchmarkProgram::test_08_claims_registry_blocks_config_b_and_small_n PASSED [100%]
+  ======= 8 passed in 1.16s =======
+  ```
+
+
