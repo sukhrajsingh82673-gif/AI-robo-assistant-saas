@@ -84,3 +84,25 @@ Executed local test suite `tests/test_step6_preservation_contract.py` passing 7/
 - `test_06_evolution_flag_defaults_to_false_and_preserves_step5_behavior`: PASSED
 - `test_07_git_diff_integrity_against_step5_final`: PASSED
 
+---
+
+## Sub-Step 6C — Failure Intelligence, Taxonomy Ingestion, LangGraph Analyst Graph, & Self-Eval Scorecards
+
+### 1. Architectural Implementation
+- Built `core/evolution/failure_intelligence.py` providing:
+  - **Failure Taxonomy:** Strict 6-class categorization (`EXECUTION_ERROR`, `VERIFICATION_FAILURE`, `POLICY_DENIAL`, `REGRESSION`, `HALLUCINATION`, `AMBIGUOUS_SPEC`) with `UNKNOWN` mutation fallback.
+  - **PII & Secret Scrubbing:** Multi-pattern regex engine ensuring JWTs, API tokens, passwords, and emails are scrubbed from traces before persistence.
+  - **Structural Deduplication:** Normalized hashing collapsing repeated errors into single incidents with occurrence counts.
+  - **LangGraph Analyst Graph:** 3-node graph diagnosing root causes and proposing mitigations (`PLAYBOOK_CANDIDATE`, `OPTIMIZER_CANDIDATE`, `OWNER_HELP_REQUEST`, `GITHUB_TRIAGE`).
+  - **Self-Eval Scorecard:** Calculates tenant-level MTTF, MTTR, regression rates, and actionable governance recommendations.
+
+### 2. Verification & Qualification Tests
+Executed local test suite `tests/test_step6_failure_intelligence.py` passing 6/6 tests:
+- `test_01_taxonomy_ingestion_all_classes`: PASSED
+- `test_02_failure_deduplication_collapses_repeats`: PASSED
+- `test_03_analyst_graph_routes_mitigation_correctly`: PASSED
+- `test_04_pii_and_secret_scrubbing_in_traces`: PASSED
+- `test_05_scorecard_mttf_mttr_and_regression_metrics`: PASSED
+- `test_06_mutation_check_unclassified_failure_defaults_unknown`: PASSED
+
+
