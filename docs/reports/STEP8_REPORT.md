@@ -13,9 +13,9 @@
 
 | Sub-Step | Title / Scope | Primary Artifacts | Status | CI Run ID |
 | :--- | :--- | :--- | :--- | :--- |
-| **8A** | Preflight, Inventory & ADRs 0039–0047 | `STEP8_INVENTORY.md`, ADRs 0039-0047, Preflight tests | **PASS** | `b0e8f70` |
-| **8B** | Preservation Extension & Factory Framework | Baseline freeze v3, overlay schemas, T0-T4 tiers | **IN PROGRESS** | Pending |
-| **8C** | Industry Coverage at Scale | ISIC Rev. 5 divisions, T1 overlays, 16 T2 reference overlays | Pending | Pending |
+| **8A** | Preflight, Inventory & ADRs 0039–0047 | `STEP8_INVENTORY.md`, ADRs 0039-0047, Preflight tests | **PASS** | `78ec21e` |
+| **8B** | Preservation Extension & Factory Framework | Baseline freeze v3, overlay schemas, T0-T4 tiers | **PASS** | `b0e8f70` |
+| **8C** | Industry Coverage at Scale | ISIC Rev. 5 divisions, T1 overlays, 16 T2 reference overlays | **IN PROGRESS** | Pending |
 | **8D** | Global Corporate Readiness | Multi-company consolidation, 30+ jurisdictions, EN 16931, CLDR | Pending | Pending |
 | **8E** | Human-Baseline Benchmark Program | Benchmark vault, pre-registration seal, claims registry | Pending | Pending |
 | **8F** | Benchmark Execution & Report | Golden tasks execution, empirical results, effect sizes | Pending | Pending |
@@ -51,4 +51,46 @@
   tests/test_step8a_preflight.py::TestStep8Preflight::test_06_rule_68_industry_neutrality_grep PASSED [ 85%]
   tests/test_step8a_preflight.py::TestStep8Preflight::test_07_mutation_check_missing_adr_fails PASSED [100%]
   ======= 7 passed in 0.86s =======
+  ```
+
+
+---
+
+## Sub-Step 8B: Preservation Extension and Industry Depth Factory Framework
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `docs/baselines/STEP1-7_BASELINE.json`: Baseline v3 manifest containing 2,137 file SHA-256 digests frozen at commit `b0e8f70` (tag `step7-final`).
+  - `security/protected_paths_step8.yaml`: Extended security policy freezing Steps 1–7 directories and modules under Rule 67.
+  - `core/industry/schema.py`: Schema validator for `zonata.industry-overlay/v1` supporting multi-scheme taxonomy (ISIC Rev. 5, Rev. 4, NACE Rev. 2.1, NAICS 2022), calculators, SOP overlays, regulatory registers, and boundary policies.
+  - `core/industry/tiers.py`: Maturity tier engine enforcing T0 to T4 progression, dynamic coverage report generation, and automated voiding to T2/T1 upon post-signature modification.
+  - `core/industry/expert_review.py`: Human expert review protocol binding reviews to cryptographic content digests, with strict rejection of AI principals (`AIReviewerProhibitedError` under Rule 71).
+  - `core/industry/calculator.py`: AST-safe arithmetic formula evaluator with division-by-zero protection and golden test runner.
+  - `core/industry/boundary.py`: Rule 72 sector boundary enforcer refusing clinical diagnoses/dosing, legal advice, consumer investment/credit decisions, and safety-critical control writes.
+  - `core/industry/pipeline.py`: LangGraph-compatible factory pipeline executing source ingestion, draft compilation, automated validation, and human review dispatch.
+  - `core/jurisdiction/schema.py`: Schema validator for `zonata.jurisdiction-pack/v1` supporting tax regimes, statutory calendars, e-invoicing pointers, and cross-border data protection rules.
+  - `migrations/pg/0034_step8_industry_jurisdiction_benchmark_schemas.sql`: Additive database migration creating `industries`, `jurisdictions`, and `benchmarks` schemas with RLS policies and tenant isolation.
+  - `migrations/rollback/0034_step8_industry_jurisdiction_benchmark_schemas_downgrade.sql`: Rollback script.
+  - `core/industry/flags.py`: Per-company feature flags defaulting to False (`is_industry_factory_enabled`, `is_global_readiness_enabled`).
+  - `tests/test_preservation_step8.py`: 6 tests proving 2,137 Step 1–7 baseline files remain bit-for-bit unchanged, migrations are additive, flags default OFF, and Rule 68 neutrality is preserved.
+  - `tests/test_step8b_framework.py`: 9 tests verifying overlay schema, jurisdiction schema, tier transitions, AI reviewer rejection, post-review modification voiding, calculator execution, sector boundaries, and factory pipeline stages.
+- **Verification Output:**
+  ```text
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_01_baseline_file_count_and_metadata PASSED [  6%]
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_02_preservation_cryptographic_hashes PASSED [ 13%]
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_03_mutation_check_altered_hash_fails PASSED [ 20%]
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_04_flags_off_equivalence PASSED [ 26%]
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_05_migration_linter_additive_only PASSED [ 33%]
+  tests/test_preservation_step8.py::TestStep8PreservationContract::test_06_rule_68_industry_neutrality_preserved PASSED [ 40%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_01_overlay_schema_valid_and_invalid PASSED [ 46%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_02_jurisdiction_pack_schema PASSED [ 53%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_03_tier_transitions_and_coverage_report PASSED [ 60%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_04_expert_review_human_promotion_and_digest_binding PASSED [ 66%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_05_rule_71_ai_reviewer_strictly_rejected PASSED [ 73%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_06_post_review_modification_voids_tier PASSED [ 80%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_07_safe_domain_calculator_execution_and_golden_tests PASSED [ 86%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_08_rule_72_hard_sector_boundary_enforcer PASSED [ 93%]
+  tests/test_step8b_framework.py::TestStep8bFramework::test_09_factory_pipeline_stages PASSED [100%]
+  ======= 15 passed in 1.05s =======
   ```
