@@ -17,8 +17,8 @@
 | **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | `ba03cdd` |
 | **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | **PASS** | `c3a6243` |
 | **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | `14177fa` |
-| **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | Pending |
-| **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | Pending | - |
+| **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | `4109727` |
+| **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | Pending |
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | Pending | - |
 | **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | Pending | - |
 | **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | Pending | - |
@@ -121,6 +121,24 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7e_marketing.py` -> 6 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py` -> 34 passed.
+
+---
+
+## Sub-Step 7F: Human Resources & Workforce Operations
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/hr/recruiting.py`: Structured recruiting engine with inclusive language linter detecting masculine/biased terms and enforcing mandatory salary transparency ranges.
+  - `core/hr/fairness.py`: Rule 63 counterfactual fairness auditor generating 100 demographic permutations across names, gender markers, and age; strictly halts models if disparity ratios deviate outside $[0.95, 1.05]$.
+  - `core/hr/lifecycle.py`: Employee lifecycle manager with onboarding state checklists and mandatory human gateway authorization for compensation adjustments (Rule 62).
+  - `core/hr/payroll.py` & `packs/regions/india/payroll_rules.json`: Deterministic payroll computation based on cited statutory rates (EPF 12%, ESIC 0.75%, PT, TDS) under Rule 61.
+  - `core/hr/offboarding.py`: Rapid sub-60s offboarding checklist revoking active user sessions, OpenBao dynamic secret leases, and DB privileges with SHA256 cryptographic audit receipt.
+  - `tests/test_step7f_hr.py`: 6 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7f_hr.py` -> 6 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py` -> 40 passed.
+
 
 
 

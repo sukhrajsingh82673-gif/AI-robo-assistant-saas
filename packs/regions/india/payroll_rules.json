@@ -1,0 +1,18 @@
+{
+  "$schema": "zonata.statutory-pack/v1",
+  "pack_id": "india_payroll_2026",
+  "jurisdiction": "IN",
+  "statute": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952; ESI Act, 1948",
+  "citation": "Ministry of Labour & Employment Gazette Notification 2026",
+  "currency": "INR",
+  "rates": {
+    "epf_employee_pct": 0.12,
+    "epf_employer_pct": 0.12,
+    "epf_wage_ceiling_inr": 15000.0,
+    "esic_employee_pct": 0.0075,
+    "esic_employer_pct": 0.0325,
+    "esic_wage_ceiling_inr": 21000.0,
+    "professional_tax_monthly_inr": 200.0,
+    "tds_standard_deduction_inr": 75000.0
+  }
+}
