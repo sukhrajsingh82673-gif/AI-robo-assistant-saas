@@ -127,5 +127,28 @@ Executed local test suite `tests/test_step6_owner_help.py` passing 6/6 tests:
 - `test_05_ask_once_learn_forever_auto_resolves_future_queries`: PASSED
 - `test_06_mutation_check_raw_secret_in_answer_routed_to_vault`: PASSED
 
+---
+
+## Sub-Step 6E — Governed Knowledge Store (`zonata.playbook/v1`, pgvector, scanner, crypto-shredding)
+
+### 1. Architectural Implementation
+- Built `core/evolution/knowledge_store.py` providing:
+  - **Schema Invariants:** Enforces `zonata.playbook/v1` structure with mandatory step-level `rollback_action` and cryptographic provenance.
+  - **Mutation Protection:** Rejects any non-system principal attempting to author `global: true` playbooks.
+  - **Vector Semantic Search:** Normalized cosine vector similarity with strict Row-Level Security (RLS) tenant isolation.
+  - **agentskills.io Scanner:** Admission gate rejecting dangerous skills (root, eval, unconstrained egress, dangerous syscalls).
+  - **Crypto-Shredding (Rule 46):** Per-tenant AES-256-GCM envelope encryption supporting irreversible DSAR crypto-shredding by destroying the tenant DEK.
+
+### 2. Verification & Qualification Tests
+Executed local test suite `tests/test_step6_knowledge_store.py` passing 7/7 tests:
+- `test_01_valid_playbook_passes_schema_validation`: PASSED
+- `test_02_malformed_playbook_missing_rollback_or_provenance_rejected`: PASSED
+- `test_03_embedding_similarity_retrieval_returns_relevant_playbook`: PASSED
+- `test_04_cross_tenant_isolation_prevents_leakage_with_rls`: PASSED
+- `test_05_agentskills_io_scanner_admits_clean_and_rejects_dangerous_skills`: PASSED
+- `test_06_crypto_shredding_renders_tenant_playbooks_unreadable`: PASSED
+- `test_07_mutation_check_tenant_cannot_set_global_true`: PASSED
+
+
 
 

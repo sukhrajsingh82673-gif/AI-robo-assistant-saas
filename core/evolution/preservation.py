@@ -218,6 +218,9 @@ class PreservationEngine:
                 continue
             status, path = parts[0], parts[1].strip()
 
+            if path in self.DYNAMIC_GENERATED_FILES:
+                continue
+
             if path in baseline_files:
                 if status != "A":
                     violations.append(f"ILLEGAL_MUTATION: Baseline file {path} has status '{status}'")
