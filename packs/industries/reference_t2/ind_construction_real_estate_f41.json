@@ -1,0 +1,844 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_construction_real_estate_f41",
+    "title": "Construction and Real Estate Development",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "F",
+    "division": "41"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "41",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "41"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "F.41"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "2362"
+    }
+  ],
+  "standards_references": [
+    "IFC_4_3",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "cpi",
+      "name": "Cost Performance Index",
+      "formula": "earned_value / actual_cost",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "earned_value": 800000,
+            "actual_cost": 1000000
+          },
+          "expected_output": 0.8,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "spi",
+      "name": "Schedule Performance Index",
+      "formula": "earned_value / planned_value",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "earned_value": 850000,
+            "planned_value": 1000000
+          },
+          "expected_output": 0.85,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cap_rate",
+      "name": "Capitalization Rate Percentage",
+      "formula": "(net_operating_income / current_market_value) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_operating_income": 70000,
+            "current_market_value": 1000000
+          },
+          "expected_output": 7.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "noi",
+      "name": "Annual Net Operating Income",
+      "formula": "gross_operating_income - operating_expenses",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "gross_operating_income": 120000,
+            "operating_expenses": 40000
+          },
+          "expected_output": 80000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ltc",
+      "name": "Loan to Construction Cost",
+      "formula": "(construction_loan_amount / total_development_cost) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "construction_loan_amount": 700000,
+            "total_development_cost": 1000000
+          },
+          "expected_output": 70.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "retainage_accrual",
+      "name": "Subcontractor Retainage Holdback",
+      "formula": "billed_work_amount * (retainage_percentage / 100)",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "billed_work_amount": 200000,
+            "retainage_percentage": 10
+          },
+          "expected_output": 20000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "square_meter_cost",
+      "name": "Cost per Square Meter Construction",
+      "formula": "total_construction_expenditure / gross_floor_area_sqm",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_construction_expenditure": 5000000,
+            "gross_floor_area_sqm": 2500
+          },
+          "expected_output": 2000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "change_order_ratio",
+      "name": "Change Order Budget Impact Percentage",
+      "formula": "(change_order_total / baseline_contract_value) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "change_order_total": 80000,
+            "baseline_contract_value": 1000000
+          },
+          "expected_output": 8.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "punch_defect_density",
+      "name": "Punch List Defects per Thousand SqM",
+      "formula": "(defect_items_count / gross_area_sqm) * 1000",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "defect_items_count": 25,
+            "gross_area_sqm": 5000
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cash_on_cash",
+      "name": "Cash on Cash Return",
+      "formula": "(annual_pretax_cash_flow / total_cash_invested) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "annual_pretax_cash_flow": 24000,
+            "total_cash_invested": 300000
+          },
+          "expected_output": 8.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "occupancy_rate",
+      "name": "Leased Occupancy Percentage",
+      "formula": "(occupied_leasable_sqm / total_leasable_sqm) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "occupied_leasable_sqm": 9200,
+            "total_leasable_sqm": 10000
+          },
+          "expected_output": 92.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "debt_yield",
+      "name": "Debt Yield Ratio",
+      "formula": "(net_operating_income / total_loan_balance) * 100",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_operating_income": 100000,
+            "total_loan_balance": 1000000
+          },
+          "expected_output": 10.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "trir",
+      "name": "Total Recordable Incident Rate",
+      "formula": "(recordable_incidents * 200000) / total_man_hours",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "recordable_incidents": 2,
+            "total_man_hours": 200000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "progress_billing_variance",
+      "name": "Progress Billing Variance",
+      "formula": "billed_to_date - earned_value_to_date",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "billed_to_date": 550000,
+            "earned_value_to_date": 500000
+          },
+          "expected_output": 50000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "completion_estimate_variance",
+      "name": "Estimate at Completion Variance",
+      "formula": "forecast_completion_cost - budget_at_completion",
+      "data_source": "folio_f41_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "forecast_completion_cost": 1050000,
+            "budget_at_completion": 1000000
+          },
+          "expected_output": 50000.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_f41_intake_verification",
+      "title": "Construction and Real Estate Development - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_statutory_compliance_check",
+      "title": "Construction and Real Estate Development - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_quality_audit_sampling",
+      "title": "Construction and Real Estate Development - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_exception_escalation_protocol",
+      "title": "Construction and Real Estate Development - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_monthly_period_cutoff",
+      "title": "Construction and Real Estate Development - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_incident_remediation_workflow",
+      "title": "Construction and Real Estate Development - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_partner_sla_verification",
+      "title": "Construction and Real Estate Development - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_safety_inspection_checklist",
+      "title": "Construction and Real Estate Development - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_change_management_review",
+      "title": "Construction and Real Estate Development - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_f41_final_dispatch_attestation",
+      "title": "Construction and Real Estate Development - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_f41_doc_01",
+      "name": "Construction and Real Estate Development Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_02",
+      "name": "Construction and Real Estate Development Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_03",
+      "name": "Construction and Real Estate Development Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_04",
+      "name": "Construction and Real Estate Development Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_05",
+      "name": "Construction and Real Estate Development Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_06",
+      "name": "Construction and Real Estate Development Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_07",
+      "name": "Construction and Real Estate Development Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_08",
+      "name": "Construction and Real Estate Development Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_09",
+      "name": "Construction and Real Estate Development Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_10",
+      "name": "Construction and Real Estate Development Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_11",
+      "name": "Construction and Real Estate Development Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_12",
+      "name": "Construction and Real Estate Development Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_13",
+      "name": "Construction and Real Estate Development Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_14",
+      "name": "Construction and Real Estate Development Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_15",
+      "name": "Construction and Real Estate Development Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_16",
+      "name": "Construction and Real Estate Development Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_17",
+      "name": "Construction and Real Estate Development Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_18",
+      "name": "Construction and Real Estate Development Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_19",
+      "name": "Construction and Real Estate Development Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_f41_doc_20",
+      "name": "Construction and Real Estate Development Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "OSHA 29 CFR 1926 (Safety and Health Regulations for Construction)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Construction Products Regulation (EU) No 305/2011",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_f41_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_f41_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_f41_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_f41_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_f41_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "certify structural load bearing",
+        "override crane limiters",
+        "waive foundation inspection"
+      ],
+      "rejection_message": "Autonomous agents cannot certify structural integrity or waive mandatory site safety checks."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_f41_golden_01",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_02",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_03",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_04",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_05",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_06",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_07",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_08",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_09",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_10",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_11",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_12",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_13",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_14",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_15",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_f41_golden_16",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_17",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_18",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_19",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_20",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_21",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_22",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_23",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_24",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_f41_golden_25",
+      "name": "Construction and Real Estate Development Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "3a34fd7a467f1b46635dcf2752100cbb1046815d8426ba86b97a1b2c82e88b1d"
+}

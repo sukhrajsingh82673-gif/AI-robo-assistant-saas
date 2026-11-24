@@ -1,0 +1,847 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_insurance_k65",
+    "title": "Insurance Operations and Underwriting",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "K",
+    "division": "65"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "65",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "65"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "K.65"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "5241"
+    }
+  ],
+  "standards_references": [
+    "ACORD_STANDARDS",
+    "ISO_20022",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "loss_ratio",
+      "name": "Loss Ratio",
+      "formula": "(incurred_claims_and_lae / earned_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "incurred_claims_and_lae": 650000,
+            "earned_premiums": 1000000
+          },
+          "expected_output": 65.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "expense_ratio",
+      "name": "Underwriting Expense Ratio",
+      "formula": "(underwriting_expenses / written_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "underwriting_expenses": 280000,
+            "written_premiums": 1000000
+          },
+          "expected_output": 28.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "combined_ratio",
+      "name": "Combined Ratio",
+      "formula": "((incurred_losses + expenses) / earned_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "incurred_losses": 650000,
+            "expenses": 280000,
+            "earned_premiums": 1000000
+          },
+          "expected_output": 93.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "lae_ratio",
+      "name": "Loss Adjustment Expense Ratio",
+      "formula": "(loss_adjustment_expenses / earned_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "loss_adjustment_expenses": 80000,
+            "earned_premiums": 1000000
+          },
+          "expected_output": 8.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "premium_retention",
+      "name": "Net Premium Retention Ratio",
+      "formula": "(net_written_premiums / gross_written_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_written_premiums": 800000,
+            "gross_written_premiums": 1000000
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "solvency_scr_ratio",
+      "name": "Solvency Capital Requirement Coverage",
+      "formula": "(eligible_own_funds / solvency_capital_requirement) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "eligible_own_funds": 1800000,
+            "solvency_capital_requirement": 1000000
+          },
+          "expected_output": 180.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "claims_velocity",
+      "name": "Claims Settlement Velocity Days",
+      "formula": "total_days_to_settle / claims_closed_count",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_days_to_settle": 360,
+            "claims_closed_count": 24
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "underwriting_profit",
+      "name": "Underwriting Profit Margin",
+      "formula": "((earned_premiums - incurred_losses - expenses) / earned_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "earned_premiums": 1000000,
+            "incurred_losses": 650000,
+            "expenses": 280000
+          },
+          "expected_output": 7.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "reinsurance_ceded_ratio",
+      "name": "Reinsurance Ceded Fraction",
+      "formula": "(ceded_premiums / gross_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "ceded_premiums": 200000,
+            "gross_premiums": 1000000
+          },
+          "expected_output": 20.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cat_loss_load",
+      "name": "Catastrophe Loss Ratio Contribution",
+      "formula": "(catastrophe_losses / earned_premiums) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "catastrophe_losses": 50000,
+            "earned_premiums": 1000000
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ibnr_factor",
+      "name": "Incurred But Not Reported Reserve Factor",
+      "formula": "estimated_ibnr_amount / reported_claims_amount",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "estimated_ibnr_amount": 250000,
+            "reported_claims_amount": 1000000
+          },
+          "expected_output": 0.25,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "policy_persistency",
+      "name": "Policyholder Persistency Rate",
+      "formula": "(renewed_policies_count / eligible_renewal_count) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "renewed_policies_count": 880,
+            "eligible_renewal_count": 1000
+          },
+          "expected_output": 88.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "claim_frequency",
+      "name": "Claim Frequency per Thousand Policy Years",
+      "formula": "(claims_count / policy_years_exposed) * 1000",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "claims_count": 45,
+            "policy_years_exposed": 1000
+          },
+          "expected_output": 45.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "claim_severity",
+      "name": "Average Incurred Claim Severity",
+      "formula": "total_incurred_claims / claims_count",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_incurred_claims": 450000,
+            "claims_count": 45
+          },
+          "expected_output": 10000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "investment_yield_reserves",
+      "name": "Investment Yield on Float Reserves",
+      "formula": "(net_investment_income / average_technical_reserves) * 100",
+      "data_source": "folio_k65_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_investment_income": 120000,
+            "average_technical_reserves": 3000000
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_k65_intake_verification",
+      "title": "Insurance Operations and Underwriting - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_statutory_compliance_check",
+      "title": "Insurance Operations and Underwriting - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_quality_audit_sampling",
+      "title": "Insurance Operations and Underwriting - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_exception_escalation_protocol",
+      "title": "Insurance Operations and Underwriting - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_monthly_period_cutoff",
+      "title": "Insurance Operations and Underwriting - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_incident_remediation_workflow",
+      "title": "Insurance Operations and Underwriting - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_partner_sla_verification",
+      "title": "Insurance Operations and Underwriting - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_safety_inspection_checklist",
+      "title": "Insurance Operations and Underwriting - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_change_management_review",
+      "title": "Insurance Operations and Underwriting - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k65_final_dispatch_attestation",
+      "title": "Insurance Operations and Underwriting - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_k65_doc_01",
+      "name": "Insurance Operations and Underwriting Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_02",
+      "name": "Insurance Operations and Underwriting Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_03",
+      "name": "Insurance Operations and Underwriting Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_04",
+      "name": "Insurance Operations and Underwriting Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_05",
+      "name": "Insurance Operations and Underwriting Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_06",
+      "name": "Insurance Operations and Underwriting Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_07",
+      "name": "Insurance Operations and Underwriting Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_08",
+      "name": "Insurance Operations and Underwriting Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_09",
+      "name": "Insurance Operations and Underwriting Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_10",
+      "name": "Insurance Operations and Underwriting Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_11",
+      "name": "Insurance Operations and Underwriting Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_12",
+      "name": "Insurance Operations and Underwriting Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_13",
+      "name": "Insurance Operations and Underwriting Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_14",
+      "name": "Insurance Operations and Underwriting Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_15",
+      "name": "Insurance Operations and Underwriting Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_16",
+      "name": "Insurance Operations and Underwriting Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_17",
+      "name": "Insurance Operations and Underwriting Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_18",
+      "name": "Insurance Operations and Underwriting Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_19",
+      "name": "Insurance Operations and Underwriting Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k65_doc_20",
+      "name": "Insurance Operations and Underwriting Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "NAIC Model Unfair Claims Settlement Practices Act (#900)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Solvency II Directive 2009/138/EC",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_k65_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_k65_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_k65_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_k65_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_k65_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_legal_advice",
+      "prohibited_terms": [
+        "final claim denial",
+        "deny coverage definitively",
+        "refuse policy payout"
+      ],
+      "rejection_message": "Autonomous systems cannot execute final claims denials or policy cancellations without human adjuster sign-off."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_k65_golden_01",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_02",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_03",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_04",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_05",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_06",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_07",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_08",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_09",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_10",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_11",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_12",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_13",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_14",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_15",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k65_golden_16",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_17",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_18",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_19",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_20",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_21",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_22",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_23",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_24",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k65_golden_25",
+      "name": "Insurance Operations and Underwriting Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "9ca56a9fd5dbc8b870f3937a4176f0bf83e3aa7687118ef3a99d1a1db02e9107"
+}

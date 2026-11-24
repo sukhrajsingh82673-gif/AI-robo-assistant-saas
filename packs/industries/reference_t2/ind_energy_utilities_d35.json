@@ -1,0 +1,845 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_energy_utilities_d35",
+    "title": "Energy, Power Generation and Utilities",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "D",
+    "division": "35"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "35",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "35"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "D.35"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "2211"
+    }
+  ],
+  "standards_references": [
+    "OPC_UA",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "heat_rate",
+      "name": "Turbine Thermal Heat Rate",
+      "formula": "fuel_energy_input_btu / net_generated_kwh",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "fuel_energy_input_btu": 7500000,
+            "net_generated_kwh": 1000
+          },
+          "expected_output": 7500.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "capacity_factor",
+      "name": "Plant Generation Capacity Factor",
+      "formula": "(actual_generated_mwh / (nameplate_capacity_mw * period_hours)) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_generated_mwh": 60000,
+            "nameplate_capacity_mw": 100,
+            "period_hours": 720
+          },
+          "expected_output": 83.3333,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "saidi",
+      "name": "System Average Interruption Duration Index",
+      "formula": "total_customer_outage_minutes / total_customers_served",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_customer_outage_minutes": 120000,
+            "total_customers_served": 1000
+          },
+          "expected_output": 120.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "saifi",
+      "name": "System Average Interruption Frequency Index",
+      "formula": "total_customer_interruptions / total_customers_served",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_customer_interruptions": 1500,
+            "total_customers_served": 1000
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "lcoe",
+      "name": "Levelized Cost of Electricity",
+      "formula": "total_lifecycle_cost / lifetime_energy_production_mwh",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_lifecycle_cost": 5000000,
+            "lifetime_energy_production_mwh": 100000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "transmission_losses",
+      "name": "Line Transmission Loss Percentage",
+      "formula": "((generated_mwh - delivered_mwh) / generated_mwh) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "generated_mwh": 100000,
+            "delivered_mwh": 94000
+          },
+          "expected_output": 6.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "reserve_margin",
+      "name": "Grid Generation Reserve Margin",
+      "formula": "((total_capacity_mw - peak_demand_mw) / peak_demand_mw) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_capacity_mw": 1200,
+            "peak_demand_mw": 1000
+          },
+          "expected_output": 20.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "eaf",
+      "name": "Equivalent Availability Factor",
+      "formula": "(available_hours / period_hours) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "available_hours": 700,
+            "period_hours": 720
+          },
+          "expected_output": 97.2222,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "renewable_fraction",
+      "name": "Renewable Generation Fraction",
+      "formula": "(renewable_mwh / total_generation_mwh) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "renewable_mwh": 35000,
+            "total_generation_mwh": 100000
+          },
+          "expected_output": 35.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "carbon_intensity",
+      "name": "Emissions Intensity per MWh",
+      "formula": "co2_metric_tons / generated_mwh",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "co2_metric_tons": 450,
+            "generated_mwh": 1000
+          },
+          "expected_output": 0.45,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "unplanned_outage_rate",
+      "name": "Forced Outage Rate",
+      "formula": "(forced_outage_hours / (operating_hours + forced_outage_hours)) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "forced_outage_hours": 20,
+            "operating_hours": 480
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "peak_demand_variance",
+      "name": "Peak Load Forecast Variance",
+      "formula": "actual_peak_mw - forecast_peak_mw",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_peak_mw": 1050,
+            "forecast_peak_mw": 1000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fuel_stock_burn_days",
+      "name": "Fuel Inventory Days Remaining",
+      "formula": "current_stock_tons / daily_burn_rate_tons",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "current_stock_tons": 60000,
+            "daily_burn_rate_tons": 2000
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "meter_reading_accuracy",
+      "name": "Smart Meter Data Delivery Completeness",
+      "formula": "(successful_reads / total_scheduled_reads) * 100",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "successful_reads": 9950,
+            "total_scheduled_reads": 10000
+          },
+          "expected_output": 99.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ramp_rate_compliance",
+      "name": "Ramp Rate Compliance Ratio",
+      "formula": "actual_mw_per_min / dispatched_mw_per_min",
+      "data_source": "folio_d35_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_mw_per_min": 18,
+            "dispatched_mw_per_min": 20
+          },
+          "expected_output": 0.9,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_d35_intake_verification",
+      "title": "Energy, Power Generation and Utilities - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_statutory_compliance_check",
+      "title": "Energy, Power Generation and Utilities - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_quality_audit_sampling",
+      "title": "Energy, Power Generation and Utilities - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_exception_escalation_protocol",
+      "title": "Energy, Power Generation and Utilities - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_monthly_period_cutoff",
+      "title": "Energy, Power Generation and Utilities - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_incident_remediation_workflow",
+      "title": "Energy, Power Generation and Utilities - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_partner_sla_verification",
+      "title": "Energy, Power Generation and Utilities - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_safety_inspection_checklist",
+      "title": "Energy, Power Generation and Utilities - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_change_management_review",
+      "title": "Energy, Power Generation and Utilities - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_d35_final_dispatch_attestation",
+      "title": "Energy, Power Generation and Utilities - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_d35_doc_01",
+      "name": "Energy, Power Generation and Utilities Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_02",
+      "name": "Energy, Power Generation and Utilities Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_03",
+      "name": "Energy, Power Generation and Utilities Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_04",
+      "name": "Energy, Power Generation and Utilities Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_05",
+      "name": "Energy, Power Generation and Utilities Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_06",
+      "name": "Energy, Power Generation and Utilities Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_07",
+      "name": "Energy, Power Generation and Utilities Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_08",
+      "name": "Energy, Power Generation and Utilities Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_09",
+      "name": "Energy, Power Generation and Utilities Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_10",
+      "name": "Energy, Power Generation and Utilities Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_11",
+      "name": "Energy, Power Generation and Utilities Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_12",
+      "name": "Energy, Power Generation and Utilities Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_13",
+      "name": "Energy, Power Generation and Utilities Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_14",
+      "name": "Energy, Power Generation and Utilities Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_15",
+      "name": "Energy, Power Generation and Utilities Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_16",
+      "name": "Energy, Power Generation and Utilities Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_17",
+      "name": "Energy, Power Generation and Utilities Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_18",
+      "name": "Energy, Power Generation and Utilities Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_19",
+      "name": "Energy, Power Generation and Utilities Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_d35_doc_20",
+      "name": "Energy, Power Generation and Utilities Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "NERC CIP Reliability Standards (CIP-002 through CIP-014)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "EU Directive 2019/944 (Common Rules for Internal Electricity Market)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_d35_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_d35_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_d35_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_d35_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_d35_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "bypass pressure valve",
+        "actuate centrifuge",
+        "override emergency scram"
+      ],
+      "rejection_message": "Autonomous writes to power plant turbines, emergency SCADA, or grid switching gear are strictly refused."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_d35_golden_01",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_02",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_03",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_04",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_05",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_06",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_07",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_08",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_09",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_10",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_11",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_12",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_13",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_14",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_15",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_d35_golden_16",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_17",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_18",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_19",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_20",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_21",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_22",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_23",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_24",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_d35_golden_25",
+      "name": "Energy, Power Generation and Utilities Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "f96d11b101bd3b74e05696cb490e7999ce1426ba1f5920f7770500ea5dc767d2"
+}

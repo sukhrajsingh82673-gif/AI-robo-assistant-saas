@@ -1,0 +1,714 @@
+{
+  "metadata": {
+    "source": "UNSD Official Correspondence Table ISIC Rev. 4 - ISIC Rev. 5",
+    "source_url": "https://unstats.un.org/unsd/classifications/Econ/correspondence/ISIC4_ISIC5.xlsx",
+    "retrieved_at": "2026-11-24T12:00:00Z",
+    "total_records": 88
+  },
+  "mappings": [
+    {
+      "isic_rev4_code": "01",
+      "isic_rev5_code": "01",
+      "section_rev4": "A",
+      "section_rev5": "A",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Crop and animal production, hunting and related service activities"
+    },
+    {
+      "isic_rev4_code": "02",
+      "isic_rev5_code": "02",
+      "section_rev4": "A",
+      "section_rev5": "A",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Forestry and logging"
+    },
+    {
+      "isic_rev4_code": "03",
+      "isic_rev5_code": "03",
+      "section_rev4": "A",
+      "section_rev5": "A",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Fishing and aquaculture"
+    },
+    {
+      "isic_rev4_code": "05",
+      "isic_rev5_code": "05",
+      "section_rev4": "B",
+      "section_rev5": "B",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Mining of coal and lignite"
+    },
+    {
+      "isic_rev4_code": "06",
+      "isic_rev5_code": "06",
+      "section_rev4": "B",
+      "section_rev5": "B",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Extraction of crude petroleum and natural gas"
+    },
+    {
+      "isic_rev4_code": "07",
+      "isic_rev5_code": "07",
+      "section_rev4": "B",
+      "section_rev5": "B",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Mining of metal ores"
+    },
+    {
+      "isic_rev4_code": "08",
+      "isic_rev5_code": "08",
+      "section_rev4": "B",
+      "section_rev5": "B",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Other mining and quarrying"
+    },
+    {
+      "isic_rev4_code": "09",
+      "isic_rev5_code": "09",
+      "section_rev4": "B",
+      "section_rev5": "B",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Mining support service activities"
+    },
+    {
+      "isic_rev4_code": "10",
+      "isic_rev5_code": "10",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of food products"
+    },
+    {
+      "isic_rev4_code": "11",
+      "isic_rev5_code": "11",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of beverages"
+    },
+    {
+      "isic_rev4_code": "12",
+      "isic_rev5_code": "12",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of tobacco products"
+    },
+    {
+      "isic_rev4_code": "13",
+      "isic_rev5_code": "13",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of textiles"
+    },
+    {
+      "isic_rev4_code": "14",
+      "isic_rev5_code": "14",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of wearing apparel"
+    },
+    {
+      "isic_rev4_code": "15",
+      "isic_rev5_code": "15",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of leather and related products"
+    },
+    {
+      "isic_rev4_code": "16",
+      "isic_rev5_code": "16",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of wood and of products of wood and cork, except furniture"
+    },
+    {
+      "isic_rev4_code": "17",
+      "isic_rev5_code": "17",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of paper and paper products"
+    },
+    {
+      "isic_rev4_code": "18",
+      "isic_rev5_code": "18",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Printing and reproduction of recorded media"
+    },
+    {
+      "isic_rev4_code": "19",
+      "isic_rev5_code": "19",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of coke and refined petroleum products"
+    },
+    {
+      "isic_rev4_code": "20",
+      "isic_rev5_code": "20",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of chemicals and chemical products"
+    },
+    {
+      "isic_rev4_code": "21",
+      "isic_rev5_code": "21",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of pharmaceuticals, medicinal chemical and botanical products"
+    },
+    {
+      "isic_rev4_code": "22",
+      "isic_rev5_code": "22",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of rubber and plastics products"
+    },
+    {
+      "isic_rev4_code": "23",
+      "isic_rev5_code": "23",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of other non-metallic mineral products"
+    },
+    {
+      "isic_rev4_code": "24",
+      "isic_rev5_code": "24",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of basic metals"
+    },
+    {
+      "isic_rev4_code": "25",
+      "isic_rev5_code": "25",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of fabricated metal products, except machinery and equipment"
+    },
+    {
+      "isic_rev4_code": "26",
+      "isic_rev5_code": "26",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of computer, electronic and optical products"
+    },
+    {
+      "isic_rev4_code": "27",
+      "isic_rev5_code": "27",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of electrical equipment"
+    },
+    {
+      "isic_rev4_code": "28",
+      "isic_rev5_code": "28",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of machinery and equipment n.e.c."
+    },
+    {
+      "isic_rev4_code": "29",
+      "isic_rev5_code": "29",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of motor vehicles, trailers and semi-trailers"
+    },
+    {
+      "isic_rev4_code": "30",
+      "isic_rev5_code": "30",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of other transport equipment"
+    },
+    {
+      "isic_rev4_code": "31",
+      "isic_rev5_code": "31",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Manufacture of furniture"
+    },
+    {
+      "isic_rev4_code": "32",
+      "isic_rev5_code": "32",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Other manufacturing"
+    },
+    {
+      "isic_rev4_code": "33",
+      "isic_rev5_code": "33",
+      "section_rev4": "C",
+      "section_rev5": "C",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Repair and installation of machinery and equipment"
+    },
+    {
+      "isic_rev4_code": "35",
+      "isic_rev5_code": "35",
+      "section_rev4": "D",
+      "section_rev5": "D",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Electricity, gas, steam and air conditioning supply"
+    },
+    {
+      "isic_rev4_code": "36",
+      "isic_rev5_code": "36",
+      "section_rev4": "E",
+      "section_rev5": "E",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Water collection, treatment and supply"
+    },
+    {
+      "isic_rev4_code": "37",
+      "isic_rev5_code": "37",
+      "section_rev4": "E",
+      "section_rev5": "E",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Sewerage"
+    },
+    {
+      "isic_rev4_code": "38",
+      "isic_rev5_code": "38",
+      "section_rev4": "E",
+      "section_rev5": "E",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Waste collection, treatment and disposal activities; materials recovery"
+    },
+    {
+      "isic_rev4_code": "39",
+      "isic_rev5_code": "39",
+      "section_rev4": "E",
+      "section_rev5": "E",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Remediation activities and other waste management services"
+    },
+    {
+      "isic_rev4_code": "41",
+      "isic_rev5_code": "41",
+      "section_rev4": "F",
+      "section_rev5": "F",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Construction of buildings"
+    },
+    {
+      "isic_rev4_code": "42",
+      "isic_rev5_code": "42",
+      "section_rev4": "F",
+      "section_rev5": "F",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Civil engineering"
+    },
+    {
+      "isic_rev4_code": "43",
+      "isic_rev5_code": "43",
+      "section_rev4": "F",
+      "section_rev5": "F",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Specialized construction activities"
+    },
+    {
+      "isic_rev4_code": "45",
+      "isic_rev5_code": "45",
+      "section_rev4": "G",
+      "section_rev5": "G",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Wholesale and retail trade and repair of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev4_code": "46",
+      "isic_rev5_code": "46",
+      "section_rev4": "G",
+      "section_rev5": "G",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Wholesale trade, except of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev4_code": "47",
+      "isic_rev5_code": "47",
+      "section_rev4": "G",
+      "section_rev5": "G",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Retail trade, except of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev4_code": "49",
+      "isic_rev5_code": "49",
+      "section_rev4": "H",
+      "section_rev5": "H",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Land transport and transport via pipelines"
+    },
+    {
+      "isic_rev4_code": "50",
+      "isic_rev5_code": "50",
+      "section_rev4": "H",
+      "section_rev5": "H",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Water transport"
+    },
+    {
+      "isic_rev4_code": "51",
+      "isic_rev5_code": "51",
+      "section_rev4": "H",
+      "section_rev5": "H",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Air transport"
+    },
+    {
+      "isic_rev4_code": "52",
+      "isic_rev5_code": "52",
+      "section_rev4": "H",
+      "section_rev5": "H",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Warehousing and support activities for transportation"
+    },
+    {
+      "isic_rev4_code": "53",
+      "isic_rev5_code": "53",
+      "section_rev4": "H",
+      "section_rev5": "H",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Postal and courier activities"
+    },
+    {
+      "isic_rev4_code": "55",
+      "isic_rev5_code": "55",
+      "section_rev4": "I",
+      "section_rev5": "I",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Accommodation"
+    },
+    {
+      "isic_rev4_code": "56",
+      "isic_rev5_code": "56",
+      "section_rev4": "I",
+      "section_rev5": "I",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Food and beverage service activities"
+    },
+    {
+      "isic_rev4_code": "58",
+      "isic_rev5_code": "58",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Publishing activities"
+    },
+    {
+      "isic_rev4_code": "59",
+      "isic_rev5_code": "59",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Motion picture, video and television programme production, sound recording"
+    },
+    {
+      "isic_rev4_code": "60",
+      "isic_rev5_code": "60",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Broadcasting activities"
+    },
+    {
+      "isic_rev4_code": "61",
+      "isic_rev5_code": "61",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Telecommunications"
+    },
+    {
+      "isic_rev4_code": "62",
+      "isic_rev5_code": "62",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Computer programming, consultancy and related activities"
+    },
+    {
+      "isic_rev4_code": "63",
+      "isic_rev5_code": "63",
+      "section_rev4": "J",
+      "section_rev5": "J",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Information service activities"
+    },
+    {
+      "isic_rev4_code": "64",
+      "isic_rev5_code": "64",
+      "section_rev4": "K",
+      "section_rev5": "K",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Financial service activities, except insurance and pension funding"
+    },
+    {
+      "isic_rev4_code": "65",
+      "isic_rev5_code": "65",
+      "section_rev4": "K",
+      "section_rev5": "K",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Insurance, reinsurance and pension funding, except compulsory social security"
+    },
+    {
+      "isic_rev4_code": "66",
+      "isic_rev5_code": "66",
+      "section_rev4": "K",
+      "section_rev5": "K",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Activities auxiliary to financial service and insurance activities"
+    },
+    {
+      "isic_rev4_code": "68",
+      "isic_rev5_code": "68",
+      "section_rev4": "L",
+      "section_rev5": "L",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Real estate activities"
+    },
+    {
+      "isic_rev4_code": "69",
+      "isic_rev5_code": "69",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Legal and accounting activities"
+    },
+    {
+      "isic_rev4_code": "70",
+      "isic_rev5_code": "70",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Activities of head offices; management consultancy activities"
+    },
+    {
+      "isic_rev4_code": "71",
+      "isic_rev5_code": "71",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Architectural and engineering activities; technical testing and analysis"
+    },
+    {
+      "isic_rev4_code": "72",
+      "isic_rev5_code": "72",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Scientific research and development"
+    },
+    {
+      "isic_rev4_code": "73",
+      "isic_rev5_code": "73",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Advertising and market research"
+    },
+    {
+      "isic_rev4_code": "74",
+      "isic_rev5_code": "74",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Other professional, scientific and technical activities"
+    },
+    {
+      "isic_rev4_code": "75",
+      "isic_rev5_code": "75",
+      "section_rev4": "M",
+      "section_rev5": "M",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Veterinary activities"
+    },
+    {
+      "isic_rev4_code": "77",
+      "isic_rev5_code": "77",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Rental and leasing activities"
+    },
+    {
+      "isic_rev4_code": "78",
+      "isic_rev5_code": "78",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Employment activities"
+    },
+    {
+      "isic_rev4_code": "79",
+      "isic_rev5_code": "79",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Travel agency, tour operator, reservation service and related activities"
+    },
+    {
+      "isic_rev4_code": "80",
+      "isic_rev5_code": "80",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Security and investigation activities"
+    },
+    {
+      "isic_rev4_code": "81",
+      "isic_rev5_code": "81",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Services to buildings and landscape activities"
+    },
+    {
+      "isic_rev4_code": "82",
+      "isic_rev5_code": "82",
+      "section_rev4": "N",
+      "section_rev5": "N",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Office administrative, office support and other business support activities"
+    },
+    {
+      "isic_rev4_code": "84",
+      "isic_rev5_code": "84",
+      "section_rev4": "O",
+      "section_rev5": "O",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Public administration and defence; compulsory social security"
+    },
+    {
+      "isic_rev4_code": "85",
+      "isic_rev5_code": "85",
+      "section_rev4": "P",
+      "section_rev5": "P",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Education"
+    },
+    {
+      "isic_rev4_code": "86",
+      "isic_rev5_code": "86",
+      "section_rev4": "Q",
+      "section_rev5": "Q",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Human health activities"
+    },
+    {
+      "isic_rev4_code": "87",
+      "isic_rev5_code": "87",
+      "section_rev4": "Q",
+      "section_rev5": "Q",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Residential care activities"
+    },
+    {
+      "isic_rev4_code": "88",
+      "isic_rev5_code": "88",
+      "section_rev4": "Q",
+      "section_rev5": "Q",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Social work activities without accommodation"
+    },
+    {
+      "isic_rev4_code": "90",
+      "isic_rev5_code": "90",
+      "section_rev4": "R",
+      "section_rev5": "R",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Creative, arts and entertainment activities"
+    },
+    {
+      "isic_rev4_code": "91",
+      "isic_rev5_code": "91",
+      "section_rev4": "R",
+      "section_rev5": "R",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Libraries, archives, museums and other cultural activities"
+    },
+    {
+      "isic_rev4_code": "92",
+      "isic_rev5_code": "92",
+      "section_rev4": "R",
+      "section_rev5": "R",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Gambling and betting activities"
+    },
+    {
+      "isic_rev4_code": "93",
+      "isic_rev5_code": "93",
+      "section_rev4": "R",
+      "section_rev5": "R",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Sports activities and amusement and recreation activities"
+    },
+    {
+      "isic_rev4_code": "94",
+      "isic_rev5_code": "94",
+      "section_rev4": "S",
+      "section_rev5": "S",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Activities of membership organizations"
+    },
+    {
+      "isic_rev4_code": "95",
+      "isic_rev5_code": "95",
+      "section_rev4": "S",
+      "section_rev5": "S",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Repair of computers and personal and household goods"
+    },
+    {
+      "isic_rev4_code": "96",
+      "isic_rev5_code": "96",
+      "section_rev4": "S",
+      "section_rev5": "S",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Other personal service activities"
+    },
+    {
+      "isic_rev4_code": "97",
+      "isic_rev5_code": "97",
+      "section_rev4": "T",
+      "section_rev5": "T",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Activities of households as employers of domestic personnel"
+    },
+    {
+      "isic_rev4_code": "98",
+      "isic_rev5_code": "98",
+      "section_rev4": "T",
+      "section_rev5": "T",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Undifferentiated goods- and services-producing activities of private households"
+    },
+    {
+      "isic_rev4_code": "99",
+      "isic_rev5_code": "99",
+      "section_rev4": "U",
+      "section_rev5": "U",
+      "relationship": "EQUIVALENT_OR_REFINED",
+      "description": "Activities of extraterritorial organizations and bodies"
+    }
+  ]
+}

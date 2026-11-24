@@ -1,0 +1,845 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_retail_ecommerce_g47",
+    "title": "Retail and E-Commerce Operations",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "G",
+    "division": "47"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "47",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "47"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "G.47"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "4541"
+    }
+  ],
+  "standards_references": [
+    "GS1_EPCIS_2_0",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "gmv_net_revenue",
+      "name": "Net Merchandise Revenue Ratio",
+      "formula": "net_sales / gross_merchandise_value",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_sales": 850000,
+            "gross_merchandise_value": 1000000
+          },
+          "expected_output": 0.85,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "return_rate",
+      "name": "Customer Return Rate",
+      "formula": "(returned_units / total_sold_units) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "returned_units": 150,
+            "total_sold_units": 1500
+          },
+          "expected_output": 10.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cac",
+      "name": "Customer Acquisition Cost",
+      "formula": "total_marketing_spend / new_customers_acquired",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_marketing_spend": 50000,
+            "new_customers_acquired": 1000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ltv",
+      "name": "Customer Lifetime Value",
+      "formula": "average_order_value * purchase_frequency * lifespan_years",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "average_order_value": 80,
+            "purchase_frequency": 4,
+            "lifespan_years": 3
+          },
+          "expected_output": 960.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "inventory_turnover",
+      "name": "Inventory Turnover Ratio",
+      "formula": "cost_of_goods_sold / average_inventory_value",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "cost_of_goods_sold": 600000,
+            "average_inventory_value": 100000
+          },
+          "expected_output": 6.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "aov",
+      "name": "Average Order Value",
+      "formula": "total_revenue / order_count",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_revenue": 120000,
+            "order_count": 1500
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cart_abandonment",
+      "name": "Shopping Cart Abandonment Rate",
+      "formula": "((initiated_carts - completed_orders) / initiated_carts) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "initiated_carts": 1000,
+            "completed_orders": 300
+          },
+          "expected_output": 70.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "sell_through_rate",
+      "name": "Merchandise Sell-Through Rate",
+      "formula": "(units_sold / initial_inventory_received) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "units_sold": 800,
+            "initial_inventory_received": 1000
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "gmroi",
+      "name": "Gross Margin Return on Investment",
+      "formula": "gross_margin_dollars / average_inventory_cost",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "gross_margin_dollars": 150000,
+            "average_inventory_cost": 75000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "dsi",
+      "name": "Days Sales of Inventory",
+      "formula": "(average_inventory / cost_of_goods_sold) * 365",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "average_inventory": 50000,
+            "cost_of_goods_sold": 365000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fulfillment_cost_per_order",
+      "name": "Fulfillment Cost per Shipped Order",
+      "formula": "total_warehouse_shipping_costs / total_shipped_orders",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_warehouse_shipping_costs": 45000,
+            "total_shipped_orders": 9000
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "repurchase_rate",
+      "name": "Repeat Buyer Percentage",
+      "formula": "(repeat_customers / total_active_customers) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "repeat_customers": 400,
+            "total_active_customers": 1000
+          },
+          "expected_output": 40.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "markdown_percentage",
+      "name": "Markdown Discount Rate",
+      "formula": "(discount_reduction_value / original_retail_value) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "discount_reduction_value": 20000,
+            "original_retail_value": 100000
+          },
+          "expected_output": 20.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "shrinkage_ratio",
+      "name": "Inventory Shrinkage Percentage",
+      "formula": "(shrinkage_loss_value / total_expected_inventory) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "shrinkage_loss_value": 15000,
+            "total_expected_inventory": 1000000
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "conversion_rate",
+      "name": "E-Commerce Conversion Rate",
+      "formula": "(completed_orders / total_site_sessions) * 100",
+      "data_source": "folio_g47_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "completed_orders": 250,
+            "total_site_sessions": 10000
+          },
+          "expected_output": 2.5,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_g47_intake_verification",
+      "title": "Retail and E-Commerce Operations - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_statutory_compliance_check",
+      "title": "Retail and E-Commerce Operations - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_quality_audit_sampling",
+      "title": "Retail and E-Commerce Operations - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_exception_escalation_protocol",
+      "title": "Retail and E-Commerce Operations - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_monthly_period_cutoff",
+      "title": "Retail and E-Commerce Operations - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_incident_remediation_workflow",
+      "title": "Retail and E-Commerce Operations - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_partner_sla_verification",
+      "title": "Retail and E-Commerce Operations - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_safety_inspection_checklist",
+      "title": "Retail and E-Commerce Operations - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_change_management_review",
+      "title": "Retail and E-Commerce Operations - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_g47_final_dispatch_attestation",
+      "title": "Retail and E-Commerce Operations - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_g47_doc_01",
+      "name": "Retail and E-Commerce Operations Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_02",
+      "name": "Retail and E-Commerce Operations Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_03",
+      "name": "Retail and E-Commerce Operations Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_04",
+      "name": "Retail and E-Commerce Operations Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_05",
+      "name": "Retail and E-Commerce Operations Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_06",
+      "name": "Retail and E-Commerce Operations Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_07",
+      "name": "Retail and E-Commerce Operations Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_08",
+      "name": "Retail and E-Commerce Operations Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_09",
+      "name": "Retail and E-Commerce Operations Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_10",
+      "name": "Retail and E-Commerce Operations Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_11",
+      "name": "Retail and E-Commerce Operations Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_12",
+      "name": "Retail and E-Commerce Operations Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_13",
+      "name": "Retail and E-Commerce Operations Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_14",
+      "name": "Retail and E-Commerce Operations Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_15",
+      "name": "Retail and E-Commerce Operations Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_16",
+      "name": "Retail and E-Commerce Operations Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_17",
+      "name": "Retail and E-Commerce Operations Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_18",
+      "name": "Retail and E-Commerce Operations Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_19",
+      "name": "Retail and E-Commerce Operations Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_g47_doc_20",
+      "name": "Retail and E-Commerce Operations Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "FTC Mail, Internet, or Telephone Order Merchandise Rule (16 CFR 435)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Consumer Rights Directive 2011/83/EU",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_g47_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_g47_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_g47_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_g47_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_g47_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_consumer_credit_investment_advice",
+      "prohibited_terms": [
+        "guaranteed investment return",
+        "approved your mortgage",
+        "buy this stock"
+      ],
+      "rejection_message": "Retail customer service agents cannot approve consumer credit or provide financial advice."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_g47_golden_01",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_02",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_03",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_04",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_05",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_06",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_07",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_08",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_09",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_10",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_11",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_12",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_13",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_14",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_15",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_g47_golden_16",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_17",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_18",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_19",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_20",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_21",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_22",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_23",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_24",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_g47_golden_25",
+      "name": "Retail and E-Commerce Operations Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "12dd1864ca9434750adb51167e69fbebfabfcd1928c32c3671cfa8f171c8b128"
+}

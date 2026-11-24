@@ -1,0 +1,846 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_banking_lending_k64",
+    "title": "Banking and Commercial Lending Operations",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "K",
+    "division": "64"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "64",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "64"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "K.64"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "5221"
+    }
+  ],
+  "standards_references": [
+    "ISO_20022",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "dscr",
+      "name": "Debt Service Coverage Ratio",
+      "formula": "net_operating_income / total_debt_service",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_operating_income": 150000,
+            "total_debt_service": 100000
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ltv",
+      "name": "Loan to Value Ratio",
+      "formula": "(loan_principal_amount / appraised_property_value) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "loan_principal_amount": 750000,
+            "appraised_property_value": 1000000
+          },
+          "expected_output": 75.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "nim",
+      "name": "Net Interest Margin Percentage",
+      "formula": "((interest_income - interest_expense) / average_earning_assets) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "interest_income": 60000,
+            "interest_expense": 20000,
+            "average_earning_assets": 1000000
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "npl_ratio",
+      "name": "Non-Performing Loan Ratio",
+      "formula": "(non_performing_loans / total_loan_portfolio) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "non_performing_loans": 250000,
+            "total_loan_portfolio": 10000000
+          },
+          "expected_output": 2.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "tier1_capital_ratio",
+      "name": "Tier 1 Capital Adequacy Ratio",
+      "formula": "(tier1_capital / risk_weighted_assets) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "tier1_capital": 1200000,
+            "risk_weighted_assets": 8000000
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cost_of_funds",
+      "name": "Weighted Cost of Funds",
+      "formula": "(interest_expense / total_interest_bearing_liabilities) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "interest_expense": 30000,
+            "total_interest_bearing_liabilities": 1000000
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "efficiency_ratio",
+      "name": "Banking Efficiency Ratio",
+      "formula": "(non_interest_expense / (net_interest_income + non_interest_income)) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "non_interest_expense": 55000,
+            "net_interest_income": 80000,
+            "non_interest_income": 20000
+          },
+          "expected_output": 55.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "lcr",
+      "name": "Liquidity Coverage Ratio",
+      "formula": "(high_quality_liquid_assets / total_net_cash_outflows) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "high_quality_liquid_assets": 1300000,
+            "total_net_cash_outflows": 1000000
+          },
+          "expected_output": 130.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "loan_loss_reserve_ratio",
+      "name": "Loan Loss Reserve to Total Loans",
+      "formula": "(allowance_for_credit_losses / total_loans_outstanding) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "allowance_for_credit_losses": 150000,
+            "total_loans_outstanding": 10000000
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "dti",
+      "name": "Debt to Income Ratio",
+      "formula": "(monthly_debt_payments / monthly_gross_income) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "monthly_debt_payments": 3600,
+            "monthly_gross_income": 10000
+          },
+          "expected_output": 36.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "loan_yield",
+      "name": "Gross Commercial Loan Yield",
+      "formula": "(interest_fee_income / average_loan_balance) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "interest_fee_income": 70000,
+            "average_loan_balance": 1000000
+          },
+          "expected_output": 7.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "pcl_rate",
+      "name": "Provision for Credit Losses Rate",
+      "formula": "(credit_loss_provision / average_loans) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "credit_loss_provision": 40000,
+            "average_loans": 10000000
+          },
+          "expected_output": 0.4,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "return_on_rwa",
+      "name": "Return on Risk Weighted Assets",
+      "formula": "(net_income / risk_weighted_assets) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_income": 160000,
+            "risk_weighted_assets": 8000000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "deposit_loan_ratio",
+      "name": "Loan to Deposit Ratio",
+      "formula": "(total_loans / total_deposits) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_loans": 8500000,
+            "total_deposits": 10000000
+          },
+          "expected_output": 85.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "concentration_index",
+      "name": "Single Sector Exposure Ratio",
+      "formula": "(sector_exposure / total_capital) * 100",
+      "data_source": "folio_k64_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "sector_exposure": 2000000,
+            "total_capital": 10000000
+          },
+          "expected_output": 20.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_k64_intake_verification",
+      "title": "Banking and Commercial Lending Operations - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_statutory_compliance_check",
+      "title": "Banking and Commercial Lending Operations - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_quality_audit_sampling",
+      "title": "Banking and Commercial Lending Operations - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_exception_escalation_protocol",
+      "title": "Banking and Commercial Lending Operations - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_monthly_period_cutoff",
+      "title": "Banking and Commercial Lending Operations - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_incident_remediation_workflow",
+      "title": "Banking and Commercial Lending Operations - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_partner_sla_verification",
+      "title": "Banking and Commercial Lending Operations - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_safety_inspection_checklist",
+      "title": "Banking and Commercial Lending Operations - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_change_management_review",
+      "title": "Banking and Commercial Lending Operations - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_k64_final_dispatch_attestation",
+      "title": "Banking and Commercial Lending Operations - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_k64_doc_01",
+      "name": "Banking and Commercial Lending Operations Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_02",
+      "name": "Banking and Commercial Lending Operations Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_03",
+      "name": "Banking and Commercial Lending Operations Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_04",
+      "name": "Banking and Commercial Lending Operations Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_05",
+      "name": "Banking and Commercial Lending Operations Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_06",
+      "name": "Banking and Commercial Lending Operations Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_07",
+      "name": "Banking and Commercial Lending Operations Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_08",
+      "name": "Banking and Commercial Lending Operations Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_09",
+      "name": "Banking and Commercial Lending Operations Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_10",
+      "name": "Banking and Commercial Lending Operations Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_11",
+      "name": "Banking and Commercial Lending Operations Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_12",
+      "name": "Banking and Commercial Lending Operations Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_13",
+      "name": "Banking and Commercial Lending Operations Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_14",
+      "name": "Banking and Commercial Lending Operations Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_15",
+      "name": "Banking and Commercial Lending Operations Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_16",
+      "name": "Banking and Commercial Lending Operations Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_17",
+      "name": "Banking and Commercial Lending Operations Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_18",
+      "name": "Banking and Commercial Lending Operations Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_19",
+      "name": "Banking and Commercial Lending Operations Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_k64_doc_20",
+      "name": "Banking and Commercial Lending Operations Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "Equal Credit Opportunity Act (12 CFR 1002 - Regulation B)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Capital Requirements Regulation (EU) No 575/2013 (CRR II)",
+      "effective_date": "2021-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_k64_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_k64_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_k64_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_k64_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_k64_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_consumer_credit_investment_advice",
+      "prohibited_terms": [
+        "personal loan approval",
+        "consumer credit score decision",
+        "approved your mortgage"
+      ],
+      "rejection_message": "Autonomous agents cannot make final consumer credit or lending underwriting decisions without human sign-off."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_k64_golden_01",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_02",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_03",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_04",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_05",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_06",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_07",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_08",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_09",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_10",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_11",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_12",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_13",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_14",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_15",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_k64_golden_16",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_17",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_18",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_19",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_20",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_21",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_22",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_23",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_24",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_k64_golden_25",
+      "name": "Banking and Commercial Lending Operations Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "36ffb5f41b64ec9ac71c8274364333e370f5bb4eb251078e1d8dd25f5cac50ef"
+}

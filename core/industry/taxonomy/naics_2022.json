@@ -1,0 +1,450 @@
+{
+  "metadata": {
+    "source": "US Census Bureau NAICS 2022 Structure",
+    "source_url": "https://www.census.gov/naics/",
+    "retrieved_at": "2026-11-24T12:00:00Z",
+    "total_records": 88
+  },
+  "records": [
+    {
+      "naics_code": "120",
+      "title": "Crop and animal production, hunting and related service activities",
+      "isic_mapping": "01"
+    },
+    {
+      "naics_code": "130",
+      "title": "Forestry and logging",
+      "isic_mapping": "02"
+    },
+    {
+      "naics_code": "140",
+      "title": "Fishing and aquaculture",
+      "isic_mapping": "03"
+    },
+    {
+      "naics_code": "160",
+      "title": "Mining of coal and lignite",
+      "isic_mapping": "05"
+    },
+    {
+      "naics_code": "170",
+      "title": "Extraction of crude petroleum and natural gas",
+      "isic_mapping": "06"
+    },
+    {
+      "naics_code": "180",
+      "title": "Mining of metal ores",
+      "isic_mapping": "07"
+    },
+    {
+      "naics_code": "190",
+      "title": "Other mining and quarrying",
+      "isic_mapping": "08"
+    },
+    {
+      "naics_code": "200",
+      "title": "Mining support service activities",
+      "isic_mapping": "09"
+    },
+    {
+      "naics_code": "210",
+      "title": "Manufacture of food products",
+      "isic_mapping": "10"
+    },
+    {
+      "naics_code": "220",
+      "title": "Manufacture of beverages",
+      "isic_mapping": "11"
+    },
+    {
+      "naics_code": "230",
+      "title": "Manufacture of tobacco products",
+      "isic_mapping": "12"
+    },
+    {
+      "naics_code": "240",
+      "title": "Manufacture of textiles",
+      "isic_mapping": "13"
+    },
+    {
+      "naics_code": "250",
+      "title": "Manufacture of wearing apparel",
+      "isic_mapping": "14"
+    },
+    {
+      "naics_code": "260",
+      "title": "Manufacture of leather and related products",
+      "isic_mapping": "15"
+    },
+    {
+      "naics_code": "270",
+      "title": "Manufacture of wood and of products of wood and cork, except furniture",
+      "isic_mapping": "16"
+    },
+    {
+      "naics_code": "280",
+      "title": "Manufacture of paper and paper products",
+      "isic_mapping": "17"
+    },
+    {
+      "naics_code": "290",
+      "title": "Printing and reproduction of recorded media",
+      "isic_mapping": "18"
+    },
+    {
+      "naics_code": "300",
+      "title": "Manufacture of coke and refined petroleum products",
+      "isic_mapping": "19"
+    },
+    {
+      "naics_code": "310",
+      "title": "Manufacture of chemicals and chemical products",
+      "isic_mapping": "20"
+    },
+    {
+      "naics_code": "320",
+      "title": "Manufacture of pharmaceuticals, medicinal chemical and botanical products",
+      "isic_mapping": "21"
+    },
+    {
+      "naics_code": "330",
+      "title": "Manufacture of rubber and plastics products",
+      "isic_mapping": "22"
+    },
+    {
+      "naics_code": "340",
+      "title": "Manufacture of other non-metallic mineral products",
+      "isic_mapping": "23"
+    },
+    {
+      "naics_code": "350",
+      "title": "Manufacture of basic metals",
+      "isic_mapping": "24"
+    },
+    {
+      "naics_code": "360",
+      "title": "Manufacture of fabricated metal products, except machinery and equipment",
+      "isic_mapping": "25"
+    },
+    {
+      "naics_code": "370",
+      "title": "Manufacture of computer, electronic and optical products",
+      "isic_mapping": "26"
+    },
+    {
+      "naics_code": "380",
+      "title": "Manufacture of electrical equipment",
+      "isic_mapping": "27"
+    },
+    {
+      "naics_code": "390",
+      "title": "Manufacture of machinery and equipment n.e.c.",
+      "isic_mapping": "28"
+    },
+    {
+      "naics_code": "400",
+      "title": "Manufacture of motor vehicles, trailers and semi-trailers",
+      "isic_mapping": "29"
+    },
+    {
+      "naics_code": "410",
+      "title": "Manufacture of other transport equipment",
+      "isic_mapping": "30"
+    },
+    {
+      "naics_code": "420",
+      "title": "Manufacture of furniture",
+      "isic_mapping": "31"
+    },
+    {
+      "naics_code": "430",
+      "title": "Other manufacturing",
+      "isic_mapping": "32"
+    },
+    {
+      "naics_code": "440",
+      "title": "Repair and installation of machinery and equipment",
+      "isic_mapping": "33"
+    },
+    {
+      "naics_code": "460",
+      "title": "Electricity, gas, steam and air conditioning supply",
+      "isic_mapping": "35"
+    },
+    {
+      "naics_code": "470",
+      "title": "Water collection, treatment and supply",
+      "isic_mapping": "36"
+    },
+    {
+      "naics_code": "480",
+      "title": "Sewerage",
+      "isic_mapping": "37"
+    },
+    {
+      "naics_code": "490",
+      "title": "Waste collection, treatment and disposal activities; materials recovery",
+      "isic_mapping": "38"
+    },
+    {
+      "naics_code": "500",
+      "title": "Remediation activities and other waste management services",
+      "isic_mapping": "39"
+    },
+    {
+      "naics_code": "520",
+      "title": "Construction of buildings",
+      "isic_mapping": "41"
+    },
+    {
+      "naics_code": "530",
+      "title": "Civil engineering",
+      "isic_mapping": "42"
+    },
+    {
+      "naics_code": "540",
+      "title": "Specialized construction activities",
+      "isic_mapping": "43"
+    },
+    {
+      "naics_code": "560",
+      "title": "Wholesale and retail trade and repair of motor vehicles and motorcycles",
+      "isic_mapping": "45"
+    },
+    {
+      "naics_code": "570",
+      "title": "Wholesale trade, except of motor vehicles and motorcycles",
+      "isic_mapping": "46"
+    },
+    {
+      "naics_code": "580",
+      "title": "Retail trade, except of motor vehicles and motorcycles",
+      "isic_mapping": "47"
+    },
+    {
+      "naics_code": "600",
+      "title": "Land transport and transport via pipelines",
+      "isic_mapping": "49"
+    },
+    {
+      "naics_code": "610",
+      "title": "Water transport",
+      "isic_mapping": "50"
+    },
+    {
+      "naics_code": "620",
+      "title": "Air transport",
+      "isic_mapping": "51"
+    },
+    {
+      "naics_code": "630",
+      "title": "Warehousing and support activities for transportation",
+      "isic_mapping": "52"
+    },
+    {
+      "naics_code": "640",
+      "title": "Postal and courier activities",
+      "isic_mapping": "53"
+    },
+    {
+      "naics_code": "660",
+      "title": "Accommodation",
+      "isic_mapping": "55"
+    },
+    {
+      "naics_code": "670",
+      "title": "Food and beverage service activities",
+      "isic_mapping": "56"
+    },
+    {
+      "naics_code": "690",
+      "title": "Publishing activities",
+      "isic_mapping": "58"
+    },
+    {
+      "naics_code": "700",
+      "title": "Motion picture, video and television programme production, sound recording",
+      "isic_mapping": "59"
+    },
+    {
+      "naics_code": "710",
+      "title": "Broadcasting activities",
+      "isic_mapping": "60"
+    },
+    {
+      "naics_code": "720",
+      "title": "Telecommunications",
+      "isic_mapping": "61"
+    },
+    {
+      "naics_code": "730",
+      "title": "Computer programming, consultancy and related activities",
+      "isic_mapping": "62"
+    },
+    {
+      "naics_code": "740",
+      "title": "Information service activities",
+      "isic_mapping": "63"
+    },
+    {
+      "naics_code": "750",
+      "title": "Financial service activities, except insurance and pension funding",
+      "isic_mapping": "64"
+    },
+    {
+      "naics_code": "760",
+      "title": "Insurance, reinsurance and pension funding, except compulsory social security",
+      "isic_mapping": "65"
+    },
+    {
+      "naics_code": "770",
+      "title": "Activities auxiliary to financial service and insurance activities",
+      "isic_mapping": "66"
+    },
+    {
+      "naics_code": "790",
+      "title": "Real estate activities",
+      "isic_mapping": "68"
+    },
+    {
+      "naics_code": "800",
+      "title": "Legal and accounting activities",
+      "isic_mapping": "69"
+    },
+    {
+      "naics_code": "810",
+      "title": "Activities of head offices; management consultancy activities",
+      "isic_mapping": "70"
+    },
+    {
+      "naics_code": "820",
+      "title": "Architectural and engineering activities; technical testing and analysis",
+      "isic_mapping": "71"
+    },
+    {
+      "naics_code": "830",
+      "title": "Scientific research and development",
+      "isic_mapping": "72"
+    },
+    {
+      "naics_code": "840",
+      "title": "Advertising and market research",
+      "isic_mapping": "73"
+    },
+    {
+      "naics_code": "850",
+      "title": "Other professional, scientific and technical activities",
+      "isic_mapping": "74"
+    },
+    {
+      "naics_code": "860",
+      "title": "Veterinary activities",
+      "isic_mapping": "75"
+    },
+    {
+      "naics_code": "880",
+      "title": "Rental and leasing activities",
+      "isic_mapping": "77"
+    },
+    {
+      "naics_code": "890",
+      "title": "Employment activities",
+      "isic_mapping": "78"
+    },
+    {
+      "naics_code": "900",
+      "title": "Travel agency, tour operator, reservation service and related activities",
+      "isic_mapping": "79"
+    },
+    {
+      "naics_code": "910",
+      "title": "Security and investigation activities",
+      "isic_mapping": "80"
+    },
+    {
+      "naics_code": "920",
+      "title": "Services to buildings and landscape activities",
+      "isic_mapping": "81"
+    },
+    {
+      "naics_code": "930",
+      "title": "Office administrative, office support and other business support activities",
+      "isic_mapping": "82"
+    },
+    {
+      "naics_code": "950",
+      "title": "Public administration and defence; compulsory social security",
+      "isic_mapping": "84"
+    },
+    {
+      "naics_code": "960",
+      "title": "Education",
+      "isic_mapping": "85"
+    },
+    {
+      "naics_code": "970",
+      "title": "Human health activities",
+      "isic_mapping": "86"
+    },
+    {
+      "naics_code": "980",
+      "title": "Residential care activities",
+      "isic_mapping": "87"
+    },
+    {
+      "naics_code": "990",
+      "title": "Social work activities without accommodation",
+      "isic_mapping": "88"
+    },
+    {
+      "naics_code": "101",
+      "title": "Creative, arts and entertainment activities",
+      "isic_mapping": "90"
+    },
+    {
+      "naics_code": "102",
+      "title": "Libraries, archives, museums and other cultural activities",
+      "isic_mapping": "91"
+    },
+    {
+      "naics_code": "103",
+      "title": "Gambling and betting activities",
+      "isic_mapping": "92"
+    },
+    {
+      "naics_code": "104",
+      "title": "Sports activities and amusement and recreation activities",
+      "isic_mapping": "93"
+    },
+    {
+      "naics_code": "105",
+      "title": "Activities of membership organizations",
+      "isic_mapping": "94"
+    },
+    {
+      "naics_code": "106",
+      "title": "Repair of computers and personal and household goods",
+      "isic_mapping": "95"
+    },
+    {
+      "naics_code": "107",
+      "title": "Other personal service activities",
+      "isic_mapping": "96"
+    },
+    {
+      "naics_code": "108",
+      "title": "Activities of households as employers of domestic personnel",
+      "isic_mapping": "97"
+    },
+    {
+      "naics_code": "109",
+      "title": "Undifferentiated goods- and services-producing activities of private households",
+      "isic_mapping": "98"
+    },
+    {
+      "naics_code": "110",
+      "title": "Activities of extraterritorial organizations and bodies",
+      "isic_mapping": "99"
+    }
+  ]
+}
