@@ -105,4 +105,27 @@ Executed local test suite `tests/test_step6_failure_intelligence.py` passing 6/6
 - `test_05_scorecard_mttf_mttr_and_regression_metrics`: PASSED
 - `test_06_mutation_check_unclassified_failure_defaults_unknown`: PASSED
 
+---
+
+## Sub-Step 6D — Owner Help Protocol (3-Step Rule, Throttling, Step-Up Auth, Learn Forever)
+
+### 1. Architectural Implementation
+- Built `core/evolution/owner_help.py` providing:
+  - **The 3-Step Rule:** Enforces maximum 3 numbered imperative action steps (`1 <= len(steps) <= 3`), rejecting over-length requests and mandating agent task decomposition.
+  - **Deduplication:** Hashing questions and preventing identical questions to the owner within 24 hours.
+  - **Hourly Rate Limiting:** Enforces maximum 5 help requests per tenant per hour; excess requests are automatically queued.
+  - **Sensitive Action Step-Up Auth:** Demands cryptographically verified step-up authentication tokens for high-impact actions (wires, schema modifications, credential rotations).
+  - **Ask Once / Learn Forever:** Automatically caches approved resolutions into the knowledge index; subsequent identical requests auto-resolve with 0 human interruptions.
+  - **Rule 41 Secret Interception:** Human replies containing raw API tokens (`sk_live_...`, `ghp_...`, passwords) are intercepted, securely placed in Vault (`vault://<tenant>/secrets/<id>`), and scrubbed from plaintext resolution bodies.
+
+### 2. Verification & Qualification Tests
+Executed local test suite `tests/test_step6_owner_help.py` passing 6/6 tests:
+- `test_01_three_step_rule_enforcement_rejects_greater_than_three`: PASSED
+- `test_02_duplicate_question_within_24h_returns_existing_ticket`: PASSED
+- `test_03_hourly_rate_limit_enforces_queuing_after_5_requests`: PASSED
+- `test_04_sensitive_action_requires_step_up_token`: PASSED
+- `test_05_ask_once_learn_forever_auto_resolves_future_queries`: PASSED
+- `test_06_mutation_check_raw_secret_in_answer_routed_to_vault`: PASSED
+
+
 
