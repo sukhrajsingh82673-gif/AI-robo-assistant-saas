@@ -250,6 +250,28 @@
   ======= 7 passed in 0.94s =======
   ```
 
+## Sub-Step 8H: Scale, Cost & Reliability Qualification
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/scale/load_profile.py`: Load profiler and soak stability monitor calculating latency percentiles (p50, p95, p99, max) and tracking error rates across sustained concurrency runs.
+  - `core/scale/noisy_neighbor.py`: Concurrency and throughput governor enforcing per-tenant token-bucket rate limits (`ConcurrencyGovernor`) and proving neighbor isolation against burst exhaustion (`RateLimitExceededError`).
+  - `core/scale/consolidation_scale.py`: 50-entity, 10-currency group consolidation scale benchmark proving sub-500ms execution latency and 0 net elimination variance across 500 intercompany transactions.
+  - `core/scale/chaos.py`: Chaos fault injector and idempotent retry runner proving recovery from transient transport partitions and deduplication caching without duplicate ledger commits.
+  - `core/scale/cost_model.py`: Unit economic cost modeling engine projecting minor integer unit costs per task archetype and calculating monthly corporate budgets showing > 90% cost savings vs human baseline.
+  - `tests/test_step8h_scale_qualification.py`: 5 automated tests validating latency percentiles, noisy-neighbor isolation, 50-entity consolidation scale, chaos recovery, and unit economic forecasts.
+- **Verification Output:**
+  ```text
+  tests/test_step8h_scale_qualification.py::TestStep8HScaleQualification::test_01_load_profiling_and_percentiles PASSED [ 20%]
+  tests/test_step8h_scale_qualification.py::TestStep8HScaleQualification::test_02_noisy_neighbor_isolation_governor PASSED [ 40%]
+  tests/test_step8h_scale_qualification.py::TestStep8HScaleQualification::test_03_fifty_entity_consolidation_scale_benchmark PASSED [ 60%]
+  tests/test_step8h_scale_qualification.py::TestStep8HScaleQualification::test_04_chaos_injection_and_idempotent_retry PASSED [ 80%]
+  tests/test_step8h_scale_qualification.py::TestStep8HScaleQualification::test_05_unit_economic_cost_modeling PASSED [100%]
+  ======= 5 passed in 0.92s =======
+  ```
+
+
 
 
 
