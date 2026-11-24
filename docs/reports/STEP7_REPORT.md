@@ -20,8 +20,8 @@
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | `4109727` |
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | `8c16daf` |
 | **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | `d9a32b1` |
-| **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | Pending |
-| **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | Pending | - |
+| **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | `24d2556` |
+| **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | **PASS** | Pending |
 | **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | Pending | - |
 | **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | Pending | - |
 | **7L** | Cross-Department Workflows | 7 compiled Temporal process workflows | Pending | - |
@@ -171,6 +171,22 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7h_supply_chain.py` -> 4 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py` -> 49 passed.
+
+---
+
+## Sub-Step 7I: Research & Development Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/rnd/experiment_tracker.py`: Immutable experiment registry recording hypotheses, hyperparameters, metrics, and artifact hashes. Finalized experiments are locked against mutation. Exports MLflow and W&B compliant metadata.
+  - `core/rnd/prd.py`: Product Requirements Document framework (`zonata.prd/v1`) with automated completeness validation enforcing non-goals, problem statements, testable acceptance criteria, and risk mitigations.
+  - `core/rnd/prototype_runner.py`: Sandboxed prototype runner executing experimental code under strict CPU timeouts, memory envelopes, sanitized host environments (Rule 41), and artifact hash extraction.
+  - `tests/test_step7i_rnd.py`: 5 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7i_rnd.py` -> 5 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py tests/test_step7i_rnd.py` -> 54 passed.
+
 
 
 
