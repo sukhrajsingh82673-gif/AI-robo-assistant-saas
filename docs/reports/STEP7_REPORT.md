@@ -19,8 +19,8 @@
 | **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | **PASS** | `14177fa` |
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | **PASS** | `4109727` |
 | **7F** | HR & Workforce Operations | Counterfactual fairness, deterministic payroll, offboarding | **PASS** | `8c16daf` |
-| **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | Pending |
-| **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | Pending | - |
+| **7G** | Operations & Production Depth | BOM explosion, OEE calculation, inspection lot holds | **PASS** | `d9a32b1` |
+| **7H** | Supply Chain & Procurement | Sanctions screening, RFQ matrix, reorder policies | **PASS** | Pending |
 | **7I** | R&D & Prototyping Depth | Immutable experiment registry, PRD templates, sandbox runner | Pending | - |
 | **7J** | Legal, IT & Security Depth | Obligation extraction, contract redlines, IT asset inventory | Pending | - |
 | **7K** | Analytics & Business Intelligence | Semantic layer (Cube Core), Superset BI dashboards | Pending | - |
@@ -155,6 +155,23 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7g_operations.py` -> 5 passed.
   - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py` -> 45 passed.
+
+---
+
+## Sub-Step 7H: Supply Chain & Procurement Depth
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/procurement/sanctions.py`: Sanctions and global watchlist screening engine checking OFAC, UN, and EU lists, placing immediate non-bypassable freezes on positive hits.
+  - `core/procurement/rfq.py`: Request for Quote pipeline with weighted multi-criteria decision matrix (Price, Lead Time, Quality, Terms) and Rule 62 human gateway award gate.
+  - `core/procurement/inventory_policy.py`: Inventory replenishment engine calculating Economic Order Quantity (EOQ), Safety Stock, and Reorder Point (ROP) with automated requisition generation.
+  - `core/procurement/carrier_tracking.py`: `LogisticsPort` tracking state machine managing linear carrier milestones (`label_created` -> `in_transit` -> `out_for_delivery` -> `delivered`) across DHL, FedEx, and Freight.
+  - `tests/test_step7h_supply_chain.py`: 4 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_step7h_supply_chain.py` -> 4 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py tests/test_step7c_finance.py tests/test_step7d_sales_support.py tests/test_step7e_marketing.py tests/test_step7f_hr.py tests/test_step7g_operations.py tests/test_step7h_supply_chain.py` -> 49 passed.
+
 
 
 
