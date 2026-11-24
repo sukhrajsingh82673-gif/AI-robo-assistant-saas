@@ -13,8 +13,8 @@
 
 | Sub-Step | Title / Scope | Primary Artifacts | Status | CI Run ID |
 | :--- | :--- | :--- | :--- | :--- |
-| **7A** | Preflight, Inventory & ADRs 0032–0038 | `STEP7_INVENTORY.md`, ADRs 0032-0038, CI workflow | **PASS** | Pending Push |
-| **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | Pending | - |
+| **7A** | Preflight, Inventory & ADRs 0032–0038 | `STEP7_INVENTORY.md`, ADRs 0032-0038, CI workflow | **PASS** | `0d1aed7` |
+| **7B** | Preservation Extension & Dept Platform | Baseline freeze, department pack schema, base ports | **PASS** | Pending |
 | **7C** | Finance & Accounting Depth | AP 3-way match, bank rec, fraud hold, India GST | Pending | - |
 | **7D** | Sales, CRM & Customer Support | Lead deduplication, consent checks, CRM/Helpdesk ports | Pending | - |
 | **7E** | Marketing & Brand Depth | Brand guidelines as data, budgeting, attribution | Pending | - |
@@ -47,3 +47,23 @@
 - **Verification Commands:**
   - `pytest -v tests/test_step7_preflight.py` -> 6 passed.
   - `pytest -q tests/test_step6_*.py tests/test_step5_preflight.py` -> 91 passed.
+
+---
+
+## Sub-Step 7B: Preservation v2 & Department Platform
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `docs/baselines/STEP1-6_BASELINE.json`: 2,006 baseline files hashed at tag `step6-final` (`0f64d75`).
+  - `tests/test_preservation_step7.py`: Cryptographic sha256 hash preservation test verifying all 2,006 baseline files remain unmodified (Rule 58).
+  - `core/departments/base_port.py`: Standard `DepartmentBasePort` with health checks, status, config schema, audit tap, and metric tap.
+  - `core/departments/schema.py`: `zonata.department-pack/v1` manifest schema declaring capabilities, policies, workflows, and metrics.
+  - `core/departments/models.py`: Canonical department entities with mandatory multi-tenant `tenant_id`, `company_id`, and budget commit/spend lifecycle enforcement.
+  - `core/reconciliation/base.py`: Generic `Reconciler[T, U]` with drift detection raising `DriftDetectedException` without silent auto-correction (Rule 59).
+  - `core/connectors/base.py` & `core/connectors/replay.py`: `BaseConnector` with OpenBao dynamic auth lease (Rule 41, 42), token-bucket rate limiter, 3-state circuit breaker, and deterministic replay fixture engine.
+  - `tests/test_step7b_platform.py`: 5 comprehensive unit and contract tests.
+- **Verification Commands:**
+  - `pytest -v tests/test_preservation_step7.py tests/test_step7b_platform.py` -> 8 passed.
+  - `pytest -q tests/test_step7_preflight.py tests/test_preservation_step7.py tests/test_step7b_platform.py` -> 14 passed.
+
