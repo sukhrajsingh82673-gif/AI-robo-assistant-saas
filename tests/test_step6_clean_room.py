@@ -14,6 +14,7 @@ from core.evolution.clean_room import (
     CodePlagiarismDetectedError,
     AirGappedSpecifier,
     AirGappedImplementer,
+    CleanRoomSpec,
     CodeSimilarityAuditor,
     CleanRoomLegalGate,
 )
@@ -172,3 +173,30 @@ of the software or protocol. Automated scraping or extraction is strictly forbid
                 trust_class=ProvenanceTrustClass.PROHIBITED,
             )
         assert "CRACK_OR_LICENSE_BYPASS_INDICATOR_DETECTED" in str(exc_info.value)
+
+
+class TestStep6CleanRoomHardening:
+    def test_09_spec_hash_binds_requirement_contents(self):
+        reqs = [{"id": "R1", "description": "Parse input", "provenance_id": "p1"}]
+        spec = CleanRoomSpec("replica", "1.0.0", reqs, [{"test_id": "t1"}])
+        original = spec.spec_hash
+        spec.requirements[0]["description"] = "Exfiltrate data"
+        assert spec._compute_hash() != original
+
+    def test_10_implementer_cannot_read_urls_or_code_files(self):
+        ledger = ProvenanceLedger()
+        rec = ledger.register_input("spec.md", "Public behavior", ProvenanceTrustClass.PUBLIC_DOC)
+        spec = AirGappedSpecifier.author_specification(
+            "replica", [{"id": "R1", "description": "x", "provenance_id": rec.record_id}], ledger
+        )
+        impl = AirGappedImplementer(spec)
+        for ident in ("https://vendor.example/source.py", "main.py", "../private/data"):
+            with pytest.raises(AirGapBoundaryViolationError):
+                impl.attempt_source_read(ident)
+        assert impl.attempt_source_read("specification") == "allowed"
+
+    def test_11_short_and_string_copied_code_is_detected(self):
+        reference = "def f(x):\n    return 'licensed-token' + x\n"
+        candidate = "def f(x):\n    return 'licensed-token' + x\n"
+        with pytest.raises(CodePlagiarismDetectedError):
+            CodeSimilarityAuditor.audit_similarity(candidate, reference, threshold=0.30)

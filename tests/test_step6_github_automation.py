@@ -179,3 +179,18 @@ class TestStep6GitHubAutomation:
 
         with pytest.raises(HumanMergeOnlyError):
             PullRequestContract.attempt_merge("PR-999", actor_principal="system:cron")
+
+
+class TestStep6GitHubHardening:
+    def test_09_unknown_app_permission_rejected(self):
+        with pytest.raises(ExcessivePermissionError, match="unknown permission"):
+            GitHubAppScope.validate_permissions({"packages": "write"})
+
+    def test_10_release_requires_gateway_approval_action(self):
+        with pytest.raises(ValueError, match="approval cannot be omitted"):
+            ReleaseAttestation.verify_release_artifacts(
+                release_tag="v6.0.0",
+                commit_sha="a" * 40,
+                has_sbom=True,
+                has_provenance_attestation=True,
+            )

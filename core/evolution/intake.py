@@ -65,6 +65,11 @@ class CapabilityMismatchError(IntakeSecurityViolationError):
     pass
 
 
+class SandboxTraceRequiredError(IntakeSecurityViolationError):
+    """Raised when certification is attempted without a real recorded sandbox trace."""
+    pass
+
+
 class AgentManifest:
     """Metadata specification for an intake candidate."""
 
@@ -101,6 +106,10 @@ class StaticSecurityScanner:
     """Static and AST scanner for external codebases."""
 
     DANGEROUS_CALLS = {"eval", "exec", "__import__"}
+    DANGEROUS_ATTRIBUTES = {
+        "system", "popen", "spawn", "spawnl", "spawnv", "run", "call",
+        "check_call", "check_output", "Popen", "getenv", "putenv",
+    }
     PROHIBITED_INSTALLER_PATTERNS = [
         re.compile(r"curl\s+.*\|\s*(?:ba)?sh", re.IGNORECASE),
         re.compile(r"wget\s+.*\|\s*(?:ba)?sh", re.IGNORECASE),
@@ -217,7 +226,7 @@ class StaticSecurityScanner:
             return
 
         for node in ast.walk(tree):
-            # Dangerous calls
+            # Dangerous calls and process spawning
             if isinstance(node, ast.Call):
                 if isinstance(node.func, ast.Name) and node.func.id in cls.DANGEROUS_CALLS:
                     findings.append({
@@ -225,9 +234,26 @@ class StaticSecurityScanner:
                         "category": "DANGEROUS_CALL",
                         "message": f"Prohibited dynamic evaluation '{node.func.id}' in {path}:L{node.lineno}",
                     })
-            # Secret / Environment inspection
+                elif isinstance(node.func, ast.Attribute) and node.func.attr in cls.DANGEROUS_ATTRIBUTES:
+                    findings.append({
+                        "severity": "CRITICAL",
+                        "category": "DANGEROUS_CALL",
+                        "message": f"Prohibited process/environment call '{node.func.attr}' in {path}:L{node.lineno}",
+                    })
+            # Secret / Environment inspection (subscript and os.getenv/os.environ.get)
             if isinstance(node, ast.Subscript):
                 if isinstance(node.value, ast.Attribute) and node.value.attr == "environ":
+                    findings.append({
+                        "severity": "CRITICAL",
+                        "category": "ENV_READ_ATTEMPT",
+                        "message": f"Direct environment access detected in {path}:L{node.lineno}",
+                    })
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr == "getenv" or (
+                    isinstance(node.func.value, ast.Attribute)
+                    and node.func.value.attr == "environ"
+                    and node.func.attr == "get"
+                ):
                     findings.append({
                         "severity": "CRITICAL",
                         "category": "ENV_READ_ATTEMPT",
@@ -263,12 +289,11 @@ class BehavioralSandbox:
         Executes or verifies candidate behavior against security policies.
         Traces: network_calls, file_writes, process_spawns, env_reads.
         """
-        trace = simulated_trace or {
-            "network_calls": [],
-            "file_writes": [f"/sandbox/work/{manifest.name}/output.txt"],
-            "process_spawns": [],
-            "env_reads": [],
-        }
+        if simulated_trace is None:
+            raise SandboxTraceRequiredError(
+                "Certification requires a real recorded sandbox trace; no safe trace is fabricated."
+            )
+        trace = simulated_trace
 
         violations = []
         observed_capabilities = set()
@@ -416,6 +441,7 @@ class AgentZooManager:
         self,
         intake_id: str,
         actor_principal: str,
+        boundary_isolation: Optional[Dict[str, Any]] = None,
     ) -> AgentZooRecord:
         """
         Step 5: Promote certified agent to ACTIVE.
@@ -429,6 +455,16 @@ class AgentZooManager:
             raise HumanApprovalRequiredError(
                 f"Principal '{actor_principal}' is unauthorized. Only human/owner accounts can activate external agents."
             )
+
+        classification = (record.static_report or {}).get("license_classification")
+        if classification == LicenseClassification.BOUNDARY:
+            isolation = boundary_isolation or {}
+            if not (isolation.get("containerized") and isolation.get("network_isolated")
+                    and isolation.get("host_credentials") is False):
+                raise IntakeSecurityViolationError(
+                    "BOUNDARY-licensed agents require containerized, network-isolated "
+                    "execution with zero host credentials before activation."
+                )
 
         record.state = IntakeState.ACTIVE
         record.promoted_by = actor_principal

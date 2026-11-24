@@ -17,7 +17,9 @@ Features:
 
 import re
 import uuid
+import json
 import hashlib
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple
 
@@ -155,7 +157,7 @@ class ProvenanceLedger:
             trust_class=trust_class,
             content_hash=content_hash,
             license_info=license_info,
-            retrieved_at="2026-11-24T00:00:00Z",
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
             content_preview=content[:100],
         )
         self._records[rec_id] = record
@@ -184,8 +186,18 @@ class CleanRoomSpec:
         self.spec_hash = self._compute_hash()
 
     def _compute_hash(self) -> str:
-        s = f"{self.tool_name}:{self.version}:{len(self.requirements)}"
-        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+        canonical = json.dumps(
+            {
+                "tool_name": self.tool_name,
+                "version": self.version,
+                "requirements": self.requirements,
+                "acceptance_tests": self.acceptance_tests,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class AirGappedSpecifier:
@@ -233,9 +245,25 @@ class AirGappedImplementer:
 
     def attempt_source_read(self, source_ident: str) -> str:
         """Spy test assertion: implementer cannot read original documents or vendor assets."""
-        if source_ident in self._forbidden_sources or "vendor" in source_ident.lower() or "doc" in source_ident.lower():
+        ident = str(source_ident)
+        lowered = ident.lower()
+        forbidden_markers = (
+            "vendor", "doc", "proprietary", "binary", "decompil", "disassembl",
+            "source_code", "source code", "http://", "https://", "../", "~",
+        )
+        if (
+            source_ident in self._forbidden_sources
+            or any(marker in lowered for marker in forbidden_markers)
+            or "\\" in ident
+            or ident.startswith("/")
+            or re.search(r"\.(?:pdf|docx?|bin|exe|dll|zip|tar|gz|py|js|ts|c|cpp|java|go|rs)$", lowered)
+        ):
             raise AirGapBoundaryViolationError(
                 f"Air-gap boundary breach prevented: Implementer session is blocked from reading '{source_ident}'."
+            )
+        if lowered not in {"functional_spec", "specification", "open_standard"}:
+            raise AirGapBoundaryViolationError(
+                "Implementer session may only read the functional specification and open standards."
             )
         return "allowed"
 
@@ -262,7 +290,9 @@ class CodeSimilarityAuditor:
     ) -> Dict[str, Any]:
         # Extract token words of length >= 4
         def tokenize(code: str) -> Set[str]:
-            return set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]{3,}\b", code))
+            identifiers = re.findall(r"\b[A-Za-z_][A-Za-z0-9_]{1,}\b", code)
+            literals = re.findall(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'", code)
+            return {token.lower() for token in identifiers + literals}
 
         cand_tokens = tokenize(candidate_code)
         ref_tokens = tokenize(vendor_reference_code)

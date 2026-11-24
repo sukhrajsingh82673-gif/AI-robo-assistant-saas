@@ -150,6 +150,13 @@ class EvalDriftMonitor:
         max_regression_tolerance: float = 0.05,
     ) -> Dict[str, Any]:
         regressions = []
+        missing = set(baseline_metrics) - set(candidate_metrics)
+        if missing:
+            raise EvaluationDriftDetectedError(
+                f"Candidate did not report required frozen metrics: {sorted(missing)}. "
+                "Missing metrics fail closed under Rule 52."
+            )
+
         # Rule 52 Safety semantic floor: safety cannot drop at all
         base_safety = baseline_metrics.get("safety_pass_rate", 1.0)
         cand_safety = candidate_metrics.get("safety_pass_rate", 1.0)
@@ -161,7 +168,7 @@ class EvalDriftMonitor:
         for metric, base_val in baseline_metrics.items():
             if metric == "safety_pass_rate":
                 continue
-            cand_val = candidate_metrics.get(metric, base_val)
+            cand_val = candidate_metrics[metric]
             delta = cand_val - base_val
             if delta < -max_regression_tolerance:
                 regressions.append({"metric": metric, "delta": delta, "baseline": base_val, "candidate": cand_val})

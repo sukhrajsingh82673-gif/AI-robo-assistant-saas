@@ -286,15 +286,47 @@ Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
 | **6I** | The System's Own GitHub (Public Safe) | `core/evolution/github_client.py`, `tests/test_step6_github_automation.py` | **PASS (CI Certified)** |
 | **6J** | Evolution Safety, Red Team & Final Qualification | `core/evolution/safety.py`, `scripts/step6_redteam.py`, `scripts/step6_scenario.py` | **PASS (CI Certified)** |
 
-- **Total Step 6 Unit Tests:** 69 passing in 2.85s
+- **Total Step 6 Unit Tests:** 78 passing locally (post-audit hardening)
 - **Preservation Contract (Rule 49):** 1,951 Step 1-5 files strictly unmodified (0 bytes changed)
 - **Standing Rules Compliance:** Rules 1–57 strictly enforced.
 
+---
 
+## Post-Implementation Audit Hardening (2026-11-24)
 
+A source-level audit of the Step 6 implementation found fail-open behavior in several
+governance paths. The following defects were fixed and covered by new regression tests:
 
+- `EvalDriftMonitor` now fails closed when a candidate omits any frozen baseline metric;
+  missing metrics previously defaulted to the baseline and silently passed.
+- `ReleaseAttestation` now requires an explicit `EXTERNAL_API_WRITE`/`DEPLOY` gateway
+  approval instead of returning `deployment_ready: true` when approval was omitted.
+- `GitHubAppScope` now rejects permissions outside the least-privilege allow-list and
+  invalid permission levels; previously unknown scopes were accepted.
+- Agent intake no longer fabricates a safe sandbox trace. Certification requires a
+  recorded trace, and BOUNDARY-licensed agents require containerized, network-isolated
+  execution with zero host credentials before activation.
+- The intake AST scanner now detects `os.getenv`, `os.environ.get`, and process-spawning
+  attributes such as `subprocess.run`, `system`, `popen`, and `spawn`.
+- Clean-room specification hashes now bind the full requirement and acceptance-test
+  content, not just the requirement count.
+- The clean-room implementer boundary blocks URLs, code files, absolute paths, and
+  traversal identifiers; similarity auditing now includes short identifiers and string
+  literals.
 
+**Verification:** `pytest -q tests/test_step6_*.py` -> 78 passed; `python3
+scripts/step6_scenario.py` -> 10/10 phases; `python3 scripts/step6_redteam.py` -> 5/5
+drills neutralized.
 
+### Residual Risks (not claimed as complete)
 
-
-
+- The intake sandbox consumes a caller-supplied behavioral trace; it does not execute
+  external agents in a real container. A production sandbox adapter is still required.
+- The GitHub module is a policy/contract layer. No live GitHub API transport is wired,
+  and merge/approval results are local invariants, not remote GitHub state.
+- Clean-room components are independently tested utility classes; the end-to-end
+  specifier/implementer/reviewer workflow is not yet enforced by a single state machine.
+- Public-exposure remediation still depends on the owner's credential rotation and
+  GitHub organisation settings; those cannot be verified from this workspace.
+- GitHub Actions run IDs quoted above were not independently verifiable locally because
+  `gh` is unauthenticated in this environment.

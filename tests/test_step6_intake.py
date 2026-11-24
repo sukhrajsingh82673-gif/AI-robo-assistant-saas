@@ -12,6 +12,8 @@ from core.evolution.intake import (
     AgentZooManager,
     HermesEvaluator,
     HumanApprovalRequiredError,
+    IntakeSecurityViolationError,
+    SandboxTraceRequiredError,
 )
 
 
@@ -157,8 +159,16 @@ def run():
         rec = manager.approve_for_sandbox(rec.intake_id)
         assert rec.state == IntakeState.APPROVED_FOR_SANDBOX
 
-        # Step 4: Sandbox execution -> CERTIFIED
-        rec = manager.run_sandbox_evaluation(rec.intake_id)
+        # Step 4: Sandbox execution -> CERTIFIED (explicit recorded trace)
+        rec = manager.run_sandbox_evaluation(
+            rec.intake_id,
+            simulated_trace={
+                "network_calls": [],
+                "file_writes": [],
+                "process_spawns": [],
+                "env_reads": [],
+            },
+        )
         assert rec.state == IntakeState.CERTIFIED
 
         # Step 5: Unauthorized AI promotion fails
@@ -189,3 +199,59 @@ def run():
         assert scan["clean"] is False
         injection_findings = [f for f in scan["findings"] if f["category"] == "PROMPT_INJECTION"]
         assert len(injection_findings) >= 1
+
+
+class TestStep6IntakeHardening:
+    def _manifest(self, license_spdx="MIT", source="print('ok')\n"):
+        return AgentManifest(
+            name="hardened-agent",
+            version="1.0.0",
+            repository_url="https://github.com/example/hardened",
+            commit_hash="0123456789abcdef0123456789abcdef01234567",
+            license_spdx=license_spdx,
+            dependencies=[{"name": "requests", "version": "2.31.0", "hash": "sha256:" + "a" * 64}],
+            declared_capabilities=["filesystem_write"],
+            entrypoint="main.py",
+            source_files={"main.py": source},
+        )
+
+    def test_09_sandbox_certification_requires_recorded_trace(self):
+        manager = AgentZooManager()
+        rec = manager.discover_agent(self._manifest(), "tenant_a", "company_a")
+        manager.evaluate_candidate(rec.intake_id)
+        manager.approve_for_sandbox(rec.intake_id)
+        with pytest.raises(SandboxTraceRequiredError):
+            manager.run_sandbox_evaluation(rec.intake_id)
+        assert rec.state == IntakeState.APPROVED_FOR_SANDBOX
+
+    def test_10_ast_scanner_detects_getenv_and_process_spawning(self):
+        scan = StaticSecurityScanner.scan_manifest(self._manifest(
+            source="import os, subprocess\nos.getenv('SECRET_KEY')\nsubprocess.run(['id'])\n"
+        ))
+        categories = {f["category"] for f in scan["findings"]}
+        assert scan["clean"] is False
+        assert "ENV_READ_ATTEMPT" in categories
+        assert "DANGEROUS_CALL" in categories
+
+    def test_11_boundary_license_requires_isolation_before_activation(self):
+        manager = AgentZooManager()
+        rec = manager.discover_agent(self._manifest(license_spdx="AGPL-3.0"), "tenant_a", "company_a")
+        manager.evaluate_candidate(rec.intake_id)
+        manager.approve_for_sandbox(rec.intake_id)
+        manager.run_sandbox_evaluation(rec.intake_id, {
+            "network_calls": [], "file_writes": [], "process_spawns": [], "env_reads": [],
+        })
+        assert rec.state == IntakeState.CERTIFIED
+
+        with pytest.raises(IntakeSecurityViolationError, match="BOUNDARY"):
+            manager.promote_to_active(rec.intake_id, "human:owner")
+        manager.promote_to_active(
+            rec.intake_id,
+            "human:owner",
+            boundary_isolation={
+                "containerized": True,
+                "network_isolated": True,
+                "host_credentials": False,
+            },
+        )
+        assert rec.state == IntakeState.ACTIVE

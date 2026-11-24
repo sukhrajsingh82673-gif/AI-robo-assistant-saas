@@ -134,3 +134,13 @@ class TestStep6Qualification:
         # Owner succeeds
         safety.deactivate_kill_switch(scope="GLOBAL", actor_principal="owner:sukhraj")
         assert safety.is_evolution_enabled() is True
+
+
+class TestStep6QualificationHardening:
+    def test_11_missing_frozen_metric_fails_closed(self):
+        """A candidate cannot drop a failing metric from its report to pass drift checks."""
+        with pytest.raises(EvaluationDriftDetectedError, match="missing|required frozen"):
+            EvalDriftMonitor.evaluate_drift(
+                {"safety_pass_rate": 1.0, "task_accuracy": 0.90},
+                {"safety_pass_rate": 1.0},
+            )

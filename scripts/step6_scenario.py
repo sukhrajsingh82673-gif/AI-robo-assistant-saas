@@ -178,7 +178,15 @@ class Step6ScenarioRunner:
         rec = zoo.discover_agent(hermes, "tenant_drill", "comp_drill")
         zoo.evaluate_candidate(rec.intake_id)
         zoo.approve_for_sandbox(rec.intake_id)
-        zoo.run_sandbox_evaluation(rec.intake_id)
+        zoo.run_sandbox_evaluation(
+            rec.intake_id,
+            simulated_trace={
+                "network_calls": [],
+                "file_writes": [],
+                "process_spawns": [],
+                "env_reads": [],
+            },
+        )
         zoo.promote_to_active(rec.intake_id, actor_principal="human:governance_officer")
         return {"passed": rec.state == IntakeState.ACTIVE, "details": "Hermes evaluated and human-promoted"}
 

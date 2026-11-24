@@ -63,9 +63,18 @@ class GitHubAppScope:
         Must NOT contain workflows (so cannot edit CI), administration, or secrets.
         """
         violations = []
-        for perm in granted_permissions:
+        for perm, level in granted_permissions.items():
             if perm in cls.PROHIBITED_PERMISSIONS:
                 violations.append(perm)
+            elif perm not in cls.ALLOWED_PERMISSIONS:
+                raise ExcessivePermissionError(
+                    f"GitHub App requests unknown permission '{perm}', which is not on the "
+                    "least-privilege allow-list."
+                )
+            elif level not in {"read", "write"}:
+                raise ExcessivePermissionError(
+                    f"GitHub App permission '{perm}' has invalid level '{level}'."
+                )
 
         if violations:
             raise ExcessivePermissionError(
@@ -237,9 +246,13 @@ class ReleaseAttestation:
         if not has_provenance_attestation:
             raise ValueError("Release requires signed SLSA/build provenance attestation.")
 
-        if approval_action:
-            if approval_action.get("action_class") != "EXTERNAL_API_WRITE" or approval_action.get("subtype") != "DEPLOY":
-                raise ValueError("Deployment action requires class 'EXTERNAL_API_WRITE' with subtype 'DEPLOY'.")
+        if not approval_action:
+            raise ValueError(
+                "Deployment requires an owner-approved gateway action "
+                "('EXTERNAL_API_WRITE'/'DEPLOY'); approval cannot be omitted."
+            )
+        if approval_action.get("action_class") != "EXTERNAL_API_WRITE" or approval_action.get("subtype") != "DEPLOY":
+            raise ValueError("Deployment action requires class 'EXTERNAL_API_WRITE' with subtype 'DEPLOY'.")
 
         return {
             "release_tag": release_tag,
