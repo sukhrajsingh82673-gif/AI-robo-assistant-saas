@@ -218,6 +218,31 @@ Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
   - `test_07_legal_gate_blocks_tos_restricted_tools_without_owner`: PASSED
   - `test_08_mutation_check_unauthorized_crack_or_keygen_blocked`: PASSED
 
+---
+
+## Sub-step 6I: The System's Own GitHub (Governed, Public-Repo Safe)
+- **Status:** PASS
+- **Module:** `core/evolution/github_client.py`
+- **Tests:** `tests/test_step6_github_automation.py` (8 passed)
+- **Key Capabilities Verified:**
+  - GitHub App least-privilege scoping: blocks tokens containing `workflows`, `administration`, or `secrets` under Rule 54.
+  - Branch naming convention requiring `ai/<class>/<id>` and banning pushes to protected branches (`main`, `master`, `release`).
+  - Strict Rule 57 Human-Merge Invariant: AI principals cannot approve or merge pull requests; human accounts verified.
+  - PR description contract: hashed failure-cluster IDs, metric counts (zero canary strings or PII), eval deltas, and rollback plans.
+  - Protected path gate: blocks and closes PRs attempting to modify `security/protected_paths.yaml` or `.github/workflows/`.
+  - Public input sanitization: read-only triage worker without write tools or secrets safely routing prompt injection attempts to owner inbox.
+  - Release attestation verifying CycloneDX/SPDX SBOM, SLSA build provenance, and gateway deployment authorization (`EXTERNAL_API_WRITE` + `DEPLOY`).
+- **Test Suite Results:**
+  - `test_01_github_app_permissions_enforces_least_privilege_and_blocks_workflows`: PASSED
+  - `test_02_branch_naming_validator_blocks_protected_branches_and_requires_ai_prefix`: PASSED
+  - `test_03_pr_merge_and_approval_prohibits_ai_principals_rule57`: PASSED
+  - `test_04_pr_body_builder_hashes_failure_clusters_and_excludes_tenant_canary`: PASSED
+  - `test_05_protected_path_inspector_blocks_and_rejects_ai_prs_touching_protected_set`: PASSED
+  - `test_06_public_input_sanitizer_quarantines_prompt_injection_with_zero_tool_calls`: PASSED
+  - `test_07_release_attestation_verifies_sbom_provenance_and_gateway_approval`: PASSED
+  - `test_08_mutation_check_unauthenticated_or_ai_actor_cannot_force_merge`: PASSED
+
+
 
 
 
