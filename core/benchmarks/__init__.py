@@ -23,6 +23,13 @@ from core.benchmarks.claims import (
     BenchmarkClaimsRegistry,
     UnverifiedClaimBlockedError,
 )
+from core.benchmarks.stats import BenchmarkStats
+from core.benchmarks.runner import (
+    BenchmarkRunner,
+    BenchmarkStatus,
+    TrialMeasurements,
+)
+from core.benchmarks.report_generator import BenchmarkReportGenerator
 
 __all__ = [
     "BenchmarkVault",
@@ -38,4 +45,9 @@ __all__ = [
     "BenchmarkClaim",
     "BenchmarkClaimsRegistry",
     "UnverifiedClaimBlockedError",
+    "BenchmarkStats",
+    "BenchmarkRunner",
+    "BenchmarkStatus",
+    "TrialMeasurements",
+    "BenchmarkReportGenerator",
 ]

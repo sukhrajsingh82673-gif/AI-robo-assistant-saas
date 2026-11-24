@@ -205,4 +205,26 @@
   ======= 8 passed in 1.16s =======
   ```
 
+## Sub-Step 8F: Benchmark Execution & Report
+
+- **Completed Date:** 2026-11-24
+- **Review Status:** PASS (OpenCode Arbiter)
+- **Key Deliverables:**
+  - `core/benchmarks/stats.py`: Statistical computation engine computing sample variances, pooled standard deviations, Cohen's $d$ effect sizes, 95% Confidence Intervals for difference in means, and Welch's t-test p-value approximations.
+  - `core/benchmarks/runner.py`: Execution runner and classification engine implementing the formal status state machine (`NO_BASELINE`, `INSUFFICIENT_EVIDENCE`, `BETTER`, `EQUIVALENT`, `WORSE`), and enforcing the Rule 72 Critical-Error Veto mechanism.
+  - `core/benchmarks/report_generator.py`: Benchmark report generator producing the comprehensive Markdown report with statistical tables, unit economics, boundary compliance records, and SHA-256 seal.
+  - `docs/benchmarks/STEP8_BENCHMARK_REPORT.md`: Formal sealed empirical benchmark report comparing Config C vs Config A across enterprise tasks, demonstrating ~98.6% cost reduction on invoice reconciliation and 0 critical safety violations.
+  - `tests/test_step8f_benchmark_report.py`: 6 automated tests validating statistical math, sample size thresholds, classification states, Critical-Error Veto disqualification, and report markdown integrity.
+- **Verification Output:**
+  ```text
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_01_stats_calculations_mean_sd_cohens_d_ci PASSED [ 16%]
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_02_classification_no_baseline PASSED [ 33%]
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_03_classification_insufficient_evidence PASSED [ 50%]
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_04_classification_better_statistically_significant PASSED [ 66%]
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_05_critical_error_veto_disqualification PASSED [ 83%]
+  tests/test_step8f_benchmark_report.py::TestStep8FBenchmarkReport::test_06_benchmark_report_generation_and_integrity PASSED [100%]
+  ======= 6 passed in 0.88s =======
+  ```
+
+
 
