@@ -194,6 +194,31 @@ Executed local test suite `tests/test_step6_optimizer.py` passing 6/6 tests:
   - `test_07_promotion_to_active_strictly_requires_human_principal`: PASSED
   - `test_08_mutation_check_readme_prompt_injection_flagged`: PASSED
 
+---
+
+## Sub-step 6H: Clean-Room Tool Replication Protocol
+- **Status:** PASS
+- **Module:** `core/evolution/clean_room.py`
+- **Tests:** `tests/test_step6_clean_room.py` (8 passed)
+- **Key Capabilities Verified:**
+  - Prioritized Decision Ladder (first match wins: Open-source -> Official Vendor API -> Clean-Room -> Infeasible).
+  - Strict air-gap architecture dividing Specifier and Implementer sessions; spy tests confirm implementer cannot access original vendor documents or assets.
+  - Mandatory Provenance Ledger enforcing full requirement tracing to allowed inputs (`PUBLIC_DOC`, `OPEN_SOURCE`, `OWNER_AUTHORED`, `BLACK_BOX_OBSERVATION`) under Rule 53.
+  - Prohibited input filter blocking decompiled binaries, IDA/Ghidra dumps, cracks, keygens, and ToS scraping under Rule 55.
+  - Code similarity auditor detecting plagiarized identifiers and structure.
+  - Clean-room legal gate parsing Terms-of-Service reverse engineering clauses and requiring explicit human owner authorization.
+  - Replica registry tagging with measured acceptance coverage against owner requirements.
+- **Test Suite Results:**
+  - `test_01_decision_ladder_chooses_open_source_first`: PASSED
+  - `test_02_decision_ladder_falls_through_to_clean_room`: PASSED
+  - `test_03_prohibited_input_detector_rejects_decompiled_code`: PASSED
+  - `test_04_provenance_ledger_verifies_all_spec_requirements_cited`: PASSED
+  - `test_05_air_gapped_implementer_blocks_raw_source_reads_spy_test`: PASSED
+  - `test_06_similarity_auditor_flags_planted_licensed_code`: PASSED
+  - `test_07_legal_gate_blocks_tos_restricted_tools_without_owner`: PASSED
+  - `test_08_mutation_check_unauthorized_crack_or_keygen_blocked`: PASSED
+
+
 
 
 
