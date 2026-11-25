@@ -58,3 +58,26 @@ tests/test_step9b_platform.py::TestStep9bPlatform::test_entitlements_restricted_
 tests/test_step9b_platform.py::TestStep9bPlatform::test_openfeature_provider_defaults_and_killswitch PASSED [100%]
 10 passed in 4.28s
 ```
+
+---
+
+## Sub-Step 9C: Billing, Plans, Metering and Cost Caps
+
+### Status: Complete & Verified
+- **Billing Architecture (ADR 0048, Rules 78 & 79):**
+  - Provider abstraction: [core/billing/port.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/billing/port.py) (`BillingPort`, `SandboxBillingAdapter`, `PaddleBillingAdapter`, `StripeBillingAdapter`, `LagoBillingAdapter`).
+  - Plan Registry & Overage Model: [core/billing/plans.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/billing/plans.py) (`community`, `starter`, `team`, `enterprise`).
+  - Append-only Cryptographic Ledger: [core/billing/metering.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/billing/metering.py) (`UsageLedger` with SHA-256 chaining).
+  - Cost Cap Safeguards: [core/billing/cost_caps.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/billing/cost_caps.py) (80% soft cap alert, 100% hard cap halt).
+  - Delinquency & Legal Hold State Machine: [core/billing/lifecycle.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/billing/lifecycle.py) (`BillingLifecycleManager`).
+
+### Verification Evidence
+```text
+tests/test_step9c_billing.py::TestStep9cBilling::test_sandbox_billing_adapter_lifecycle_and_money_truth PASSED [ 16%]
+tests/test_step9c_billing.py::TestStep9cBilling::test_unconfigured_adapters_report_not_configured PASSED [ 33%]
+tests/test_step9c_billing.py::TestStep9cBilling::test_plan_registry_and_overage_pricing PASSED [ 50%]
+tests/test_step9c_billing.py::TestStep9cBilling::test_usage_ledger_cryptographic_chaining_and_tamper_detection PASSED [ 66%]
+tests/test_step9c_billing.py::TestStep9cBilling::test_cost_caps_soft_and_hard_cap_safeguards PASSED [ 83%]
+tests/test_step9c_billing.py::TestStep9cBilling::test_billing_lifecycle_grace_period_and_legal_hold PASSED [100%]
+6 passed in 0.63s
+```
