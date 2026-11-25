@@ -204,3 +204,23 @@ tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_capability_sandbox
 tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_instant_revocation_engine_sla PASSED [100%]
 5 passed in 0.51s
 ```
+
+---
+
+## Sub-Step 9J: Release Engineering & Deployment
+
+### Status: Complete & Verified
+- **Release Automation & Rollbacks:**
+  - Progressive Canary Deployment: [core/release/canary.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/release/canary.py) (Staged 5%->25%->50%->100%, automated threshold rollback).
+  - CycloneDX v1.5 SBOM & Provenance: [core/release/provenance.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/release/provenance.py)
+  - Release Readiness Checker: [scripts/release_readiness.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/scripts/release_readiness.py)
+
+### Verification Evidence
+```text
+tests/test_step9j_release_engineering.py::TestStep9jReleaseEngineering::test_progressive_canary_rollout_full_success_path PASSED [ 20%]
+tests/test_step9j_release_engineering.py::TestStep9jReleaseEngineering::test_canary_auto_rollback_on_5xx_spike PASSED [ 40%]
+tests/test_step9j_release_engineering.py::TestStep9jReleaseEngineering::test_canary_auto_rollback_on_latency_spike PASSED [ 60%]
+tests/test_step9j_release_engineering.py::TestStep9jReleaseEngineering::test_cyclonedx_sbom_generation PASSED [ 80%]
+tests/test_step9j_release_engineering.py::TestStep9jReleaseEngineering::test_release_readiness_script PASSED [100%]
+5 passed in 0.57s
+```

@@ -74,3 +74,7 @@ allowed_step9_paths:
   - "openapi_v9_public.json"
   - "docs/api/"
   - "docs/portal/"
+  - "scripts/release_readiness.py"
+  - "scripts/step9_scenario.py"
+  - "docs/release/"
+  - "docs/reports/RELEASE_READINESS*"
