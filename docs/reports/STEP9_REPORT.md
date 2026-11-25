@@ -122,3 +122,23 @@ tests/test_step9e_consoles.py::TestStep9eConsoles::test_platform_operator_consol
 tests/test_step9e_consoles.py::TestStep9eConsoles::test_dead_control_detector_on_console_manifests PASSED [100%]
 3 passed in 0.55s
 ```
+
+---
+
+## Sub-Step 9F: Onboarding, Demo Company, Data Import & Switching
+
+### Status: Complete & Verified
+- **Onboarding & Portability (ADR 0057):**
+  - First-Run Wizard: [core/onboarding/wizard.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/onboarding/wizard.py) (5-step progressive setup).
+  - Synthetic Demo Company: [core/onboarding/demo_company.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/onboarding/demo_company.py) (Isolated sandbox, chart of accounts, invoices, clean reset).
+  - CSV Data Importer: [core/onboarding/importer.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/onboarding/importer.py) (Dry-run mode, atomic rollback on validation errors).
+  - EU Data Act Switching Engine: [core/compliance/data_act_export.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/compliance/data_act_export.py) (Regulation EU 2023/2854, zero exit fees, full structured machine-readable export).
+
+### Verification Evidence
+```text
+tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_onboarding_wizard_step_by_step_progression PASSED [ 25%]
+tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_demo_company_sandbox_isolation_and_reset PASSED [ 50%]
+tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_csv_importer_dry_run_and_atomic_rollback PASSED [ 75%]
+tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_eu_data_act_export_engine_and_zero_exit_fees PASSED [100%]
+4 passed in 2.53s
+```
