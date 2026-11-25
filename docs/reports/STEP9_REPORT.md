@@ -81,3 +81,26 @@ tests/test_step9c_billing.py::TestStep9cBilling::test_cost_caps_soft_and_hard_ca
 tests/test_step9c_billing.py::TestStep9cBilling::test_billing_lifecycle_grace_period_and_legal_hold PASSED [100%]
 6 passed in 0.63s
 ```
+
+---
+
+## Sub-Step 9D: Public API, Webhooks, SDKs and Developer Portal
+
+### Status: Complete & Verified
+- **Contract & Spec (ADR 0050, Rule 80):**
+  - Canonical OpenAPI 3.1.0 Specification: [openapi_v9_public.json](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/openapi_v9_public.json)
+  - Public API Router: [core/api/public_v1.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/api/public_v1.py) (RFC 9457 errors, `Idempotency-Key` cache, cursor pagination).
+  - Standard Webhooks & SSRF Defense: [core/webhooks/standard_webhooks.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/webhooks/standard_webhooks.py) (HMAC-SHA256, 300s replay window, loopback/private/metadata blocklist).
+  - Developer Portal: [core/api/portal.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/api/portal.py)
+  - Python SDK: [sdk/python/zonata_sdk/client.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/sdk/python/zonata_sdk/client.py)
+  - TypeScript SDK: [sdk/typescript/src/client.ts](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/sdk/typescript/src/client.ts)
+
+### Verification Evidence
+```text
+tests/test_step9d_public_api.py::TestStep9dPublicApi::test_openapi_v9_public_spec_is_valid_310 PASSED [ 20%]
+tests/test_step9d_public_api.py::TestStep9dPublicApi::test_standard_webhooks_signing_and_replay_protection PASSED [ 40%]
+tests/test_step9d_public_api.py::TestStep9dPublicApi::test_ssrf_validator_prohibits_private_and_metadata_addresses PASSED [ 60%]
+tests/test_step9d_public_api.py::TestStep9dPublicApi::test_public_api_router_dispatch_and_idempotency PASSED [ 80%]
+tests/test_step9d_public_api.py::TestStep9dPublicApi::test_sdk_helpers_and_portal PASSED [100%]
+5 passed in 0.73s
+```

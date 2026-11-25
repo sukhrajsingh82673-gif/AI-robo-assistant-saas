@@ -71,3 +71,6 @@ allowed_step9_paths:
   - "tests/test_preservation_step9.py"
   - "security/protected_paths_step9.yaml"
   - "docs/baselines/STEP1-8_BASELINE.json"
+  - "openapi_v9_public.json"
+  - "docs/api/"
+  - "docs/portal/"
