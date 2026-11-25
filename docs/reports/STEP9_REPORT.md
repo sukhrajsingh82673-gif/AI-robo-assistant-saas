@@ -104,3 +104,21 @@ tests/test_step9d_public_api.py::TestStep9dPublicApi::test_public_api_router_dis
 tests/test_step9d_public_api.py::TestStep9dPublicApi::test_sdk_helpers_and_portal PASSED [100%]
 5 passed in 0.73s
 ```
+
+---
+
+## Sub-Step 9E: Tenant Admin & Platform Operator Consoles and Dead-Control Detector
+
+### Status: Complete & Verified
+- **Consoles & Dual Control (Rule 82 & Rule 84):**
+  - Tenant Admin Console: [core/ui/tenant_console.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/ui/tenant_console.py) (RBAC, API keys, audit trail, last owner safeguard).
+  - Platform Operator Console: [core/ui/operator_console.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/ui/operator_console.py) (Dual-control support grants, uncredentialed access blocked).
+  - Dead Control Detector: [core/ui/dead_control_detector.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/ui/dead_control_detector.py) (Automated crawler prohibiting dead `#` links and orphan buttons).
+
+### Verification Evidence
+```text
+tests/test_step9e_consoles.py::TestStep9eConsoles::test_tenant_admin_console_team_and_keys PASSED [ 33%]
+tests/test_step9e_consoles.py::TestStep9eConsoles::test_platform_operator_console_dual_control_support_access PASSED [ 66%]
+tests/test_step9e_consoles.py::TestStep9eConsoles::test_dead_control_detector_on_console_manifests PASSED [100%]
+3 passed in 0.55s
+```
