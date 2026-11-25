@@ -29,3 +29,32 @@ tests/test_step9a_preflight.py::test_step9_inventory_document PASSED     [ 66%]
 tests/test_step9a_preflight.py::test_zero_plaintext_secrets_in_new_files PASSED [100%]
 3 passed in 0.56s
 ```
+
+---
+
+## Sub-Step 9B: Preservation Extension & Product Platform Foundations
+
+### Status: Complete & Verified
+- **Preservation Contract (Rule 77):** Frozen at `step8-final` commit `7aee993` (2,297 files). Verified via [STEP1-8_BASELINE.json](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/docs/baselines/STEP1-8_BASELINE.json) and [protected_paths_step9.yaml](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/security/protected_paths_step9.yaml).
+- **Database Schemas & Migrations:**
+  - Forward migration: [0035_step9_product_readiness.sql](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/migrations/pg/0035_step9_product_readiness.sql)
+  - Rollback downgrade: [0035_step9_product_readiness_downgrade.sql](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/migrations/rollback/0035_step9_product_readiness_downgrade.sql)
+- **Core Platform Engines:**
+  - Edge Gateway Reverse Proxy: [core/edge/gateway.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/edge/gateway.py)
+  - Entitlements Engine: [core/entitlements/engine.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/entitlements/engine.py)
+  - OpenFeature Flag Provider: [core/flags/openfeature_provider.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/flags/openfeature_provider.py)
+
+### Verification Evidence
+```text
+tests/test_preservation_step9.py::TestStep9PreservationContract::test_01_baseline_file_count_and_metadata PASSED [ 10%]
+tests/test_preservation_step9.py::TestStep9PreservationContract::test_02_preservation_cryptographic_hashes PASSED [ 20%]
+tests/test_preservation_step9.py::TestStep9PreservationContract::test_03_mutation_check_altered_hash_fails PASSED [ 30%]
+tests/test_preservation_step9.py::TestStep9PreservationContract::test_04_rule68_industry_branching_grep_clean PASSED [ 40%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_migrations_sql_exist_and_well_formed PASSED [ 50%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_edge_gateway_headers_and_trace PASSED [ 60%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_edge_gateway_rate_limiting PASSED [ 70%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_entitlements_tier_and_feature_gates PASSED [ 80%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_entitlements_restricted_billing_mode PASSED [ 90%]
+tests/test_step9b_platform.py::TestStep9bPlatform::test_openfeature_provider_defaults_and_killswitch PASSED [100%]
+10 passed in 4.28s
+```
