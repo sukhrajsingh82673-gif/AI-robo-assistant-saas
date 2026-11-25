@@ -142,3 +142,23 @@ tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_csv_importer_dry_run
 tests/test_step9f_onboarding.py::TestStep9fOnboarding::test_eu_data_act_export_engine_and_zero_exit_fees PASSED [100%]
 4 passed in 2.53s
 ```
+
+---
+
+## Sub-Step 9G: Mobile PWA & Accessibility Quality Gates
+
+### Status: Complete & Verified
+- **Mobile & Accessibility (ADR 0054 & ADR 0057):**
+  - Web App Manifest: [web/pwa/manifest.json](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/web/pwa/manifest.json)
+  - Service Worker: [web/pwa/sw.js](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/web/pwa/sw.js) (Offline read-only cache, VAPID Web Push).
+  - Mobile Approval Service: [core/ui/mobile_approvals.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/ui/mobile_approvals.py) (Passkey WebAuthn guard, offline mutation block).
+  - Automated WCAG 2.2 AA Checker: [core/ui/accessibility_checker.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/ui/accessibility_checker.py)
+  - Accessibility Conformance Report (VPAT 2.5): [docs/accessibility/DRAFT_ACR_VPAT.md](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/docs/accessibility/DRAFT_ACR_VPAT.md)
+
+### Verification Evidence
+```text
+tests/test_step9g_mobile_accessibility.py::TestStep9gMobileAccessibility::test_pwa_manifest_and_service_worker_exist PASSED [ 33%]
+tests/test_step9g_mobile_accessibility.py::TestStep9gMobileAccessibility::test_mobile_approvals_offline_guard_and_passkey_enforcement PASSED [ 66%]
+tests/test_step9g_mobile_accessibility.py::TestStep9gMobileAccessibility::test_accessibility_checker_compliant_and_mutation_detection PASSED [100%]
+3 passed in 2.46s
+```
