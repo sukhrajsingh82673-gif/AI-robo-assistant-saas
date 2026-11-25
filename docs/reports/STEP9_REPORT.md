@@ -183,3 +183,24 @@ tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_trust_centre_
 tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_cra_incident_runbook_documented PASSED [100%]
 4 passed in 2.43s
 ```
+
+---
+
+## Sub-Step 9I: Marketplace Foundations
+
+### Status: Complete & Verified
+- **Marketplace Isolation & Sandboxing (ADR 0055, Rule 81):**
+  - Package Manifest Spec: [core/marketplace/manifest.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/marketplace/manifest.py) (`zonata.marketplace-package/v1`, capability requirements, SHA-256 digest).
+  - Registry & Security Scanner: [core/marketplace/registry.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/marketplace/registry.py) (Prohibits `eval`/`os.system`, commercial truth on paid listings).
+  - Capability Sandbox Runtime: [core/marketplace/sandbox.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/marketplace/sandbox.py) (Egress allowlist enforcement, capability authorization).
+  - Instant Revocation Engine: [core/marketplace/revocation.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/marketplace/revocation.py) (< 1s global revocation and runtime termination).
+
+### Verification Evidence
+```text
+tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_marketplace_manifest_schema_and_digest PASSED [ 20%]
+tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_security_review_static_analysis_and_rejection PASSED [ 40%]
+tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_installation_and_commercial_truth PASSED [ 60%]
+tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_capability_sandbox_enforcement_and_network_egress PASSED [ 80%]
+tests/test_step9i_marketplace.py::TestStep9iMarketplace::test_instant_revocation_engine_sla PASSED [100%]
+5 passed in 0.51s
+```
