@@ -162,3 +162,24 @@ tests/test_step9g_mobile_accessibility.py::TestStep9gMobileAccessibility::test_m
 tests/test_step9g_mobile_accessibility.py::TestStep9gMobileAccessibility::test_accessibility_checker_compliant_and_mutation_detection PASSED [100%]
 3 passed in 2.46s
 ```
+
+---
+
+## Sub-Step 9H: Status, Support, Trust, Legal & Product Security
+
+### Status: Complete & Verified
+- **Status & Trust Operations (Rule 82 & Rule 83):**
+  - Independent Status Probe Engine: [core/status/probe.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/status/probe.py) (Rule 83 out-of-band monitoring, incident state machine).
+  - Dual-Control Support Grants: [core/support/grants.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/support/grants.py) (Rule 82, time-boxed HMAC tokens, reserved owner action barrier).
+  - Trust Centre & Sub-Processors: [core/trust/center.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/trust/center.py)
+  - Legal Registry & Clickwrap: [core/trust/legal_registry.py](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/core/trust/legal_registry.py)
+  - CRA Incident Runbook: [docs/security/CRA_INCIDENT_RUNBOOK.md](file:///data/data/com.termux/files/home/AI-robo-assistant-saas/docs/security/CRA_INCIDENT_RUNBOOK.md)
+
+### Verification Evidence
+```text
+tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_status_probe_engine_and_incident_lifecycle PASSED [ 25%]
+tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_support_grant_engine_dual_control_and_rule82_barrier PASSED [ 50%]
+tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_trust_centre_and_legal_registry PASSED [ 75%]
+tests/test_step9h_status_support.py::TestStep9hStatusSupport::test_cra_incident_runbook_documented PASSED [100%]
+4 passed in 2.43s
+```
