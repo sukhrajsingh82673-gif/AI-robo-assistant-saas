@@ -360,7 +360,7 @@ jobs:
               exit 1
             fi
             body=$(curl -sf http://127.0.0.1:8085/health || true)
-            if echo "$body" | grep -q '"status": "HEALTHY"'; then
+            if echo "$body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"(OK|HEALTHY)"'; then
               echo "Readiness probe succeeded on attempt $attempt."
               ready=1
               break
@@ -369,7 +369,7 @@ jobs:
           done
 
           if [ "$ready" -ne 1 ]; then
-            echo "API server did not report HEALTHY within the readiness window."
+            echo "API server did not report OK within the readiness window."
             cat /tmp/api_server.log
             exit 1
           fi

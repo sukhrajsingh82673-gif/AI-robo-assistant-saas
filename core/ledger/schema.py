@@ -42,7 +42,7 @@ def ensure_ledger_tables(conn: Optional[Any] = None) -> None:
     if conn is not None:
         if db.pg_tables_ready(conn, "accounts", "journal_entries", "journal_lines"):
             return
-        if hasattr(conn, "executescript"):
+        if hasattr(conn, "executescript") and db.dialect == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
                 conn.executescript(sql_path.read_text(encoding="utf-8"))

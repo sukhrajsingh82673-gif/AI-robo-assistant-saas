@@ -85,13 +85,18 @@ class EnterpriseFinanceEngine:
                 updated_at REAL NOT NULL
             );
             """)
+            # Commit base table DDL before additive ALTERs so PostgreSQL
+            # rollbacks on already-present columns never undo CREATE TABLE.
+            conn.commit()
             # Additive migrations for databases created by earlier versions.
-            for stmt in (
-                "ALTER TABLE finance_expenses ADD COLUMN claimant_user_id TEXT",
-                "ALTER TABLE finance_expenses ADD COLUMN approved_by TEXT",
-                "ALTER TABLE finance_expenses ADD COLUMN approved_at REAL",
-                "ALTER TABLE finance_expenses ADD COLUMN decision_reason TEXT",
+            for col_name, stmt in (
+                ("claimant_user_id", "ALTER TABLE finance_expenses ADD COLUMN claimant_user_id TEXT"),
+                ("approved_by", "ALTER TABLE finance_expenses ADD COLUMN approved_by TEXT"),
+                ("approved_at", "ALTER TABLE finance_expenses ADD COLUMN approved_at REAL"),
+                ("decision_reason", "ALTER TABLE finance_expenses ADD COLUMN decision_reason TEXT"),
             ):
+                if db.pg_column_exists(conn, "finance_expenses", col_name):
+                    continue
                 try:
                     conn.execute(stmt)
                     conn.commit()
