@@ -123,7 +123,11 @@ jobs:
         run: |
           echo "Applying full relational DDL and additive controlled migrations..."
           python3 -c "
+          # 1. Apply core relational schema DDL first (creates tenants, companies, documents, folios)
           from core.db import db
+          db.verify_readiness()
+          db._init_db()
+
           from core.controlled_migration_engine import ControlledMigrationEngine
           from core.enterprise_files import EnterpriseFilesEngine
           from core.enterprise_records import EnterpriseRecordsEngine
@@ -144,9 +148,6 @@ jobs:
           from core.action_envelope import command_bus
           from tests.schema_bootstrap import init_all_subsystem_schemas
 
-          # 1. Apply core & subsystem relational schema DDL as zonata_admin
-          db.verify_readiness()
-          db._init_db()
           EnterpriseFilesEngine(tenant_id='tnt_init')._init_db()
           EnterpriseRecordsEngine(tenant_id='tnt_init')._init_db()
           EnterpriseReportsEngine(tenant_id='tnt_init')._init_db()

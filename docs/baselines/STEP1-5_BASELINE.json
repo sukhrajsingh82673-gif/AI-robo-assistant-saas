@@ -44,8 +44,8 @@
       "is_symlink": false
     },
     ".github/workflows/docker_staging_qualification.yml": {
-      "sha256": "cc070b88668c6ffcfd75e9361b118e5dfdd2df3a578df082f5dcc923655012ba",
-      "size": 18425,
+      "sha256": "d61bbb6fb1ef0fc76ff192748f20a4e8fd5f8247d421719aaa8b05a5f3ed00ab",
+      "size": 18452,
       "is_symlink": false
     },
     ".github/workflows/e2e-browser.yml": {
