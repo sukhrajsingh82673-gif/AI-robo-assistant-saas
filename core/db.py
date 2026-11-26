@@ -5550,44 +5550,45 @@ class Database:
                         conn.rollback()
                     except Exception:
                         pass
+            conn.commit()
+            _init_steps = (
+                ("core.documents.schema", "ensure_document_backbone_tables"),
+                ("core.folios.schema", "ensure_folio_tables"),
+                ("core.ledger.schema", "ensure_ledger_tables"),
+                ("core.industry_packs.loader", "ensure_industry_pack_tables"),
+                ("core.baseline.outbox", "ensure_outbox_tables"),
+                ("core.baseline.scheduler", "ensure_scheduler_tables"),
+                ("core.authority", "ensure_authority_tables"),
+                ("core.organization", "ensure_organization_tables"),
+                ("core.agents", "ensure_agent_runtime_tables"),
+                ("core.work", "ensure_work_kernel_tables"),
+                ("core.sop", "ensure_sop_tables"),
+                ("core.verification", "ensure_verification_tables"),
+                ("core.kpi", "ensure_kpi_tables"),
+                ("core.executive", "ensure_executive_tables"),
+                ("core.evals", "ensure_eval_tables"),
+                ("core.host.types", "ensure_host_permission_tables"),
+            )
+            import importlib
+            for _mod, _fn_name in _init_steps:
+                try:
+                    _fn = getattr(importlib.import_module(_mod), _fn_name)
+                    _fn(conn)
+                    conn.commit()
+                except Exception:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             try:
-                from core.documents.schema import ensure_document_backbone_tables
-                ensure_document_backbone_tables(conn)
-                from core.folios.schema import ensure_folio_tables
-                ensure_folio_tables(conn)
-                from core.ledger.schema import ensure_ledger_tables
-                ensure_ledger_tables(conn)
-                from core.industry_packs.loader import ensure_industry_pack_tables
-                ensure_industry_pack_tables(conn)
-                from core.baseline.outbox import ensure_outbox_tables
-                ensure_outbox_tables(conn)
-                from core.baseline.scheduler import ensure_scheduler_tables
-                ensure_scheduler_tables(conn)
-                from core.authority import ensure_authority_tables
-                ensure_authority_tables(conn)
-                from core.organization import ensure_organization_tables
-                ensure_organization_tables(conn)
-                from core.agents import ensure_agent_runtime_tables
-                ensure_agent_runtime_tables(conn)
-                from core.work import ensure_work_kernel_tables
-                ensure_work_kernel_tables(conn)
-                from core.sop import ensure_sop_tables
-                ensure_sop_tables(conn)
-                from core.verification import ensure_verification_tables
-                ensure_verification_tables(conn)
-                from core.kpi import ensure_kpi_tables
-                ensure_kpi_tables(conn)
-                from core.executive import ensure_executive_tables
-                ensure_executive_tables(conn)
-                from core.evals import ensure_eval_tables
-                ensure_eval_tables(conn)
-                from core.host.types import ensure_host_permission_tables
-                ensure_host_permission_tables(conn)
                 from core.vault.vault import OriginBoundSecretVault
                 OriginBoundSecretVault().ensure_tables(conn)
+                conn.commit()
             except Exception:
-                pass
-            conn.commit()
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
 # Global Singleton Database Instance
 db = Database()

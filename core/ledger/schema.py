@@ -50,6 +50,8 @@ def ensure_ledger_tables(conn: Optional[Any] = None) -> None:
             sql_path = root_dir / "migrations" / "pg" / migration_file
             if sql_path.exists():
                 conn.execute(sql_path.read_text(encoding="utf-8"))
+                if hasattr(conn, "commit"):
+                    conn.commit()
         return
 
     with db.get_connection() as connection:
