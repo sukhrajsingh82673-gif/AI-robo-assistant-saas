@@ -253,7 +253,7 @@ jobs:
           "
 
       - name: Upload SBOM Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zonata-cyclonedx-sbom
           path: docs/cyclonedx_sbom.json
@@ -302,7 +302,7 @@ jobs:
           "
 
       - name: Upload Build Attestation Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: slsa-provenance-attestation
           path: slsa_provenance.json
