@@ -7,6 +7,7 @@ __pycache__/
 
 # Distribution / packaging
 build/
+!agent_factory/build/
 dist/
 *.egg-info/
 
@@ -18,6 +19,7 @@ htmlcov/
 
 # Local databases & run logs
 *.log
+storage/roboassistant.db
 storage/*.db-journal
 storage/*.db-wal
 storage/*.db-shm

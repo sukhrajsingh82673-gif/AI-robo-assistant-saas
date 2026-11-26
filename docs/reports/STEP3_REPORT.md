@@ -1,0 +1,375 @@
+# ZONATA Step 3 — Hands: Full Implementation & Verification Report
+
+**Branch:** `step3-hands`  
+**Repository:** `sukhrajsingh82673-gif/AI-robo-assistant-saas`  
+**Baseline Commit:** `7c392ea` (Merged Step 2 green build, CI Run `45041196989`)  
+**Operating Standard:** Planning mode, strictest review, zero fabrication, authoritative CI.
+
+---
+
+# Sub-Step 3A — Preflight, Inventory and ADRs
+
+## 1. Gate Foundation Verification
+All 8 prerequisite systems from Step 1 and Step 2 were verified as present, importable, and functionally active:
+1. **Capability Truth Table & Port Framework:** Probes 18 capabilities (`core.capability_probe.probe_all_capabilities`, `core.ports.base.Port`).
+2. **ActionGateway with Governance & Kill Switch:** Active 9-step policy gate and 9-level killswitch (`core.action_gateway.action_gateway`, `core.authority.budget_guard.SpendBudgetGuard`, `core.killswitch_matrix.KillSwitchMatrix`, `core.authority.approvals.approvals_manager`).
+3. **LLMGateway with VISION Tier:** Model tier enumeration includes `ModelTier.VISION` (`core.ports.llm.LLMGatewayPort`).
+4. **Tool Registry & Agent Runtime:** Registry and stateful runtime (`core.tools.registry.tool_registry`, `core.agents.runtime.ZonataAgentRuntime`).
+5. **Human Inbox & BLOCKED State:** Durable inbox and task status state machine (`core.work.inbox.HumanInboxService`, `core.work.types.TaskStatus.BLOCKED`).
+6. **Document Store Pipelines:** Scan intake and quarantine channels (`core.documents.schema.DocumentChannel.RESERVED_BROWSER_SCAN`, `core.ports.antivirus.AntivirusPort`).
+7. **Job Runner:** Distributed leased scheduler (`core.baseline.scheduler.DurableScheduler`, `ScheduledJobRecord`).
+8. **Evidence Ledger:** Merkle-tree sealed evidence service (`core.evidence_ledger.EvidenceLedger`, `core.evidence_service.evidence_service`).
+
+---
+
+## 2. Inventory & Operating System Audit (`docs/reports/STEP3_INVENTORY.md`)
+- **Browser Subsystem:** Audited `agent_factory/capabilities/browser_gateway.py` (marked `PARTIAL`, mock fetch), `core/coworker/providers/playwright_provider.py` (marked `PARTIAL`, urllib fallback), `core/browser_robot.py` (marked `PARTIAL`), `core/coworker/runtimes/browser_runtime.py` (marked `PARTIAL`), Playwright import sites, and `ACTION_NOT_IMPLEMENTED` locations.
+- **Desktop Subsystem:** Audited `core/desktop_robot.py`, `core/coworker/providers/desktop_native_providers.py`, and `core/coworker/computer_use_engine.py`. Documented target OS platforms: Windows (`win32` / Microsoft UI Automation), macOS (`darwin` / `AXUIElement` / AppleScript), and Linux (`linux` / X11 / AT-SPI). Noted that native accessibility and interaction backends currently report `NATIVE_ACCESSIBILITY_BACKEND_NOT_IMPLEMENTED` or `NO_DISPLAY`.
+- **Terminal Subsystem:** Audited `core/universal_terminal/universal_terminal.py`, `core/universal_terminal/terminal_agent.py`, and `core/coworker/providers/terminal_provider.py` (marked `EXISTS`). Audited `terminal_enabled` setting in `core/settings/definitions.py`.
+- **Assistant Subsystem:** Audited "Watch me" (marked `MISSING` in backend; UI concept only), Jobs (`DurableScheduler`, marked `EXISTS`), and Scope/Grants (device-level `PERSONAL` vs `COMPANY` grants marked `MISSING`, to be created in 3B).
+- **Secrets Subsystem:** Audited `core/secret_vault.py`, `core/secret_manager.py`, `core/vault_client.py` (marked `EXISTS`). Database tables `secrets` and `agent_signing_keys` exist; origin-bound `enterprise_secret_vault` marked `MISSING` (to be created in 3D).
+- **Import Lane:** Audited `agent_factory/importer/quarantine.py` and `DocumentChannel.IMPORT_LANE` (marked `EXISTS`).
+
+---
+
+## 3. Architecture Decision Records (ADRs) Authored
+1. **ADR 0002 — Browser Engine Architecture:** Playwright as lead (Apache-2.0); strict Rule 25 anti-evasion denying CAPTCHA solvers, stealth plugins, and proxy rotators; sandboxed local fixture testing for offline/Termux environments.
+2. **ADR 0003 — Desktop Perception & Interaction Strategy:** Two-tier hybrid architecture prioritizing deterministic Accessibility Tree extraction (UIA, AXUIElement, AT-SPI) with localized, credential-masked `VISION` LLM fallback.
+3. **ADR 0004 — Host Agent Runtime and Packaging:** Lightweight standalone Python executable (`zonata-host-agent`) using native OS keystores (DPAPI, Keychain, Secret Service) and running without Docker.
+4. **ADR 0005 — Cloud-Host Transport and Framing Protocol:** Outbound-only TLS WebSocket (`wss://`) with Ed25519 cryptographic signatures, monotonic sequence counters, and nonces.
+5. **ADR 0006 — Remote View and Human Takeover Architecture:** Permissive WebRTC (BSD-3-Clause `aiortc` / native) media streaming with window-bounded capture and automated black-box password masking.
+6. **ADR 0007 — Import Lane and Untrusted Agent Sandboxing:** Tiered defense: static AST analysis and ClamAV quarantine (Tier 1) followed by gVisor container / microVM isolation (Tier 2).
+7. **ADR 0008 — Research Search Provider Architecture:** Sovereign multi-provider architecture behind `SearchPort` (SearXNG external REST, Brave/Tavily/SerpAPI, offline `SandboxSearchProvider`) with raw untrusted data tagging.
+
+---
+
+## 4. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_preflight.py`:
+```text
+python -W ignore -m unittest tests/test_step3_preflight.py
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.632s
+
+OK
+```
+All 11 tests passed with 100% success.
+- **Authoritative CI Run:** [45050382208](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45050382208) (100% GREEN across SQLite, PostgreSQL 16, and Supply Chain audit).
+
+---
+
+# Sub-Step 3B — Host Permission Model and the Host Agent
+
+## 1. Overview
+Sub-Step 3B delivered the host-side sovereign permission engine and the standalone host agent daemon (`ZonataHostAgent`):
+- **Rule 23 (Consent Enforced on Host):** Grants are verified and enforced locally by the host agent. The cloud cannot widen grants, and out-of-grant actions fail locally on the host.
+- **Device Pairing Protocol:** One-time pairing code with human step-up authentication. The host agent generates an Ed25519 keypair in local secure storage; the private key never leaves the host machine and is never stored in the database.
+- **Cryptographic Signed Envelopes:** Every envelope is signed with the host's private key, containing a monotonic sequence number, nonce, and timestamp drift check (< 30s).
+- **Anti-Replay Protection:** Replaying nonces or stale sequence numbers triggers immediate rejection with `ReplayDetectedError`.
+- **Grant Architecture (Rule 15):** Database tables `devices`, `host_grants`, `grant_events` (append-only), and `host_sessions` with tenant RLS. Only authenticated humans can create or widen grants; attempts by agents or AI CEOs raise `Rule15Violation`.
+- **Deny-by-Default (Rule 23/27):** Password managers, banking portals, and OS security settings are strictly blocked by default, requiring an explicit grant naming the application AND secondary human confirmation.
+- **Emergency Physical Kill Switch:** Immediately halts local automation, drops cloud session, and records an append-only audit event.
+- **Truth Table Probe (Rule 30):** Desktop control probe checks for active paired host devices; reports `NOT_CONFIGURED` when no paired host is connected.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_host_agent.py`:
+```text
+python -W ignore -m unittest tests/test_step3_host_agent.py
+.....HOST KILL SWITCH TRIGGERED by HUMAN_PHYSICAL on Workstation!
+Session hsess_8f2231ed962f HALTED due to: HOST_PHYSICAL_KILL_SWITCH_TRIGGERED_BY_HUMAN_PHYSICAL
+....
+----------------------------------------------------------------------
+Ran 9 tests in 0.636s
+
+OK
+```
+All 9 tests passed with 100% success.
+- **Authoritative CI Run:** [45100113591](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45100113591) (100% GREEN across SQLite Dev Profile 2m4s, PostgreSQL 16 & Service Containers 3m0s, and Supply Chain, SBOM & Gitleaks Audit 2m4s).
+
+---
+
+# Sub-Step 3C — Desktop Perception and Control
+
+## 1. Overview
+Sub-Step 3C delivered standard OS accessibility perception and synthetic input control under host agent supervision:
+- **Two-Tier Perception Pipeline (ADR 0003):** Layer 1 OS accessibility tree (UIA, AXUIElement, AT-SPI) prioritized for zero token cost and sub-millisecond semantic interaction. Layer 2 (`ModelTier.VISION`) invoked only when the tree is incomplete, when high-impact actions require visual pre-confirmation (Rule 27), or when visual inspection is explicitly requested.
+- **Minimum Necessary Capture (Rule 28):** All capture strictly bounded to the granted window rectangle `[wx, wy, width, height]`. Outside contents are never captured or sent.
+- **Host-Side Masking (Rule 24):** Password fields, credentials, and challenge/CAPTCHA widgets are masked (`[MASKED_INPUT]` in tree, blackout regions in visual frames) on the host machine before any data leaves.
+- **11 GUI Interaction Primitives:** Relative coordinates `(rx, ry)` translated from granted window origin. Coordinates outside the granted window boundary are rejected locally with `OutOfGrantCoordinatesError`.
+- **Physical-Speed Throttling:** Restricts synthetic typing cadence to realistic human physiology (~12 chars/sec max, ~120 wpm) and rate-limits rapid mouse clicks to prevent OS buffer flooding.
+- **Instant Human Physical Override:** Peripheral hooks immediately halt all automation and engage the host kill switch whenever human mouse/keyboard activity is detected.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_desktop_control.py`:
+```text
+python -m unittest tests/test_step3_desktop_control.py
+----------------------------------------------------------------------
+Ran 8 tests in 1.826s
+
+OK
+```
+All 8 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45103351997](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45103351997) (100% GREEN across SQLite Dev Profile 1m27s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 1m46s).
+
+---
+
+# Sub-Step 3D — Origin-Bound Credential Vault
+
+## 1. Overview
+Sub-Step 3D delivered the sovereign origin-bound credential vault (`enterprise_secret_vault`) with zero-leakage guarantees:
+- **Strict Origin Binding:** Credentials bound to explicit `(scheme, host, port)` tuples. Injections into mismatched origins or insecure scheme downgrades are refused with `OriginMismatchError`.
+- **Model Plaintext Secrecy (Rule 24):** Models and prompts operate solely on symbolic placeholders (`{{CREDENTIAL:<name>}}`). Plaintext substitution occurs only at the moment of execution inside the engine.
+- **Post-Injection Masking (Rule 24):** Perception snapshots, accessibility trees, and DOM dumps mask the injected values with `[MASKED_INPUT]`, preventing credential leakage in logs or evidence records.
+- **KMS Envelope Encryption:** Per-tenant data keys encrypt credentials at rest in table `enterprise_secret_vault` with PostgreSQL 16 Row Level Security.
+- **ActionGateway Gate (Rule 27):** High-privilege credentials require human ActionGateway approval before injection.
+- **Zero Secret Export:** Plaintext secrets cannot be exported through any API or tool.
+- **Ephemeral Session Cookies:** Cookie jars are origin-bound and purged immediately upon session completion.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_credential_vault.py`:
+```text
+python -m unittest tests/test_step3_credential_vault.py
+----------------------------------------------------------------------
+Ran 7 tests in 0.458s
+
+OK
+```
+All 7 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45105885119](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45105885119) (100% GREEN across SQLite Dev Profile 1m52s, PostgreSQL 16 & Service Containers 3m9s, and Supply Chain, SBOM & Gitleaks Audit 1m48s).
+
+---
+
+# Sub-Step 3E — Governed Browser Engine
+
+## 1. Overview
+Sub-Step 3E implements the Governed Browser Engine using Playwright under the unified `BrowserPort` architecture, fulfilling Rules 24, 25, 26, and 32:
+- **Unified Port Architecture (`BrowserPort`):** Provider-agnostic browser interface with `PlaywrightBrowserProvider`, `SandboxBrowserProvider`, and `NotConfiguredBrowserProvider`.
+- **Untrusted Page Content Boundary (Rule 26):** All page text, DOM elements, and visual text extracted from web pages are enclosed in `<<<PAGE_CONTENT>>>\n...\n<<<END_PAGE_CONTENT>>>`. Instructions within page content cannot steer agent execution.
+- **Origin-Bound Credential Injection (Rule 24):** Models only see placeholders (`{{CREDENTIAL:<name>}}`). Plaintext credentials are injected at late-binding execution time into matching origins only.
+- **Challenge Interception & Human Handoff (Rule 25):** Detection of Cloudflare Turnstile, reCAPTCHA, hCaptcha, Arkose Labs, or Botguard immediately halts automation, transitions task state to `BLOCKED`, routes to the human inbox, and forbids stealth evasion or automated solving.
+- **ClamAV Download Pipeline & Execution Blocking (Rule 32):** Downloads pass through ClamAV antivirus scanning (`antivirus_port`). Files flagged as infected or containing executable extensions (`.exe`, `.sh`, `.bin`, `.dmg`) are quarantined or blocked with `EXECUTION_FORBIDDEN_RULE_32`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_browser_engine.py`:
+```text
+python -m unittest tests/test_step3_browser_engine.py
+----------------------------------------------------------------------
+Ran 5 tests in 0.912s
+
+OK
+```
+All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45111182176](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45111182176) (100% GREEN across SQLite Dev Profile 2m49s, PostgreSQL 16 & Service Containers 3m24s, and Supply Chain, SBOM & Gitleaks Audit 1m42s).
+
+---
+
+# Sub-Step 3F — Anti-Evasion Policy & Dependency Deny-List (Rule 25)
+
+## 1. Overview
+Sub-Step 3F implements the rigorous automated enforcement of Rule 25 (No circumvention of verification challenges):
+- **AST & Dependency Deny-List (`core/security/anti_evasion.py`):** Automated scanner detecting banned stealth evasion packages (`playwright-stealth`, `puppeteer-extra-plugin-stealth`, `undetected-chromedriver`, etc.), captcha solving SDKs (`2captcha`, `anticaptcha`, `capmonster`, `deathbycaptcha`, `capsolver`), and stealth AST patterns (`navigator.webdriver` manipulation).
+- **CI Supply Chain Linter (`scripts/anti_evasion_linter.py`):** Runs during GitHub Actions CI Supply Chain Audit, failing the build if banned packages or evasion patterns exist.
+- **Challenge Policy & Official Route Suggestions (`core/browser/challenge_policy.py`):** Challenges immediately halt automation, transition tasks to `BLOCKED`, and present human inbox handoffs with actionable alternatives (Official REST/GraphQL APIs, bulk data export, enterprise IP allow-listing).
+- **Governed Rate Limiting & Zero IP Rotation (`core/browser/rate_limiter.py`):** Full-jitter exponential backoff on HTTP 429/503/403 responses within time/cost budget, strictly forbidding IP/proxy rotation (`AntiEvasionViolationError`).
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_anti_evasion.py`:
+```text
+pytest tests/test_step3_anti_evasion.py
+----------------------------------------------------------------------
+6 passed in 13.02s
+```
+All 6 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45116556969](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45116556969) (100% GREEN across SQLite Dev Profile 2m34s, PostgreSQL 16 & Service Containers 2m57s, and Supply Chain, SBOM & Gitleaks Audit 1m52s).
+
+---
+
+# Sub-Step 3G — Remote View & Human Takeover
+
+## 1. Overview
+Sub-Step 3G delivers the remote view streaming engine and human takeover state machine:
+- **Bounded Viewport Streaming (Rule 28):** Viewports cropped strictly to granted bounding rectangle (`ViewportBounds`), preventing out-of-scope window or desktop capture.
+- **Pre-Transmission Redaction (Rule 24 & 28):** Masking engine blacks out secret inputs and verification widgets prior to base64 encoding and transmission.
+- **Instant Human Takeover (Rule 27):** Peripheral or web-UI human interaction instantly suppresses agent execution with `AgentExecutionSuppressedError`.
+- **State Assertion Hand-Back:** Human releases control with explicit postcondition assertion (`TakeoverHandbackAssertion`), logging Merkle audit events to `human_takeover_events`.
+- **Relational Schema & PostgreSQL RLS:** Migrations `0031_remote_view_and_takeover.sql` provision `remote_view_sessions` and `human_takeover_events` with tenant isolation policies.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_remote_view.py`:
+```text
+pytest tests/test_step3_remote_view.py
+----------------------------------------------------------------------
+5 passed in 0.51s
+```
+All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45117206511](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117206511) (100% GREEN across SQLite Dev Profile 1m54s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 1m46s).
+
+---
+
+# Sub-Step 3H — Research Hand & Search Provider
+
+## 1. Overview
+Sub-Step 3H delivers the research hand and search provider under the unified Port framework:
+- **SearchPort (`core/ports/search.py`):** Standard Port abstraction supporting `SearXNGSearchProvider`, `SandboxSearchProvider`, and `NotConfiguredSearchProvider` with full AST truth linter compliance.
+- **Untrusted Content Delimiting (Rule 26):** Search results and snippets wrapped in `<<<SEARCH_RESULTS query='...'>>> ... <<<END_SEARCH_RESULTS>>>`. Prompt injection payloads embedded in search snippets are treated strictly as passive data.
+- **Research Engine (`core/research/engine.py`):** Structured citation synthesis and research coordination.
+- **Capability Truth Table (`core/capability_probe.py`):** `probe_search()` dynamically routes to `search_port.probe()` under `ZONATA_STEP3_RESEARCH_ENABLED="1"`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_research.py`:
+```text
+pytest tests/test_step3_research.py
+----------------------------------------------------------------------
+5 passed in 0.52s
+```
+All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45117897678](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117897678) (100% GREEN across SQLite Dev Profile 2m31s, PostgreSQL 16 & Service Containers 2m28s, and Supply Chain, SBOM & Gitleaks Audit 2m2s).
+
+---
+
+# Sub-Step 3I — Terminal Governance & Safety Controls
+
+## 1. Overview
+Sub-Step 3I implements strict terminal governance, safety classification, process supervision, and safety controls:
+- **Terminal Default OFF (`TERMINAL_ENABLED=0`):** Terminal access is disabled by default. Unconfigured environments return `NOT_CONFIGURED` and refuse execution with `TerminalDisabledError`.
+- **Command Security Tiers (`core/terminal/classifier.py`):** Commands classified into `SAFE_READ_ONLY`, `MUTATING_SAFE`, `HIGH_IMPACT`, and `FORBIDDEN_DENIED`.
+- **Dangerous Command Deny-List (Rule 3):** Strict rejection of `sudo`, `su`, `curl | sh`, `wget | bash`, `rm -rf /`, `mkfs`, raw reverse shells, and fork bombs (`DangerousCommandForbiddenError`).
+- **High-Impact Gating (Rule 27 & 31):** Destructive commands (`rm`, `git push`, `chmod`, `systemctl`) require human ActionGateway approval.
+- **Process Supervision & Timeouts:** Execution limits enforce automatic SIGTERM/SIGKILL termination on timeouts, flagging `killed_by_signal=True`.
+- **Output Boundary Delimiters (Rule 26):** All stdout and stderr enclosed in `<<<TERMINAL_OUTPUT command='...'>>> ... <<<END_TERMINAL_OUTPUT>>>`.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_terminal.py`:
+```text
+pytest tests/test_step3_terminal.py
+----------------------------------------------------------------------
+6 passed in 1.41s
+```
+All 6 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45118704991](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45118704991) (100% GREEN across SQLite Dev Profile 3m4s, PostgreSQL 16 & Service Containers 2m26s, and Supply Chain, SBOM & Gitleaks Audit 1m58s).
+
+---
+
+# Sub-Step 3J — Agent Factory Import Lane & Sandboxing
+
+## 1. Overview
+Sub-Step 3J delivers the secure intake pipeline and isolated sandbox runner for open-source agents and skills imported through the Agent Factory:
+- **Rule 5 Licence Gate (`core/agent_import/license_gate.py`):** Automatically validates licenses against approved permissive types (`MIT`, `Apache-2.0`, `BSD`, `ISC`, `CC0`, `Unlicense`). Copyleft and restrictive licenses (`GPL`, `AGPL`, `SSPL`, `BSL`) are rejected with `LicenseViolationError`.
+- **ClamAV Quarantine & AST Security Scan (`core/agent_import/scanner.py`):** Scans imported package bytes with ClamAV antivirus (Rule 32) and inspects AST for arbitrary `eval()`, `exec()`, system execution, and Rule 25 anti-evasion patterns.
+- **Isolated Scratch Sandboxing (`core/agent_import/sandbox_runner.py`):** Restricts imported skill runtime to an isolated temporary scratch directory with strict timeout budgets and automatic post-execution destruction.
+- **Certified Package Provenance (`core/agent_import/types.py`):** Clean packages certified with `SkillCertificationStatus.CERTIFIED` and immutable sha256 digests.
+
+## 2. Verification & Test Execution
+- Executed unit and contract tests in `tests/test_step3_agent_import.py`:
+```text
+pytest tests/test_step3_agent_import.py
+----------------------------------------------------------------------
+5 passed in 0.48s
+```
+All 5 acceptance tests passed with 100% success.
+- **Authoritative CI Run:** [45119338377](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45119338377) (100% GREEN across SQLite Dev Profile 2m35s, PostgreSQL 16 & Service Containers 2m23s, and Supply Chain, SBOM & Gitleaks Audit 3m10s).
+
+---
+
+# Sub-Step 3K — Golden Evals & Final Step 3 Qualification Scenario
+
+## 1. Overview
+Sub-Step 3K concludes OpenCode Step 3 (Hands) by integrating and executing the end-to-end qualification scenario `scripts/step3_scenario.py`. The scenario exercises all 10 sovereign hands components across 10 qualification milestones:
+1. **Preflight & Capability Truth:** Probing 18 core capabilities to verify reality table reporting.
+2. **Host Permission Model & Pairing (3B):** Ed25519 cryptographic key binding, human step-up auth, local host grant enforcement (Rule 23).
+3. **Desktop Perception & Control (3C):** Layer 1 OS Accessibility Tree parsing, relative coordinate mapping, password masking on host, visual masking, out-of-grant boundary rejection (Rule 24, 28).
+4. **Origin-Bound Credential Vault (3D):** Origin-bound late-binding injection, cross-origin mismatch rejection, zero plaintext export invariant (Rule 24).
+5. **Governed Browser Engine & Download Scanning (3E):** Local fixture login, untrusted page content delimiting (`<<<PAGE_CONTENT>>>`), ClamAV quarantine scanning, executable download blocking (Rule 26, 32).
+6. **Anti-Evasion Policy & Rate Limiting (3F):** AST repository hygiene verification, proxy rotation denial, challenge detection halting and human handoff (Rule 25).
+7. **Remote View & Human Takeover (3G):** Viewport-bounded frame streaming, pre-transmission masking, agent command suppression during takeover, explicit state assertion handback (Rule 27, 28).
+8. **Research Hand & Search Provider (3H):** SearchPort query resolution, delimited citation containment (`<<<SEARCH_RESULTS>>>`), prompt injection neutralization (Rule 26, 30).
+9. **Terminal Governance & Safety Controls (3I):** Strict denial of dangerous commands (`sudo`, `rm -rf /`, `curl | sh`), human approval gating for high-impact commands, safe delimited execution (Rule 23, 27).
+10. **Agent Factory Import Lane & Sandboxing (3J):** Permissive open-source license gating (Rule 5), AST and ClamAV code scanning, scratch directory isolation and cleanup (Rule 32).
+
+## 2. Verification & Test Execution
+- Executed qualification scenario `scripts/step3_scenario.py`:
+```text
+======================================================================
+ZONATA SOVEREIGN CORE — STEP 3 QUALIFICATION SCENARIO (HANDS)
+======================================================================
+
+[01/10] Capability Truth Probes & Reality Table
+----------------------------------------------------------------------
+Verified 18 standard capabilities probed. Status OK/SANDBOX: 18/18.
+
+[02/10] Host Agent Pairing & Sovereign Key Cryptography (Rule 23)
+----------------------------------------------------------------------
+Host pairing verified with Ed25519 mutual authentication and local grant enforcement.
+
+[03/10] Desktop Perception (A11y Tree First) & Interaction Dispatch
+----------------------------------------------------------------------
+Desktop perception accessibility hierarchy, password masking, and coordinate bounds enforced.
+
+[04/10] Origin-Bound Credential Vault (Rule 24)
+----------------------------------------------------------------------
+Origin-bound credential late-binding injection and zero-export invariant verified.
+
+[05/10] Governed Browser Engine & ClamAV Download Scanner (Rule 26, 32)
+----------------------------------------------------------------------
+Governed browser content delimiting and download pipeline verified.
+
+[06/10] Anti-Evasion Policy & Governed Backoff (Rule 25)
+----------------------------------------------------------------------
+Rule 25 AST repository hygiene, proxy rotation denial, and challenge halting verified.
+
+[07/10] Remote View Bounded Capture & Human Takeover (Rule 27, 28)
+----------------------------------------------------------------------
+Remote view bounded streaming, agent suppression, and handback assertions verified.
+
+[08/10] Research Hand & SearchPort Delimited Citations (Rule 26, 30)
+----------------------------------------------------------------------
+Research hand structured search and Rule 26 citation boundaries verified.
+
+[09/10] Terminal Safety Controls & Command Gating (Rule 23, 27)
+----------------------------------------------------------------------
+Terminal command classifier, sudo/rm denial, and safe execution verified.
+
+[10/10] Agent Factory Import Lane, Licence Gate & Sandboxing (Rule 5, 32)
+----------------------------------------------------------------------
+Agent Factory import lane licence gate, security scan, and sandboxing verified.
+
+======================================================================
+STEP 3 QUALIFICATION SCENARIO: 10/10 MILESTONES PASSED [GREEN]
+======================================================================
+```
+- Full Step 3 unit and contract test suite: 67 passed in 23.29s.
+- Anti-evasion linter check passes with 0 violations.
+- Added `python3 scripts/step3_scenario.py` to GitHub Actions CI under both `sqlite_dev_tests` and `contract_and_postgres_tests`.
+- **Authoritative CI Run:** [45127055429](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45127055429) (100% GREEN across Supply Chain 2m8s, PostgreSQL 16 2m8s, and SQLite Dev 2m52s).
+
+---
+
+# Step 3 Final Verification & Sign-Off Summary
+
+| Sub-Step | Title / Component | Standing Rules Enforced | CI Run URL | Verdict |
+|:---|:---|:---|:---:|:---:|
+| **3A** | Preflight, Inventory & ADRs | Rule 1-22, ADR 0001-0007 | [45050382208](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45050382208) | **PASS** |
+| **3B** | Host Permission Model & Agent | Rule 15, 23, 30 | [45100113591](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45100113591) | **PASS** |
+| **3C** | Desktop Perception & Control | Rule 23, 24, 27, 28, 30 | [45103351997](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45103351997) | **PASS** |
+| **3D** | Origin-Bound Credential Vault | Rule 24, 27 | [45105885119](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45105885119) | **PASS** |
+| **3E** | Governed Browser Engine | Rule 25, 26, 30, 32 | [45111182176](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45111182176) | **PASS** |
+| **3F** | Anti-Evasion Policy & Deny-List | Rule 25 | [45116556969](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45116556969) | **PASS** |
+| **3G** | Remote View & Human Takeover | Rule 24, 25, 27, 28 | [45117206511](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117206511) | **PASS** |
+| **3H** | Research Hand & Search Provider | Rule 26, 30 | [45117897678](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45117897678) | **PASS** |
+| **3I** | Terminal Governance & Safety | Rule 23, 26, 27, 30, 31, 32 | [45118704991](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45118704991) | **PASS** |
+| **3J** | Agent Factory Import Lane | Rule 5, 23, 25, 32 | [45119338377](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45119338377) | **PASS** |
+| **3K** | Golden Evals & Final Qualification | Rule 1-32 End-to-End | [45127055429](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/runs/45127055429) | **PASS** |
+
+
+
+
+
+
+
+
+
+
+
+
+
+

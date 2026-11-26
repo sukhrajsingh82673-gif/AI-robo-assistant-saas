@@ -143,6 +143,42 @@ class SettingsV2API:
                 "registry": self.service.registry_catalog(principal, section=section),
             }
 
+        if subpath == "capabilities":
+            from core.capability_probe import probe_all_capabilities, summarize_capabilities
+            probe_results = probe_all_capabilities()
+            summary = summarize_capabilities(probe_results)
+
+            plain_language_map = {
+                "OK": "live",
+                "ACCEPTED_BY_PROVIDER": "live",
+                "SANDBOX": "test only",
+                "NOT_CONFIGURED": "not connected",
+                "DEGRADED": "degraded",
+                "NOT_IMPLEMENTED": "not implemented",
+                "FAILED": "failed",
+            }
+
+            capabilities_list = []
+            for cap_name, res in sorted(probe_results.items()):
+                st = res.status.value if hasattr(res.status, "value") else str(res.status)
+                plain_lbl = plain_language_map.get(st, st.lower())
+                capabilities_list.append({
+                    "capability": cap_name,
+                    "status": st,
+                    "plain_language": plain_lbl,
+                    "provider": res.provider,
+                    "provider_ref": res.provider_ref,
+                    "sandbox": res.sandbox,
+                    "latency_ms": round(res.latency_ms, 3),
+                    "cost": res.cost,
+                    "error": res.error,
+                })
+            return 200, {
+                "success": True,
+                "summary": summary,
+                "capabilities": capabilities_list
+            }
+
         if subpath == "effective":
             key = _first(query, "key")
             if not key:

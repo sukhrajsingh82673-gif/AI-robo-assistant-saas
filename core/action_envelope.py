@@ -55,6 +55,14 @@ class ActionEnvelope:
     created_at: float
     expires_at: float
     parameters: Optional[Dict[str, Any]] = None
+    action_class: str = "READ_INTERNAL"
+    principal_type: str = "AGENT"
+    principal_id: Optional[str] = None
+    principal_grade: Optional[str] = None
+    spend_amount_minor_units: int = 0
+    target_principal_type: Optional[str] = None
+    target_principal_id: Optional[str] = None
+    is_autonomous: bool = False
 
     @classmethod
     def create(
@@ -76,7 +84,15 @@ class ActionEnvelope:
         idempotency_key: Optional[str] = None,
         ttl_seconds: float = 300.0,
         parent_action_id: Optional[str] = None,
-        causality_id: Optional[str] = None
+        causality_id: Optional[str] = None,
+        action_class: Optional[str] = None,
+        principal_type: str = "AGENT",
+        principal_id: Optional[str] = None,
+        principal_grade: Optional[str] = None,
+        spend_amount_minor_units: int = 0,
+        target_principal_type: Optional[str] = None,
+        target_principal_id: Optional[str] = None,
+        is_autonomous: bool = False,
     ) -> 'ActionEnvelope':
         now = time.time()
         canonical_params = json.dumps(parameters, sort_keys=True)
@@ -85,6 +101,31 @@ class ActionEnvelope:
         contract_id = authorization_contract_id or f"auth_contract_{uuid.uuid4().hex[:12]}"
         idemp = idempotency_key or f"idemp_{param_hash[:16]}"
         caus = causality_id or f"caus_{uuid.uuid4().hex[:16]}"
+
+        # Infer action class if not explicitly provided
+        resolved_action_class = action_class
+        if not resolved_action_class:
+            cap_lower = capability_id.lower()
+            if any(w in cap_lower for w in ["spend", "payment", "payout", "charge", "refund"]):
+                resolved_action_class = "COMMIT_SPEND"
+            elif any(w in cap_lower for w in ["ledger", "journal"]):
+                resolved_action_class = "POST_LEDGER"
+            elif any(w in cap_lower for w in ["document.create", "document.upload"]):
+                resolved_action_class = "CREATE_DOCUMENT"
+            elif any(w in cap_lower for w in ["email.send", "message.send", "slack.post"]):
+                resolved_action_class = "SEND_EXTERNAL_MESSAGE"
+            elif any(w in cap_lower for w in ["hire", "provision"]):
+                resolved_action_class = "PROVISION_AGENT_OR_HIRE"
+            elif any(w in cap_lower for w in ["permission", "grant"]):
+                resolved_action_class = "CHANGE_PERMISSION"
+            elif any(w in cap_lower for w in ["delete", "purge"]):
+                resolved_action_class = "DELETE_DATA"
+            elif any(w in cap_lower for w in ["legal", "contract.sign"]):
+                resolved_action_class = "LEGAL_COMMITMENT"
+            elif any(w in cap_lower for w in ["write", "update"]):
+                resolved_action_class = "WRITE_INTERNAL"
+            else:
+                resolved_action_class = "READ_INTERNAL"
 
         return cls(
             action_id=action_id,
@@ -108,7 +149,15 @@ class ActionEnvelope:
             causality_id=caus,
             created_at=now,
             expires_at=now + ttl_seconds,
-            parameters=parameters
+            parameters=parameters,
+            action_class=resolved_action_class,
+            principal_type=principal_type,
+            principal_id=principal_id or agent_id,
+            principal_grade=principal_grade,
+            spend_amount_minor_units=spend_amount_minor_units,
+            target_principal_type=target_principal_type,
+            target_principal_id=target_principal_id,
+            is_autonomous=is_autonomous,
         )
 
     def is_expired(self) -> bool:

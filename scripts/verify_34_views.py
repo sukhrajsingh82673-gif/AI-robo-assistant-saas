@@ -433,7 +433,8 @@ for v in views:
     audit_results.append(record)
     print(f"[{v['id']:02d}/34] {v['name']} ({method} {endpoint}): {status} (HTTP {status_code}, {dt:.0f}ms)")
 
-with open("/root/roboassistant/scripts/views_verification_results.json", "w") as fp:
+out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "views_verification_results.json")
+with open(out_path, "w") as fp:
     json.dump(audit_results, fp, indent=2)
 
 passed = [r for r in audit_results if r["status"] in ("PASS — VERIFIED", "PASS WITH LIMITATIONS")]

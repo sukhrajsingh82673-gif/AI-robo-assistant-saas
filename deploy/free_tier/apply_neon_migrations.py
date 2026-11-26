@@ -16,9 +16,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.insert(0, PROJECT_ROOT)
 
 # Add Termux site-packages if present
-termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
-if os.path.exists(termux_site) and termux_site not in sys.path:
-    sys.path.insert(0, termux_site)
+_prefix = os.environ.get("PREFIX")
+if _prefix:
+    _termux_site = os.path.join(_prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+    if os.path.exists(_termux_site) and _termux_site not in sys.path:
+        sys.path.insert(0, _termux_site)
 
 from core.db import db, sanitize_db_url
 from core.controlled_migration_engine import ControlledMigrationEngine

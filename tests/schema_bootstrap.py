@@ -91,6 +91,56 @@ def init_all_subsystem_schemas():
         ApprovalRevocationEngine("tnt_bootstrap")._ensure_table()
     except Exception:
         pass
+    try:
+        from core.llm import ensure_model_gateway_tables
+        ensure_model_gateway_tables()
+    except Exception:
+        pass
+    try:
+        from core.authority import ensure_authority_tables
+        ensure_authority_tables()
+    except Exception:
+        pass
+    try:
+        from core.organization import ensure_organization_tables
+        ensure_organization_tables()
+    except Exception:
+        pass
+    try:
+        from core.agents import ensure_agent_runtime_tables
+        ensure_agent_runtime_tables()
+    except Exception:
+        pass
+    try:
+        from core.work import ensure_work_kernel_tables
+        ensure_work_kernel_tables()
+    except Exception:
+        pass
+    try:
+        from core.sop import ensure_sop_tables
+        ensure_sop_tables()
+    except Exception:
+        pass
+    try:
+        from core.verification import ensure_verification_tables
+        ensure_verification_tables()
+    except Exception:
+        pass
+    try:
+        from core.kpi import ensure_kpi_tables
+        ensure_kpi_tables()
+    except Exception:
+        pass
+    try:
+        from core.executive import ensure_executive_tables
+        ensure_executive_tables()
+    except Exception:
+        pass
+    try:
+        from core.evals import ensure_eval_tables
+        ensure_eval_tables()
+    except Exception:
+        pass
 
 
 def seed_baseline_tenant_scope():

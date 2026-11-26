@@ -1,0 +1,180 @@
+department: sales
+tasks:
+  - id: sales_001
+    name: "Enterprise Inbound Lead Qualification and ICP Matching"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_sales_inbound_leads"
+      data:
+        company_name: "Apex FinTech Corp"
+        employee_count: 850
+        annual_revenue_usd: 120000000
+        industry: "Financial Services"
+        budget_confirmed: true
+    task: "Score inbound prospect against Ideal Customer Profile (ICP) criteria and route to enterprise account executive."
+    acceptance_criteria:
+      - "icp_scored"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_002
+    name: "Contract Quote Discount Authorization Limit Check"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_sales_quotes"
+      data:
+        quote_id: "Q-8829"
+        discount_percent: 15.0
+        max_authorized_percent: 20.0
+        deal_size_minor_units: 5000000
+    task: "Verify that requested sales quote discount is within sales manager authority matrix G2."
+    acceptance_criteria:
+      - "discount_authorized"
+    scoring:
+      required_fields:
+        - "status"
+        - "authorized"
+
+  - id: sales_003
+    name: "Pipeline Stage Advancement Milestone Verification"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_crm_deals"
+      data:
+        deal_id: "DEAL-309"
+        current_stage: "PROPOSAL"
+        next_stage: "NEGOTIATION"
+        security_review_completed: true
+        economic_buyer_identified: true
+    task: "Verify that all mandatory exit criteria are satisfied before advancing CRM opportunity stage."
+    acceptance_criteria:
+      - "stage_advancement_verified"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_004
+    name: "Sales Commission Tier Calculation"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_sales_compensation"
+      data:
+        rep_id: "REP-102"
+        deal_size_minor_units: 10000000
+        commission_tier: "STANDARD_10_PERCENT"
+    task: "Calculate exact commission earned in minor units according to sales plan."
+    acceptance_criteria:
+      - "commission_calculated"
+    scoring:
+      required_fields:
+        - "commission_minor_units"
+        - "status"
+
+  - id: sales_005
+    name: "Subscription Renewal Notice Trigger"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_contracts_subscriptions"
+      data:
+        contract_id: "SUB-8819"
+        days_until_expiration: 60
+        auto_renew: true
+        arr_minor_units: 2400000
+    task: "Trigger 60-day enterprise renewal outreach notice for customer success team."
+    acceptance_criteria:
+      - "renewal_triggered"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_006
+    name: "Competitive Battlecard Positioning Retrieval"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_sales_enablement"
+      data:
+        competitor_name: "LegacyCloudSuite"
+        deal_context: "On-premises compliance requirements"
+    task: "Retrieve competitive positioning points addressing data sovereignty and multi-tenant RLS."
+    acceptance_criteria:
+      - "battlecard_retrieved"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_007
+    name: "Customer Churn Risk Scoring"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_customer_health"
+      data:
+        account_id: "ACC-552"
+        login_drop_percent: 45.0
+        support_tickets_count: 12
+        sentiment_score: "NEGATIVE"
+    task: "Analyze customer telemetry trends and flag high risk of churn for account director."
+    acceptance_criteria:
+      - "churn_risk_flagged"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_008
+    name: "SDR Outbound Email Sequence Cadence Check"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_outbound_campaigns"
+      data:
+        sequence_step: 3
+        days_since_last_touch: 4
+        unsubscribed: false
+    task: "Verify that prospect sequence interval meets anti-spam cadence standards."
+    acceptance_criteria:
+      - "cadence_validated"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_009
+    name: "Master Services Agreement (MSA) Legal Terms Compliance"
+    tier: "PLANNER"
+    input:
+      folios:
+        - "folio_sales_legal_msa"
+      data:
+        payment_terms: "NET_30"
+        governing_law: "Delaware"
+        liability_cap_months: 12
+        ip_ownership: "COMPANY_RETAINED"
+    task: "Audit customer redline contract against corporate standard sales contracting guidelines."
+    acceptance_criteria:
+      - "legal_terms_audited"
+    scoring:
+      required_fields:
+        - "status"
+
+  - id: sales_010
+    name: "Expansion Cross-Sell Opportunity Identification"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_account_telemetry"
+      data:
+        current_seat_count: 98
+        licensed_seats: 100
+        storage_utilized_percent: 88.5
+    task: "Identify seat capacity threshold breach and generate account expansion proposal."
+    acceptance_criteria:
+      - "expansion_identified"
+    scoring:
+      required_fields:
+        - "status"

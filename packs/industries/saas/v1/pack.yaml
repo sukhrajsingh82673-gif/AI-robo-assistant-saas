@@ -1,0 +1,86 @@
+schema_version: "zonata.industry-pack/v1"
+metadata:
+  pack_id: "saas_enterprise"
+  name: "B2B SaaS & Cloud Platforms"
+  version: "1.0.0"
+  description: "Enterprise operating pack for subscription software and recurring revenue businesses"
+  author: "ZONATA Systems Foundation"
+  industry_code: "J62"  # Computer programming, consultancy and related activities
+
+document_templates:
+  - template_id: "tpl_saas_msa"
+    name: "Master Services Agreement (MSA)"
+    type: "legal_contract"
+    default_sensitivity: "RESTRICTED"
+    default_retention_days: 2555
+    schema:
+      customer_legal_name: "string"
+      annual_contract_value: "integer"
+      governing_jurisdiction: "string"
+  - template_id: "tpl_saas_sla"
+    name: "Service Level Agreement (SLA)"
+    type: "sla"
+    default_sensitivity: "CONFIDENTIAL"
+    default_retention_days: 1095
+    schema:
+      uptime_sla_percentage: "number"
+
+chart_of_accounts:
+  - code: "1010"
+    name: "Operating Cash & Treasury"
+    type: "ASSET"
+    currency: "USD"
+  - code: "1200"
+    name: "Accounts Receivable - Subscriptions"
+    type: "ASSET"
+    currency: "USD"
+  - code: "2010"
+    name: "Accounts Payable - Infrastructure & Vendors"
+    type: "LIABILITY"
+    currency: "USD"
+  - code: "2200"
+    name: "Deferred Subscription Revenue"
+    type: "LIABILITY"
+    currency: "USD"
+  - code: "3010"
+    name: "Common Stock & Paid-In Capital"
+    type: "EQUITY"
+    currency: "USD"
+  - code: "4010"
+    name: "ARR SaaS Subscription Revenue"
+    type: "REVENUE"
+    currency: "USD"
+  - code: "5010"
+    name: "Cloud Hosting & Datacenter Infrastructure (COGS)"
+    type: "EXPENSE"
+    currency: "USD"
+  - code: "5020"
+    name: "Engineering & Product R&D"
+    type: "EXPENSE"
+    currency: "USD"
+
+folio_types:
+  - folio_type: "customer_onboarding"
+    name: "Enterprise Customer Onboarding Folio"
+    description: "Governs enterprise customer contract execution, SOC2 vetting, and tenant provisioning"
+    required_documents: ["tpl_saas_msa"]
+    optional_documents: ["tpl_saas_sla"]
+    required_tasks: ["security_questionnaire", "tenant_provisioning", "payment_method_verified"]
+
+workflows:
+  - workflow_id: "wf_saas_subscription_billing"
+    name: "Monthly Subscription Billing & Revenue Recognition"
+    triggers: ["billing_period_end", "manual_audit"]
+    steps:
+      - step_id: "meter_usage"
+        action: "aggregate_usage_events"
+      - step_id: "post_revenue"
+        action: "post_journal_entry"
+        debit_account: "1200"
+        credit_account: "4010"
+
+compliance_rules:
+  - rule_id: "cmp_soc2_access_review"
+    name: "Quarterly SOC 2 Production Access Review"
+    frequency_days: 90
+    required_approvers: ["ciso", "vp_engineering"]

@@ -102,6 +102,15 @@ class CEOWorkforceController:
         decision_id = f"dec_{uuid.uuid4().hex[:12]}"
         mission_id = f"miss_{uuid.uuid4().hex[:8]}"
 
+        # OpenCode Step 1C: Read truth table before promising or scheduling any mission
+        from agent_factory.control.planner import check_required_capabilities
+        canonical_caps = [
+            rc.lower() for rc in required_capabilities
+            if rc.lower() in ("browser", "web_scrape", "scrape", "desktop_control", "antivirus", "ocr", "email_out", "storage")
+        ]
+        if canonical_caps:
+            check_required_capabilities(canonical_caps)
+
         # 1. Discover Active Template Employees in Company
         existing_employees = ai_employee_registry.list_employees(tenant_id, company_id)
         matching_active_emps = []
@@ -259,6 +268,23 @@ class CEOWorkforceController:
         """
         cmd_lower = command.lower()
 
+        # OpenCode Step 1C: Check capability truth table on scrape / browser commands
+        if any(w in cmd_lower for w in ["scrape", "scraping", "browser", "crawl", "webpage", "web scrape"]):
+            from agent_factory.control.planner import check_required_capabilities, CapabilityUnavailableError
+            try:
+                check_required_capabilities(["browser"])
+            except CapabilityUnavailableError as exc:
+                return {
+                    "action": "MISSION_REFUSED",
+                    "status": "REFUSED",
+                    "reason": exc.reason,
+                    "capability": exc.capability,
+                    "configured_alternatives": exc.alternatives,
+                    "manual_fallback": exc.manual_fallback,
+                    "message": str(exc),
+                    "looping": False
+                }
+
         # 1. Pause / Suspend Employee Command
         if "pause" in cmd_lower or "suspend" in cmd_lower:
             words = command.split()
@@ -324,5 +350,8 @@ class CEOWorkforceController:
             "command": command,
             "status": "LOGGED_IN_AUDIT"
         }
+
+    # Alias for conversational command dispatch
+    handle_chat_command = execute_natural_language_command
 
 ceo_workforce_controller = CEOWorkforceController()

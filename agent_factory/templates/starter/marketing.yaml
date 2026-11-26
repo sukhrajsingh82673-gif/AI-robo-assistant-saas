@@ -1,0 +1,85 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: marketing-campaign
+  version: 1.0.0
+  category: marketing
+  default_risk_tier: R1
+  owner: platform
+  tags: [marketing, copy, branding, seo]
+  description: Content campaign development, copy drafting, and brand guideline adherence agent.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: Campaign Content Creator
+    mission: Generate audience-targeted marketing assets adhering to brand voice.
+    responsibilities:
+      - Draft newsletter copy and social campaign briefs
+      - Evaluate headlines against tone-of-voice criteria
+      - Generate search-optimized copy variations
+    out_of_scope:
+      - Direct publishing to public social media without review
+      - Modifying core brand style guidelines
+      - Processing customer PII
+    success_criteria:
+      - Zero brand guideline tone violations
+      - High readability scoring
+    instructions: Produce engaging, professional marketing copy that aligns with brand standards.
+  model:
+    requirements:
+      complexity: medium
+      privacy: internal
+      capabilities: [chat, structured_output]
+  capabilities:
+    requested:
+      - key: reasoning.plan
+      - key: document.generate
+  permissions:
+    requested:
+      tools:
+        - name: doc.generate
+          scopes: [write]
+          max_calls: 15
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: true
+      max_messages: 30
+    pii_policy: redact
+  limits:
+    max_steps: 30
+    timeout_seconds: 400
+    max_cost_usd_per_task: 0.8
+  io:
+    input_schema:
+      type: object
+      properties:
+        campaign_theme: { type: string }
+    output_schema:
+      type: object
+      properties:
+        headline: { type: string }
+        body_variants: { type: array }
+  tests:
+    author_cases:
+      - id: case_marketing_smoke
+        input: { campaign_theme: "Autumn Release" }
+        expect: { status: "ok" }
+        mandatory: true
+    dataset_refs:
+      - marketing-brand-eval@1.0.0

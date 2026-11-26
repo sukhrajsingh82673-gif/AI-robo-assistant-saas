@@ -1,0 +1,39 @@
+region: india
+version: "1.0.0"
+name: "India Sovereign Enterprise Pack"
+jurisdiction: "Republic of India"
+currency: "INR"
+currency_symbol: "₹"
+
+taxation:
+  framework: "GST"
+  standard_rates:
+    goods: 0.18
+    services: 0.18
+    exempt: 0.00
+    reduced: 0.05
+  rules:
+    intra_state:
+      cgst_percent: 9.0
+      sgst_percent: 9.0
+    inter_state:
+      igst_percent: 18.0
+  mandatory_identifiers:
+    - "GSTIN"
+    - "PAN"
+
+compliance:
+  privacy_law: "DPDP_2023" # Digital Personal Data Protection Act 2023
+  dpdp_mandates:
+    consent_required: true
+    purpose_limitation: true
+    data_fiduciary_registration: true
+    retention_period_days: 730
+    prohibited_processing:
+      - "unauthorized_child_behavior_tracking"
+      - "unconsented_profiling"
+
+localization:
+  date_format: "DD/MM/YYYY"
+  financial_year_start: "01-04"
+  financial_year_end: "31-03"

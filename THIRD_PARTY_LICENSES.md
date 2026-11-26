@@ -8,66 +8,61 @@ The ZONATA Universal AI Co-Worker Fabric integrates open-source execution engine
 > **Sovereign Authority Invariant**:
 > External open-source components are **execution providers only**. Under no circumstances does an open-source library, runtime, agent framework, or external protocol obtain sovereign authority over ZONATA. All executions remain subordinate to the **Company Kernel**, **PolicyEngine**, **ApprovalEngine**, **AuthorityGateway**, **CredentialAuthority**, and **EvidenceLedger**.
 
-Every external dependency is audited, quarantined in sandboxes, cryptographically bounded by HMAC execution leases, and restricted from unauthorized credential access.
+Every external dependency is audited, quarantined in sandboxes, cryptographically bounded by execution leases, and restricted from unauthorized credential access.
 
 ---
 
-## 2. Integrated Open-Source Projects Inventory
+## 2. Integrated Open-Source Runtime Dependencies (Actually Installed)
 
-| Project | Upstream Repository | License (SPDX) | Integration Version | Tracked Commit | Upstream Activity | Confinement Profile |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Crawlee** | `https://github.com/apify/crawlee-python` | Apache-2.0 | `v0.4.2` | `d7f19a2` | Active (weekly releases) | Sandboxed HTTP Client, Token Bucket |
-| **Playwright** | `https://github.com/microsoft/playwright-python` | Apache-2.0 | `v1.44.0` | `b3e811c` | Active (bi-weekly releases) | Remote Worker Node, Ephemeral Context |
-| **OpenClaw** | `https://github.com/openclaw/openclaw` | MIT | `v1.0.0` | `8f3b2a1` | Active (monthly releases) | Headless Tokenizer, No Display |
-| **Agent-S** | `https://github.com/simular-ai/Agent-S` | Apache-2.0 | `v0.2.1` | `24c8b3a` | Active (OSWorld Research) | Visual CUA, Supervised Human Takeover |
-| **UI-TARS** | `https://github.com/bytedance/UI-TARS` | Apache-2.0 | `v1.0.0` | `3a1f8c4` | Active (ByteDance Seed) | VLM Grounding Only, Read-Only Frame |
-| **OpenAdapt** | `https://github.com/OpenAdaptAI/OpenAdapt` | MIT | `v0.3.1` | `9c2b4d8` | Active (community driven) | Deterministic Macro Replay, Scrubbed PII |
-| **Hermes Agent** | `https://github.com/NousResearch/Hermes-Agent` | Apache-2.0 | `v0.3.0` | `6d4a1b9` | Active (Nous Research) | Sandboxed Subworker, JSON IPC |
-| **OpenHands** | `https://github.com/All-Hands-AI/OpenHands` | MIT | `v0.9.1` | `e2b8c5f` | Highly Active (daily commits) | Docker/PRoot Container, Read/Write Jail |
-| **MCP Python SDK** | `https://github.com/modelcontextprotocol/python-sdk` | MIT | `v1.1.0` | `c4f721d` | Active (Anthropic / Linux Foundation) | Local Stdio / SSE Transport Sandbox |
-| **PyAutoGUI** | `https://github.com/asweigart/pyautogui` | BSD-3-Clause | `v0.9.54` | `7e1a3b5` | Stable / Maintenance | Native OS Desktop Dispatch, Rate-Limited |
-| **LangGraph Core** | `https://github.com/langchain-ai/langgraph` | MIT | `v0.2.14` | `f5a91d2` | Highly Active (daily commits) | Zero-Secret SQLite State Checkpointing |
-| **Robocorp RPA** | `https://github.com/robocorp/rpaframework` | Apache-2.0 | `v28.0.0` | `1b8c4d2` | Stable / Enterprise | Governed RPA Execution Layer |
-| **OpenRPA** | `https://github.com/open-rpa/openrpa` | AGPL-3.0* | `v1.4.52` | `5e9a2f1` | Active | Isolated Out-of-Process Worker Node |
+The following libraries are physically installed and verified against package metadata:
 
-*\*Note on OpenRPA AGPL-3.0: Integrated strictly across out-of-process network/IPC boundary (A2A JSON-RPC / REST) to guarantee complete license isolation from ZONATA proprietary enterprise core.*
+| Project | Installed Version | License (SPDX) | Role in ZONATA | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **pg8000** | `1.31.6` | BSD-3-Clause | Pure-Python PostgreSQL Wire Protocol Driver | INTEGRATED & ACTIVE |
+| **psycopg2-binary** | `2.9.9` | LGPL-3.0 with exception | PostgreSQL Driver (Linux Container Profile) | INTEGRATED & ACTIVE |
+| **PyYAML** | `6.0.3` | MIT | Process Pack & Declarative Schema Parser | INTEGRATED & ACTIVE |
+| **numpy** | `2.5.5` | BSD-3-Clause | Numeric Computations & Mathematical Kernels | INTEGRATED & ACTIVE |
+| **pandas** | `3.1.1` | BSD-3-Clause | Tabular Financial Dataframe Modeling | INTEGRATED & ACTIVE |
+| **cryptography** | `50.0.2` | Apache-2.0 OR BSD-3-Clause | AES-256-GCM Sovereign Envelopes & Signatures | INTEGRATED & ACTIVE |
+| **python-dateutil** | `4.0.0` | BSD-3-Clause | ISO-8601 UTC Timestamp & Recurrence Arithmetic | INTEGRATED & ACTIVE |
 
 ---
 
-## 3. Dependency Footprint & Transitive Audit
+## 3. Network Service Boundaries (Independent Service Containers)
 
-### 3.1 Network & HTTP Scraping Stack
-- **Direct Dependencies**: `urllib.request`, `urllib.robotparser`, `html.parser`, `json`, `hashlib`, `ssl`.
-- **Transitive Footprint**: Zero external C-extensions required for native fallback layer. Eliminates supply-chain bloat and compile-time vulnerabilities on ARM64 and embedded platforms.
-- **External Node Footprint**: Optional remote node packages (`crawlee`, `playwright`, `playwright-stealth`) isolated to dedicated remote node environments.
-
-### 3.2 Visual & Computer-Use Stack
-- **Direct Dependencies**: Built-in coordinate mapping, JSON grounding schema, Base64 frame serialization.
-- **Transitive Footprint**: PyAutoGUI (optional on display-equipped nodes), Pillow / OpenCV (optional for screenshot diffing).
-- **VLM Inference Isolation**: Vision-Language model grounding (Qwen2-VL, Claude-3.5-Sonnet) operates behind zero-retention API gateways or local self-hosted GPU nodes without local file read access.
+| Service | Pinned Image | License (SPDX) | Protocol Boundary | Confinement |
+| :--- | :--- | :--- | :--- | :--- |
+| **PostgreSQL 16** | `postgres:16.4-alpine` | PostgreSQL (MIT-style) | TCP Port 5432 network wire | RLS enforced; zero shared memory |
+| **SeaweedFS** | `chrislusf/seaweedfs:3.79` | Apache-2.0 | TCP Port 8333 S3 HTTP API | Pre-signed URLs, read-back SHA-256 |
+| **Mailpit** | `axllent/mailpit:v1.21.8` | Apache-2.0 | TCP Port 1025 SMTP / 8025 API | Sandboxed test sink; zero disclosure |
+| **Apache Tika** | `apache/tika:2.9.2.1` | Apache-2.0 | TCP Port 9998 HTTP REST | Document text/metadata extraction |
+| **ClamAV** | `clamav/clamav:1.4.1` | GPL-2.0-only | TCP Port 3310 socket | Quarantined network boundary |
 
 ---
 
-## 4. Security Audit, CVE History & Vulnerability Mitigation
+## 4. Planned Future Integrations (Architecture Roadmap)
 
-| Upstream Project | Known CVE History | Current Severity | ZONATA Confinement & Defensive Countermeasures |
-| :--- | :--- | :--- | :--- |
-| **Playwright / Chromium** | CVE-2023-4863 (libwebp), CVE-2024-0519 (V8) | Mitigated upstream | Ephemeral browser contexts, non-root user execution, sandboxed storage isolation, and dispatch to dedicated remote worker nodes. |
-| **OpenHands** | CVE-2024-43405 (sandbox escape attempt in docker agent) | Patched upstream | Confined inside restricted subdirectories with path traversal guards (`os.path.commonpath`), command allowlisting, and PolicyEngine killswitch. |
-| **Model Context Protocol (MCP)** | Stdio pipe injection risks | None active | Stdio streams validated against strict JSON-RPC 2.0 schemas. Process arguments sanitized against shell injection. |
-| **OpenAdapt** | PII leakage in recording logs | Scrubbed | Pre-capture PII scrubbers enabled. Screen buffer cleared immediately after hashing. No persistent keystroke logs. |
-| **urllib / http.client** | Header injection / CRLF | Mitigated | URLs strictly parsed through `urllib.parse.urlsplit()`. Strict validation of HTTP headers against newline injection. |
+The following components were referenced in earlier pilot specifications but are **not currently imported** into runtime execution. Per OpenCode Step 1 honesty invariants, they are designated as `PLANNED` for subsequent architectural stages:
+
+| Component | Upstream Project | License (SPDX) | Planned Stage | Integration Architecture |
+| :--- | :--- | :--- | :--- | :--- |
+| **Temporal** | `temporalio/sdk-python` | MIT | Step 4 | Durable Workflow Engine behind `WorkflowPort` |
+| **NATS JetStream** | `nats-py` | Apache-2.0 | Step 4 | High-throughput distributed event broker |
+| **MCP Python SDK** | `modelcontextprotocol` | MIT | Step 4 | Standardized tool exposition protocol |
+| **OpenTelemetry** | `opentelemetry-api` | Apache-2.0 | Step 4 | Distributed tracing and span propagation |
+| **Langfuse / LiteLLM** | `langfuse`, `litellm` | MIT / Apache-2.0 | Step 2 | Model gateway tracing and token routing |
+| **boto3** | `boto3` | Apache-2.0 | Step 1D | Production AWS S3 client behind `StoragePort` |
+| **pydantic** | `pydantic` | MIT | Step 1H | Typed schema validation for industry packs |
+| **httpx** | `httpx` | BSD-3-Clause | Step 1D | Async HTTP client for outbound webhook delivery |
+| **OpenHands** | `All-Hands-AI/OpenHands` | MIT | Step 3 | Sandboxed software engineer coworker runtime |
+| **Playwright** | `playwright` | Apache-2.0 | Step 3 | Headless browser execution with human hand-off |
+| **OpenAdapt** | `OpenAdaptAI/OpenAdapt` | MIT | Step 3 | Desktop visual perception & macro recording |
+| **LangGraph Core** | `langgraph` | MIT | Step 4 | Multi-agent state graph coordinator |
 
 ---
 
-## 5. Sandboxing & Privilege Confinement Posture
+## 5. Security Audit & Supply Chain Policy
 
-1. **Principle of Least Privilege**:
-   - Web harvesting workers possess **read-only egress HTTP** capabilities. They cannot write to the system root, spawn shell processes, or query corporate credential vaults.
-   - Computer-use workers run with strict coordinate bounds, rate-limited keystroke entry, and mandatory policy evaluation on sensitive windows.
-2. **Cryptographic Execution Leases**:
-   - Workers cannot execute capabilities without a cryptographically signed lease token containing tenant ID, authority ceiling, and expiry timestamp.
-3. **Zero-Secret Checkpoint Storage**:
-   - Checkpoints recorded in SQLite pass through automated secret scanners (RegEx token patterns for API keys, AWS credentials, Bearer tokens).
-4. **KillSwitch & Emergency Isolation**:
-   - Global, Tenant, and Provider-level killswitches take precedence over all running execution processes, immediately revoking active leases.
+1. **SPDX Allowlist**: Only OSI-approved, non-viral licenses (MIT, Apache-2.0, BSD-2/3-Clause, MPL-2.0, PSFL, 0BSD, ISC) may be imported directly into Python runtime space.
+2. **Copyleft & Source-Available Boundaries**: Any tool with GPL, AGPL, SSPL, BSL, or Elastic licensing is strictly confined to independent network services communicating via network sockets or REST APIs.
+3. **Automated Audit Gates**: Every CI push evaluates `gitleaks`, `pip-audit`, CycloneDX SBOM, and an AST license validator.

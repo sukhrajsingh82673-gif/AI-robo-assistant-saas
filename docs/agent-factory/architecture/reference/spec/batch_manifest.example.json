@@ -1,0 +1,48 @@
+{
+  "apiVersion": "zonata.batch/v1",
+  "kind": "ManufacturingManifest",
+  "batch_id": "b3f1a8e2-0000-4000-8000-000000000001",
+  "request_id": "r7a0c1d4-0000-4000-8000-000000000002",
+  "tenant_id": "<tenant-uuid>",
+  "company_id": "<company-uuid>",
+  "requesting_principal": { "id": "<employee-uuid>", "kind": "ai_employee", "role": "CMO" },
+  "release_policy": "atomic_team",
+  "risk_tier": "R1",
+  "budget": { "cap_usd": 18.0, "reserved_usd": 12.5, "per_agent_cap_usd": 2.5 },
+  "concurrency": { "max_parallel_builds": 4, "tenant_concurrent_builds_limit": 4 },
+  "agent_count": 7,
+  "agents": [
+    { "key": "market_research",  "role": "Market Research Agent",       "template": "research-agent@1.2.0", "risk_tier": "R1", "wave": 0 },
+    { "key": "competitor",       "role": "Competitor Analysis Agent",   "template": "research-agent@1.2.0", "risk_tier": "R1", "wave": 0 },
+    { "key": "customer_intel",   "role": "Customer Intelligence Agent", "template": "data-analysis-agent@1.0.0", "risk_tier": "R1", "wave": 0 },
+    { "key": "trend",            "role": "Trend Analysis Agent",        "template": "research-agent@1.2.0", "risk_tier": "R1", "wave": 0 },
+    { "key": "campaign",         "role": "Campaign Strategy Agent",     "template": "marketing-strategy-agent@1.0.0", "risk_tier": "R1", "wave": 1 },
+    { "key": "reporting",        "role": "Reporting Agent",             "template": "document-reporting-agent@1.1.0", "risk_tier": "R0", "wave": 1 },
+    { "key": "supervisor",       "role": "Marketing Supervisor Agent",  "template": "supervisor-agent@1.0.0", "risk_tier": "R1", "wave": 2 }
+  ],
+  "dependency_graph": {
+    "edges": [
+      ["market_research", "campaign", "build_requires"], ["competitor", "campaign", "build_requires"],
+      ["customer_intel", "campaign", "build_requires"],  ["trend", "campaign", "build_requires"],
+      ["market_research", "reporting", "build_requires"],
+      ["campaign", "supervisor", "build_requires"], ["reporting", "supervisor", "build_requires"],
+      ["supervisor", "market_research", "runtime_delegates_to"], ["supervisor", "competitor", "runtime_delegates_to"],
+      ["supervisor", "customer_intel", "runtime_delegates_to"], ["supervisor", "trend", "runtime_delegates_to"],
+      ["supervisor", "campaign", "runtime_delegates_to"], ["supervisor", "reporting", "runtime_delegates_to"],
+      ["market_research", "supervisor", "reports_to"], ["competitor", "supervisor", "reports_to"],
+      ["customer_intel", "supervisor", "reports_to"], ["trend", "supervisor", "reports_to"],
+      ["campaign", "supervisor", "reports_to"], ["reporting", "supervisor", "reports_to"]
+    ]
+  },
+  "communication_contracts": [
+    { "from": "supervisor", "to": "*", "protocol": "a2a", "task_schema": "contracts/delegation-task@1", "result_schema": "contracts/agent-result@1", "max_depth": 2 }
+  ],
+  "shared_knowledge": [
+    { "collection": "marketing-shared", "access": { "supervisor": "read", "market_research": "write", "competitor": "write", "customer_intel": "write", "trend": "write", "campaign": "read", "reporting": "read" }, "isolation": "tenant+company, row-level, no cross-company reads" }
+  ],
+  "status": { "batch": "BUILDING", "items": { "market_research": "BUILT", "competitor": "BUILDING", "customer_intel": "BUILDING", "trend": "BUILDING", "campaign": "PENDING", "reporting": "PENDING", "supervisor": "PENDING" } },
+  "individual_qa": {}, "team_qa": null,
+  "release": { "status": "NOT_SUBMITTED", "approval_id": null },
+  "evidence": { "ledger_entries": [], "merkle_root_at_last_checkpoint": null },
+  "manifest_sha256": "<computed over canonical JSON of the immutable parts: agents, dependency_graph, contracts, release_policy>"
+}

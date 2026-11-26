@@ -1,0 +1,47 @@
+FFF..FFFF...FE                                                           [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_enterprise_02_adversarial_security_and_prompt_injection _
+E   OSError: [Errno 30] Read-only file system: '/tmp'
+=================================== FAILURES ===================================
+E   sqlite3.OperationalError: unable to open database file
+/data/data/com.termux/files/home/AI-robo-assistant-saas/core/coworker/agent_cloud_registry.py:100: sqlite3.OperationalError: unable to open database file
+E   sqlite3.OperationalError: unable to open database file
+/data/data/com.termux/files/home/AI-robo-assistant-saas/core/coworker/db_store_v2.py:178: sqlite3.OperationalError: unable to open database file
+E   RuntimeError: Subprocess failed (1): Traceback (most recent call last):
+      File "<string>", line 4, in <module>
+        from dotenv import load_dotenv
+    ModuleNotFoundError: No module named 'dotenv'
+/data/data/com.termux/files/home/AI-robo-assistant-saas/tests/test_cross_process_concurrency_coordination.py:32: RuntimeError: Subprocess failed (1): Traceback (most recent call last):
+E   AssertionError: Lists differ: ['core/accountable_owner.py:91: INSERT OR [330 chars]ces'] != []
+    
+    First list contains 5 additional elements.
+    First extra element 0:
+    'core/accountable_owner.py:91: INSERT OR REPLACE INTO af_accountable_owner ('
+    
+    + []
+    - ['core/accountable_owner.py:91: INSERT OR REPLACE INTO af_accountable_owner (',
+    -  'core/ura_router.py:208: INSERT OR REPLACE INTO af_thread_subscriptions',
+    -  'core/ura_router.py:768: INSERT OR REPLACE INTO af_work_items (',
+    -  'core/process_packs/loader.py:169: INSERT OR REPLACE INTO af_process_packs',
+    -  'core/process_packs/engine.py:296: INSERT OR REPLACE INTO '
+    -  'af_process_instances'] : Found disallowed SQLite INSERT OR REPLACE statements: ['core/accountable_owner.py:91: INSERT OR REPLACE INTO af_accountable_owner (', 'core/ura_router.py:208: INSERT OR REPLACE INTO af_thread_subscriptions', 'core/ura_router.py:768: INSERT OR REPLACE INTO af_work_items (', 'core/process_packs/loader.py:169: INSERT OR REPLACE INTO af_process_packs', 'core/process_packs/engine.py:296: INSERT OR REPLACE INTO af_process_instances']
+/data/data/com.termux/files/usr/lib/python3.14/unittest/case.py:750: AssertionError: Lists differ: ['core/accountable_owner.py:91: INSERT OR [330 chars]ces'] != []
+E   OSError: [Errno 30] Read-only file system: '/tmp'
+<frozen os>:236: OSError: [Errno 30] Read-only file system: '/tmp'
+E   AssertionError: 0 not greater than 0
+/data/data/com.termux/files/usr/lib/python3.14/unittest/case.py:750: AssertionError: 0 not greater than 0
+E   AssertionError: 0 not greater than 0
+/data/data/com.termux/files/usr/lib/python3.14/unittest/case.py:750: AssertionError: 0 not greater than 0
+E   OSError: [Errno 30] Read-only file system: '/tmp'
+<frozen os>:236: OSError: [Errno 30] Read-only file system: '/tmp'
+=========================== short test summary info ============================
+FAILED tests/test_acceptance_scenarios_v3.py::test_scenario_5_enterprise_agent_cloud_stress_and_lifecycle_benchmarking
+FAILED tests/test_acceptance_scenarios_v3.py::test_scenario_7_defensive_cybersecurity_patrol_scheduler_and_incident_lifecycle
+FAILED tests/test_cross_process_concurrency_coordination.py::TestCrossProcessConcurrencyCoordination::test_01_cross_process_lease_coordination
+FAILED tests/test_postgresql_dialect_compatibility.py::TestPostgreSqlDialectCompatibility::test_01_codebase_has_zero_insert_or_replace
+FAILED tests/test_production_infrastructure_qualification.py::TestProductionInfrastructureQualification::test_area_f_remote_disaster_recovery_drill
+FAILED tests/test_universal_linux_terminal_fabric.py::TestUniversalLinuxTerminalFabric::test_07_resource_inspector_hardware_metrics
+FAILED tests/test_universal_terminal_operational_qualification.py::TestUniversalTerminalOperationalQualification::test_failure_05_resource_constraint_limit
+FAILED tests/test_gemma4_adversarial_qualification.py::TestGemma4AdversarialQualification::test_adversarial_evidence_ledger_tampering_detected
+ERROR tests/test_coworker_v2_enterprise_qualification.py::test_enterprise_02_adversarial_security_and_prompt_injection
+8 failed, 5 passed, 1 error in 24.45s

@@ -670,10 +670,10 @@ class TestApiLayer(SettingsV2TestBase):
             "GET", "/api/settings/v2/registry", {}, {}, self._context(self.owner), "c1"
         )
         self.assertEqual(status, 200)
-        self.assertEqual(payload["registry"]["counts"]["total"], 202)
+        self.assertEqual(payload["registry"]["counts"]["total"], 214)
         self.assertEqual(payload["registry"]["counts"]["hidden"], 4)
         catalog_keys = {item["key"] for item in payload["registry"]["settings"]}
-        self.assertEqual(len(catalog_keys), 198)
+        self.assertEqual(len(catalog_keys), 210)
         self.assertNotIn("bill_plan_tier", catalog_keys)
         capabilities = payload["registry"]["capabilities"]
         self.assertTrue(capabilities["can_write"])

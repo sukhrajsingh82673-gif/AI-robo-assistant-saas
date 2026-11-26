@@ -105,9 +105,9 @@ def test_milestone_5_sovereign_asset_protection(temp_db):
     guard = ResourceGuardEngine(db_store=temp_db)
 
     # Sovereign asset paths must NEVER be allowed for cleanup
-    assert guard.is_protected_path("/root/roboassistant/storage/evidence/audit_ledger.jsonl") is True
-    assert guard.is_protected_path("/root/roboassistant/core/api_server.py") is True
-    assert guard.is_protected_path("/root/roboassistant/storage/roboassistant.db") is True
+    assert guard.is_protected_path(os.path.join(BASE_DIR, "storage/evidence/audit_ledger.jsonl")) is True
+    assert guard.is_protected_path(os.path.join(BASE_DIR, "core/api_server.py")) is True
+    assert guard.is_protected_path(os.path.join(BASE_DIR, "storage/roboassistant.db")) is True
     assert guard.is_protected_path("/etc/shadow") is True
 
     # Attempting to clean a protected file must be blocked
@@ -116,7 +116,7 @@ def test_milestone_5_sovereign_asset_protection(temp_db):
         task_id="task_01",
         mission_id="msn_01",
         resource_type=CleanupResourceType.TEMP_FILE,
-        resource_path="/root/roboassistant/storage/roboassistant.db"
+        resource_path=os.path.join(BASE_DIR, "storage/roboassistant.db")
     )
     cleaned, err = guard.safe_reclaim_resource(protected_record)
     assert cleaned is False

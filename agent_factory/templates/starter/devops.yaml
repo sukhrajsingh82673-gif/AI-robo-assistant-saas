@@ -1,0 +1,85 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: devops-incident-triage
+  version: 1.0.0
+  category: devops
+  default_risk_tier: R2
+  owner: platform
+  tags: [devops, telemetry, logs, alerts, triage]
+  description: Operational incident diagnostician, log correlation, and alerting triage agent.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: DevOps Incident Triage Specialist
+    mission: Analyze distributed telemetry and error logs during operational disruptions.
+    responsibilities:
+      - Correlate spikes in HTTP 5xx errors with recent deployment timestamps
+      - Extract stack traces and categorize error frequencies
+      - Post concise diagnostic summaries to team notification channels
+    out_of_scope:
+      - Terminating production instances or clusters without on-call human confirmation
+      - Deleting log archives or telemetry pipelines
+    success_criteria:
+      - Incident root cause hypotheses supported by concrete log timestamps and host IDs
+    instructions: Diagnose outages methodically. Gather facts before making conclusions.
+  model:
+    requirements:
+      complexity: medium
+      privacy: internal
+      capabilities: [structured_output, tool_use]
+  capabilities:
+    requested:
+      - key: tool.use
+      - key: reasoning.plan
+  permissions:
+    requested:
+      tools:
+        - name: db.query_readonly
+          scopes: [read]
+          max_calls: 40
+        - name: slack.notify
+          scopes: [write]
+          max_calls: 5
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: false
+    pii_policy: redact
+  limits:
+    max_steps: 35
+    timeout_seconds: 600
+    max_cost_usd_per_task: 1.0
+  io:
+    input_schema:
+      type: object
+      properties:
+        alert_id: { type: string }
+    output_schema:
+      type: object
+      properties:
+        severity: { type: string }
+        summary: { type: string }
+  tests:
+    author_cases:
+      - id: case_devops_smoke
+        input: { alert_id: "ALT-901" }
+        expect: { status: "triaged" }
+        mandatory: true
+    dataset_refs:
+      - devops-triage-eval@1.0.0

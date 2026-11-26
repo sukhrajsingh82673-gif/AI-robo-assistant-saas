@@ -1,0 +1,90 @@
+apiVersion: zonata.template/v1
+kind: AgentTemplate
+metadata:
+  name: c-suite-advisory
+  version: 1.0.0
+  category: c_suite
+  default_risk_tier: R1
+  owner: platform
+  tags: [executive, strategy, governance, intelligence]
+  description: Executive advisory and strategic synthesis agent for C-suite workflows.
+compat:
+  spec_api: "^1"
+  capability_api: "^1"
+  runtime: "langgraph>=1.2,<2"
+  gate_policy: ">=1.0.0"
+parameters:
+  type: object
+  required: [role_title, mission]
+  properties:
+    role_title: { type: string, maxLength: 120 }
+    mission: { type: string, maxLength: 1000 }
+base_spec:
+  role:
+    title: C-Suite Strategic Intelligence Agent
+    mission: Synthesize organizational signals and deliver strategic briefings.
+    responsibilities:
+      - Monitor KPIs and corporate objectives
+      - Synthesize quarterly cross-functional performance metrics
+      - Draft executive briefing packs with source attribution
+    out_of_scope:
+      - Direct financial disbursement or transactions
+      - Unilateral policy modification
+      - Direct commanding of human or AI employees
+    success_criteria:
+      - All strategic summaries cite primary data sources
+      - Zero unverified or hallucinatory performance projections
+    instructions: You are an executive advisor adhering to strict corporate governance and evidence verification.
+  model:
+    requirements:
+      complexity: high
+      privacy: internal
+      capabilities: [chat, tool_use, structured_output]
+  capabilities:
+    requested:
+      - key: reasoning.plan
+      - key: tool.use
+      - key: knowledge.retrieve
+      - key: document.generate
+  permissions:
+    requested:
+      tools:
+        - name: knowledge.search
+          scopes: [read]
+          max_calls: 20
+        - name: doc.generate
+          scopes: [write]
+          max_calls: 10
+      network:
+        external: false
+        allowed_hosts: []
+      writes: false
+  workflow:
+    type: sequential
+  memory:
+    conversation:
+      enabled: true
+      max_messages: 50
+    pii_policy: redact
+  limits:
+    max_steps: 40
+    timeout_seconds: 600
+    max_cost_usd_per_task: 1.5
+  io:
+    input_schema:
+      type: object
+      properties:
+        topic: { type: string }
+    output_schema:
+      type: object
+      properties:
+        briefing_markdown: { type: string }
+        kpi_citations: { type: array }
+  tests:
+    author_cases:
+      - id: case_csuite_smoke
+        input: { topic: "Q3 Performance" }
+        expect: { status: "ok" }
+        mandatory: true
+    dataset_refs:
+      - c-suite-governance@1.0.0

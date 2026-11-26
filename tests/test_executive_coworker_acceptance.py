@@ -322,7 +322,7 @@ def test_gap3_dlp_comprehensive_8_scenarios():
     assert denied["reason"] == "AUTHORIZATION_DENIED"
 
     # Scenario 7: MCP tool file leakage -> Blocked
-    s7_ok, s7_err = monitor.intercept_mcp_tool("cat_file", {"file_path": "/root/roboassistant/.env"})
+    s7_ok, s7_err = monitor.intercept_mcp_tool("cat_file", {"file_path": os.path.join(BASE_DIR, ".env")})
     assert s7_ok is False
     assert "BLOCKED_BY_DLP" in s7_err
 

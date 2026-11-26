@@ -1,0 +1,84 @@
+schema_version: "zonata.industry-pack/v1"
+metadata:
+  pack_id: "discrete_manufacturing"
+  name: "Industrial & Machinery Manufacturing"
+  version: "1.0.0"
+  description: "Manufacturing blueprint for shop-floor production, BOMs, and equipment maintenance"
+  author: "ZONATA Systems Foundation"
+  industry_code: "C28"  # Manufacture of machinery and equipment n.e.c.
+
+document_templates:
+  - template_id: "tpl_mfg_work_order"
+    name: "Shop-Floor Production Work Order"
+    type: "work_order"
+    default_sensitivity: "INTERNAL"
+    default_retention_days: 1095
+    schema:
+      batch_number: "string"
+      target_units: "integer"
+  - template_id: "tpl_mfg_qa_inspection"
+    name: "Quality Assurance Certificate of Conformance"
+    type: "qa_certificate"
+    default_sensitivity: "RESTRICTED"
+    default_retention_days: 3650
+    schema:
+      inspector_id: "string"
+      pass_tolerance: "boolean"
+
+chart_of_accounts:
+  - code: "1010"
+    name: "Treasury & Commercial Banking"
+    type: "ASSET"
+    currency: "USD"
+  - code: "1300"
+    name: "Raw Materials & Inventory (Asset)"
+    type: "ASSET"
+    currency: "USD"
+  - code: "1350"
+    name: "Work in Process (WIP)"
+    type: "ASSET"
+    currency: "USD"
+  - code: "2010"
+    name: "Vendor Accounts Payable"
+    type: "LIABILITY"
+    currency: "USD"
+  - code: "3010"
+    name: "Capital Stock"
+    type: "EQUITY"
+    currency: "USD"
+  - code: "4010"
+    name: "Finished Goods Shipment Revenue"
+    type: "REVENUE"
+    currency: "USD"
+  - code: "5010"
+    name: "Direct Raw Material & Steel Cost (COGS)"
+    type: "EXPENSE"
+    currency: "USD"
+  - code: "5020"
+    name: "Machine Maintenance & Tooling Wear"
+    type: "EXPENSE"
+    currency: "USD"
+
+folio_types:
+  - folio_type: "production_batch"
+    name: "Production Batch Run Folio"
+    description: "Tracks raw material release, machining operations, and quality sign-off"
+    required_documents: ["tpl_mfg_work_order", "tpl_mfg_qa_inspection"]
+    optional_documents: []
+    required_tasks: ["material_check", "calibration_signoff", "final_qa_pack"]
+
+workflows:
+  - workflow_id: "wf_batch_completion"
+    name: "Batch Completion & Inventory Ingestion"
+    triggers: ["qa_signoff", "manual_supervisor_close"]
+    steps:
+      - step_id: "record_cogs"
+        action: "post_journal_entry"
+        debit_account: "5010"
+        credit_account: "1300"
+
+compliance_rules:
+  - rule_id: "cmp_iso9001_audit"
+    name: "ISO 9001 Quality Management Audit"
+    frequency_days: 180
+    required_approvers: ["qa_lead", "plant_manager"]

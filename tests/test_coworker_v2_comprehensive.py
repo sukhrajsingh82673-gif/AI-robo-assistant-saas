@@ -411,12 +411,12 @@ def test_acceptance_07_storage_and_resource_guard(temp_coworker_env):
     assert tmpdir in ws_dir
 
     # 3. Sovereign asset protection invariant
-    assert guard.is_path_protected("/root/roboassistant/core/coworker/orchestrator_v2.py") is True
-    assert guard.is_path_protected("/root/roboassistant/api_server.py") is True
+    assert guard.is_path_protected(os.path.join(BASE_DIR, "core/coworker/orchestrator_v2.py")) is True
+    assert guard.is_path_protected(os.path.join(BASE_DIR, "api_server.py")) is True
     assert guard.is_path_protected(os.path.join(ws_dir, "temp_data.csv")) is False
 
     with pytest.raises(PermissionError):
-        guard.assert_path_unprotected("/root/roboassistant/core/v8_api_handler.py")
+        guard.assert_path_unprotected(os.path.join(BASE_DIR, "core/v8_api_handler.py"))
 
     # 4. Safe cleanup execution
     guard.register_cleanup_resource(

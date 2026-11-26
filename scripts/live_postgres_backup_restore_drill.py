@@ -88,6 +88,7 @@ def run_live_postgres_backup_restore_drill() -> Dict[str, Any]:
             f"VALUES ('{rid}', '{tid}', '{dept}', '{escaped_payload}', '{r_hash}');"
         )
     
+    inserts_sql = "\n".join(insert_statements)
     init_sql = f"""
     DROP TABLE IF EXISTS {full_table_name};
     CREATE TABLE {full_table_name} (
@@ -98,7 +99,7 @@ def run_live_postgres_backup_restore_drill() -> Dict[str, Any]:
         record_sha256 TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    {"\n".join(insert_statements)}
+    {inserts_sql}
     """
     run_psql(db_url, init_sql)
     

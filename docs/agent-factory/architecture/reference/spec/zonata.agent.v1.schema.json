@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zonata.dev/schemas/zonata.agent.v1.schema.json",
+  "title": "zonata.agent/v1 — declarative agent specification",
+  "description": "An agent is DATA, not code. The factory validates this document; the LangGraph runtime compiles it. No model-generated code is executed in the backend. Secrets are referenced by NAME only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "identity", "role", "model", "capabilities", "permissions", "workflow", "memory", "limits", "io", "observability", "tests"],
+  "properties": {
+    "apiVersion": { "const": "zonata.agent/v1" },
+    "kind": { "const": "Agent" },
+    "metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "category", "risk_tier"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,62}$" },
+        "display_name": { "type": "string", "maxLength": 200 },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$" },
+        "category": { "enum": ["c_suite","corporate_management","finance","accounting","hr","marketing","sales","operations","research","data_analysis","customer_support","software_engineering","devops","database_engineering","defensive_cybersecurity","browser_automation","document_processing","knowledge_management","custom"] },
+        "risk_tier": { "enum": ["R0", "R1", "R2", "R3"] },
+        "template": { "type": "string", "pattern": "^[a-z0-9-]+@[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["principal_kind", "tenant_bound"],
+      "properties": {
+        "principal_kind": { "const": "agent" },
+        "tenant_bound": { "const": true },
+        "may_use_employees": { "const": false, "description": "ZONATA rule: AI employees may use agents; agents may never use employees." }
+      }
+    },
+    "role": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "mission", "responsibilities", "out_of_scope", "success_criteria"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 120 },
+        "mission": { "type": "string", "maxLength": 1000 },
+        "responsibilities": { "type": "array", "minItems": 1, "items": { "type": "string", "maxLength": 400 } },
+        "out_of_scope": { "type": "array", "items": { "type": "string", "maxLength": 400 } },
+        "success_criteria": { "type": "array", "minItems": 1, "items": { "type": "string", "maxLength": 400 } },
+        "linked_kra_kpi": { "type": "array", "items": { "type": "string" }, "description": "KRA/KPI ids of the employee this agent supports (employees run under SOP + KRA/KPI)." },
+        "instructions": { "type": "string", "maxLength": 20000, "description": "System instructions. Must not contain credentials, URLs with tokens, or tenant data." },
+        "sop_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "model": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirements"],
+      "properties": {
+        "requirements": {
+          "type": "object", "additionalProperties": false,
+          "required": ["complexity", "privacy"],
+          "properties": {
+            "complexity": { "enum": ["low", "medium", "high"] },
+            "privacy": { "enum": ["public", "internal", "confidential", "restricted"] },
+            "max_latency_ms_p95": { "type": "integer", "minimum": 100 },
+            "capabilities": { "type": "array", "items": { "enum": ["chat", "tool_use", "structured_output", "vision", "long_context", "code"] } },
+            "min_context_tokens": { "type": "integer", "minimum": 1024 }
+          }
+        },
+        "profile": { "type": "string", "description": "Optional approved model-gateway profile NAME. Never a raw provider key or hard-coded vendor model when a profile exists." },
+        "fallback_profiles": { "type": "array", "maxItems": 3, "items": { "type": "string" } },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0 }
+      }
+    },
+    "capabilities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requested"],
+      "properties": {
+        "requested": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["key"],
+            "properties": {
+              "key": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9_]+)+$" },
+              "version": { "type": "string" },
+              "params": { "type": "object" },
+              "justification": { "type": "string", "maxLength": 400 }
+            }
+          }
+        }
+      },
+      "description": "REQUESTED capabilities. Requesting is not authorisation: the granted set is computed into permissions.granted by the factory and stored in af_agent_version.permission_profile."
+    },
+    "permissions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requested"],
+      "properties": {
+        "requested": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "tools": { "type": "array", "items": { "$ref": "#/$defs/toolRef" } },
+            "mcp": { "type": "array", "items": { "$ref": "#/$defs/mcpRef" } },
+            "a2a_peers": { "type": "array", "items": { "type": "string" } },
+            "knowledge_collections": { "type": "array", "items": { "type": "string" } },
+            "database_views": { "type": "array", "items": { "type": "string" }, "description": "Read-only governed views. Direct production database access is never grantable." },
+            "network": {
+              "type": "object", "additionalProperties": false,
+              "properties": {
+                "external": { "type": "boolean", "default": false },
+                "allowed_hosts": { "type": "array", "items": { "type": "string" } },
+                "browser": { "enum": ["none", "allowlist_readonly", "allowlist_interactive"], "default": "none" }
+              }
+            },
+            "writes": { "type": "boolean", "default": false },
+            "require_approval_for": { "type": "array", "items": { "type": "string" } },
+            "data_classification_max": { "enum": ["public", "internal", "confidential", "restricted"], "default": "internal" }
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["single", "sequential", "supervisor", "parallel", "hierarchical"] },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "specialists": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "agent"], "properties": { "id": { "type": "string" }, "agent": { "type": "string", "description": "agent-slug@semver; must be certified" }, "description": { "type": "string" } } } },
+        "max_delegations": { "type": "integer", "minimum": 0, "maximum": 20, "default": 6 },
+        "max_delegation_depth": { "type": "integer", "minimum": 0, "maximum": 5, "default": 2 }
+      }
+    },
+    "memory": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "conversation": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "max_messages": { "type": "integer", "minimum": 1, "maximum": 500 } } },
+        "long_term": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "store": { "const": "letta" }, "scope": { "enum": ["agent", "team", "company"] }, "retention_days": { "type": "integer", "minimum": 1, "maximum": 3650 } } },
+        "knowledge": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "top_k": { "type": "integer", "minimum": 1, "maximum": 50 }, "min_score": { "type": "number", "minimum": 0 } } },
+        "pii_policy": { "enum": ["none", "redact", "allow_internal"], "default": "redact" }
+      }
+    },
+    "limits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_steps", "timeout_seconds", "max_cost_usd_per_task"],
+      "properties": {
+        "max_steps": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "max_model_calls": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "max_tool_calls": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "max_retries": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "max_context_tokens": { "type": "integer", "minimum": 256 },
+        "max_cost_usd_per_task": { "type": "number", "minimum": 0 },
+        "max_subagents": { "type": "integer", "minimum": 0, "maximum": 20 }
+      }
+    },
+    "io": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_schema", "output_schema"],
+      "properties": {
+        "input_schema": { "type": "object" },
+        "output_schema": { "type": "object" },
+        "reports_to": { "type": "string", "description": "agent slug or 'employee:<role>' that receives reports" }
+      }
+    },
+    "observability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trace", "capture_content"],
+      "properties": {
+        "trace": { "const": true },
+        "capture_content": { "enum": ["none", "redacted", "full_in_staging_only"] },
+        "slo": { "type": "object", "properties": { "success_rate_min": { "type": "number" }, "p95_latency_ms_max": { "type": "integer" }, "cost_per_task_usd_max": { "type": "number" } } }
+      }
+    },
+    "tests": {
+      "type": "object", "additionalProperties": false,
+      "required": ["author_cases", "dataset_refs"],
+      "properties": {
+        "author_cases": { "type": "array", "description": "Builder-authored cases. They count only toward the builder_unit phase, never toward independent QA.", "items": { "type": "object", "required": ["id", "input", "expect"], "properties": { "id": { "type": "string" }, "input": {}, "expect": { "type": "object" }, "mandatory": { "type": "boolean" } } } },
+        "dataset_refs": { "type": "array", "items": { "type": "string" }, "description": "Independent evaluation datasets (dataset@version) owned by evaluator principals." }
+      }
+    }
+  },
+  "$defs": {
+    "toolRef": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" }, "scopes": { "type": "array", "items": { "type": "string" } }, "max_calls": { "type": "integer" } }
+    },
+    "mcpRef": {
+      "type": "object", "additionalProperties": false, "required": ["server", "tools"],
+      "properties": { "server": { "type": "string", "description": "id of an MCP server registered in the ZONATA MCP gateway" }, "tools": { "type": "array", "minItems": 1, "items": { "type": "string" } }, "scopes": { "type": "array", "items": { "type": "string" } } }
+    },
+    "step": {
+      "type": "object", "additionalProperties": false, "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,40}$" },
+        "kind": { "enum": ["model", "agent_loop", "tool", "validate", "approval", "delegate", "retrieve", "branch", "parallel_map", "report"] },
+        "description": { "type": "string" },
+        "prompt": { "type": "string" },
+        "tool": { "type": "string" },
+        "tools": { "type": "array", "items": { "type": "string" } },
+        "agent": { "type": "string" },
+        "task": { "type": "string" },
+        "action": { "type": "string", "description": "action class requiring human decision (approval step)" },
+        "max_iterations": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "on_error": { "enum": ["fail", "continue", "escalate"], "default": "fail" },
+        "final": { "type": "boolean" }
+      }
+    }
+  }
+}

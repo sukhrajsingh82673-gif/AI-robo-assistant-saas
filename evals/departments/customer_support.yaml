@@ -1,0 +1,181 @@
+department: customer_support
+tasks:
+  - id: cs_001
+    name: "Customer Urgent Outage Ticket Severity Escalation"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_support_tickets"
+      data:
+        ticket_id: "TICK-1009"
+        urgency: "CRITICAL"
+        sentiment: "VERY_NEGATIVE"
+        customer_tier: "ENTERPRISE"
+        issue: "Production payment processing endpoint returning 500 error"
+    task: "Identify critical enterprise production failure and escalate ticket to high-priority triage."
+    acceptance_criteria:
+      - "ticket_escalated"
+    scoring:
+      required_fields:
+        - "priority"
+        - "routing"
+
+  - id: cs_002
+    name: "Technical Knowledge Base Documentation Retrieval"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_knowledge_base"
+      data:
+        query: "How to configure multi-tenant RLS in PostgreSQL 16"
+        category: "DATABASE_ADMIN"
+    task: "Retrieve correct technical knowledge base article and provide accurate cited response."
+    acceptance_criteria:
+      - "kb_article_retrieved"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_003
+    name: "Customer Subscription Refund Eligibility Validation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_billing_disputes"
+      data:
+        ticket_id: "TICK-4412"
+        refund_requested_days: 14
+        policy_max_days: 30
+        invoice_total: 9900
+    task: "Verify that user cancellation and refund request falls within the 30-day money-back window."
+    acceptance_criteria:
+      - "refund_policy_validated"
+    scoring:
+      required_fields:
+        - "refund_eligible"
+        - "routing"
+
+  - id: cs_004
+    name: "Customer Account Lockout Security Verification"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_auth_support"
+      data:
+        user_id: "USR-9921"
+        failed_logins: 5
+        mfa_verified: true
+        ip_reputation: "CLEAN"
+    task: "Verify multi-factor identity proofing before issuing secure password reset token."
+    acceptance_criteria:
+      - "identity_verified"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_005
+    name: "Bug Report Reproduction Steps Extraction"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_engineering_defects"
+      data:
+        ticket_id: "TICK-5104"
+        raw_message: "When I click export PDF on the invoice page with Firefox 120, the modal spins forever."
+        browser: "Firefox 120"
+        os: "macOS Sonoma"
+    task: "Extract structured reproduction steps, client environment, and expected vs actual behavior."
+    acceptance_criteria:
+      - "repro_extracted"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_006
+    name: "Customer Conflict De-escalation Sentiment Analysis"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_sentiment_analysis"
+      data:
+        conversation_turns: 3
+        urgency: "CRITICAL"
+        sentiment: "VERY_NEGATIVE"
+    task: "Formulate empathetic, professional resolution acknowledging frustration and presenting actionable fix."
+    acceptance_criteria:
+      - "response_deescalated"
+    scoring:
+      required_fields:
+        - "priority"
+        - "routing"
+
+  - id: cs_007
+    name: "Billing Overcharge Calculation and Adjustment"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_billing_adjustments"
+      data:
+        customer_id: "CUST-881"
+        billed_amount_minor_units: 15000
+        correct_amount_minor_units: 10000
+        overcharge_minor_units: 5000
+    task: "Verify overcharge calculation and generate service credit adjustment voucher."
+    acceptance_criteria:
+      - "credit_calculated"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_008
+    name: "Enterprise VIP Account Routing"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_vip_routing"
+      data:
+        account_tier: "TIER_1_STRATEGIC"
+        arr_minor_units: 50000000
+        assigned_csm: "Sarah Connor"
+    task: "Route inbound enterprise ticket directly to dedicated customer success manager queue."
+    acceptance_criteria:
+      - "routed_to_csm"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_009
+    name: "Customer Satisfaction (CSAT) Survey Tagging"
+    tier: "FAST"
+    input:
+      folios:
+        - "folio_csat_surveys"
+      data:
+        score: 5
+        sentiment: "POSITIVE"
+        tags:
+          - "FAST_RESPONSE"
+          - "ACCURATE_RESOLUTION"
+    task: "Categorize post-resolution survey sentiment and tag positive feedback for agent recognition."
+    acceptance_criteria:
+      - "survey_categorized"
+    scoring:
+      required_fields:
+        - "routing"
+
+  - id: cs_010
+    name: "Feature Request Deduplication and Aggregation"
+    tier: "WORKER"
+    input:
+      folios:
+        - "folio_product_feedback"
+      data:
+        feedback_id: "FB-202"
+        requested_feature: "Dark Mode Theme for Web Dashboard"
+        existing_cluster_id: "FEAT-DARK-THEME"
+    task: "Match customer enhancement feedback to existing product backlog cluster."
+    acceptance_criteria:
+      - "feature_clustered"
+    scoring:
+      required_fields:
+        - "routing"

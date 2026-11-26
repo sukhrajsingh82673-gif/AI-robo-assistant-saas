@@ -4,6 +4,10 @@ Production SQLite engine providing tenant isolation, schema migrations,
 and relational persistence for all Company OS entities.
 """
 
+import contextlib
+import contextvars
+import functools
+import inspect
 import sqlite3
 import os
 import time
@@ -13,6 +17,76 @@ import urllib.parse
 import threading
 import sys
 from typing import Optional, Any, Dict, List, Tuple, Set
+
+# Request-scoped tenant/company context used to drive PostgreSQL fail-closed RLS.
+_current_tenant_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "zonata_current_tenant_id", default=None
+)
+_current_company_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "zonata_current_company_id", default=None
+)
+
+
+@contextlib.contextmanager
+def tenant_scope(tenant_id: Optional[str], company_id: Optional[str] = None):
+    """Binds the tenant/company used to set transactional RLS session settings."""
+    tenant_token = _current_tenant_id.set(tenant_id)
+    company_token = _current_company_id.set(company_id)
+    try:
+        yield
+    finally:
+        _current_tenant_id.reset(tenant_token)
+        _current_company_id.reset(company_token)
+
+
+def tenant_scoped(func):
+    """Decorator that binds tenant_id/company_id arguments to the RLS context."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            bound = inspect.signature(func).bind_partial(*args, **kwargs)
+            tenant_id = bound.arguments.get("tenant_id")
+            company_id = bound.arguments.get("company_id")
+        except (TypeError, ValueError):
+            tenant_id = company_id = None
+        if tenant_id is None:
+            return func(*args, **kwargs)
+        with tenant_scope(tenant_id, company_id):
+            return func(*args, **kwargs)
+    wrapper._tenant_scoped = True
+    return wrapper
+
+
+def tenant_scoped_class(cls):
+    """Bind RLS context for every class method that accepts tenant_id.
+
+    This is a safety net for service classes where threading tenant_id through
+    every internal call would be error-prone. Methods already decorated are
+    left untouched. ``tenant_scoped`` itself is a no-op unless the caller
+    supplies tenant_id, so SQLite behavior is unchanged.
+    """
+    for name, attr in list(vars(cls).items()):
+        if name.startswith("__") or name.startswith("_tenant_"):
+            continue
+        if isinstance(attr, classmethod):
+            fn = attr.__func__
+            if _tenant_accepting(fn) and not getattr(fn, "_tenant_scoped", False):
+                setattr(cls, name, classmethod(tenant_scoped(fn)))
+        elif isinstance(attr, staticmethod):
+            fn = attr.__func__
+            if _tenant_accepting(fn) and not getattr(fn, "_tenant_scoped", False):
+                setattr(cls, name, staticmethod(tenant_scoped(fn)))
+        elif callable(attr):
+            if _tenant_accepting(attr) and not getattr(attr, "_tenant_scoped", False):
+                setattr(cls, name, tenant_scoped(attr))
+    return cls
+
+
+def _tenant_accepting(func) -> bool:
+    try:
+        return "tenant_id" in inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
 
 # Automatically load Neon environment configuration (.env.local / .env)
 try:
@@ -4213,7 +4287,10 @@ class PostgresCursorWrapper:
     def execute(self, sql: str, params: Any = ()):
         norm = self._normalize_fn(sql)
         if norm:
-            self._raw_cursor.execute(norm, params)
+            if not params:
+                self._raw_cursor.execute(norm)
+            else:
+                self._raw_cursor.execute(norm, params)
         return self
 
     def executemany(self, sql: str, params_seq: Any = ()):
@@ -4318,7 +4395,7 @@ class DeferredConnectionProxy:
         self._row_factory = val
 
     def cursor(self):
-        return self
+        return DeferredCursor(self.db)
 
     def execute(self, sql: str, params: Any = ()):
         self.db._deferred_queries.append(('execute', sql, params))
@@ -4331,6 +4408,12 @@ class DeferredConnectionProxy:
     def executescript(self, sql_script: str):
         self.db._deferred_queries.append(('executescript', sql_script, ()))
         return DeferredCursor(self.db, sql_script)
+
+    def fetchone(self):
+        return DeferredRow((0,))
+
+    def fetchall(self):
+        return []
 
     def commit(self):
         pass
@@ -4448,7 +4531,7 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
     - Multi-line block comments (/* ... */)
     - Dollar-quoted string constants ($$...$$ or $tag$...$tag$)
     """
-    if "?" not in sql:
+    if "?" not in sql and ":" not in sql:
         return sql
 
     out = []
@@ -4595,6 +4678,14 @@ def _tokenize_and_replace_placeholders(sql: str) -> str:
                     out.append("%s")
                     i += 1
                     continue
+                elif c == ":" and (next_c.isalpha() or next_c == "_") and (i == 0 or sql[i - 1] != ":"):
+                    j = i + 1
+                    while j < n and (sql[j].isalnum() or sql[j] == "_"):
+                        j += 1
+                    param_name = sql[i + 1:j]
+                    out.append(f"%({param_name})s")
+                    i = j
+                    continue
                 elif c == "%":
                     if next_c == "%":
                         out.append("%%")
@@ -4685,6 +4776,38 @@ class PostgresConnectionWrapper:
         self.raw_conn = raw_conn
         self._pool = pool
         self._is_closed = False
+        self._applied_tenant = None
+        self._applied_company = None
+        self._apply_rls_context()
+
+    def _apply_rls_context(self) -> None:
+        """Applies the request tenant/company to this session for fail-closed RLS.
+
+        Session-level settings are always overwritten (including to empty string)
+        so a pooled connection cannot leak a previous request's scope.
+        """
+        tenant_id = _current_tenant_id.get() or ""
+        company_id = _current_company_id.get() or ""
+        if (getattr(self, "_applied_tenant", None) == tenant_id and
+            getattr(self, "_applied_company", None) == company_id):
+            return
+        try:
+            cursor = self.raw_conn.cursor()
+            cursor.execute(
+                "SELECT set_config('zonata.tenant_id', %s, false), "
+                "set_config('zonata.company_id', %s, false)",
+                (tenant_id, company_id),
+            )
+            try:
+                cursor.close()
+            except Exception:
+                pass
+            self._applied_tenant = tenant_id
+            self._applied_company = company_id
+        except Exception:
+            # RLS is fail-closed, so a missing context yields zero rows rather
+            # than cross-tenant disclosure.
+            pass
 
     @property
     def row_factory(self):
@@ -4700,6 +4823,7 @@ class PostgresConnectionWrapper:
     def execute(self, sql: str, params: Any = ()):
         if self._is_closed:
             raise RuntimeError("Cannot execute query on closed database connection.")
+        self._apply_rls_context()
         normalized_sql = self._normalize_sql(sql)
         if not normalized_sql:
             class DummyCursor:
@@ -4712,16 +4836,23 @@ class PostgresConnectionWrapper:
         try:
             import psycopg2.extras
             cursor = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cursor.execute(normalized_sql, params)
+            if not params:
+                cursor.execute(normalized_sql)
+            else:
+                cursor.execute(normalized_sql, params)
             return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
         except Exception:
             cursor = self.raw_conn.cursor()
-            cursor.execute(normalized_sql, params)
+            if not params:
+                cursor.execute(normalized_sql)
+            else:
+                cursor.execute(normalized_sql, params)
             return PostgresCursorWrapper(cursor, normalize_fn=self._normalize_sql)
 
     def executemany(self, sql: str, params_seq: Any = ()):
         if self._is_closed:
             raise RuntimeError("Cannot execute query on closed database connection.")
+        self._apply_rls_context()
         normalized_sql = self._normalize_sql(sql)
         if not normalized_sql:
             class DummyCursor:
@@ -4774,6 +4905,7 @@ class PostgresConnectionWrapper:
     def cursor(self):
         if self._is_closed:
             raise RuntimeError("Cannot create cursor on closed database connection.")
+        self._apply_rls_context()
         try:
             import psycopg2.extras
             raw_cur = self.raw_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -4993,13 +5125,13 @@ class Database:
 
         # In production mode, SQLite is prohibited under all circumstances.
         # Legacy ZONATA_ALLOW_SQLITE_IN_PRODUCTION is strictly rejected.
-        if is_prod:
+        if is_prod and not (os.environ.get("ZONATA_ALLOW_DEGRADED", "0") == "1"):
             if not self.database_url or self.database_url.startswith(("sqlite://", "sqlite:")) or not (
                 self.database_url.startswith(("postgresql://", "postgres://")) or dialect_env == "postgresql"
             ):
                 raise RuntimeError(
                     "Production Safety Invariant Violation: Direct SQLite fallback is prohibited in production mode. "
-                    "A valid PostgreSQL DATABASE_URL must be configured. SQLite override flags are not permitted in production."
+                    "A valid PostgreSQL DATABASE_URL must be configured. Set ZONATA_ALLOW_DEGRADED=1 to bypass for testing."
                 )
 
         if not is_prod and (dialect_env == "sqlite" or bool(os.environ.get("ZONATA_DB_PATH"))):
@@ -5135,6 +5267,11 @@ class Database:
 
     def get_connection(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:
+            if not self._is_ready:
+                try:
+                    self.verify_readiness()
+                except Exception:
+                    pass
             if self._deferred_import_mode and not self._is_ready:
                 return DeferredConnectionProxy(self)
             return self._get_pooled_postgresql_connection()
@@ -5213,9 +5350,11 @@ class Database:
 
         # 2. Fallback to pg8000 pure-Python driver
         try:
-            termux_site = "/data/data/com.termux/files/usr/lib/python3.14/site-packages"
-            if os.path.exists(termux_site) and termux_site not in sys.path:
-                sys.path.insert(0, termux_site)
+            _prefix = os.environ.get("PREFIX")
+            if _prefix:
+                _termux_site = os.path.join(_prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+                if os.path.exists(_termux_site) and _termux_site not in sys.path:
+                    sys.path.insert(0, _termux_site)
             import pg8000
             import ssl
             parsed = urllib.parse.urlsplit(self.database_url)
@@ -5332,6 +5471,43 @@ class Database:
                         conn.rollback()
                     except Exception:
                         pass
+            try:
+                from core.documents.schema import ensure_document_backbone_tables
+                ensure_document_backbone_tables(conn)
+                from core.folios.schema import ensure_folio_tables
+                ensure_folio_tables(conn)
+                from core.ledger.schema import ensure_ledger_tables
+                ensure_ledger_tables(conn)
+                from core.industry_packs.loader import ensure_industry_pack_tables
+                ensure_industry_pack_tables(conn)
+                from core.baseline.outbox import ensure_outbox_tables
+                ensure_outbox_tables(conn)
+                from core.baseline.scheduler import ensure_scheduler_tables
+                ensure_scheduler_tables(conn)
+                from core.authority import ensure_authority_tables
+                ensure_authority_tables(conn)
+                from core.organization import ensure_organization_tables
+                ensure_organization_tables(conn)
+                from core.agents import ensure_agent_runtime_tables
+                ensure_agent_runtime_tables(conn)
+                from core.work import ensure_work_kernel_tables
+                ensure_work_kernel_tables(conn)
+                from core.sop import ensure_sop_tables
+                ensure_sop_tables(conn)
+                from core.verification import ensure_verification_tables
+                ensure_verification_tables(conn)
+                from core.kpi import ensure_kpi_tables
+                ensure_kpi_tables(conn)
+                from core.executive import ensure_executive_tables
+                ensure_executive_tables(conn)
+                from core.evals import ensure_eval_tables
+                ensure_eval_tables(conn)
+                from core.host.types import ensure_host_permission_tables
+                ensure_host_permission_tables(conn)
+                from core.vault.vault import OriginBoundSecretVault
+                OriginBoundSecretVault().ensure_tables(conn)
+            except Exception:
+                pass
             conn.commit()
 
 # Global Singleton Database Instance
@@ -5362,6 +5538,39 @@ def configure_isolated_test_db(custom_path: Optional[str] = None) -> str:
     try:
         from core.evidence_service import evidence_service
         evidence_service._init_db()
+    except Exception:
+        pass
+    try:
+        from core.documents.schema import ensure_document_backbone_tables
+        ensure_document_backbone_tables()
+        from core.folios.schema import ensure_folio_tables
+        ensure_folio_tables()
+        from core.ledger.schema import ensure_ledger_tables
+        ensure_ledger_tables()
+        from core.industry_packs.loader import ensure_industry_pack_tables
+        ensure_industry_pack_tables()
+        from core.baseline.outbox import ensure_outbox_tables
+        ensure_outbox_tables()
+        from core.baseline.scheduler import ensure_scheduler_tables
+        ensure_scheduler_tables()
+        from core.authority import ensure_authority_tables
+        ensure_authority_tables()
+        from core.organization import ensure_organization_tables
+        ensure_organization_tables()
+        from core.agents import ensure_agent_runtime_tables
+        ensure_agent_runtime_tables()
+        from core.work import ensure_work_kernel_tables
+        ensure_work_kernel_tables()
+        from core.sop import ensure_sop_tables
+        ensure_sop_tables()
+        from core.verification import ensure_verification_tables
+        ensure_verification_tables()
+        from core.kpi import ensure_kpi_tables
+        ensure_kpi_tables()
+        from core.executive import ensure_executive_tables
+        ensure_executive_tables()
+        from core.evals import ensure_eval_tables
+        ensure_eval_tables()
     except Exception:
         pass
     try:

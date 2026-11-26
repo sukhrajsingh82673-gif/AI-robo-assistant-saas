@@ -1,0 +1,178 @@
+pack: hire_to_retire
+version: "1.0.0"
+name: "Hire-to-Retire Workforce & Talent Engine"
+description: "End-to-end human capital engine covering headcount requisition, bias-free candidate screening, interview coordination, offer negotiation, onboarding, performance tracking, and secure offboarding access revocation."
+owner_role: "CHRO"
+trigger_events:
+  - "hr.requisition_approved"
+  - "hr.candidate_applied"
+  - "hr.employee_separation_initiated"
+
+SIPOC:
+  suppliers:
+    - "Hiring Managers"
+    - "Job Applicants"
+    - "Talent Marketplaces"
+    - "HR Operations"
+  inputs:
+    - "job_requisition_id"
+    - "candidate_profile"
+    - "compensation_band"
+    - "separation_notice"
+  process_steps:
+    - "requisition_intake"
+    - "candidate_screening"
+    - "interview_coordination"
+    - "offer_formulation"
+    - "employee_onboarding"
+    - "offboarding_access_revocation"
+  outputs:
+    - "approved_candidate_id"
+    - "executed_offer_letter"
+    - "provisioned_iam_identity"
+    - "deprovisioning_certificate"
+  customers:
+    - "Hiring Managers"
+    - "New Hires"
+    - "IT & Security Operations"
+    - "Payroll Administration"
+
+steps:
+  - id: "requisition_intake"
+    name: "Headcount Requisition Intake & Budget Validation"
+    actor: "agent"
+    role: "CHRO"
+    tool_capabilities:
+      - "hr.parse_requisition"
+      - "budget.verify_headcount_allotment"
+    gate_checks:
+      - "BudgetGate"
+      - "CharterGate"
+    reversible: true
+
+  - id: "candidate_screening"
+    name: "Blind Bias-Free Candidate Qualification"
+    actor: "agent"
+    role: "CHRO"
+    tool_capabilities:
+      - "screening.blind_resume_parser"
+      - "fairness.verify_bias_free_criteria"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "interview_coordination"
+    name: "Autonomous Panel Scheduling & Follow-Up"
+    actor: "agent"
+    role: "CHRO"
+    tool_capabilities:
+      - "calendar.schedule_panel"
+      - "email.dispatch_invites"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "offer_formulation"
+    name: "Offer Package Formulation & Executive Authorization"
+    actor: "human"
+    role: "CHRO"
+    tool_capabilities:
+      - "comp.generate_offer_package"
+      - "approvals.request_hiring_manager"
+    gate_checks:
+      - "AutonomyGate"
+    reversible: false
+
+  - id: "employee_onboarding"
+    name: "Contract Execution, Identity Provisioning & Document Intake"
+    actor: "agent"
+    role: "CHRO"
+    tool_capabilities:
+      - "it.request_hardware_access"
+      - "compliance.collect_i9_dpdp"
+    gate_checks:
+      - "CharterGate"
+    reversible: true
+
+  - id: "offboarding_access_revocation"
+    name: "Immediate Credential Deprovisioning & Ledger Audit"
+    actor: "system"
+    role: "CISO"
+    tool_capabilities:
+      - "iam.revoke_all_sessions"
+      - "ledger.record_deprovisioning"
+    gate_checks:
+      - "KillSwitchGate"
+      - "AutonomyGate"
+    reversible: false
+
+policies:
+  max_base_salary_variance_percent: 10.0
+  mandatory_background_check: true
+  offboarding_sla_hours: 1
+
+KPIs:
+  target_cycle_time_seconds: 604800.0
+  target_first_pass_yield: 0.90
+  target_cost_per_unit_usd: 150.0
+  target_error_rate: 0.01
+  target_customer_satisfaction: 4.7
+
+waste_tags:
+  - "waiting"
+  - "handoff"
+  - "unused_talent"
+  - "rework"
+
+andon:
+  - condition_id: "ANDON-H2R-01"
+    rule_name: "discriminatory_screening_detected"
+    trigger_expression: "bias_risk_detected == True"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CLO"
+    description: "Halt process when algorithmic screening detects discriminatory criteria or protected attribute filtering."
+
+  - condition_id: "ANDON-H2R-02"
+    rule_name: "compensation_exceeds_band"
+    trigger_expression: "proposed_salary > max_band_salary"
+    action: "HALT_AND_ESCALATE"
+    escalate_to_role: "CFO"
+    description: "Halt process when proposed compensation exceeds approved grade band."
+
+autonomy:
+  current_level: 1
+  promotion_criteria:
+    min_completed_runs: 30
+    min_first_pass_yield: 0.94
+    max_error_rate: 0.01
+    zero_redline_violations: true
+  demotion_criteria:
+    error_rate_threshold: 0.04
+    redline_violation_count: 1
+
+simulation_scenarios:
+  - scenario_id: "SIM-H2R-STANDARD-ONBOARDING"
+    name: "Standard Employee Hiring Cycle"
+    description: "Standard hiring flow with approved compensation and zero bias flags."
+    initial_inputs:
+      job_requisition_id: "REQ-ENG-042"
+      candidate_profile: "Staff Distributed Systems Engineer"
+      proposed_salary: 140000.0
+      max_band_salary: 160000.0
+      bias_risk_detected: False
+    expected_outputs:
+      requisition_intake_output: "processed"
+      candidate_screening_output: "processed"
+    expected_status: "COMPLETED"
+
+  - scenario_id: "SIM-H2R-ANDON-BIAS-TRIGGER"
+    name: "Andon Algorithmic Bias Trigger"
+    description: "Triggers stop-the-line Andon escalation when protected attribute criteria is detected."
+    initial_inputs:
+      job_requisition_id: "REQ-MKT-011"
+      candidate_profile: "Senior Marketing Lead"
+      proposed_salary: 95000.0
+      max_band_salary: 110000.0
+      bias_risk_detected: True
+    expected_outputs: {}
+    expected_status: "HALTED_ANDON"
