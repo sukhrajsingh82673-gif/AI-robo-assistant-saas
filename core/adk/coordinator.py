@@ -184,7 +184,19 @@ class HierarchicalTeamCoordinator:
             session.add_message("worker", worker_output, agent_id="worker")
 
             # --- ROLE 3: CRITIC (Depth 2 / Critic) ---
-            if loop >= 2 or not tool_results:
+            # A verdict must be based on the worker's actual output and tool
+            # results, not on a fixed loop counter.
+            requested_tool = input_data.get("requested_tool")
+            tool_failed = any(
+                isinstance(result, dict)
+                and (
+                    result.get("status") in ("FAILED", "EXECUTION_ERROR")
+                    or result.get("success") is False
+                )
+                for result in tool_results.values()
+            )
+            tool_missing = bool(requested_tool and requested_tool not in tool_results)
+            if worker_output.strip() and not tool_failed and not tool_missing:
                 critic_verdict = "APPROVED"
             else:
                 critic_verdict = "REVISION_REQUIRED"

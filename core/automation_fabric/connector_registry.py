@@ -321,6 +321,7 @@ class GovernedConnectorRegistry:
         - Rate limiting & circuit breaking
         - Tenant isolation
         """
+        self._ensure_idempotency_table()
         if killswitch_check and killswitch_check():
             raise RuntimeError(f"KillSwitch active: connector operation '{operation}' on '{connector_id}' halted before execution.")
 

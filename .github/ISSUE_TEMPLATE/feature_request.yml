@@ -1,0 +1,19 @@
+name: Feature or Architecture Proposal
+description: Propose a new capability, integration port, or ADR
+title: "[Proposal]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem & Proposed Solution
+      description: Explain the use case, relevant department/industry layer, and architectural boundary.
+    validations:
+      required: true
+  - type: checkboxes
+    id: compliance
+    attributes:
+      label: Governance & License Checks
+      options:
+        - label: Compatible with existing Steps 1–9 preservation contracts
+        - label: External copyleft services (AGPL/GPL/SSPL) remain network-isolated if applicable

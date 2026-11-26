@@ -15,6 +15,7 @@ Implements OpenCode Step 4C (Standing Rules 33, 34, 35, 36, 38):
 from __future__ import annotations
 import json
 import logging
+import os
 import time
 import uuid
 from typing import Any, Dict, Iterator, List, Optional
@@ -53,13 +54,33 @@ class LangGraphRuntimeAdapter(AgentRuntimePort):
         self._cancelled_runs: set[str] = set()
 
     def probe(self) -> ProviderResult:
+        is_test = os.environ.get("ZONATA_TEST_MODE") == "1"
+        try:
+            import langgraph  # noqa: F401
+            has_sdk = True
+        except ImportError:
+            has_sdk = False
+
+        if is_test or self.sandbox or has_sdk:
+            # This adapter uses a local cyclic loop, not a LangGraph-compiled
+            # graph. Report it as a sandbox/local runtime rather than live.
+            return ProviderResult(
+                status=PortStatus.SANDBOX,
+                provider=self.provider_name,
+                provider_ref=f"local_cyclic_loop_{int(time.time())}",
+                sandbox=True,
+                latency_ms=0.8,
+                metadata={
+                    "runtime": "local_cyclic_loop",
+                    "checkpointer": "encrypted_relational",
+                    "live": False,
+                    "version": "1.0.0",
+                },
+            )
         return ProviderResult(
-            status=PortStatus.OK,
+            status=PortStatus.NOT_CONFIGURED,
             provider=self.provider_name,
-            provider_ref=f"langgraph_{int(time.time())}",
-            sandbox=self.sandbox,
-            latency_ms=0.8,
-            metadata={"runtime": "langgraph_cyclic", "checkpointer": "postgres_encrypted", "version": "1.0.0"},
+            error="LangGraph SDK is not installed and the local loop is not enabled in production.",
         )
 
     def execute_agent(
@@ -200,7 +221,11 @@ class LangGraphRuntimeAdapter(AgentRuntimePort):
             if state.iteration >= 2 or not state.tool_outputs:
                 state.needs_revision = False
                 state.completed = True
-                state.final_output = f"Plan completed across {state.iteration} cycle(s)."
+                state.final_output = state.plan[-1] if state.plan else ""
+                if not state.final_output:
+                    state.final_output = (
+                        f"Loop finished after {state.iteration} cycle(s) without a model output."
+                    )
             else:
                 state.needs_revision = True
                 state.critic_feedback = "Additional verification cycle required."

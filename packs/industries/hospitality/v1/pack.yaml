@@ -3,9 +3,24 @@ metadata:
   pack_id: "hospitality_hotel"
   name: "Hotel & Hospitality Operations"
   version: "1.0.0"
+  aliases:
+    - hospitality
+    - hotel
+    - hotels
   description: "Operating blueprint for hotels, resorts, and managed accommodation properties"
   author: "ZONATA Systems Foundation"
   industry_code: "I55"  # Accommodation
+
+  standard_kpis:
+    - name: RevPAR
+      unit: "index"
+      benchmark: 4500.0
+    - name: ADR
+      unit: "currency"
+      benchmark: 120.0
+    - name: Occupancy Pct
+      unit: "%"
+      benchmark: 75.0
 
 document_templates:
   - template_id: "tpl_hotel_guest_folio"

@@ -3,9 +3,24 @@ metadata:
   pack_id: "saas_enterprise"
   name: "B2B SaaS & Cloud Platforms"
   version: "1.0.0"
+  aliases:
+    - saas
+    - b2b saas
+    - cloud platform
   description: "Enterprise operating pack for subscription software and recurring revenue businesses"
   author: "ZONATA Systems Foundation"
   industry_code: "J62"  # Computer programming, consultancy and related activities
+
+  standard_kpis:
+    - name: Monthly Churn Rate
+      unit: "%"
+      benchmark: 5.0
+    - name: MRR
+      unit: "currency"
+      benchmark: 100000.0
+    - name: LTV:CAC
+      unit: "ratio"
+      benchmark: 3.0
 
 document_templates:
   - template_id: "tpl_saas_msa"

@@ -41,11 +41,13 @@ class RLSAuditReport:
     missing_rls: List[str]
     missing_force_rls: List[str]
     missing_policies: List[str]
+    errors: List[str] = field(default_factory=list)
 
     @property
     def is_compliant(self) -> bool:
         return (
-            len(self.missing_rls) == 0
+            not self.errors
+            and len(self.missing_rls) == 0
             and len(self.missing_force_rls) == 0
             and len(self.missing_policies) == 0
         )
@@ -78,13 +80,18 @@ class DBRoleAuditor:
                 pass
 
             if not role_row:
-                # In SQLite or non-Postgres environments, report compliant test shim
+                violation = (
+                    f"Rule 42: role '{current_user}' was not found in pg_roles; "
+                    "least-privilege status cannot be verified."
+                )
+                if is_production:
+                    raise DatabaseSecurityViolation(violation)
                 return DBRoleSafetyReport(
                     current_user=current_user,
                     is_superuser=False,
                     is_bypass_rls=False,
-                    is_safe=True,
-                    violations=[],
+                    is_safe=False,
+                    violations=[violation],
                 )
 
             _, is_super, is_bypass = role_row
@@ -115,13 +122,15 @@ class DBRoleAuditor:
         except Exception as e:
             if isinstance(e, DatabaseSecurityViolation):
                 raise
-            # Fallback for non-Postgres / SQLite
+            violation = f"Rule 42: role safety check failed and cannot be assumed safe: {e}"
+            if is_production:
+                raise DatabaseSecurityViolation(violation) from e
             return DBRoleSafetyReport(
-                current_user="sqlite_app",
+                current_user="unknown",
                 is_superuser=False,
                 is_bypass_rls=False,
-                is_safe=True,
-                violations=[],
+                is_safe=False,
+                violations=[violation],
             )
 
 
@@ -136,6 +145,7 @@ class RLSAuditor:
         - relforcerowsecurity = true (RLS forced even on table owners)
         - At least one active policy referencing zonata.tenant_id
         """
+        is_production = os.environ.get("APP_ENV") == "production"
         try:
             cursor = conn.cursor()
             # Find all public tables with tenant_id column
@@ -175,7 +185,8 @@ class RLSAuditor:
                         """
                         SELECT count(*) FROM pg_policy p
                         JOIN pg_class c ON c.oid = p.polrelid
-                        WHERE c.relname = %s;
+                        WHERE c.relname = %s
+                          AND COALESCE(pg_get_expr(p.polqual, p.polrelid), '') LIKE '%%zonata.tenant_id%%';
                         """,
                         (table_name,),
                     )
@@ -198,8 +209,10 @@ class RLSAuditor:
                 missing_force_rls=missing_force_rls,
                 missing_policies=missing_policies,
             )
-        except Exception:
-            # Fallback for SQLite simulation
+        except Exception as exc:
+            error = f"RLS audit failed and cannot be assumed compliant: {exc}"
+            if is_production:
+                raise DatabaseSecurityViolation(error) from exc
             return RLSAuditReport(
                 total_tables_inspected=0,
                 tenant_tables=[],
@@ -207,6 +220,7 @@ class RLSAuditor:
                 missing_rls=[],
                 missing_force_rls=[],
                 missing_policies=[],
+                errors=[error],
             )
 
 

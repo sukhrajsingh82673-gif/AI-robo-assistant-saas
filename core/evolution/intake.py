@@ -13,11 +13,16 @@ Features:
 """
 
 import ast
+import hashlib
+import hmac
+import json
+import os
 import re
 import uuid
-import hashlib
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple
+
+from core.evolution.principal import PrincipalLike, is_human_principal, principal_id
 
 
 class IntakeState(str, Enum):
@@ -280,20 +285,50 @@ class BehavioralSandbox:
             "raw.githubusercontent.com",
         }
 
+    @staticmethod
+    def compute_trace_attestation(trace: Dict[str, Any], key: str) -> str:
+        canonical = json.dumps(trace, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hmac.new(key.encode("utf-8"), canonical, hashlib.sha256).hexdigest()
+
     def simulate_execution(
         self,
         manifest: AgentManifest,
         simulated_trace: Optional[Dict[str, Any]] = None,
+        trace_attestation: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Executes or verifies candidate behavior against security policies.
         Traces: network_calls, file_writes, process_spawns, env_reads.
+
+        In production the trace must carry an HMAC attestation produced by the
+        sandbox runner. A caller-supplied dictionary alone is not evidence.
         """
         if simulated_trace is None:
             raise SandboxTraceRequiredError(
                 "Certification requires a real recorded sandbox trace; no safe trace is fabricated."
             )
         trace = simulated_trace
+        if not isinstance(trace, dict):
+            raise SandboxTraceRequiredError("Sandbox trace must be a mapping.")
+
+        if os.environ.get("ZONATA_TEST_MODE") != "1":
+            key = os.environ.get("ZONATA_SANDBOX_ATTESTATION_KEY", "")
+            if not key:
+                raise SandboxTraceRequiredError(
+                    "Sandbox trace attestation key is not configured; refusing unauthenticated trace."
+                )
+            expected = self.compute_trace_attestation(trace, key)
+            if not trace_attestation or not hmac.compare_digest(expected, trace_attestation):
+                raise SandboxTraceRequiredError(
+                    "Sandbox trace attestation is missing or invalid; refusing unauthenticated trace."
+                )
+
+        for field_name in ("network_calls", "file_writes", "process_spawns", "env_reads"):
+            value = trace.get(field_name, [])
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                raise SandboxTraceRequiredError(
+                    f"Sandbox trace field '{field_name}' must be a list of strings."
+                )
 
         violations = []
         observed_capabilities = set()
@@ -440,7 +475,7 @@ class AgentZooManager:
     def promote_to_active(
         self,
         intake_id: str,
-        actor_principal: str,
+        actor_principal: PrincipalLike,
         boundary_isolation: Optional[Dict[str, Any]] = None,
     ) -> AgentZooRecord:
         """
@@ -451,9 +486,10 @@ class AgentZooManager:
         if record.state != IntakeState.CERTIFIED:
             raise ValueError(f"Cannot promote agent in state '{record.state}'. Must be CERTIFIED.")
 
-        if not actor_principal.startswith("human:") and not actor_principal.startswith("owner:"):
+        if not is_human_principal(actor_principal):
             raise HumanApprovalRequiredError(
-                f"Principal '{actor_principal}' is unauthorized. Only human/owner accounts can activate external agents."
+                f"Principal '{principal_id(actor_principal)}' is unauthorized. "
+                "Only an authenticated human/owner principal can activate external agents."
             )
 
         classification = (record.static_report or {}).get("license_classification")
@@ -467,7 +503,7 @@ class AgentZooManager:
                 )
 
         record.state = IntakeState.ACTIVE
-        record.promoted_by = actor_principal
+        record.promoted_by = principal_id(actor_principal)
         record.active_version = record.manifest.version
         return record
 

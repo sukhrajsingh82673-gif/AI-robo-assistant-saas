@@ -6,6 +6,7 @@ bounding box element grounding, and graceful headless fallback simulation.
 
 from __future__ import annotations
 import os
+import tempfile
 import sys
 import time
 import uuid
@@ -605,7 +606,7 @@ class ComputerUseEngine:
         self._record("screenshot", {"region": region})
         display = os.environ.get("DISPLAY")
         if display and shutil.which("scrot"):
-            tmp_f = f"/tmp/cu_shot_{uuid.uuid4().hex[:8]}.png"
+            tmp_f = os.path.join(tempfile.gettempdir(), f"cu_shot_{uuid.uuid4().hex[:8]}.png")
             try:
                 subprocess.run(["scrot", tmp_f], check=True, timeout=5,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

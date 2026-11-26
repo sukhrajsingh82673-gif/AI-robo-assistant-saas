@@ -1569,15 +1569,20 @@ class TestUniversalAutomationFabricQualification(unittest.TestCase):
             "print(claimed)\n"
         )
 
-        p1 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        p2 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        out1, _ = p1.communicate(timeout=10.0)
-        out2, _ = p2.communicate(timeout=10.0)
+        worker_env = dict(os.environ)
+        worker_env["ZONATA_DB_PATH"] = db.db_path
+        p1 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=worker_env)
+        p2 = subprocess.Popen([sys.executable, "-c", worker_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=worker_env)
+        out1, err1 = p1.communicate(timeout=15.0)
+        out2, err2 = p2.communicate(timeout=15.0)
+
+        self.assertEqual(p1.returncode, 0, f"Worker 1 exited {p1.returncode}: {err1}")
+        self.assertEqual(p2.returncode, 0, f"Worker 2 exited {p2.returncode}: {err2}")
 
         c1 = int(out1.strip() or "0")
         c2 = int(out2.strip() or "0")
 
-        self.assertGreaterEqual(c1 + c2, 1)
+        self.assertGreaterEqual(c1 + c2, 1, f"Worker outputs out1={out1!r} err1={err1!r} out2={out2!r} err2={err2!r}")
 
         # Confirm each task is in a valid state without duplicate claiming errors
         with db.get_connection() as conn:

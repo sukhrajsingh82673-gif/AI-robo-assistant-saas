@@ -130,9 +130,17 @@ class GovernedMCPClient:
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT OR REPLACE INTO mcp_server_registrations
+                INSERT INTO mcp_server_registrations
                 (server_id, tenant_id, company_id, name, transport_type, endpoint_url, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
+                ON CONFLICT (server_id) DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
+                    company_id = EXCLUDED.company_id,
+                    name = EXCLUDED.name,
+                    transport_type = EXCLUDED.transport_type,
+                    endpoint_url = EXCLUDED.endpoint_url,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
                 """,
                 (server_id, tenant_id, company_id, name, transport_type, endpoint_url, now, now),
             )
@@ -147,19 +155,30 @@ class GovernedMCPClient:
         schema: Dict[str, Any],
         verified_description: str,
         required_action_class: str = "READ_INTERNAL",
-        is_approved: bool = True,
+        is_approved: bool = False,
     ) -> str:
-        """Pins a tool's schema hash and assigns a human-reviewed sovereign description."""
+        """Pins a tool's schema hash and assigns a human-reviewed sovereign description.
+
+        Approval is explicit. Pinning a schema must never imply execution approval.
+        """
         schema_hash = self.compute_schema_hash(schema)
-        tool_id = f"mcp_tool_{server_id}_{tool_name}"
+        identity = f"{tenant_id}\x1f{company_id}\x1f{server_id}\x1f{tool_name}"
+        tool_id = "mcp_tool_" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
         now = time.time()
         with db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT OR REPLACE INTO mcp_pinned_tools
+                INSERT INTO mcp_pinned_tools
                 (tool_id, tenant_id, company_id, server_id, tool_name, schema_hash, raw_schema_json, verified_description, required_action_class, is_approved, pinned_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tool_id) DO UPDATE SET
+                    schema_hash = EXCLUDED.schema_hash,
+                    raw_schema_json = EXCLUDED.raw_schema_json,
+                    verified_description = EXCLUDED.verified_description,
+                    required_action_class = EXCLUDED.required_action_class,
+                    is_approved = EXCLUDED.is_approved,
+                    pinned_at = EXCLUDED.pinned_at
                 """,
                 (
                     tool_id,
@@ -242,9 +261,11 @@ class GovernedMCPClient:
         idempotency_key: str,
     ) -> Dict[str, Any]:
         """Executes an MCP tool through ActionGateway evaluation and ToolRegistry execution (Rule 34 & 35)."""
-        # Idempotency check
-        if idempotency_key in self._idempotency_cache:
-            cached = dict(self._idempotency_cache[idempotency_key])
+        # Idempotency check. The cache key is tenant- and tool-scoped so one
+        # tenant's replay key can never return another tenant's result.
+        cache_key = f"{tenant_id}:{company_id}:{server_id}:{tool_name}:{idempotency_key}"
+        if cache_key in self._idempotency_cache:
+            cached = dict(self._idempotency_cache[cache_key])
             cached["cached_replay"] = True
             return cached
 
@@ -299,7 +320,10 @@ class GovernedMCPClient:
                 idempotency_key=idempotency_key,
             )
         else:
-            raw_result = {"status": "SUCCESS", "data": {"echo": arguments, "server": server_id}}
+            raise UnpinnedToolError(
+                f"MCP tool '{tool_name}' from server '{server_id}' is approved but has no "
+                "registered sovereign implementation. Refusing to fabricate an echo result."
+            )
 
         outcome = {
             "server_id": server_id,
@@ -309,7 +333,7 @@ class GovernedMCPClient:
             "executed_at": time.time(),
             "cached_replay": False,
         }
-        self._idempotency_cache[idempotency_key] = outcome
+        self._idempotency_cache[cache_key] = outcome
         return outcome
 
 

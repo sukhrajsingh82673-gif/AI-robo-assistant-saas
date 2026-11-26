@@ -40,7 +40,7 @@ class TestEnterpriseSettingsCenter(unittest.TestCase):
 
     def test_01_all_43_categories_registered(self):
         """Verify all categories exist and belong to the 6 canonical groups."""
-        self.assertEqual(len(CATEGORIES_CATALOG), 45, f"Expected 45 categories, got {len(CATEGORIES_CATALOG)}")
+        self.assertEqual(len(CATEGORIES_CATALOG), 46, f"Expected 45 categories, got {len(CATEGORIES_CATALOG)}")
         group_ids = {g["id"] for g in GROUPS}
         self.assertEqual(len(group_ids), 6)
 
@@ -53,7 +53,7 @@ class TestEnterpriseSettingsCenter(unittest.TestCase):
     def test_02_catalog_summary_generation(self):
         """Verify summary generation for the square card control plane."""
         catalog = settings_service.get_categories_catalog(self.tenant_id, self.company_a)
-        self.assertEqual(len(catalog), 45)
+        self.assertEqual(len(catalog), 46)
         for c in catalog:
             self.assertIn("current_value_summary", c)
             self.assertIn("status", c)

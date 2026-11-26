@@ -93,6 +93,8 @@ class IndustryPackRegistry:
                 "version": p["metadata"]["version"],
                 "industry_code": p["metadata"]["industry_code"],
                 "description": p["metadata"].get("description", ""),
+                "aliases": p["metadata"].get("aliases", []),
+                "standard_kpis": p["metadata"].get("standard_kpis", []),
             }
             for p in self._cache.values()
         ]

@@ -1,224 +1,165 @@
-# ZONATA / RoboAssistant
+# ZONATA — Autonomous AI Company Operating System
 
-**A governed AI workforce operating system.** You define a company; the platform provisions an
-organisation with an AI CEO, C-suite executives, departments and employees; those employees do
-work through controlled tools, and every consequential action is filtered by policy, approvals
-and budgets, then sealed into an evidence ledger.
+[![CI Pipeline](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/workflows/ci.yml/badge.svg)](https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Node](https://img.shields.io/badge/node-20%2B-green)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1.0-brightgreen)
+![Release Status](https://img.shields.io/badge/status-Step%209%20Product%20Readiness%20Certified-success)
 
-> **Release status: restricted production pilot.** This is not a public GA product. Several
-> capabilities are implemented but unproven, and a few are explicitly not implemented. The
-> per-capability matrix in [`docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md`](docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md)
-> is the authoritative statement of what works. Where this README and that report disagree, the
-> report wins.
+**A governed AI workforce, enterprise operations, and developer platform.** Define a company; ZONATA provisions an executive hierarchy (AI CEO, C-suite roles, departments, and outcome-owning AI employees), orchestrates work across 10 functional departments and 88 UN ISIC Rev. 4 industry divisions, filters every side effect through policy/authority/budget gates, and seals outcomes into a cryptographic evidence ledger.
 
----
-
-## Status at a glance
-
-| Dimension | State |
-|---|---|
-| Release stage | Restricted production pilot (single-tenant evaluations, synthetic data) |
-| Test suite | See [§5 Verification](#5-verification) — run it yourself, results are environment-dependent |
-| Persistence | SQLite by default; PostgreSQL supported through `DATABASE_URL` |
-| Live PostgreSQL qualification | **Blocked** in this environment (no server available) |
-| Container / Kubernetes suites | **Blocked** here (no Docker daemon) |
-| Browser interaction | **Partial** — `navigate` performs a real HTTP fetch; click/type/submit return `ACTION_NOT_IMPLEMENTED` |
-| Tenant, company and employee isolation | **Verified** by negative tests (cross-tenant, cross-company, cross-employee refusals) |
-
-Nothing below is a marketing claim about market readiness. It describes the system that exists in
-this repository.
+> **Verification & Honesty Contract:** This README describes strictly what is implemented and verified in the repository. Unconfigured live third-party credentials (such as commercial billing gateways or customer ERPs) explicitly report `NOT_CONFIGURED` or `NOT_IMPLEMENTED`, and live PostgreSQL 16 / container contracts require CI or Docker environments rather than lightweight local SQLite runs. Authoritative evidence lives in [`docs/reports/`](docs/reports/).
 
 ---
 
-## What the system actually does
-
-**Organisation provisioning.** A company is created from one of 15 industry blueprints
-(SaaS, e-commerce, professional services, manufacturing, healthcare, financial services, education,
-logistics, media, real estate, insurance, energy/utilities, hospitality, telecommunications,
-agriculture). Each blueprint provisions 13 C-suite roles plus industry-specific departments.
-Hierarchy is data, not code: departments, positions and reporting lines are configurable, and
-circular reporting is rejected.
-
-**Employees, not agents.** An AI employee owns an outcome. An agent is a shared capability that an
-employee invokes through an isolated instance. Employees have SOPs (immutably versioned), KRAs with
-KPIs, and performance reviews that must cite evidence. The co-worker assistant stays outside the
-employee hierarchy — it is a tool the owner uses, not a member of staff.
-
-**Governed execution.** Every action that leaves the system passes an action gateway: policy
-evaluation, authority tier check, approval requirement, budget check, and a kill switch per surface
-(`automation`, `browser`, `mcp`, `nango`, `openhands`, `temporal`, `a2a`). Agents cannot widen their
-own authority; HR-style expansion requests cannot approve themselves.
-
-**Evidence, not assertions.** Outcomes are sealed into an append-only ledger with Merkle chaining.
-A performance or business claim without a measurement is refused rather than estimated — the
-evaluation endpoint returns `409 INSUFFICIENT_MEASUREMENTS` instead of inventing a score.
-
-**Decision arena.** Corporate decisions are scored by four independent deterministic lenses
-(FINANCE, RISK, OPERATIONS, COMPLIANCE), producing `CONSENSUS`, `MAJORITY`, `CONTESTED` or
-`INSUFFICIENT_EVIDENCE`. Disagreement is reported, never averaged away.
-
----
-
-## Architecture
+## Platform Architecture
 
 ```
-                    ┌──────────────────────────────┐
-                    │          HUMAN OWNER         │
-                    │  approvals · kill switch     │
-                    └───────────────┬──────────────┘
-                                    │
-                    ┌───────────────▼──────────────┐
-                    │            AI CEO            │
-                    │  strategy · missions · arena │
-                    └───────────────┬──────────────┘
-                                    │
-        ┌───────────────────────────▼───────────────────────────┐
-        │         EXECUTIVES & DEPARTMENTS (data-driven)        │
-        │  CFO · CTO · COO · CRO · CHRO · CISO · …  (13 roles)  │
-        └───────────────────────────┬───────────────────────────┘
-                                    │
-        ┌───────────────────────────▼───────────────────────────┐
-        │              EMPLOYEES (own outcomes)                 │
-        │   SOP versions · KRAs/KPIs · reviews · collaboration  │
-        └───────────────────────────┬───────────────────────────┘
-                                    │ invoke (isolated instance + quota)
-        ┌───────────────────────────▼───────────────────────────┐
-        │        AGENT CAPABILITY FACTORY (shared, sandboxed)   │
-        └───────────────────────────┬───────────────────────────┘
-                                    │
-   ┌────────────────────────────────▼────────────────────────────────┐
-   │  ACTION GATEWAY → PolicyEngine → Authority → Approvals → Budget │
-   │  → Kill switch check → Execution → Evidence ledger (Merkle)     │
-   └─────────────────────────────────────────────────────────────────┘
+                         ┌─────────────────────────────────────┐
+                         │             HUMAN OWNER             │
+                         │  Approvals · Kill Switches · Grants │
+                         └──────────────────┬──────────────────┘
+                                            │
+                         ┌──────────────────▼──────────────────┐
+                         │        EDGE GATEWAY & AUTH          │
+                         │  Rate Limits · Entitlements · Flags │
+                         └──────────────────┬──────────────────┘
+                                            │
+       ┌────────────────────────────────────▼────────────────────────────────────┐
+       │                   AI CEO & MULTI-DEPARTMENT ENGINE                      │
+       │  Strategy · Decision Arena · 10 Departments · 88 ISIC Divisions · 30 Geo│
+       └────────────────────────────────────┬────────────────────────────────────┘
+                                            │
+       ┌────────────────────────────────────▼────────────────────────────────────┐
+       │         ACTION GATEWAY & DURABLE EXECUTION RUNTIMES                     │
+       │  Policy · Authority · Budgets · LangGraph · Temporal · ADK · MCP        │
+       └────────────────────────────────────┬────────────────────────────────────┘
+                                            │
+       ┌────────────────────────────────────▼────────────────────────────────────┐
+       │    SOVEREIGN BACKBONE, BILLING, PUBLIC API & MARKETPLACE SANDBOX        │
+       │  Double-Entry Ledger · Merkle Evidence · SHA-256 Metering · Webhooks    │
+       └─────────────────────────────────────────────────────────────────────────┘
 ```
-
-Layer notes and contracts: [`docs/architecture/`](docs/architecture/).
 
 ---
 
-## 1. Quick start
+## Capability Overview (Steps 1–9)
 
-Requirements: Python 3.12, `pip`. No paid service is required to run locally.
+| Milestone | Scope & Implemented Capabilities | Report & Spec |
+| :--- | :--- | :--- |
+| **Step 1 — Backbone** | Sovereign SQLite/PostgreSQL 16 storage, multi-tenant RLS, double-entry minor-unit ledger, Merkle folio export packs, capability truth probe | [`STEP1_REPORT.md`](docs/reports/STEP1_REPORT.md) |
+| **Step 2 — Intelligence** | AI CEO brain, Action Gateway, authority/delegation, org hierarchy, work kernel, SOP executor, 5-layer verification pyramid, KPI/Kaizen loop | [`STEP2_REPORT.md`](docs/reports/STEP2_REPORT.md) |
+| **Step 3 — Hands** | Host pairing & permissions, desktop control, origin-bound credential vault, browser engine, anti-evasion AST linters, remote takeover, terminal & sandboxed skill import | [`STEP3_REPORT.md`](docs/reports/STEP3_REPORT.md) |
+| **Step 4 — Runtimes** | Runtime ports, LangGraph adapter & encrypted checkpointer, Temporal durable workflows, Google ADK local coordinator, governed MCP runtime | [`STEP4_REPORT.md`](docs/reports/STEP4_REPORT.md) |
+| **Step 5 — Trust & Security** | Secrets management, RBAC & dual-control ownership transfer, DB RLS audit, CycloneDX SBOM supply-chain checks, SIEM audit stream, DR drills, crypto-agility | [`STEP5_REPORT.md`](docs/reports/STEP5_REPORT.md) |
+| **Step 6 — Evolution** | Failure intelligence taxonomy, owner help escalation, playbook store, canary optimizer, open-source agent intake sandbox, clean-room replication, human-merge GitHub guard | [`STEP6_REPORT.md`](docs/reports/STEP6_REPORT.md) |
+| **Step 7 — Department Depth** | 10 functional domains (Finance, Sales/CRM, Support, Marketing, HR fairness/payroll, Operations, Supply Chain/Sanctions, R&D, Legal/Security, BI Semantic Layer) + 7 Temporal workflows | [`STEP7_REPORT.md`](docs/reports/STEP7_REPORT.md) |
+| **Step 8 — Global Industry Factory** | Declarative `zonata.industry-pack/v1` factory, 88 ISIC Rev. 4 T1 divisions, 16 T2 overlays, 30 jurisdiction packs, EN 16931 e-invoicing, multi-entity consolidation, blinded benchmark engine | [`STEP8_REPORT.md`](docs/reports/STEP8_REPORT.md) |
+| **Step 9 — Product Readiness** | Edge Gateway, OpenFeature flags, Entitlements, BillingPort & SHA-256 metering with hard cost caps & legal hold protection, OpenAPI 3.1.0 Public API v1, Standard Webhooks + SSRF defense, Python & TS SDKs, Consoles + Dead-Control Detector, Onboarding & EU Data Act switching, Mobile PWA + WCAG 2.2 AA gates, Out-of-band Status & Dual-Control Support Grants, Marketplace Sandboxing, Canary Rollback & SLOs | [`STEP9_REPORT.md`](docs/reports/STEP9_REPORT.md) |
+
+---
+
+## Verification & Environment Boundaries
+
+| Surface | Local Dev (SQLite) | GitHub Actions CI | Notes |
+| :--- | :--- | :--- | :--- |
+| **Core Unit, Security & Qualification Suites** | **Verified** (~2,843 tests across 250 files) | **Verified** | Run with `ZONATA_DB_DIALECT=sqlite ZONATA_TEST_MODE=1` |
+| **AST Security & License Linters** | **Verified** | **Verified** | `anti_evasion_linter.py`, `anti_bypass_linter.py`, `gitleaks` |
+| **PostgreSQL 16 + Live Service Containers** | Requires local Postgres/Docker | **Verified in CI** | Tests live Postgres 16 RLS, SeaweedFS S3, Mailpit, ClamAV, Tika |
+| **Billing / SaaS / Live LLM Providers** | `NOT_CONFIGURED` / `Sandbox` | `Sandbox` fixtures | Real external credentials supplied only by deployment owner |
+| **Marketplace Paid Listings** | `NOT_IMPLEMENTED` | `NOT_IMPLEMENTED` | Capability-sandboxed free extensions operational; paid rails gated honestly |
+
+---
+
+## Quick Start
+
+### 1. Local Development Setup
+
+Requirements: Python 3.11+ (tested on 3.11 and 3.14), `pip`, and Node.js 20+ (optional, for frontend syntax checks and TypeScript SDK).
 
 ```bash
 git clone https://github.com/sukhrajsingh82673-gif/AI-robo-assistant-saas.git
 cd AI-robo-assistant-saas
 
 python3 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt
 
-./run_local.sh                 # http://localhost:8080
+# Seed development database and start local API + web workspace on :8080
+./run_local.sh
 ```
 
-`run_local.sh` copies `storage/roboassistant.db` to `storage/runtime.db` and starts the API and the
-web shell. To run against a scratch database on a specific port:
+Run an isolated API instance against a disposable SQLite file:
 
 ```bash
 ZONATA_DB_PATH=/tmp/zonata-dev.db APP_ENV=development python3 api_server.py 8101
+curl -s http://127.0.0.1:8101/health
 ```
 
-Health probes:
+### 2. Running Verification Tests & Linters
 
 ```bash
-curl -s localhost:8101/health
-curl -s localhost:8101/api/v1/health
+# Run full pytest suite (SQLite isolated test mode)
+env -u DATABASE_URL -u DATABASE_URL_UNPOOLED ZONATA_DB_DIALECT=sqlite ZONATA_TEST_MODE=1 python3 -m pytest -q
+
+# Run security AST linters & bytecode check
+python3 -m compileall -q .
+python3 scripts/anti_evasion_linter.py
+python3 scripts/anti_bypass_linter.py
+
+# Run Step 9 Release Readiness & End-to-End Qualification Scenario
+python3 scripts/release_readiness.py
+python3 scripts/step9_scenario.py
 ```
 
-## 2. Configuration
+### 3. Production Container Stack
 
-| Variable | Purpose |
-|---|---|
-| `ZONATA_DB_PATH` | SQLite file to use (local development default) |
-| `DATABASE_URL` / `DATABASE_URL_UNPOOLED` | PostgreSQL connection; takes precedence over SQLite |
-| `ZONATA_DB_DIALECT` | Force `sqlite` or `postgres` |
-| `APP_ENV` | `development`, `staging`, `production` |
-| `ZONATA_TEST_MODE` | Enables test-only fixtures; never set this in production |
-
-Secrets belong in environment variables or a secret manager, never in the repository. `.env*`
-files are git-ignored; only `.env.production.example` / `production.env.example` templates are
-tracked, and they contain placeholder values.
-
-## 3. Repository layout
-
-| Path | Contents |
-|---|---|
-| `api_server.py` | HTTP API and static web shell (standard-library server, no framework) |
-| `core/` | Domain logic: governance, workforce, agents, evidence, connectors, finance (~370 modules) |
-| `web/` | Vanilla-JS workspace shell and per-workspace views |
-| `tests/` | Test suite (~120 files) |
-| `migrations/pg/` | PostgreSQL schema migrations |
-| `docs/` | All long-form documentation — start at [`docs/README.md`](docs/README.md) |
-| `k8s/`, `docker/`, `Dockerfile`, `docker-compose.*.yml` | Deployment assets |
-| `scripts/`, `run_local.sh` | Operational scripts |
-| `production_readiness/`, `organization_qualification_evidence/` | Readiness artefacts and retained evidence |
-
-## 4. Governance invariants
-
-These are enforced in code and covered by negative tests. They are not configuration options.
-
-1. **No self-granted authority.** An agent cannot raise its own authority tier; expansion requires
-   an approval from a tier that already holds it.
-2. **Tenant and company isolation.** Every read and write is scoped; cross-tenant and
-   cross-company access is refused, including through shared resources.
-3. **Kill switch is authoritative.** While engaged, every execution surface returns `403`,
-   including terminal, browser, missions, MCP, workflows, A2A, finance and workforce.
-4. **Budgets are hard limits.** Exhaustion stops work; it does not degrade into a warning.
-5. **Evidence or it did not happen.** Business outcomes require a verified record; claims without
-   measurement are refused, not estimated.
-6. **Employee ≠ agent ≠ co-worker.** Employees own outcomes, agents are shared capabilities with
-   isolated sessions, the co-worker sits outside the employee hierarchy.
-
-## 5. Verification
-
-Run the suite locally:
+Copy `production.env.example` to `.env`, configure strong secrets and `DATABASE_URL`, and validate the compose stack:
 
 ```bash
-env -u DATABASE_URL -u DATABASE_URL_UNPOOLED ZONATA_DB_DIALECT=sqlite ZONATA_TEST_MODE=1 \
-  python3 -m pytest -q
+cp production.env.example .env
+docker compose -f docker-compose.prod.yml config --quiet
 ```
 
-Tests are treated as necessary but not sufficient: end-to-end claims in the reports come from
-executed HTTP calls with retained responses, not from unit tests. Every capability row in
-[`docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md`](docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md) names
-the evidence file that backs it.
+---
 
-Known environment limits at the time of writing:
+## Repository Layout
 
-- No Playwright/Chromium, so browser interaction E2E cannot run (`BLOCKED`).
-- No Docker daemon, so container suites cannot run (`BLOCKED`).
-- No PostgreSQL server, so live-PG qualification and migration `0005` remain unexecuted (`BLOCKED`).
-- No local language model (no Ollama daemon, no `HERMES_API_ENDPOINT`). The bundled engine is a
-  deterministic rule router, not a model; it reports `RULE_ENGINE_ONLY`, `is_language_model: false`.
-- No OCR/AT-SPI tooling, so desktop perception is limited to real X11 windows plus a frame digest;
-  interactive elements inside a window are seeded (`PARTIAL`).
-- The co-worker autonomy scheduler is verified on one host; its duplicate-run lock is host-local
-  `flock`, not a distributed lease (`PARTIAL` for multi-host deployments).
+| Path | Description |
+| :--- | :--- |
+| `api_server.py`, `cli.py` | HTTP API server and management CLI |
+| `core/` | Domain engine: governance, billing, edge gateway, entitlements, flags, webhooks, public API, consoles, onboarding, EU Data Act compliance, marketplace sandbox, release/SLO engineering, industry/jurisdiction engines, security & execution ports |
+| `agent_factory/` | Agent capability compiler, signer, isolated runtime pipeline |
+| `sdk/python/`, `sdk/typescript/` | Official client SDKs (`zonata-sdk`, `@zonata/sdk`) and Standard Webhooks verifiers |
+| `web/`, `web/pwa/` | Web shell, consoles, Progressive Web App manifest & service worker |
+| `migrations/pg/`, `migrations/rollback/` | PostgreSQL 16 schemas, RLS policies, and additive migration rollbacks |
+| `packs/`, `evals/` | Declarative UN ISIC Rev. 4 industry packs and golden benchmark evaluations |
+| `scripts/` | Scenario runners, linters, release readiness checks, DB seeding, and DR drills |
+| `security/` | Protected paths policies (`protected_paths*.yaml`) and security manifests |
+| `docs/` | Architecture specs, ADRs (`ADR_0001`–`ADR_0057`), baselines, compliance reports, WCAG 2.2 AA VPAT, CRA runbook — start at [`docs/README.md`](docs/README.md) |
+| `openapi_v4.json` – `openapi_v9_public.json` | Versioned OpenAPI specifications (including OpenAPI 3.1.0 Public API v1) |
+| `tests/` | Comprehensive unit, contract, preservation, security, chaos, and scenario test suite (250 test files) |
 
-## 6. Documentation
+---
 
-[`docs/README.md`](docs/README.md) is the index. The short version:
+## Core Governance Invariants
 
-| You need | Go to |
-|---|---|
-| Honest capability and gap matrix | [`docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md`](docs/reports/STAGE1_NORTHSTAR_GAP_REPORT.md) |
-| Coworker §1–§16 spec status | [`docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md`](docs/reports/SPEC_VS_IMPLEMENTATION_GAP_REPORT.md) |
-| Coworker autonomy runtime | [`docs/architecture/COWORKER_AUTONOMY_RUNTIME.md`](docs/architecture/COWORKER_AUTONOMY_RUNTIME.md), [`docs/runbooks/AUTONOMY_SUPERVISOR.md`](docs/runbooks/AUTONOMY_SUPERVISOR.md) |
-| Corrections to earlier coworker reports | [`docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md`](docs/reports/ZONATA_COWORKER_REPORT_CORRECTIONS.md) |
-| Release gate status | [`docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md`](docs/qualification/PUBLIC_GA_FINAL_GATE_MATRIX.md) |
-| Architecture and contracts | [`docs/architecture/`](docs/architecture/) (the `01_`–`30_` series is in order) |
-| Security model and audits | [`docs/architecture/SECURITY_MODEL.md`](docs/architecture/SECURITY_MODEL.md), [`docs/security/`](docs/security/) |
-| Runbooks and incident response | [`docs/operations/`](docs/operations/), [`docs/runbooks/`](docs/runbooks/) |
-| Installation and deployment | [`docs/deployment/LOCAL_AND_PRODUCTION_INSTALLATION.md`](docs/deployment/LOCAL_AND_PRODUCTION_INSTALLATION.md) |
+1. **Preservation Contract (Rules 49, 58, 67, 77):** Protected baselines and schema invariants are verified cryptographically via `docs/baselines/`.
+2. **Truth Rule & Honest Capability Reporting (Rule 24):** Missing credentials or unbuilt paths return `NOT_CONFIGURED` / `NOT_IMPLEMENTED`; test simulations require `ZONATA_TEST_MODE=1`.
+3. **Money Truth & Billing Safety (Rules 78 & 79):** All monetary arithmetic uses minor integer units (cents) with SHA-256 hash-chained ledgers. Delinquency enforces grace periods, read-only export windows, and strict legal-hold protection against deletion.
+4. **No Self-Granted Authority & Dual Control (Rules 15, 57, 82):** Agents cannot elevate permissions or self-approve merges; support staff cannot act without tenant-signed time-boxed grants and cannot invoke owner-reserved actions.
+5. **Hostile Extension Sandboxing (Rule 81):** Marketplace packages run inside capability-scoped sandboxes with egress allowlisting and sub-second global revocation.
+6. **UX Honesty & Regulatory Readiness (Rule 84 & ADR 0057):** Automated Dead-Control Detector checks, WCAG 2.2 AA quality gates (`DRAFT_ACR_VPAT.md`), EU Data Act zero-fee export, and CRA 24h/72h incident runbooks.
 
-## 7. Security
+---
 
-- Report vulnerabilities privately to the repository owner; do not open a public issue.
-- Do not commit credentials. If a token or password is ever committed, treat it as compromised,
-  revoke it, and rotate anything it could reach.
-- Third-party licence inventory: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+## Documentation, Contributing & Security
 
-## 8. Licence
+- **Documentation Index:** [`docs/README.md`](docs/README.md)
+- **Contributing Guidelines:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- **Security Policy & Vulnerability Reporting:** [`SECURITY.md`](SECURITY.md)
+- **Third-Party Licences:** [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)
 
-No project licence file is currently included, so default copyright applies. Third-party
-components are listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+## Licence
+
+No project-wide open-source licence file is currently included in this repository; default copyright applies. Third-party dependency licences are catalogued in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).

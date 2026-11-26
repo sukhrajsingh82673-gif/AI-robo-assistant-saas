@@ -61,7 +61,7 @@ def test_scenario_1_hermes_cli_and_real_delegation_pipeline():
     a 3-stage subagent delegation pipeline (Research -> Implementation -> Independent Review),
     and session context survival across process restart.
     """
-    test_db = f"/tmp/test_hermes_sc1_{uuid.uuid4().hex[:6]}.db"
+    test_db = f"{tempfile.gettempdir()}/test_hermes_sc1_{uuid.uuid4().hex[:6]}.db"
     store = HermesSessionStore(db_path=test_db)
     pm = HermesProcessManager(session_store=store)
 
@@ -312,7 +312,7 @@ def test_scenario_5_enterprise_agent_cloud_stress_and_lifecycle_benchmarking():
     exercises all 7 lifecycle states, and runs progressive workload stress tests
     (10, 50, 100, 250 tasks) on the 16-worker pool measuring queue throughput and latency.
     """
-    test_db = f"/tmp/test_agent_cloud_sc5_{uuid.uuid4().hex[:6]}.db"
+    test_db = f"{tempfile.gettempdir()}/test_agent_cloud_sc5_{uuid.uuid4().hex[:6]}.db"
     registry = AgentCloudRegistry(db_path=test_db, max_active_workers=16, max_queue_depth=2000)
 
     try:
@@ -451,7 +451,7 @@ def test_scenario_7_defensive_cybersecurity_patrol_scheduler_and_incident_lifecy
     Scenario 7: Tests all 5 cybersecurity severity tiers, runs PatrolScheduler
     in a background daemon loop, and executes the complete incident response lifecycle.
     """
-    test_db = f"/tmp/test_sec_sc7_{uuid.uuid4().hex[:6]}.db"
+    test_db = f"{tempfile.gettempdir()}/test_sec_sc7_{uuid.uuid4().hex[:6]}.db"
     store = CoworkerDbStoreV2(db_path=test_db)
     monitor = DefensiveCybersecurityMonitor(db_store=store, scan_root=BASE_DIR)
 
@@ -515,7 +515,7 @@ def test_scenario_8_database_outbox_reliability_under_failure():
     Scenario 8: Verifies transactional outbox resilience, simulated database disconnects,
     idempotent event processing, and recovery without data loss.
     """
-    test_db = f"/tmp/test_db_outbox_sc8_{uuid.uuid4().hex[:6]}.db"
+    test_db = f"{tempfile.gettempdir()}/test_db_outbox_sc8_{uuid.uuid4().hex[:6]}.db"
     store = CoworkerDbStoreV2(db_path=test_db)
 
     try:
@@ -570,15 +570,15 @@ def test_scenario_9_ceo_compound_mission_and_merkle_evidence_ledger():
     (Software Engineering + Defensive Audit + Executive Report) with physical deliverable
     verification, append-only Merkle ledger hashing, and zero simulated claims.
     """
-    test_ledger = f"/tmp/test_merkle_ledger_{uuid.uuid4().hex[:6]}.jsonl"
+    test_ledger = f"{tempfile.gettempdir()}/test_merkle_ledger_{uuid.uuid4().hex[:6]}.jsonl"
     engine = EvidenceAndReportingEngine(ledger_path=test_ledger)
 
     # 1. Create tangible physical deliverables
-    deliverable_1 = "/tmp/q3_security_audit_report.json"
+    deliverable_1 = f"{tempfile.gettempdir()}/q3_security_audit_report.json"
     with open(deliverable_1, "w") as f:
         json.dump({"audit_status": "APPROVED", "vulnerabilities_found": 0, "verified_at": time.time()}, f)
 
-    deliverable_2 = "/tmp/q3_code_fix_summary.txt"
+    deliverable_2 = f"{tempfile.gettempdir()}/q3_code_fix_summary.txt"
     with open(deliverable_2, "w") as f:
         f.write("OpenCode Ralph Loop completed with 100% test pass on calculator.py\n")
 

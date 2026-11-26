@@ -23,6 +23,12 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple
 
+from core.evolution.principal import (
+    PrincipalLike,
+    is_human_principal,
+    is_owner_principal,
+)
+
 
 class ProvenanceTrustClass(str, Enum):
     PUBLIC_DOC = "PUBLIC_DOC"
@@ -336,15 +342,20 @@ class CleanRoomLegalGate:
         }
 
     @classmethod
-    def check_owner_authorization(cls, actor_principal: str, terms_evaluation: Dict[str, Any]) -> bool:
+    def check_owner_authorization(
+        cls, actor_principal: PrincipalLike, terms_evaluation: Dict[str, Any]
+    ) -> bool:
         if terms_evaluation["prohibits_reverse_engineering"]:
-            # If terms forbid it, must stop unless owner explicitly executes legal override
-            if not actor_principal.startswith("owner:"):
+            # If terms forbid it, must stop unless the authenticated owner
+            # explicitly executes the legal override.
+            if not is_owner_principal(actor_principal):
                 raise LegalGateBlockedError(
-                    "Legal Gate Blocked: Vendor terms prohibit reverse engineering and no human owner override was provided."
+                    "Legal Gate Blocked: Vendor terms prohibit reverse engineering and no authenticated owner override was provided."
                 )
-        if not (actor_principal.startswith("human:") or actor_principal.startswith("owner:")):
-            raise LegalGateBlockedError("Human approval is mandatory to promote clean-room replicated tools.")
+        if not is_human_principal(actor_principal):
+            raise LegalGateBlockedError(
+                "Human approval is mandatory to promote clean-room replicated tools."
+            )
         return True
 
 

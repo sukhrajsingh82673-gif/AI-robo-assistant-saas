@@ -10,6 +10,7 @@ Provides first-class operational integration with Nous Research Hermes Agent:
 
 from __future__ import annotations
 import os
+import tempfile
 import sys
 import time
 import json
@@ -39,7 +40,7 @@ class HermesSessionStore:
     survive worker crashes and controlled process restarts.
     """
 
-    def __init__(self, db_path: str = "/tmp/hermes_sessions.db"):
+    def __init__(self, db_path: str = os.path.join(tempfile.gettempdir(), "hermes_sessions.db")):
         self.db_path = db_path
         self._init_db()
 

@@ -628,7 +628,11 @@ def run_scenario() -> Dict[str, Any]:
     # STEP 11: Capability Reality Probe & Report Generation
     # -------------------------------------------------------------------------
     print("\n[*] Step 11: Executing Live Capability Reality Probe & Generating Status Report...")
-    cap_report_path = REPO_ROOT / "docs" / "reports" / "CAPABILITY_STATUS.md"
+    cap_report_path = pathlib.Path(
+        os.environ.get("ZONATA_CAPABILITY_REPORT_PATH")
+        or (REPO_ROOT / "docs" / "reports" / "CAPABILITY_STATUS.md")
+    )
+    cap_report_path.parent.mkdir(parents=True, exist_ok=True)
 
     probe_cmd = [
         sys.executable,
@@ -642,7 +646,11 @@ def run_scenario() -> Dict[str, Any]:
     report_size = cap_report_path.stat().st_size
     assert report_size > 500, f"Generated report is unexpectedly small ({report_size} bytes)"
 
-    print(f"  [+] Generated {cap_report_path.relative_to(REPO_ROOT)} ({report_size} bytes).")
+    try:
+        cap_label = str(cap_report_path.relative_to(REPO_ROOT))
+    except ValueError:
+        cap_label = str(cap_report_path)
+    print(f"  [+] Generated {cap_label} ({report_size} bytes).")
 
     report["steps"]["step11_reality_probe"] = {
         "status": "PASSED",

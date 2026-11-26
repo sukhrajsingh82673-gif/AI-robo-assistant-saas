@@ -20,7 +20,7 @@ class TestEnterpriseLoadBenchmarks(unittest.TestCase):
     def setUpClass(cls):
         cls.tenant_id = "tnt_primary"
         cls.company_id = "comp_primary"
-        cls.ledger = EvidenceLedger("storage/evidence/test_audit_ledger.jsonl")
+        cls.ledger = EvidenceLedger(os.environ.get("ZONATA_EVIDENCE_PATH") or "storage/evidence/test_audit_ledger.jsonl")
 
     def test_01_load_10_concurrent_agents(self):
         """Measures execution latency and throughput for 10 concurrent simulated agents."""

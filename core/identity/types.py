@@ -93,6 +93,11 @@ class OwnershipTransferCoolingOffError(IdentitySecurityError):
     pass
 
 
+class OwnershipTransferMFARequiredError(IdentitySecurityError):
+    """Rule 44: Ownership transfer approvals require a verified MFA signal."""
+    pass
+
+
 class DualControlApprovalRequiredError(IdentitySecurityError):
     """Rule 44: Ownership or governance transfer requires distinct dual-control authorization."""
     pass

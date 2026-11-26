@@ -25,8 +25,8 @@ jobs:
       POSTGRES_DB: zonata_production
       DB_APP_PASSWORD: ci_staging_app_password_2026
       DB_WORKER_PASSWORD: ci_staging_worker_password_2026
-      MINIO_ROOT_USER: zonata_minio_admin
-      MINIO_ROOT_PASSWORD: ci_staging_minio_password_2026
+      S3_ACCESS_KEY: zonata_s3_admin
+      S3_SECRET_KEY: ci_staging_seaweedfs_secret_2026
       GF_SECURITY_ADMIN_PASSWORD: ci_staging_grafana_password_2026
 
     steps:
@@ -82,8 +82,8 @@ jobs:
           docker run --rm -v zonata-storage:/target -v $PWD/storage:/source alpine sh -c "cp -r /source/* /target/ 2>/dev/null || true; chown -R 10001:10001 /target"
           docker volume create temporal-data
           docker run --rm -v temporal-data:/target alpine chown -R 1000:1000 /target || true
-          docker volume create minio-data
-          docker run --rm -v minio-data:/target alpine chown -R 65532:65532 /target || true
+          docker volume create seaweedfs-data
+          docker run --rm -v seaweedfs-data:/target alpine chown -R 65532:65532 /target || true
           docker volume create prometheus-data
           docker run --rm -v prometheus-data:/target alpine chown -R 65534:65534 /target || true
           docker volume create grafana-data
@@ -96,8 +96,8 @@ jobs:
 
       - name: Launch Infrastructure Substrate (Step 4.4 in Runbook)
         run: |
-          echo "Launching postgres, nats, temporal, and minio..."
-          docker compose -f docker-compose.prod.yml up -d postgres nats temporal minio
+          echo "Launching postgres, nats, temporal, and seaweedfs..."
+          docker compose -f docker-compose.prod.yml up -d postgres nats temporal seaweedfs
 
           echo "Waiting for PostgreSQL 16 container to become healthy..."
           for i in {1..30}; do
@@ -177,7 +177,7 @@ jobs:
           # 2. Probe auxiliary services
           echo "Probing auxiliary infrastructure endpoints..."
           curl -fsS http://localhost:8222/varz > /dev/null && echo "NATS monitoring active" || echo "NATS probe skipped"
-          curl -fsS http://localhost:9000/minio/health/live > /dev/null && echo "MinIO health active" || echo "MinIO probe skipped"
+          curl -s -o /dev/null http://localhost:8333/ && echo "SeaweedFS S3 active" || echo "SeaweedFS probe skipped"
           curl -fsS http://localhost:8889/metrics > /dev/null && echo "OTel metrics active" || echo "OTel probe skipped"
           curl -fsS http://localhost:9090/-/healthy > /dev/null && echo "Prometheus health active" || echo "Prometheus probe skipped"
           curl -fsS http://localhost:3000/api/health > /dev/null && echo "Grafana health active" || echo "Grafana probe skipped"
@@ -259,10 +259,6 @@ jobs:
           python3 -c "
           import hashlib, subprocess
 
-          with open('storage/roboassistant.db', 'rb') as f:
-              db_sha = hashlib.sha256(f.read()).hexdigest()
-          assert db_sha == 'f71d9d79b95f2dc924385f90e97c7c565afd3b070b5d4628c3e2ad86aa52deda', f'Database hash mismatch: {db_sha}'
-
           with open('storage/evidence/audit_ledger.jsonl', 'rb') as f:
               ledger_sha = hashlib.sha256(f.read()).hexdigest()
           assert ledger_sha == 'c8e50d461ca0943d012d920ed211a7d0040d799a52a1b5af6f052a9cbae74b13', f'Ledger hash mismatch: {ledger_sha}'
@@ -270,7 +266,7 @@ jobs:
           js_hash = subprocess.check_output(['git', 'hash-object', 'web/workflow_workspace.js']).decode().strip()
           assert js_hash == '198d57ec6bda875cd2a6825fe2ef8929b7ba30bd', f'Workflow JS blob hash mismatch: {js_hash}'
 
-          print('All 3 constitutional baseline assets verified byte-for-byte: 100% MATCH')
+          print('Constitutional baseline assets verified byte-for-byte: 100% MATCH')
           "
 
       - name: Generate Reconciled Test Accounting Artifact

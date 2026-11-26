@@ -342,7 +342,7 @@ jobs:
           export ZONATA_DB_DIALECT=sqlite
           export ZONATA_DB_PATH="${RUNNER_TEMP:-/tmp}/stage5_isolated.db"
           export ZONATA_EVIDENCE_PATH="${RUNNER_TEMP:-/tmp}/stage5_ledger.jsonl"
-          cp storage/roboassistant.db "$ZONATA_DB_PATH"
+          python3 scripts/seed_dev_db.py --path "$ZONATA_DB_PATH"
 
           python3 api_server.py 8085 > /tmp/api_server.log 2>&1 &
           SERVER_PID=$!

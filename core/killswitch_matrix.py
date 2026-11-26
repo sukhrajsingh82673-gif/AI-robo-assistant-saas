@@ -62,6 +62,7 @@ class KillSwitchMatrix:
         activated_by: str = "HUMAN_OWNER"
     ) -> str:
         """Engages a KillSwitch at a specified level. Enforces Rule 15 principal separation."""
+        self._ensure_table()
         if activated_by in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or activated_by.startswith(("agt_", "ai_emp_")):
             raise PermissionError(f"Rule 15 Violation: Principal '{activated_by}' cannot engage kill switch")
 
@@ -100,6 +101,7 @@ class KillSwitchMatrix:
         deactivated_by: str = "HUMAN_OWNER"
     ) -> bool:
         """Disengages an active KillSwitch by switch_id or (level, target_id). Enforces Rule 15."""
+        self._ensure_table()
         if deactivated_by in ("AGENT", "AI_EMPLOYEE", "MODEL", "SYSTEM_AGENT") or deactivated_by.startswith(("agt_", "ai_emp_")):
             raise PermissionError(f"Rule 15 Violation: Principal '{deactivated_by}' cannot disengage kill switch")
 
@@ -131,6 +133,7 @@ class KillSwitchMatrix:
 
     def is_activated(self, level: str, target_id: Optional[str] = None) -> bool:
         """Checks if a KillSwitch is currently active at level (and optional target)."""
+        self._ensure_table()
         with db.get_connection() as conn:
             if target_id and target_id != "*":
                 row = conn.execute("""
@@ -162,6 +165,7 @@ class KillSwitchMatrix:
         Evaluates all 9 levels.
         Raises KillSwitchEngagedException immediately if any level is active.
         """
+        self._ensure_table()
         with db.get_connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM enterprise_killswitch_matrix WHERE is_active = 1"

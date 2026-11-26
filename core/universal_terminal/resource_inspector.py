@@ -6,6 +6,7 @@ memory headroom, CPU architecture, and kernel capabilities to ensure resource-aw
 
 from typing import Dict, List, Optional, Any
 import os
+import tempfile
 import sys
 import platform
 import shutil
@@ -79,6 +80,10 @@ class ResourceInspector:
             usage = shutil.disk_usage("/")
             total_mb = usage.total // (1024 * 1024)
             free_mb = usage.free // (1024 * 1024)
+            if free_mb == 0:
+                usage = shutil.disk_usage(tempfile.gettempdir())
+                total_mb = usage.total // (1024 * 1024)
+                free_mb = usage.free // (1024 * 1024)
         except Exception:
             pass
         return {

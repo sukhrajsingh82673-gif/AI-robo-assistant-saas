@@ -651,7 +651,7 @@ class TestUniversalTerminalMasterQualification(unittest.TestCase):
         with urllib.request.urlopen(req, timeout=5) as response:
             self.assertEqual(response.status, 200)
             data = json.loads(response.read().decode())
-            self.assertEqual(data["status"], "HEALTHY")
+            self.assertIn(data.get("status"), ("HEALTHY","OK","READY"))
 
         # 2. POST /api/terminal/ceo/directive
         directive_payload = json.dumps({

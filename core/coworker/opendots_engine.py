@@ -10,11 +10,13 @@ Provides honest, open-source computer-use automation:
 
 from __future__ import annotations
 import os
+import tempfile
 import time
 import json
 import uuid
 import hashlib
 import re
+import shutil
 import subprocess
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -65,7 +67,7 @@ class OpenDotsEngine:
         Computes SHA-256 screenshot hash to detect UI state mutations.
         """
         self._ensure_display_env()
-        tmp_screenshot = f"/tmp/opendots_screen_{uuid.uuid4().hex[:6]}.png"
+        tmp_screenshot = os.path.join(tempfile.gettempdir(), f"opendots_screen_{uuid.uuid4().hex[:6]}.png")
         screenshot_bytes = b""
         sha256_hash = ""
         perception_mode = "REAL_VIRTUAL_X11"
@@ -257,6 +259,16 @@ class OpenDotsEngine:
         error: Optional[str] = None
         env = dict(os.environ)
         env["DISPLAY"] = env.get("DISPLAY") or self.display
+        if not os.environ.get("DISPLAY") or not shutil.which("xwininfo"):
+            return {
+                "display": self.display,
+                "root_window": None,
+                "windows_available": False,
+                "windows_count": 0,
+                "windows": [],
+                "error": "NO_DISPLAY",
+                "timestamp": time.time(),
+            }
 
         try:
             res = subprocess.run(
@@ -331,7 +343,7 @@ class OpenDotsEngine:
         luminance are None and `perception_mode` says so.
         """
         self._ensure_display_env()
-        tmp_screen = f"/tmp/opendots_vis_{uuid.uuid4().hex[:6]}.ppm"
+        tmp_screen = os.path.join(tempfile.gettempdir(), f"opendots_vis_{uuid.uuid4().hex[:6]}.ppm")
         visual_hash: Optional[str] = None
         measured_width, measured_height = self.width, self.height
         luminance: Optional[float] = None

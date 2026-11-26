@@ -26,6 +26,7 @@ Comprehensive qualification tests covering:
 import unittest
 import time
 import os
+import tempfile
 import json
 import uuid
 import hashlib
@@ -237,7 +238,7 @@ class TestGemma4AdversarialQualification(unittest.TestCase):
         Adversarial Attempt: Mutate an evidence record on disk.
         Expected: Merkle chain integrity verification detects fork/tamper immediately.
         """
-        test_ledger_path = f"/tmp/test_audit_ledger_{uuid.uuid4().hex[:8]}.jsonl"
+        test_ledger_path = f"{tempfile.gettempdir()}/test_audit_ledger_{uuid.uuid4().hex[:8]}.jsonl"
         ledger = EvidenceLedger(ledger_file=test_ledger_path)
 
         try:

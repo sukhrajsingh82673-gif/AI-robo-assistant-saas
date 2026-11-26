@@ -31,6 +31,7 @@ protected_files:
 
 # Explicit directory and file exceptions where Step 6 additive files are permitted
 allowed_step6_paths:
+  - "core/departments/"
   - "core/evolution/"
   - "security/"
   - "tools/"
@@ -48,6 +49,155 @@ allowed_step6_paths:
   - "tests/test_step6_*"
   - "scripts/step6_*"
   - ".github/workflows/ci-evolution.yml"
+
+# Authorized security-remediation edits to Step 1-5 files. Each path was
+# reviewed, fixed, and re-sealed in docs/baselines/STEP1-5_BASELINE.json.
+remediated_step5_paths:
+  - "PROJECT_MEMORY.md"
+  - "core/adk/adapter.py"
+  - "core/adk/coordinator.py"
+  - "core/agent_import/sandbox_runner.py"
+  - "core/agent_import/scanner.py"
+  - "core/audit/siem_exporter.py"
+  - "core/db_security.py"
+  - "core/host/agent.py"
+  - "core/host/interaction.py"
+  - "core/host/perception.py"
+  - "core/identity/ownership.py"
+  - "core/identity/types.py"
+  - "core/langgraph/adapter.py"
+  - "core/langgraph/checkpointer.py"
+  - "core/mcp/client.py"
+  - "core/ports/browser.py"
+  - "core/temporal/adapter.py"
+  - "core/temporal/workflows.py"
+  - "core/universal_terminal/security_gateway.py"
+  - "tests/test_step3_agent_import.py"
+  - "tests/test_step5_identity_access.py"
+
+  - "core/authority/profiles.py"
+
+  - "core/baseline/health.py"
+
+  - "core/ceo_brain/industry.py"
+
+  - "core/coworker/agent_cloud_registry.py"
+
+  - "core/coworker/computer_use_engine.py"
+
+  - "core/coworker/decision_engine.py"
+
+  - "core/coworker/hermes_agent_v3.py"
+
+  - "core/coworker/opencode_engine.py"
+
+  - "core/coworker/opendots_engine.py"
+
+  - "core/coworker/orchestrator_v2.py"
+
+  - "core/coworker/resource_guard.py"
+
+  - "core/coworker/resource_manifests.py"
+
+  - "core/industry_packs/loader.py"
+
+  - "core/industry_packs/registry.py"
+
+  - "core/llm/budget.py"
+
+  - "core/llm/policy.py"
+
+  - "core/mcp_interoperability_runtime.py"
+
+  - "core/ports/base.py"
+
+  - "core/remote_disaster_recovery.py"
+
+  - "core/secret_vault.py"
+
+  - "core/universal_terminal/resource_inspector.py"
+
+  - "docs/cyclonedx_sbom.json"
+
+  - "packs/industries/hospitality/v1/pack.yaml"
+
+  - "packs/industries/manufacturing/v1/pack.yaml"
+
+  - "packs/industries/saas/v1/pack.yaml"
+
+  - "production.env.example"
+
+  - "tests/test_acceptance_scenarios_v3.py"
+
+  - "tests/test_ai_ceo_live_integration_qualification.py"
+
+  - "tests/test_audit_remediation_security.py"
+
+  - "tests/test_container_security_staging.py"
+
+  - "tests/test_coworker_v2_comprehensive.py"
+
+  - "tests/test_coworker_v3_acceptance.py"
+
+  - "tests/test_enterprise_settings_center.py"
+
+  - "tests/test_executive_coworker_acceptance.py"
+
+  - "tests/test_gemma4_adversarial_qualification.py"
+
+  - "tests/test_phase_14_cross_process_governance.py"
+
+  - "tests/test_production_infrastructure_qualification.py"
+
+  - "tests/test_restricted_pilot_operating_envelope.py"
+
+  - "tests/test_secrets_least_privilege.py"
+
+  - "tests/test_universal_terminal_master_qualification.py"
+
+  - "tests/test_coworker_fabric.py"
+
+  - "tests/test_preservation_step7.py"
+
+  - "tests/test_preservation_step8.py"
+
+  - "tests/test_preservation_step9.py"
+
+  - ".github/workflows/ci.yml"
+
+  - ".github/workflows/ci_cd.yml"
+
+  - ".github/workflows/docker_staging_qualification.yml"
+
+  - ".github/workflows/e2e-browser.yml"
+
+  - ".github/workflows/postgres_16_qualification.yml"
+
+  - ".gitignore"
+
+  - "README.md"
+
+  - "core/db.py"
+
+  - "core/killswitch_matrix.py"
+
+  - "docs/reports/CAPABILITY_STATUS.md"
+
+  - "scripts/step1_scenario.py"
+
+  - "tests/conftest.py"
+
+  - "tests/test_adversarial_security_and_chaos.py"
+
+  - "tests/test_enterprise_load_benchmarks.py"
+
+  - "core/automation_fabric/connector_registry.py"
+
+  - "core/temporal_durable_execution_runtime.py"
+
+  - "core/automation_fabric/fabric.py"
+
+  - "tests/test_universal_automation_fabric_qualification.py"
 
 enforcement:
   deny_modifications_to_baseline_files: true

@@ -91,25 +91,32 @@ class UniversalAutomationFabric:
             return env_key
 
         with db.get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT key_id, secret_key FROM automation_signing_keys WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
             ).fetchone()
             if row and row["secret_key"]:
+                conn.commit()
                 cls._cached_secret_key = row["secret_key"]
                 SecretManager.store_secret("sys_automation", row["key_id"], row["secret_key"])
                 return row["secret_key"]
 
             now = time.time()
             sec = hashlib.sha256(f"zonata_master_lease_salt_{uuid.uuid4().hex}_{now}".encode()).hexdigest()
-            key_id = f"key_{uuid.uuid4().hex[:12]}"
+            key_id = "key_default_active"
             conn.execute("""
-                INSERT INTO automation_signing_keys (key_id, secret_key, status, created_at, expires_at)
+                INSERT OR IGNORE INTO automation_signing_keys (key_id, secret_key, status, created_at, expires_at)
                 VALUES (?, ?, 'ACTIVE', ?, NULL)
             """, (key_id, sec, now))
             conn.commit()
-            SecretManager.store_secret("sys_automation", key_id, sec)
-            cls._cached_secret_key = sec
-            return sec
+            row = conn.execute(
+                "SELECT key_id, secret_key FROM automation_signing_keys WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            resolved_id = row["key_id"] if row else key_id
+            resolved_sec = row["secret_key"] if row else sec
+            SecretManager.store_secret("sys_automation", resolved_id, resolved_sec)
+            cls._cached_secret_key = resolved_sec
+            return resolved_sec
 
     @classmethod
     def rotate_signing_key(cls, new_key: Optional[str] = None, grace_period_seconds: float = 300.0) -> str:
@@ -149,7 +156,7 @@ class UniversalAutomationFabric:
         with db.get_connection() as conn:
             rows = conn.execute("""
                 SELECT key_id, secret_key, expires_at FROM automation_signing_keys
-                WHERE status = 'ROTATED' AND (expires_at IS NULL OR expires_at > ?)
+                WHERE status IN ('ACTIVE', 'ROTATED') AND (expires_at IS NULL OR expires_at > ?)
             """, (now,)).fetchall()
             for r in rows:
                 if r["secret_key"] and r["secret_key"] != active:

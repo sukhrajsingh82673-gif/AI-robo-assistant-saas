@@ -10,6 +10,7 @@ Enforces strict Constitutional Boundaries and self-development invariants:
 
 from __future__ import annotations
 import os
+import tempfile
 import sys
 import time
 import uuid
@@ -50,7 +51,7 @@ class OpenCodeEngine:
 
     def __init__(self, repo_root: Optional[str] = None):
         self.repo_root = os.path.abspath(repo_root or get_repo_root())
-        self.worktree_base = "/tmp/zonata_opencode_worktrees"
+        self.worktree_base = os.path.join(tempfile.gettempdir(), "zonata_opencode_worktrees")
         os.makedirs(self.worktree_base, exist_ok=True)
         import shutil
         # Resolve the CLI portably: PATH first, then common install prefixes.

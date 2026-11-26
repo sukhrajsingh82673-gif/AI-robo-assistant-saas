@@ -126,11 +126,18 @@ class TenantModelPolicyManager:
                 ))
             else:
                 cur.execute("""
-                INSERT OR REPLACE INTO tenant_model_policies (
+                INSERT INTO tenant_model_policies (
                     policy_id, tenant_id, company_id, allowed_providers_json,
                     allowed_regions_json, require_no_retention, block_restricted_docs,
                     allow_degraded, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tenant_id, company_id) DO UPDATE SET
+                    allowed_providers_json = EXCLUDED.allowed_providers_json,
+                    allowed_regions_json = EXCLUDED.allowed_regions_json,
+                    require_no_retention = EXCLUDED.require_no_retention,
+                    block_restricted_docs = EXCLUDED.block_restricted_docs,
+                    allow_degraded = EXCLUDED.allow_degraded,
+                    updated_at = EXCLUDED.updated_at
                 """, (
                     policy_id, tenant_id, company_id, providers_json, regions_json,
                     1 if require_no_retention else 0,

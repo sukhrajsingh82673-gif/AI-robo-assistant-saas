@@ -9,11 +9,15 @@ Features:
 - Owner-Facing Evolution Journal: immutable audit log and weekly digest of all evolved components.
 """
 
-import uuid
 import hashlib
+import json
+import os
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set
+
+from core.db import db
 
 
 class KillSwitchStatus(str, Enum):
@@ -44,6 +48,84 @@ class EvolutionSafetyEngine:
         self._global_kill_switch: bool = False
         self._company_kill_switches: Dict[str, bool] = {}
         self._incident_log: List[Dict[str, Any]] = []
+        self._persistent = os.environ.get("ZONATA_TEST_MODE") != "1"
+        if self._persistent:
+            self._init_db()
+            self._load_state()
+
+    def _init_db(self) -> None:
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evolution_kill_switches (
+                    scope TEXT PRIMARY KEY,
+                    active INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evolution_incident_log (
+                    event_id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    activated_by TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+
+    def _load_state(self) -> None:
+        with db.get_connection() as conn:
+            for scope, active in conn.execute(
+                "SELECT scope, active FROM evolution_kill_switches"
+            ).fetchall():
+                if scope == "GLOBAL":
+                    self._global_kill_switch = bool(active)
+                else:
+                    self._company_kill_switches[scope] = bool(active)
+            for row in conn.execute(
+                "SELECT event_id, scope, activated_by, reason, timestamp "
+                "FROM evolution_incident_log ORDER BY timestamp"
+            ).fetchall():
+                self._incident_log.append({
+                    "event_id": row[0],
+                    "scope": row[1],
+                    "activated_by": row[2],
+                    "reason": row[3],
+                    "timestamp": row[4],
+                })
+
+    def _persist_scope(self, scope: str, active: bool) -> None:
+        if not self._persistent:
+            return
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO evolution_kill_switches (scope, active, updated_at) "
+                "VALUES (?, ?, ?) ON CONFLICT(scope) DO UPDATE SET "
+                "active = excluded.active, updated_at = excluded.updated_at",
+                (scope, 1 if active else 0, datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+
+    def _persist_incident(self, record: Dict[str, Any]) -> None:
+        if not self._persistent:
+            return
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO evolution_incident_log "
+                "(event_id, scope, activated_by, reason, timestamp) VALUES (?, ?, ?, ?, ?)",
+                (
+                    record["event_id"],
+                    record["scope"],
+                    record["activated_by"],
+                    record["reason"],
+                    record["timestamp"],
+                ),
+            )
+            conn.commit()
 
     def is_evolution_enabled(self, company_id: Optional[str] = None) -> bool:
         if self._global_kill_switch:
@@ -66,11 +148,14 @@ class EvolutionSafetyEngine:
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        if scope.upper() == "GLOBAL":
+        persisted_scope = "GLOBAL" if scope.upper() == "GLOBAL" else scope
+        if persisted_scope == "GLOBAL":
             self._global_kill_switch = True
         else:
-            self._company_kill_switches[scope] = True
+            self._company_kill_switches[persisted_scope] = True
 
+        self._persist_scope(persisted_scope, True)
+        self._persist_incident(record)
         self._incident_log.append(record)
         return record
 
@@ -80,12 +165,16 @@ class EvolutionSafetyEngine:
         actor_principal: str = "owner:root",
     ) -> None:
         """Deactivates kill switch (requires owner principal)."""
-        if not actor_principal.startswith("owner:"):
-            raise PermissionError("Only repository owner can deactivate the evolution kill switch.")
-        if scope.upper() == "GLOBAL":
+        from core.evolution.principal import is_owner_principal
+
+        if not is_owner_principal(actor_principal):
+            raise PermissionError("Only an authenticated repository owner can deactivate the evolution kill switch.")
+        persisted_scope = "GLOBAL" if scope.upper() == "GLOBAL" else scope
+        if persisted_scope == "GLOBAL":
             self._global_kill_switch = False
-        elif scope in self._company_kill_switches:
-            self._company_kill_switches[scope] = False
+        elif persisted_scope in self._company_kill_switches:
+            self._company_kill_switches[persisted_scope] = False
+        self._persist_scope(persisted_scope, False)
 
     def check_evolution_permitted(self, company_id: Optional[str] = None) -> None:
         if not self.is_evolution_enabled(company_id):
@@ -186,6 +275,67 @@ class EvolutionJournal:
 
     def __init__(self):
         self._entries: List[Dict[str, Any]] = []
+        self._persistent = os.environ.get("ZONATA_TEST_MODE") != "1"
+        if self._persistent:
+            self._init_db()
+            self._load_entries()
+
+    def _init_db(self) -> None:
+        with db.get_connection() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evolution_journal (
+                    entry_id TEXT PRIMARY KEY,
+                    timestamp TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    change_class TEXT NOT NULL,
+                    target_name TEXT NOT NULL,
+                    rationale TEXT NOT NULL,
+                    measured_effect_json TEXT NOT NULL,
+                    rollback_id TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+
+    def _load_entries(self) -> None:
+        with db.get_connection() as conn:
+            for row in conn.execute(
+                "SELECT entry_id, timestamp, company_id, change_class, target_name, "
+                "rationale, measured_effect_json, rollback_id "
+                "FROM evolution_journal ORDER BY timestamp"
+            ).fetchall():
+                self._entries.append({
+                    "entry_id": row[0],
+                    "timestamp": row[1],
+                    "company_id": row[2],
+                    "change_class": row[3],
+                    "target_name": row[4],
+                    "rationale": row[5],
+                    "measured_effect": json.loads(row[6]),
+                    "rollback_id": row[7],
+                })
+
+    def _persist_entry(self, entry: Dict[str, Any]) -> None:
+        if not self._persistent:
+            return
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO evolution_journal (entry_id, timestamp, company_id, "
+                "change_class, target_name, rationale, measured_effect_json, rollback_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    entry["entry_id"],
+                    entry["timestamp"],
+                    entry["company_id"],
+                    entry["change_class"],
+                    entry["target_name"],
+                    entry["rationale"],
+                    json.dumps(entry["measured_effect"], sort_keys=True),
+                    entry["rollback_id"],
+                ),
+            )
+            conn.commit()
 
     def record_evolution(
         self,
@@ -206,6 +356,7 @@ class EvolutionJournal:
             "measured_effect": measured_effect,
             "rollback_id": rollback_id,
         }
+        self._persist_entry(entry)
         self._entries.append(entry)
         return entry
 

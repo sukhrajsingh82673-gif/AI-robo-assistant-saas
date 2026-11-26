@@ -54,7 +54,7 @@ def test_hermes_agent_real_execution_and_restart_recovery():
     Test A: Verifies Hermes session lifecycle, honest inference status, real
     tool execution, persistent memory in SQLite, and restart recovery.
     """
-    test_db = f"/tmp/test_hermes_{uuid.uuid4().hex[:6]}.db"
+    test_db = f"{tempfile.gettempdir()}/test_hermes_{uuid.uuid4().hex[:6]}.db"
     store = HermesSessionStore(db_path=test_db)
     pm = HermesProcessManager(session_store=store)
 
@@ -88,11 +88,11 @@ def test_hermes_agent_real_execution_and_restart_recovery():
 
         # A shell metacharacter must not be interpreted: no shell=True.
         injection = pm.dispatcher.dispatch(
-            "terminal_exec", json.dumps({"command": "echo safe; touch /tmp/hermes_should_not_exist"})
+            "terminal_exec", json.dumps({"command": f"echo safe; touch {tempfile.gettempdir()}/hermes_should_not_exist"})
         )
         assert injection["result"].get("executed") is True
         assert "safe; touch" in injection["result"]["stdout"]
-        assert not os.path.exists("/tmp/hermes_should_not_exist")
+        assert not os.path.exists(f"{tempfile.gettempdir()}/hermes_should_not_exist")
 
         # Delegation is not wired to a subagent runtime and must say so.
         delegation = pm.dispatcher.dispatch(
@@ -325,7 +325,7 @@ def test_enterprise_agent_fleet_5000_capacity_and_bounded_scheduling():
     Test E: Verifies registration of 5,000 logical agent identities in SQLite,
     bounded worker pool scheduling (16 max workers), backpressure, and quotas.
     """
-    db_file = f"/tmp/test_fleet_{uuid.uuid4().hex[:6]}.db"
+    db_file = f"{tempfile.gettempdir()}/test_fleet_{uuid.uuid4().hex[:6]}.db"
     registry = AgentCloudRegistry(db_path=db_file, max_active_workers=8, max_queue_depth=100)
 
     try:
@@ -413,7 +413,7 @@ def test_senior_defensive_cybersecurity_patrol_5_tiers():
     # 5. Verification requires a real host-state check, not a boolean.
     assert monitor.verify_remediation(inc["incident_id"], True)["verified"] is False
 
-    marker = f"/tmp/incident_marker_{uuid.uuid4().hex[:6]}"
+    marker = f"{tempfile.gettempdir()}/incident_marker_{uuid.uuid4().hex[:6]}"
     open(marker, "w").close()
 
     def remediate_and_check():
@@ -574,10 +574,10 @@ def test_frontend_executive_cockpit_and_single_floating_assistant():
     with open(os.path.join(REPO_ROOT, "web", "index.html"), "r", encoding="utf-8") as f:
         html = f.read()
 
-    assert '<div id="floatingAssistantContainer"' in html
-    assert html.count('id="floatingAssistantContainer"') == 1
-    # Check no duplicate floating launchers exist
-    assert html.count('class="floating-assistant-container"') == 1
+    assert '<div id="uraAssistantRoot"' in html
+    assert html.count('id="uraAssistantRoot"') == 1
+    # URA is the only assistant surface; no legacy duplicate launcher.
+    assert 'floatingAssistantContainer' not in html
 
     # 2. Dashboard telemetry must reflect live state, never a fixed advert.
     class _Engine:

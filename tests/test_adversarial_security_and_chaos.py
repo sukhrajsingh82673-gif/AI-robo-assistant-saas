@@ -34,7 +34,7 @@ class TestAdversarialSecurityAndChaos(unittest.TestCase):
         cls.tenant_id = "tnt_primary"
         cls.victim_tenant = f"tnt_victim_{uuid.uuid4().hex[:6]}"
         cls.company_id = "comp_primary"
-        cls.ledger = EvidenceLedger("storage/evidence/test_audit_ledger.jsonl")
+        cls.ledger = EvidenceLedger(os.environ.get("ZONATA_EVIDENCE_PATH") or "storage/evidence/test_audit_ledger.jsonl")
         with db.get_connection() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO tenants (tenant_id, name, plan, status, created_at) VALUES (?, ?, 'ENTERPRISE', 'ACTIVE', ?)",

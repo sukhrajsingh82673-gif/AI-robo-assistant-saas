@@ -49,7 +49,7 @@ class TestSecretsLeastPrivilege(unittest.TestCase):
 
         # Confirm environment variable interpolation patterns are used
         self.assertIn("${POSTGRES_PASSWORD}", content)
-        self.assertIn("${MINIO_ROOT_PASSWORD}", content)
+        self.assertIn("${S3_SECRET_KEY}", content)
         self.assertIn("${GF_SECURITY_ADMIN_PASSWORD}", content)
 
     def test_02_docker_compose_least_privilege_role_separation(self):
@@ -161,7 +161,7 @@ class TestSecretsLeastPrivilege(unittest.TestCase):
             "DB_MIGRATOR_PASSWORD",
             "MIGRATOR_DATABASE_URL",
             "ZONATA_AUTH_SECRET",
-            "MINIO_ROOT_PASSWORD",
+            "S3_SECRET_KEY",
             "GF_SECURITY_ADMIN_PASSWORD"
         ]
         for var in required_vars:

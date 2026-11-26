@@ -172,7 +172,13 @@ class TerminalSecurityGateway:
         norm_ws = os.path.abspath(allowed_workspace)
         norm_tmp = os.path.abspath("/tmp")
 
-        is_allowed = norm_target.startswith(norm_ws) or norm_target.startswith(norm_tmp)
+        def _within(path: str, root: str) -> bool:
+            try:
+                return os.path.commonpath([path, root]) == root
+            except ValueError:
+                return False
+
+        is_allowed = _within(norm_target, norm_ws) or _within(norm_target, norm_tmp)
         return is_allowed, norm_target
 
     @classmethod

@@ -12,10 +12,11 @@ Enforces:
 from __future__ import annotations
 import json
 import logging
+import os
 import secrets
 import time
 import uuid
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Callable, Dict, List, Optional, Any, Set, Tuple
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -58,9 +59,15 @@ class ZonataHostAgent:
     Connects outbound only to cloud; all command consent is verified locally.
     """
 
-    def __init__(self, device_name: str = "Workstation", os_type: str = "linux"):
+    def __init__(
+        self,
+        device_name: str = "Workstation",
+        os_type: str = "linux",
+        host_executor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+    ):
         self.device_name = device_name
         self.os_type = os_type
+        self.host_executor = host_executor
         self.device_id: Optional[str] = None
         self.tenant_id: Optional[str] = None
         self.company_id: Optional[str] = None
@@ -304,16 +311,58 @@ class ZonataHostAgent:
                     f"Host grant mode is CONFIRM_EACH. Action '{action_type}' was not confirmed by the human on the host."
                 )
 
-        # 5. Successful Execution Verification
-        self._record_command_event(GrantEventType.COMMAND_ALLOWED, command_payload, "IN_GRANT_EXECUTED", matching_grant.grant_id)
+        # 5. Dispatch to the real host backend. Test mode may use an explicit
+        # simulation, but production must never report a phantom execution.
+        is_test = os.environ.get("ZONATA_TEST_MODE") == "1"
+        if self.host_executor is not None:
+            try:
+                backend_result = self.host_executor(dict(command_payload))
+            except Exception as exc:
+                self._record_command_event(
+                    GrantEventType.COMMAND_DENIED, command_payload,
+                    f"HOST_EXECUTOR_FAILED: {exc}", matching_grant.grant_id,
+                )
+                raise HostSecurityViolation(f"Host executor failed: {exc}") from exc
+            if not isinstance(backend_result, dict) or backend_result.get("executed") is not True:
+                self._record_command_event(
+                    GrantEventType.COMMAND_DENIED, command_payload,
+                    "HOST_EXECUTOR_DID_NOT_EXECUTE", matching_grant.grant_id,
+                )
+                raise HostSecurityViolation(
+                    "Host executor did not confirm execution; refusing to report success."
+                )
+            executed = True
+            simulated = False
+            backend_output = backend_result
+        elif is_test:
+            executed = True
+            simulated = True
+            backend_output = {"status": "SIMULATED_TEST_EXECUTION"}
+        else:
+            self._record_command_event(
+                GrantEventType.COMMAND_DENIED, command_payload,
+                "NO_HOST_EXECUTOR_CONFIGURED", matching_grant.grant_id,
+            )
+            raise HostSecurityViolation(
+                "No host execution backend is configured. The host agent cannot execute "
+                "GUI actions without a real OS automation backend."
+            )
+
+        self._record_command_event(
+            GrantEventType.COMMAND_ALLOWED, command_payload,
+            "IN_GRANT_EXECUTED" if not simulated else "IN_GRANT_SIMULATED_TEST_EXECUTION",
+            matching_grant.grant_id,
+        )
         return {
             "status": "SUCCESS",
-            "executed": True,
+            "executed": executed,
+            "simulated": simulated,
             "device_id": self.device_id,
             "app_name": app_name,
             "action_type": action_type,
             "mode": matching_grant.mode.value,
             "grant_id": matching_grant.grant_id,
+            "backend": backend_output,
             "timestamp": now,
         }
 

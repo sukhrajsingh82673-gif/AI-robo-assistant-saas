@@ -52,6 +52,31 @@ class SecretVault:
                 FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
             );
             """)
+            try:
+                cols = [r[1] for r in conn.execute("PRAGMA table_info(enterprise_secret_vault)").fetchall()]
+            except Exception:
+                cols = []
+            if "encrypted_payload" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN encrypted_payload TEXT NOT NULL DEFAULT ''")
+            if "version" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+            if "status" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+            if "company_id" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN company_id TEXT NOT NULL DEFAULT ''")
+            if "origin" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN origin TEXT NOT NULL DEFAULT 'internal'")
+            if "secret_ciphertext" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN secret_ciphertext TEXT NOT NULL DEFAULT ''")
+            if "secret_type" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN secret_type TEXT NOT NULL DEFAULT 'API_KEY'")
+            if "rotated_at" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN rotated_at REAL")
+            if "access_count" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0")
+            if "last_accessed_at" not in cols:
+                conn.execute("ALTER TABLE enterprise_secret_vault ADD COLUMN last_accessed_at REAL")
+
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_secret_access_audit (
                 audit_id TEXT PRIMARY KEY,
@@ -111,10 +136,11 @@ class SecretVault:
         with db.get_connection() as conn:
             conn.execute("""
                 INSERT INTO enterprise_secret_vault (
-                    secret_id, tenant_id, name, encrypted_payload,
+                    secret_id, tenant_id, company_id, name, origin,
+                    secret_ciphertext, encrypted_payload, secret_type,
                     version, status, created_at, expires_at
-                ) VALUES (?, ?, ?, ?, 1, 'ACTIVE', ?, ?)
-            """, (secret_id, self.tenant_id, name, encrypted, now, expires_at))
+                ) VALUES (?, ?, ?, ?, 'internal', ?, ?, 'API_KEY', 1, 'ACTIVE', ?, ?)
+            """, (secret_id, self.tenant_id, self.tenant_id, name, encrypted, encrypted, now, expires_at))
 
             conn.execute("""
                 INSERT INTO enterprise_secret_access_audit (

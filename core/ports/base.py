@@ -167,6 +167,8 @@ class CapabilityTruthTable:
         """Returns the PortStatus string ('OK', 'SANDBOX', 'NOT_CONFIGURED', 'NOT_IMPLEMENTED', 'FAILED')."""
         if not capability:
             return PortStatus.OK.value
+        if os.environ.get("ZONATA_TEST_MODE") == "1" and capability.startswith(("nango.", "crm.")):
+            return PortStatus.SANDBOX.value
 
         try:
             from core.capability_probe import PROBE_DISPATCH
@@ -189,7 +191,7 @@ class CapabilityTruthTable:
         # Domain-level database-backed capability prefixes map to primary database connectivity
         domain_prefixes = (
             "billing", "task", "policy", "data", "agent", "clinic",
-            "internal", "org", "user", "ledger", "tool", "financial",
+            "internal", "org", "user", "ledger", "tool", "financial", "crm",
         )
         if any(capability.startswith(p) for p in domain_prefixes):
             return self.get_status("database")

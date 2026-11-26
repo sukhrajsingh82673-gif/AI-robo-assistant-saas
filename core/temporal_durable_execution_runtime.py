@@ -624,6 +624,7 @@ class TemporalDurableExecutionGateway:
         ]
         with db.get_connection() as conn:
             for q_name, w_type, sec, conc, rate, desc in default_queues:
+                scoped_q_name = f"{q_name}@{self.tenant_id}"
                 conn.execute(
                     """
                     INSERT OR IGNORE INTO temporal_task_queues (
@@ -631,7 +632,7 @@ class TemporalDurableExecutionGateway:
                         concurrency_limit, rate_limit_per_minute, status, description, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
                     """,
-                    (q_name, self.tenant_id, self.company_id, w_type, sec, conc, rate, desc, time.time())
+                    (scoped_q_name, self.tenant_id, self.company_id, w_type, sec, conc, rate, desc, time.time())
                 )
             conn.commit()
 
@@ -647,6 +648,8 @@ class TemporalDurableExecutionGateway:
         ]
         with db.get_connection() as conn:
             for w_id, q_name, caps, acts, conc in default_workers:
+                scoped_w_id = f"{w_id}_{self.tenant_id}"
+                scoped_q_name = f"{q_name}@{self.tenant_id}"
                 conn.execute(
                     """
                     INSERT OR IGNORE INTO temporal_workers (
@@ -655,7 +658,7 @@ class TemporalDurableExecutionGateway:
                         max_concurrent_activities, max_concurrent_workflows, heartbeat_at, created_at
                     ) VALUES (?, ?, ?, ?, ?, 'ONLINE', ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (w_id, self.tenant_id, self.company_id, q_name, json.dumps(caps),
+                    (scoped_w_id, self.tenant_id, self.company_id, scoped_q_name, json.dumps(caps),
                      ZONATA_DURABLE_RUNTIME_VERSION, WORKFLOW_DEFINITION_VERSION, json.dumps(acts),
                      conc, conc, time.time(), time.time())
                 )

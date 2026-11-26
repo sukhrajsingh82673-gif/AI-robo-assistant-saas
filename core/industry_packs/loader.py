@@ -194,9 +194,14 @@ class IndustryPackLoader:
                 else:
                     cur.execute(
                         """
-                        INSERT OR REPLACE INTO company_folio_types (
+                        INSERT INTO company_folio_types (
                             id, tenant_id, company_id, pack_id, folio_type, name, description, config, created_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (tenant_id, company_id, folio_type) DO UPDATE SET
+                            pack_id = EXCLUDED.pack_id,
+                            name = EXCLUDED.name,
+                            description = EXCLUDED.description,
+                            config = EXCLUDED.config
                         """,
                         (
                             ft_id,
@@ -243,9 +248,15 @@ class IndustryPackLoader:
             else:
                 cur.execute(
                     """
-                    INSERT OR REPLACE INTO installed_industry_packs (
+                    INSERT INTO installed_industry_packs (
                         id, tenant_id, company_id, pack_id, name, version, isic_code, raw_manifest, installed_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (tenant_id, company_id, pack_id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        version = EXCLUDED.version,
+                        isic_code = EXCLUDED.isic_code,
+                        raw_manifest = EXCLUDED.raw_manifest,
+                        installed_at = EXCLUDED.installed_at
                     """,
                     (
                         inst_id,

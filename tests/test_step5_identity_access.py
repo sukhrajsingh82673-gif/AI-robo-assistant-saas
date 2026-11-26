@@ -21,6 +21,7 @@ from core.identity.types import (
     MachineInteractiveLoginForbiddenError,
     MFAEnforcementError,
     OwnershipTransferCoolingOffError,
+    OwnershipTransferMFARequiredError,
     RecoveryForbiddenByEmailAloneError,
     RoleTier,
     StepUpRequiredError,
@@ -232,9 +233,9 @@ class TestIdentityAccessGovernance:
             cooling_off_seconds=3600.0,  # 1 hour
         )
         assert record.status == "PENDING"
-        assert len(record.approvals) == 1
+        assert len(record.approvals) == 0
 
-        # 2. Cannot execute with only 1 approval
+        # 2. Initiation is not an approval; execution needs two explicit approvals
         with pytest.raises(DualControlApprovalRequiredError, match="at least 2 distinct approvals"):
             gov.execute_transfer(record.request_id, executor_id="usr_founder_1")
 
@@ -247,7 +248,25 @@ class TestIdentityAccessGovernance:
                 mfa_verified=True,
             )
 
-        # 4. Independent board member approves
+        # 4. Current owner approval requires a verified MFA signal
+        with pytest.raises(OwnershipTransferMFARequiredError, match="MFA"):
+            gov.approve_transfer(
+                request_id=record.request_id,
+                approver_id="usr_founder_1",
+                approver_role="OWNER",
+                mfa_verified=False,
+            )
+
+        first = gov.approve_transfer(
+            request_id=record.request_id,
+            approver_id="usr_founder_1",
+            approver_role="OWNER",
+            mfa_verified=True,
+        )
+        assert first.status == "PENDING"
+        assert len(first.approvals) == 1
+
+        # 5. Independent board member approves
         updated = gov.approve_transfer(
             request_id=record.request_id,
             approver_id="usr_board_member_3",
