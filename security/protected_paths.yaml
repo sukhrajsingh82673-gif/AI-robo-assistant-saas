@@ -199,6 +199,14 @@ remediated_step5_paths:
 
   - "tests/test_universal_automation_fabric_qualification.py"
 
+  - "core/baseline/outbox.py"
+
+  - "core/action_envelope.py"
+
+  - "docker-compose.prod.yml"
+
+  - "tests/test_docker_staging_qualification.py"
+
 enforcement:
   deny_modifications_to_baseline_files: true
   deny_deletions_of_baseline_files: true

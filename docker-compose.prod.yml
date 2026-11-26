@@ -52,6 +52,10 @@ services:
       - ZONATA_STRICT_AUTH=1
       - ZONATA_DISABLE_DEMO_SEED=1
       - ZONATA_CLEAN_STARTUP=1
+      - ZONATA_AUTH_SECRET=${ZONATA_AUTH_SECRET}
+      - KMS_MASTER_KEY=${KMS_MASTER_KEY}
+      - ZONATA_MODEL_PROVIDER=${ZONATA_MODEL_PROVIDER:-openai}
+      - ZONATA_ALLOW_DEGRADED=${ZONATA_ALLOW_DEGRADED:-0}
       - DATABASE_URL=${DATABASE_URL:-postgresql://zonata_app:${DB_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-zonata_production}}
       - DATABASE_MIN_POOL_SIZE=${DATABASE_MIN_POOL_SIZE:-10}
       - DATABASE_MAX_POOL_SIZE=${DATABASE_MAX_POOL_SIZE:-50}
@@ -60,7 +64,7 @@ services:
       - DB_PATH=/app/storage/roboassistant.db
       - NATS_URL=nats://nats:4222
       - TEMPORAL_HOST=temporal:7233
-      - VAULT_ADDR=http://vault:8200
+      - VAULT_ADDR=${VAULT_ADDR:-}
       - KEYCLOAK_URL=http://keycloak:8080
       - S3_ENDPOINT=http://seaweedfs:8333
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -106,6 +110,8 @@ services:
       - ENVIRONMENT=production
       - ZONATA_STRICT_AUTH=1
       - ZONATA_DISABLE_DEMO_SEED=1
+      - ZONATA_AUTH_SECRET=${ZONATA_AUTH_SECRET}
+      - KMS_MASTER_KEY=${KMS_MASTER_KEY}
       - DATABASE_URL=${WORKER_DATABASE_URL:-postgresql://zonata_worker:${DB_WORKER_PASSWORD}@postgres:5432/${POSTGRES_DB:-zonata_production}}
       - DATABASE_MIN_POOL_SIZE=${DATABASE_MIN_POOL_SIZE:-5}
       - DATABASE_MAX_POOL_SIZE=${DATABASE_MAX_POOL_SIZE:-20}

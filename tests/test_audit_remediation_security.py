@@ -54,6 +54,10 @@ MODULE_TEMP_DIR = None
 def setUpModule():
     """Configures a globally isolated database for all test fixtures in this suite."""
     global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
+    prod_db_candidate = os.path.join(BASE_DIR, "storage", "roboassistant.db")
+    if os.path.exists(prod_db_candidate) and not os.environ.get("ZONATA_PRETEST_DB_SHA256"):
+        with open(prod_db_candidate, "rb") as _pf:
+            os.environ["ZONATA_PRETEST_DB_SHA256"] = hashlib.sha256(_pf.read()).hexdigest()
     MODULE_ORIG_DB_PATH = db.db_path
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "security_test_isolated.db")
@@ -338,7 +342,7 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def setUp(self):
         self.orig_env = {
             k: os.environ.get(k)
-            for k in ["ZONATA_ALLOW_HOST_SHELL", "STRICT_ISOLATION_REQUIRED", "APP_ENV", "ZONATA_ENV", "ZONATA_STRICT_AUTH", "ZONATA_PRODUCTION"]
+            for k in ["ZONATA_ALLOW_HOST_SHELL", "STRICT_ISOLATION_REQUIRED", "APP_ENV", "ZONATA_ENV", "ZONATA_STRICT_AUTH", "ZONATA_PRODUCTION", "ZONATA_CONTAINER_ISOLATION"]
         }
         for k in self.orig_env:
             if k in os.environ:
@@ -370,11 +374,12 @@ class TestRuntimeSandboxFailClosed(unittest.TestCase):
     def test_02_microvm_runtime_fails_closed_without_kvm(self):
         """MicroVM adapter must fail closed with code 126 when KVM/MicroVM runtime is absent."""
         adapter = VMRuntimeAdapter()
-        res = adapter.execute_command(
-            session_id="test_sess_02",
-            command="echo 'unauthorized_execution'",
-            cwd=tempfile.gettempdir()
-        )
+        with patch.object(VMRuntimeAdapter, "_has_virtualization", return_value=False):
+            res = adapter.execute_command(
+                session_id="test_sess_02",
+                command="echo 'unauthorized_execution'",
+                cwd=tempfile.gettempdir()
+            )
         self.assertEqual(res.get("exit_code"), 126)
         self.assertTrue(res.get("sandbox_failure"))
         self.assertIn("virtualization", res.get("stderr", "").lower())

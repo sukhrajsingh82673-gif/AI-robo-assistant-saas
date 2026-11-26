@@ -68,6 +68,13 @@ class UniversalAutomationFabric:
     @classmethod
     def _ensure_signing_keys_table(cls):
         with db.get_connection() as conn:
+            if getattr(getattr(db, "dialect", None), "value", getattr(db, "dialect", None)) == "postgresql" and not getattr(db, "_deferred_import_mode", False):
+                try:
+                    reg = conn.execute("SELECT to_regclass('public.automation_signing_keys')").fetchone()
+                    if reg and reg[0]:
+                        return
+                except Exception:
+                    pass
             conn.execute("""
             CREATE TABLE IF NOT EXISTS automation_signing_keys (
                 key_id TEXT PRIMARY KEY,
@@ -189,6 +196,13 @@ class UniversalAutomationFabric:
     def _init_automation_tables(self):
         """Ensure necessary database tables exist."""
         with db.get_connection() as conn:
+            if getattr(getattr(db, "dialect", None), "value", getattr(db, "dialect", None)) == "postgresql" and not getattr(db, "_deferred_import_mode", False):
+                try:
+                    reg = conn.execute("SELECT to_regclass('public.automation_workflows')").fetchone()
+                    if reg and reg[0]:
+                        return
+                except Exception:
+                    pass
             conn.executescript("""
             CREATE TABLE IF NOT EXISTS automation_workflows (
                 workflow_id TEXT PRIMARY KEY,

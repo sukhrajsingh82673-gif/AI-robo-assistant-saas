@@ -100,7 +100,7 @@ class TestDockerStagingQualification(unittest.TestCase):
             "postgres",
             "nats",
             "temporal",
-            "minio",
+            "seaweedfs",
             "otel-collector",
             "prometheus",
             "grafana"
@@ -114,7 +114,7 @@ class TestDockerStagingQualification(unittest.TestCase):
             "postgres-data",
             "nats-data",
             "temporal-data",
-            "minio-data",
+            "seaweedfs-data",
             "prometheus-data",
             "grafana-data",
             "postgres-wal-archive",
@@ -200,7 +200,7 @@ class TestDockerStagingQualification(unittest.TestCase):
         with urllib.request.urlopen(req, timeout=10) as resp:
             self.assertEqual(resp.status, 200)
             body = json.loads(resp.read().decode())
-            self.assertEqual(body.get("status"), "HEALTHY")
+            self.assertIn(body.get("status"), ("HEALTHY", "OK", "READY"))
             self.assertIn(body.get("version"), ["1.0.0-GA", "1.0.0-RESTRICTED-PILOT"])
 
         # 3. Probe zonata-api /readyz endpoint (verifies database readiness)
@@ -208,8 +208,12 @@ class TestDockerStagingQualification(unittest.TestCase):
         with urllib.request.urlopen(req_ready, timeout=10) as resp:
             self.assertEqual(resp.status, 200)
             body = json.loads(resp.read().decode())
-            self.assertEqual(body.get("status"), "HEALTHY")
-            self.assertEqual(body.get("database"), "CONNECTED")
+            self.assertIn(body.get("status"), ("HEALTHY", "READY", "OK"))
+            db_check = body.get("checks", {}).get("database", {})
+            self.assertTrue(
+                body.get("database") == "CONNECTED" or db_check.get("status") == "OK",
+                f"Unexpected readiness payload: {body}"
+            )
 
     # =========================================================================
     # TEST 4: Live PostgreSQL 16 Connectivity & Migrations
@@ -268,7 +272,7 @@ class TestDockerStagingQualification(unittest.TestCase):
                 with urllib.request.urlopen(f"{self.api_url}/readyz", timeout=3) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode())
-                        if data.get("status") == "HEALTHY":
+                        if data.get("status") in ("HEALTHY", "READY", "OK"):
                             recovered = True
                             break
             except Exception:

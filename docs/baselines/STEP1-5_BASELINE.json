@@ -44,8 +44,8 @@
       "is_symlink": false
     },
     ".github/workflows/docker_staging_qualification.yml": {
-      "sha256": "1c43747f815757d59324b0a0c4c271a5f89558137f2ec2288d3115fc855bd593",
-      "size": 15781,
+      "sha256": "f28d264c7d2536f0e31588ea40adb0683ca342fe1f526f381f5ffc442e067376",
+      "size": 17173,
       "is_symlink": false
     },
     ".github/workflows/e2e-browser.yml": {
@@ -359,8 +359,8 @@
       "is_symlink": false
     },
     "core/action_envelope.py": {
-      "sha256": "51a63ca62bb4977bfa612c8245e00755b9450ad50ac0129fb103c88818f25298",
-      "size": 18330,
+      "sha256": "0167bcbaea8949ed34d852d25e681f582ac5c0b58dc315ec3bd33675e79551a0",
+      "size": 18763,
       "is_symlink": false
     },
     "core/action_gateway.py": {
@@ -644,8 +644,8 @@
       "is_symlink": false
     },
     "core/automation_fabric/connector_registry.py": {
-      "sha256": "15a01000afeb1d737db76b9600934bab28e10bda1b340650c47ab4fa441e9892",
-      "size": 24007,
+      "sha256": "dabfde528107cb7a6d6a91a4e1cc4383686f520dff8b3c437189f44666b9113d",
+      "size": 24426,
       "is_symlink": false
     },
     "core/automation_fabric/contracts.py": {
@@ -664,8 +664,8 @@
       "is_symlink": false
     },
     "core/automation_fabric/fabric.py": {
-      "sha256": "3e684099e769c331baa82d0ebf350ad49963ea4e65df19046c685615535156b6",
-      "size": 91515,
+      "sha256": "924db093d8a063de10df0d16771fb0174e56d21eaafa13b62c37320ae285a2a6",
+      "size": 92346,
       "is_symlink": false
     },
     "core/automation_fabric/kestra_adapter.py": {
@@ -709,8 +709,8 @@
       "is_symlink": false
     },
     "core/baseline/outbox.py": {
-      "sha256": "894aac8161760366ec19859fca97d74f75c3e6efaebbf66e9829911910f5492d",
-      "size": 13573,
+      "sha256": "8499d8a9511fe728e18054e23d9fcb016bd90d743e93a303b5f1af0fe91bef7b",
+      "size": 13889,
       "is_symlink": false
     },
     "core/baseline/scheduler.py": {
@@ -3789,8 +3789,8 @@
       "is_symlink": false
     },
     "docker-compose.prod.yml": {
-      "sha256": "5591d3ef01bdddcf4184b9589a6ba8fa07b3c6d71fba520a0e71c44990fad2de",
-      "size": 12404,
+      "sha256": "5cce4ab69f27b35dbbc8981cbd558dec35ae6c3ea6070e3a5f2aa67ffd06a5ef",
+      "size": 12703,
       "is_symlink": false
     },
     "docker/Dockerfile.api": {
@@ -8349,8 +8349,8 @@
       "is_symlink": false
     },
     "tests/test_audit_remediation_security.py": {
-      "sha256": "62cd9791f9de6b4e4fb095df5bf8ae36268336213d1b704504e1d3d762182ad8",
-      "size": 37669,
+      "sha256": "9cdd80462441f8fabd6b3bb4a7109aeb98ed9130f3478fcb339ecb8eb5584131",
+      "size": 38121,
       "is_symlink": false
     },
     "tests/test_browser_use_execution.py": {
@@ -8504,8 +8504,8 @@
       "is_symlink": false
     },
     "tests/test_docker_staging_qualification.py": {
-      "sha256": "8da77919e370e267ff456a702926f8159856dc3dea0c0a12e8b60b5d1e914042",
-      "size": 17819,
+      "sha256": "7a8a5310d0d07cc380ad9893d054d691c035ee7ba5e08b8f0df370027615ea96",
+      "size": 18060,
       "is_symlink": false
     },
     "tests/test_documents_backbone.py": {

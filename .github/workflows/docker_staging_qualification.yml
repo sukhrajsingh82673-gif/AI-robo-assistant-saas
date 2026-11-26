@@ -28,6 +28,9 @@ jobs:
       S3_ACCESS_KEY: zonata_s3_admin
       S3_SECRET_KEY: ci_staging_seaweedfs_secret_2026
       GF_SECURITY_ADMIN_PASSWORD: ci_staging_grafana_password_2026
+      ZONATA_AUTH_SECRET: ci_staging_auth_secret_key_for_compose_test_2026_32bytes
+      KMS_MASTER_KEY: ci_staging_kms_master_key_32_bytes_testing_2026
+      ZONATA_MODEL_PROVIDER: openai
 
     steps:
       - name: Checkout Source Repository
@@ -126,6 +129,10 @@ jobs:
           from core.enterprise_records import EnterpriseRecordsEngine
           from core.enterprise_reports import EnterpriseReportsEngine
           from core.automation_fabric.data_integration_engine import SyncCheckpointManager
+          from core.baseline.outbox import ensure_outbox_tables
+          from core.automation_fabric.fabric import universal_automation_fabric
+          from core.automation_fabric.connector_registry import connector_registry
+          from core.action_envelope import command_bus
 
           # 1. Apply core relational schema DDL
           db.verify_readiness()
@@ -134,6 +141,11 @@ jobs:
           EnterpriseRecordsEngine(tenant_id='tnt_init')._init_db()
           EnterpriseReportsEngine(tenant_id='tnt_init')._init_db()
           SyncCheckpointManager._ensure_tables()
+          ensure_outbox_tables()
+          universal_automation_fabric._init_automation_tables()
+          universal_automation_fabric._ensure_signing_keys_table()
+          connector_registry._ensure_idempotency_table()
+          command_bus._init_db()
           print('Relational schema DDL applied successfully.')
 
           # 2. Apply controlled migrations
@@ -147,11 +159,21 @@ jobs:
           assert 2026100502 in versions, 'Migration 2026100502 missing!'
           print('Schema initialization & migration execution: SUCCESS')
           "
+          docker compose -f docker-compose.prod.yml exec -T postgres psql -U zonata_admin -d zonata_production -c "
+            GRANT USAGE ON SCHEMA public TO zonata_app, zonata_worker;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO zonata_app, zonata_worker;
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO zonata_app, zonata_worker;
+          "
 
       - name: Launch Application Services (Step 4.6 in Runbook)
         run: |
           echo "Launching zonata-api, zonata-worker, otel-collector, prometheus, and grafana..."
-          docker compose -f docker-compose.prod.yml up -d zonata-api zonata-worker otel-collector prometheus grafana
+          if ! docker compose -f docker-compose.prod.yml up -d zonata-api zonata-worker otel-collector prometheus grafana; then
+            echo "=== Container failure diagnostics ==="
+            docker compose -f docker-compose.prod.yml ps -a
+            docker compose -f docker-compose.prod.yml logs --tail=80 zonata-api zonata-worker || true
+            exit 1
+          fi
           echo "Complete 9-service application stack started."
 
       - name: Wait for & Verify Service Health and Readiness

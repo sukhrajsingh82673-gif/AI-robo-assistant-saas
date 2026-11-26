@@ -70,6 +70,13 @@ def ensure_outbox_tables(conn: Optional[Any] = None) -> None:
             if sql_path.exists():
                 connection.executescript(sql_path.read_text(encoding="utf-8"))
         else:
+            if not getattr(db, "_deferred_import_mode", False):
+                try:
+                    reg = connection.execute("SELECT to_regclass('public.outbox_events')").fetchone()
+                    if reg and reg[0]:
+                        return
+                except Exception:
+                    pass
             sql_path = root_dir / "migrations" / "pg" / migration_file
             if sql_path.exists():
                 connection.execute(sql_path.read_text(encoding="utf-8"))

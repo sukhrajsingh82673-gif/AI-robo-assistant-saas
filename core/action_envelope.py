@@ -241,6 +241,14 @@ class AsynchronousCommandBus:
         if engine.dialect == "sqlite" and os.path.abspath(engine.db_path) == protected_db and os.path.exists(protected_db):
             # Protected baseline database — never mutate or execute schema scripts automatically
             return
+        if engine.dialect == "postgresql" and not getattr(engine, "_deferred_import_mode", False):
+            with engine.transaction(workload=WorkloadType.CONTROL_PLANE) as conn:
+                try:
+                    reg = conn.execute("SELECT to_regclass('public.async_command_queue')").fetchone()
+                    if reg and reg[0]:
+                        return
+                except Exception:
+                    pass
         with engine.transaction(workload=WorkloadType.CONTROL_PLANE) as conn:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS async_command_queue (

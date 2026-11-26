@@ -57,9 +57,10 @@ class AccessibilityChecker:
             # Skip hidden or submit inputs
             if 'type="hidden"' in attrs or 'type="submit"' in attrs or 'type="button"' in attrs:
                 continue
-            has_label = ('aria-label=' in attrs) or ('aria-labelledby=' in attrs) or ('id=' in attrs and f'for="{re.search(r"id=[\"'](.*?)[\"']", attrs).group(1)}"' in html_snippet)
+            id_m = re.search(r'id=["\'](.*?)["\']', attrs)
+            has_for_label = bool(id_m and f'for="{id_m.group(1)}"' in html_snippet)
+            has_label = ('aria-label=' in attrs) or ('aria-labelledby=' in attrs) or has_for_label
             if not has_label:
-                id_m = re.search(r'id=["\'](.*?)["\']', attrs)
                 violations.append(
                     AccessibilityViolation(
                         rule_id="input-label-required",

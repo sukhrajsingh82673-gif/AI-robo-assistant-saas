@@ -117,8 +117,15 @@ class GovernedConnectorRegistry:
         self._init_enterprise_connectors()
 
     def _ensure_idempotency_table(self):
-        """Ensures durable SQLite idempotency table exists for cross-process & crash-window recovery."""
+        """Ensures durable idempotency table exists for cross-process & crash-window recovery."""
         with db.get_connection() as conn:
+            if getattr(getattr(db, "dialect", None), "value", getattr(db, "dialect", None)) == "postgresql" and not getattr(db, "_deferred_import_mode", False):
+                try:
+                    reg = conn.execute("SELECT to_regclass('public.automation_connector_idempotency')").fetchone()
+                    if reg and reg[0]:
+                        return
+                except Exception:
+                    pass
             conn.execute("""
             CREATE TABLE IF NOT EXISTS automation_connector_idempotency (
                 idempotency_key TEXT PRIMARY KEY,
