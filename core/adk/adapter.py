@@ -56,20 +56,27 @@ class GoogleADKRuntimeAdapter(AgentRuntimePort):
 
         is_test_mode = os.environ.get("ZONATA_TEST_MODE") == "1"
 
-        if has_sdk:
-            return ProviderResult(
-                status=PortStatus.OK,
-                provider=self.provider_name,
-                provider_ref=f"google_adk_live_{int(time.time())}",
-                metadata={"target": "google_adk", "live": True},
-            )
-        elif is_test_mode or self.sandbox:
+        if is_test_mode or self.sandbox:
             return ProviderResult(
                 status=PortStatus.SANDBOX,
                 provider=self.provider_name,
                 provider_ref=f"sandbox_google_adk_{int(time.time())}",
                 sandbox=True,
                 metadata={"target": "google_adk", "mode": "sovereign_team_simulation"},
+            )
+        if has_sdk:
+            # The SDK may be present, but this adapter still runs the local
+            # coordinator rather than an ADK runner. Never label that as live.
+            return ProviderResult(
+                status=PortStatus.SANDBOX,
+                provider=self.provider_name,
+                provider_ref=f"local_adk_coordinator_{int(time.time())}",
+                sandbox=True,
+                metadata={
+                    "target": "google_adk",
+                    "live": False,
+                    "mode": "local_coordinator_not_adk_runner",
+                },
             )
         else:
             return ProviderResult(

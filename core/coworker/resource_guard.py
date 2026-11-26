@@ -11,6 +11,7 @@ Enforces:
 
 from __future__ import annotations
 import os
+import tempfile
 import sys
 import shutil
 import time
@@ -76,7 +77,7 @@ class ResourceGuardEngine:
         cls,
         db_store: Optional[CoworkerDbStoreV2] = None,
         store: Optional[CoworkerDbStoreV2] = None,
-        workspaces_root: str = "/tmp/zonata_workspaces",
+        workspaces_root: str = os.path.join(tempfile.gettempdir(), "zonata_workspaces"),
         base_workspace_dir: Optional[str] = None
     ) -> ResourceGuardEngine:
         if cls._instance is None:
@@ -90,7 +91,7 @@ class ResourceGuardEngine:
     def __init__(
         self,
         db_store: Optional[CoworkerDbStoreV2] = None,
-        workspaces_root: str = "/tmp/zonata_workspaces",
+        workspaces_root: str = os.path.join(tempfile.gettempdir(), "zonata_workspaces"),
         min_free_ram_mb: float = 256.0,
         min_free_disk_gb: float = 1.0,
         max_cpu_percent: float = 85.0,

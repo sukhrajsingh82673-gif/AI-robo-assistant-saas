@@ -120,7 +120,8 @@ class ZonataAgentWorkflow:
                 "llm_plan": llm_outcome.get("text", ""),
                 "tool_results": {requested_tool: tool_outcome} if tool_outcome else {},
                 "steps_completed": len(record.step_history),
-                "is_durable": True,
+                "is_durable": False,
+                "execution_mode": "in_process_orchestration",
             }
             return record
 

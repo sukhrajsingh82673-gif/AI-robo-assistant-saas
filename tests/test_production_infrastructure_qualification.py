@@ -25,6 +25,7 @@ Covers Areas A through Q + API Integration:
 """
 
 import os
+import tempfile
 import time
 import json
 import uuid
@@ -356,7 +357,7 @@ class TestProductionInfrastructureQualification(unittest.TestCase):
         # 2. Execute 12-Step DR Drill
         drill_out = remote_dr_manager.execute_complete_disaster_recovery_drill(
             manifest_id=manifest.manifest_id,
-            target_drill_dir="/tmp/zonata_dr_test_env"
+            target_drill_dir=tempfile.mkdtemp(prefix="zonata_dr_test_env")
         )
         self.assertTrue(drill_out["success"])
         self.assertEqual(drill_out["overall_status"], "DISASTER_RECOVERY_QUALIFIED")

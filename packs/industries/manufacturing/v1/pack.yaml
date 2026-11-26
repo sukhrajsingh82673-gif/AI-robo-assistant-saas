@@ -3,9 +3,24 @@ metadata:
   pack_id: "discrete_manufacturing"
   name: "Industrial & Machinery Manufacturing"
   version: "1.0.0"
+  aliases:
+    - precision manufacturing
+    - industrial manufacturing
+    - machinery manufacturing
   description: "Manufacturing blueprint for shop-floor production, BOMs, and equipment maintenance"
   author: "ZONATA Systems Foundation"
   industry_code: "C28"  # Manufacture of machinery and equipment n.e.c.
+
+  standard_kpis:
+    - name: "OEE (Overall Equipment Effectiveness)"
+      unit: "%"
+      benchmark: 85.0
+    - name: First Pass Yield
+      unit: "%"
+      benchmark: 98.0
+    - name: Throughput Units Per Hour
+      unit: "count"
+      benchmark: 100.0
 
 document_templates:
   - template_id: "tpl_mfg_work_order"

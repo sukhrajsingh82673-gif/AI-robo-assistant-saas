@@ -285,10 +285,12 @@ class TestCoworkerFabric(unittest.TestCase):
         worker = self.engine.create_coworker("Desktop Operator")
         graph = self.engine.create_mission_from_objective("Operate this legacy desktop application and export yesterday's report.")
         completed_graph = self.engine.execute_mission(graph, worker)
-        self.assertEqual(completed_graph.status, ExecutionState.SUCCESS)
-        node = list(completed_graph.nodes.values())[0]
-        self.assertEqual(node.verification.status, VerificationStatus.VERIFIED)
-        self.assertIn("file_path", node.verification.evidence_details)
+        # No native desktop/accessibility backend is present in this environment:
+        # the engine must fail honestly rather than fabricate a verified export.
+        self.assertEqual(completed_graph.status, ExecutionState.EXECUTION_FAILURE)
+        node = next(iter(completed_graph.nodes.values()), None)
+        if node is not None and node.verification is not None:
+            self.assertNotEqual(node.verification.status, VerificationStatus.VERIFIED)
 
     # 17. Acceptance Scenario 4: Send Approved Report to Management
     def test_17_scenario_4_send_report_email(self):

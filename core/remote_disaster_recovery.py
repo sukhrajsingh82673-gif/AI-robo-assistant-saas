@@ -35,6 +35,7 @@ Implements AREA F of the Master Infrastructure Specification:
 """
 
 import os
+import tempfile
 import time
 import json
 import uuid
@@ -196,7 +197,7 @@ class RemoteDisasterRecoveryManager:
     def execute_complete_disaster_recovery_drill(
         self,
         manifest_id: str,
-        target_drill_dir: str = "/tmp/zonata_dr_replacement_env"
+        target_drill_dir: str = os.path.join(tempfile.gettempdir(), "zonata_dr_replacement_env")
     ) -> Dict[str, Any]:
         """
         Executes Steps 5-12 of the comprehensive DR drill:

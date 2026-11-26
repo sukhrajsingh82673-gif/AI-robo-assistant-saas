@@ -109,9 +109,12 @@ class TestStep8FBenchmarkReport:
         assert res["critical_safety_violations"] == 1
 
     # 6. Report Generator and Document Verification
-    def test_06_benchmark_report_generation_and_integrity(self):
-        report_md = BenchmarkReportGenerator.write_report_file("docs/benchmarks/STEP8_BENCHMARK_REPORT.md")
-        assert Path("docs/benchmarks/STEP8_BENCHMARK_REPORT.md").exists()
+    def test_06_benchmark_report_generation_and_integrity(self, tmp_path):
+        temp_report = tmp_path / "STEP8_BENCHMARK_REPORT.md"
+        report_md = BenchmarkReportGenerator.write_report_file(str(temp_report))
+        assert temp_report.exists()
+        committed_report = Path("docs/benchmarks/STEP8_BENCHMARK_REPORT.md")
+        assert committed_report.exists()
 
         assert "# Step 8 Empirical Human-Baseline Benchmark Report" in report_md
         assert "Config C (Zonata Autonomous System) vs Config A" in report_md

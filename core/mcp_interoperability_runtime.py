@@ -38,6 +38,7 @@ Constitutional Invariants Enforced:
 """
 
 import os
+import tempfile
 import re
 import json
 import time
@@ -597,7 +598,7 @@ class StdioTransport(MCPTransport):
         if not valid:
             raise SecurityException(f"Stdio Transport Security Rejection: {msg}")
         self.command = command
-        self.cwd = cwd or "/tmp"
+        self.cwd = cwd or tempfile.gettempdir()
         self.env = env or {}
 
     def send_request(self, request_payload: Dict[str, Any], timeout: float = 30.0) -> Dict[str, Any]:

@@ -10,6 +10,7 @@ Ladder of Execution:
 
 from __future__ import annotations
 import os
+import tempfile
 import sys
 import ast
 import json
@@ -102,7 +103,7 @@ class ExecutionDecisionEngine:
         self,
         db_store: Optional[CoworkerDbStoreV2] = None,
         capability_registry: Optional[Any] = None,
-        workspaces_root: str = "/tmp/zonata_workspaces",
+        workspaces_root: str = os.path.join(tempfile.gettempdir(), "zonata_workspaces"),
         store: Optional[CoworkerDbStoreV2] = None,
         scan_root: Optional[str] = None
     ):

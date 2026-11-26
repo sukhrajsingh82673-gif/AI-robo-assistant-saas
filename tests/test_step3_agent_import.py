@@ -79,12 +79,12 @@ def run():
     def test_04_execution_sandboxing_scratch_containment(self):
         """Rule 23 & 32: Sandboxed runner isolates execution and restricts writes to scratch dir."""
         runner = SandboxSkillRunner(tenant_id="tenant_gamma", skill_id="skill_csv_parser")
-        created_file_path = None
+        # The task runs in a forked child, so the parent observes the assigned
+        # scratch path rather than a mutation of parent-local variables.
+        created_file_path = os.path.join(runner.scratch_dir, "output.txt")
 
         def skill_task(scratch_dir: str) -> str:
-            nonlocal created_file_path
             out_file = os.path.join(scratch_dir, "output.txt")
-            created_file_path = out_file
             with open(out_file, "w") as f:
                 f.write("data_processed")
             return "SUCCESS"

@@ -19,6 +19,8 @@ import hashlib
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple
 
+from core.evolution.principal import PrincipalLike, is_human_principal, principal_id
+
 
 class ExcessivePermissionError(Exception):
     """Raised when GitHub App permissions include prohibited scopes (workflows, administration, secrets)."""
@@ -171,22 +173,32 @@ class PullRequestContract:
             )
 
     @classmethod
-    def attempt_merge(cls, pr_id: str, actor_principal: str) -> Dict[str, Any]:
-        """Rule 57 Invariant: Only humans can merge PRs."""
-        if not (actor_principal.startswith("human:") or actor_principal.startswith("owner:")):
+    def attempt_merge(cls, pr_id: str, actor_principal: PrincipalLike) -> Dict[str, Any]:
+        """Rule 57 Invariant: Only authenticated humans can merge PRs."""
+        if not is_human_principal(actor_principal):
             raise HumanMergeOnlyError(
-                f"Actor '{actor_principal}' cannot merge pull requests. Rule 57 requires human-only merges."
+                f"Actor '{principal_id(actor_principal)}' cannot merge pull requests. "
+                "Rule 57 requires an authenticated human principal."
             )
-        return {"pr_id": pr_id, "status": "MERGED", "merged_by": actor_principal}
+        return {
+            "pr_id": pr_id,
+            "status": "MERGED",
+            "merged_by": principal_id(actor_principal),
+        }
 
     @classmethod
-    def attempt_approve(cls, pr_id: str, actor_principal: str) -> Dict[str, Any]:
-        """Rule 57 Invariant: Only humans can approve PRs."""
-        if not (actor_principal.startswith("human:") or actor_principal.startswith("owner:")):
+    def attempt_approve(cls, pr_id: str, actor_principal: PrincipalLike) -> Dict[str, Any]:
+        """Rule 57 Invariant: Only authenticated humans can approve PRs."""
+        if not is_human_principal(actor_principal):
             raise HumanApprovalOnlyError(
-                f"Actor '{actor_principal}' cannot approve pull requests. Approvals require human authorization."
+                f"Actor '{principal_id(actor_principal)}' cannot approve pull requests. "
+                "Approvals require an authenticated human principal."
             )
-        return {"pr_id": pr_id, "status": "APPROVED", "approved_by": actor_principal}
+        return {
+            "pr_id": pr_id,
+            "status": "APPROVED",
+            "approved_by": principal_id(actor_principal),
+        }
 
 
 class PublicInputSanitizer:

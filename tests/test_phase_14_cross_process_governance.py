@@ -94,7 +94,34 @@ def _mp_worker_release(db_path: str, reservation_id: str, queue: Any):
         queue.put({"pid": pid, "success": False, "reason": "ERROR", "error": f"{type(e).__name__}: {e}"})
 
 
-def _join_workers(processes, timeout: float = 10.0):
+def _probe_worker(queue: Any):
+    queue.put(os.getpid())
+
+
+_SPAWN_CONTEXT_OK = None
+
+
+def _worker_context():
+    """Return spawn when this interpreter can actually start a spawn child.
+
+    Some Termux/Android Python builds exit a spawn child with status 1 before it
+    can report; fork remains available there. Probe once and cache the result.
+    """
+    global _SPAWN_CONTEXT_OK
+    if _SPAWN_CONTEXT_OK is None:
+        try:
+            ctx = mp.get_context("spawn")
+            queue = ctx.Queue()
+            probe = ctx.Process(target=_probe_worker, args=(queue,))
+            probe.start()
+            probe.join(5.0)
+            _SPAWN_CONTEXT_OK = probe.exitcode == 0 and not queue.empty()
+        except Exception:
+            _SPAWN_CONTEXT_OK = False
+    return mp.get_context("spawn" if _SPAWN_CONTEXT_OK else "fork")
+
+
+def _join_workers(processes, timeout: float = 60.0):
     """Join workers within a single shared deadline, then stop stragglers.
 
     Joining each process with its own timeout multiplied the worst case by the
@@ -114,7 +141,7 @@ def _join_workers(processes, timeout: float = 10.0):
     return stragglers
 
 
-def _collect_results(queue, expected: int, timeout: float = 10.0):
+def _collect_results(queue, expected: int, timeout: float = 60.0):
     """Drain up to ``expected`` worker results without blocking indefinitely.
 
     A bare ``queue.get()`` waits forever when a worker dies before reporting,
@@ -141,7 +168,7 @@ class TestPhase14CrossProcessGovernance(unittest.TestCase):
         # parent's lock state, so a worker can inherit an import/runtime lock
         # held by a background thread left over from an earlier suite and
         # deadlock before it ever reports a result.
-        self.ctx = mp.get_context("spawn")
+        self.ctx = _worker_context()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "cross_process_governance.db")
         configure_isolated_test_db(self.db_path)

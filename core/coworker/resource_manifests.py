@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 import sqlite3
 import time
 import uuid
@@ -100,7 +101,7 @@ class ResourceManifestStore:
 
     def __init__(self, db_path: Optional[str] = None, tenant_id: str = "tnt_primary"):
         self.db_path = db_path or os.environ.get(
-            "ZONATA_MANIFEST_DB", "/tmp/zonata_manifests.db"
+            "ZONATA_MANIFEST_DB", os.path.join(tempfile.gettempdir(), "zonata_manifests.db")
         )
         self.tenant_id = tenant_id
         parent = os.path.dirname(self.db_path)

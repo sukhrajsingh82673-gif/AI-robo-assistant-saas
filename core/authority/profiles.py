@@ -130,11 +130,20 @@ class AuthorityProfileManager:
             else:
                 cur.execute(
                     """
-                    INSERT OR REPLACE INTO authority_profiles (
+                    INSERT INTO authority_profiles (
                         profile_id, tenant_id, company_id, principal_id, grade, tier,
                         single_spend_limit_usd, monthly_spend_limit_usd, can_hire, can_delegate,
                         can_modify_sops, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (profile_id) DO UPDATE SET
+                        grade = EXCLUDED.grade,
+                        tier = EXCLUDED.tier,
+                        single_spend_limit_usd = EXCLUDED.single_spend_limit_usd,
+                        monthly_spend_limit_usd = EXCLUDED.monthly_spend_limit_usd,
+                        can_hire = EXCLUDED.can_hire,
+                        can_delegate = EXCLUDED.can_delegate,
+                        can_modify_sops = EXCLUDED.can_modify_sops,
+                        updated_at = EXCLUDED.updated_at
                     """,
                     (
                         profile_id, tenant_id, company_id, principal_id, grade, std["tier"],

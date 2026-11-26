@@ -10,6 +10,7 @@ Provides high-capacity management for 5,000 to 6,000 registered logical agent id
 
 from __future__ import annotations
 import os
+import tempfile
 import time
 import json
 import uuid
@@ -83,7 +84,7 @@ class AgentCloudRegistry:
 
     def __init__(
         self,
-        db_path: str = "/tmp/agent_cloud_catalog.db",
+        db_path: str = os.path.join(tempfile.gettempdir(), "agent_cloud_catalog.db"),
         max_active_workers: int = 16,
         max_queue_depth: int = 2000
     ):

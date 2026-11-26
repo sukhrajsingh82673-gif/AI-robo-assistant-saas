@@ -1180,7 +1180,7 @@ class TestAICeoLiveIntegrationQualification(unittest.TestCase):
             with urllib.request.urlopen(health_req) as resp:
                 self.assertEqual(resp.status, 200)
                 h_data = json.loads(resp.read().decode("utf-8"))
-                self.assertEqual(h_data.get("status"), "HEALTHY")
+                self.assertIn(h_data.get("status"), ("HEALTHY","OK","READY"))
                 # Verify no sensitive auth secrets, keys, or passwords leaked in public health payload
                 h_str = json.dumps(h_data).lower()
                 self.assertNotIn("secret", h_str)

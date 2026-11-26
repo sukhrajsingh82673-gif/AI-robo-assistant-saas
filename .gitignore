@@ -49,6 +49,9 @@ storage/evidence/test_*
 storage/evidence/tenants/
 storage/evidence/*test*
 storage/evidence/debug_*
+storage/test_vault/
+storage/test_worm_ledger.json
+storage/backups_qualification_test/
 storage/reports/
 storage/company_exports/
 storage/voice_output/

@@ -97,11 +97,13 @@ class LLMBudgetManager:
                 ))
             else:
                 cur.execute("""
-                INSERT OR REPLACE INTO llm_budget_hierarchies (
+                INSERT INTO llm_budget_hierarchies (
                     budget_id, tenant_id, company_id, entity_type, entity_id,
                     period_start, period_end, allocated_micro_usd, reserved_micro_usd,
                     spent_micro_usd, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+                ON CONFLICT (tenant_id, company_id, entity_type, entity_id, period_start)
+                DO UPDATE SET allocated_micro_usd = EXCLUDED.allocated_micro_usd
                 """, (
                     budget_id, tenant_id, company_id, entity_type.upper(), entity_id,
                     start, end, allocated_micro_usd, now

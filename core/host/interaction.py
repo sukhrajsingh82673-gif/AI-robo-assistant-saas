@@ -10,12 +10,13 @@ Implements:
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Callable, Dict, List, Optional, Tuple, Any
 
 from core.evidence_service import evidence_service
 from .perception import BoundingRect
@@ -84,8 +85,10 @@ class PhysicalSpeedThrottler:
     MAX_TYPING_CPS = 12.0  # Max 12 characters per second
     MIN_INTER_CLICK_INTERVAL_SEC = 0.05  # 50ms between clicks
 
-    def __init__(self, simulated: bool = True):
-        self.simulated = simulated  # In tests/headless, compute delay without blocking wall-clock
+    def __init__(self, simulated: Optional[bool] = None):
+        self.simulated = (
+            os.environ.get("ZONATA_TEST_MODE") == "1" if simulated is None else simulated
+        )
         self._last_interaction_time: float = 0.0
 
     def compute_typing_duration(self, text: str) -> float:
@@ -145,8 +148,17 @@ class DesktopInteractionDispatcher:
     and human physical override interception.
     """
 
-    def __init__(self, throttler: Optional[PhysicalSpeedThrottler] = None):
-        self.throttler = throttler or PhysicalSpeedThrottler(simulated=True)
+    def __init__(
+        self,
+        throttler: Optional[PhysicalSpeedThrottler] = None,
+        backend: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        simulated: Optional[bool] = None,
+    ):
+        self.simulated = (
+            os.environ.get("ZONATA_TEST_MODE") == "1" if simulated is None else simulated
+        )
+        self.throttler = throttler or PhysicalSpeedThrottler(simulated=self.simulated)
+        self.backend = backend
         self.override_detector = HumanOverrideDetector()
 
     def dispatch(
@@ -208,9 +220,35 @@ class DesktopInteractionDispatcher:
         if self.override_detector.is_override_active:
             raise HumanPhysicalOverrideError("Automation halted by human override during throttling pause.")
 
+        # 4. Dispatch through a real backend. A test may explicitly simulate;
+        # production cannot claim execution without one.
+        executed = False
+        execution_error: Optional[str] = None
+        if self.simulated:
+            executed = True
+        elif self.backend is not None:
+            try:
+                executed = bool(self.backend({
+                    "action_id": action_id,
+                    "primitive": primitive.value,
+                    "relative_coords": relative_coords,
+                    "absolute_coords": abs_coords,
+                    "text": text,
+                    "key_name": key_name,
+                    "scroll_delta": scroll_delta,
+                }))
+                if not executed:
+                    execution_error = "Desktop backend refused the interaction."
+            except Exception as exc:
+                execution_error = f"Desktop backend failed: {exc}"
+        else:
+            execution_error = (
+                "No desktop interaction backend is configured; refusing to report a phantom execution."
+            )
+
         duration_ms = (time.time() - start_time) * 1000.0
 
-        # 4. Cryptographic Evidence Ledger Recording
+        # 5. Cryptographic Evidence Ledger Recording
         ev_receipt = evidence_service.record_event(
             tenant_id=tenant_id,
             company_id=company_id,
@@ -223,13 +261,19 @@ class DesktopInteractionDispatcher:
                 "text_length": len(text) if text else 0,
                 "throttled_wait_ms": throttled_wait_ms,
                 "window_bounds": window_bounds.to_dict(),
+                "executed": executed,
+                "simulated": self.simulated,
+                "error": execution_error,
             },
         )
+
+        if execution_error:
+            raise HumanPhysicalOverrideError(execution_error)
 
         return InteractionResult(
             action_id=action_id,
             primitive=primitive,
-            executed=True,
+            executed=executed,
             relative_coords=relative_coords,
             absolute_coords=abs_coords,
             duration_ms=duration_ms,

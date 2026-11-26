@@ -1,32 +1,18 @@
-# Project Memory: AI Robo-Assistant SaaS
+# Project Memory: ZONATA — AI Robo-Assistant SaaS
 
-## Current Status: Step 7 — Department Depth (Complete & Qualified)
-- **Branch:** `step7-departments`
-- **Latest Commit:** `a0827f2`
-- **Merged Base:** Step 6 Final (`0f64d75`)
-- **Preservation Contract (Rule 58):** 2,006 baseline files hashed in `docs/baselines/STEP1-6_BASELINE.json`. 100% cryptographic integrity verified across all runs.
+## Repository Status
+- **Active Branch:** `main` (consolidated from `step1` through `step9-product-readiness` / tag `step9-final`)
+- **Latest Verified Milestones:** Steps 1 through 9 Complete & Qualified
+- **Verification Coverage:** 250 test files (~2,843 collected pytest tests), AST security linters (`anti_evasion_linter.py`, `anti_bypass_linter.py`), OpenAPI 3.1.0 Public API specs, and release readiness qualification.
 
-## Sub-Step Progression (7A – 7M)
-- [x] **7A:** Preflight Gate, Department Capability Inventory (10 domains), ADRs 0032–0038, CI workflow (`0d1aed7`)
-- [x] **7B:** Preservation v2 extension, Department Base Port, Canonical Models, Reconciler, Connector SDK (`ba03cdd`)
-- [x] **7C:** Finance & Accounting Depth (AP 3-way match, CAMT/MT940/CSV bank rec, vendor fraud hold, month-end close, India GST E-Invoicing & IRN) (`c3a6243`)
-- [x] **7D:** Sales, CRM & Customer Support Depth (Lead dedup, Rule 64 consent, quote margin analysis, discount approvals, bounded negotiation, CRM/Helpdesk ports, SLA clocks) (`14177fa`)
-- [x] **7E:** Marketing & Brand Depth (Brand guidelines schema, claim verifier, campaign lifecycle, first-party privacy-safe attribution) (`4109727`)
-- [x] **7F:** HR & Workforce Operations (Inclusive recruiting linter, Rule 63 counterfactual fairness disparity audit across 100 slices, deterministic payroll, rapid sub-60s offboarding) (`8c16daf`)
-- [x] **7G:** Operations & Production Depth (Multi-level indented BOM explosion, work orders, OEE calculation, QC AQL quarantine holds, MTBF/MTTR) (`d9a32b1`)
-- [x] **7H:** Supply Chain & Procurement Depth (OFAC/UN/EU sanctions screening freeze, RFQ matrix, EOQ/ROP replenishment, carrier tracking) (`24d2556`)
-- [x] **7I:** Research & Development Depth (Immutable experiment tracker with MLflow export, `zonata.prd/v1` validator, sandboxed prototype runner) (`bff76dc`)
-- [x] **7J:** Legal, Compliance, IT & Security Depth (Contract obligations, redlines, human signature gate, SOC 2/GDPR/DPDP controls, IT asset inventory, CVSS v3.1 SLAs, domain posture) (`bf6d092`)
-- [x] **7K:** Analytics & Business Intelligence Depth (Semantic layer ARR/CCC/OEE metrics, Rule 65 SQL blocking, Superset multi-tenant RLS guest tokens, meeting intelligence, asset depreciation journals) (`0a6a790`)
-- [x] **7L:** Cross-Department Orchestration (7 compiled Temporal process workflows: Lead-to-Cash, Procure-to-Pay, Record-to-Report, Hire-to-Retire, Plan-to-Deliver, Support-to-Resolution, Compliance-Audit-Cycle with Rule 59 independent re-read verification) (`f5353c2`)
-- [x] **7M:** Company-in-a-Box Qualification & 250 Benchmarks (TheAgentCompany 5-checkpoint framework, GDPval blinded comparison methodology, 30-day simulation scenario, 7/7 adversarial red-team drill containment) (`a0827f2`)
-
-## Safety & Architectural Invariants Enforced
-- **Rule 58:** Preservation Contract strictly held across 2,006 baseline files.
-- **Rule 59:** Independent re-read verification after every database mutation.
-- **Rule 61:** Statutory calculations (India GST E-invoicing, PF/ESIC payroll) loaded dynamically with legal citations.
-- **Rule 62:** Human gateway approval tokens strictly required for quotes > 20%, compensation changes, procurement awards, contracts, and fraud releases.
-- **Rule 63:** Counterfactual fairness audited across 100 demographic slices ($[0.95, 1.05]$ parity ratio).
-- **Rule 64:** Outreach consent verified prior to any external contact.
-- **Rule 65:** Semantic Layer (Cube) is the sole metric source; raw SQL execution by agents is blocked.
-- **Rule 66:** Department performance verified against 250 golden checkpoint tasks.
+## Completed Steps (1 – 9)
+- [x] **Step 1 — Truth Foundation & Backbone:** Multi-tenant SQLite/PG16 persistence, double-entry minor-unit ledger, document & Merkle folio evidence backbone, capability truth probe (`STEP1_REPORT.md`).
+- [x] **Step 2 — Intelligence, Authority & Execution:** AI CEO brain, Action Gateway, authority/delegation, work kernel, SOP executor, 5-layer verification pyramid, KPI/Kaizen loop (`STEP2_REPORT.md`).
+- [x] **Step 3 — Hands & Governance:** Host permission pairing, desktop control, origin-bound credential vault, browser engine, anti-evasion AST policy, remote view, sandboxed skill import (`STEP3_REPORT.md`).
+- [x] **Step 4 — Durable Frameworks:** Runtime ports, LangGraph adapter & encrypted checkpointer, Temporal durable workflows, Google ADK local coordinator, governed MCP runtime (`STEP4_REPORT.md`).
+- [x] **Step 5 — Trust & Enterprise Security:** Secrets platform, dual-control identity/ownership, PostgreSQL RLS isolation audit, supply-chain SBOM & signing, SIEM audit trail, crypto-agility (`STEP5_REPORT.md`).
+- [x] **Step 6 — Evolution Layer (`step6-final`):** Failure intelligence taxonomy, owner help escalation, knowledge playbook store, canary optimizer, OSS agent intake sandbox, clean-room replication, human-only GitHub merge contract (`STEP6_REPORT.md`).
+- [x] **Step 7 — Department Depth (`step7-departments` / `step7-final`):** 10 department domains + 7 compiled Temporal workflows with Rule 59 re-read invariants (`STEP7_REPORT.md`).
+- [x] **Step 8 — Global Industry Factory (`step8-final`):** Declarative `zonata.industry-pack/v1` factory across 88 ISIC Rev. 4 divisions, 30 jurisdictions, EN 16931 e-invoicing, multi-entity consolidation, blinded benchmark program, pilot readiness (`STEP8_REPORT.md`).
+- [x] **Step 9 — Product Readiness (`step9-final`):** Edge Gateway reverse proxy, Entitlements Engine, OpenFeature provider, BillingPort & SHA-256 metering with cost caps & legal hold safety, OpenAPI 3.1.0 Public API v1, Standard Webhooks + SSRF defense, Python & TypeScript SDKs, Consoles + Dead-Control Detector, Onboarding + EU Data Act switching, Mobile PWA + WCAG 2.2 AA gates, Independent Status + Dual-Control Support Grants + Trust Centre + CRA runbook, Marketplace Sandboxing, Progressive Canary Rollback & SLOs (`STEP9_REPORT.md`).
+- [x] **Post-Step 9 Audit & `main` Consolidation:** Applied OpenCode security remediations (`_ClosingSQLiteConnection`, `AuthenticatedPrincipal` enforcement, POSIX forked `SandboxSkillRunner`, legacy module bridges for `billing`/`webhooks`/`connectors`/`departments`, SeaweedFS S3 alignment), isolated test side-effects (`conftest.py`), updated CI workflows for `main`, and published repository governance documentation (`CONTRIBUTING.md`, `SECURITY.md`, issue/PR templates).

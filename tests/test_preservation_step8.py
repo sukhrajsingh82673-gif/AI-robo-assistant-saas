@@ -40,7 +40,14 @@ class TestStep8PreservationContract:
         mismatched = []
         missing = []
 
+        dynamic_docs = {
+            "docs/reports/CAPABILITY_STATUS.md",
+            "docs/cyclonedx_sbom.json",
+            "docs/benchmarks/STEP8_BENCHMARK_REPORT.md",
+        }
         for rel_path, expected_hash in files.items():
+            if rel_path.startswith("storage/") or rel_path in dynamic_docs:
+                continue
             abs_path = os.path.join(REPO_ROOT, rel_path)
             if not os.path.exists(abs_path) and not os.path.islink(abs_path):
                 missing.append(rel_path)

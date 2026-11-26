@@ -7,6 +7,7 @@ Rule 26 (Untrusted content delimiters), and Rule 32 (Download scanning & executa
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 import time
@@ -205,6 +206,10 @@ class PlaywrightBrowserProvider(BaseBrowserProvider):
 
     def __init__(self):
         self._playwright_available = False
+        self._playwright = None
+        self._browser = None
+        self._context = None
+        self._page = None
         try:
             import playwright  # noqa: F401
             self._playwright_available = True
@@ -217,6 +222,99 @@ class PlaywrightBrowserProvider(BaseBrowserProvider):
 
     def is_configured(self) -> bool:
         return self._playwright_available
+
+    def _ensure_page(self):
+        if not self._playwright_available:
+            raise RuntimeError("Playwright is not installed.")
+        if self._page is not None:
+            return self._page
+        from playwright.sync_api import sync_playwright
+
+        self._playwright = sync_playwright().start()
+        self._browser = self._playwright.chromium.launch(headless=True)
+        self._context = self._browser.new_context()
+        self._page = self._context.new_page()
+        return self._page
+
+    def navigate(self, url: str, tenant_id: str, company_id: str) -> BrowserExecutionResult:
+        start_time = time.time()
+        try:
+            page = self._ensure_page()
+            response = page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            status_code = response.status if response is not None else 0
+            html = page.content()
+            title = page.title()
+            screenshot = page.screenshot(full_page=False)
+            snapshot = BrowserPageSnapshot(
+                url=page.url,
+                title=title,
+                status_code=status_code,
+                content_delimited=f"<<<PAGE_CONTENT>>>\n{html}\n<<<END_PAGE_CONTENT>>>",
+                raw_content=html,
+                has_challenge=False,
+                challenge_type="NONE",
+                screenshot_base64="data:image/png;base64," + base64.b64encode(screenshot).decode("ascii"),
+            )
+            return BrowserExecutionResult(
+                status=PortStatus.OK,
+                provider=self.name,
+                provider_ref=f"page_{uuid.uuid4().hex[:8]}",
+                latency_ms=(time.time() - start_time) * 1000.0,
+                page_snapshot=snapshot,
+            )
+        except Exception as exc:
+            return BrowserExecutionResult(
+                status=PortStatus.FAILED,
+                provider=self.name,
+                latency_ms=(time.time() - start_time) * 1000.0,
+                error=f"Playwright navigation failed: {exc}",
+            )
+
+    def click(self, selector: str) -> BrowserExecutionResult:
+        try:
+            page = self._ensure_page()
+            page.click(selector, timeout=10_000)
+            return BrowserExecutionResult(
+                status=PortStatus.OK,
+                provider=self.name,
+                provider_ref=f"click_{uuid.uuid4().hex[:8]}",
+                metadata={"action": "click", "selector": selector, "executed": True},
+            )
+        except Exception as exc:
+            return BrowserExecutionResult(
+                status=PortStatus.FAILED,
+                provider=self.name,
+                error=f"Playwright click failed: {exc}",
+            )
+
+    def fill(self, selector: str, value: str) -> BrowserExecutionResult:
+        try:
+            page = self._ensure_page()
+            page.fill(selector, value, timeout=10_000)
+            return BrowserExecutionResult(
+                status=PortStatus.OK,
+                provider=self.name,
+                provider_ref=f"fill_{uuid.uuid4().hex[:8]}",
+                metadata={"action": "fill", "selector": selector, "filled": True},
+            )
+        except Exception as exc:
+            return BrowserExecutionResult(
+                status=PortStatus.FAILED,
+                provider=self.name,
+                error=f"Playwright fill failed: {exc}",
+            )
+
+    def content(self) -> str:
+        page = self._ensure_page()
+        return f"<<<PAGE_CONTENT>>>\n{page.content()}\n<<<END_PAGE_CONTENT>>>"
+
+    def evaluate_readonly(self, expression: str) -> Any:
+        forbidden_mutations = ["document.write", "window.location", "localStorage.clear", ".submit()"]
+        for marker in forbidden_mutations:
+            if marker in expression:
+                raise PermissionError(f"State mutating script evaluate forbidden: '{marker}'")
+        page = self._ensure_page()
+        return page.evaluate(expression)
 
 
 class NotConfiguredBrowserProvider(BaseBrowserProvider):

@@ -58,20 +58,28 @@ class TemporalRuntimeAdapter(AgentRuntimePort):
 
         is_test_mode = os.environ.get("ZONATA_TEST_MODE") == "1"
 
-        if has_sdk and self._server_host:
-            return ProviderResult(
-                status=PortStatus.OK,
-                provider=self.provider_name,
-                provider_ref=f"temporal_{self._server_host}",
-                metadata={"target": "temporal", "host": self._server_host, "live": True},
-            )
-        elif is_test_mode or self.sandbox:
+        if is_test_mode or self.sandbox:
             return ProviderResult(
                 status=PortStatus.SANDBOX,
                 provider=self.provider_name,
                 provider_ref=f"sandbox_temporal_{int(time.time())}",
                 sandbox=True,
                 metadata={"target": "temporal", "mode": "sovereign_durable_simulation"},
+            )
+        if has_sdk and self._server_host:
+            # The SDK and host are present, but this adapter still executes the
+            # local orchestration loop. Do not claim a live Temporal connection.
+            return ProviderResult(
+                status=PortStatus.SANDBOX,
+                provider=self.provider_name,
+                provider_ref=f"local_temporal_loop_{int(time.time())}",
+                sandbox=True,
+                metadata={
+                    "target": "temporal",
+                    "host": self._server_host,
+                    "live": False,
+                    "mode": "local_orchestration_not_temporal_client",
+                },
             )
         else:
             return ProviderResult(

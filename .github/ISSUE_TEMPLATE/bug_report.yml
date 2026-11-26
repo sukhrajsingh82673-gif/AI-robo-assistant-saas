@@ -1,0 +1,32 @@
+name: Bug Report
+description: Report an unexpected failure, regression, or governance defect
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for reporting an issue. Never include secrets, tokens, or real tenant data.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear summary of what went wrong and what was expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Run command / call endpoint ...
+        2. Observed error / test failure ...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, database dialect (sqlite or postgres), and commit SHA.
+      placeholder: "Ubuntu 24.04 / Python 3.11 / SQLite"
+    validations:
+      required: false

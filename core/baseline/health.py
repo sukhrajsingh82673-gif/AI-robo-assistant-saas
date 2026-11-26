@@ -16,6 +16,13 @@ logger = logging.getLogger("zonata.baseline.health")
 
 SERVER_START_TIME = time.time()
 MIN_DISK_FREE_BYTES = int(os.environ.get("MIN_DISK_FREE_BYTES", 500 * 1024 * 1024))  # 500 MB default
+RELEASE_VERSION = os.environ.get("ZONATA_RELEASE_VERSION", "1.0.0-RESTRICTED-PILOT")
+RELEASE_SCOPE = "URA / ZONATA — RESTRICTED PRODUCTION PILOT, NOT PUBLIC GA"
+PILOT_ENVELOPE = {
+    "max_organizations": 3,
+    "max_concurrency_leases_per_tenant": 4,
+    "max_rpm_per_tenant": 60,
+}
 
 
 def check_liveness() -> Tuple[int, Dict[str, Any]]:
@@ -24,6 +31,8 @@ def check_liveness() -> Tuple[int, Dict[str, Any]]:
     return 200, {
         "status": "OK",
         "service": "zonata-ai-robo-assistant",
+        "version": RELEASE_VERSION,
+        "release_scope": RELEASE_SCOPE,
         "uptime_seconds": round(now - SERVER_START_TIME, 2),
         "timestamp": now,
     }
@@ -140,6 +149,9 @@ def check_readiness() -> Tuple[int, Dict[str, Any]]:
     payload = {
         "status": "READY" if is_ready else "UNREADY",
         "status_code": status_code,
+        "version": RELEASE_VERSION,
+        "release_scope": RELEASE_SCOPE,
+        "pilot_envelope": PILOT_ENVELOPE,
         "timestamp": now,
         "checks": checks,
     }

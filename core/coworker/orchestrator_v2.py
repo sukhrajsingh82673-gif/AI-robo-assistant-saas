@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 import uuid
 import os
+import tempfile
 import shutil
 import signal
 from typing import Optional, Dict, Any, List
@@ -255,7 +256,7 @@ class CoworkerLifecycleOrchestrator:
 
         # 1. Check for stale temporary directories in /tmp/zonata_workspaces
         finding = None
-        base_ws = "/tmp/zonata_workspaces"
+        base_ws = os.path.join(tempfile.gettempdir(), "zonata_workspaces")
         stale_dirs_count = 0
         if os.path.exists(base_ws):
             try:

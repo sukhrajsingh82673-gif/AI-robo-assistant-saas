@@ -25,11 +25,13 @@ class IndustryUnderstandingEngine:
         # 1. Lookup in declarative IndustryPackRegistry by ISIC code or pack_id
         matched_pack = industry_pack_registry.find_by_isic(target)
         if not matched_pack:
-            # Check by pack_id or name in registered packs
+            # Check by pack_id, name, or declarative aliases in registered packs
             for pack_meta in industry_pack_registry.list_packs():
                 p_id = pack_meta["pack_id"]
                 p_name = pack_meta["name"].lower()
-                if target.lower() in p_id.lower() or target.lower() in p_name:
+                aliases = [str(a).lower() for a in pack_meta.get("aliases", [])]
+                t = target.lower()
+                if t in p_id.lower() or t in p_name or any(a in t or t in a for a in aliases):
                     matched_pack = industry_pack_registry.get_pack(p_id)
                     break
 
@@ -46,7 +48,7 @@ class IndustryUnderstandingEngine:
                 "pack_id": meta.get("pack_id"),
                 "revenue_engines": revenue_engines or ["Subscription Revenue", "Direct Sales"],
                 "cost_drivers": cost_drivers or ["Operational Expenses", "COGS"],
-                "standard_kpis": [
+                "standard_kpis": meta.get("standard_kpis") or meta.get("kpis") or [
                     {"name": "Gross Contribution Margin", "unit": "%", "benchmark": 30.0},
                     {"name": "Operating Cost Ratio", "unit": "%", "benchmark": 70.0},
                 ],

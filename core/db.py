@@ -4381,6 +4381,26 @@ class DeferredCursor:
         return iter([])
 
 
+
+
+class _ClosingSQLiteConnection(sqlite3.Connection):
+    """SQLite connection that closes when used as a context manager.
+
+    sqlite3.Connection.__exit__ only commits/rolls back; without an explicit
+    close every `with db.get_connection()` leaks a file descriptor. Long test
+    suites exhaust the process FD limit. This subclass closes deterministically.
+    """
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            return super().__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            try:
+                self.close()
+            except Exception:
+                pass
+
+
 class DeferredConnectionProxy:
     """Proxy connection returned during module import when live database is unreachable."""
     def __init__(self, db_instance):
@@ -5304,7 +5324,7 @@ class Database:
                 self.set_db_path(session_db)
             else:
                 configure_isolated_test_db()
-        conn = sqlite3.connect(self.db_path, timeout=60.0)
+        conn = sqlite3.connect(self.db_path, timeout=60.0, factory=_ClosingSQLiteConnection)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")

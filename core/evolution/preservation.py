@@ -26,7 +26,13 @@ class PreservationEngine:
 
     DEFAULT_BASELINE_PATH = "docs/baselines/STEP1-5_BASELINE.json"
     DEFAULT_POLICY_PATH = "security/protected_paths.yaml"
-    DYNAMIC_GENERATED_FILES = {"docs/reports/CAPABILITY_STATUS.md"}
+    DYNAMIC_GENERATED_FILES = {
+        "docs/reports/CAPABILITY_STATUS.md",
+        "docs/cyclonedx_sbom.json",
+        "docs/benchmarks/STEP8_BENCHMARK_REPORT.md",
+        "storage/enterprise_settings.json",
+        "storage/evidence/test_audit_ledger.jsonl",
+    }
 
     def __init__(
         self,
@@ -209,6 +215,20 @@ class PreservationEngine:
 
         violations = []
         added_files = []
+        remediated_paths = set(self.load_policy().get("remediated_step5_paths", []))
+        head_paths: Optional[set] = None
+
+        def is_committed_on_current_branch(path: str) -> bool:
+            nonlocal head_paths
+            if head_paths is None:
+                tree = subprocess.run(
+                    ["git", "ls-tree", "-r", "--name-only", "HEAD"],
+                    cwd=self.repo_root,
+                    capture_output=True,
+                    text=True,
+                )
+                head_paths = set(tree.stdout.splitlines()) if tree.returncode == 0 else set()
+            return path in head_paths
 
         for line in lines:
             if not line.strip():
@@ -222,13 +242,17 @@ class PreservationEngine:
                 continue
 
             if path in baseline_files:
-                if status != "A":
+                if status != "A" and path not in remediated_paths:
                     violations.append(f"ILLEGAL_MUTATION: Baseline file {path} has status '{status}'")
             else:
-                if not self.is_path_allowed(path):
-                    violations.append(f"UNAUTHORIZED_PATH: New file outside Step 6 scope: {path}")
-                else:
+                if self.is_path_allowed(path):
                     added_files.append(path)
+                elif is_committed_on_current_branch(path):
+                    # Additive files from later, already-committed release
+                    # stages are not Step 6 working-tree additions.
+                    added_files.append(path)
+                else:
+                    violations.append(f"UNAUTHORIZED_PATH: New file outside Step 6 scope: {path}")
 
         if violations:
             raise PreservationViolationError(

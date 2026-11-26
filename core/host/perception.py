@@ -380,7 +380,8 @@ class DesktopPerceptionEngine:
                     )
                     masked_visual_summary["vision_model_analysis"] = llm_result.text
                 except Exception as e:
-                    masked_visual_summary["vision_model_analysis"] = f"Simulated local vision perception ({e})"
+                    masked_visual_summary["vision_model_analysis"] = None
+                    masked_visual_summary["vision_error"] = f"Vision model unavailable: {e}"
 
         # 3. Evidence Ledger Recording
         ev_receipt = evidence_service.record_event(

@@ -53,8 +53,12 @@ class PostgresCheckpointer:
                     if stmt:
                         try:
                             cur.execute(stmt)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            conn.rollback()
+                            raise RuntimeError(
+                                f"Checkpoint schema initialization failed; refusing to run "
+                                f"without durable checkpoint tables: {exc}"
+                            ) from exc
                 conn.commit()
 
     def _encrypt_payload(self, data: Dict[str, Any], tenant_id: str, company_id: str) -> str:

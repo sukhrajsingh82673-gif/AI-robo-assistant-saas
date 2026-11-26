@@ -19,6 +19,7 @@ from core.evidence_ledger import EvidenceLedger
 from core.identity.types import (
     DualControlApprovalRequiredError,
     OwnershipTransferCoolingOffError,
+    OwnershipTransferMFARequiredError,
     RecoveryForbiddenByEmailAloneError,
     RoleTier,
 )
@@ -53,8 +54,14 @@ class OwnershipGovernance:
         target_owner_id: str,
         reason: str,
         cooling_off_seconds: float = 86400.0,  # 24 hours default
+        current_owner_mfa_verified: bool = False,
     ) -> OwnershipTransferRecord:
-        """Initiate an ownership transfer under dual control and cooling-off period."""
+        """Initiate an ownership transfer under dual control and cooling-off period.
+
+        Initiation is not an approval. The current owner must explicitly approve
+        with a verified MFA signal, and a second independent OWNER/BOARD principal
+        must also approve before execution.
+        """
         if not current_owner_id or not target_owner_id:
             raise ValueError("Current and target owner IDs are required")
         if current_owner_id == target_owner_id:
@@ -70,16 +77,16 @@ class OwnershipGovernance:
             reason=reason,
             initiated_at=now,
             cooling_off_seconds=cooling_off_seconds,
-            approvals=[
-                {
-                    "approver_id": current_owner_id,
-                    "role": RoleTier.OWNER.value,
-                    "timestamp": now,
-                    "mfa_verified": True,
-                }
-            ],
+            approvals=[],
             status="PENDING",
         )
+        if current_owner_mfa_verified:
+            record.approvals.append({
+                "approver_id": current_owner_id,
+                "role": RoleTier.OWNER.value,
+                "timestamp": now,
+                "mfa_verified": True,
+            })
         self._transfers[request_id] = record
         return record
 
@@ -97,12 +104,25 @@ class OwnershipGovernance:
         if record.status != "PENDING":
             raise ValueError(f"Cannot approve transfer in status {record.status}")
         if not mfa_verified:
-            raise ValueError("Dual-control approval requires MFA verification")
+            raise OwnershipTransferMFARequiredError(
+                "Dual-control approval requires a verified MFA signal"
+            )
 
         # Must not be the target owner self-approving
         if approver_id == record.target_owner_id:
             raise DualControlApprovalRequiredError(
                 "Target owner cannot self-approve ownership transfer"
+            )
+
+        role_upper = str(approver_role).upper()
+        if approver_id == record.current_owner_id:
+            if role_upper != RoleTier.OWNER.value:
+                raise DualControlApprovalRequiredError(
+                    "The current owner approval must be made in the OWNER role."
+                )
+        elif role_upper not in {RoleTier.OWNER.value, "BOARD"}:
+            raise DualControlApprovalRequiredError(
+                "Second ownership approval must come from an OWNER or BOARD principal."
             )
 
         # Must not be duplicate approval by the same user

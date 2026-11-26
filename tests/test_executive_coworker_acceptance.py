@@ -11,6 +11,7 @@ Formally verifies all 14 mandatory acceptance missions and closes all 6 critical
 """
 
 import os
+import tempfile
 import re
 import sys
 import time
@@ -361,7 +362,7 @@ def test_gap5_opencode_real_cli_and_worktree():
 
 def test_gap6_database_outbox_queue_and_offline_recovery():
     """Gap 6: SQLite & Outbox Transactional Queue Resilience During Remote Disconnect."""
-    tmp_db = f"/tmp/test_cw2_db_{int(time.time())}.sqlite3"
+    tmp_db = f"{tempfile.gettempdir()}/test_cw2_db_{int(time.time())}.sqlite3"
     db_store = CoworkerDbStoreV2(db_path=tmp_db)
 
     # 1. Create a task locally while remote is offline

@@ -79,8 +79,10 @@ class SkillImportScanner:
             inspector.visit(tree)
             if inspector.violations:
                 raise DangerousCodeRejectedError(inspector.violations[0])
-        except SyntaxError:
-            pass
+        except SyntaxError as exc:
+            raise DangerousCodeRejectedError(
+                f"Imported code could not be parsed for security review: {exc}"
+            ) from exc
 
         return {
             "clean": True,
