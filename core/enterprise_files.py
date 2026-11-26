@@ -22,6 +22,8 @@ class EnterpriseFilesEngine:
 
     def _init_db(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "enterprise_files"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_files (
                 file_id TEXT PRIMARY KEY,

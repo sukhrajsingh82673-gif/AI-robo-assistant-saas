@@ -28,6 +28,8 @@ class EnterpriseReportsEngine:
 
     def _init_db(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "enterprise_reports"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_reports (
                 report_id TEXT PRIMARY KEY,

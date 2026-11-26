@@ -50,6 +50,8 @@ class EnterpriseSettingsService:
     def _ensure_schema(self):
         """Initializes tables for persistent enterprise settings and auditable events."""
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "enterprise_settings", "settings_audit_events", "settings_proposals"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_settings (
                 tenant_id TEXT NOT NULL,

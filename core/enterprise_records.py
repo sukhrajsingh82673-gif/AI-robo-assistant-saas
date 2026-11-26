@@ -26,6 +26,8 @@ class EnterpriseRecordsEngine:
 
     def _init_db(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "enterprise_records"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_records (
                 record_id TEXT PRIMARY KEY,

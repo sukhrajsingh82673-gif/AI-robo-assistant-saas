@@ -13,6 +13,15 @@ def ensure_model_gateway_tables(conn: Optional[Any] = None) -> None:
     root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
 
     if conn is not None:
+        if db.pg_tables_ready(
+            conn,
+            "llm_budget_hierarchies",
+            "llm_budget_reservations",
+            "llm_price_catalog",
+            "model_calls",
+            "tenant_model_policies",
+        ):
+            return
         if hasattr(conn, "executescript") and getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
@@ -24,6 +33,15 @@ def ensure_model_gateway_tables(conn: Optional[Any] = None) -> None:
         return
 
     with db.get_connection() as connection:
+        if db.pg_tables_ready(
+            connection,
+            "llm_budget_hierarchies",
+            "llm_budget_reservations",
+            "llm_price_catalog",
+            "model_calls",
+            "tenant_model_policies",
+        ):
+            return
         if getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():

@@ -118,6 +118,8 @@ class LLMGatewayPort(Port):
 
     def _ensure_tables(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "model_calls"):
+                return
             cur = conn.cursor()
             cur.execute("""
             CREATE TABLE IF NOT EXISTS model_calls (

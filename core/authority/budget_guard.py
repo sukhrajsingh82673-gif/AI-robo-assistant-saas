@@ -36,6 +36,8 @@ class SpendBudgetGuard:
             )
         """
         if conn is not None:
+            if db.pg_tables_ready(conn, "company_spend_budgets"):
+                return
             cur = conn.cursor()
             cur.execute(sql)
             if hasattr(conn, "commit"):
@@ -46,6 +48,8 @@ class SpendBudgetGuard:
             return
 
         with db.get_connection() as c:
+            if db.pg_tables_ready(c, "company_spend_budgets"):
+                return
             cur = c.cursor()
             cur.execute(sql)
             c.commit()

@@ -29,8 +29,8 @@
       "is_symlink": false
     },
     ".github/workflows/ci.yml": {
-      "sha256": "bbedee40fa5015e9f0c0783c6c5220605af415be23773382f7b0a246b58986dd",
-      "size": 20416,
+      "sha256": "02df5c6fad390c1f04f1f66f6e64ec7f8096bd64b527e9e9f3e7d6b7cc5b28af",
+      "size": 20494,
       "is_symlink": false
     },
     ".github/workflows/ci_cd.yml": {
@@ -44,8 +44,8 @@
       "is_symlink": false
     },
     ".github/workflows/docker_staging_qualification.yml": {
-      "sha256": "f28d264c7d2536f0e31588ea40adb0683ca342fe1f526f381f5ffc442e067376",
-      "size": 17173,
+      "sha256": "cc070b88668c6ffcfd75e9361b118e5dfdd2df3a578df082f5dcc923655012ba",
+      "size": 18425,
       "is_symlink": false
     },
     ".github/workflows/e2e-browser.yml": {
@@ -599,8 +599,8 @@
       "is_symlink": false
     },
     "core/authority/__init__.py": {
-      "sha256": "3db2197b1dbcb091591b7252bd3fb32ccb757472dcff6d2b223bdb5ae70c3e4a",
-      "size": 2773,
+      "sha256": "bf1444ef0fdb9999a72be2382f127ab81775df99db9981f9c667422b2eaf264b",
+      "size": 3315,
       "is_symlink": false
     },
     "core/authority/approvals.py": {
@@ -614,8 +614,8 @@
       "is_symlink": false
     },
     "core/authority/budget_guard.py": {
-      "sha256": "f0b9660d7a80cccfd70036d3c3f0ad8d4c1d0e76322841fdf3ed4575a089bd7d",
-      "size": 5800,
+      "sha256": "d198611b5eb8a967b7a823a06c9ce6959b0e606296f6a2ddd0541b4666bdd9e5",
+      "size": 5975,
       "is_symlink": false
     },
     "core/authority/constitution.py": {
@@ -654,8 +654,8 @@
       "is_symlink": false
     },
     "core/automation_fabric/data_integration_engine.py": {
-      "sha256": "20e00a346a4794e3897f554502092618d72303c76d197cb3be489a122f843b01",
-      "size": 43818,
+      "sha256": "54ac316a59947d50c3bf0902c1973c04333b18c99dda7dc2f59ffada78df4cc6",
+      "size": 43944,
       "is_symlink": false
     },
     "core/automation_fabric/enterprise_connectors.py": {
@@ -1689,8 +1689,8 @@
       "is_symlink": false
     },
     "core/db.py": {
-      "sha256": "93295576290813799081af0dcb3bfb57d76601a0281dec866e88244596f8ff86",
-      "size": 226605,
+      "sha256": "33451f45e8fdcaf651529ed6e1c44323809a79ffd7c61a17d0dff200524b120e",
+      "size": 228145,
       "is_symlink": false
     },
     "core/db_security.py": {
@@ -1864,8 +1864,8 @@
       "is_symlink": false
     },
     "core/enterprise_agent_factory.py": {
-      "sha256": "7f5a954b2763ea6d8571d5c201b2ad63a7069f170428c8896bb22326584459b8",
-      "size": 21440,
+      "sha256": "42103c07e0882f24216945f91111346661ef76ea3b0c155053c7ce6a14481e1c",
+      "size": 21524,
       "is_symlink": false
     },
     "core/enterprise_crm.py": {
@@ -1874,13 +1874,13 @@
       "is_symlink": false
     },
     "core/enterprise_files.py": {
-      "sha256": "9e5f2c90a2f98813f7fb0c86db9a174537c88e8eb330fa7f3a3638e3085e522b",
-      "size": 14476,
+      "sha256": "825429d2c8bd1b6a49fc8317c00071424af9ab0df10fd1c5da4b408baa7d4134",
+      "size": 14560,
       "is_symlink": false
     },
     "core/enterprise_finance.py": {
-      "sha256": "c000e0695cab8258964ede906bd63811dbc90d44315fb101b671c01281a559e7",
-      "size": 27710,
+      "sha256": "4b166114ccc1c3ff501006a3d3493bb138fb62c905641143f8081e94e844c7e5",
+      "size": 27907,
       "is_symlink": false
     },
     "core/enterprise_idp_client.py": {
@@ -1894,13 +1894,13 @@
       "is_symlink": false
     },
     "core/enterprise_records.py": {
-      "sha256": "9cd0779058919797fa80f33055305d8c108b97c5b247091926ec1c87ea9c1a72",
-      "size": 18563,
+      "sha256": "0a8cfbd1975e9594eefccbc1704995d8e996c359f7889c9796d883b523cbb125",
+      "size": 18649,
       "is_symlink": false
     },
     "core/enterprise_reports.py": {
-      "sha256": "ae6264b3651cdae091cc0aea9e0a22aa82900889741e7f15f831bc9c1acc8398",
-      "size": 17668,
+      "sha256": "8203d9a89806078140b3406275486d170186d203acdb53f5e0c3c3cabe98024b",
+      "size": 17754,
       "is_symlink": false
     },
     "core/evals/__init__.py": {
@@ -2254,8 +2254,8 @@
       "is_symlink": false
     },
     "core/industry_packs/loader.py": {
-      "sha256": "ab0401b3784a9d7eec679f7c7298a0b427e925b30e1372dcdb5f38e7ff093c5f",
-      "size": 13023,
+      "sha256": "dd0644d45732693ce0ca257195334325714c4c34474b8ab5bb0b897a561d9d08",
+      "size": 13137,
       "is_symlink": false
     },
     "core/industry_packs/registry.py": {
@@ -2309,8 +2309,8 @@
       "is_symlink": false
     },
     "core/killswitch_matrix.py": {
-      "sha256": "889287913dfb3033776a93e010e916d03680b324333794150fe2546906f4c56a",
-      "size": 9199,
+      "sha256": "a2c411bd23c504185490455798a47a84f7c1dcb85582cbb8cbfa82d61fc4d93a",
+      "size": 9295,
       "is_symlink": false
     },
     "core/knowledge_gateway.py": {
@@ -2409,8 +2409,8 @@
       "is_symlink": false
     },
     "core/ledger/schema.py": {
-      "sha256": "ff3e2cd8ccc3e3ad05843bc7e63eaf52442c45ccb02fcb5e42444ed6ce256775",
-      "size": 2080,
+      "sha256": "9f095a597f593aca4fe5366c03498f90baef2baed94b435b1ffb9618a6710248",
+      "size": 2294,
       "is_symlink": false
     },
     "core/lint/__init__.py": {
@@ -2424,8 +2424,8 @@
       "is_symlink": false
     },
     "core/llm/__init__.py": {
-      "sha256": "e0f0ecc292a100a8b77421013ba0c2ce6757d5a7628b5f30a264e3391e21116a",
-      "size": 1502,
+      "sha256": "e1c96053b1e09787f6451c127c210afb2f70e66a7b1d2fdc6966d2d64b23c0bd",
+      "size": 2014,
       "is_symlink": false
     },
     "core/llm/budget.py": {
@@ -2724,8 +2724,8 @@
       "is_symlink": false
     },
     "core/ports/llm.py": {
-      "sha256": "bd2d91f126bd60b8dbfbe7ef4a9e53e2e7dc109d6db12a99733d3b3454c53de6",
-      "size": 26992,
+      "sha256": "43e90890152586bba5c0ba7352c9513dcabc71ede80680aea2772f9833584315",
+      "size": 27071,
       "is_symlink": false
     },
     "core/ports/ocr.py": {
@@ -2889,8 +2889,8 @@
       "is_symlink": false
     },
     "core/saas_billing.py": {
-      "sha256": "ab6b5c31a9de33de671f54673f90529224c602c7d499112d7714219e9b410302",
-      "size": 53286,
+      "sha256": "83945d2eafbe7924d56338af9ea38672224649ac1c0464db675e5f17228809a1",
+      "size": 53427,
       "is_symlink": false
     },
     "core/sales_workforce.py": {
@@ -3049,8 +3049,8 @@
       "is_symlink": false
     },
     "core/settings_service.py": {
-      "sha256": "43d53015a04fdb5a02eefceb299cbdbdc2fa06b05e65e632b1a3a975104e3efc",
-      "size": 67541,
+      "sha256": "c6607b7ad6f00e793a013ed73080ae67b0c246cb21b7cf0ea9683b5e6ba9a854",
+      "size": 67675,
       "is_symlink": false
     },
     "core/simulation_fixtures.py": {
@@ -8349,8 +8349,8 @@
       "is_symlink": false
     },
     "tests/test_audit_remediation_security.py": {
-      "sha256": "9cdd80462441f8fabd6b3bb4a7109aeb98ed9130f3478fcb339ecb8eb5584131",
-      "size": 38121,
+      "sha256": "9365bdd1b9e0324e178eabf57f06b2ef1bf1a90fba06031ef8f15e3d8119ea10",
+      "size": 38552,
       "is_symlink": false
     },
     "tests/test_browser_use_execution.py": {

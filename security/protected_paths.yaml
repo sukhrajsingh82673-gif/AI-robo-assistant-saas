@@ -207,6 +207,36 @@ remediated_step5_paths:
 
   - "tests/test_docker_staging_qualification.py"
 
+  - "core/authority/__init__.py"
+
+  - "core/authority/budget_guard.py"
+
+  - "core/automation_fabric/data_integration_engine.py"
+
+  - "core/enterprise_agent_factory.py"
+
+  - "core/enterprise_files.py"
+
+  - "core/enterprise_finance.py"
+
+  - "core/enterprise_records.py"
+
+  - "core/enterprise_reports.py"
+
+  - "core/industry_packs/loader.py"
+
+  - "core/ledger/schema.py"
+
+  - "core/llm/__init__.py"
+
+  - "core/ports/llm.py"
+
+  - "core/saas_billing.py"
+
+  - "core/settings_service.py"
+
+  - "tests/test_audit_remediation_security.py"
+
 enforcement:
   deny_modifications_to_baseline_files: true
   deny_deletions_of_baseline_files: true

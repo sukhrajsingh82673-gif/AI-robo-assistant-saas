@@ -518,6 +518,8 @@ class SyncCheckpointManager:
     @classmethod
     def _ensure_tables(cls):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "automation_sync_checkpoints", "automation_sync_dead_letter"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS automation_sync_checkpoints (
                 tenant_id TEXT NOT NULL,

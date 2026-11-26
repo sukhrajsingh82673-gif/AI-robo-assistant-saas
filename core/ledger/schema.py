@@ -40,6 +40,8 @@ def ensure_ledger_tables(conn: Optional[Any] = None) -> None:
     root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
 
     if conn is not None:
+        if db.pg_tables_ready(conn, "accounts", "journal_entries", "journal_lines"):
+            return
         if hasattr(conn, "executescript"):
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():
@@ -51,6 +53,8 @@ def ensure_ledger_tables(conn: Optional[Any] = None) -> None:
         return
 
     with db.get_connection() as connection:
+        if db.pg_tables_ready(connection, "accounts", "journal_entries", "journal_lines"):
+            return
         if db.dialect == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():

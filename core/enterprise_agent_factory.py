@@ -89,6 +89,8 @@ class EnterpriseAgentFactory:
 
     def _init_db(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "agent_blueprints"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS agent_blueprints (
                 blueprint_id TEXT PRIMARY KEY,

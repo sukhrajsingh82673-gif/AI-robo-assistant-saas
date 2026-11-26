@@ -38,6 +38,8 @@ class KillSwitchMatrix:
 
     def _ensure_table(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "enterprise_killswitch_matrix"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS enterprise_killswitch_matrix (
                 switch_id TEXT PRIMARY KEY,

@@ -59,26 +59,42 @@ def ensure_authority_tables(conn: Optional[Any] = None) -> None:
     root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
 
     if conn is not None:
-        if hasattr(conn, "executescript") and getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
-            sql_path = root_dir / "migrations" / "common" / migration_file
-            if sql_path.exists():
-                conn.executescript(sql_path.read_text(encoding="utf-8"))
-        else:
-            sql_path = root_dir / "migrations" / "pg" / migration_file
-            if sql_path.exists():
-                conn.execute(sql_path.read_text(encoding="utf-8"))
+        if not db.pg_tables_ready(
+            conn,
+            "policy_decisions",
+            "authority_profiles",
+            "authority_delegations",
+            "action_approvals",
+            "company_constitutions",
+        ):
+            if hasattr(conn, "executescript") and getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
+                sql_path = root_dir / "migrations" / "common" / migration_file
+                if sql_path.exists():
+                    conn.executescript(sql_path.read_text(encoding="utf-8"))
+            else:
+                sql_path = root_dir / "migrations" / "pg" / migration_file
+                if sql_path.exists():
+                    conn.execute(sql_path.read_text(encoding="utf-8"))
         spend_budget_guard._ensure_table(conn)
         return
 
     with db.get_connection() as connection:
-        if getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
-            sql_path = root_dir / "migrations" / "common" / migration_file
-            if sql_path.exists():
-                connection.executescript(sql_path.read_text(encoding="utf-8"))
-        else:
-            sql_path = root_dir / "migrations" / "pg" / migration_file
-            if sql_path.exists():
-                connection.execute(sql_path.read_text(encoding="utf-8"))
+        if not db.pg_tables_ready(
+            connection,
+            "policy_decisions",
+            "authority_profiles",
+            "authority_delegations",
+            "action_approvals",
+            "company_constitutions",
+        ):
+            if getattr(db, "dialect", None) == DatabaseDialect.SQLITE:
+                sql_path = root_dir / "migrations" / "common" / migration_file
+                if sql_path.exists():
+                    connection.executescript(sql_path.read_text(encoding="utf-8"))
+            else:
+                sql_path = root_dir / "migrations" / "pg" / migration_file
+                if sql_path.exists():
+                    connection.execute(sql_path.read_text(encoding="utf-8"))
         spend_budget_guard._ensure_table(connection)
 
 

@@ -5251,6 +5251,42 @@ class Database:
     def is_postgresql(self) -> bool:
         return self.dialect == DatabaseDialect.POSTGRESQL
 
+    def pg_tables_ready(self, conn: Any, *table_names: str) -> bool:
+        """Returns True in PostgreSQL when all given public tables already exist.
+
+        Lets least-privilege application roles skip runtime DDL when migrations
+        have already created the tables, while still failing closed if absent.
+        """
+        if self.dialect != DatabaseDialect.POSTGRESQL or not table_names:
+            return False
+        if isinstance(conn, DeferredConnectionProxy):
+            return False
+        try:
+            for tbl in table_names:
+                qualified = tbl if "." in tbl else f"public.{tbl}"
+                row = conn.execute("SELECT to_regclass(?)", (qualified,)).fetchone()
+                if not row or not row[0]:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def pg_column_exists(self, conn: Any, table_name: str, column_name: str) -> bool:
+        """Returns True in PostgreSQL when ``public.<table_name>.<column_name>`` exists."""
+        if self.dialect != DatabaseDialect.POSTGRESQL:
+            return False
+        if isinstance(conn, DeferredConnectionProxy):
+            return False
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = ? AND column_name = ? LIMIT 1",
+                (table_name, column_name),
+            ).fetchone()
+            return bool(row)
+        except Exception:
+            return False
+
     def is_ready(self) -> bool:
         """Returns True if the database connection has been verified."""
         if self.dialect == DatabaseDialect.SQLITE:

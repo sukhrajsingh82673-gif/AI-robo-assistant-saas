@@ -54,14 +54,27 @@ MODULE_TEMP_DIR = None
 def setUpModule():
     """Configures a globally isolated database for all test fixtures in this suite."""
     global MODULE_ORIG_DB_PATH, MODULE_TEMP_DIR
-    prod_db_candidate = os.path.join(BASE_DIR, "storage", "roboassistant.db")
-    if os.path.exists(prod_db_candidate) and not os.environ.get("ZONATA_PRETEST_DB_SHA256"):
-        with open(prod_db_candidate, "rb") as _pf:
-            os.environ["ZONATA_PRETEST_DB_SHA256"] = hashlib.sha256(_pf.read()).hexdigest()
+    import gc
+    import sqlite3
+
     MODULE_ORIG_DB_PATH = db.db_path
     MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
     isolated_db = os.path.join(MODULE_TEMP_DIR.name, "security_test_isolated.db")
     configure_isolated_test_db(isolated_db)
+    gc.collect()
+
+    prod_db_candidate = os.path.join(BASE_DIR, "storage", "roboassistant.db")
+    if os.path.exists(prod_db_candidate) and not os.environ.get("ZONATA_PRETEST_DB_SHA256"):
+        # Flush any WAL created by module-level imports before recording the baseline digest.
+        if os.path.exists(prod_db_candidate + "-wal"):
+            try:
+                _wc = sqlite3.connect(prod_db_candidate, timeout=10.0)
+                _wc.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                _wc.close()
+            except Exception:
+                pass
+        with open(prod_db_candidate, "rb") as _pf:
+            os.environ["ZONATA_PRETEST_DB_SHA256"] = hashlib.sha256(_pf.read()).hexdigest()
 
 
 def tearDownModule():

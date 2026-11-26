@@ -128,24 +128,45 @@ jobs:
           from core.enterprise_files import EnterpriseFilesEngine
           from core.enterprise_records import EnterpriseRecordsEngine
           from core.enterprise_reports import EnterpriseReportsEngine
+          from core.enterprise_finance import EnterpriseFinanceEngine
+          from core.enterprise_agent_factory import EnterpriseAgentFactory
+          from core.settings_service import settings_service
+          from core.killswitch_matrix import KillSwitchMatrix
+          from core.saas_billing import saas_billing_engine
+          from core.llm import ensure_model_gateway_tables
+          from core.authority import ensure_authority_tables
+          from core.ledger.schema import ensure_ledger_tables
+          from core.industry_packs.loader import ensure_industry_pack_tables
           from core.automation_fabric.data_integration_engine import SyncCheckpointManager
           from core.baseline.outbox import ensure_outbox_tables
           from core.automation_fabric.fabric import universal_automation_fabric
           from core.automation_fabric.connector_registry import connector_registry
           from core.action_envelope import command_bus
+          from tests.schema_bootstrap import init_all_subsystem_schemas
 
-          # 1. Apply core relational schema DDL
+          # 1. Apply core & subsystem relational schema DDL as zonata_admin
           db.verify_readiness()
           db._init_db()
           EnterpriseFilesEngine(tenant_id='tnt_init')._init_db()
           EnterpriseRecordsEngine(tenant_id='tnt_init')._init_db()
           EnterpriseReportsEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseFinanceEngine(tenant_id='tnt_init')._init_db()
+          EnterpriseAgentFactory(tenant_id='tnt_init')._init_db()
+          settings_service._ensure_schema()
+          settings_service._seed_default_settings()
+          KillSwitchMatrix(tenant_id='tnt_init')._ensure_table()
+          saas_billing_engine._init_db_tables()
+          ensure_model_gateway_tables()
+          ensure_authority_tables()
+          ensure_ledger_tables()
+          ensure_industry_pack_tables()
           SyncCheckpointManager._ensure_tables()
           ensure_outbox_tables()
           universal_automation_fabric._init_automation_tables()
           universal_automation_fabric._ensure_signing_keys_table()
           connector_registry._ensure_idempotency_table()
           command_bus._init_db()
+          init_all_subsystem_schemas()
           print('Relational schema DDL applied successfully.')
 
           # 2. Apply controlled migrations
@@ -171,7 +192,7 @@ jobs:
           if ! docker compose -f docker-compose.prod.yml up -d zonata-api zonata-worker otel-collector prometheus grafana; then
             echo "=== Container failure diagnostics ==="
             docker compose -f docker-compose.prod.yml ps -a
-            docker compose -f docker-compose.prod.yml logs --tail=80 zonata-api zonata-worker || true
+            docker compose -f docker-compose.prod.yml logs --tail=120 zonata-api zonata-worker otel-collector prometheus grafana || true
             exit 1
           fi
           echo "Complete 9-service application stack started."

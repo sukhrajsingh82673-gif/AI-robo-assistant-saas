@@ -182,26 +182,26 @@ class PreservationEngine:
         baseline = self.load_baseline()
         baseline_files = set(baseline.get("files", {}).keys())
 
-        # Check if base_ref is accessible in current git clone
+        # Verify the actual commit object exists in the local git store; bare
+        # 40-char SHAs always pass `git rev-parse --verify` even in shallow clones.
         check_ref = subprocess.run(
-            ["git", "rev-parse", "--verify", base_ref],
+            ["git", "cat-file", "-e", f"{base_ref}^{{commit}}"],
             cwd=self.repo_root,
             capture_output=True,
             text=True
         )
         if check_ref.returncode != 0:
-            # Fallback to commit sha from baseline
             base_sha = baseline.get("step5_commit_sha")
             check_sha = subprocess.run(
-                ["git", "rev-parse", "--verify", base_sha],
+                ["git", "cat-file", "-e", f"{base_sha}^{{commit}}"],
                 cwd=self.repo_root,
                 capture_output=True,
                 text=True
-            )
-            if check_sha.returncode == 0:
+            ) if base_sha else None
+            if check_sha and check_sha.returncode == 0:
                 base_ref = base_sha
             else:
-                # If shallow clone without commit history, return PASS as baseline files are verified on disk
+                # Shallow clone without commit history: rely on verified baseline file hashes on disk.
                 return {
                     "status": "PASS",
                     "base_ref": "baseline_manifest_fallback",

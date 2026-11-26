@@ -59,6 +59,8 @@ def ensure_industry_pack_tables(conn: Optional[Any] = None) -> None:
     """
 
     def _exec(target_conn):
+        if db.pg_tables_ready(target_conn, "installed_industry_packs", "company_folio_types"):
+            return
         if db.dialect == DatabaseDialect.SQLITE:
             sql_path = root_dir / "migrations" / "common" / migration_file
             if sql_path.exists():

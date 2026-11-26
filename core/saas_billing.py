@@ -518,6 +518,8 @@ class SaasBillingEngine:
         """Ensures persistence tables are available in the underlying database."""
         try:
             with db.get_connection() as conn:
+                if db.pg_tables_ready(conn, "tenant_subscriptions", "billing_webhook_events", "tenant_invoices"):
+                    return
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS tenant_subscriptions (

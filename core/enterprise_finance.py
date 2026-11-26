@@ -28,6 +28,8 @@ class EnterpriseFinanceEngine:
 
     def _init_db(self):
         with db.get_connection() as conn:
+            if db.pg_tables_ready(conn, "finance_accounts", "finance_transactions", "finance_expenses") and db.pg_column_exists(conn, "finance_expenses", "decision_reason"):
+                return
             conn.execute("""
             CREATE TABLE IF NOT EXISTS finance_accounts (
                 account_id TEXT PRIMARY KEY,
