@@ -1,0 +1,1 @@
+"""ZONATA Department Platform Package."""

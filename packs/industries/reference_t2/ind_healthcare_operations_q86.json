@@ -1,0 +1,845 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_healthcare_operations_q86",
+    "title": "Healthcare Operations and Clinical Administration",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "Q",
+    "division": "86"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "86",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "86"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "Q.86"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "6211"
+    }
+  ],
+  "standards_references": [
+    "FHIR_R4",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "bed_occupancy_rate",
+      "name": "Inpatient Bed Occupancy Rate",
+      "formula": "(occupied_bed_days / total_available_bed_days) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "occupied_bed_days": 850,
+            "total_available_bed_days": 1000
+          },
+          "expected_output": 85.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "alos",
+      "name": "Average Length of Stay in Days",
+      "formula": "total_inpatient_days / total_discharges_count",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_inpatient_days": 2000,
+            "total_discharges_count": 400
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cmi",
+      "name": "Case Mix Index",
+      "formula": "total_drg_relative_weights / total_patient_discharges",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_drg_relative_weights": 750,
+            "total_patient_discharges": 500
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "or_utilization",
+      "name": "Surgical Operating Room Utilization Rate",
+      "formula": "(actual_surgical_minutes / scheduled_room_minutes) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_surgical_minutes": 3600,
+            "scheduled_room_minutes": 4500
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "readmission_rate",
+      "name": "30-Day Unplanned Readmission Rate",
+      "formula": "(readmitted_patients_30d / total_discharges) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "readmitted_patients_30d": 36,
+            "total_discharges": 450
+          },
+          "expected_output": 8.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "hai_rate",
+      "name": "Hospital Acquired Infection Rate per Thousand Patient Days",
+      "formula": "(infection_count / inpatient_days) * 1000",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "infection_count": 4,
+            "inpatient_days": 2000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ed_dwell_time",
+      "name": "Emergency Department Average Dwell Minutes",
+      "formula": "total_ed_wait_and_treatment_minutes / total_ed_patients",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_ed_wait_and_treatment_minutes": 36000,
+            "total_ed_patients": 200
+          },
+          "expected_output": 180.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "nurse_patient_ratio",
+      "name": "Nurse to Patient Staffing Ratio",
+      "formula": "assigned_patients_count / on_duty_nurses_count",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "assigned_patients_count": 16,
+            "on_duty_nurses_count": 4
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "revenue_per_discharge",
+      "name": "Net Revenue per Adjusted Patient Discharge",
+      "formula": "net_patient_revenue / adjusted_discharges_count",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_patient_revenue": 4500000,
+            "adjusted_discharges_count": 500
+          },
+          "expected_output": 9000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "claims_denial_rate",
+      "name": "Insurance Claims Initial Denial Rate",
+      "formula": "(denied_claims_value / total_submitted_claims_value) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "denied_claims_value": 75000,
+            "total_submitted_claims_value": 1500000
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cost_per_case",
+      "name": "Average Hospitalization Cost per Case",
+      "formula": "total_inpatient_operating_costs / total_admitted_cases",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_inpatient_operating_costs": 3200000,
+            "total_admitted_cases": 400
+          },
+          "expected_output": 8000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "imaging_idle_time",
+      "name": "MRI and CT Scanner Idle Time Percentage",
+      "formula": "(idle_equipment_hours / total_operational_hours) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "idle_equipment_hours": 15,
+            "total_operational_hours": 100
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "bad_debt_fraction",
+      "name": "Healthcare Bad Debt Uncompensated Care Ratio",
+      "formula": "(bad_debt_expense / gross_patient_revenue) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "bad_debt_expense": 40000,
+            "gross_patient_revenue": 1000000
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "med_dispense_accuracy",
+      "name": "Pharmacy Dispense Accuracy Rate",
+      "formula": "((total_dispensed_doses - error_doses) / total_dispensed_doses) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_dispensed_doses": 10000,
+            "error_doses": 1
+          },
+          "expected_output": 99.99,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ambulatory_no_show",
+      "name": "Outpatient Clinic Appointment No-Show Rate",
+      "formula": "(missed_appointments / total_scheduled_appointments) * 100",
+      "data_source": "folio_q86_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "missed_appointments": 45,
+            "total_scheduled_appointments": 450
+          },
+          "expected_output": 10.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_q86_intake_verification",
+      "title": "Healthcare Operations and Clinical Administration - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_statutory_compliance_check",
+      "title": "Healthcare Operations and Clinical Administration - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_quality_audit_sampling",
+      "title": "Healthcare Operations and Clinical Administration - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_exception_escalation_protocol",
+      "title": "Healthcare Operations and Clinical Administration - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_monthly_period_cutoff",
+      "title": "Healthcare Operations and Clinical Administration - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_incident_remediation_workflow",
+      "title": "Healthcare Operations and Clinical Administration - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_partner_sla_verification",
+      "title": "Healthcare Operations and Clinical Administration - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_safety_inspection_checklist",
+      "title": "Healthcare Operations and Clinical Administration - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_change_management_review",
+      "title": "Healthcare Operations and Clinical Administration - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_q86_final_dispatch_attestation",
+      "title": "Healthcare Operations and Clinical Administration - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_q86_doc_01",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_02",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_03",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_04",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_05",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_06",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_07",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_08",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_09",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_10",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_11",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_12",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_13",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_14",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_15",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_16",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_17",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_18",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_19",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_q86_doc_20",
+      "name": "Healthcare Operations and Clinical Administration Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "HIPAA Privacy and Security Rules (45 CFR Parts 160 and 164)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Medical Device Regulation (EU) 2017/745 (MDR) / GDPR Health Data",
+      "effective_date": "2021-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_q86_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_q86_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_q86_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_q86_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_q86_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_clinical_decision",
+      "prohibited_terms": [
+        "prescribe medication",
+        "clinical diagnosis",
+        "dosage titration",
+        "emergency triage decision"
+      ],
+      "rejection_message": "Autonomous software is strictly prohibited from making diagnostic, treatment, prescription, or triage clinical decisions (Rule 72)."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_q86_golden_01",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_02",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_03",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_04",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_05",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_06",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_07",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_08",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_09",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_10",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_11",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_12",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_13",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_14",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_15",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_q86_golden_16",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_17",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_18",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_19",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_20",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_21",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_22",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_23",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_24",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_q86_golden_25",
+      "name": "Healthcare Operations and Clinical Administration Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "e2965534c62b888e977822b5a0a8c95cbac29ac1c891bf4859f725086e1f2f9c"
+}

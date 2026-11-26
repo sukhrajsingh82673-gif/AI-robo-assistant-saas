@@ -1,0 +1,279 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ZONATA Public API",
+    "version": "1.0.0",
+    "description": "ZONATA Public Developer API for enterprise integrations, autonomous workforce control, metered usage, and event webhooks.",
+    "contact": {
+      "name": "ZONATA Developer Platform",
+      "url": "https://zonata.ai/docs/portal"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.zonata.ai/api/public/v1",
+      "description": "Production Edge Gateway"
+    },
+    {
+      "url": "https://sandbox.api.zonata.ai/api/public/v1",
+      "description": "Synthetic Sandbox Environment"
+    }
+  ],
+  "paths": {
+    "/plans": {
+      "get": {
+        "summary": "List available subscription plans",
+        "operationId": "listPlans",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Plan" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "summary": "Get current tenant metered usage and quotas",
+        "operationId": "getUsage",
+        "responses": {
+          "200": {
+            "description": "Usage summary",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UsageSummary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "summary": "List registered webhooks",
+        "operationId": "listWebhooks",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of webhooks",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedWebhooks" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Register a new Standard Webhook destination",
+        "operationId": "createWebhook",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WebhookCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook endpoint registered",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WebhookEndpoint" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/tasks": {
+      "post": {
+        "summary": "Submit an asynchronous autonomous agent task",
+        "operationId": "createTask",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Task accepted for execution",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskRecord" }
+              }
+            }
+          },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/tasks/{taskId}": {
+      "get": {
+        "summary": "Query status of an autonomous agent task",
+        "operationId": "getTask",
+        "parameters": [
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskRecord" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "plan_id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "tier": { "type": "string" },
+          "base_fee_cents": { "type": "integer" },
+          "included_tokens": { "type": "integer" },
+          "currency": { "type": "string" }
+        },
+        "required": ["plan_id", "code", "name", "tier", "base_fee_cents", "included_tokens", "currency"]
+      },
+      "UsageSummary": {
+        "type": "object",
+        "properties": {
+          "tenant_id": { "type": "string" },
+          "tier": { "type": "string" },
+          "tokens_used": { "type": "integer" },
+          "token_quota": { "type": "integer" },
+          "spend_cents": { "type": "integer" },
+          "hard_cap_cents": { "type": "integer" }
+        },
+        "required": ["tenant_id", "tier", "tokens_used", "token_quota", "spend_cents", "hard_cap_cents"]
+      },
+      "WebhookCreateRequest": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "event_types": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["url", "event_types"]
+      },
+      "WebhookEndpoint": {
+        "type": "object",
+        "properties": {
+          "webhook_id": { "type": "string" },
+          "url": { "type": "string" },
+          "event_types": { "type": "array", "items": { "type": "string" } },
+          "secret": { "type": "string" },
+          "created_at": { "type": "number" }
+        },
+        "required": ["webhook_id", "url", "event_types", "secret", "created_at"]
+      },
+      "PaginatedWebhooks": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookEndpoint" } },
+          "next_cursor": { "type": ["string", "null"] },
+          "has_more": { "type": "boolean" }
+        },
+        "required": ["items", "next_cursor", "has_more"]
+      },
+      "TaskCreateRequest": {
+        "type": "object",
+        "properties": {
+          "instruction": { "type": "string" },
+          "department": { "type": "string" }
+        },
+        "required": ["instruction"]
+      },
+      "TaskRecord": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "instruction": { "type": "string" },
+          "status": { "type": "string" },
+          "created_at": { "type": "number" }
+        },
+        "required": ["task_id", "instruction", "status", "created_at"]
+      },
+      "RFC9457Problem": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" }
+        },
+        "required": ["type", "title", "status", "detail", "instance"]
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "RFC 9457 Bad Request",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/RFC9457Problem" } } }
+      },
+      "Unauthorized": {
+        "description": "RFC 9457 Unauthorized",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/RFC9457Problem" } } }
+      },
+      "Forbidden": {
+        "description": "RFC 9457 Forbidden (Feature not entitled)",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/RFC9457Problem" } } }
+      },
+      "NotFound": {
+        "description": "RFC 9457 Not Found",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/RFC9457Problem" } } }
+      },
+      "RateLimited": {
+        "description": "RFC 9457 Rate Limit Exceeded",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/RFC9457Problem" } } }
+      }
+    }
+  }
+}

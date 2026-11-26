@@ -1,0 +1,843 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_food_manufacturing_c10",
+    "title": "Process and Food Manufacturing",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "C",
+    "division": "10"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "10",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "10"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "C.10"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "3111"
+    }
+  ],
+  "standards_references": [
+    "GS1_EPCIS_2_0",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "batch_yield",
+      "name": "Batch Output Yield",
+      "formula": "(actual_yield_kg / theoretical_yield_kg) * 100",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_yield_kg": 950,
+            "theoretical_yield_kg": 1000
+          },
+          "expected_output": 95.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "moisture_ratio",
+      "name": "Moisture Ratio Variance",
+      "formula": "actual_moisture - target_moisture",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_moisture": 14.5,
+            "target_moisture": 12.0
+          },
+          "expected_output": 2.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cip_water_intensity",
+      "name": "Clean-in-Place Water Intensity",
+      "formula": "water_consumed_liters / batch_weight_kg",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "water_consumed_liters": 5000,
+            "batch_weight_kg": 2500
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "thermal_death_variance",
+      "name": "Pasteurization Thermal Hold Variance",
+      "formula": "actual_hold_secs - required_hold_secs",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_hold_secs": 18,
+            "required_hold_secs": 15
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cold_chain_excursion_rate",
+      "name": "Cold Chain Excursion Rate",
+      "formula": "(excursion_minutes / total_transit_minutes) * 100",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "excursion_minutes": 15,
+            "total_transit_minutes": 1500
+          },
+          "expected_output": 1.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "raw_material_waste_ratio",
+      "name": "Raw Ingredient Spoilage Ratio",
+      "formula": "(spoiled_weight / intake_weight) * 100",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "spoiled_weight": 20,
+            "intake_weight": 1000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "packaging_fill_accuracy",
+      "name": "Packaging Overfill Percentage",
+      "formula": "((actual_fill_grams - target_fill_grams) / target_fill_grams) * 100",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_fill_grams": 505,
+            "target_fill_grams": 500
+          },
+          "expected_output": 1.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "energy_per_ton",
+      "name": "Specific Energy Consumption per Ton",
+      "formula": "total_kwh_consumed / total_tons_produced",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_kwh_consumed": 12000,
+            "total_tons_produced": 60
+          },
+          "expected_output": 200.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "allergen_rinse_efficiency",
+      "name": "Allergen Cleanout Verification Factor",
+      "formula": "residual_ppm / allowable_threshold_ppm",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "residual_ppm": 2,
+            "allowable_threshold_ppm": 10
+          },
+          "expected_output": 0.2,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "shelf_life_index",
+      "name": "Remaining Shelf Life Fraction",
+      "formula": "days_to_expiry / total_shelf_life_days",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "days_to_expiry": 180,
+            "total_shelf_life_days": 360
+          },
+          "expected_output": 0.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "line_recovery_velocity",
+      "name": "Line Sanitation Recovery Rate",
+      "formula": "sanitation_mins / standard_sanitation_mins",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "sanitation_mins": 45,
+            "standard_sanitation_mins": 60
+          },
+          "expected_output": 0.75,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "byproduct_utilization",
+      "name": "Organic Byproduct Recovery Rate",
+      "formula": "(recycled_byproduct_kg / total_byproduct_kg) * 100",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "recycled_byproduct_kg": 400,
+            "total_byproduct_kg": 500
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "downtime_micro_stops",
+      "name": "Micro-Stop Frequency per Shift",
+      "formula": "micro_stop_count / shift_hours",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "micro_stop_count": 16,
+            "shift_hours": 8
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ingredient_batch_variance",
+      "name": "Ingredient Dosing Variance",
+      "formula": "actual_dosing_kg - formula_target_kg",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_dosing_kg": 102,
+            "formula_target_kg": 100
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "traceability_audit_velocity",
+      "name": "Traceability One-Up One-Down Velocity",
+      "formula": "lookup_duration_minutes / allowable_sla_mins",
+      "data_source": "folio_c10_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "lookup_duration_minutes": 15,
+            "allowable_sla_mins": 120
+          },
+          "expected_output": 0.125,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_c10_intake_verification",
+      "title": "Process and Food Manufacturing - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_statutory_compliance_check",
+      "title": "Process and Food Manufacturing - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_quality_audit_sampling",
+      "title": "Process and Food Manufacturing - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_exception_escalation_protocol",
+      "title": "Process and Food Manufacturing - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_monthly_period_cutoff",
+      "title": "Process and Food Manufacturing - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_incident_remediation_workflow",
+      "title": "Process and Food Manufacturing - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_partner_sla_verification",
+      "title": "Process and Food Manufacturing - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_safety_inspection_checklist",
+      "title": "Process and Food Manufacturing - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_change_management_review",
+      "title": "Process and Food Manufacturing - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_c10_final_dispatch_attestation",
+      "title": "Process and Food Manufacturing - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_c10_doc_01",
+      "name": "Process and Food Manufacturing Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_02",
+      "name": "Process and Food Manufacturing Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_03",
+      "name": "Process and Food Manufacturing Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_04",
+      "name": "Process and Food Manufacturing Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_05",
+      "name": "Process and Food Manufacturing Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_06",
+      "name": "Process and Food Manufacturing Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_07",
+      "name": "Process and Food Manufacturing Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_08",
+      "name": "Process and Food Manufacturing Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_09",
+      "name": "Process and Food Manufacturing Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_10",
+      "name": "Process and Food Manufacturing Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_11",
+      "name": "Process and Food Manufacturing Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_12",
+      "name": "Process and Food Manufacturing Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_13",
+      "name": "Process and Food Manufacturing Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_14",
+      "name": "Process and Food Manufacturing Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_15",
+      "name": "Process and Food Manufacturing Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_16",
+      "name": "Process and Food Manufacturing Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_17",
+      "name": "Process and Food Manufacturing Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_18",
+      "name": "Process and Food Manufacturing Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_19",
+      "name": "Process and Food Manufacturing Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_c10_doc_20",
+      "name": "Process and Food Manufacturing Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "FDA 21 CFR 117 (FSMA Preventive Controls)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Regulation (EC) No 178/2002 (General Food Law)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_c10_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_c10_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_c10_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_c10_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_c10_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "bypass pasteurizer thermal cutoff",
+        "disable allergen cleaning check"
+      ],
+      "rejection_message": "Bypassing thermal kill steps or food safety controls is strictly prohibited."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_c10_golden_01",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_02",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_03",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_04",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_05",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_06",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_07",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_08",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_09",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_10",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_11",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_12",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_13",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_14",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_15",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_c10_golden_16",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_17",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_18",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_19",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_20",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_21",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_22",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_23",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_24",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_c10_golden_25",
+      "name": "Process and Food Manufacturing Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "71f0cc7970ff835de8e5b86faded2094a339fbb1c913006cee0ce5846bac4ac0"
+}

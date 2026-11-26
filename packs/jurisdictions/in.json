@@ -1,0 +1,45 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "IN",
+    "country_name": "India",
+    "version": "1.0.0",
+    "regime_type": "CLEARANCE_CTC",
+    "currency": "INR",
+    "is_deep_overlay": true
+  },
+  "tax_regime": {
+    "system_name": "Goods and Services Tax (GST)",
+    "standard_rate": 18.0,
+    "e_invoicing_model": "CLEARANCE_IRP_PORTAL",
+    "status": "UNVERIFIED",
+    "statutory_citation": "India Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "India Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 3650,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "04-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "payroll_regime": {
+    "statutory_withholding": true,
+    "social_security_rate_employer": 12.0,
+    "status": "UNVERIFIED",
+    "citation": "India Statutory Payroll Act"
+  },
+  "e_invoicing_adapter_config": {
+    "adapter_id": "adapter_in_clearance_irp_portal",
+    "schema_version": "1.0.0",
+    "requires_digital_seal": true
+  },
+  "content_digest": "4d73cf10c8c309e03a04daac27a540306f20895cbc7cee8fbfee6808fe48ed04"
+}

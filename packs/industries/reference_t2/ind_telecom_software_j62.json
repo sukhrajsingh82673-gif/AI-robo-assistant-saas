@@ -1,0 +1,846 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_telecom_software_j62",
+    "title": "Telecommunications, SaaS and Cloud Computing",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "J",
+    "division": "62"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "62",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "62"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "J.62"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "5415"
+    }
+  ],
+  "standards_references": [
+    "ISO_20022",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "mrr",
+      "name": "Monthly Recurring Revenue Total",
+      "formula": "subscriber_count * average_subscription_fee",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "subscriber_count": 2500,
+            "average_subscription_fee": 40
+          },
+          "expected_output": 100000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "arr",
+      "name": "Annual Recurring Revenue",
+      "formula": "monthly_recurring_revenue * 12",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "monthly_recurring_revenue": 100000
+          },
+          "expected_output": 1200000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "nrr",
+      "name": "Net Revenue Retention Percentage",
+      "formula": "((starting_mrr + expansion_mrr - churned_mrr - contraction_mrr) / starting_mrr) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "starting_mrr": 100000,
+            "expansion_mrr": 20000,
+            "churned_mrr": 5000,
+            "contraction_mrr": 2000
+          },
+          "expected_output": 113.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "grr",
+      "name": "Gross Revenue Retention Percentage",
+      "formula": "((starting_mrr - churned_mrr - contraction_mrr) / starting_mrr) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "starting_mrr": 100000,
+            "churned_mrr": 5000,
+            "contraction_mrr": 2000
+          },
+          "expected_output": 93.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "churn_rate",
+      "name": "Monthly Customer Churn Rate",
+      "formula": "(lost_customers / starting_customers) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "lost_customers": 40,
+            "starting_customers": 2000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "magic_number",
+      "name": "SaaS Magic Number Sales Efficiency",
+      "formula": "(net_new_arr_quarter * 4) / prior_quarter_sales_marketing_expense",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "net_new_arr_quarter": 250000,
+            "prior_quarter_sales_marketing_expense": 1000000
+          },
+          "expected_output": 1.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cac_payback",
+      "name": "CAC Payback Period in Months",
+      "formula": "customer_acquisition_cost / (monthly_arpu * gross_margin_fraction)",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "customer_acquisition_cost": 1200,
+            "monthly_arpu": 100,
+            "gross_margin_fraction": 0.8
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "arpu",
+      "name": "Average Revenue Per User",
+      "formula": "total_service_revenue / active_users_count",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_service_revenue": 500000,
+            "active_users_count": 10000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "rule_of_40",
+      "name": "Rule of 40 Efficiency Index",
+      "formula": "revenue_growth_rate_pct + free_cash_flow_margin_pct",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "revenue_growth_rate_pct": 30,
+            "free_cash_flow_margin_pct": 15
+          },
+          "expected_output": 45.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "uptime_percentage",
+      "name": "Service SLA Availability Percentage",
+      "formula": "((total_minutes - downtime_minutes) / total_minutes) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_minutes": 43200,
+            "downtime_minutes": 4.32
+          },
+          "expected_output": 99.99,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "bandwidth_utilization",
+      "name": "Network Peak Bandwidth Utilization",
+      "formula": "(peak_bandwidth_gbps / provisioned_bandwidth_gbps) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "peak_bandwidth_gbps": 80,
+            "provisioned_bandwidth_gbps": 100
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "infra_cost_per_mau",
+      "name": "Cloud Infrastructure Cost per Active User",
+      "formula": "total_monthly_cloud_bill / monthly_active_users",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_monthly_cloud_bill": 50000,
+            "monthly_active_users": 100000
+          },
+          "expected_output": 0.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "api_latency_p99_variance",
+      "name": "API P99 Latency SLA Variance",
+      "formula": "actual_p99_ms - target_sla_p99_ms",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_p99_ms": 140,
+            "target_sla_p99_ms": 100
+          },
+          "expected_output": 40.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "saas_gross_margin",
+      "name": "Software Platform Gross Margin",
+      "formula": "((total_revenue - hosting_support_cogs) / total_revenue) * 100",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_revenue": 1000000,
+            "hosting_support_cogs": 200000
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "subscriber_ltv",
+      "name": "Customer Lifetime Value Total",
+      "formula": "arpu / (churn_rate_decimal)",
+      "data_source": "folio_j62_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "arpu": 50,
+            "churn_rate_decimal": 0.02
+          },
+          "expected_output": 2500.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_j62_intake_verification",
+      "title": "Telecommunications, SaaS and Cloud Computing - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_statutory_compliance_check",
+      "title": "Telecommunications, SaaS and Cloud Computing - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_quality_audit_sampling",
+      "title": "Telecommunications, SaaS and Cloud Computing - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_exception_escalation_protocol",
+      "title": "Telecommunications, SaaS and Cloud Computing - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_monthly_period_cutoff",
+      "title": "Telecommunications, SaaS and Cloud Computing - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_incident_remediation_workflow",
+      "title": "Telecommunications, SaaS and Cloud Computing - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_partner_sla_verification",
+      "title": "Telecommunications, SaaS and Cloud Computing - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_safety_inspection_checklist",
+      "title": "Telecommunications, SaaS and Cloud Computing - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_change_management_review",
+      "title": "Telecommunications, SaaS and Cloud Computing - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_j62_final_dispatch_attestation",
+      "title": "Telecommunications, SaaS and Cloud Computing - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_j62_doc_01",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_02",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_03",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_04",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_05",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_06",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_07",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_08",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_09",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_10",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_11",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_12",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_13",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_14",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_15",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_16",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_17",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_18",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_19",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_j62_doc_20",
+      "name": "Telecommunications, SaaS and Cloud Computing Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "FCC Communications Act (47 U.S.C. 222 - CPNI)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "NIS 2 Directive (EU) 2022/2555 (Cybersecurity Requirements)",
+      "effective_date": "2023-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_j62_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_j62_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_j62_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_j62_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_j62_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "disable production ddos protection",
+        "purge root key vault"
+      ],
+      "rejection_message": "Autonomous actions cannot execute destructive security boundary modifications or purge root crypto vaults."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_j62_golden_01",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_02",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_03",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_04",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_05",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_06",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_07",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_08",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_09",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_10",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_11",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_12",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_13",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_14",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_15",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_j62_golden_16",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_17",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_18",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_19",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_20",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_21",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_22",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_23",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_24",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_j62_golden_25",
+      "name": "Telecommunications, SaaS and Cloud Computing Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "48b23a2aeb91bdce4e2082436bba6a4a54fc6627d1e2ec8304e47ec6d4d78c18"
+}

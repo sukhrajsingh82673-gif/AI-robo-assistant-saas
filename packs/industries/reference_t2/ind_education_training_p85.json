@@ -1,0 +1,844 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_education_training_p85",
+    "title": "Higher Education and Professional Training",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "P",
+    "division": "85"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "85",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "85"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "P.85"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "6113"
+    }
+  ],
+  "standards_references": [
+    "ED_FI_DATA_STANDARD",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "graduation_rate",
+      "name": "Cohort Graduation Rate",
+      "formula": "(graduated_students / cohort_intake_students) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "graduated_students": 850,
+            "cohort_intake_students": 1000
+          },
+          "expected_output": 85.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "retention_rate",
+      "name": "First Year Student Retention Rate",
+      "formula": "(returning_second_year_students / first_year_cohort) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "returning_second_year_students": 900,
+            "first_year_cohort": 1000
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "student_faculty_ratio",
+      "name": "Student to Faculty Ratio",
+      "formula": "total_student_fte / total_faculty_fte",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_student_fte": 3000,
+            "total_faculty_fte": 200
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cost_per_degree",
+      "name": "Institutional Cost per Awarded Degree",
+      "formula": "total_instructional_expenditure / total_degrees_awarded",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_instructional_expenditure": 20000000,
+            "total_degrees_awarded": 500
+          },
+          "expected_output": 40000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "tuition_discount_rate",
+      "name": "Institutional Tuition Discount Rate",
+      "formula": "(total_institutional_grant_aid / gross_tuition_revenue) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_institutional_grant_aid": 15000000,
+            "gross_tuition_revenue": 50000000
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "endowment_spending_rate",
+      "name": "Endowment Annual Spending Rate",
+      "formula": "(distributed_endowment_funds / average_endowment_market_value) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "distributed_endowment_funds": 4500000,
+            "average_endowment_market_value": 100000000
+          },
+          "expected_output": 4.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "instructional_expense_ratio",
+      "name": "Instructional Expense Ratio",
+      "formula": "(instruction_spending / total_operating_budget) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "instruction_spending": 35000000,
+            "total_operating_budget": 70000000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "course_completion_rate",
+      "name": "Course Completion Rate",
+      "formula": "(completed_course_enrollments / total_enrolled_seats) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "completed_course_enrollments": 9200,
+            "total_enrolled_seats": 10000
+          },
+          "expected_output": 92.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "job_placement_rate",
+      "name": "Post-Graduation Employment Rate",
+      "formula": "(employed_graduates / reporting_graduates) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "employed_graduates": 450,
+            "reporting_graduates": 500
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "student_default_rate",
+      "name": "Cohort Student Loan Default Rate",
+      "formula": "(defaulted_borrowers / entering_repayment_borrowers) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "defaulted_borrowers": 15,
+            "entering_repayment_borrowers": 500
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "classroom_fill_rate",
+      "name": "Classroom Seat Utilization Rate",
+      "formula": "(enrolled_students / classroom_seat_capacity) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "enrolled_students": 40,
+            "classroom_seat_capacity": 50
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "grant_overhead_rate",
+      "name": "Indirect Cost Recovery Rate",
+      "formula": "(indirect_grant_revenue / direct_research_expenditures) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "indirect_grant_revenue": 2500000,
+            "direct_research_expenditures": 5000000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "satisfaction_index",
+      "name": "Student Satisfaction Index",
+      "formula": "(positive_survey_responses / total_survey_responses) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "positive_survey_responses": 850,
+            "total_survey_responses": 1000
+          },
+          "expected_output": 85.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "program_margin",
+      "name": "Academic Department Contribution Margin",
+      "formula": "((department_revenue - direct_expenses) / department_revenue) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "department_revenue": 2000000,
+            "direct_expenses": 1400000
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "admissions_yield",
+      "name": "Admitted Student Acceptance Yield",
+      "formula": "(matriculated_students / admitted_applicants) * 100",
+      "data_source": "folio_p85_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "matriculated_students": 600,
+            "admitted_applicants": 2000
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_p85_intake_verification",
+      "title": "Higher Education and Professional Training - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_statutory_compliance_check",
+      "title": "Higher Education and Professional Training - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_quality_audit_sampling",
+      "title": "Higher Education and Professional Training - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_exception_escalation_protocol",
+      "title": "Higher Education and Professional Training - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_monthly_period_cutoff",
+      "title": "Higher Education and Professional Training - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_incident_remediation_workflow",
+      "title": "Higher Education and Professional Training - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_partner_sla_verification",
+      "title": "Higher Education and Professional Training - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_safety_inspection_checklist",
+      "title": "Higher Education and Professional Training - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_change_management_review",
+      "title": "Higher Education and Professional Training - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_p85_final_dispatch_attestation",
+      "title": "Higher Education and Professional Training - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_p85_doc_01",
+      "name": "Higher Education and Professional Training Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_02",
+      "name": "Higher Education and Professional Training Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_03",
+      "name": "Higher Education and Professional Training Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_04",
+      "name": "Higher Education and Professional Training Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_05",
+      "name": "Higher Education and Professional Training Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_06",
+      "name": "Higher Education and Professional Training Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_07",
+      "name": "Higher Education and Professional Training Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_08",
+      "name": "Higher Education and Professional Training Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_09",
+      "name": "Higher Education and Professional Training Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_10",
+      "name": "Higher Education and Professional Training Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_11",
+      "name": "Higher Education and Professional Training Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_12",
+      "name": "Higher Education and Professional Training Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_13",
+      "name": "Higher Education and Professional Training Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_14",
+      "name": "Higher Education and Professional Training Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_15",
+      "name": "Higher Education and Professional Training Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_16",
+      "name": "Higher Education and Professional Training Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_17",
+      "name": "Higher Education and Professional Training Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_18",
+      "name": "Higher Education and Professional Training Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_19",
+      "name": "Higher Education and Professional Training Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_p85_doc_20",
+      "name": "Higher Education and Professional Training Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "Family Educational Rights and Privacy Act (FERPA - 34 CFR Part 99)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "UK",
+      "cite": "Higher Education and Research Act 2017 (OfS Registration)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_p85_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_p85_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_p85_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_p85_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_p85_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_legal_advice",
+      "prohibited_terms": [
+        "unreviewed high-stakes grading",
+        "final degree revocation",
+        "unreviewed expulsion"
+      ],
+      "rejection_message": "Autonomous systems cannot issue unreviewed high-stakes assessment decisions, degree denials, or expulsions."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_p85_golden_01",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_02",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_03",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_04",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_05",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_06",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_07",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_08",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_09",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_10",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_11",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_12",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_13",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_14",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_15",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_p85_golden_16",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_17",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_18",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_19",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_20",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_21",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_22",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_23",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_24",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_p85_golden_25",
+      "name": "Higher Education and Professional Training Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "614b8cf0aadb5a46f31a06f9a75af0e3ecbf0a00c4690b605cbdf7cbd9a33560"
+}

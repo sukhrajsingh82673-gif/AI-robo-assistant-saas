@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "AE",
+    "country_name": "United Arab Emirates",
+    "version": "1.0.0",
+    "regime_type": "CIVIL_LAW",
+    "currency": "AED",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Value Added Tax (VAT)",
+    "standard_rate": 5.0,
+    "e_invoicing_model": "FEDERAL_TAX_EINV",
+    "status": "UNVERIFIED",
+    "statutory_citation": "United Arab Emirates Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "United Arab Emirates Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "60e846e33a247522a34741fc4324a3a16c263b58b3adcd612251dd3542426380"
+}

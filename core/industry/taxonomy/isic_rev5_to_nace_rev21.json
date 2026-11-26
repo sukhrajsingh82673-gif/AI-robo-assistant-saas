@@ -1,0 +1,450 @@
+{
+  "metadata": {
+    "source": "Eurostat NACE Rev. 2.1 to ISIC Rev. 5 Alignment Table",
+    "source_url": "https://ec.europa.eu/eurostat/ramon/nomenclatures",
+    "retrieved_at": "2026-11-24T12:00:00Z",
+    "total_records": 88
+  },
+  "mappings": [
+    {
+      "isic_rev5_code": "01",
+      "nace_rev21_code": "A.01",
+      "title": "Crop and animal production, hunting and related service activities"
+    },
+    {
+      "isic_rev5_code": "02",
+      "nace_rev21_code": "A.02",
+      "title": "Forestry and logging"
+    },
+    {
+      "isic_rev5_code": "03",
+      "nace_rev21_code": "A.03",
+      "title": "Fishing and aquaculture"
+    },
+    {
+      "isic_rev5_code": "05",
+      "nace_rev21_code": "B.05",
+      "title": "Mining of coal and lignite"
+    },
+    {
+      "isic_rev5_code": "06",
+      "nace_rev21_code": "B.06",
+      "title": "Extraction of crude petroleum and natural gas"
+    },
+    {
+      "isic_rev5_code": "07",
+      "nace_rev21_code": "B.07",
+      "title": "Mining of metal ores"
+    },
+    {
+      "isic_rev5_code": "08",
+      "nace_rev21_code": "B.08",
+      "title": "Other mining and quarrying"
+    },
+    {
+      "isic_rev5_code": "09",
+      "nace_rev21_code": "B.09",
+      "title": "Mining support service activities"
+    },
+    {
+      "isic_rev5_code": "10",
+      "nace_rev21_code": "C.10",
+      "title": "Manufacture of food products"
+    },
+    {
+      "isic_rev5_code": "11",
+      "nace_rev21_code": "C.11",
+      "title": "Manufacture of beverages"
+    },
+    {
+      "isic_rev5_code": "12",
+      "nace_rev21_code": "C.12",
+      "title": "Manufacture of tobacco products"
+    },
+    {
+      "isic_rev5_code": "13",
+      "nace_rev21_code": "C.13",
+      "title": "Manufacture of textiles"
+    },
+    {
+      "isic_rev5_code": "14",
+      "nace_rev21_code": "C.14",
+      "title": "Manufacture of wearing apparel"
+    },
+    {
+      "isic_rev5_code": "15",
+      "nace_rev21_code": "C.15",
+      "title": "Manufacture of leather and related products"
+    },
+    {
+      "isic_rev5_code": "16",
+      "nace_rev21_code": "C.16",
+      "title": "Manufacture of wood and of products of wood and cork, except furniture"
+    },
+    {
+      "isic_rev5_code": "17",
+      "nace_rev21_code": "C.17",
+      "title": "Manufacture of paper and paper products"
+    },
+    {
+      "isic_rev5_code": "18",
+      "nace_rev21_code": "C.18",
+      "title": "Printing and reproduction of recorded media"
+    },
+    {
+      "isic_rev5_code": "19",
+      "nace_rev21_code": "C.19",
+      "title": "Manufacture of coke and refined petroleum products"
+    },
+    {
+      "isic_rev5_code": "20",
+      "nace_rev21_code": "C.20",
+      "title": "Manufacture of chemicals and chemical products"
+    },
+    {
+      "isic_rev5_code": "21",
+      "nace_rev21_code": "C.21",
+      "title": "Manufacture of pharmaceuticals, medicinal chemical and botanical products"
+    },
+    {
+      "isic_rev5_code": "22",
+      "nace_rev21_code": "C.22",
+      "title": "Manufacture of rubber and plastics products"
+    },
+    {
+      "isic_rev5_code": "23",
+      "nace_rev21_code": "C.23",
+      "title": "Manufacture of other non-metallic mineral products"
+    },
+    {
+      "isic_rev5_code": "24",
+      "nace_rev21_code": "C.24",
+      "title": "Manufacture of basic metals"
+    },
+    {
+      "isic_rev5_code": "25",
+      "nace_rev21_code": "C.25",
+      "title": "Manufacture of fabricated metal products, except machinery and equipment"
+    },
+    {
+      "isic_rev5_code": "26",
+      "nace_rev21_code": "C.26",
+      "title": "Manufacture of computer, electronic and optical products"
+    },
+    {
+      "isic_rev5_code": "27",
+      "nace_rev21_code": "C.27",
+      "title": "Manufacture of electrical equipment"
+    },
+    {
+      "isic_rev5_code": "28",
+      "nace_rev21_code": "C.28",
+      "title": "Manufacture of machinery and equipment n.e.c."
+    },
+    {
+      "isic_rev5_code": "29",
+      "nace_rev21_code": "C.29",
+      "title": "Manufacture of motor vehicles, trailers and semi-trailers"
+    },
+    {
+      "isic_rev5_code": "30",
+      "nace_rev21_code": "C.30",
+      "title": "Manufacture of other transport equipment"
+    },
+    {
+      "isic_rev5_code": "31",
+      "nace_rev21_code": "C.31",
+      "title": "Manufacture of furniture"
+    },
+    {
+      "isic_rev5_code": "32",
+      "nace_rev21_code": "C.32",
+      "title": "Other manufacturing"
+    },
+    {
+      "isic_rev5_code": "33",
+      "nace_rev21_code": "C.33",
+      "title": "Repair and installation of machinery and equipment"
+    },
+    {
+      "isic_rev5_code": "35",
+      "nace_rev21_code": "D.35",
+      "title": "Electricity, gas, steam and air conditioning supply"
+    },
+    {
+      "isic_rev5_code": "36",
+      "nace_rev21_code": "E.36",
+      "title": "Water collection, treatment and supply"
+    },
+    {
+      "isic_rev5_code": "37",
+      "nace_rev21_code": "E.37",
+      "title": "Sewerage"
+    },
+    {
+      "isic_rev5_code": "38",
+      "nace_rev21_code": "E.38",
+      "title": "Waste collection, treatment and disposal activities; materials recovery"
+    },
+    {
+      "isic_rev5_code": "39",
+      "nace_rev21_code": "E.39",
+      "title": "Remediation activities and other waste management services"
+    },
+    {
+      "isic_rev5_code": "41",
+      "nace_rev21_code": "F.41",
+      "title": "Construction of buildings"
+    },
+    {
+      "isic_rev5_code": "42",
+      "nace_rev21_code": "F.42",
+      "title": "Civil engineering"
+    },
+    {
+      "isic_rev5_code": "43",
+      "nace_rev21_code": "F.43",
+      "title": "Specialized construction activities"
+    },
+    {
+      "isic_rev5_code": "45",
+      "nace_rev21_code": "G.45",
+      "title": "Wholesale and retail trade and repair of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev5_code": "46",
+      "nace_rev21_code": "G.46",
+      "title": "Wholesale trade, except of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev5_code": "47",
+      "nace_rev21_code": "G.47",
+      "title": "Retail trade, except of motor vehicles and motorcycles"
+    },
+    {
+      "isic_rev5_code": "49",
+      "nace_rev21_code": "H.49",
+      "title": "Land transport and transport via pipelines"
+    },
+    {
+      "isic_rev5_code": "50",
+      "nace_rev21_code": "H.50",
+      "title": "Water transport"
+    },
+    {
+      "isic_rev5_code": "51",
+      "nace_rev21_code": "H.51",
+      "title": "Air transport"
+    },
+    {
+      "isic_rev5_code": "52",
+      "nace_rev21_code": "H.52",
+      "title": "Warehousing and support activities for transportation"
+    },
+    {
+      "isic_rev5_code": "53",
+      "nace_rev21_code": "H.53",
+      "title": "Postal and courier activities"
+    },
+    {
+      "isic_rev5_code": "55",
+      "nace_rev21_code": "I.55",
+      "title": "Accommodation"
+    },
+    {
+      "isic_rev5_code": "56",
+      "nace_rev21_code": "I.56",
+      "title": "Food and beverage service activities"
+    },
+    {
+      "isic_rev5_code": "58",
+      "nace_rev21_code": "J.58",
+      "title": "Publishing activities"
+    },
+    {
+      "isic_rev5_code": "59",
+      "nace_rev21_code": "J.59",
+      "title": "Motion picture, video and television programme production, sound recording"
+    },
+    {
+      "isic_rev5_code": "60",
+      "nace_rev21_code": "J.60",
+      "title": "Broadcasting activities"
+    },
+    {
+      "isic_rev5_code": "61",
+      "nace_rev21_code": "J.61",
+      "title": "Telecommunications"
+    },
+    {
+      "isic_rev5_code": "62",
+      "nace_rev21_code": "J.62",
+      "title": "Computer programming, consultancy and related activities"
+    },
+    {
+      "isic_rev5_code": "63",
+      "nace_rev21_code": "J.63",
+      "title": "Information service activities"
+    },
+    {
+      "isic_rev5_code": "64",
+      "nace_rev21_code": "K.64",
+      "title": "Financial service activities, except insurance and pension funding"
+    },
+    {
+      "isic_rev5_code": "65",
+      "nace_rev21_code": "K.65",
+      "title": "Insurance, reinsurance and pension funding, except compulsory social security"
+    },
+    {
+      "isic_rev5_code": "66",
+      "nace_rev21_code": "K.66",
+      "title": "Activities auxiliary to financial service and insurance activities"
+    },
+    {
+      "isic_rev5_code": "68",
+      "nace_rev21_code": "L.68",
+      "title": "Real estate activities"
+    },
+    {
+      "isic_rev5_code": "69",
+      "nace_rev21_code": "M.69",
+      "title": "Legal and accounting activities"
+    },
+    {
+      "isic_rev5_code": "70",
+      "nace_rev21_code": "M.70",
+      "title": "Activities of head offices; management consultancy activities"
+    },
+    {
+      "isic_rev5_code": "71",
+      "nace_rev21_code": "M.71",
+      "title": "Architectural and engineering activities; technical testing and analysis"
+    },
+    {
+      "isic_rev5_code": "72",
+      "nace_rev21_code": "M.72",
+      "title": "Scientific research and development"
+    },
+    {
+      "isic_rev5_code": "73",
+      "nace_rev21_code": "M.73",
+      "title": "Advertising and market research"
+    },
+    {
+      "isic_rev5_code": "74",
+      "nace_rev21_code": "M.74",
+      "title": "Other professional, scientific and technical activities"
+    },
+    {
+      "isic_rev5_code": "75",
+      "nace_rev21_code": "M.75",
+      "title": "Veterinary activities"
+    },
+    {
+      "isic_rev5_code": "77",
+      "nace_rev21_code": "N.77",
+      "title": "Rental and leasing activities"
+    },
+    {
+      "isic_rev5_code": "78",
+      "nace_rev21_code": "N.78",
+      "title": "Employment activities"
+    },
+    {
+      "isic_rev5_code": "79",
+      "nace_rev21_code": "N.79",
+      "title": "Travel agency, tour operator, reservation service and related activities"
+    },
+    {
+      "isic_rev5_code": "80",
+      "nace_rev21_code": "N.80",
+      "title": "Security and investigation activities"
+    },
+    {
+      "isic_rev5_code": "81",
+      "nace_rev21_code": "N.81",
+      "title": "Services to buildings and landscape activities"
+    },
+    {
+      "isic_rev5_code": "82",
+      "nace_rev21_code": "N.82",
+      "title": "Office administrative, office support and other business support activities"
+    },
+    {
+      "isic_rev5_code": "84",
+      "nace_rev21_code": "O.84",
+      "title": "Public administration and defence; compulsory social security"
+    },
+    {
+      "isic_rev5_code": "85",
+      "nace_rev21_code": "P.85",
+      "title": "Education"
+    },
+    {
+      "isic_rev5_code": "86",
+      "nace_rev21_code": "Q.86",
+      "title": "Human health activities"
+    },
+    {
+      "isic_rev5_code": "87",
+      "nace_rev21_code": "Q.87",
+      "title": "Residential care activities"
+    },
+    {
+      "isic_rev5_code": "88",
+      "nace_rev21_code": "Q.88",
+      "title": "Social work activities without accommodation"
+    },
+    {
+      "isic_rev5_code": "90",
+      "nace_rev21_code": "R.90",
+      "title": "Creative, arts and entertainment activities"
+    },
+    {
+      "isic_rev5_code": "91",
+      "nace_rev21_code": "R.91",
+      "title": "Libraries, archives, museums and other cultural activities"
+    },
+    {
+      "isic_rev5_code": "92",
+      "nace_rev21_code": "R.92",
+      "title": "Gambling and betting activities"
+    },
+    {
+      "isic_rev5_code": "93",
+      "nace_rev21_code": "R.93",
+      "title": "Sports activities and amusement and recreation activities"
+    },
+    {
+      "isic_rev5_code": "94",
+      "nace_rev21_code": "S.94",
+      "title": "Activities of membership organizations"
+    },
+    {
+      "isic_rev5_code": "95",
+      "nace_rev21_code": "S.95",
+      "title": "Repair of computers and personal and household goods"
+    },
+    {
+      "isic_rev5_code": "96",
+      "nace_rev21_code": "S.96",
+      "title": "Other personal service activities"
+    },
+    {
+      "isic_rev5_code": "97",
+      "nace_rev21_code": "T.97",
+      "title": "Activities of households as employers of domestic personnel"
+    },
+    {
+      "isic_rev5_code": "98",
+      "nace_rev21_code": "T.98",
+      "title": "Undifferentiated goods- and services-producing activities of private households"
+    },
+    {
+      "isic_rev5_code": "99",
+      "nace_rev21_code": "U.99",
+      "title": "Activities of extraterritorial organizations and bodies"
+    }
+  ]
+}

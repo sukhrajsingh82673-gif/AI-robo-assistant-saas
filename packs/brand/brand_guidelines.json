@@ -1,0 +1,43 @@
+{
+  "$schema": "zonata.brand-guidelines/v1",
+  "brand_name": "ZONATA",
+  "tagline": "Sovereign Autonomous Enterprise Operations",
+  "voice_principles": [
+    "Truthful, measured, and evidence-grounded",
+    "Precise and mathematically rigorous",
+    "Empowering human decision-makers rather than claiming replacement"
+  ],
+  "disallowed_terms": [
+    "magic",
+    "miracle",
+    "guaranteed 100% return",
+    "foolproof",
+    "unhackable"
+  ],
+  "forbidden_superlatives": [
+    "fastest",
+    "cheapest",
+    "only solution",
+    "world's best",
+    "most powerful",
+    "number one in the world"
+  ],
+  "rule_44_banned_phrases": [
+    "better than human",
+    "superhuman intelligence",
+    "eliminates all humans",
+    "replaces your accountant completely",
+    "human-free workforce"
+  ],
+  "colors": {
+    "primary": "#0A2540",
+    "secondary": "#635BFF",
+    "accent": "#00D4B2",
+    "background": "#F8FAFC"
+  },
+  "typography": {
+    "primary_font": "Inter, sans-serif",
+    "heading_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace"
+  }
+}

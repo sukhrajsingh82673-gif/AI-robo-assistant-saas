@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "NZ",
+    "country_name": "New Zealand",
+    "version": "1.0.0",
+    "regime_type": "COMMON_LAW",
+    "currency": "NZD",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Goods and Services Tax (GST)",
+    "standard_rate": 15.0,
+    "e_invoicing_model": "PEPPOL_BIS_BILLING_3",
+    "status": "UNVERIFIED",
+    "statutory_citation": "New Zealand Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "New Zealand Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "ccb1e87ba1caad147984dcc27aa48da5fe9ef168790d67350135089dbbf4bb73"
+}

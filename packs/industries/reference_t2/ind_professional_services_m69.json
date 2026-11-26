@@ -1,0 +1,844 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_professional_services_m69",
+    "title": "Legal, Audit and Professional Services",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "M",
+    "division": "69"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "69",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "69"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "M.69"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "5411"
+    }
+  ],
+  "standards_references": [
+    "HR_OPEN_4_3",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "billable_utilization",
+      "name": "Billable Consultant Utilization",
+      "formula": "(billable_hours / available_standard_hours) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "billable_hours": 1500,
+            "available_standard_hours": 2000
+          },
+          "expected_output": 75.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "realization_rate",
+      "name": "Billed Fee Realization Rate",
+      "formula": "(realized_revenue / standard_rack_rate_fees) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "realized_revenue": 450000,
+            "standard_rack_rate_fees": 500000
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "rev_per_consultant",
+      "name": "Revenue per Full-Time Consultant",
+      "formula": "total_net_fees / full_time_consultants",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_net_fees": 1200000,
+            "full_time_consultants": 4
+          },
+          "expected_output": 300000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "hourly_realized_rate",
+      "name": "Average Realized Hourly Rate",
+      "formula": "collected_fees / actual_hours_worked",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "collected_fees": 300000,
+            "actual_hours_worked": 1200
+          },
+          "expected_output": 250.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fee_multiplier",
+      "name": "Fee to Labor Cost Multiplier",
+      "formula": "billed_revenue / direct_payroll_cost",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "billed_revenue": 300000,
+            "direct_payroll_cost": 100000
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "dso",
+      "name": "Days Sales Outstanding",
+      "formula": "(accounts_receivable / annual_credit_sales) * 365",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "accounts_receivable": 100000,
+            "annual_credit_sales": 730000
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "project_overrun_variance",
+      "name": "Project Cost Overrun Ratio",
+      "formula": "(actual_project_cost - budgeted_cost) / budgeted_cost",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_project_cost": 110000,
+            "budgeted_cost": 100000
+          },
+          "expected_output": 0.1,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "backlog_months",
+      "name": "Firm Revenue Backlog Months",
+      "formula": "signed_contract_backlog / average_monthly_burn",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "signed_contract_backlog": 600000,
+            "average_monthly_burn": 100000
+          },
+          "expected_output": 6.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "client_retention_rate",
+      "name": "Annual Client Retention Rate",
+      "formula": "(retained_clients / baseline_clients) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "retained_clients": 85,
+            "baseline_clients": 100
+          },
+          "expected_output": 85.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "engagement_margin",
+      "name": "Engagement Contribution Margin",
+      "formula": "((engagement_fee - direct_costs) / engagement_fee) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "engagement_fee": 100000,
+            "direct_costs": 60000
+          },
+          "expected_output": 40.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "leverage_ratio",
+      "name": "Staff to Partner Leverage Ratio",
+      "formula": "associate_staff_heads / equity_partner_heads",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "associate_staff_heads": 16,
+            "equity_partner_heads": 4
+          },
+          "expected_output": 4.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fee_writeoff_ratio",
+      "name": "Fee Write-Off Bad Debt Ratio",
+      "formula": "(written_off_fees / total_billed_fees) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "written_off_fees": 15000,
+            "total_billed_fees": 500000
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "bid_win_rate",
+      "name": "RFP Engagement Win Rate",
+      "formula": "(won_proposals / submitted_proposals) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "won_proposals": 12,
+            "submitted_proposals": 40
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fixed_fee_variance",
+      "name": "Fixed-Price Engagement Variance",
+      "formula": "fixed_contract_price - actual_incurred_cost",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "fixed_contract_price": 50000,
+            "actual_incurred_cost": 42000
+          },
+          "expected_output": 8000.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "idle_capacity_ratio",
+      "name": "Bench Capacity Idle Ratio",
+      "formula": "(unassigned_bench_hours / total_staff_hours) * 100",
+      "data_source": "folio_m69_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "unassigned_bench_hours": 200,
+            "total_staff_hours": 2000
+          },
+          "expected_output": 10.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_m69_intake_verification",
+      "title": "Legal, Audit and Professional Services - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_statutory_compliance_check",
+      "title": "Legal, Audit and Professional Services - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_quality_audit_sampling",
+      "title": "Legal, Audit and Professional Services - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_exception_escalation_protocol",
+      "title": "Legal, Audit and Professional Services - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_monthly_period_cutoff",
+      "title": "Legal, Audit and Professional Services - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_incident_remediation_workflow",
+      "title": "Legal, Audit and Professional Services - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_partner_sla_verification",
+      "title": "Legal, Audit and Professional Services - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_safety_inspection_checklist",
+      "title": "Legal, Audit and Professional Services - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_change_management_review",
+      "title": "Legal, Audit and Professional Services - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_m69_final_dispatch_attestation",
+      "title": "Legal, Audit and Professional Services - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_m69_doc_01",
+      "name": "Legal, Audit and Professional Services Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_02",
+      "name": "Legal, Audit and Professional Services Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_03",
+      "name": "Legal, Audit and Professional Services Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_04",
+      "name": "Legal, Audit and Professional Services Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_05",
+      "name": "Legal, Audit and Professional Services Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_06",
+      "name": "Legal, Audit and Professional Services Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_07",
+      "name": "Legal, Audit and Professional Services Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_08",
+      "name": "Legal, Audit and Professional Services Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_09",
+      "name": "Legal, Audit and Professional Services Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_10",
+      "name": "Legal, Audit and Professional Services Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_11",
+      "name": "Legal, Audit and Professional Services Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_12",
+      "name": "Legal, Audit and Professional Services Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_13",
+      "name": "Legal, Audit and Professional Services Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_14",
+      "name": "Legal, Audit and Professional Services Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_15",
+      "name": "Legal, Audit and Professional Services Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_16",
+      "name": "Legal, Audit and Professional Services Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_17",
+      "name": "Legal, Audit and Professional Services Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_18",
+      "name": "Legal, Audit and Professional Services Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_19",
+      "name": "Legal, Audit and Professional Services Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_m69_doc_20",
+      "name": "Legal, Audit and Professional Services Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "ABA Model Rules of Professional Conduct (Rule 5.4)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "UK",
+      "cite": "SRA Standards and Regulations 2019",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_m69_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_m69_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_m69_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_m69_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_m69_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_legal_advice",
+      "prohibited_terms": [
+        "formal legal opinion on liability",
+        "attorney-client privilege established",
+        "legal advice"
+      ],
+      "rejection_message": "System cannot provide formal legal advice or create attorney-client privilege relationships."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_m69_golden_01",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_02",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_03",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_04",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_05",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_06",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_07",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_08",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_09",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_10",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_11",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_12",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_13",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_14",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_15",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_m69_golden_16",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_17",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_18",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_19",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_20",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_21",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_22",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_23",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_24",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_m69_golden_25",
+      "name": "Legal, Audit and Professional Services Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "3d495224965f9fe7accbe1a4d3b622af5c89bb555b97227790d259ea81b07834"
+}

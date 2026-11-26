@@ -1,0 +1,846 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_logistics_freight_h52",
+    "title": "Wholesale, Logistics and Freight Operations",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "H",
+    "division": "52"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "52",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "52"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "H.52"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "4931"
+    }
+  ],
+  "standards_references": [
+    "GS1_EPCIS_2_0",
+    "ISO_20022",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "ton_km_cost",
+      "name": "Freight Ton-Kilometer Cost",
+      "formula": "total_trip_cost / (freight_weight_tons * distance_km)",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_trip_cost": 2500,
+            "freight_weight_tons": 20,
+            "distance_km": 500
+          },
+          "expected_output": 0.25,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "otif_rate",
+      "name": "On-Time In-Full Delivery Rate",
+      "formula": "(on_time_in_full_orders / total_dispatched_orders) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "on_time_in_full_orders": 950,
+            "total_dispatched_orders": 1000
+          },
+          "expected_output": 95.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "empty_miles_ratio",
+      "name": "Empty Haul Distance Ratio",
+      "formula": "(empty_distance_km / total_distance_km) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "empty_distance_km": 150,
+            "total_distance_km": 1000
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "dock_to_stock_hours",
+      "name": "Dock to Stock Turnaround Hours",
+      "formula": "total_processing_hours / receiving_lots",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_processing_hours": 24,
+            "receiving_lots": 8
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "warehouse_cube_utilization",
+      "name": "Warehouse Volumetric Storage Density",
+      "formula": "(occupied_cubic_meters / total_storage_cubic_meters) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "occupied_cubic_meters": 8000,
+            "total_storage_cubic_meters": 10000
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fuel_burn_variance",
+      "name": "Fleet Fuel Burn Variance",
+      "formula": "actual_fuel_liters - planned_fuel_liters",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_fuel_liters": 450,
+            "planned_fuel_liters": 400
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "demurrage_exposure_cost",
+      "name": "Container Demurrage Accrual",
+      "formula": "excess_dwell_days * daily_demurrage_rate",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "excess_dwell_days": 4,
+            "daily_demurrage_rate": 150
+          },
+          "expected_output": 600.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "order_fill_rate",
+      "name": "Warehouse Order Line Fill Rate",
+      "formula": "(shipped_line_items / ordered_line_items) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "shipped_line_items": 4900,
+            "ordered_line_items": 5000
+          },
+          "expected_output": 98.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "claims_per_mile",
+      "name": "Cargo Damage Claims per Thousand Miles",
+      "formula": "(damage_claims_count / fleet_miles) * 1000",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "damage_claims_count": 5,
+            "fleet_miles": 50000
+          },
+          "expected_output": 0.1,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "crossdock_velocity",
+      "name": "Cross-Dock Transit Hours",
+      "formula": "crossdock_dispatch_hours / shipments_cleared",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "crossdock_dispatch_hours": 12,
+            "shipments_cleared": 6
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cwt_shipping_cost",
+      "name": "Hundredweight Shipping Rate",
+      "formula": "(total_freight_cost / total_weight_lbs) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_freight_cost": 500,
+            "total_weight_lbs": 10000
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "dwell_time_ratio",
+      "name": "Driver Detention Dwell Time Ratio",
+      "formula": "detention_hours / scheduled_loading_hours",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "detention_hours": 3,
+            "scheduled_loading_hours": 2
+          },
+          "expected_output": 1.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "payload_capacity_fill",
+      "name": "Trailer Weight Utilization Percentage",
+      "formula": "(cargo_weight / max_payload_weight) * 100",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "cargo_weight": 36000,
+            "max_payload_weight": 40000
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "route_variance_ratio",
+      "name": "Route Distance Compliance Ratio",
+      "formula": "actual_miles / planned_miles",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_miles": 550,
+            "planned_miles": 500
+          },
+          "expected_output": 1.1,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "backhaul_revenue_rate",
+      "name": "Backhaul Cost Offset Ratio",
+      "formula": "backhaul_revenue / outbound_freight_cost",
+      "data_source": "folio_h52_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "backhaul_revenue": 1200,
+            "outbound_freight_cost": 2400
+          },
+          "expected_output": 0.5,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_h52_intake_verification",
+      "title": "Wholesale, Logistics and Freight Operations - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_statutory_compliance_check",
+      "title": "Wholesale, Logistics and Freight Operations - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_quality_audit_sampling",
+      "title": "Wholesale, Logistics and Freight Operations - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_exception_escalation_protocol",
+      "title": "Wholesale, Logistics and Freight Operations - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_monthly_period_cutoff",
+      "title": "Wholesale, Logistics and Freight Operations - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_incident_remediation_workflow",
+      "title": "Wholesale, Logistics and Freight Operations - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_partner_sla_verification",
+      "title": "Wholesale, Logistics and Freight Operations - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_safety_inspection_checklist",
+      "title": "Wholesale, Logistics and Freight Operations - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_change_management_review",
+      "title": "Wholesale, Logistics and Freight Operations - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_h52_final_dispatch_attestation",
+      "title": "Wholesale, Logistics and Freight Operations - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_h52_doc_01",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_02",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_03",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_04",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_05",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_06",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_07",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_08",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_09",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_10",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_11",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_12",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_13",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_14",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_15",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_16",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_17",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_18",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_19",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_h52_doc_20",
+      "name": "Wholesale, Logistics and Freight Operations Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "FMCSA 49 CFR 395 (Hours of Service)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Regulation (EC) No 561/2006 (Driving Times and Rest Periods)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_h52_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_h52_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_h52_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_h52_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_h52_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "autonomous brake control write",
+        "override speed limiter",
+        "bypass hazmat routing"
+      ],
+      "rejection_message": "Autonomous dispatch cannot override vehicle safety governors or hazardous materials routing restrictions."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_h52_golden_01",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_02",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_03",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_04",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_05",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_06",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_07",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_08",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_09",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_10",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_11",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_12",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_13",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_14",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_15",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_h52_golden_16",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_17",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_18",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_19",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_20",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_21",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_22",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_23",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_24",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_h52_golden_25",
+      "name": "Wholesale, Logistics and Freight Operations Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "5d59beca8dc46e68a55554a1d4e64b7283c54649fcc442eeb3dd9ef1f6229888"
+}

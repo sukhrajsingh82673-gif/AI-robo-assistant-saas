@@ -1,0 +1,844 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_hospitality_travel_i55",
+    "title": "Hospitality, Travel and Lodging Management",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "I",
+    "division": "55"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "55",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "55"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "I.55"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "7211"
+    }
+  ],
+  "standards_references": [
+    "ISO_20022",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "revpar",
+      "name": "Revenue Per Available Room",
+      "formula": "total_room_revenue / total_available_rooms",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_room_revenue": 100000,
+            "total_available_rooms": 1000
+          },
+          "expected_output": 100.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "adr",
+      "name": "Average Daily Room Rate",
+      "formula": "total_room_revenue / total_rooms_sold",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_room_revenue": 100000,
+            "total_rooms_sold": 800
+          },
+          "expected_output": 125.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "occ_rate",
+      "name": "Hotel Room Occupancy Rate",
+      "formula": "(total_rooms_sold / total_available_rooms) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_rooms_sold": 800,
+            "total_available_rooms": 1000
+          },
+          "expected_output": 80.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "revpash",
+      "name": "Revenue Per Available Seat Hour (F&B)",
+      "formula": "total_fnb_revenue / (seat_count * open_hours)",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_fnb_revenue": 18000,
+            "seat_count": 100,
+            "open_hours": 6
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cpor",
+      "name": "Cost per Occupied Room",
+      "formula": "total_operating_costs / total_rooms_sold",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_operating_costs": 40000,
+            "total_rooms_sold": 800
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "trevpar",
+      "name": "Total Revenue Per Available Room",
+      "formula": "total_property_revenue / total_available_rooms",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_property_revenue": 160000,
+            "total_available_rooms": 1000
+          },
+          "expected_output": 160.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "goppar",
+      "name": "Gross Operating Profit Per Available Room",
+      "formula": "gross_operating_profit / total_available_rooms",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "gross_operating_profit": 65000,
+            "total_available_rooms": 1000
+          },
+          "expected_output": 65.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fnb_cost_percentage",
+      "name": "Food and Beverage Cost Ratio",
+      "formula": "(cost_of_food_and_beverage / fnb_sales_revenue) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "cost_of_food_and_beverage": 30000,
+            "fnb_sales_revenue": 100000
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "cancellation_rate",
+      "name": "Reservation Cancellation Rate",
+      "formula": "(cancelled_reservations / total_booked_reservations) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "cancelled_reservations": 120,
+            "total_booked_reservations": 800
+          },
+          "expected_output": 15.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "direct_booking_ratio",
+      "name": "Direct Channel Booking Ratio",
+      "formula": "(direct_bookings / total_bookings) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "direct_bookings": 400,
+            "total_bookings": 800
+          },
+          "expected_output": 50.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "average_los",
+      "name": "Average Length of Guest Stay Days",
+      "formula": "total_guest_nights / total_bookings_count",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_guest_nights": 2400,
+            "total_bookings_count": 800
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "staff_per_hundred_keys",
+      "name": "Staffing Intensity per 100 Rooms",
+      "formula": "(total_hotel_staff / total_available_rooms) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_hotel_staff": 60,
+            "total_available_rooms": 100
+          },
+          "expected_output": 60.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "ancillary_spend_per_guest",
+      "name": "Ancillary Non-Room Spend per Guest",
+      "formula": "ancillary_revenue / total_registered_guests",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "ancillary_revenue": 45000,
+            "total_registered_guests": 1500
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "no_show_ratio",
+      "name": "Guest No-Show Percentage",
+      "formula": "(no_show_reservations / confirmed_reservations) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "no_show_reservations": 16,
+            "confirmed_reservations": 800
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "guest_satisfaction_index",
+      "name": "Guest CSAT Positive Rating Rate",
+      "formula": "(five_star_reviews / total_reviewed_stays) * 100",
+      "data_source": "folio_i55_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "five_star_reviews": 720,
+            "total_reviewed_stays": 800
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_i55_intake_verification",
+      "title": "Hospitality, Travel and Lodging Management - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_statutory_compliance_check",
+      "title": "Hospitality, Travel and Lodging Management - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_quality_audit_sampling",
+      "title": "Hospitality, Travel and Lodging Management - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_exception_escalation_protocol",
+      "title": "Hospitality, Travel and Lodging Management - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_monthly_period_cutoff",
+      "title": "Hospitality, Travel and Lodging Management - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_incident_remediation_workflow",
+      "title": "Hospitality, Travel and Lodging Management - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_partner_sla_verification",
+      "title": "Hospitality, Travel and Lodging Management - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_safety_inspection_checklist",
+      "title": "Hospitality, Travel and Lodging Management - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_change_management_review",
+      "title": "Hospitality, Travel and Lodging Management - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_i55_final_dispatch_attestation",
+      "title": "Hospitality, Travel and Lodging Management - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_i55_doc_01",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_02",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_03",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_04",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_05",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_06",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_07",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_08",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_09",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_10",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_11",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_12",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_13",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_14",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_15",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_16",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_17",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_18",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_19",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_i55_doc_20",
+      "name": "Hospitality, Travel and Lodging Management Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "Americans with Disabilities Act (28 CFR Part 36 - Public Accommodations)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Package Travel Directive (EU) 2015/2302",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_i55_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_i55_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_i55_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_i55_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_i55_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_clinical_decision",
+      "prohibited_terms": [
+        "prescribe medication",
+        "medical diagnosis"
+      ],
+      "rejection_message": "Hospitality concierges and agents cannot provide clinical diagnoses or pharmacy prescriptions."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_i55_golden_01",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_02",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_03",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_04",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_05",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_06",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_07",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_08",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_09",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_10",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_11",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_12",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_13",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_14",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_15",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_i55_golden_16",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_17",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_18",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_19",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_20",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_21",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_22",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_23",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_24",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_i55_golden_25",
+      "name": "Hospitality, Travel and Lodging Management Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "98f51eb4211870b232382b56660041dc9bd38c05fbe83da94b044d2403fa7429"
+}

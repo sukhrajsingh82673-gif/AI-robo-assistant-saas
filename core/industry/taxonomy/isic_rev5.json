@@ -1,0 +1,1073 @@
+{
+  "metadata": {
+    "scheme": "ISIC",
+    "version": "Rev.5",
+    "title": "International Standard Industrial Classification of All Economic Activities, Revision 5",
+    "endorsed_year": 2023,
+    "explanatory_notes_year": 2024,
+    "source_url": "https://unstats.un.org/unsd/classifications/Econ/ISIC",
+    "retrieved_at": "2026-11-24T12:00:00Z",
+    "total_divisions": 88
+  },
+  "divisions": [
+    {
+      "section": "A",
+      "division_code": "01",
+      "title": "Crop and animal production, hunting and related service activities",
+      "industry_id": "ind_a01",
+      "vocabulary": [
+        "crop",
+        "animal",
+        "production",
+        "hunting",
+        "related",
+        "service",
+        "activities"
+      ]
+    },
+    {
+      "section": "A",
+      "division_code": "02",
+      "title": "Forestry and logging",
+      "industry_id": "ind_a02",
+      "vocabulary": [
+        "forestry",
+        "logging"
+      ]
+    },
+    {
+      "section": "A",
+      "division_code": "03",
+      "title": "Fishing and aquaculture",
+      "industry_id": "ind_a03",
+      "vocabulary": [
+        "fishing",
+        "aquaculture"
+      ]
+    },
+    {
+      "section": "B",
+      "division_code": "05",
+      "title": "Mining of coal and lignite",
+      "industry_id": "ind_b05",
+      "vocabulary": [
+        "mining",
+        "coal",
+        "lignite"
+      ]
+    },
+    {
+      "section": "B",
+      "division_code": "06",
+      "title": "Extraction of crude petroleum and natural gas",
+      "industry_id": "ind_b06",
+      "vocabulary": [
+        "extraction",
+        "crude",
+        "petroleum",
+        "natural"
+      ]
+    },
+    {
+      "section": "B",
+      "division_code": "07",
+      "title": "Mining of metal ores",
+      "industry_id": "ind_b07",
+      "vocabulary": [
+        "mining",
+        "metal",
+        "ores"
+      ]
+    },
+    {
+      "section": "B",
+      "division_code": "08",
+      "title": "Other mining and quarrying",
+      "industry_id": "ind_b08",
+      "vocabulary": [
+        "other",
+        "mining",
+        "quarrying"
+      ]
+    },
+    {
+      "section": "B",
+      "division_code": "09",
+      "title": "Mining support service activities",
+      "industry_id": "ind_b09",
+      "vocabulary": [
+        "mining",
+        "support",
+        "service",
+        "activities"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "10",
+      "title": "Manufacture of food products",
+      "industry_id": "ind_c10",
+      "vocabulary": [
+        "manufacture",
+        "food",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "11",
+      "title": "Manufacture of beverages",
+      "industry_id": "ind_c11",
+      "vocabulary": [
+        "manufacture",
+        "beverages"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "12",
+      "title": "Manufacture of tobacco products",
+      "industry_id": "ind_c12",
+      "vocabulary": [
+        "manufacture",
+        "tobacco",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "13",
+      "title": "Manufacture of textiles",
+      "industry_id": "ind_c13",
+      "vocabulary": [
+        "manufacture",
+        "textiles"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "14",
+      "title": "Manufacture of wearing apparel",
+      "industry_id": "ind_c14",
+      "vocabulary": [
+        "manufacture",
+        "wearing",
+        "apparel"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "15",
+      "title": "Manufacture of leather and related products",
+      "industry_id": "ind_c15",
+      "vocabulary": [
+        "manufacture",
+        "leather",
+        "related",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "16",
+      "title": "Manufacture of wood and of products of wood and cork, except furniture",
+      "industry_id": "ind_c16",
+      "vocabulary": [
+        "manufacture",
+        "wood",
+        "products",
+        "wood",
+        "cork",
+        "except",
+        "furniture"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "17",
+      "title": "Manufacture of paper and paper products",
+      "industry_id": "ind_c17",
+      "vocabulary": [
+        "manufacture",
+        "paper",
+        "paper",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "18",
+      "title": "Printing and reproduction of recorded media",
+      "industry_id": "ind_c18",
+      "vocabulary": [
+        "printing",
+        "reproduction",
+        "recorded",
+        "media"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "19",
+      "title": "Manufacture of coke and refined petroleum products",
+      "industry_id": "ind_c19",
+      "vocabulary": [
+        "manufacture",
+        "coke",
+        "refined",
+        "petroleum",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "20",
+      "title": "Manufacture of chemicals and chemical products",
+      "industry_id": "ind_c20",
+      "vocabulary": [
+        "manufacture",
+        "chemicals",
+        "chemical",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "21",
+      "title": "Manufacture of pharmaceuticals, medicinal chemical and botanical products",
+      "industry_id": "ind_c21",
+      "vocabulary": [
+        "manufacture",
+        "pharmaceuticals",
+        "medicinal",
+        "chemical",
+        "botanical",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "22",
+      "title": "Manufacture of rubber and plastics products",
+      "industry_id": "ind_c22",
+      "vocabulary": [
+        "manufacture",
+        "rubber",
+        "plastics",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "23",
+      "title": "Manufacture of other non-metallic mineral products",
+      "industry_id": "ind_c23",
+      "vocabulary": [
+        "manufacture",
+        "other",
+        "non-metallic",
+        "mineral",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "24",
+      "title": "Manufacture of basic metals",
+      "industry_id": "ind_c24",
+      "vocabulary": [
+        "manufacture",
+        "basic",
+        "metals"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "25",
+      "title": "Manufacture of fabricated metal products, except machinery and equipment",
+      "industry_id": "ind_c25",
+      "vocabulary": [
+        "manufacture",
+        "fabricated",
+        "metal",
+        "products",
+        "except",
+        "machinery",
+        "equipment"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "26",
+      "title": "Manufacture of computer, electronic and optical products",
+      "industry_id": "ind_c26",
+      "vocabulary": [
+        "manufacture",
+        "computer",
+        "electronic",
+        "optical",
+        "products"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "27",
+      "title": "Manufacture of electrical equipment",
+      "industry_id": "ind_c27",
+      "vocabulary": [
+        "manufacture",
+        "electrical",
+        "equipment"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "28",
+      "title": "Manufacture of machinery and equipment n.e.c.",
+      "industry_id": "ind_c28",
+      "vocabulary": [
+        "manufacture",
+        "machinery",
+        "equipment",
+        "n.e.c"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "29",
+      "title": "Manufacture of motor vehicles, trailers and semi-trailers",
+      "industry_id": "ind_c29",
+      "vocabulary": [
+        "manufacture",
+        "motor",
+        "vehicles",
+        "trailers",
+        "semi-trailers"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "30",
+      "title": "Manufacture of other transport equipment",
+      "industry_id": "ind_c30",
+      "vocabulary": [
+        "manufacture",
+        "other",
+        "transport",
+        "equipment"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "31",
+      "title": "Manufacture of furniture",
+      "industry_id": "ind_c31",
+      "vocabulary": [
+        "manufacture",
+        "furniture"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "32",
+      "title": "Other manufacturing",
+      "industry_id": "ind_c32",
+      "vocabulary": [
+        "other",
+        "manufacturing"
+      ]
+    },
+    {
+      "section": "C",
+      "division_code": "33",
+      "title": "Repair and installation of machinery and equipment",
+      "industry_id": "ind_c33",
+      "vocabulary": [
+        "repair",
+        "installation",
+        "machinery",
+        "equipment"
+      ]
+    },
+    {
+      "section": "D",
+      "division_code": "35",
+      "title": "Electricity, gas, steam and air conditioning supply",
+      "industry_id": "ind_d35",
+      "vocabulary": [
+        "electricity",
+        "gas",
+        "steam",
+        "conditioning",
+        "supply"
+      ]
+    },
+    {
+      "section": "E",
+      "division_code": "36",
+      "title": "Water collection, treatment and supply",
+      "industry_id": "ind_e36",
+      "vocabulary": [
+        "water",
+        "collection",
+        "treatment",
+        "supply"
+      ]
+    },
+    {
+      "section": "E",
+      "division_code": "37",
+      "title": "Sewerage",
+      "industry_id": "ind_e37",
+      "vocabulary": [
+        "sewerage"
+      ]
+    },
+    {
+      "section": "E",
+      "division_code": "38",
+      "title": "Waste collection, treatment and disposal activities; materials recovery",
+      "industry_id": "ind_e38",
+      "vocabulary": [
+        "waste",
+        "collection",
+        "treatment",
+        "disposal",
+        "activities",
+        "materials",
+        "recovery"
+      ]
+    },
+    {
+      "section": "E",
+      "division_code": "39",
+      "title": "Remediation activities and other waste management services",
+      "industry_id": "ind_e39",
+      "vocabulary": [
+        "remediation",
+        "activities",
+        "other",
+        "waste",
+        "management",
+        "services"
+      ]
+    },
+    {
+      "section": "F",
+      "division_code": "41",
+      "title": "Construction of buildings",
+      "industry_id": "ind_f41",
+      "vocabulary": [
+        "construction",
+        "buildings"
+      ]
+    },
+    {
+      "section": "F",
+      "division_code": "42",
+      "title": "Civil engineering",
+      "industry_id": "ind_f42",
+      "vocabulary": [
+        "civil",
+        "engineering"
+      ]
+    },
+    {
+      "section": "F",
+      "division_code": "43",
+      "title": "Specialized construction activities",
+      "industry_id": "ind_f43",
+      "vocabulary": [
+        "specialized",
+        "construction",
+        "activities"
+      ]
+    },
+    {
+      "section": "G",
+      "division_code": "45",
+      "title": "Wholesale and retail trade and repair of motor vehicles and motorcycles",
+      "industry_id": "ind_g45",
+      "vocabulary": [
+        "wholesale",
+        "retail",
+        "trade",
+        "repair",
+        "motor",
+        "vehicles",
+        "motorcycles"
+      ]
+    },
+    {
+      "section": "G",
+      "division_code": "46",
+      "title": "Wholesale trade, except of motor vehicles and motorcycles",
+      "industry_id": "ind_g46",
+      "vocabulary": [
+        "wholesale",
+        "trade",
+        "except",
+        "motor",
+        "vehicles",
+        "motorcycles"
+      ]
+    },
+    {
+      "section": "G",
+      "division_code": "47",
+      "title": "Retail trade, except of motor vehicles and motorcycles",
+      "industry_id": "ind_g47",
+      "vocabulary": [
+        "retail",
+        "trade",
+        "except",
+        "motor",
+        "vehicles",
+        "motorcycles"
+      ]
+    },
+    {
+      "section": "H",
+      "division_code": "49",
+      "title": "Land transport and transport via pipelines",
+      "industry_id": "ind_h49",
+      "vocabulary": [
+        "land",
+        "transport",
+        "transport",
+        "pipelines"
+      ]
+    },
+    {
+      "section": "H",
+      "division_code": "50",
+      "title": "Water transport",
+      "industry_id": "ind_h50",
+      "vocabulary": [
+        "water",
+        "transport"
+      ]
+    },
+    {
+      "section": "H",
+      "division_code": "51",
+      "title": "Air transport",
+      "industry_id": "ind_h51",
+      "vocabulary": [
+        "transport"
+      ]
+    },
+    {
+      "section": "H",
+      "division_code": "52",
+      "title": "Warehousing and support activities for transportation",
+      "industry_id": "ind_h52",
+      "vocabulary": [
+        "warehousing",
+        "support",
+        "activities",
+        "transportation"
+      ]
+    },
+    {
+      "section": "H",
+      "division_code": "53",
+      "title": "Postal and courier activities",
+      "industry_id": "ind_h53",
+      "vocabulary": [
+        "postal",
+        "courier",
+        "activities"
+      ]
+    },
+    {
+      "section": "I",
+      "division_code": "55",
+      "title": "Accommodation",
+      "industry_id": "ind_i55",
+      "vocabulary": [
+        "accommodation"
+      ]
+    },
+    {
+      "section": "I",
+      "division_code": "56",
+      "title": "Food and beverage service activities",
+      "industry_id": "ind_i56",
+      "vocabulary": [
+        "food",
+        "beverage",
+        "service",
+        "activities"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "58",
+      "title": "Publishing activities",
+      "industry_id": "ind_j58",
+      "vocabulary": [
+        "publishing",
+        "activities"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "59",
+      "title": "Motion picture, video and television programme production, sound recording",
+      "industry_id": "ind_j59",
+      "vocabulary": [
+        "motion",
+        "picture",
+        "video",
+        "television",
+        "programme",
+        "production",
+        "sound",
+        "recording"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "60",
+      "title": "Broadcasting activities",
+      "industry_id": "ind_j60",
+      "vocabulary": [
+        "broadcasting",
+        "activities"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "61",
+      "title": "Telecommunications",
+      "industry_id": "ind_j61",
+      "vocabulary": [
+        "telecommunications"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "62",
+      "title": "Computer programming, consultancy and related activities",
+      "industry_id": "ind_j62",
+      "vocabulary": [
+        "computer",
+        "programming",
+        "consultancy",
+        "related",
+        "activities"
+      ]
+    },
+    {
+      "section": "J",
+      "division_code": "63",
+      "title": "Information service activities",
+      "industry_id": "ind_j63",
+      "vocabulary": [
+        "information",
+        "service",
+        "activities"
+      ]
+    },
+    {
+      "section": "K",
+      "division_code": "64",
+      "title": "Financial service activities, except insurance and pension funding",
+      "industry_id": "ind_k64",
+      "vocabulary": [
+        "financial",
+        "service",
+        "activities",
+        "except",
+        "insurance",
+        "pension",
+        "funding"
+      ]
+    },
+    {
+      "section": "K",
+      "division_code": "65",
+      "title": "Insurance, reinsurance and pension funding, except compulsory social security",
+      "industry_id": "ind_k65",
+      "vocabulary": [
+        "insurance",
+        "reinsurance",
+        "pension",
+        "funding",
+        "except",
+        "compulsory",
+        "social",
+        "security"
+      ]
+    },
+    {
+      "section": "K",
+      "division_code": "66",
+      "title": "Activities auxiliary to financial service and insurance activities",
+      "industry_id": "ind_k66",
+      "vocabulary": [
+        "activities",
+        "auxiliary",
+        "financial",
+        "service",
+        "insurance",
+        "activities"
+      ]
+    },
+    {
+      "section": "L",
+      "division_code": "68",
+      "title": "Real estate activities",
+      "industry_id": "ind_l68",
+      "vocabulary": [
+        "real",
+        "estate",
+        "activities"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "69",
+      "title": "Legal and accounting activities",
+      "industry_id": "ind_m69",
+      "vocabulary": [
+        "legal",
+        "accounting",
+        "activities"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "70",
+      "title": "Activities of head offices; management consultancy activities",
+      "industry_id": "ind_m70",
+      "vocabulary": [
+        "activities",
+        "head",
+        "offices",
+        "management",
+        "consultancy",
+        "activities"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "71",
+      "title": "Architectural and engineering activities; technical testing and analysis",
+      "industry_id": "ind_m71",
+      "vocabulary": [
+        "architectural",
+        "engineering",
+        "activities",
+        "technical",
+        "testing",
+        "analysis"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "72",
+      "title": "Scientific research and development",
+      "industry_id": "ind_m72",
+      "vocabulary": [
+        "scientific",
+        "research",
+        "development"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "73",
+      "title": "Advertising and market research",
+      "industry_id": "ind_m73",
+      "vocabulary": [
+        "advertising",
+        "market",
+        "research"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "74",
+      "title": "Other professional, scientific and technical activities",
+      "industry_id": "ind_m74",
+      "vocabulary": [
+        "other",
+        "professional",
+        "scientific",
+        "technical",
+        "activities"
+      ]
+    },
+    {
+      "section": "M",
+      "division_code": "75",
+      "title": "Veterinary activities",
+      "industry_id": "ind_m75",
+      "vocabulary": [
+        "veterinary",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "77",
+      "title": "Rental and leasing activities",
+      "industry_id": "ind_n77",
+      "vocabulary": [
+        "rental",
+        "leasing",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "78",
+      "title": "Employment activities",
+      "industry_id": "ind_n78",
+      "vocabulary": [
+        "employment",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "79",
+      "title": "Travel agency, tour operator, reservation service and related activities",
+      "industry_id": "ind_n79",
+      "vocabulary": [
+        "travel",
+        "agency",
+        "tour",
+        "operator",
+        "reservation",
+        "service",
+        "related",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "80",
+      "title": "Security and investigation activities",
+      "industry_id": "ind_n80",
+      "vocabulary": [
+        "security",
+        "investigation",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "81",
+      "title": "Services to buildings and landscape activities",
+      "industry_id": "ind_n81",
+      "vocabulary": [
+        "services",
+        "buildings",
+        "landscape",
+        "activities"
+      ]
+    },
+    {
+      "section": "N",
+      "division_code": "82",
+      "title": "Office administrative, office support and other business support activities",
+      "industry_id": "ind_n82",
+      "vocabulary": [
+        "office",
+        "administrative",
+        "office",
+        "support",
+        "other",
+        "business",
+        "support",
+        "activities"
+      ]
+    },
+    {
+      "section": "O",
+      "division_code": "84",
+      "title": "Public administration and defence; compulsory social security",
+      "industry_id": "ind_o84",
+      "vocabulary": [
+        "public",
+        "administration",
+        "defence",
+        "compulsory",
+        "social",
+        "security"
+      ]
+    },
+    {
+      "section": "P",
+      "division_code": "85",
+      "title": "Education",
+      "industry_id": "ind_p85",
+      "vocabulary": [
+        "education"
+      ]
+    },
+    {
+      "section": "Q",
+      "division_code": "86",
+      "title": "Human health activities",
+      "industry_id": "ind_q86",
+      "vocabulary": [
+        "human",
+        "health",
+        "activities"
+      ]
+    },
+    {
+      "section": "Q",
+      "division_code": "87",
+      "title": "Residential care activities",
+      "industry_id": "ind_q87",
+      "vocabulary": [
+        "residential",
+        "care",
+        "activities"
+      ]
+    },
+    {
+      "section": "Q",
+      "division_code": "88",
+      "title": "Social work activities without accommodation",
+      "industry_id": "ind_q88",
+      "vocabulary": [
+        "social",
+        "work",
+        "activities",
+        "without",
+        "accommodation"
+      ]
+    },
+    {
+      "section": "R",
+      "division_code": "90",
+      "title": "Creative, arts and entertainment activities",
+      "industry_id": "ind_r90",
+      "vocabulary": [
+        "creative",
+        "arts",
+        "entertainment",
+        "activities"
+      ]
+    },
+    {
+      "section": "R",
+      "division_code": "91",
+      "title": "Libraries, archives, museums and other cultural activities",
+      "industry_id": "ind_r91",
+      "vocabulary": [
+        "libraries",
+        "archives",
+        "museums",
+        "other",
+        "cultural",
+        "activities"
+      ]
+    },
+    {
+      "section": "R",
+      "division_code": "92",
+      "title": "Gambling and betting activities",
+      "industry_id": "ind_r92",
+      "vocabulary": [
+        "gambling",
+        "betting",
+        "activities"
+      ]
+    },
+    {
+      "section": "R",
+      "division_code": "93",
+      "title": "Sports activities and amusement and recreation activities",
+      "industry_id": "ind_r93",
+      "vocabulary": [
+        "sports",
+        "activities",
+        "amusement",
+        "recreation",
+        "activities"
+      ]
+    },
+    {
+      "section": "S",
+      "division_code": "94",
+      "title": "Activities of membership organizations",
+      "industry_id": "ind_s94",
+      "vocabulary": [
+        "activities",
+        "membership",
+        "organizations"
+      ]
+    },
+    {
+      "section": "S",
+      "division_code": "95",
+      "title": "Repair of computers and personal and household goods",
+      "industry_id": "ind_s95",
+      "vocabulary": [
+        "repair",
+        "computers",
+        "personal",
+        "household",
+        "goods"
+      ]
+    },
+    {
+      "section": "S",
+      "division_code": "96",
+      "title": "Other personal service activities",
+      "industry_id": "ind_s96",
+      "vocabulary": [
+        "other",
+        "personal",
+        "service",
+        "activities"
+      ]
+    },
+    {
+      "section": "T",
+      "division_code": "97",
+      "title": "Activities of households as employers of domestic personnel",
+      "industry_id": "ind_t97",
+      "vocabulary": [
+        "activities",
+        "households",
+        "employers",
+        "domestic",
+        "personnel"
+      ]
+    },
+    {
+      "section": "T",
+      "division_code": "98",
+      "title": "Undifferentiated goods- and services-producing activities of private households",
+      "industry_id": "ind_t98",
+      "vocabulary": [
+        "undifferentiated",
+        "goods-",
+        "services-producing",
+        "activities",
+        "private",
+        "households"
+      ]
+    },
+    {
+      "section": "U",
+      "division_code": "99",
+      "title": "Activities of extraterritorial organizations and bodies",
+      "industry_id": "ind_u99",
+      "vocabulary": [
+        "activities",
+        "extraterritorial",
+        "organizations",
+        "bodies"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "BE",
+    "country_name": "Belgium",
+    "version": "1.0.0",
+    "regime_type": "PEPPOL",
+    "currency": "EUR",
+    "is_deep_overlay": true
+  },
+  "tax_regime": {
+    "system_name": "Belgian VAT / TVA",
+    "standard_rate": 21.0,
+    "e_invoicing_model": "PEPPOL_BIS_BILLING_3",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Belgium Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Belgium Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 3650,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "payroll_regime": {
+    "statutory_withholding": true,
+    "social_security_rate_employer": 12.0,
+    "status": "UNVERIFIED",
+    "citation": "Belgium Statutory Payroll Act"
+  },
+  "e_invoicing_adapter_config": {
+    "adapter_id": "adapter_be_peppol_bis_billing_3",
+    "schema_version": "1.0.0",
+    "requires_digital_seal": true
+  },
+  "content_digest": "718a08d5629820189553de666cc8b8bc4f97dbb9671df208224f0b891a914c87"
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "GB",
+    "country_name": "United Kingdom",
+    "version": "1.0.0",
+    "regime_type": "COMMON_LAW",
+    "currency": "GBP",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Value Added Tax (VAT)",
+    "standard_rate": 20.0,
+    "e_invoicing_model": "MAKING_TAX_DIGITAL",
+    "status": "UNVERIFIED",
+    "statutory_citation": "United Kingdom Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "United Kingdom Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "04-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "d1218ef5a608d7899b52a34cf59b2c64eacb7eef8f1b9d029b71db43d404f4ba"
+}

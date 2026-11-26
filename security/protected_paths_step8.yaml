@@ -1,0 +1,70 @@
+# ZONATA Security: Protected Paths Policy (Rule 67 Preservation Extension)
+# Steps 1 to 7 are frozen under signed tag `step7-final` (commit b0e8f70).
+# Step 8 is strictly additive. Any modification, deletion, or renaming of protected paths is a hard violation.
+
+version: "zonata.protected_paths/v2"
+governing_rule: "Rule 67 (Preservation Extension to Steps 1-7)"
+status: "FROZEN"
+baseline_commit: "b0e8f70"
+baseline_tag: "step7-final"
+
+protected_directories:
+  - "core/"
+  - "models/"
+  - "db/"
+  - "scripts/"
+  - "web/"
+  - "tests/"
+  - "storage/"
+  - ".github/workflows/"
+  - "packs/"
+
+protected_files:
+  - "requirements.txt"
+  - "pytest.ini"
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - "docker-compose.dev.yml"
+  - "docker-compose.prod.yml"
+  - ".github/workflows/ci.yml"
+  - "README.md"
+  - "LICENSE"
+  - "PROJECT_MEMORY.md"
+
+# Explicit directory and file exceptions where Step 8 additive files are permitted
+allowed_step8_paths:
+  - "core/industry/"
+  - "core/jurisdiction/"
+  - "core/consolidation/"
+  - "core/invoicing/"
+  - "core/i18n/"
+  - "core/benchmarks/"
+  - "core/pilot/"
+  - "security/protected_paths_step8.yaml"
+  - "docs/adr/ADR_0039*"
+  - "docs/adr/ADR_0040*"
+  - "docs/adr/ADR_0041*"
+  - "docs/adr/ADR_0042*"
+  - "docs/adr/ADR_0043*"
+  - "docs/adr/ADR_0044*"
+  - "docs/adr/ADR_0045*"
+  - "docs/adr/ADR_0046*"
+  - "docs/adr/ADR_0047*"
+  - "docs/reviews/step8-*"
+  - "docs/reports/STEP8_*"
+  - "docs/reports/INDUSTRY_COVERAGE.md"
+  - "docs/reports/PILOT_READINESS_REPORT.md"
+  - "docs/benchmarks/STEP8_BENCHMARK_REPORT.md"
+  - "docs/baselines/STEP1-7_BASELINE.json"
+  - "tests/test_step8*"
+  - "tests/test_preservation_step8.py"
+  - "scripts/step8_*"
+  - "scripts/pilot_readiness.py"
+  - "migrations/step8_*"
+  - ".github/workflows/ci-step8.yml"
+
+enforcement:
+  deny_modifications_to_baseline_files: true
+  deny_deletions_of_baseline_files: true
+  deny_destructive_ddl_migrations: true
+  step8_flag_default: false

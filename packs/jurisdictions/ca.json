@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "CA",
+    "country_name": "Canada",
+    "version": "1.0.0",
+    "regime_type": "COMMON_LAW",
+    "currency": "CAD",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "GST / HST / QST",
+    "standard_rate": 13.0,
+    "e_invoicing_model": "CANADIAN_STANDARD",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Canada Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Canada Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "c5084ba713d016580d6b45505e994a0d36c77c6c176382eb3b23f52b8f21605a"
+}

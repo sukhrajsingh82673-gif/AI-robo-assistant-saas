@@ -4781,10 +4781,10 @@ class PostgresConnectionWrapper:
         self._apply_rls_context()
 
     def _apply_rls_context(self) -> None:
-        """Applies the request tenant/company to this session for fail-closed RLS.
+        """Applies the request tenant/company to this transaction for fail-closed RLS (Rule 43).
 
-        Session-level settings are always overwritten (including to empty string)
-        so a pooled connection cannot leak a previous request's scope.
+        Transaction-level settings (is_local=true) are automatically cleared on COMMIT/ROLLBACK,
+        preventing pooled connections behind transaction poolers (PgBouncer/Neon) from leaking context.
         """
         tenant_id = _current_tenant_id.get() or ""
         company_id = _current_company_id.get() or ""
@@ -4794,8 +4794,8 @@ class PostgresConnectionWrapper:
         try:
             cursor = self.raw_conn.cursor()
             cursor.execute(
-                "SELECT set_config('zonata.tenant_id', %s, false), "
-                "set_config('zonata.company_id', %s, false)",
+                "SELECT set_config('zonata.tenant_id', %s, true), "
+                "set_config('zonata.company_id', %s, true)",
                 (tenant_id, company_id),
             )
             try:
@@ -4917,11 +4917,15 @@ class PostgresConnectionWrapper:
         if self._is_closed:
             raise RuntimeError("Cannot commit on closed database connection.")
         self.raw_conn.commit()
+        self._applied_tenant = None
+        self._applied_company = None
 
     def rollback(self):
         if self._is_closed:
             return
         self.raw_conn.rollback()
+        self._applied_tenant = None
+        self._applied_company = None
 
     def close(self):
         if self._is_closed:
@@ -5264,6 +5268,25 @@ class Database:
             raise RuntimeError(
                 f"Database Readiness Verification Failed for '{sanitized_url}': {sanitized_err}"
             )
+
+    def audit_security(self) -> Dict[str, Any]:
+        """Audits database connection role privileges and forced RLS compliance (Rule 42, Rule 43)."""
+        from core.db_security import DBRoleAuditor, RLSAuditor
+        conn = self.get_connection()
+        try:
+            role_report = DBRoleAuditor.verify_connection_role_safety(conn)
+            rls_report = RLSAuditor.audit_tenant_tables(conn)
+            return {
+                "role_safety": role_report,
+                "rls_compliance": rls_report,
+                "dialect": self.dialect,
+                "is_secure": role_report.is_safe and (self.dialect == DatabaseDialect.SQLITE or rls_report.is_compliant),
+            }
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def get_connection(self):
         if self.dialect == DatabaseDialect.POSTGRESQL:

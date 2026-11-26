@@ -448,10 +448,9 @@ class SandboxKMSProvider(KeyManagementPort):
 class LocalEnvelopeKeyProvider(SovereignEnvelopeKMSProvider):
     """Local sovereign envelope key provider.
 
-    Implements Step 1E envelope encryption requirement:
-    Allowed only with an explicit environment flag (ZONATA_ALLOW_DEGRADED=1 or
-    LOCAL_ENVELOPE_KEY=1) and reports DEGRADED in the truth table.
-    No default key; master key never stored in database or logs.
+    Implements Step 1E envelope encryption requirement.
+    RULE 41 ENFORCEMENT: Removed from production code path.
+    Production profile refuses to start with interim local providers.
     """
 
     def __init__(self, master_key_material: Optional[str] = None):
@@ -459,6 +458,23 @@ class LocalEnvelopeKeyProvider(SovereignEnvelopeKMSProvider):
         self.provider_name = "local_envelope_kms"
 
     def probe(self) -> ProviderResult:
+        app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+        is_production = (
+            (app_env in ("production", "prod", "staging"))
+            or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+            or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
+        )
+        if is_production:
+            return ProviderResult(
+                status=PortStatus.FAILED,
+                provider=self.provider_name,
+                provider_ref=None,
+                sandbox=False,
+                latency_ms=0.0,
+                cost=0.0,
+                error="Rule 41 Violation: LocalEnvelopeKeyProvider is prohibited in production profile.",
+            )
+
         res = super().probe()
         if res.status == PortStatus.OK:
             allow_degraded = (
@@ -489,21 +505,174 @@ class LocalEnvelopeKeyProvider(SovereignEnvelopeKMSProvider):
         return res
 
 
+class OpenBaoTransitKMSProvider(KeyManagementPort):
+    """
+    Production OpenBao Transit KMS Provider (MPL-2.0).
+    Implements envelope encryption via OpenBao Transit engine.
+    """
+
+    def __init__(
+        self,
+        addr: Optional[str] = None,
+        token: Optional[str] = None,
+        key_name: str = "zonata-root",
+    ):
+        super().__init__(provider_name="openbao_transit_kms", sandbox=False)
+        self.addr = (addr or os.environ.get("OPENBAO_ADDR") or os.environ.get("VAULT_ADDR") or "http://localhost:8200").rstrip("/")
+        self.token = token or os.environ.get("VAULT_TOKEN", "")
+        self.key_name = key_name
+
+    def _http_post(self, path: str, payload: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+        import urllib.request, urllib.error
+        url = f"{self.addr}{path}"
+        headers = {"X-Vault-Token": self.token, "Content-Type": "application/json"}
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                body = resp.read().decode("utf-8")
+                return resp.status, json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8") if e.fp else ""
+            try:
+                parsed = json.loads(body)
+            except Exception:
+                parsed = {"errors": [body or str(e)]}
+            return e.code, parsed
+        except Exception as e:
+            return 500, {"errors": [str(e)]}
+
+    def probe(self) -> ProviderResult:
+        import urllib.request
+        url = f"{self.addr}/v1/sys/seal-status"
+        req = urllib.request.Request(url, headers={"X-Vault-Token": self.token})
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("sealed", True):
+                    return ProviderResult(
+                        status=PortStatus.FAILED,
+                        provider=self.provider_name,
+                        error="OpenBao Transit KMS is sealed",
+                    )
+                return ProviderResult(
+                    status=PortStatus.OK,
+                    provider=self.provider_name,
+                    provider_ref=f"openbao://transit/{self.key_name}",
+                    metadata={"transit_key": self.key_name, "version": data.get("version")},
+                )
+        except Exception as e:
+            return ProviderResult(
+                status=PortStatus.FAILED,
+                provider=self.provider_name,
+                error=f"OpenBao connection failed: {e}",
+            )
+
+    def generate_data_key(
+        self, context: Optional[Dict[str, str]] = None
+    ) -> Tuple[ProviderResult, bytes, bytes]:
+        t_key = (context or {}).get("tenant_id")
+        key = f"tenant-{t_key}" if t_key else self.key_name
+        payload: Dict[str, Any] = {"bits": 256}
+        if context:
+            b64_ctx = base64.b64encode(json.dumps(sorted(context.items())).encode("utf-8")).decode("utf-8")
+            payload["context"] = b64_ctx
+        code, resp = self._http_post(f"/v1/transit/datakey/plaintext/{key}", payload)
+        if code == 200:
+            data = resp.get("data", {})
+            plain_dek = base64.b64decode(data.get("plaintext", ""))
+            cipher_dek = data.get("ciphertext", "").encode("utf-8")
+            return ProviderResult(status=PortStatus.OK, provider=self.provider_name, provider_ref=f"openbao://transit/datakey/{key}"), plain_dek, cipher_dek
+        return ProviderResult(status=PortStatus.FAILED, provider=self.provider_name, error=f"HTTP {code}"), b"", b""
+
+    def encrypt(
+        self, plaintext: bytes, context: Optional[Dict[str, str]] = None
+    ) -> Tuple[ProviderResult, bytes]:
+        t_key = (context or {}).get("tenant_id")
+        key = f"tenant-{t_key}" if t_key else self.key_name
+        payload: Dict[str, Any] = {"plaintext": base64.b64encode(plaintext).decode("utf-8")}
+        if context:
+            b64_ctx = base64.b64encode(json.dumps(sorted(context.items())).encode("utf-8")).decode("utf-8")
+            payload["context"] = b64_ctx
+        code, resp = self._http_post(f"/v1/transit/encrypt/{key}", payload)
+        if code == 200:
+            ct = resp.get("data", {}).get("ciphertext", "").encode("utf-8")
+            return ProviderResult(status=PortStatus.OK, provider=self.provider_name, provider_ref=f"openbao://transit/{key}"), ct
+        return ProviderResult(status=PortStatus.FAILED, provider=self.provider_name, error=f"HTTP {code}"), b""
+
+    def decrypt(
+        self, envelope_ciphertext: bytes, context: Optional[Dict[str, str]] = None
+    ) -> Tuple[ProviderResult, bytes]:
+        t_key = (context or {}).get("tenant_id")
+        key = f"tenant-{t_key}" if t_key else self.key_name
+        payload: Dict[str, Any] = {"ciphertext": envelope_ciphertext.decode("utf-8")}
+        if context:
+            b64_ctx = base64.b64encode(json.dumps(sorted(context.items())).encode("utf-8")).decode("utf-8")
+            payload["context"] = b64_ctx
+        code, resp = self._http_post(f"/v1/transit/decrypt/{key}", payload)
+        if code == 200:
+            pt = base64.b64decode(resp.get("data", {}).get("plaintext", ""))
+            return ProviderResult(status=PortStatus.OK, provider=self.provider_name, provider_ref=f"openbao://transit/{key}"), pt
+        return ProviderResult(status=PortStatus.FAILED, provider=self.provider_name, error=f"HTTP {code}"), b""
+
+    def rewrap_key(
+        self,
+        envelope_ciphertext: bytes,
+        old_context: Optional[Dict[str, str]] = None,
+        new_context: Optional[Dict[str, str]] = None,
+    ) -> Tuple[ProviderResult, bytes]:
+        t_key = (new_context or old_context or {}).get("tenant_id")
+        key = f"tenant-{t_key}" if t_key else self.key_name
+        payload: Dict[str, Any] = {"ciphertext": envelope_ciphertext.decode("utf-8")}
+        if old_context:
+            payload["context"] = base64.b64encode(json.dumps(sorted(old_context.items())).encode("utf-8")).decode("utf-8")
+        code, resp = self._http_post(f"/v1/transit/rewrap/{key}", payload)
+        if code == 200:
+            new_ct = resp.get("data", {}).get("ciphertext", "").encode("utf-8")
+            return ProviderResult(status=PortStatus.OK, provider=self.provider_name, provider_ref=f"openbao://transit/{key}"), new_ct
+        return ProviderResult(status=PortStatus.FAILED, provider=self.provider_name, error=f"HTTP {code}"), b""
+
+
 def resolve_kms_provider() -> KeyManagementPort:
+    app_env = (os.environ.get("APP_ENV") or os.environ.get("ZONATA_ENV") or "").lower()
+    is_production = (
+        (app_env in ("production", "prod", "staging"))
+        or (os.environ.get("ZONATA_STRICT_AUTH", "0") == "1")
+        or (os.environ.get("ZONATA_PRODUCTION", "0") == "1")
+    )
+
+    openbao_addr = os.environ.get("OPENBAO_ADDR") or os.environ.get("VAULT_ADDR")
+    if openbao_addr:
+        return OpenBaoTransitKMSProvider(addr=openbao_addr)
+
     use_local = (
         os.environ.get("USE_LOCAL_ENVELOPE_KMS") == "1"
         or os.environ.get("LOCAL_ENVELOPE_KEY") == "1"
         or os.environ.get("KMS_PROVIDER", "").lower() == "local"
     )
+
+    if is_production and use_local:
+        raise RuntimeError(
+            "Rule 41 Violation: Production profile refuses to start with LocalEnvelopeKeyProvider. "
+            "ZONATA_ALLOW_DEGRADED no longer covers key management or secrets."
+        )
+
     raw_key = os.environ.get("KMS_MASTER_KEY") or os.environ.get("SECRET_VAULT_KEY")
     if HAS_CRYPTOGRAPHY and raw_key:
         if use_local:
             return LocalEnvelopeKeyProvider(raw_key)
         return SovereignEnvelopeKMSProvider(raw_key)
+
     is_test = os.environ.get("ZONATA_TEST_MODE") == "1" or os.environ.get("APP_ENV") in ("test", "testing")
     if is_test:
         return SandboxKMSProvider()
+
+    if is_production:
+        raise RuntimeError(
+            "Rule 41 Violation: Production profile requires configured KMS or OpenBao. "
+            "Unconfigured KMS is rejected."
+        )
+
     return NotConfiguredKMSProvider(
-        "KMS master key not configured (set KMS_MASTER_KEY or SECRET_VAULT_KEY)"
+        "KMS master key not configured (set KMS_MASTER_KEY, SECRET_VAULT_KEY, or OPENBAO_ADDR)"
     )
 

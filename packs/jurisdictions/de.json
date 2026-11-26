@@ -1,0 +1,45 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "DE",
+    "country_name": "Germany",
+    "version": "1.0.0",
+    "regime_type": "POST_AUDIT",
+    "currency": "EUR",
+    "is_deep_overlay": true
+  },
+  "tax_regime": {
+    "system_name": "Umsatzsteuer (USt)",
+    "standard_rate": 19.0,
+    "e_invoicing_model": "POST_AUDIT_ZUGFERD",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Germany Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Germany Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 3650,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "payroll_regime": {
+    "statutory_withholding": true,
+    "social_security_rate_employer": 12.0,
+    "status": "UNVERIFIED",
+    "citation": "Germany Statutory Payroll Act"
+  },
+  "e_invoicing_adapter_config": {
+    "adapter_id": "adapter_de_post_audit_zugferd",
+    "schema_version": "1.0.0",
+    "requires_digital_seal": true
+  },
+  "content_digest": "19e5a0b8060e84ea00053c30b4919f101042c672e694c7f6024cef252c0e90c3"
+}

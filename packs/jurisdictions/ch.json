@@ -1,0 +1,34 @@
+{
+  "schema_version": "zonata.jurisdiction-pack/v1",
+  "metadata": {
+    "jurisdiction_code": "CH",
+    "country_name": "Switzerland",
+    "version": "1.0.0",
+    "regime_type": "CIVIL_LAW",
+    "currency": "CHF",
+    "is_deep_overlay": false
+  },
+  "tax_regime": {
+    "system_name": "Mehrwertsteuer (MWST)",
+    "standard_rate": 8.1,
+    "e_invoicing_model": "E_INVOICE_SWISS_QR",
+    "status": "UNVERIFIED",
+    "statutory_citation": "Switzerland Primary Tax Code \u00a7 1-12"
+  },
+  "data_protection": {
+    "statutory_act": "Switzerland Data Privacy Law / GDPR Equivalent",
+    "cross_border_transfer_restricted": true,
+    "standard_retention_days": 1825,
+    "status": "UNVERIFIED"
+  },
+  "calendars": {
+    "fiscal_year_start": "01-01",
+    "official_holidays": [
+      "2026-01-01",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "status": "UNVERIFIED"
+  },
+  "content_digest": "be9126da5bcdd4307f7e7bddc2b77cea5fc254943204764d6f780d74ea2650ee"
+}

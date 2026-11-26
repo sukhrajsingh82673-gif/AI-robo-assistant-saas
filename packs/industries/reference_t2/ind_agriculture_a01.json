@@ -1,0 +1,843 @@
+{
+  "schema_version": "zonata.industry-overlay/v1",
+  "metadata": {
+    "industry_id": "ind_agriculture_a01",
+    "title": "Commercial Agriculture and Crop Production",
+    "version": "1.0.0",
+    "tier": "T2",
+    "section": "A",
+    "division": "01"
+  },
+  "classification_codes": [
+    {
+      "scheme": "ISIC",
+      "version": "Rev.5",
+      "code": "01",
+      "is_primary": true
+    },
+    {
+      "scheme": "ISIC",
+      "version": "Rev.4",
+      "code": "01"
+    },
+    {
+      "scheme": "NACE",
+      "version": "Rev.2.1",
+      "code": "A.01"
+    },
+    {
+      "scheme": "NAICS",
+      "version": "2022",
+      "code": "1111"
+    }
+  ],
+  "standards_references": [
+    "ADAPT_FRAMEWORK",
+    "EN_16931"
+  ],
+  "calculators": [
+    {
+      "calculator_id": "yield_per_hectare",
+      "name": "Harvest Yield per Hectare",
+      "formula": "total_harvest_metric_tons / harvested_hectares",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_harvest_metric_tons": 800,
+            "harvested_hectares": 100
+          },
+          "expected_output": 8.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "crop_moisture_variance",
+      "name": "Grain Moisture Content Variance",
+      "formula": "harvested_moisture_pct - standard_storage_moisture_pct",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "harvested_moisture_pct": 16.5,
+            "standard_storage_moisture_pct": 14.0
+          },
+          "expected_output": 2.5,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fcr",
+      "name": "Livestock Feed Conversion Ratio",
+      "formula": "total_feed_consumed_kg / total_weight_gained_kg",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_feed_consumed_kg": 4000,
+            "total_weight_gained_kg": 2000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "irrigation_productivity",
+      "name": "Water Productivity Index",
+      "formula": "total_yield_kg / irrigation_volume_cubic_meters",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "total_yield_kg": 800000,
+            "irrigation_volume_cubic_meters": 400000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "harvest_loss_rate",
+      "name": "Field Harvest Loss Rate",
+      "formula": "(unharvested_shattered_grain_kg / total_standing_yield_kg) * 100",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "unharvested_shattered_grain_kg": 24,
+            "total_standing_yield_kg": 800
+          },
+          "expected_output": 3.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fertilizer_efficiency",
+      "name": "Nitrogen Fertilizer Recovery Efficiency",
+      "formula": "nitrogen_taken_up_kg / nitrogen_applied_kg",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "nitrogen_taken_up_kg": 75,
+            "nitrogen_applied_kg": 100
+          },
+          "expected_output": 0.75,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "post_harvest_spoilage",
+      "name": "Silo Storage Spoilage Ratio",
+      "formula": "(spoiled_storage_tons / total_silo_tons) * 100",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "spoiled_storage_tons": 10,
+            "total_silo_tons": 1000
+          },
+          "expected_output": 1.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "machinery_cost_per_acre",
+      "name": "Tractor & Implement Cost per Acre",
+      "formula": "annual_equipment_operating_cost / farm_acres",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "annual_equipment_operating_cost": 45000,
+            "farm_acres": 1500
+          },
+          "expected_output": 30.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "livestock_mortality_rate",
+      "name": "Herd Annual Mortality Rate",
+      "formula": "(dead_animals_count / total_herd_size) * 100",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "dead_animals_count": 10,
+            "total_herd_size": 1000
+          },
+          "expected_output": 1.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "seed_germination_rate",
+      "name": "Certified Seed Germination Percentage",
+      "formula": "(germinated_seeds / sample_planted_seeds) * 100",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "germinated_seeds": 96,
+            "sample_planted_seeds": 100
+          },
+          "expected_output": 96.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "soil_carbon_gain",
+      "name": "Soil Organic Matter Index",
+      "formula": "measured_som_pct - baseline_som_pct",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "measured_som_pct": 3.8,
+            "baseline_som_pct": 3.2
+          },
+          "expected_output": 0.6,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "spray_application_accuracy",
+      "name": "Chemical Application Rate Variance",
+      "formula": "actual_applied_liters_per_ha - label_rate_liters_per_ha",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "actual_applied_liters_per_ha": 105,
+            "label_rate_liters_per_ha": 100
+          },
+          "expected_output": 5.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "working_capital_turnover",
+      "name": "Agricultural Working Capital Turnover",
+      "formula": "annual_crop_sales / seasonal_operating_debt",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "annual_crop_sales": 600000,
+            "seasonal_operating_debt": 300000
+          },
+          "expected_output": 2.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "fuel_per_hectare",
+      "name": "Field Tractor Fuel Consumption Intensity",
+      "formula": "fuel_consumed_liters / tilled_hectares",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "fuel_consumed_liters": 2500,
+            "tilled_hectares": 100
+          },
+          "expected_output": 25.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "calculator_id": "calving_rate",
+      "name": "Breeding Herd Weaning Percentage",
+      "formula": "(weaned_calves_count / bred_cows_count) * 100",
+      "data_source": "folio_a01_ledger",
+      "golden_tests": [
+        {
+          "inputs": {
+            "weaned_calves_count": 90,
+            "bred_cows_count": 100
+          },
+          "expected_output": 90.0,
+          "tolerance": 0.01
+        }
+      ]
+    }
+  ],
+  "sop_overlays": [
+    {
+      "sop_id": "sop_a01_intake_verification",
+      "title": "Commercial Agriculture and Crop Production - Intake Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_statutory_compliance_check",
+      "title": "Commercial Agriculture and Crop Production - Statutory Compliance Check",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_quality_audit_sampling",
+      "title": "Commercial Agriculture and Crop Production - Quality Audit Sampling",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_exception_escalation_protocol",
+      "title": "Commercial Agriculture and Crop Production - Exception Escalation Protocol",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_monthly_period_cutoff",
+      "title": "Commercial Agriculture and Crop Production - Monthly Period Cutoff",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_incident_remediation_workflow",
+      "title": "Commercial Agriculture and Crop Production - Incident Remediation Workflow",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_partner_sla_verification",
+      "title": "Commercial Agriculture and Crop Production - Partner Sla Verification",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_safety_inspection_checklist",
+      "title": "Commercial Agriculture and Crop Production - Safety Inspection Checklist",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_change_management_review",
+      "title": "Commercial Agriculture and Crop Production - Change Management Review",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    },
+    {
+      "sop_id": "sop_a01_final_dispatch_attestation",
+      "title": "Commercial Agriculture and Crop Production - Final Dispatch Attestation",
+      "department_overlay_target": "operations",
+      "steps_count": 5
+    }
+  ],
+  "document_templates": [
+    {
+      "template_id": "tpl_a01_doc_01",
+      "name": "Commercial Agriculture and Crop Production Standard Document 01",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_02",
+      "name": "Commercial Agriculture and Crop Production Standard Document 02",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_03",
+      "name": "Commercial Agriculture and Crop Production Standard Document 03",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_04",
+      "name": "Commercial Agriculture and Crop Production Standard Document 04",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_05",
+      "name": "Commercial Agriculture and Crop Production Standard Document 05",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_06",
+      "name": "Commercial Agriculture and Crop Production Standard Document 06",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_07",
+      "name": "Commercial Agriculture and Crop Production Standard Document 07",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_08",
+      "name": "Commercial Agriculture and Crop Production Standard Document 08",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_09",
+      "name": "Commercial Agriculture and Crop Production Standard Document 09",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_10",
+      "name": "Commercial Agriculture and Crop Production Standard Document 10",
+      "category": "OPERATIONAL_RECORD",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_11",
+      "name": "Commercial Agriculture and Crop Production Standard Document 11",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_12",
+      "name": "Commercial Agriculture and Crop Production Standard Document 12",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_13",
+      "name": "Commercial Agriculture and Crop Production Standard Document 13",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_14",
+      "name": "Commercial Agriculture and Crop Production Standard Document 14",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_15",
+      "name": "Commercial Agriculture and Crop Production Standard Document 15",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_16",
+      "name": "Commercial Agriculture and Crop Production Standard Document 16",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_17",
+      "name": "Commercial Agriculture and Crop Production Standard Document 17",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_18",
+      "name": "Commercial Agriculture and Crop Production Standard Document 18",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_19",
+      "name": "Commercial Agriculture and Crop Production Standard Document 19",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    },
+    {
+      "template_id": "tpl_a01_doc_20",
+      "name": "Commercial Agriculture and Crop Production Standard Document 20",
+      "category": "COMPLIANCE_ATTESTATION",
+      "default_retention_days": 1095
+    }
+  ],
+  "regulatory_register": [
+    {
+      "jurisdiction": "US",
+      "cite": "EPA FIFRA (40 CFR Part 170 - Worker Protection Standard)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    },
+    {
+      "jurisdiction": "EU",
+      "cite": "Regulation (EC) No 1107/2009 (Plant Protection Products)",
+      "effective_date": "2020-01-01",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "hazard_register": [
+    {
+      "hazard_id": "haz_a01_01",
+      "name": "Statutory non-compliance penalty",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_a01_02",
+      "name": "Data leakage / unauthorized disclosure",
+      "severity": "CRITICAL"
+    },
+    {
+      "hazard_id": "haz_a01_03",
+      "name": "Mathematical discrepancy in statutory calculation",
+      "severity": "HIGH"
+    },
+    {
+      "hazard_id": "haz_a01_04",
+      "name": "Operational bottleneck / SLA breach",
+      "severity": "MEDIUM"
+    },
+    {
+      "hazard_id": "haz_a01_05",
+      "name": "Unverified vendor fraud / unapproved wire",
+      "severity": "CRITICAL"
+    }
+  ],
+  "boundary_policies": [
+    {
+      "policy_id": "boundary_safety_critical_control_write",
+      "prohibited_terms": [
+        "exceed pesticide maximum residue limit",
+        "autonomous chemical spray override"
+      ],
+      "rejection_message": "Autonomous crop spraying cannot exceed statutory maximum residue limits (MRLs) or bypass chemical drift locks."
+    }
+  ],
+  "golden_tasks": [
+    {
+      "task_id": "task_a01_golden_01",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 01",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_02",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 02",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_03",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 03",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_04",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 04",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_05",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 05",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_06",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 06",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_07",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 07",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_08",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 08",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_09",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 09",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_10",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 10",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_11",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 11",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_12",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 12",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_13",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 13",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_14",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 14",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_15",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 15",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "STANDARD"
+    },
+    {
+      "task_id": "task_a01_golden_16",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 16",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_17",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 17",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_18",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 18",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_19",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 19",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_20",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 20",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_21",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 21",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_22",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 22",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_23",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 23",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_24",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 24",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    },
+    {
+      "task_id": "task_a01_golden_25",
+      "name": "Commercial Agriculture and Crop Production Automated Golden Execution Task 25",
+      "task_type": "DOMAIN_SPECIALIZED_OPERATION",
+      "checkpoints": [
+        "CP1_SCHEMA",
+        "CP2_POLICY",
+        "CP3_EXEC",
+        "CP4_REREAD",
+        "CP5_ATTEST"
+      ],
+      "difficulty": "ADVANCED"
+    }
+  ],
+  "content_digest": "1819223431a71c8221c527b7f989b3de1a28597f0d614548f7ecd4c3aed5c66c"
+}
