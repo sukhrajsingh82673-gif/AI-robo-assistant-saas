@@ -56,6 +56,34 @@ class UnpostedFolioJournalEntriesError(LedgerError):
     pass
 
 
+def _db_timestamp(unix_ts: float) -> Any:
+    """Returns UTC datetime on PostgreSQL (TIMESTAMPTZ) or Unix float on SQLite."""
+    if db.is_postgresql():
+        return datetime.fromtimestamp(unix_ts, tz=timezone.utc)
+    return unix_ts
+
+
+def _db_bool(value: bool) -> Any:
+    """Returns native bool on PostgreSQL (BOOLEAN) or 0/1 integer on SQLite."""
+    if db.is_postgresql():
+        return bool(value)
+    return 1 if value else 0
+
+
+def _from_db_timestamp(val: Any) -> Any:
+    """Normalizes datetime/numeric timestamps from SQLite/PG to Unix epoch float."""
+    if hasattr(val, "timestamp"):
+        return val.timestamp()
+    return val
+
+
+def _from_db_date(val: Any) -> Any:
+    """Normalizes date/datetime values from PG DATE columns to ISO YYYY-MM-DD strings."""
+    if hasattr(val, "isoformat"):
+        return val.isoformat()
+    return val
+
+
 class LedgerKernel:
     """Double-entry financial ledger kernel enforcing strict statutory invariants."""
 
@@ -101,8 +129,8 @@ class LedgerKernel:
                     name.strip(),
                     account_type.value,
                     curr,
-                    1 if is_active else 0,
-                    now,
+                    _db_bool(is_active),
+                    _db_timestamp(now),
                 ),
             )
             conn.commit()
@@ -134,7 +162,7 @@ class LedgerKernel:
                 "type": AccountType(row[5]),
                 "currency": row[6],
                 "is_active": bool(row[7]),
-                "created_at": row[8],
+                "created_at": _from_db_timestamp(row[8]),
             }
 
     @tenant_scoped
@@ -162,7 +190,7 @@ class LedgerKernel:
                 "type": AccountType(row[5]),
                 "currency": row[6],
                 "is_active": bool(row[7]),
-                "created_at": row[8],
+                "created_at": _from_db_timestamp(row[8]),
             }
 
     @tenant_scoped
@@ -174,7 +202,7 @@ class LedgerKernel:
             params: List[Any] = [tenant_id, company_id]
             if is_active is not None:
                 sql += " AND is_active = ?"
-                params.append(1 if is_active else 0)
+                params.append(_db_bool(is_active))
             sql += " ORDER BY code ASC"
             cur.execute(sql, tuple(params))
             rows = cur.fetchall()
@@ -188,7 +216,7 @@ class LedgerKernel:
                     "type": AccountType(r[5]),
                     "currency": r[6],
                     "is_active": bool(r[7]),
-                    "created_at": r[8],
+                    "created_at": _from_db_timestamp(r[8]),
                 }
                 for r in rows
             ]
@@ -232,7 +260,7 @@ class LedgerKernel:
                     description.strip(),
                     reversal_of_entry_id,
                     created_by,
-                    now,
+                    _db_timestamp(now),
                 ),
             )
             conn.commit()
@@ -356,13 +384,13 @@ class LedgerKernel:
                 "company_id": row[2],
                 "folio_id": row[3],
                 "entry_number": row[4],
-                "date": row[5],
+                "date": _from_db_date(row[5]),
                 "description": row[6],
                 "status": JournalEntryStatus(row[7]),
                 "reversal_of_entry_id": row[8],
                 "created_by": row[9],
-                "posted_at": row[10],
-                "created_at": row[11],
+                "posted_at": _from_db_timestamp(row[10]),
+                "created_at": _from_db_timestamp(row[11]),
                 "lines": [
                     {
                         "line_id": lr[0],
@@ -465,7 +493,7 @@ class LedgerKernel:
                 SET status = 'POSTED', posted_at = ?
                 WHERE entry_id = ? AND status = 'DRAFT'
                 """,
-                (now, entry_id),
+                (_db_timestamp(now), entry_id),
             )
             conn.commit()
 
@@ -620,7 +648,7 @@ class LedgerKernel:
 
             sql += " GROUP BY jl.account_id"
             cur.execute(sql, tuple(params))
-            totals_by_account = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+            totals_by_account = {row[0]: (int(row[1]), int(row[2])) for row in cur.fetchall()}
 
             grand_total_debits = 0
             grand_total_credits = 0

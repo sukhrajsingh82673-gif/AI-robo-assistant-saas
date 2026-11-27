@@ -55,6 +55,7 @@ allowed_step6_paths:
 remediated_step5_paths:
   - "PROJECT_MEMORY.md"
   - "api_server.py"
+  - "core/ledger/kernel.py"
   - "scripts/backup_restore_drill.py"
   - "core/adk/adapter.py"
   - "core/adk/coordinator.py"
