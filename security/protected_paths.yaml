@@ -54,6 +54,8 @@ allowed_step6_paths:
 # reviewed, fixed, and re-sealed in docs/baselines/STEP1-5_BASELINE.json.
 remediated_step5_paths:
   - "PROJECT_MEMORY.md"
+  - "api_server.py"
+  - "scripts/backup_restore_drill.py"
   - "core/adk/adapter.py"
   - "core/adk/coordinator.py"
   - "core/agent_import/sandbox_runner.py"
@@ -74,6 +76,7 @@ remediated_step5_paths:
   - "core/universal_terminal/security_gateway.py"
   - "tests/test_step3_agent_import.py"
   - "tests/test_step5_identity_access.py"
+  - "tests/test_overview_production.py"
 
   - "core/authority/profiles.py"
 

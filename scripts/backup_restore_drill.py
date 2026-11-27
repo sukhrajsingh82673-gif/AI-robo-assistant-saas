@@ -22,7 +22,7 @@ import uuid
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-from core.db import db
+from core.db import db, tenant_scope
 from core.documents.pipeline import DocumentPipeline
 from core.documents.schema import DocumentStatus
 from core.folios.manager import FolioManager
@@ -166,7 +166,8 @@ def main():
     company_id = f"cmp_drill_{uuid.uuid4().hex[:8]}"
 
     # Step 1: Seed Synthetic Data
-    pre_docs, pre_folios, pre_entries, pre_trial_balance = seed_synthetic_tenant_dataset(tenant_id, company_id)
+    with tenant_scope(tenant_id, company_id):
+        pre_docs, pre_folios, pre_entries, pre_trial_balance = seed_synthetic_tenant_dataset(tenant_id, company_id)
 
     tmp_dir = tempfile.mkdtemp(prefix="zonata_backup_drill_")
     is_pg = db.is_postgresql()
@@ -184,153 +185,154 @@ def main():
     ]
 
     try:
-        # Step 2: Take Snapshot / Backup
-        print("\n[*] Step 2: Taking tenant dataset snapshot...")
-        snapshot_records: Dict[str, List[Dict[str, Any]]] = {}
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            for tbl in TOPOLOGICAL_TABLES:
-                if tbl == "document_versions":
-                    cur.execute(
-                        "SELECT * FROM document_versions WHERE document_id IN (SELECT id FROM documents WHERE tenant_id = ?)",
-                        (tenant_id,),
-                    )
-                else:
-                    cur.execute(f"SELECT * FROM {tbl} WHERE tenant_id = ?", (tenant_id,))
-
-                col_names = [desc[0] for desc in cur.description] if cur.description else []
-                rows = cur.fetchall()
-                tbl_rows = []
-                for r in rows:
-                    if isinstance(r, dict):
-                        tbl_rows.append(dict(r))
-                    else:
-                        tbl_rows.append({col_names[idx]: r[idx] for idx in range(len(col_names))})
-                snapshot_records[tbl] = tbl_rows
-                print(f"  [+] Snapshotted {len(tbl_rows)} records from {tbl}")
-
-        dump_file = os.path.join(tmp_dir, "tenant_snapshot.json")
-        with open(dump_file, "w", encoding="utf-8") as f:
-            json.dump(snapshot_records, f, indent=2, default=str)
-        print(f"  [+] Tenant snapshot persisted to {dump_file} ({os.path.getsize(dump_file)} bytes)")
-
-        # Step 3: Purge / Drop Synthetic Tenant Records (Disaster Simulation)
-        print(f"\n[*] Step 3: Dropping tenant {tenant_id} records across all backbone tables...")
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            if is_pg:
-                cur.execute("TRUNCATE TABLE journal_lines, journal_entries, accounts, folio_entries, folios, document_events, document_versions, documents, blobs CASCADE;")
-            else:
-                cur.execute("DROP TRIGGER IF EXISTS trg_prevent_delete_posted_line")
-                cur.execute("DROP TRIGGER IF EXISTS trg_prevent_update_posted_line")
-                cur.execute("DROP TRIGGER IF EXISTS trg_prevent_delete_posted_entry")
-                cur.execute("DROP TRIGGER IF EXISTS trg_prevent_update_posted_entry")
-
-                # Reverse topological order purge
-                for tbl in reversed(TOPOLOGICAL_TABLES):
+        with tenant_scope(tenant_id, company_id):
+            # Step 2: Take Snapshot / Backup
+            print("\n[*] Step 2: Taking tenant dataset snapshot...")
+            snapshot_records: Dict[str, List[Dict[str, Any]]] = {}
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                for tbl in TOPOLOGICAL_TABLES:
                     if tbl == "document_versions":
                         cur.execute(
-                            "DELETE FROM document_versions WHERE document_id IN (SELECT id FROM documents WHERE tenant_id = ?)",
+                            "SELECT * FROM document_versions WHERE document_id IN (SELECT id FROM documents WHERE tenant_id = ?)",
                             (tenant_id,),
                         )
                     else:
-                        cur.execute(f"DELETE FROM {tbl} WHERE tenant_id = ?", (tenant_id,))
-            conn.commit()
+                        cur.execute(f"SELECT * FROM {tbl} WHERE tenant_id = ?", (tenant_id,))
 
-        # Verify tenant data is purged
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM documents WHERE tenant_id = ?", (tenant_id,))
-            assert cur.fetchone()[0] == 0, "Documents were not purged!"
-            cur.execute("SELECT COUNT(*) FROM folios WHERE tenant_id = ?", (tenant_id,))
-            assert cur.fetchone()[0] == 0, "Folios were not purged!"
-            cur.execute("SELECT COUNT(*) FROM journal_entries WHERE tenant_id = ?", (tenant_id,))
-            assert cur.fetchone()[0] == 0, "Journal entries were not purged!"
-        print("  [+] Verified all synthetic tenant records dropped (counts = 0).")
-
-        # Step 4: Restore from Snapshot
-        print(f"\n[*] Step 4: Restoring database from snapshot ({dump_file})...")
-        with open(dump_file, "r", encoding="utf-8") as f:
-            restored_records = json.load(f)
-
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            for tbl in TOPOLOGICAL_TABLES:
-                rows = restored_records.get(tbl, [])
-                if not rows:
-                    continue
-                cols = list(rows[0].keys())
-                placeholders = ", ".join(["?"] * len(cols))
-                col_str = ", ".join(cols)
-                insert_sql = f"INSERT INTO {tbl} ({col_str}) VALUES ({placeholders})"
-                for r in rows:
-                    vals = []
-                    for c in cols:
-                        v = r[c]
-                        if isinstance(v, (dict, list)):
-                            vals.append(json.dumps(v))
+                    col_names = [desc[0] for desc in cur.description] if cur.description else []
+                    rows = cur.fetchall()
+                    tbl_rows = []
+                    for r in rows:
+                        if isinstance(r, dict):
+                            tbl_rows.append(dict(r))
                         else:
-                            vals.append(v)
-                    cur.execute(insert_sql, tuple(vals))
-            conn.commit()
-        print("  [+] Database restoration completed.")
+                            tbl_rows.append({col_names[idx]: r[idx] for idx in range(len(col_names))})
+                    snapshot_records[tbl] = tbl_rows
+                    print(f"  [+] Snapshotted {len(tbl_rows)} records from {tbl}")
 
-        # Step 5: Byte-for-Byte Invariant Parity Verification
-        print("\n[*] Step 5: Verifying byte-for-byte SHA-256 digests and Merkle roots...")
+            dump_file = os.path.join(tmp_dir, "tenant_snapshot.json")
+            with open(dump_file, "w", encoding="utf-8") as f:
+                json.dump(snapshot_records, f, indent=2, default=str)
+            print(f"  [+] Tenant snapshot persisted to {dump_file} ({os.path.getsize(dump_file)} bytes)")
 
-        # 5a. Documents SHA-256 verification
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            for doc in pre_docs:
-                cur.execute(
-                    """
-                    SELECT d.id, b.sha256
-                    FROM documents d
-                    JOIN document_versions v ON d.current_version_id = v.id
-                    JOIN blobs b ON v.blob_id = b.id
-                    WHERE d.id = ? AND d.tenant_id = ?
-                    """,
-                    (doc["document_id"], tenant_id),
-                )
-                row = cur.fetchone()
-                assert row is not None, f"Document {doc['document_id']} missing after restore!"
-                restored_sha256 = row[1]
-                assert restored_sha256 == doc["sha256"], (
-                    f"SHA-256 mismatch for document {doc['document_id']}: expected {doc['sha256']}, got {restored_sha256}"
-                )
-        print(f"  [+] All {len(pre_docs)} documents verified with byte-for-byte SHA-256 match.")
+            # Step 3: Purge / Drop Synthetic Tenant Records (Disaster Simulation)
+            print(f"\n[*] Step 3: Dropping tenant {tenant_id} records across all backbone tables...")
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                if is_pg:
+                    cur.execute("TRUNCATE TABLE journal_lines, journal_entries, accounts, folio_entries, folios, document_events, document_versions, documents, blobs CASCADE;")
+                else:
+                    cur.execute("DROP TRIGGER IF EXISTS trg_prevent_delete_posted_line")
+                    cur.execute("DROP TRIGGER IF EXISTS trg_prevent_update_posted_line")
+                    cur.execute("DROP TRIGGER IF EXISTS trg_prevent_delete_posted_entry")
+                    cur.execute("DROP TRIGGER IF EXISTS trg_prevent_update_posted_entry")
 
-        # 5b. Folios Merkle root verification
-        with db.get_connection() as conn:
-            cur = conn.cursor()
-            for f in pre_folios:
-                cur.execute(
-                    "SELECT id, merkle_root, status FROM folios WHERE id = ? AND tenant_id = ?",
-                    (f["folio_id"], tenant_id),
-                )
-                row = cur.fetchone()
-                assert row is not None, f"Folio {f['folio_id']} missing after restore!"
-                restored_merkle_root = row[1]
-                assert restored_merkle_root == f["merkle_root"], (
-                    f"Merkle root mismatch for folio {f['folio_id']}: expected {f['merkle_root']}, got {restored_merkle_root}"
-                )
-        print(f"  [+] All {len(pre_folios)} folios verified with byte-for-byte Merkle root match.")
+                    # Reverse topological order purge
+                    for tbl in reversed(TOPOLOGICAL_TABLES):
+                        if tbl == "document_versions":
+                            cur.execute(
+                                "DELETE FROM document_versions WHERE document_id IN (SELECT id FROM documents WHERE tenant_id = ?)",
+                                (tenant_id,),
+                            )
+                        else:
+                            cur.execute(f"DELETE FROM {tbl} WHERE tenant_id = ?", (tenant_id,))
+                conn.commit()
 
-        # 5c. Ledger 50 journal entries & Trial balance verification
-        ledger = LedgerKernel()
-        restored_trial = ledger.generate_trial_balance(tenant_id, company_id, "USD", as_of_date=date.today().isoformat())
-        assert restored_trial["is_balanced"] is True
-        assert restored_trial["total_debits"] == pre_trial_balance["total_debits"]
-        assert restored_trial["total_credits"] == pre_trial_balance["total_credits"]
-        print(f"  [+] All {len(pre_entries)} journal entries verified with net zero trial balance.")
+            # Verify tenant data is purged
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM documents WHERE tenant_id = ?", (tenant_id,))
+                assert cur.fetchone()[0] == 0, "Documents were not purged!"
+                cur.execute("SELECT COUNT(*) FROM folios WHERE tenant_id = ?", (tenant_id,))
+                assert cur.fetchone()[0] == 0, "Folios were not purged!"
+                cur.execute("SELECT COUNT(*) FROM journal_entries WHERE tenant_id = ?", (tenant_id,))
+                assert cur.fetchone()[0] == 0, "Journal entries were not purged!"
+            print("  [+] Verified all synthetic tenant records dropped (counts = 0).")
 
-        print("\n" + "=" * 70)
-        print("[BACKUP_RESTORE_DRILL_VERIFIED] 100% byte-for-byte parity confirmed.")
-        print("  - Documents Verified: 10/10 (SHA-256 parity)")
-        print("  - Folios Verified: 3/3 (Merkle root parity)")
-        print("  - Ledger Journal Entries: 50/50 (Double-entry balance parity)")
-        print("=" * 70)
-        return 0
+            # Step 4: Restore from Snapshot
+            print(f"\n[*] Step 4: Restoring database from snapshot ({dump_file})...")
+            with open(dump_file, "r", encoding="utf-8") as f:
+                restored_records = json.load(f)
+
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                for tbl in TOPOLOGICAL_TABLES:
+                    rows = restored_records.get(tbl, [])
+                    if not rows:
+                        continue
+                    cols = list(rows[0].keys())
+                    placeholders = ", ".join(["?"] * len(cols))
+                    col_str = ", ".join(cols)
+                    insert_sql = f"INSERT INTO {tbl} ({col_str}) VALUES ({placeholders})"
+                    for r in rows:
+                        vals = []
+                        for c in cols:
+                            v = r[c]
+                            if isinstance(v, (dict, list)):
+                                vals.append(json.dumps(v))
+                            else:
+                                vals.append(v)
+                        cur.execute(insert_sql, tuple(vals))
+                conn.commit()
+            print("  [+] Database restoration completed.")
+
+            # Step 5: Byte-for-Byte Invariant Parity Verification
+            print("\n[*] Step 5: Verifying byte-for-byte SHA-256 digests and Merkle roots...")
+
+            # 5a. Documents SHA-256 verification
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                for doc in pre_docs:
+                    cur.execute(
+                        """
+                        SELECT d.id, b.sha256
+                        FROM documents d
+                        JOIN document_versions v ON d.current_version_id = v.id
+                        JOIN blobs b ON v.blob_id = b.id
+                        WHERE d.id = ? AND d.tenant_id = ?
+                        """,
+                        (doc["document_id"], tenant_id),
+                    )
+                    row = cur.fetchone()
+                    assert row is not None, f"Document {doc['document_id']} missing after restore!"
+                    restored_sha256 = row[1]
+                    assert restored_sha256 == doc["sha256"], (
+                        f"SHA-256 mismatch for document {doc['document_id']}: expected {doc['sha256']}, got {restored_sha256}"
+                    )
+            print(f"  [+] All {len(pre_docs)} documents verified with byte-for-byte SHA-256 match.")
+
+            # 5b. Folios Merkle root verification
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                for f in pre_folios:
+                    cur.execute(
+                        "SELECT id, merkle_root, status FROM folios WHERE id = ? AND tenant_id = ?",
+                        (f["folio_id"], tenant_id),
+                    )
+                    row = cur.fetchone()
+                    assert row is not None, f"Folio {f['folio_id']} missing after restore!"
+                    restored_merkle_root = row[1]
+                    assert restored_merkle_root == f["merkle_root"], (
+                        f"Merkle root mismatch for folio {f['folio_id']}: expected {f['merkle_root']}, got {restored_merkle_root}"
+                    )
+            print(f"  [+] All {len(pre_folios)} folios verified with byte-for-byte Merkle root match.")
+
+            # 5c. Ledger 50 journal entries & Trial balance verification
+            ledger = LedgerKernel()
+            restored_trial = ledger.generate_trial_balance(tenant_id, company_id, "USD", as_of_date=date.today().isoformat())
+            assert restored_trial["is_balanced"] is True
+            assert restored_trial["total_debits"] == pre_trial_balance["total_debits"]
+            assert restored_trial["total_credits"] == pre_trial_balance["total_credits"]
+            print(f"  [+] All {len(pre_entries)} journal entries verified with net zero trial balance.")
+
+            print("\n" + "=" * 70)
+            print("[BACKUP_RESTORE_DRILL_VERIFIED] 100% byte-for-byte parity confirmed.")
+            print("  - Documents Verified: 10/10 (SHA-256 parity)")
+            print("  - Folios Verified: 3/3 (Merkle root parity)")
+            print("  - Ledger Journal Entries: 50/50 (Double-entry balance parity)")
+            print("=" * 70)
+            return 0
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

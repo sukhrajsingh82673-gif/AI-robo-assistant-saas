@@ -189,22 +189,34 @@ def run_scenario() -> Dict[str, Any]:
     company_beta = "company_beta"
 
     # Clean previous run state for deterministic repeatability
-    with db.get_connection() as conn:
-        cur = conn.cursor()
-        for t_id in [tenant_alpha, tenant_beta]:
-            for tbl in [
-                "journal_lines", "journal_entries", "accounts",
-                "folio_entries", "folios",
-                "share_links", "access_grants", "extractions", "classifications",
-                "document_versions", "document_events", "documents", "blobs",
-                "installed_industry_packs", "company_folio_types",
-                "outbox_events"
-            ]:
-                try:
-                    cur.execute(f"DELETE FROM {tbl} WHERE tenant_id = ?", (t_id,))
-                except Exception:
-                    pass
-        conn.commit()
+    doc_child_tables = {"extractions", "classifications", "document_versions"}
+    cleanup_tables = [
+        "journal_lines", "journal_entries", "accounts",
+        "folio_entries", "folios",
+        "share_links", "access_grants", "extractions", "classifications",
+        "document_versions", "document_events", "documents", "blobs",
+        "installed_industry_packs", "company_folio_types",
+        "outbox_events"
+    ]
+    for t_id, c_id in [(tenant_alpha, company_alpha), (tenant_beta, company_beta)]:
+        with tenant_scope(t_id, c_id):
+            with db.get_connection() as conn:
+                cur = conn.cursor()
+                for tbl in cleanup_tables:
+                    try:
+                        if tbl in doc_child_tables:
+                            cur.execute(
+                                f"DELETE FROM {tbl} WHERE document_id IN (SELECT id FROM documents WHERE tenant_id = ?)",
+                                (t_id,),
+                            )
+                        else:
+                            cur.execute(f"DELETE FROM {tbl} WHERE tenant_id = ?", (t_id,))
+                        conn.commit()
+                    except Exception:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
 
     ledger = LedgerKernel()
     pack_loader = IndustryPackLoader(ledger_kernel=ledger)
@@ -274,18 +286,19 @@ def run_scenario() -> Dict[str, Any]:
     print(f"  [+] Ingested 5 documents for Tenant Beta (statuses: {[r.status.value for r in ingested_beta.values()]})")
 
     # Verify untrusted tagging on prompt injection
-    with db.get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT trust, metadata_json FROM extractions WHERE document_id = ?",
-            (ingested_alpha["adversarial_memo.txt"].document_id,),
-        )
-        inj_row = cur.fetchone()
-        assert inj_row is not None, "Extraction row missing for adversarial memo"
-        assert inj_row[0] == "UNTRUSTED", f"Adversarial document trust was {inj_row[0]}, expected UNTRUSTED"
-        inj_meta = json.loads(inj_row[1]) if isinstance(inj_row[1], str) else inj_row[1]
-        assert inj_meta.get("prompt_injection_detected") is True, "Prompt injection not detected"
-        print(f"  [+] Prompt injection defense verified: trust=UNTRUSTED, match={inj_meta.get('injection_matches')}")
+    with tenant_scope(tenant_alpha, company_alpha):
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT trust, metadata_json FROM extractions WHERE document_id = ?",
+                (ingested_alpha["adversarial_memo.txt"].document_id,),
+            )
+            inj_row = cur.fetchone()
+            assert inj_row is not None, "Extraction row missing for adversarial memo"
+            assert inj_row[0] == "UNTRUSTED", f"Adversarial document trust was {inj_row[0]}, expected UNTRUSTED"
+            inj_meta = json.loads(inj_row[1]) if isinstance(inj_row[1], str) else inj_row[1]
+            assert inj_meta.get("prompt_injection_detected") is True, "Prompt injection not detected"
+            print(f"  [+] Prompt injection defense verified: trust=UNTRUSTED, match={inj_meta.get('injection_matches')}")
 
     report["steps"]["step3_documents"] = {
         "status": "PASSED",
@@ -535,11 +548,12 @@ def run_scenario() -> Dict[str, Any]:
     print("\n[*] Step 9: Enforcing Multi-Tenant Cross-Isolation Invariants...")
 
     # 1. Folio Cross-Tenant Read Check
-    with db.get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT id FROM folios WHERE id = ? AND tenant_id = ?", (folio_alpha_id, tenant_beta))
-        cross_folio = cur.fetchone()
-        assert cross_folio is None, "Cross-tenant folio read was permitted"
+    with tenant_scope(tenant_beta, company_beta):
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM folios WHERE id = ? AND tenant_id = ?", (folio_alpha_id, tenant_beta))
+            cross_folio = cur.fetchone()
+            assert cross_folio is None, "Cross-tenant folio read was permitted"
     print("  [+] Folio Isolation: Tenant Beta cannot query Tenant Alpha folios (returns None).")
 
     # 2. Document Cross-Tenant Access Check

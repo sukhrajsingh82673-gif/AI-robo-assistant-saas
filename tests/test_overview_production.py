@@ -37,6 +37,8 @@ class TestOverviewProductionRebuild(unittest.TestCase):
             shutil.copy2(src_baseline, cls.isolated_db)
         os.environ["ZONATA_DB_PATH"] = cls.isolated_db
         db.set_db_path(cls.isolated_db)
+        from tests.schema_bootstrap import seed_baseline_tenant_scope
+        seed_baseline_tenant_scope()
 
         src_evidence = os.path.join(BASE_DIR, "storage", "evidence", "audit_ledger.jsonl")
         cls.isolated_ev = os.path.join(cls.temp_dir.name, "audit_ledger_copy.jsonl")

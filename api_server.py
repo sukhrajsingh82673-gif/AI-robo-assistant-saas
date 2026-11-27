@@ -47,7 +47,7 @@ from core.evidence_ledger import EvidenceLedger
 from core.control_kernel import UniversalControlKernel
 from core.tool_fabric import CapabilityRegistry
 from core.workforce import DynamicAgentFactory
-from core.db import db
+from core.db import db, DatabaseDialect
 from core.auth import TenantManager, UserManager, AuthorizationEnforcer, UserRole, AuthExceptions, TokenRevocationStore
 from core.departments import DepartmentControlUnit
 from core.approvals import ApprovalPipeline

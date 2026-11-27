@@ -314,8 +314,8 @@
       "is_symlink": false
     },
     "api_server.py": {
-      "sha256": "ba45c10913e3b1dd2328eb9a5fbc265cd7307faf4edd520b5545eae8811717d0",
-      "size": 512336,
+      "sha256": "8dad643aab983027f3f4c4d43f4f9d5fdc25150a173e4e27ce131cdd29930153",
+      "size": 512353,
       "is_symlink": false
     },
     "cli.py": {
@@ -7704,8 +7704,8 @@
       "is_symlink": false
     },
     "scripts/backup_restore_drill.py": {
-      "sha256": "764fc08213b8da15197c17911ab364f745d9b3394d363e32c1b58b49792880e4",
-      "size": 14745,
+      "sha256": "c90de7c502c334ffb64a686ac319a254fe347103ea3995783aa9686aae9d3137",
+      "size": 15399,
       "is_symlink": false
     },
     "scripts/deduplicate_database.py": {
@@ -7789,8 +7789,8 @@
       "is_symlink": false
     },
     "scripts/step1_scenario.py": {
-      "sha256": "c3687c8e00ea086c6bbea5d13a5891fd4a10246d5dbb3855bc88dd1044a5fb25",
-      "size": 32523,
+      "sha256": "53f1ab001accc6cee92b1e4a65cc110c4152a684f7059ba3172eeadafb5160b5",
+      "size": 33317,
       "is_symlink": false
     },
     "scripts/step2_audit_results.json": {
@@ -8679,8 +8679,8 @@
       "is_symlink": false
     },
     "tests/test_overview_production.py": {
-      "sha256": "36cb4286ea095f9de0781c471a928a47e5f324aaac2ec490bab7effdc17d4de2",
-      "size": 15785,
+      "sha256": "4e8e073c0219848013c904aab549410d53a648440ebd73f0a0979f0d6cf1c8b7",
+      "size": 15892,
       "is_symlink": false
     },
     "tests/test_phase_11_governance_qualification.py": {
@@ -9768,5 +9768,6 @@
       "size": 1791,
       "is_symlink": false
     }
-  }
+  },
+  "remediation_revision": "security-hardening-2026-11-26"
 }
